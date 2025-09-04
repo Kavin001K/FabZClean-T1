@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Filter, Plus, Package, AlertTriangle, CheckCircle } from "lucide-react";
+import { Search, Filter, Plus, Package, AlertTriangle, CheckCircle, Brain, TrendingUp, Zap, Target, BarChart3, Clock } from "lucide-react";
 import { getStockStatusColor, getStockStatusText, formatCurrency } from "@/lib/data";
 import type { Product } from "@shared/schema";
 
@@ -69,15 +69,112 @@ export default function Inventory() {
 
   return (
     <div className="p-8" data-testid="inventory-page">
+      {/* Intelligence Command Center Header */}
       <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="font-display font-bold text-3xl text-foreground">Inventory</h1>
-          <p className="text-muted-foreground mt-1">Manage products and stock levels</p>
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl flex items-center justify-center">
+            <Brain className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <h1 className="font-display font-bold text-3xl text-foreground">Inventory Intelligence</h1>
+              <div className="status-indicator-enhanced bg-green-500"></div>
+              <span className="text-sm text-muted-foreground">AI Active</span>
+            </div>
+            <p className="text-muted-foreground">Predictive analytics and intelligent stock management</p>
+          </div>
         </div>
-        <Button data-testid="add-product">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Product
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" data-testid="ai-insights">
+            <Zap className="w-4 h-4 mr-2" />
+            AI Insights
+          </Button>
+          <Button data-testid="add-product">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Product
+          </Button>
+        </div>
+      </div>
+
+      {/* AI Predictive Analytics Banner */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <Card className="bento-card lg:col-span-2 animate-fade-in">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Demand Forecast</h3>
+                  <p className="text-sm text-muted-foreground">Next 30 days prediction</p>
+                </div>
+              </div>
+              <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                94% Accuracy
+              </Badge>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Dry Cleaning Services</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="w-4/5 h-full bg-blue-500 rounded-full"></div>
+                  </div>
+                  <span className="text-sm font-medium">+18%</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Laundry Detergents</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="w-3/5 h-full bg-green-500 rounded-full"></div>
+                  </div>
+                  <span className="text-sm font-medium">+12%</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Fabric Softeners</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="w-2/5 h-full bg-yellow-500 rounded-full"></div>
+                  </div>
+                  <span className="text-sm font-medium">+8%</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bento-card animate-fade-in" style={{ animationDelay: "0.1s" }}>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-orange-500/20 to-orange-600/10 rounded-lg flex items-center justify-center">
+                <Target className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Restock Alerts</h3>
+                <p className="text-sm text-muted-foreground">AI recommendations</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-red-700 dark:text-red-400">Critical</p>
+                  <p className="text-xs text-red-600 dark:text-red-500">3 items need restocking</p>
+                </div>
+                <AlertTriangle className="w-4 h-4 text-red-500" />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">Warning</p>
+                  <p className="text-xs text-yellow-600 dark:text-yellow-500">5 items low stock</p>
+                </div>
+                <Clock className="w-4 h-4 text-yellow-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Inventory Overview */}

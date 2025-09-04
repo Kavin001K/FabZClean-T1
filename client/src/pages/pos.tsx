@@ -92,15 +92,15 @@ export default function POS() {
   );
 
   return (
-    <div className="p-8" data-testid="pos-page">
+    <div className="p-8 animate-fade-in" data-testid="pos-page">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-display font-bold text-3xl text-foreground">Point of Sale</h1>
-          <p className="text-muted-foreground mt-1">Process sales transactions and manage payments</p>
+          <h1 className="text-expressive text-4xl text-foreground mb-2">Point of Sale</h1>
+          <p className="text-muted-foreground text-lg">Touch-optimized transaction processing</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="status-indicator status-online"></div>
-          <span className="text-sm text-muted-foreground">POS System Online</span>
+        <div className="flex items-center gap-3">
+          <div className="status-indicator-enhanced bg-green-500"></div>
+          <span className="text-sm font-medium text-foreground">POS System Online</span>
         </div>
       </div>
 
@@ -184,23 +184,52 @@ export default function POS() {
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredProducts.map((product) => (
                     <div 
                       key={product.id}
-                      className="p-4 border border-border rounded-lg hover:shadow-md transition-shadow cursor-pointer"
+                      className="pos-product-card interactive-press animate-scale-in"
                       onClick={() => addToCart(product)}
                       data-testid={`pos-product-${product.sku}`}
+                      style={{ animationDelay: `${filteredProducts.indexOf(product) * 0.05}s` }}
                     >
-                      <h3 className="font-medium text-foreground mb-1">{product.name}</h3>
-                      <p className="text-sm text-muted-foreground mb-2">{product.sku}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-lg text-foreground">
-                          {formatCurrency(parseFloat(product.price))}
+                      {/* Product Image Placeholder */}
+                      <div className="w-16 h-16 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl flex items-center justify-center mb-4 mx-auto">
+                        <span className="text-2xl font-bold text-primary">
+                          {product.name.charAt(0)}
                         </span>
-                        <Badge variant={product.stockQuantity > 0 ? "default" : "destructive"}>
-                          {product.stockQuantity > 0 ? "In Stock" : "Out of Stock"}
-                        </Badge>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <h3 className="font-semibold text-foreground text-center leading-tight">
+                          {product.name}
+                        </h3>
+                        <p className="text-xs text-muted-foreground text-center">
+                          SKU: {product.sku}
+                        </p>
+                        
+                        <div className="flex items-center justify-between pt-2">
+                          <span className="font-display font-bold text-xl text-foreground">
+                            {formatCurrency(parseFloat(product.price))}
+                          </span>
+                          <Badge 
+                            variant={product.stockQuantity > 0 ? "default" : "destructive"}
+                            className="text-xs"
+                          >
+                            {product.stockQuantity > 0 ? "In Stock" : "Out of Stock"}
+                          </Badge>
+                        </div>
+                        
+                        {/* Stock indicator */}
+                        <div className="flex items-center justify-center gap-1 pt-1">
+                          <div className={`w-2 h-2 rounded-full ${
+                            product.stockQuantity > 10 ? 'bg-green-500' :
+                            product.stockQuantity > 0 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}></div>
+                          <span className="text-xs text-muted-foreground">
+                            {product.stockQuantity} available
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -243,27 +272,30 @@ export default function POS() {
                         <Button
                           size="sm"
                           variant="outline"
+                          className="pos-touch-target interactive-press"
                           onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
                           data-testid={`decrease-quantity-${item.product.sku}`}
                         >
-                          <Minus className="w-3 h-3" />
+                          <Minus className="w-4 h-4" />
                         </Button>
-                        <span className="w-8 text-center font-medium">{item.quantity}</span>
+                        <span className="w-12 text-center font-semibold text-lg">{item.quantity}</span>
                         <Button
                           size="sm"
                           variant="outline"
+                          className="pos-touch-target interactive-press"
                           onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
                           data-testid={`increase-quantity-${item.product.sku}`}
                         >
-                          <Plus className="w-3 h-3" />
+                          <Plus className="w-4 h-4" />
                         </Button>
                         <Button
                           size="sm"
                           variant="destructive"
+                          className="pos-touch-target interactive-press"
                           onClick={() => removeFromCart(item.product.id)}
                           data-testid={`remove-item-${item.product.sku}`}
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                     </div>
@@ -280,28 +312,36 @@ export default function POS() {
                       <span className="text-muted-foreground">Tax:</span>
                       <span className="font-medium">{formatCurrency(cartTotal * 0.08)}</span>
                     </div>
-                    <div className="flex justify-between text-lg font-bold">
+                    <div className="flex justify-between text-2xl font-bold">
                       <span>Total:</span>
-                      <span data-testid="cart-total">{formatCurrency(cartTotal * 1.08)}</span>
+                      <span>{formatCurrency(total)}</span>
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-6">
+                    {/* Payment Methods */}
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-foreground">Payment Method</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="pos-payment-method selected">
+                          <CreditCard className="w-5 h-5 text-primary" />
+                          <span className="font-medium">Card</span>
+                        </div>
+                        <div className="pos-payment-method">
+                          <DollarSign className="w-5 h-5 text-muted-foreground" />
+                          <span className="font-medium">Cash</span>
+                        </div>
+                      </div>
+                    </div>
+                    
                     <Button 
-                      className="w-full" 
-                      onClick={processPayment}
-                      data-testid="process-payment"
+                      className="pos-checkout-button interactive-press"
+                      onClick={handleCheckout}
+                      disabled={cart.length === 0}
+                      data-testid="pos-checkout-button"
                     >
-                      <CreditCard className="w-4 h-4 mr-2" />
+                      <CreditCard className="w-5 h-5 mr-2" />
                       Process Payment
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={clearCart}
-                      data-testid="clear-cart"
-                    >
-                      Clear Cart
                     </Button>
                   </div>
                 </div>

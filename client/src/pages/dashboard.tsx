@@ -24,9 +24,27 @@ export default function Dashboard() {
   });
 
   return (
-    <div className="p-8" data-testid="dashboard-page">
-      {/* KPI Banner */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div className="p-8 animate-fade-in" data-testid="dashboard-page">
+      {/* Command Center Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-expressive text-4xl text-foreground mb-2">
+              Unified Command Center
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Real-time business intelligence and operational oversight
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="status-indicator-enhanced bg-green-500"></div>
+            <span className="text-sm font-medium text-foreground">All Systems Operational</span>
+          </div>
+        </div>
+      </div>
+
+      {/* KPI Banner - Enhanced Bento Box Layout */}
+      <div className="kpi-banner animate-slide-up">
         <KPICard
           title="Total Revenue"
           value={metrics ? formatCurrency(metrics.totalRevenue) : "$0"}
@@ -65,21 +83,23 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Main Dashboard Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Sales Chart - spans 2 columns */}
-        <SalesChart />
+      {/* Main Command Center Grid - Enhanced Bento Box Layout */}
+      <div className="command-center-grid animate-slide-up" style={{ animationDelay: '0.1s' }}>
+        {/* Sales Chart - Primary Focus Area */}
+        <div className="lg:col-span-2">
+          <SalesChart />
+        </div>
         
-        {/* Recent Orders */}
+        {/* Live Order Feed */}
         <RecentOrders />
         
-        {/* Inventory Status */}
+        {/* Inventory Intelligence */}
         <InventoryStatus />
         
-        {/* Delivery Tracking */}
+        {/* Logistics Snapshot */}
         <DeliveryTracking />
         
-        {/* POS Integration */}
+        {/* POS Integration Hub */}
         <POSIntegration />
       </div>
     </div>

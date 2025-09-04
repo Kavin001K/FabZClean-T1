@@ -54,21 +54,21 @@
 }
 
 .dark {
-  /* Dark Mode Colors */
+  /* Dark Mode Colors - Optimized for readability */
   --background: hsl(222, 16%, 7%);
-  --foreground: hsl(0, 0%, 87%);
+  --foreground: rgba(255, 255, 255, 0.87);
   --card: hsl(222, 13%, 11%);
-  --card-foreground: hsl(0, 0%, 87%);
+  --card-foreground: rgba(255, 255, 255, 0.87);
   --popover: hsl(222, 13%, 11%);
-  --popover-foreground: hsl(0, 0%, 87%);
+  --popover-foreground: rgba(255, 255, 255, 0.87);
   --primary: hsl(217, 91%, 67%);
   --primary-foreground: hsl(222, 16%, 7%);
   --secondary: hsl(217, 10%, 15%);
-  --secondary-foreground: hsl(0, 0%, 60%);
+  --secondary-foreground: rgba(255, 255, 255, 0.60);
   --muted: hsl(217, 10%, 15%);
-  --muted-foreground: hsl(0, 0%, 60%);
+  --muted-foreground: rgba(255, 255, 255, 0.60);
   --accent: hsl(217, 10%, 15%);
-  --accent-foreground: hsl(0, 0%, 87%);
+  --accent-foreground: rgba(255, 255, 255, 0.87);
   --destructive: hsl(0, 63%, 71%);
   --destructive-foreground: hsl(222, 16%, 7%);
   --border: hsl(217, 10%, 15%);
@@ -80,17 +80,26 @@
   --chart-4: hsl(280, 65%, 70%);
   --chart-5: hsl(15, 85%, 70%);
   --sidebar: hsl(228, 9.8039%, 10%);
-  --sidebar-foreground: hsl(0, 0%, 85.0980%);
+  --sidebar-foreground: rgba(255, 255, 255, 0.85);
   --sidebar-primary: hsl(202.8169, 89.1213%, 53.1373%);
   --sidebar-primary-foreground: hsl(0, 0%, 100%);
   --sidebar-accent: hsl(205.7143, 70%, 7.8431%);
   --sidebar-accent-foreground: hsl(203.7736, 87.6033%, 52.5490%);
   --sidebar-border: hsl(205.7143, 15.7895%, 26.0784%);
   --sidebar-ring: hsl(202.8169, 89.1213%, 53.1373%);
-  --font-sans: "Inter", system-ui, sans-serif;
-  --font-display: "Poppins", "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
-  --radius: 12px;
+  
+  /* Dark mode semantic colors - desaturated */
+  --color-success: hsl(142, 71%, 55%);
+  --color-warning: hsl(43, 96%, 60%);
+  --color-error: hsl(0, 63%, 71%);
+  --color-info: hsl(217, 91%, 67%);
+  
+  /* Enhanced shadows for dark mode - using layered surfaces */
+  --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-soft: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  --shadow-medium: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  --shadow-large: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
 }
 
 @layer base {
@@ -108,16 +117,53 @@
 }
 
 @layer components {
+  /* Enhanced Bento Box Cards with Evolved Minimalism */
   .bento-card {
-    @apply bg-card border border-border rounded-lg shadow-sm transition-all duration-200 ease-in-out;
+    @apply bg-card border border-border rounded-xl transition-all duration-300 ease-out;
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(8px);
   }
 
   .bento-card:hover {
-    @apply shadow-md transform -translate-y-0.5;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-medium);
   }
 
+  .bento-card-interactive {
+    @apply bento-card cursor-pointer;
+  }
+
+  .bento-card-interactive:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-large);
+  }
+
+  .bento-card-interactive:active {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-soft);
+  }
+
+  /* Enhanced Metric Cards with Selective Tangibility */
   .metric-card {
-    @apply bg-gradient-to-br from-card to-muted/50 border border-border rounded-lg shadow-sm;
+    @apply bg-gradient-to-br from-card via-card to-muted/30 border border-border rounded-xl;
+    box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    position: relative;
+  }
+
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    border-radius: 12px 12px 0 0;
+  }
+
+  .dark .metric-card {
+    @apply bg-gradient-to-br from-card via-card to-muted/20;
+    box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
   .status-indicator {
@@ -144,13 +190,106 @@
     box-shadow: 0 0 0 2px hsla(0, 63%, 71%, 0.2);
   }
 
+  /* Enhanced Glass Effect */
   .glass-effect {
-    backdrop-filter: blur(8px);
-    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px) saturate(180%);
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.2);
   }
 
   .dark .glass-effect {
-    background: rgba(30, 30, 30, 0.95);
+    background: rgba(17, 17, 17, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Command Center Specific Styles */
+  .command-center-grid {
+    @apply grid gap-6;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+
+  .kpi-banner {
+    @apply grid gap-6 mb-8;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+
+  /* Enhanced Status Indicators with Glow */
+  .status-indicator-enhanced {
+    @apply w-3 h-3 rounded-full relative;
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  /* POS Touch-Friendly Elements */
+  .pos-touch-target {
+    @apply min-h-[44px] min-w-[44px] touch-manipulation;
+  }
+
+  .pos-product-card {
+    @apply p-6 border border-border rounded-xl hover:shadow-lg transition-all duration-200 cursor-pointer bg-card/50 backdrop-blur-sm;
+    @apply hover:border-primary/20 hover:bg-card/80;
+    @apply active:scale-[0.98] active:shadow-md;
+  }
+
+  .pos-product-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .pos-checkout-button {
+    @apply w-full h-14 text-lg font-semibold rounded-xl transition-all duration-200;
+    @apply bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary;
+    @apply shadow-lg hover:shadow-xl active:scale-[0.98];
+  }
+
+  /* Kanban Board Styles */
+  .kanban-order-card {
+    @apply bg-card/60 backdrop-blur-sm transition-all duration-200;
+    @apply hover:bg-card/80 hover:scale-[1.02] hover:shadow-md;
+    @apply border border-border/40 hover:border-primary/30;
+  }
+
+  .kanban-order-card:hover {
+    transform: translateY(-1px) scale(1.02);
+  }
+
+  /* Order Lifecycle Management Enhancements */
+  .order-status-column {
+    @apply min-h-[400px] bg-muted/30 rounded-lg p-4;
+  }
+
+  .order-card-drag {
+    @apply cursor-grab active:cursor-grabbing;
+    @apply transition-transform duration-150 ease-out;
+  }
+
+  .order-card-drag:hover {
+    @apply shadow-lg;
+    transform: translateY(-2px);
+  }
+
+  .pos-payment-method {
+    @apply p-4 border-2 border-border rounded-xl cursor-pointer transition-all duration-200;
+    @apply hover:border-primary/50 hover:bg-primary/5;
+    @apply flex items-center gap-3 min-h-[60px];
+  }
+
+  .pos-payment-method.selected {
+    @apply border-primary bg-primary/10;
+  }
+
+  /* Data Visualization Enhancements */
+  .chart-container-enhanced {
+    @apply relative;
+    height: 400px;
+  }
+
+  .chart-tooltip {
+    @apply bg-card border border-border rounded-lg shadow-lg p-3;
+    backdrop-filter: blur(8px);
   }
 
   .sidebar-item {
@@ -165,5 +304,70 @@
 @layer utilities {
   .chart-container {
     @apply relative h-72;
+  }
+
+  /* Typography Utilities */
+  .text-display {
+    font-family: var(--font-display);
+  }
+
+  .text-expressive {
+    @apply text-display font-bold tracking-tight;
+  }
+
+  /* Spacing Utilities */
+  .space-xs { margin: var(--spacing-xs); }
+  .space-sm { margin: var(--spacing-sm); }
+  .space-md { margin: var(--spacing-md); }
+  .space-lg { margin: var(--spacing-lg); }
+  .space-xl { margin: var(--spacing-xl); }
+
+  /* Animation Utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { 
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to { 
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from { 
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to { 
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Interactive States */
+  .interactive-press {
+    @apply transition-transform duration-100 ease-out;
+  }
+
+  .interactive-press:active {
+    transform: scale(0.98);
   }
 }

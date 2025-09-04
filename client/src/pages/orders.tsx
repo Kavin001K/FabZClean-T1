@@ -5,14 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Filter, Plus } from "lucide-react";
+import { Search, Filter, Plus, List, Kanban, Calendar, Clock, User, DollarSign, Package } from "lucide-react";
 import { formatCurrency, getStatusColor } from "@/lib/data";
 import { formatDistanceToNow } from "date-fns";
 import type { Order } from "@shared/schema";
 
+type ViewMode = "list" | "kanban" | "calendar";
+
 export default function Orders() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   const { data: orders, isLoading } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
@@ -29,6 +32,14 @@ export default function Orders() {
     acc[order.status] = (acc[order.status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>) || {};
+
+  // Organize orders by status for Kanban view
+  const kanbanColumns = [
+    { id: "pending", title: "Pending Orders", color: "bg-yellow-500", orders: filteredOrders.filter(order => order.status === "pending") },
+    { id: "processing", title: "In Processing", color: "bg-blue-500", orders: filteredOrders.filter(order => order.status === "processing") },
+    { id: "ready", title: "Ready for Pickup", color: "bg-purple-500", orders: filteredOrders.filter(order => order.status === "ready") },
+    { id: "completed", title: "Completed", color: "bg-green-500", orders: filteredOrders.filter(order => order.status === "completed") }
+  ];
 
   if (isLoading) {
     return (
@@ -55,13 +66,45 @@ export default function Orders() {
     <div className="p-8" data-testid="orders-page">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-display font-bold text-3xl text-foreground">Orders</h1>
-          <p className="text-muted-foreground mt-1">Manage customer orders and fulfillment</p>
+          <h1 className="font-display font-bold text-3xl text-foreground">Order Lifecycle Management</h1>
+          <p className="text-muted-foreground mt-1">Track orders through their complete lifecycle with intelligent workflow management</p>
         </div>
-        <Button data-testid="create-order">
-          <Plus className="w-4 h-4 mr-2" />
-          New Order
-        </Button>
+        <div className="flex items-center gap-4">
+          {/* View Mode Toggle */}
+          <div className="flex items-center bg-muted rounded-lg p-1">
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className="h-8 px-3"
+            >
+              <List className="w-4 h-4 mr-1" />
+              List
+            </Button>
+            <Button
+              variant={viewMode === "kanban" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("kanban")}
+              className="h-8 px-3"
+            >
+              <Kanban className="w-4 h-4 mr-1" />
+              Kanban
+            </Button>
+            <Button
+              variant={viewMode === "calendar" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("calendar")}
+              className="h-8 px-3"
+            >
+              <Calendar className="w-4 h-4 mr-1" />
+              Calendar
+            </Button>
+          </div>
+          <Button data-testid="create-order">
+            <Plus className="w-4 h-4 mr-2" />
+            New Order
+          </Button>
+        </div>
       </div>
 
       {/* Order Status Overview */}
@@ -123,81 +166,166 @@ export default function Orders() {
         </Card>
       </div>
 
-      {/* Orders Table */}
-      <Card className="bento-card">
-        <CardHeader>
-          <div className="flex items-center justify-between">
+      {/* Search and Filter Controls */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search orders..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-64"
+              data-testid="search-orders"
+            />
+          </div>
+          <Button variant="outline" size="sm" data-testid="filter-orders">
+            <Filter className="w-4 h-4 mr-2" />
+            Filter
+          </Button>
+        </div>
+      </div>
+
+      {/* Conditional View Rendering */}
+      {viewMode === "list" && (
+        <Card className="bento-card">
+          <CardHeader>
             <CardTitle className="font-display font-semibold text-xl text-foreground">
               All Orders
             </CardTitle>
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search orders..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64"
-                  data-testid="search-orders"
-                />
-              </div>
-              <Button variant="outline" size="sm" data-testid="filter-orders">
-                <Filter className="w-4 h-4 mr-2" />
-                Filter
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order Number</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.map((order) => (
-                <TableRow key={order.id} data-testid={`order-row-${order.orderNumber}`}>
-                  <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{order.customerName}</p>
-                      <p className="text-sm text-muted-foreground">{order.customerEmail}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(order.status)}>
-                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(order.paymentStatus)}>
-                      {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {formatCurrency(parseFloat(order.totalAmount))}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {order.createdAt && formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="outline" size="sm" data-testid={`view-order-${order.orderNumber}`}>
-                      View
-                    </Button>
-                  </TableCell>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order Number</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Payment</TableHead>
+                  <TableHead>Total</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {filteredOrders.map((order) => (
+                  <TableRow key={order.id} data-testid={`order-row-${order.orderNumber}`}>
+                    <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{order.customerName}</p>
+                        <p className="text-sm text-muted-foreground">{order.customerEmail}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(order.status)}>
+                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(order.paymentStatus)}>
+                        {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {formatCurrency(parseFloat(order.totalAmount))}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {order.createdAt && formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm" data-testid={`view-order-${order.orderNumber}`}>
+                        View
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Kanban Board View */}
+      {viewMode === "kanban" && (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {kanbanColumns.map((column) => (
+            <Card key={column.id} className="bento-card h-fit">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="font-display font-semibold text-lg text-foreground flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full ${column.color}`}></div>
+                    {column.title}
+                  </CardTitle>
+                  <Badge variant="secondary" className="text-xs">
+                    {column.orders.length}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {column.orders.map((order) => (
+                  <Card key={order.id} className="kanban-order-card p-4 hover:shadow-md transition-all duration-200 cursor-pointer border border-border/50 hover:border-primary/20">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm text-foreground">{order.orderNumber}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {formatCurrency(parseFloat(order.totalAmount))}
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <User className="w-3 h-3" />
+                        <span className="truncate">{order.customerName}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="w-3 h-3" />
+                        <span>{order.createdAt && formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}</span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between pt-2 border-t border-border/30">
+                        <Badge className={getStatusColor(order.paymentStatus)} variant="outline">
+                          <DollarSign className="w-3 h-3 mr-1" />
+                          {order.paymentStatus}
+                        </Badge>
+                        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                          View
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+                
+                {column.orders.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No orders in this stage</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Calendar View Placeholder */}
+      {viewMode === "calendar" && (
+        <Card className="bento-card">
+          <CardHeader>
+            <CardTitle className="font-display font-semibold text-xl text-foreground flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              Calendar View
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="py-12">
+            <div className="text-center text-muted-foreground">
+              <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <h3 className="font-medium mb-2">Calendar View Coming Soon</h3>
+              <p className="text-sm">Track orders by delivery dates and schedule pickups</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
