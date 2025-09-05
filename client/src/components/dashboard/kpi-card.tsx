@@ -22,8 +22,8 @@ export default function KPICard({
   subtitle
 }: KPICardProps) {
   const changeColors = {
-    positive: "text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30",
-    negative: "text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30",
+    positive: "kpi-positive status-badge-success",
+    negative: "kpi-negative status-badge-danger",
     neutral: "text-muted-foreground bg-muted"
   };
 
@@ -56,7 +56,7 @@ export default function KPICard({
           <p className="text-sm font-medium text-muted-foreground tracking-wide uppercase">
             {title}
           </p>
-          <p className="font-display font-bold text-4xl text-foreground leading-none" 
+          <p className="kpi-value text-4xl leading-none" 
              data-testid={`kpi-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
             {value}
           </p>

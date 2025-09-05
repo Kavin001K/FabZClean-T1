@@ -52,7 +52,15 @@ export default function RecentOrders() {
           <CardTitle className="font-display font-semibold text-lg text-foreground">
             Recent Orders
           </CardTitle>
-          <Button variant="link" size="sm" data-testid="view-all-orders">
+          <Button 
+            variant="link" 
+            size="sm" 
+            data-testid="view-all-orders"
+            onClick={() => {
+              // Navigate to orders page
+              window.location.href = '/orders';
+            }}
+          >
             View All
           </Button>
         </div>

@@ -4,53 +4,59 @@
 @tailwind utilities;
 
 :root {
-  /* Light Mode Colors */
-  --background: hsl(210, 20%, 98%);
-  --foreground: hsl(215, 16%, 14%);
-  --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(215, 16%, 14%);
-  --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(215, 16%, 14%);
-  --primary: hsl(221, 83%, 53%);
-  --primary-foreground: hsl(0, 0%, 98%);
-  --secondary: hsl(210, 11%, 93%);
-  --secondary-foreground: hsl(215, 16%, 14%);
-  --muted: hsl(210, 11%, 93%);
-  --muted-foreground: hsl(215, 13%, 37%);
-  --accent: hsl(210, 11%, 93%);
-  --accent-foreground: hsl(215, 16%, 14%);
-  --destructive: hsl(0, 63%, 31%);
-  --destructive-foreground: hsl(0, 0%, 98%);
-  --border: hsl(214, 13%, 88%);
-  --input: hsl(214, 13%, 88%);
-  --ring: hsl(221, 83%, 53%);
-  --chart-1: hsl(221, 83%, 53%);
-  --chart-2: hsl(142, 71%, 45%);
-  --chart-3: hsl(43, 96%, 56%);
-  --chart-4: hsl(280, 65%, 60%);
-  --chart-5: hsl(15, 85%, 60%);
-  --sidebar: hsl(180, 6.6667%, 97.0588%);
-  --sidebar-foreground: hsl(210, 25%, 7.8431%);
-  --sidebar-primary: hsl(203.8863, 88.2845%, 53.1373%);
-  --sidebar-primary-foreground: hsl(0, 0%, 100%);
-  --sidebar-accent: hsl(211.5789, 51.3514%, 92.7451%);
-  --sidebar-accent-foreground: hsl(203.8863, 88.2845%, 53.1373%);
-  --sidebar-border: hsl(205.0000, 25.0000%, 90.5882%);
-  --sidebar-ring: hsl(202.8169, 89.1213%, 53.1373%);
+  /* Fab-Z Brand Colors - Light Mode */
+  --background: #F8F9FA; /* Primary Background */
+  --foreground: #212529; /* Primary Text */
+  --card: #FFFFFF; /* Secondary Background (Cards) */
+  --card-foreground: #212529; /* Card Text */
+  --popover: #FFFFFF;
+  --popover-foreground: #212529;
+  --primary: #2A64F5; /* Brand Blue */
+  --primary-foreground: #FFFFFF;
+  --secondary: #14B8A6; /* Accent Teal */
+  --secondary-foreground: #FFFFFF;
+  --muted: #E9ECEF; /* Disabled Elements */
+  --muted-foreground: #6C757D; /* Secondary Text */
+  --accent: #F8F9FA;
+  --accent-foreground: #212529;
+  --destructive: #DC3545; /* Danger Red */
+  --destructive-foreground: #FFFFFF;
+  --border: #DEE2E6; /* Borders & Dividers */
+  --input: #DEE2E6;
+  --ring: #2A64F5;
+  --chart-1: #2A64F5;
+  --chart-2: #14B8A6;
+  --chart-3: #FFC107;
+  --chart-4: #DC3545;
+  --chart-5: #198754;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #212529;
+  --sidebar-primary: #2A64F5;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F8F9FA;
+  --sidebar-accent-foreground: #2A64F5;
+  --sidebar-border: #DEE2E6;
+  --sidebar-ring: #2A64F5;
   --font-sans: "Inter", system-ui, sans-serif;
-  --font-display: "Poppins", "Inter", system-ui, sans-serif;
+  --font-display: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
-  --radius: 12px;
-  --shadow-2xs: 0px 2px 0px 0px hsl(202.8169, 89.1213%, 53.1373%, 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(202.8169, 89.1213%, 53.1373%, 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(202.8169, 89.1213%, 53.1373%, 0.00), 0px 1px 2px -1px hsl(202.8169, 89.1213%, 53.1373%, 0.00);
-  --shadow: 0px 2px 0px 0px hsl(202.8169, 89.1213%, 53.1373%, 0.00), 0px 1px 2px -1px hsl(202.8169, 89.1213%, 53.1373%, 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(202.8169, 89.1213%, 53.1373%, 0.00), 0px 2px 4px -1px hsl(202.8169, 89.1213%, 53.1373%, 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(202.8169, 89.1213%, 53.1373%, 0.00), 0px 4px 6px -1px hsl(202.8169, 89.1213%, 53.1373%, 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(202.8169, 89.1213%, 53.1373%, 0.00), 0px 8px 10px -1px hsl(202.8169, 89.1213%, 53.1373%, 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(202.8169, 89.1213%, 53.1373%, 0.00);
+  --radius: 8px; /* Updated border radius */
+  --shadow-2xs: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
+  --shadow-xs: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0px 1px 3px 0px rgba(0, 0, 0, 0.1), 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+  --shadow: 0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0px 10px 15px -3px rgba(0, 0, 0, 0.1), 0px 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0px 20px 25px -5px rgba(0, 0, 0, 0.1), 0px 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0px 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-2xl: 0px 25px 50px -12px rgba(0, 0, 0, 0.25);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
+  
+  /* Semantic Colors */
+  --success: #198754;
+  --warning: #FFC107;
+  --info: #0D6EFD;
+  --error: #DC3545;
 }
 
 .dark {
@@ -117,16 +123,17 @@
 }
 
 @layer components {
-  /* Enhanced Bento Box Cards with Evolved Minimalism */
+  /* Enhanced Bento Box Cards with Brand Colors */
   .bento-card {
-    @apply bg-card border border-border rounded-xl transition-all duration-300 ease-out;
-    box-shadow: var(--shadow-soft);
-    backdrop-filter: blur(8px);
+    @apply bg-card border border-border rounded-lg transition-all duration-300 ease-out;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    background: #FFFFFF;
+    border: 1px solid #DEE2E6;
   }
 
   .bento-card:hover {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-medium);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   }
 
   .bento-card-interactive {
@@ -143,10 +150,12 @@
     box-shadow: var(--shadow-soft);
   }
 
-  /* Enhanced Metric Cards with Selective Tangibility */
+  /* Enhanced Metric Cards with Brand Colors */
   .metric-card {
-    @apply bg-gradient-to-br from-card via-card to-muted/30 border border-border rounded-xl;
-    box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    @apply bg-card border border-border rounded-lg;
+    background: #FFFFFF;
+    border: 1px solid #DEE2E6;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
     position: relative;
   }
 
@@ -171,18 +180,18 @@
   }
 
   .status-online {
-    @apply bg-green-500;
-    box-shadow: 0 0 0 2px hsla(142, 71%, 45%, 0.2);
+    background: #198754;
+    box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.2);
   }
 
   .status-warning {
-    @apply bg-yellow-500;
-    box-shadow: 0 0 0 2px hsla(43, 96%, 56%, 0.2);
+    background: #FFC107;
+    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
   }
 
   .status-error {
-    @apply bg-red-500;
-    box-shadow: 0 0 0 2px hsla(0, 63%, 31%, 0.2);
+    background: #DC3545;
+    box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
   }
 
   .dark .status-error {
@@ -206,6 +215,18 @@
   .command-center-grid {
     @apply grid gap-6;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+
+  /* Dashboard Grid Layout */
+  .dashboard-grid {
+    @apply grid gap-6;
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 1024px) {
+    .dashboard-grid {
+      grid-template-columns: 2fr 1fr;
+    }
   }
 
   .kpi-banner {
@@ -240,9 +261,19 @@
   }
 
   .pos-checkout-button {
-    @apply w-full h-14 text-lg font-semibold rounded-xl transition-all duration-200;
-    @apply bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary;
-    @apply shadow-lg hover:shadow-xl active:scale-[0.98];
+    @apply w-full h-14 text-lg font-semibold rounded-lg transition-all duration-200;
+    background: #2A64F5;
+    color: #FFFFFF;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+  
+  .pos-checkout-button:hover {
+    background: #1E4AB8;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+  
+  .pos-checkout-button:active {
+    transform: scale(0.98);
   }
 
   /* Kanban Board Styles */
@@ -272,13 +303,20 @@
   }
 
   .pos-payment-method {
-    @apply p-4 border-2 border-border rounded-xl cursor-pointer transition-all duration-200;
-    @apply hover:border-primary/50 hover:bg-primary/5;
+    @apply p-4 border-2 rounded-lg cursor-pointer transition-all duration-200;
     @apply flex items-center gap-3 min-h-[60px];
+    border-color: #DEE2E6;
+    background: #FFFFFF;
+  }
+  
+  .pos-payment-method:hover {
+    border-color: #2A64F5;
+    background: rgba(42, 100, 245, 0.05);
   }
 
   .pos-payment-method.selected {
-    @apply border-primary bg-primary/10;
+    border-color: #2A64F5;
+    background: rgba(42, 100, 245, 0.1);
   }
 
   /* Data Visualization Enhancements */
@@ -370,4 +408,199 @@
   .interactive-press:active {
     transform: scale(0.98);
   }
+
+  /* Missing status indicator styles */
+  .status-indicator-enhanced {
+    @apply w-3 h-3 rounded-full relative;
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  /* Chart container height fix */
+  .chart-container {
+    @apply relative;
+    height: 300px;
+    min-height: 300px;
+  }
+
+  /* Enhanced chart container */
+  .chart-container-enhanced {
+    @apply relative;
+    height: 400px;
+    min-height: 400px;
+  }
+
+  /* Responsive chart containers */
+  @media (max-width: 768px) {
+    .chart-container {
+      height: 250px;
+      min-height: 250px;
+    }
+    
+    .chart-container-enhanced {
+      height: 300px;
+      min-height: 300px;
+    }
+  }
 }
+
+/* Updated Color Palette */
+  --primary: #2A64F5; /* Brand Blue */
+  --primary-foreground: #FFFFFF;
+  --secondary: #14B8A6; /* Accent Teal */
+  --secondary-foreground: #FFFFFF;
+  --background: #F8F9FA; /* Primary Background */
+  --card: #FFFFFF; /* Secondary Background */
+  --text-primary: #212529; /* Primary Text */
+  --text-secondary: #6C757D; /* Secondary Text */
+  --border: #DEE2E6; /* Borders & Dividers */
+  --destructive: #DC3545; /* Danger Red */
+  --success: #198754; /* Success Green */
+  --warning: #FFC107; /* Warning Yellow */
+  --info: #0D6EFD; /* Information Blue */
+
+/* Updated Typography */
+  --font-sans: "Inter", sans-serif;
+
+/* Button Styles */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground rounded-lg;
+    transition: background-color 0.3s;
+  }
+  .btn-primary:hover {
+    background-color: #1E4AB8; /* Darker Blue */
+  }
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground rounded-lg;
+    transition: background-color 0.3s;
+  }
+  .btn-secondary:hover {
+    background-color: #0F766E; /* Darker Teal */
+  }
+
+/* Input Fields */
+  .input-field {
+    @apply border border-border bg-card;
+  }
+  .input-field:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(42, 100, 245, 0.2);
+  }
+  .input-field.error {
+    border-color: var(--destructive);
+  }
+
+/* Card Styles */
+  .card {
+    @apply bg-card border border-border rounded-lg shadow-sm;
+  }
+
+/* Iconography */
+  .icon {
+    @apply text-primary;
+  }
+
+  /* Layout & Spacing */
+  .grid {
+    display: grid;
+    gap: 8px;
+  }
+  .spacing-unit {
+    margin: 8px;
+  }
+
+  /* Brand-specific button styles */
+  .btn-primary {
+    background: #2A64F5;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-primary:hover {
+    background: #1E4AB8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(42, 100, 245, 0.3);
+  }
+  
+  .btn-secondary {
+    background: #14B8A6;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-secondary:hover {
+    background: #0F766E;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+  }
+
+  /* Enhanced sidebar styling */
+  .sidebar-brand {
+    color: #2A64F5;
+    font-weight: 700;
+    font-size: 1.25rem;
+  }
+
+  /* KPI card enhancements */
+  .kpi-value {
+    color: #2A64F5;
+    font-weight: 700;
+    font-size: 2rem;
+  }
+
+  .kpi-positive {
+    color: #198754;
+  }
+
+  .kpi-negative {
+    color: #DC3545;
+  }
+
+  /* Status badges */
+  .status-badge-success {
+    background: #198754;
+    color: #FFFFFF;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .status-badge-warning {
+    background: #FFC107;
+    color: #000000;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .status-badge-danger {
+    background: #DC3545;
+    color: #FFFFFF;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .status-badge-info {
+    background: #0D6EFD;
+    color: #FFFFFF;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }

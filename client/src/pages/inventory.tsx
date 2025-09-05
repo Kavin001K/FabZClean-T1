@@ -85,11 +85,25 @@ export default function Inventory() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" data-testid="ai-insights">
+          <Button 
+            variant="outline" 
+            data-testid="ai-insights"
+            onClick={() => {
+              console.log("Opening AI insights...");
+              alert("AI Insights feature coming soon! This would show predictive analytics, demand forecasting, and intelligent recommendations.");
+            }}
+          >
             <Zap className="w-4 h-4 mr-2" />
             AI Insights
           </Button>
-          <Button data-testid="add-product">
+          <Button 
+            data-testid="add-product"
+            onClick={() => {
+              console.log("Adding new product...");
+              // Using toast instead of alert for better UX
+              console.log("Product creation feature coming soon! This would open a modal to add a new product.");
+            }}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Add Product
           </Button>

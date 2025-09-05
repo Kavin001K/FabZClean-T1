@@ -87,7 +87,13 @@ export default function Customers() {
           <h1 className="font-display font-bold text-3xl text-foreground">Customers</h1>
           <p className="text-muted-foreground mt-1">Manage customer relationships and profiles</p>
         </div>
-        <Button data-testid="add-customer">
+        <Button 
+          data-testid="add-customer"
+          onClick={() => {
+            console.log("Adding new customer...");
+            alert("Customer creation feature coming soon! This would open a modal to add a new customer.");
+          }}
+        >
           <Plus className="w-4 h-4 mr-2" />
           Add Customer
         </Button>

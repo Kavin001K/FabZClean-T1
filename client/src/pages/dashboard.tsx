@@ -6,6 +6,7 @@ import RecentOrders from "@/components/dashboard/recent-orders";
 import InventoryStatus from "@/components/dashboard/inventory-status";
 import DeliveryTracking from "@/components/dashboard/delivery-tracking";
 import POSIntegration from "@/components/dashboard/pos-integration";
+import { KPISkeleton } from "@/components/ui/loading-skeleton";
 import { formatCurrency, formatPercentage } from "@/lib/data";
 
 interface DashboardMetrics {
@@ -22,6 +23,84 @@ export default function Dashboard() {
   const { data: metrics, isLoading } = useQuery<DashboardMetrics>({
     queryKey: ["/api/dashboard/metrics"],
   });
+
+  if (isLoading) {
+    return (
+      <div className="p-8 animate-fade-in" data-testid="dashboard-page">
+        {/* Command Center Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-expressive text-4xl text-foreground mb-2">
+                Unified Command Center
+              </h1>
+              <p className="text-muted-foreground text-lg">
+                Real-time business intelligence and operational oversight
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="status-indicator-enhanced bg-green-500"></div>
+              <span className="text-sm font-medium text-foreground">All Systems Operational</span>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI Banner - Loading State */}
+        <div className="kpi-banner animate-slide-up">
+          <KPISkeleton />
+          <KPISkeleton />
+          <KPISkeleton />
+          <KPISkeleton />
+        </div>
+
+        {/* Main Command Center Grid - Loading State */}
+        <div className="command-center-grid animate-slide-up" style={{ animationDelay: '0.1s' }}>
+          <div className="lg:col-span-2">
+            <div className="bento-card">
+              <div className="p-6">
+                <div className="h-4 w-1/3 mb-4 bg-muted rounded animate-pulse"></div>
+                <div className="h-64 w-full bg-muted rounded animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-6">
+            <div className="bento-card">
+              <div className="p-6">
+                <div className="h-4 w-1/2 mb-4 bg-muted rounded animate-pulse"></div>
+                <div className="space-y-3">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-muted rounded-full animate-pulse"></div>
+                      <div className="flex-1">
+                        <div className="h-4 w-3/4 bg-muted rounded animate-pulse mb-1"></div>
+                        <div className="h-3 w-1/2 bg-muted rounded animate-pulse"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="bento-card">
+              <div className="p-6">
+                <div className="h-4 w-1/2 mb-4 bg-muted rounded animate-pulse"></div>
+                <div className="space-y-3">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 bg-muted rounded-full animate-pulse"></div>
+                        <div className="h-4 w-24 bg-muted rounded animate-pulse"></div>
+                      </div>
+                      <div className="h-4 w-8 bg-muted rounded animate-pulse"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 animate-fade-in" data-testid="dashboard-page">
@@ -84,7 +163,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main Command Center Grid - Enhanced Bento Box Layout */}
-      <div className="command-center-grid animate-slide-up" style={{ animationDelay: '0.1s' }}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
         {/* Sales Chart - Primary Focus Area */}
         <div className="lg:col-span-2">
           <SalesChart />

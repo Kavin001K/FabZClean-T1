@@ -100,7 +100,14 @@ export default function POSIntegration() {
           </div>
         </div>
 
-        <Button className="w-full mt-4" data-testid="view-pos-details">
+        <Button 
+          className="w-full mt-4" 
+          data-testid="view-pos-details"
+          onClick={() => {
+            // Navigate to POS page
+            window.location.href = '/pos';
+          }}
+        >
           <ExternalLink className="w-4 h-4 mr-2" />
           View POS Details
         </Button>

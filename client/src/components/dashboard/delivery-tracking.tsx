@@ -62,7 +62,15 @@ export default function DeliveryTracking() {
           <CardTitle className="font-display font-semibold text-lg text-foreground">
             Delivery Tracking
           </CardTitle>
-          <Button variant="link" size="sm" data-testid="view-map">
+          <Button 
+            variant="link" 
+            size="sm" 
+            data-testid="view-map"
+            onClick={() => {
+              console.log("Opening delivery map...");
+              alert("Delivery map feature coming soon! This would show real-time delivery locations and routes.");
+            }}
+          >
             View Map
           </Button>
         </div>

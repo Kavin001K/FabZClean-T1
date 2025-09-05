@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Search, Filter, Plus, List, Kanban, Calendar, Clock, User, DollarSign, Package } from "lucide-react";
 import { formatCurrency, getStatusColor } from "@/lib/data";
 import { formatDistanceToNow } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 import type { Order } from "@shared/schema";
 
 type ViewMode = "list" | "kanban" | "calendar";
@@ -16,6 +17,7 @@ export default function Orders() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const { toast } = useToast();
 
   const { data: orders, isLoading } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
@@ -100,7 +102,17 @@ export default function Orders() {
               Calendar
             </Button>
           </div>
-          <Button data-testid="create-order">
+          <Button 
+            data-testid="create-order"
+            onClick={() => {
+              // In a real app, this would open a modal or navigate to order creation
+              console.log("Creating new order...");
+              toast({
+                title: "Order Creation",
+                description: "Order creation feature coming soon! This would open a modal to create a new order.",
+              });
+            }}
+          >
             <Plus className="w-4 h-4 mr-2" />
             New Order
           </Button>
@@ -308,20 +320,87 @@ export default function Orders() {
         </div>
       )}
 
-      {/* Calendar View Placeholder */}
+      {/* Calendar View */}
       {viewMode === "calendar" && (
         <Card className="bento-card">
           <CardHeader>
             <CardTitle className="font-display font-semibold text-xl text-foreground flex items-center gap-2">
               <Calendar className="w-5 h-5" />
-              Calendar View
+              Order Calendar
             </CardTitle>
+            <p className="text-sm text-muted-foreground">Track orders by delivery dates and schedule pickups</p>
           </CardHeader>
-          <CardContent className="py-12">
-            <div className="text-center text-muted-foreground">
-              <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <h3 className="font-medium mb-2">Calendar View Coming Soon</h3>
-              <p className="text-sm">Track orders by delivery dates and schedule pickups</p>
+          <CardContent>
+            <div className="grid grid-cols-7 gap-2 mb-4">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="text-center text-sm font-medium text-muted-foreground p-2">
+                  {day}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {Array.from({ length: 35 }, (_, i) => {
+                const date = new Date();
+                date.setDate(date.getDate() - date.getDay() + i);
+                const dayOrders = orders?.filter(order => {
+                  if (!order.createdAt) return false;
+                  const orderDate = new Date(order.createdAt);
+                  return orderDate.toDateString() === date.toDateString();
+                }) || [];
+                
+                return (
+                  <div 
+                    key={i} 
+                    className={`min-h-[80px] p-2 border border-border rounded-lg ${
+                      date.toDateString() === new Date().toDateString() 
+                        ? 'bg-primary/10 border-primary' 
+                        : 'bg-muted/30'
+                    }`}
+                  >
+                    <div className="text-sm font-medium text-foreground mb-1">
+                      {date.getDate()}
+                    </div>
+                    <div className="space-y-1">
+                      {dayOrders.slice(0, 2).map((order, idx) => (
+                        <div 
+                          key={idx}
+                          className={`text-xs p-1 rounded ${
+                            order.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                            order.status === 'processing' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' :
+                            order.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' :
+                            'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                          }`}
+                        >
+                          {order.orderNumber}
+                        </div>
+                      ))}
+                      {dayOrders.length > 2 && (
+                        <div className="text-xs text-muted-foreground">
+                          +{dayOrders.length - 2} more
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex items-center justify-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span>Completed</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                <span>Processing</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <span>Pending</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <span>Cancelled</span>
+              </div>
             </div>
           </CardContent>
         </Card>

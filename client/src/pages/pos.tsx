@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, ShoppingCart, CreditCard, DollarSign, Plus, Minus, Trash2 } from "lucide-react";
+import { Search, ShoppingCart, CreditCard, DollarSign, Plus, Minus, Trash2, Smartphone } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
+import { useToast } from "@/hooks/use-toast";
 import type { Product, PosTransaction } from "@shared/schema";
 
 interface CartItem {
@@ -19,6 +20,8 @@ export default function POS() {
   const [searchTerm, setSearchTerm] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"credit" | "cash" | "debit" | "mobile">("credit");
+  const { toast } = useToast();
 
   const { data: products, isLoading: productsLoading } = useQuery<Product[]>({
     queryKey: ["/api/products"],
@@ -72,6 +75,7 @@ export default function POS() {
   const clearCart = () => {
     setCart([]);
     setSelectedCustomer("");
+    setPaymentMethod("credit");
   };
 
   const processPayment = () => {
@@ -80,6 +84,44 @@ export default function POS() {
     clearCart();
     // Show success message
   };
+
+  const handleCheckout = () => {
+    if (cart.length === 0) {
+      toast({
+        title: "Empty Cart",
+        description: "Please add items to cart before checkout.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Create a new POS transaction
+    const transaction = {
+      transactionNumber: `POS-${Date.now()}`,
+      items: cart.map(item => ({
+        productId: item.product.id,
+        quantity: item.quantity,
+        price: item.product.price
+      })),
+      totalAmount: (cartTotal + (cartTotal * 0.08)).toFixed(2), // Include tax
+      paymentMethod: paymentMethod,
+      cashierId: "DEMO_CASHIER"
+    };
+
+    // In a real app, this would call the API
+    console.log("Processing transaction:", transaction);
+    
+    // Show success toast
+    toast({
+      title: "Transaction Complete",
+      description: `Payment of ${formatCurrency(total)} processed successfully!`,
+    });
+    
+    // Clear cart after successful transaction
+    clearCart();
+  };
+
+  const total = cartTotal + (cartTotal * 0.08); // Subtotal + tax
 
   const todayTransactions = transactions?.filter(transaction => {
     const today = new Date();
@@ -323,13 +365,33 @@ export default function POS() {
                     <div className="space-y-3">
                       <h4 className="font-semibold text-foreground">Payment Method</h4>
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="pos-payment-method selected">
-                          <CreditCard className="w-5 h-5 text-primary" />
+                        <div 
+                          className={`pos-payment-method ${paymentMethod === "credit" ? "selected" : ""}`}
+                          onClick={() => setPaymentMethod("credit")}
+                        >
+                          <CreditCard className={`w-5 h-5 ${paymentMethod === "credit" ? "text-primary" : "text-muted-foreground"}`} />
                           <span className="font-medium">Card</span>
                         </div>
-                        <div className="pos-payment-method">
-                          <DollarSign className="w-5 h-5 text-muted-foreground" />
+                        <div 
+                          className={`pos-payment-method ${paymentMethod === "cash" ? "selected" : ""}`}
+                          onClick={() => setPaymentMethod("cash")}
+                        >
+                          <DollarSign className={`w-5 h-5 ${paymentMethod === "cash" ? "text-primary" : "text-muted-foreground"}`} />
                           <span className="font-medium">Cash</span>
+                        </div>
+                        <div 
+                          className={`pos-payment-method ${paymentMethod === "debit" ? "selected" : ""}`}
+                          onClick={() => setPaymentMethod("debit")}
+                        >
+                          <CreditCard className={`w-5 h-5 ${paymentMethod === "debit" ? "text-primary" : "text-muted-foreground"}`} />
+                          <span className="font-medium">Debit</span>
+                        </div>
+                        <div 
+                          className={`pos-payment-method ${paymentMethod === "mobile" ? "selected" : ""}`}
+                          onClick={() => setPaymentMethod("mobile")}
+                        >
+                          <Smartphone className={`w-5 h-5 ${paymentMethod === "mobile" ? "text-primary" : "text-muted-foreground"}`} />
+                          <span className="font-medium">Mobile</span>
                         </div>
                       </div>
                     </div>

@@ -98,7 +98,13 @@ export default function Logistics() {
             <div className="status-indicator status-online"></div>
             <span className="text-sm text-muted-foreground">GPS Tracking Active</span>
           </div>
-          <Button data-testid="view-map">
+          <Button 
+            data-testid="view-map"
+            onClick={() => {
+              console.log("Opening map view...");
+              alert("Map view feature coming soon! This would show a real-time map with delivery locations and routes.");
+            }}
+          >
             <MapPin className="w-4 h-4 mr-2" />
             View Map
           </Button>

@@ -123,6 +123,97 @@ export class MemStorage implements IStorage {
         supplier: "Green Clean Co",
         createdAt: new Date(),
         updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Stain Remover Plus",
+        sku: "SRP-004",
+        category: "Cleaning Solutions",
+        description: "Heavy-duty stain remover for tough stains",
+        price: "34.99",
+        stockQuantity: 156,
+        reorderLevel: 30,
+        supplier: "CleanTech Industries",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Glass Cleaner",
+        sku: "GLC-005",
+        category: "Cleaning Solutions",
+        description: "Streak-free glass and mirror cleaner",
+        price: "18.99",
+        stockQuantity: 89,
+        reorderLevel: 40,
+        supplier: "Crystal Clear Co",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Floor Mop Set",
+        sku: "FMS-006",
+        category: "Cleaning Tools",
+        description: "Professional floor mopping system",
+        price: "67.99",
+        stockQuantity: 45,
+        reorderLevel: 20,
+        supplier: "Floor Care Pro",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Disinfectant Spray",
+        sku: "DSP-007",
+        category: "Cleaning Solutions",
+        description: "Hospital-grade disinfectant spray",
+        price: "28.99",
+        stockQuantity: 234,
+        reorderLevel: 50,
+        supplier: "Health Clean Inc",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Vacuum Bags",
+        sku: "VAB-008",
+        category: "Cleaning Tools",
+        description: "HEPA filter vacuum bags",
+        price: "15.99",
+        stockQuantity: 12,
+        reorderLevel: 25,
+        supplier: "Air Quality Solutions",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "All-Purpose Cleaner",
+        sku: "APC-009",
+        category: "Cleaning Solutions",
+        description: "Versatile cleaner for multiple surfaces",
+        price: "22.99",
+        stockQuantity: 178,
+        reorderLevel: 35,
+        supplier: "CleanTech Industries",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Scrub Brushes Set",
+        sku: "SBS-010",
+        category: "Cleaning Tools",
+        description: "Multi-purpose scrub brush collection",
+        price: "39.99",
+        stockQuantity: 67,
+        reorderLevel: 15,
+        supplier: "Textile Solutions",
+        createdAt: new Date(),
+        updatedAt: new Date(),
       }
     ];
 
@@ -153,6 +244,72 @@ export class MemStorage implements IStorage {
         totalSpent: "756.32",
         createdAt: new Date(),
         updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Emily Rodriguez",
+        email: "emily.rodriguez@email.com",
+        phone: "+1-555-0125",
+        address: { street: "789 Pine St", city: "Springfield", state: "IL", zip: "62703" },
+        totalOrders: 22,
+        totalSpent: "1893.45",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "David Thompson",
+        email: "david.thompson@email.com",
+        phone: "+1-555-0126",
+        address: { street: "321 Elm St", city: "Springfield", state: "IL", zip: "62704" },
+        totalOrders: 5,
+        totalSpent: "423.78",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Lisa Wang",
+        email: "lisa.wang@email.com",
+        phone: "+1-555-0127",
+        address: { street: "654 Maple Ave", city: "Springfield", state: "IL", zip: "62705" },
+        totalOrders: 31,
+        totalSpent: "2156.90",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Robert Brown",
+        email: "robert.brown@email.com",
+        phone: "+1-555-0128",
+        address: { street: "987 Cedar Blvd", city: "Springfield", state: "IL", zip: "62706" },
+        totalOrders: 12,
+        totalSpent: "892.34",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Jennifer Davis",
+        email: "jennifer.davis@email.com",
+        phone: "+1-555-0129",
+        address: { street: "147 Birch St", city: "Springfield", state: "IL", zip: "62707" },
+        totalOrders: 18,
+        totalSpent: "1345.67",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Michael Wilson",
+        email: "michael.wilson@email.com",
+        phone: "+1-555-0130",
+        address: { street: "258 Spruce Dr", city: "Springfield", state: "IL", zip: "62708" },
+        totalOrders: 7,
+        totalSpent: "567.89",
+        createdAt: new Date(),
+        updatedAt: new Date(),
       }
     ];
 
@@ -161,6 +318,9 @@ export class MemStorage implements IStorage {
     });
 
     // Sample Orders
+    const productIds = Array.from(this.products.keys());
+    const customerNames = sampleCustomers.map(c => c.name);
+    
     const sampleOrders: Order[] = [
       {
         id: randomUUID(),
@@ -172,7 +332,7 @@ export class MemStorage implements IStorage {
         paymentStatus: "paid",
         totalAmount: "156.00",
         items: [
-          { productId: Array.from(this.products.keys())[0], quantity: 2, price: "89.99" }
+          { productId: productIds[0], quantity: 2, price: "89.99" }
         ],
         shippingAddress: { street: "123 Main St", city: "Springfield", state: "IL", zip: "62701" },
         createdAt: new Date(Date.now() - 2 * 60 * 1000), // 2 minutes ago
@@ -188,10 +348,112 @@ export class MemStorage implements IStorage {
         paymentStatus: "paid",
         totalAmount: "89.50",
         items: [
-          { productId: Array.from(this.products.keys())[0], quantity: 1, price: "89.99" }
+          { productId: productIds[0], quantity: 1, price: "89.99" }
         ],
         shippingAddress: { street: "456 Oak Ave", city: "Springfield", state: "IL", zip: "62702" },
         createdAt: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        orderNumber: "FC-2024-003",
+        customerName: "Emily Rodriguez",
+        customerEmail: "emily.rodriguez@email.com",
+        customerPhone: "+1-555-0125",
+        status: "pending",
+        paymentStatus: "pending",
+        totalAmount: "234.97",
+        items: [
+          { productId: productIds[1], quantity: 5, price: "12.99" },
+          { productId: productIds[3], quantity: 2, price: "34.99" },
+          { productId: productIds[4], quantity: 3, price: "18.99" }
+        ],
+        shippingAddress: { street: "789 Pine St", city: "Springfield", state: "IL", zip: "62703" },
+        createdAt: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        orderNumber: "FC-2024-004",
+        customerName: "Lisa Wang",
+        customerEmail: "lisa.wang@email.com",
+        customerPhone: "+1-555-0127",
+        status: "ready",
+        paymentStatus: "paid",
+        totalAmount: "178.95",
+        items: [
+          { productId: productIds[5], quantity: 1, price: "67.99" },
+          { productId: productIds[6], quantity: 2, price: "28.99" },
+          { productId: productIds[7], quantity: 3, price: "15.99" }
+        ],
+        shippingAddress: { street: "654 Maple Ave", city: "Springfield", state: "IL", zip: "62705" },
+        createdAt: new Date(Date.now() - 45 * 60 * 1000), // 45 minutes ago
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        orderNumber: "FC-2024-005",
+        customerName: "Robert Brown",
+        customerEmail: "robert.brown@email.com",
+        customerPhone: "+1-555-0128",
+        status: "completed",
+        paymentStatus: "paid",
+        totalAmount: "45.98",
+        items: [
+          { productId: productIds[8], quantity: 2, price: "22.99" }
+        ],
+        shippingAddress: { street: "987 Cedar Blvd", city: "Springfield", state: "IL", zip: "62706" },
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        orderNumber: "FC-2024-006",
+        customerName: "Jennifer Davis",
+        customerEmail: "jennifer.davis@email.com",
+        customerPhone: "+1-555-0129",
+        status: "processing",
+        paymentStatus: "paid",
+        totalAmount: "127.97",
+        items: [
+          { productId: productIds[9], quantity: 1, price: "39.99" },
+          { productId: productIds[1], quantity: 3, price: "12.99" },
+          { productId: productIds[4], quantity: 2, price: "18.99" }
+        ],
+        shippingAddress: { street: "147 Birch St", city: "Springfield", state: "IL", zip: "62707" },
+        createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        orderNumber: "FC-2024-007",
+        customerName: "David Thompson",
+        customerEmail: "david.thompson@email.com",
+        customerPhone: "+1-555-0126",
+        status: "cancelled",
+        paymentStatus: "failed",
+        totalAmount: "89.99",
+        items: [
+          { productId: productIds[0], quantity: 1, price: "89.99" }
+        ],
+        shippingAddress: { street: "321 Elm St", city: "Springfield", state: "IL", zip: "62704" },
+        createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        orderNumber: "FC-2024-008",
+        customerName: "Michael Wilson",
+        customerEmail: "michael.wilson@email.com",
+        customerPhone: "+1-555-0130",
+        status: "completed",
+        paymentStatus: "paid",
+        totalAmount: "67.99",
+        items: [
+          { productId: productIds[5], quantity: 1, price: "67.99" }
+        ],
+        shippingAddress: { street: "258 Spruce Dr", city: "Springfield", state: "IL", zip: "62708" },
+        createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
         updatedAt: new Date(),
       }
     ];
@@ -206,12 +468,59 @@ export class MemStorage implements IStorage {
         id: randomUUID(),
         transactionNumber: "POS-2024-001",
         items: [
-          { productId: Array.from(this.products.keys())[0], quantity: 1, price: "89.99" }
+          { productId: productIds[0], quantity: 1, price: "89.99" }
         ],
         totalAmount: "89.99",
         paymentMethod: "credit",
         cashierId: "DEMO_CASHIER",
         createdAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        transactionNumber: "POS-2024-002",
+        items: [
+          { productId: productIds[1], quantity: 3, price: "12.99" },
+          { productId: productIds[4], quantity: 2, price: "18.99" }
+        ],
+        totalAmount: "70.95",
+        paymentMethod: "cash",
+        cashierId: "DEMO_CASHIER",
+        createdAt: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+      },
+      {
+        id: randomUUID(),
+        transactionNumber: "POS-2024-003",
+        items: [
+          { productId: productIds[6], quantity: 1, price: "28.99" },
+          { productId: productIds[8], quantity: 1, price: "22.99" }
+        ],
+        totalAmount: "51.98",
+        paymentMethod: "debit",
+        cashierId: "DEMO_CASHIER",
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+      },
+      {
+        id: randomUUID(),
+        transactionNumber: "POS-2024-004",
+        items: [
+          { productId: productIds[5], quantity: 1, price: "67.99" }
+        ],
+        totalAmount: "67.99",
+        paymentMethod: "credit",
+        cashierId: "DEMO_CASHIER",
+        createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
+      },
+      {
+        id: randomUUID(),
+        transactionNumber: "POS-2024-005",
+        items: [
+          { productId: productIds[3], quantity: 2, price: "34.99" },
+          { productId: productIds[7], quantity: 4, price: "15.99" }
+        ],
+        totalAmount: "139.94",
+        paymentMethod: "mobile",
+        cashierId: "DEMO_CASHIER",
+        createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
       }
     ];
 
@@ -220,10 +529,11 @@ export class MemStorage implements IStorage {
     });
 
     // Sample Deliveries
+    const orderIds = Array.from(this.orders.keys());
     const sampleDeliveries: Delivery[] = [
       {
         id: randomUUID(),
-        orderId: Array.from(this.orders.keys())[0],
+        orderId: orderIds[0],
         driverName: "John Smith",
         vehicleId: "TRUCK-001",
         status: "in_transit",
@@ -235,6 +545,66 @@ export class MemStorage implements IStorage {
           { address: "456 Oak Ave, Springfield, IL", status: "pending" }
         ],
         createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        orderId: orderIds[2],
+        driverName: "Maria Garcia",
+        vehicleId: "VAN-002",
+        status: "pending",
+        estimatedDelivery: new Date(Date.now() + 4 * 60 * 60 * 1000), // 4 hours from now
+        actualDelivery: null,
+        location: { lat: 39.7817, lng: -89.6501 },
+        route: [
+          { address: "789 Pine St, Springfield, IL", status: "pending" }
+        ],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        orderId: orderIds[3],
+        driverName: "David Wilson",
+        vehicleId: "TRUCK-003",
+        status: "delivered",
+        estimatedDelivery: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
+        actualDelivery: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+        location: { lat: 39.7817, lng: -89.6501 },
+        route: [
+          { address: "654 Maple Ave, Springfield, IL", status: "completed" }
+        ],
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        orderId: orderIds[5],
+        driverName: "Sarah Johnson",
+        vehicleId: "VAN-004",
+        status: "in_transit",
+        estimatedDelivery: new Date(Date.now() + 1 * 60 * 60 * 1000), // 1 hour from now
+        actualDelivery: null,
+        location: { lat: 39.7817, lng: -89.6501 },
+        route: [
+          { address: "147 Birch St, Springfield, IL", status: "pending" }
+        ],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        orderId: orderIds[7],
+        driverName: "Mike Chen",
+        vehicleId: "TRUCK-005",
+        status: "delivered",
+        estimatedDelivery: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        actualDelivery: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
+        location: { lat: 39.7817, lng: -89.6501 },
+        route: [
+          { address: "258 Spruce Dr, Springfield, IL", status: "completed" }
+        ],
+        createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
         updatedAt: new Date(),
       }
     ];

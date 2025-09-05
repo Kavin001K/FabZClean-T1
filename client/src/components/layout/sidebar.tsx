@@ -33,7 +33,7 @@ export default function Sidebar() {
             <Zap className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="font-display font-bold text-xl text-foreground">Fab-Z</h1>
+            <h1 className="sidebar-brand">Fab-Z</h1>
             <p className="text-xs text-muted-foreground">Fab Clean Operations</p>
           </div>
         </div>
