@@ -21,24 +21,24 @@ import Inventory from "@/pages/inventory";
 import Logistics from "@/pages/logistics";
 
 function Router() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   return (
-    <div 
-      className={`grid min-h-screen w-full transition-all duration-300 ease-in-out ${
-        sidebarCollapsed ? "lg:grid-cols-[64px_1fr]" : "lg:grid-cols-[256px_1fr]"
-      }`}
-    >
+    <div className="flex min-h-screen w-full bg-background">
       <Sidebar 
-        isCollapsed={sidebarCollapsed} 
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
+        isOpen={isSidebarOpen}
+        isCollapsed={isSidebarCollapsed} 
+        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+        onClose={() => setIsSidebarOpen(false)}
       />
-      <div className="flex flex-col">
+      <div className={`flex flex-1 flex-col transition-all duration-300 ease-in-out ${
+        isSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
+      }`}>
         <Header 
-          sidebarCollapsed={sidebarCollapsed} 
-          onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
+          onSidebarToggle={() => setIsSidebarOpen(!isSidebarOpen)} 
         />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto bg-muted/30 p-4 md:p-6 lg:p-8 border-t">
           <ErrorBoundary>
             <Switch>
               <Route path="/" component={Dashboard} />
@@ -54,7 +54,7 @@ function Router() {
             </Switch>
           </ErrorBoundary>
         </main>
-        <Footer />
+        <Footer isSidebarCollapsed={isSidebarCollapsed} />
       </div>
     </div>
   );

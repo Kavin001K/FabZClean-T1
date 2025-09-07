@@ -1,15 +1,20 @@
-import React from 'react';
+import { cn } from "@/lib/utils";
 
-export default function Footer() {
+interface FooterProps {
+  isSidebarCollapsed: boolean;
+}
+
+export default function Footer({ isSidebarCollapsed }: FooterProps) {
   return (
-    <footer className="bg-card border-t border-border py-4 px-6">
+    <footer className={cn(
+      "border-t bg-card text-muted-foreground px-4 md:px-6 py-3 text-sm transition-all duration-300 ease-in-out",
+      isSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
+    )}>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="status-indicator status-online"></div>
-          <span className="text-label text-muted-foreground">System Online</span>
-        </div>
-        <div className="text-caption text-muted-foreground">
-          © 2025 Ace-Digital. All rights reserved.
+        <p>© 2025 Ace-Digital. All rights reserved.</p>
+        <div className="flex items-center gap-4">
+          <a href="#" className="hover:text-primary">Terms of Service</a>
+          <a href="#" className="hover:text-primary">Privacy Policy</a>
         </div>
       </div>
     </footer>
