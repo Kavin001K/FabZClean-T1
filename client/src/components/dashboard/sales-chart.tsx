@@ -19,15 +19,15 @@ export default function SalesChart() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="font-display font-semibold text-xl text-foreground">
+            <CardTitle className="font-display font-semibold text-lg sm:text-xl text-foreground">
               Sales & Revenue Overview
             </CardTitle>
-            <p className="text-sm text-muted-foreground">Daily revenue and order trends</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">Daily revenue and order trends</p>
           </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="default" data-testid="chart-period-7d">7D</Button>
-            <Button size="sm" variant="secondary" data-testid="chart-period-30d">30D</Button>
-            <Button size="sm" variant="secondary" data-testid="chart-period-90d">90D</Button>
+          <div className="flex gap-1 sm:gap-2">
+            <Button size="sm" variant="default" data-testid="chart-period-7d" className="text-xs sm:text-sm">7D</Button>
+            <Button size="sm" variant="secondary" data-testid="chart-period-30d" className="text-xs sm:text-sm">30D</Button>
+            <Button size="sm" variant="secondary" data-testid="chart-period-90d" className="text-xs sm:text-sm">90D</Button>
           </div>
         </div>
       </CardHeader>

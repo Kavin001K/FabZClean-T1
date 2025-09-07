@@ -59,13 +59,14 @@ export default function DeliveryTracking() {
     <Card className="bento-card" data-testid="delivery-tracking">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="font-display font-semibold text-lg text-foreground">
+          <CardTitle className="font-display font-semibold text-sm sm:text-lg text-foreground">
             Delivery Tracking
           </CardTitle>
           <Button 
             variant="link" 
             size="sm" 
             data-testid="view-map"
+            className="text-xs sm:text-sm"
             onClick={() => {
               console.log("Opening delivery map...");
               alert("Delivery map feature coming soon! This would show real-time delivery locations and routes.");
@@ -76,19 +77,19 @@ export default function DeliveryTracking() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {deliveries?.map((delivery) => (
             <div 
               key={delivery.id} 
-              className="border border-border rounded-lg p-4"
+              className="border border-border rounded-lg p-3 sm:p-4"
               data-testid={`delivery-${delivery.vehicleId}`}
             >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-primary" />
-                  <span className="font-medium text-sm text-foreground">{delivery.vehicleId}</span>
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <Truck className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+                  <span className="font-medium text-xs sm:text-sm text-foreground">{delivery.vehicleId}</span>
                 </div>
-                <Badge className={getStatusColor(delivery.status)}>
+                <Badge className={`text-xs ${getStatusColor(delivery.status)}`}>
                   {delivery.status.replace('_', ' ').charAt(0).toUpperCase() + delivery.status.replace('_', ' ').slice(1)}
                 </Badge>
               </div>
@@ -97,7 +98,7 @@ export default function DeliveryTracking() {
               </p>
               <Progress 
                 value={getProgressPercentage(delivery.status)} 
-                className="w-full h-2 mb-2" 
+                className="w-full h-1.5 sm:h-2 mb-2" 
               />
               <p className="text-xs text-muted-foreground">
                 {delivery.estimatedDelivery && delivery.status !== "delivered" && (

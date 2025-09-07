@@ -216,17 +216,17 @@ export default function POS() {
             </CardHeader>
             <CardContent>
               {productsLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="p-4 border border-border rounded-lg animate-pulse">
-                      <div className="w-full h-4 bg-muted rounded mb-2"></div>
-                      <div className="w-16 h-3 bg-muted rounded mb-2"></div>
-                      <div className="w-20 h-6 bg-muted rounded"></div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className="p-3 sm:p-4 border border-border rounded-lg animate-pulse">
+                      <div className="w-full h-3 sm:h-4 bg-muted rounded mb-2"></div>
+                      <div className="w-12 sm:w-16 h-2 sm:h-3 bg-muted rounded mb-2"></div>
+                      <div className="w-16 sm:w-20 h-4 sm:h-6 bg-muted rounded"></div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
                   {filteredProducts.map((product) => (
                     <div 
                       key={product.id}
@@ -236,22 +236,22 @@ export default function POS() {
                       style={{ animationDelay: `${filteredProducts.indexOf(product) * 0.05}s` }}
                     >
                       {/* Product Image Placeholder */}
-                      <div className="w-16 h-16 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl flex items-center justify-center mb-4 mx-auto">
-                        <span className="text-2xl font-bold text-primary">
+                      <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl flex items-center justify-center mb-3 sm:mb-4 mx-auto">
+                        <span className="text-lg sm:text-2xl font-bold text-primary">
                           {product.name.charAt(0)}
                         </span>
                       </div>
                       
-                      <div className="space-y-2">
-                        <h3 className="font-semibold text-foreground text-center leading-tight">
+                      <div className="space-y-1 sm:space-y-2">
+                        <h3 className="font-semibold text-foreground text-center leading-tight text-sm sm:text-base">
                           {product.name}
                         </h3>
                         <p className="text-xs text-muted-foreground text-center">
                           SKU: {product.sku}
                         </p>
                         
-                        <div className="flex items-center justify-between pt-2">
-                          <span className="font-display font-bold text-xl text-foreground">
+                        <div className="flex items-center justify-between pt-1 sm:pt-2">
+                          <span className="font-display font-bold text-sm sm:text-xl text-foreground">
                             {formatCurrency(parseFloat(product.price))}
                           </span>
                           <Badge 
@@ -264,7 +264,7 @@ export default function POS() {
                         
                         {/* Stock indicator */}
                         <div className="flex items-center justify-center gap-1 pt-1">
-                          <div className={`w-2 h-2 rounded-full ${
+                          <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${
                             product.stockQuantity > 10 ? 'bg-green-500' :
                             product.stockQuantity > 0 ? 'bg-yellow-500' : 'bg-red-500'
                           }`}></div>

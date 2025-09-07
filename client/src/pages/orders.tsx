@@ -35,12 +35,13 @@ export default function Orders() {
     return acc;
   }, {} as Record<string, number>) || {};
 
-  // Organize orders by status for Kanban view
+  // Organize orders by status for Kanban view - 5-stage workflow
   const kanbanColumns = [
-    { id: "pending", title: "Pending Orders", color: "bg-yellow-500", orders: filteredOrders.filter(order => order.status === "pending") },
-    { id: "processing", title: "In Processing", color: "bg-blue-500", orders: filteredOrders.filter(order => order.status === "processing") },
-    { id: "ready", title: "Ready for Pickup", color: "bg-purple-500", orders: filteredOrders.filter(order => order.status === "ready") },
-    { id: "completed", title: "Completed", color: "bg-green-500", orders: filteredOrders.filter(order => order.status === "completed") }
+    { id: "placed", title: "Order Placed", color: "bg-gray-500", orders: filteredOrders.filter(order => order.status === "placed") },
+    { id: "accepted", title: "Order Accepted", color: "bg-blue-500", orders: filteredOrders.filter(order => order.status === "accepted") },
+    { id: "processing", title: "Processing", color: "bg-yellow-500", orders: filteredOrders.filter(order => order.status === "processing") },
+    { id: "ready", title: "Ready to Pickup", color: "bg-purple-500", orders: filteredOrders.filter(order => order.status === "ready") },
+    { id: "out_for_delivery", title: "Out for Delivery", color: "bg-green-500", orders: filteredOrders.filter(order => order.status === "out_for_delivery") }
   ];
 
   if (isLoading) {
@@ -68,8 +69,8 @@ export default function Orders() {
     <div className="p-8" data-testid="orders-page">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-display font-bold text-3xl text-foreground">Order Lifecycle Management</h1>
-          <p className="text-muted-foreground mt-1">Track orders through their complete lifecycle with intelligent workflow management</p>
+          <h1 className="text-h1">Order Lifecycle Management</h1>
+          <p className="text-body text-muted-foreground mt-1">Track orders through their complete lifecycle with intelligent workflow management</p>
         </div>
         <div className="flex items-center gap-4">
           {/* View Mode Toggle */}
@@ -119,60 +120,74 @@ export default function Orders() {
         </div>
       </div>
 
-      {/* Order Status Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      {/* Order Status Overview - 5-Stage Workflow */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Pending</p>
-                <p className="text-2xl font-display font-bold text-foreground">
-                  {statusCounts.pending || 0}
+                <p className="text-xs sm:text-sm text-muted-foreground">Order Placed</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
+                  {statusCounts.placed || 0}
                 </p>
               </div>
-              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-gray-500"></div>
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Processing</p>
-                <p className="text-2xl font-display font-bold text-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">Order Accepted</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
+                  {statusCounts.accepted || 0}
+                </p>
+              </div>
+              <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-blue-500"></div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bento-card">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs sm:text-sm text-muted-foreground">Processing</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
                   {statusCounts.processing || 0}
                 </p>
               </div>
-              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+              <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-yellow-500"></div>
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Completed</p>
-                <p className="text-2xl font-display font-bold text-foreground">
-                  {statusCounts.completed || 0}
+                <p className="text-xs sm:text-sm text-muted-foreground">Ready to Pickup</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
+                  {statusCounts.ready || 0}
                 </p>
               </div>
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-purple-500"></div>
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Orders</p>
-                <p className="text-2xl font-display font-bold text-foreground">
-                  {orders?.length || 0}
+                <p className="text-xs sm:text-sm text-muted-foreground">Out for Delivery</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
+                  {statusCounts.out_for_delivery || 0}
                 </p>
               </div>
-              <div className="w-3 h-3 rounded-full bg-primary"></div>
+              <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-green-500"></div>
             </div>
           </CardContent>
         </Card>

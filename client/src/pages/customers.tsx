@@ -100,59 +100,59 @@ export default function Customers() {
       </div>
 
       {/* Customer Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Customers</p>
-                <p className="text-2xl font-display font-bold text-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">Total Customers</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
                   {formatNumber(totalCustomers)}
                 </p>
               </div>
-              <Users className="w-8 h-8 text-primary" />
+              <Users className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-display font-bold text-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">Total Revenue</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
                   {formatCurrency(totalRevenue)}
                 </p>
               </div>
-              <DollarSign className="w-8 h-8 text-green-500" />
+              <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Avg. Order Value</p>
-                <p className="text-2xl font-display font-bold text-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">Avg. Order Value</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
                   {formatCurrency(averageOrderValue)}
                 </p>
               </div>
-              <ShoppingBag className="w-8 h-8 text-blue-500" />
+              <ShoppingBag className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Growth Rate</p>
-                <p className="text-2xl font-display font-bold text-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">Growth Rate</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
                   +12.3%
                 </p>
               </div>
-              <TrendingUp className="w-8 h-8 text-purple-500" />
+              <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
             </div>
           </CardContent>
         </Card>

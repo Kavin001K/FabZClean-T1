@@ -9,6 +9,8 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        button: "var(--radius-button)",
+        input: "var(--radius-input)",
       },
       colors: {
         background: "hsl(var(--background))",
@@ -66,6 +68,27 @@ export default {
         sans: ["var(--font-sans)"],
         display: ["var(--font-display)"],
         mono: ["var(--font-mono)"],
+      },
+      fontSize: {
+        xs: ["var(--text-xs)", { lineHeight: "1.4" }],
+        sm: ["var(--text-sm)", { lineHeight: "1.5" }],
+        base: ["var(--text-base)", { lineHeight: "1.5" }],
+        lg: ["var(--text-lg)", { lineHeight: "1.4" }],
+        xl: ["var(--text-xl)", { lineHeight: "1.3" }],
+        "2xl": ["var(--text-2xl)", { lineHeight: "1.2" }],
+      },
+      fontWeight: {
+        normal: "var(--font-normal)",
+        medium: "var(--font-medium)",
+        semibold: "var(--font-semibold)",
+        bold: "var(--font-bold)",
+      },
+      spacing: {
+        xs: "var(--spacing-xs)",
+        sm: "var(--spacing-sm)",
+        md: "var(--spacing-md)",
+        lg: "var(--spacing-lg)",
+        xl: "var(--spacing-xl)",
       },
       boxShadow: {
         'soft': '0 2px 8px 0 rgba(0, 0, 0, 0.06)',

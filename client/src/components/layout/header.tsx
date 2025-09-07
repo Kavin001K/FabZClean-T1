@@ -1,25 +1,49 @@
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/use-theme";
-import { Moon, Sun, User } from "lucide-react";
+import { Moon, Sun, User, Menu, X } from "lucide-react";
 
-export default function Header() {
+interface HeaderProps {
+  sidebarCollapsed: boolean;
+  onSidebarToggle: () => void;
+}
+
+export default function Header({ sidebarCollapsed, onSidebarToggle }: HeaderProps) {
   const { theme, setTheme } = useTheme();
 
   return (
-    <header className="glass-effect border-b border-border px-8 py-6 sticky top-0 z-10">
+    <header className="glass-effect border-b border-border px-6 sm:px-8 py-4 sm:py-6 sticky top-0 z-10">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display font-bold text-3xl text-foreground">
-            Operations Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Real-time business intelligence and command center
-          </p>
+        <div className="flex items-center gap-3 sm:gap-4">
+          {/* Navigation Toggle Button */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onSidebarToggle}
+            className="flex-shrink-0"
+            data-testid="sidebar-toggle"
+          >
+            {sidebarCollapsed ? (
+              <Menu className="h-[1.2rem] w-[1.2rem]" />
+            ) : (
+              <X className="h-[1.2rem] w-[1.2rem]" />
+            )}
+            <span className="sr-only">Toggle navigation</span>
+          </Button>
+          
+          <div>
+            <h1 className="text-lg sm:text-h1">
+              Operations Dashboard
+            </h1>
+            <p className="text-xs sm:text-body text-muted-foreground mt-1">
+              Real-time business intelligence and command center
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground">Last updated</p>
-            <p className="font-medium text-foreground">2 minutes ago</p>
+        
+        <div className="flex items-center gap-2 sm:gap-4">
+          <div className="text-right hidden sm:block">
+            <p className="text-caption text-muted-foreground">Last updated</p>
+            <p className="text-label text-foreground">2 minutes ago</p>
           </div>
           
           {/* Theme Toggle */}
@@ -34,8 +58,8 @@ export default function Header() {
             <span className="sr-only">Toggle theme</span>
           </Button>
 
-          <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-            <User className="w-5 h-5 text-primary-foreground" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary rounded-full flex items-center justify-center">
+            <User className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
           </div>
         </div>
       </div>

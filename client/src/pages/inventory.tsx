@@ -111,20 +111,20 @@ export default function Inventory() {
       </div>
 
       {/* AI Predictive Analytics Banner */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
         <Card className="bento-card lg:col-span-2 animate-fade-in">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-blue-600" />
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground">Demand Forecast</h3>
-                  <p className="text-sm text-muted-foreground">Next 30 days prediction</p>
+                  <h3 className="text-sm sm:text-base font-semibold text-foreground">Demand Forecast</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Next 30 days prediction</p>
                 </div>
               </div>
-              <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+              <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs sm:text-sm">
                 94% Accuracy
               </Badge>
             </div>
@@ -161,30 +161,30 @@ export default function Inventory() {
         </Card>
 
         <Card className="bento-card animate-fade-in" style={{ animationDelay: "0.1s" }}>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-500/20 to-orange-600/10 rounded-lg flex items-center justify-center">
-                <Target className="w-5 h-5 text-orange-600" />
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-orange-500/20 to-orange-600/10 rounded-lg flex items-center justify-center">
+                <Target className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-foreground">Restock Alerts</h3>
-                <p className="text-sm text-muted-foreground">AI recommendations</p>
+                <h3 className="text-sm sm:text-base font-semibold text-foreground">Restock Alerts</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground">AI recommendations</p>
               </div>
             </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+            <div className="space-y-2 sm:space-y-3">
+              <div className="flex items-center justify-between p-2 sm:p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                 <div>
-                  <p className="text-sm font-medium text-red-700 dark:text-red-400">Critical</p>
+                  <p className="text-xs sm:text-sm font-medium text-red-700 dark:text-red-400">Critical</p>
                   <p className="text-xs text-red-600 dark:text-red-500">3 items need restocking</p>
                 </div>
-                <AlertTriangle className="w-4 h-4 text-red-500" />
+                <AlertTriangle className="w-3 h-3 sm:w-4 sm:h-4 text-red-500" />
               </div>
-              <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+              <div className="flex items-center justify-between p-2 sm:p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                 <div>
-                  <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">Warning</p>
+                  <p className="text-xs sm:text-sm font-medium text-yellow-700 dark:text-yellow-400">Warning</p>
                   <p className="text-xs text-yellow-600 dark:text-yellow-500">5 items low stock</p>
                 </div>
-                <Clock className="w-4 h-4 text-yellow-500" />
+                <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />
               </div>
             </div>
           </CardContent>
@@ -192,59 +192,59 @@ export default function Inventory() {
       </div>
 
       {/* Inventory Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Value</p>
-                <p className="text-2xl font-display font-bold text-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">Total Value</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
                   {formatCurrency(inventoryStats.totalValue)}
                 </p>
               </div>
-              <Package className="w-8 h-8 text-primary" />
+              <Package className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">In Stock</p>
-                <p className="text-2xl font-display font-bold text-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">In Stock</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
                   {inventoryStats.inStock}
                 </p>
               </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
+              <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Low Stock</p>
-                <p className="text-2xl font-display font-bold text-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">Low Stock</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
                   {inventoryStats.lowStock}
                 </p>
               </div>
-              <AlertTriangle className="w-8 h-8 text-yellow-500" />
+              <AlertTriangle className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-500" />
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Out of Stock</p>
-                <p className="text-2xl font-display font-bold text-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">Out of Stock</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
                   {inventoryStats.outOfStock}
                 </p>
               </div>
-              <AlertTriangle className="w-8 h-8 text-red-500" />
+              <AlertTriangle className="w-6 h-6 sm:w-8 sm:h-8 text-red-500" />
             </div>
           </CardContent>
         </Card>

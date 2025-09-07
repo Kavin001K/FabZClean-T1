@@ -112,59 +112,59 @@ export default function Logistics() {
       </div>
 
       {/* Logistics Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Active Deliveries</p>
-                <p className="text-2xl font-display font-bold text-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">Active Deliveries</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
                   {activeDeliveries}
                 </p>
               </div>
-              <Truck className="w-8 h-8 text-blue-500" />
+              <Truck className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Fleet Size</p>
-                <p className="text-2xl font-display font-bold text-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">Fleet Size</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
                   {vehicles.length}
                 </p>
               </div>
-              <Users className="w-8 h-8 text-primary" />
+              <Users className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">On-Time Rate</p>
-                <p className="text-2xl font-display font-bold text-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">On-Time Rate</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
                   {onTimeRate.toFixed(1)}%
                 </p>
               </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
+              <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Deliveries</p>
-                <p className="text-2xl font-display font-bold text-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">Total Deliveries</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
                   {totalDeliveries}
                 </p>
               </div>
-              <Package className="w-8 h-8 text-purple-500" />
+              <Package className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
             </div>
           </CardContent>
         </Card>

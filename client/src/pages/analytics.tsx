@@ -169,67 +169,67 @@ export default function Analytics() {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Revenue Growth</p>
-                <p className="text-2xl font-display font-bold text-foreground">+24.3%</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Revenue Growth</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">+24.3%</p>
                 <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp className="w-3 h-3 text-green-500" />
+                  <TrendingUp className="w-2 h-2 sm:w-3 sm:h-3 text-green-500" />
                   <span className="text-xs text-green-500">vs last month</span>
                 </div>
               </div>
-              <DollarSign className="w-8 h-8 text-green-500" />
+              <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Conversion Rate</p>
-                <p className="text-2xl font-display font-bold text-foreground">3.2%</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Conversion Rate</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">3.2%</p>
                 <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp className="w-3 h-3 text-green-500" />
+                  <TrendingUp className="w-2 h-2 sm:w-3 sm:h-3 text-green-500" />
                   <span className="text-xs text-green-500">+0.4% this week</span>
                 </div>
               </div>
-              <Target className="w-8 h-8 text-blue-500" />
+              <Target className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Customer Retention</p>
-                <p className="text-2xl font-display font-bold text-foreground">89.5%</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Customer Retention</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">89.5%</p>
                 <div className="flex items-center gap-1 mt-1">
-                  <TrendingDown className="w-3 h-3 text-red-500" />
+                  <TrendingDown className="w-2 h-2 sm:w-3 sm:h-3 text-red-500" />
                   <span className="text-xs text-red-500">-1.2% this month</span>
                 </div>
               </div>
-              <Users className="w-8 h-8 text-purple-500" />
+              <Users className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
             </div>
           </CardContent>
         </Card>
         
         <Card className="bento-card">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Inventory Efficiency</p>
-                <p className="text-2xl font-display font-bold text-foreground">94.7%</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Inventory Efficiency</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">94.7%</p>
                 <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp className="w-3 h-3 text-green-500" />
+                  <TrendingUp className="w-2 h-2 sm:w-3 sm:h-3 text-green-500" />
                   <span className="text-xs text-green-500">+2.1% this week</span>
                 </div>
               </div>
-              <Package className="w-8 h-8 text-orange-500" />
+              <Package className="w-6 h-6 sm:w-8 sm:h-8 text-orange-500" />
             </div>
           </CardContent>
         </Card>
