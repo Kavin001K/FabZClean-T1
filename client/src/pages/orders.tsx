@@ -1,425 +1,221 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Filter, Plus, List, Kanban, Calendar, Clock, User, DollarSign, Package } from "lucide-react";
-import { formatCurrency, getStatusColor } from "@/lib/data";
-import { formatDistanceToNow } from "date-fns";
-import { useToast } from "@/hooks/use-toast";
-import type { Order } from "@shared/schema";
+import {
+  File,
+  ListFilter,
+  MoreHorizontal,
+  PlusCircle,
+} from "lucide-react"
 
-type ViewMode = "list" | "kanban" | "calendar";
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+
+// NOTE: We'll use static data for now. We will reconnect this to the API later.
+const ORDERS_DATA = [
+    {
+      orderId: "ORD001",
+      customer: "Liam Johnson",
+      email: "liam@example.com",
+      type: "Sale",
+      status: "Fulfilled",
+      date: "2023-06-23",
+      amount: 250.00,
+    },
+    {
+      orderId: "ORD002",
+      customer: "Olivia Smith",
+      email: "olivia@example.com",
+      type: "Refund",
+      status: "Declined",
+      date: "2023-06-24",
+      amount: 150.00,
+    },
+    {
+      orderId: "ORD003",
+      customer: "Noah Williams",
+      email: "noah@example.com",
+      type: "Subscription",
+      status: "Fulfilled",
+      date: "2023-06-25",
+      amount: 350.00,
+    },
+    {
+      orderId: "ORD004",
+      customer: "Emma Brown",
+      email: "emma@example.com",
+      type: "Sale",
+      status: "Fulfilled",
+      date: "2023-06-26",
+      amount: 450.00,
+    },
+    {
+      orderId: "ORD005",
+      customer: "Lucas Jones",
+      email: "lucas@example.com",
+      type: "Subscription",
+      status: "Unfulfilled",
+      date: "2023-06-27",
+      amount: 550.00,
+    },
+];
+
 
 export default function Orders() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const { toast } = useToast();
-
-  const { data: orders, isLoading } = useQuery<Order[]>({
-    queryKey: ["/api/orders"],
-  });
-
-  const filteredOrders = orders?.filter(order => {
-    const matchesSearch = order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.customerName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  }) || [];
-
-  const statusCounts = orders?.reduce((acc, order) => {
-    acc[order.status] = (acc[order.status] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>) || {};
-
-  // Organize orders by status for Kanban view - 5-stage workflow
-  const kanbanColumns = [
-    { id: "placed", title: "Order Placed", color: "bg-gray-500", orders: filteredOrders.filter(order => order.status === "placed") },
-    { id: "accepted", title: "Order Accepted", color: "bg-blue-500", orders: filteredOrders.filter(order => order.status === "accepted") },
-    { id: "processing", title: "Processing", color: "bg-yellow-500", orders: filteredOrders.filter(order => order.status === "processing") },
-    { id: "ready", title: "Ready to Pickup", color: "bg-purple-500", orders: filteredOrders.filter(order => order.status === "ready") },
-    { id: "out_for_delivery", title: "Out for Delivery", color: "bg-green-500", orders: filteredOrders.filter(order => order.status === "out_for_delivery") }
-  ];
-
-  if (isLoading) {
-    return (
-      <div className="p-8" data-testid="orders-page">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="font-display font-bold text-3xl text-foreground">Orders</h1>
-            <p className="text-muted-foreground mt-1">Manage customer orders and fulfillment</p>
-          </div>
-        </div>
-        <div className="animate-pulse space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-muted rounded-lg"></div>
-            ))}
-          </div>
-          <div className="h-96 bg-muted rounded-lg"></div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-8" data-testid="orders-page">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-h1">Order Lifecycle Management</h1>
-          <p className="text-body text-muted-foreground mt-1">Track orders through their complete lifecycle with intelligent workflow management</p>
-        </div>
-        <div className="flex items-center gap-4">
-          {/* View Mode Toggle */}
-          <div className="flex items-center bg-muted rounded-lg p-1">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className="h-8 px-3"
-            >
-              <List className="w-4 h-4 mr-1" />
-              List
-            </Button>
-            <Button
-              variant={viewMode === "kanban" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("kanban")}
-              className="h-8 px-3"
-            >
-              <Kanban className="w-4 h-4 mr-1" />
-              Kanban
-            </Button>
-            <Button
-              variant={viewMode === "calendar" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("calendar")}
-              className="h-8 px-3"
-            >
-              <Calendar className="w-4 h-4 mr-1" />
-              Calendar
-            </Button>
-          </div>
-          <Button 
-            data-testid="create-order"
-            onClick={() => {
-              // In a real app, this would open a modal or navigate to order creation
-              console.log("Creating new order...");
-              toast({
-                title: "Order Creation",
-                description: "Order creation feature coming soon! This would open a modal to create a new order.",
-              });
-            }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            New Order
+    <Tabs defaultValue="all">
+      <div className="flex items-center">
+        <TabsList>
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="active">Active</TabsTrigger>
+          <TabsTrigger value="draft">Draft</TabsTrigger>
+          <TabsTrigger value="archived" className="hidden sm:flex">
+            Archived
+          </TabsTrigger>
+        </TabsList>
+        <div className="ml-auto flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 gap-1">
+                <ListFilter className="h-3.5 w-3.5" />
+                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                  Filter
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Filter by</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem checked>
+                Fulfilled
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem>Declined</DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem>
+                Refunded
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button size="sm" variant="outline" className="h-7 gap-1">
+            <File className="h-3.5 w-3.5" />
+            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+              Export
+            </span>
+          </Button>
+          <Button size="sm" className="h-7 gap-1 bg-accent text-accent-foreground hover:bg-accent/90">
+            <PlusCircle className="h-3.5 w-3.5" />
+            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+              Add Order
+            </span>
           </Button>
         </div>
       </div>
-
-      {/* Order Status Overview - 5-Stage Workflow */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
-        <Card className="bento-card">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">Order Placed</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
-                  {statusCounts.placed || 0}
-                </p>
-              </div>
-              <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-gray-500"></div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bento-card">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">Order Accepted</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
-                  {statusCounts.accepted || 0}
-                </p>
-              </div>
-              <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-blue-500"></div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bento-card">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">Processing</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
-                  {statusCounts.processing || 0}
-                </p>
-              </div>
-              <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-yellow-500"></div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bento-card">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">Ready to Pickup</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
-                  {statusCounts.ready || 0}
-                </p>
-              </div>
-              <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-purple-500"></div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bento-card">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">Out for Delivery</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
-                  {statusCounts.out_for_delivery || 0}
-                </p>
-              </div>
-              <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-green-500"></div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filter Controls */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search orders..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-64"
-              data-testid="search-orders"
-            />
-          </div>
-          <Button variant="outline" size="sm" data-testid="filter-orders">
-            <Filter className="w-4 h-4 mr-2" />
-            Filter
-          </Button>
-        </div>
-      </div>
-
-      {/* Conditional View Rendering */}
-      {viewMode === "list" && (
-        <Card className="bento-card">
+      <TabsContent value="all">
+        <Card>
           <CardHeader>
-            <CardTitle className="font-display font-semibold text-xl text-foreground">
-              All Orders
-            </CardTitle>
+            <CardTitle>Orders</CardTitle>
+            <CardDescription>
+              Manage your orders and view their sales details.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Order Number</TableHead>
+                  <TableHead>Order ID</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Payment</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="hidden md:table-cell">
+                    Date
+                  </TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow key={order.id} data-testid={`order-row-${order.orderNumber}`}>
-                    <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                {ORDERS_DATA.map((order) => (
+                  <TableRow key={order.orderId} className="interactive-row">
+                    <TableCell className="font-medium">
+                      {order.orderId}
+                    </TableCell>
                     <TableCell>
-                      <div>
-                        <p className="font-medium">{order.customerName}</p>
-                        <p className="text-sm text-muted-foreground">{order.customerEmail}</p>
+                      <div className="font-medium">{order.customer}</div>
+                      <div className="hidden text-sm text-muted-foreground md:inline">
+                        {order.email}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={getStatusColor(order.status)}>
-                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                      <Badge 
+                        variant={order.status === 'Fulfilled' ? 'default' : order.status === 'Declined' ? 'destructive' : 'secondary'}
+                        className={order.status === 'Fulfilled' ? 'bg-accent text-accent-foreground' : ''}
+                      >
+                        {order.status}
                       </Badge>
                     </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {order.date}
+                    </TableCell>
+                    <TableCell className="text-right">₹{order.amount.toFixed(2)}</TableCell>
                     <TableCell>
-                      <Badge className={getStatusColor(order.paymentStatus)}>
-                        {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {formatCurrency(parseFloat(order.totalAmount))}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {order.createdAt && formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="outline" size="sm" data-testid={`view-order-${order.orderNumber}`}>
-                        View
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            aria-haspopup="true"
+                            size="icon"
+                            variant="ghost"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Toggle menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem>Edit</DropdownMenuItem>
+                          <DropdownMenuItem>Delete</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </CardContent>
+          <CardFooter>
+            <div className="text-xs text-muted-foreground">
+              Showing <strong>1-5</strong> of <strong>5</strong> orders
+            </div>
+          </CardFooter>
         </Card>
-      )}
-
-      {/* Kanban Board View */}
-      {viewMode === "kanban" && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {kanbanColumns.map((column) => (
-            <Card key={column.id} className="bento-card h-fit">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="font-display font-semibold text-lg text-foreground flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${column.color}`}></div>
-                    {column.title}
-                  </CardTitle>
-                  <Badge variant="secondary" className="text-xs">
-                    {column.orders.length}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {column.orders.map((order) => (
-                  <Card key={order.id} className="kanban-order-card p-4 hover:shadow-md transition-all duration-200 cursor-pointer border border-border/50 hover:border-primary/20">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm text-foreground">{order.orderNumber}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {formatCurrency(parseFloat(order.totalAmount))}
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <User className="w-3 h-3" />
-                        <span className="truncate">{order.customerName}</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="w-3 h-3" />
-                        <span>{order.createdAt && formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}</span>
-                      </div>
-                      
-                      <div className="flex items-center justify-between pt-2 border-t border-border/30">
-                        <Badge className={getStatusColor(order.paymentStatus)} variant="outline">
-                          <DollarSign className="w-3 h-3 mr-1" />
-                          {order.paymentStatus}
-                        </Badge>
-                        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                          View
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-                
-                {column.orders.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No orders in this stage</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Calendar View */}
-      {viewMode === "calendar" && (
-        <Card className="bento-card">
-          <CardHeader>
-            <CardTitle className="font-display font-semibold text-xl text-foreground flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Order Calendar
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">Track orders by delivery dates and schedule pickups</p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-7 gap-2 mb-4">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="text-center text-sm font-medium text-muted-foreground p-2">
-                  {day}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-2">
-              {Array.from({ length: 35 }, (_, i) => {
-                const date = new Date();
-                date.setDate(date.getDate() - date.getDay() + i);
-                const dayOrders = orders?.filter(order => {
-                  if (!order.createdAt) return false;
-                  const orderDate = new Date(order.createdAt);
-                  return orderDate.toDateString() === date.toDateString();
-                }) || [];
-                
-                return (
-                  <div 
-                    key={i} 
-                    className={`min-h-[80px] p-2 border border-border rounded-lg ${
-                      date.toDateString() === new Date().toDateString() 
-                        ? 'bg-primary/10 border-primary' 
-                        : 'bg-muted/30'
-                    }`}
-                  >
-                    <div className="text-sm font-medium text-foreground mb-1">
-                      {date.getDate()}
-                    </div>
-                    <div className="space-y-1">
-                      {dayOrders.slice(0, 2).map((order, idx) => (
-                        <div 
-                          key={idx}
-                          className={`text-xs p-1 rounded ${
-                            order.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
-                            order.status === 'processing' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' :
-                            order.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' :
-                            'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-                          }`}
-                        >
-                          {order.orderNumber}
-                        </div>
-                      ))}
-                      {dayOrders.length > 2 && (
-                        <div className="text-xs text-muted-foreground">
-                          +{dayOrders.length - 2} more
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-4 flex items-center justify-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span>Completed</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                <span>Processing</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                <span>Pending</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <span>Cancelled</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
+      </TabsContent>
+    </Tabs>
+  )
 }

@@ -5,95 +5,57 @@ export default {
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+      colors: {
+        border: "rgb(var(--border))",
+        input: "rgb(var(--input))",
+        ring: "rgb(var(--ring))",
+        background: "rgb(var(--background))",
+        foreground: "rgb(var(--foreground))",
+        primary: {
+          DEFAULT: "rgb(var(--primary))",
+          foreground: "rgb(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "rgb(var(--secondary))",
+          foreground: "rgb(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "rgb(var(--destructive))",
+          foreground: "rgb(var(--destructive-foreground))",
+        },
+        success: {
+          DEFAULT: "rgb(var(--success))",
+          foreground: "rgb(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "rgb(var(--warning))",
+          foreground: "rgb(var(--warning-foreground))",
+        },
+        muted: {
+          DEFAULT: "rgb(var(--muted))",
+          foreground: "rgb(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "rgb(var(--accent))",
+          foreground: "rgb(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "rgb(var(--popover))",
+          foreground: "rgb(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "rgb(var(--card))",
+          foreground: "rgb(var(--card-foreground))",
+        },
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
-        button: "var(--radius-button)",
-        input: "var(--radius-input)",
-      },
-      colors: {
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
-        },
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        chart: {
-          "1": "hsl(var(--chart-1))",
-          "2": "hsl(var(--chart-2))",
-          "3": "hsl(var(--chart-3))",
-          "4": "hsl(var(--chart-4))",
-          "5": "hsl(var(--chart-5))",
-        },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
-        },
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
-        display: ["var(--font-display)"],
         mono: ["var(--font-mono)"],
-      },
-      fontSize: {
-        xs: ["var(--text-xs)", { lineHeight: "1.4" }],
-        sm: ["var(--text-sm)", { lineHeight: "1.5" }],
-        base: ["var(--text-base)", { lineHeight: "1.5" }],
-        lg: ["var(--text-lg)", { lineHeight: "1.4" }],
-        xl: ["var(--text-xl)", { lineHeight: "1.3" }],
-        "2xl": ["var(--text-2xl)", { lineHeight: "1.2" }],
-      },
-      fontWeight: {
-        normal: "var(--font-normal)",
-        medium: "var(--font-medium)",
-        semibold: "var(--font-semibold)",
-        bold: "var(--font-bold)",
-      },
-      spacing: {
-        xs: "var(--spacing-xs)",
-        sm: "var(--spacing-sm)",
-        md: "var(--spacing-md)",
-        lg: "var(--spacing-lg)",
-        xl: "var(--spacing-xl)",
-      },
-      boxShadow: {
-        'soft': '0 2px 8px 0 rgba(0, 0, 0, 0.06)',
-        'soft-lg': '0 4px 16px 0 rgba(0, 0, 0, 0.08)',
-        'elevation': '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
       },
       keyframes: {
         "accordion-down": {

@@ -22,17 +22,21 @@ function Router() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <div className={`flex h-screen overflow-hidden bg-background ${sidebarCollapsed ? 'sidebar-collapsed' : 'sidebar-expanded'}`}>
+    <div 
+      className={`grid min-h-screen w-full transition-all duration-300 ease-in-out ${
+        sidebarCollapsed ? "lg:grid-cols-[64px_1fr]" : "lg:grid-cols-[256px_1fr]"
+      }`}
+    >
       <Sidebar 
         isCollapsed={sidebarCollapsed} 
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
       />
-      <div className="flex-1 flex flex-col overflow-hidden main-content">
+      <div className="flex flex-col">
         <Header 
           sidebarCollapsed={sidebarCollapsed} 
           onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
         />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto bg-background p-4 sm:p-6 lg:p-8">
           <ErrorBoundary>
             <Switch>
               <Route path="/" component={Dashboard} />

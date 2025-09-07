@@ -1,102 +1,57 @@
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { formatCurrency, getStatusColor } from "@/lib/data";
-import { formatDistanceToNow } from "date-fns";
-import type { Order } from "@shared/schema";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { formatCurrency } from "@/lib/data";
+
+// NOTE: We'll use static data for now. We will reconnect this to the API later.
+const RECENT_ORDERS_DATA = [
+  {
+    name: "Olivia Martin",
+    email: "olivia.martin@email.com",
+    avatar: "/avatars/01.png",
+    totalAmount: 1999.00,
+  },
+  {
+    name: "Jackson Lee",
+    email: "jackson.lee@email.com",
+    avatar: "/avatars/02.png",
+    totalAmount: 39.00,
+  },
+  {
+    name: "Isabella Nguyen",
+    email: "isabella.nguyen@email.com",
+    avatar: "/avatars/03.png",
+    totalAmount: 299.00,
+  },
+  {
+    name: "William Kim",
+    email: "will@email.com",
+    avatar: "/avatars/04.png",
+    totalAmount: 99.00,
+  },
+  {
+    name: "Sofia Davis",
+    email: "sofia.davis@email.com",
+    avatar: "/avatars/05.png",
+    totalAmount: 39.00,
+  },
+];
+
 
 export default function RecentOrders() {
-  const { data: orders, isLoading } = useQuery<Order[]>({
-    queryKey: ["/api/orders"],
-    select: (data) => data?.slice(0, 4) || [], // Show only 4 most recent orders
-  });
-
-  if (isLoading) {
-    return (
-      <Card className="bento-card" data-testid="recent-orders">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="font-display font-semibold text-lg text-foreground">
-              Recent Orders
-            </CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg animate-pulse">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-muted rounded-full"></div>
-                  <div>
-                    <div className="w-24 h-4 bg-muted rounded"></div>
-                    <div className="w-20 h-3 bg-muted rounded mt-1"></div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="w-16 h-4 bg-muted rounded"></div>
-                  <div className="w-12 h-5 bg-muted rounded mt-1"></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <Card className="bento-card" data-testid="recent-orders">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="font-display font-semibold text-sm sm:text-lg text-foreground">
-            Recent Orders
-          </CardTitle>
-          <Button 
-            variant="link" 
-            size="sm" 
-            data-testid="view-all-orders"
-            className="text-xs sm:text-sm"
-            onClick={() => {
-              // Navigate to orders page
-              window.location.href = '/orders';
-            }}
-          >
-            View All
-          </Button>
+    <div className="space-y-8">
+      {RECENT_ORDERS_DATA.map((order, i) => (
+        <div key={i} className="flex items-center">
+          <Avatar className="h-9 w-9">
+            <AvatarImage src={order.avatar} alt="Avatar" />
+            <AvatarFallback>{order.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+          </Avatar>
+          <div className="ml-4 space-y-1">
+            <p className="text-sm font-medium leading-none">{order.name}</p>
+            <p className="text-sm text-muted-foreground">{order.email}</p>
+          </div>
+          <div className="ml-auto font-medium">{formatCurrency(order.totalAmount)}</div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3 sm:space-y-4">
-          {orders?.map((order) => (
-            <div 
-              key={order.id} 
-              className="flex items-center justify-between p-2 sm:p-3 bg-muted/50 rounded-lg"
-              data-testid={`order-${order.orderNumber}`}
-            >
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary rounded-full flex items-center justify-center">
-                  <span className="text-xs text-primary-foreground font-medium">
-                    {order.customerName.split(' ').map(n => n[0]).join('')}
-                  </span>
-                </div>
-                <div>
-                  <p className="font-medium text-xs sm:text-sm text-foreground">{order.customerName}</p>
-                  <p className="text-xs text-muted-foreground">{order.orderNumber}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="font-medium text-xs sm:text-sm text-foreground">
-                  {formatCurrency(parseFloat(order.totalAmount))}
-                </p>
-                <Badge className={`text-xs ${getStatusColor(order.status)}`}>
-                  {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                </Badge>
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+      ))}
+    </div>
   );
 }
