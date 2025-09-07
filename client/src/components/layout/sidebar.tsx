@@ -10,15 +10,24 @@ import {
   Home,
   Zap,
   Menu,
-  X
+  X,
+  ClipboardList,
+  Map,
+  PlusCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: Home },
   { name: "Orders", href: "/orders", icon: ShoppingCart },
   { name: "Services", href: "/services", icon: Package },
-  { name: "POS", href: "/pos", icon: CreditCard },
+  { name: "Create Order", href: "/create-order", icon: PlusCircle },
   { name: "Tracking", href: "/tracking", icon: Truck },
   { name: "Customers", href: "/customers", icon: Users },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },

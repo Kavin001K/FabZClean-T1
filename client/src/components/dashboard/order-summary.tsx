@@ -5,7 +5,7 @@ import { ExternalLink } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
 import type { PosTransaction } from "@shared/schema";
 
-export default function POSIntegration() {
+export default function OrderSummary() {
   const { data: transactions, isLoading } = useQuery<PosTransaction[]>({
     queryKey: ["/api/pos/transactions"],
   });
@@ -55,17 +55,11 @@ export default function POSIntegration() {
   }
 
   return (
-    <Card className="bento-card" data-testid="pos-integration">
+    <Card className="bento-card" data-testid="order-summary">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="font-display font-semibold text-sm sm:text-lg text-foreground">
-            POS Integration
-          </CardTitle>
-          <div className="flex items-center gap-1 sm:gap-2">
-            <div className="status-indicator status-online"></div>
-            <span className="text-xs sm:text-sm text-muted-foreground">Connected</span>
-          </div>
-        </div>
+        <CardTitle className="text-lg font-semibold tracking-tight">
+          Order Summary
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
@@ -101,15 +95,15 @@ export default function POSIntegration() {
         </div>
 
         <Button 
-          className="w-full mt-4" 
-          data-testid="view-pos-details"
+          size="sm" 
+          variant="outline" 
+          className="mt-4 w-full" 
+          data-testid="create-new-order"
           onClick={() => {
-            // Navigate to POS page
-            window.location.href = '/pos';
+            window.location.href = '/create-order';
           }}
         >
-          <ExternalLink className="w-4 h-4 mr-2" />
-          View POS Details
+          Create New Order
         </Button>
       </CardContent>
     </Card>

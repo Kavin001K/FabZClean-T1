@@ -10,13 +10,15 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Orders from "@/pages/orders";
 import Services from "@/pages/services";
-import POS from "@/pages/pos";
+import CreateOrder from "@/pages/create-order";
 import Tracking from "@/pages/tracking";
 import Customers from "@/pages/customers";
 import Analytics from "@/pages/analytics";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
+import Inventory from "@/pages/inventory";
+import Logistics from "@/pages/logistics";
 
 function Router() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -36,16 +38,18 @@ function Router() {
           sidebarCollapsed={sidebarCollapsed} 
           onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
         />
-        <main className="flex-1 overflow-auto bg-background p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           <ErrorBoundary>
             <Switch>
               <Route path="/" component={Dashboard} />
               <Route path="/orders" component={Orders} />
-              <Route path="/services" component={Services} />
-              <Route path="/pos" component={POS} />
-              <Route path="/tracking" component={Tracking} />
+              <Route path="/inventory" component={Inventory} />
               <Route path="/customers" component={Customers} />
               <Route path="/analytics" component={Analytics} />
+              <Route path="/services" component={Services} />
+              <Route path="/create-order" component={CreateOrder} />
+              <Route path="/tracking" component={Tracking} />
+              <Route path="/logistics" component={Logistics} />
               <Route component={NotFound} />
             </Switch>
           </ErrorBoundary>

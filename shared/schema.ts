@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, timestamp, boolean, jsonb, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -29,8 +29,8 @@ export const orders = pgTable("orders", {
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
   customerPhone: text("customer_phone"),
-  status: text("status").notNull().default("pending"), // pending, processing, completed, cancelled
-  paymentStatus: text("payment_status").notNull().default("pending"), // pending, paid, failed
+  status: text("status", { enum: ["pending", "processing", "completed", "cancelled"] }).notNull(), // pending, processing, completed, cancelled
+  paymentStatus: text("payment_status", { enum: ["pending", "paid", "failed"] }).notNull().default("pending"), // pending, paid, failed
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   items: jsonb("items").notNull(), // Array of order items
   shippingAddress: jsonb("shipping_address"),
@@ -43,7 +43,7 @@ export const deliveries = pgTable("deliveries", {
   orderId: varchar("order_id").references(() => orders.id),
   driverName: text("driver_name").notNull(),
   vehicleId: text("vehicle_id").notNull(),
-  status: text("status").notNull().default("pending"), // pending, in_transit, delivered, failed
+  status: text("status", { enum: ["pending", "in_transit", "delivered", "failed"] }).notNull().default("pending"), // pending, in_transit, delivered, failed
   estimatedDelivery: timestamp("estimated_delivery"),
   actualDelivery: timestamp("actual_delivery"),
   location: jsonb("location"), // Current GPS coordinates
@@ -52,14 +52,15 @@ export const deliveries = pgTable("deliveries", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const posTransactions = pgTable("pos_transactions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  transactionNumber: text("transaction_number").notNull().unique(),
+export const orderTransactions = pgTable("order_transactions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  transactionNumber: varchar("transaction_number", { length: 255 }).notNull().unique(),
   items: jsonb("items").notNull(), // Array of transaction items
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
-  paymentMethod: text("payment_method").notNull(), // cash, credit, debit, mobile
+  paymentMethod: text("payment_method", { enum: ["cash", "credit", "debit", "mobile"] }).notNull(), // cash, credit, debit, mobile
   cashierId: text("cashier_id"),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const customers = pgTable("customers", {
@@ -97,9 +98,10 @@ export const insertDeliverySchema = createInsertSchema(deliveries).omit({
   updatedAt: true,
 });
 
-export const insertPosTransactionSchema = createInsertSchema(posTransactions).omit({
+export const insertOrderTransactionSchema = createInsertSchema(orderTransactions).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 export const insertCustomerSchema = createInsertSchema(customers).omit({
@@ -121,8 +123,8 @@ export type Order = typeof orders.$inferSelect;
 export type InsertDelivery = z.infer<typeof insertDeliverySchema>;
 export type Delivery = typeof deliveries.$inferSelect;
 
-export type InsertPosTransaction = z.infer<typeof insertPosTransactionSchema>;
-export type PosTransaction = typeof posTransactions.$inferSelect;
+export type InsertOrderTransaction = z.infer<typeof insertOrderTransactionSchema>;
+export type OrderTransaction = typeof orderTransactions.$inferSelect;
 
 export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
 export type Customer = typeof customers.$inferSelect;
