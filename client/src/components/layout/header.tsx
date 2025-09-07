@@ -18,7 +18,7 @@ export default function Header({ onSidebarToggle }: HeaderProps) {
           className="lg:hidden"
           onClick={onSidebarToggle}
         >
-          <Menu className="h-5 w-5" />
+          <Menu className="h-6 w-6" />
           <span className="sr-only">Toggle sidebar</span>
         </Button>
         <h1 className="text-xl font-bold">Dashboard</h1>

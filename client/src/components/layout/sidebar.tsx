@@ -1,5 +1,4 @@
 import { Link, useLocation } from "wouter";
-import { useState } from "react";
 import { 
   BarChart3, 
   Package, 
@@ -53,11 +52,11 @@ export default function Sidebar({ isOpen, isCollapsed, onToggle, onClose }: Side
         <div className="flex h-16 items-center justify-between p-4">
           <Link href="/">
             <div className="flex items-center gap-2">
-              <img src="/assets/logo.webp" alt="FabZClean" className="h-10 w-auto" />
+              <img src="/assets/logo.webp" alt="FabZClean" className="h-100 w-auto" />
             </div>
           </Link>
           <button onClick={onToggle} className="hidden lg:block">
-            {isCollapsed ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
+            {isCollapsed ? <Menu className="w-7 h-7" /> : <X className="w-7 h-7" />}
           </button>
         </div>
         <nav className="flex-1 space-y-2 p-4">
@@ -74,7 +73,8 @@ export default function Sidebar({ isOpen, isCollapsed, onToggle, onClose }: Side
                 )}
                 onClick={onClose}
               >
-                <item.icon className="h-5 w-5" />
+                {/* ✅ MODIFIED LINE BELOW */}
+                <item.icon className="h-8 w-8 flex-shrink-0" />
                 {!isCollapsed && <span>{item.name}</span>}
               </Link>
             );
