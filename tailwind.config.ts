@@ -53,6 +53,15 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      fontSize: {
+        h1: ["2.25rem", { lineHeight: "2.5rem", fontWeight: "700" }],
+        h2: ["1.875rem", { lineHeight: "2.25rem", fontWeight: "700" }],
+        h3: ["1.5rem", { lineHeight: "2rem", fontWeight: "600" }],
+        body: ["1rem", { lineHeight: "1.5rem", fontWeight: "400" }],
+        "body-small": ["0.875rem", { lineHeight: "1.25rem", fontWeight: "400" }],
+        label: ["1rem", { lineHeight: "1.5rem", fontWeight: "500" }],
+        caption: ["0.75rem", { lineHeight: "1rem", fontWeight: "400" }],
+      },
       fontFamily: {
         sans: ["var(--font-sans)"],
         mono: ["var(--font-mono)"],
