@@ -20,13 +20,13 @@ export default function SalesChart() {
           <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.5} />
           <XAxis
             dataKey="day"
-            stroke="hsl(var(--muted-foreground))"
+            stroke="rgb(var(--muted-foreground))"
             fontSize={12}
             tickLine={false}
             axisLine={false}
           />
           <YAxis
-            stroke="hsl(var(--muted-foreground))"
+            stroke="rgb(var(--muted-foreground))"
             fontSize={12}
             tickLine={false}
             axisLine={false}
@@ -34,15 +34,15 @@ export default function SalesChart() {
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "hsl(var(--card))",
-              borderColor: "hsl(var(--border))",
+              backgroundColor: "rgb(var(--card))",
+              borderColor: "rgb(var(--border))",
             }}
           />
           <Line
             type="monotone"
             dataKey="revenue"
             strokeWidth={2}
-            stroke="hsl(var(--primary))"
+            stroke="rgb(var(--primary))"
             activeDot={{ r: 8 }}
           />
         </LineChart>
