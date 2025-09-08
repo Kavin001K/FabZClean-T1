@@ -34,46 +34,53 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { useQuery } from "@tanstack/react-query"
+import type { Service } from "@shared/schema"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { useState } from "react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
-// NOTE: We'll use static data for now. We will reconnect this to the API later.
-const SERVICES_DATA = [
-    {
-      id: "SRV001",
-      name: "Dry Cleaning - Suit",
-      category: "Dry Cleaning",
-      price: 150.00,
-      duration: "2-3 days",
-      status: "Active",
-    },
-    {
-      id: "SRV002",
-      name: "Wash & Press - Shirt",
-      category: "Wash & Press",
-      price: 25.00,
-      duration: "1 day",
-      status: "Active",
-    },
-    {
-      id: "SRV003",
-      name: "Alterations - Hemming",
-      category: "Alterations",
-      price: 50.00,
-      duration: "3-5 days",
-      status: "Active",
-    },
-    {
-      id: "SRV004",
-      name: "Leather Cleaning",
-      category: "Specialty",
-      price: 200.00,
-      duration: "5-7 days",
-      status: "Inactive",
-    },
+const kpiData = [
+    { title: "Total Services", value: "24", change: "+5 this month", changeType: "positive" },
+    { title: "Most Popular", value: "Dry Cleaning", change: "1,200 orders", changeType: "positive" },
+    { title: "Highest Revenue", value: "Premium Laundry", change: "₹150,000", changeType: "positive" },
+    { title: "Newest Service", value: "Leather Care", change: "Added 2 weeks ago", changeType: "positive" },
 ];
 
 export default function Services() {
+  const { data: services, isLoading } = useQuery<Service[]>({
+    queryKey: ["/api/services"],
+  });
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
   return (
     <div className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {kpiData.map((kpi) => (
+                <Card key={kpi.title}>
+                    <CardHeader>
+                        <CardTitle>{kpi.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{kpi.value}</div>
+                        <p className={`text-xs ${kpi.changeType === "positive" ? "text-green-500" : "text-red-500"}`}>{kpi.change}</p>
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
       <Card>
         <CardHeader>
           <div className="flex items-center">
@@ -90,12 +97,36 @@ export default function Services() {
                     Export
                     </span>
                 </Button>
-                <Button size="sm" className="h-8 gap-1 bg-accent text-accent-foreground hover:bg-accent/90">
-                    <PlusCircle className="h-3.5 w-3.5" />
-                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Add Service
-                    </span>
-                </Button>
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button size="sm" className="h-8 gap-1 bg-accent text-accent-foreground hover:bg-accent/90">
+                            <PlusCircle className="h-3.5 w-3.5" />
+                            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                            Add Service
+                            </span>
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Add New Service</DialogTitle>
+                        </DialogHeader>
+                        <div className="py-4 space-y-4">
+                            <div>
+                                <Label htmlFor="serviceName">Service Name</Label>
+                                <Input id="serviceName" />
+                            </div>
+                            <div>
+                                <Label htmlFor="servicePrice">Price</Label>
+                                <Input id="servicePrice" type="number" />
+                            </div>
+                            <div>
+                                <Label htmlFor="serviceDuration">Duration</Label>
+                                <Input id="serviceDuration" />
+                            </div>
+                            <Button>Save Service</Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
           </div>
         </CardHeader>
@@ -130,46 +161,95 @@ export default function Services() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {SERVICES_DATA.map((service) => (
-                <TableRow key={service.id} className="interactive-row">
-                  <TableCell className="font-medium">{service.name}</TableCell>
-                  <TableCell className="hidden sm:table-cell">{service.category}</TableCell>
-                  <TableCell className="hidden sm:table-cell">₹{service.price.toFixed(2)}</TableCell>
-                  <TableCell className="hidden md:table-cell">{service.duration}</TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant={service.status === 'Active' ? 'default' : 'secondary'}
-                      className={service.status === 'Active' ? 'bg-accent text-accent-foreground' : ''}
-                    >
-                      {service.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button aria-haspopup="true" size="icon" variant="ghost">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Toggle menu</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
-                        <DropdownMenuItem>Delete</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-        <CardFooter>
-          <div className="text-xs text-muted-foreground">
-            Showing <strong>1-4</strong> of <strong>4</strong> services
-          </div>
-        </CardFooter>
+                {isLoading ? (
+                    <TableRow>
+                        <TableCell colSpan={6} className="text-center">Loading services...</TableCell>
+                    </TableRow>
+                ) : (
+                    services?.map((service) => (
+                        <TableRow key={service.id} className="interactive-row">
+                            <TableCell className="font-medium">{service.name}</TableCell>
+                            <TableCell className="hidden sm:table-cell">{service.category}</TableCell>
+                            <TableCell className="hidden sm:table-cell">₹{parseFloat(service.price).toFixed(2)}</TableCell>
+                            <TableCell className="hidden md:table-cell">{service.duration}</TableCell>
+                            <TableCell>
+                                <Badge 
+                                  variant={service.status === 'Active' ? 'default' : 'secondary'}
+                                  className={service.status === 'Active' ? 'bg-accent text-accent-foreground' : ''}
+                                >
+                                  {service.status}
+                                </Badge>
+                            </TableCell>
+                            <TableCell>
+                                <AlertDialog>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                <MoreHorizontal className="h-4 w-4" />
+                                                <span className="sr-only">Toggle menu</span>
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                            <DropdownMenuItem onClick={() => {
+                                                setSelectedService(service);
+                                                setIsEditDialogOpen(true);
+                                            }}>Edit</DropdownMenuItem>
+                                            <AlertDialogTrigger asChild>
+                                                <DropdownMenuItem className="text-red-500" onSelect={(e) => e.preventDefault()}>Delete</DropdownMenuItem>
+                                            </AlertDialogTrigger>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                    <AlertDialogContent>
+                                       <AlertDialogHeader>
+                                           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                           <AlertDialogDescription>
+                                               This action cannot be undone. This will permanently delete the service.
+                                           </AlertDialogDescription>
+                                       </AlertDialogHeader>
+                                       <AlertDialogFooter>
+                                           <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                           <AlertDialogAction>Delete</AlertDialogAction>
+                                       </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </TableCell>
+                        </TableRow>
+                    ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+          <CardFooter>
+            <div className="text-xs text-muted-foreground">
+              Showing <strong>1-{services?.length || 0}</strong> of <strong>{services?.length || 0}</strong> services
+            </div>
+          </CardFooter>
       </Card>
+      {selectedService && (
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit Service</DialogTitle>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    <div>
+                        <Label htmlFor="serviceName">Service Name</Label>
+                        <Input id="serviceName" defaultValue={selectedService.name} />
+                    </div>
+                    <div>
+                        <Label htmlFor="servicePrice">Price</Label>
+                        <Input id="servicePrice" type="number" defaultValue={selectedService.price} />
+                    </div>
+                    <div>
+                        <Label htmlFor="serviceDuration">Duration</Label>
+                        <Input id="serviceDuration" defaultValue={selectedService.duration} />
+                    </div>
+                    <Button>Save Changes</Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

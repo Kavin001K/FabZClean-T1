@@ -40,6 +40,11 @@ import {
 } from "@/components/ui/tabs"
 import { useQuery } from "@tanstack/react-query"
 import type { Order } from "@shared/schema"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { useState } from "react"
 
 const kpiData = [
     { title: "Total Orders", value: "5,231", change: "+12.5%", changeType: "positive" },
@@ -48,60 +53,11 @@ const kpiData = [
     { title: "Average Order Value", value: "₹2,450", change: "+5.7%", changeType: "positive" },
 ];
 
-// NOTE: We'll use static data for now. We will reconnect this to the API later.
-const ORDERS_DATA = [
-    {
-      orderId: "ORD001",
-      customer: "Liam Johnson",
-      email: "liam@example.com",
-      type: "Sale",
-      status: "Fulfilled",
-      date: "2023-06-23",
-      amount: 250.00,
-    },
-    {
-      orderId: "ORD002",
-      customer: "Olivia Smith",
-      email: "olivia@example.com",
-      type: "Refund",
-      status: "Declined",
-      date: "2023-06-24",
-      amount: 150.00,
-    },
-    {
-      orderId: "ORD003",
-      customer: "Noah Williams",
-      email: "noah@example.com",
-      type: "Subscription",
-      status: "Fulfilled",
-      date: "2023-06-25",
-      amount: 350.00,
-    },
-    {
-      orderId: "ORD004",
-      customer: "Emma Brown",
-      email: "emma@example.com",
-      type: "Sale",
-      status: "Fulfilled",
-      date: "2023-06-26",
-      amount: 450.00,
-    },
-    {
-      orderId: "ORD005",
-      customer: "Lucas Jones",
-      email: "lucas@example.com",
-      type: "Subscription",
-      status: "Unfulfilled",
-      date: "2023-06-27",
-      amount: 550.00,
-    },
-];
-
-
 export default function Orders() {
   const { data: orders, isLoading } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
   });
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   return (
     <div className="space-y-6">
@@ -157,12 +113,36 @@ export default function Orders() {
                 Export
               </span>
             </Button>
-            <Button size="sm" className="h-7 gap-1 bg-accent text-accent-foreground hover:bg-accent/90">
-              <PlusCircle className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Add Order
-              </span>
-            </Button>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button size="sm" className="h-7 gap-1 bg-accent text-accent-foreground hover:bg-accent/90">
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                    Add Order
+                  </span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Order</DialogTitle>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                  <div>
+                    <Label htmlFor="customerName">Customer Name</Label>
+                    <Input id="customerName" />
+                  </div>
+                  <div>
+                    <Label htmlFor="orderTotal">Order Total</Label>
+                    <Input id="orderTotal" type="number" />
+                  </div>
+                  <div>
+                    <Label htmlFor="orderDetails">Order Details</Label>
+                    <Textarea id="orderDetails" />
+                  </div>
+                  <Button>Save Order</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
         <TabsContent value="all">
@@ -196,7 +176,7 @@ export default function Orders() {
                     </TableRow>
                   ) : (
                     orders?.map((order) => (
-                      <TableRow key={order.orderId} className="interactive-row">
+                      <TableRow key={order.orderId} className="interactive-row" onClick={() => setSelectedOrder(order)}>
                         <TableCell className="font-medium">
                           {order.orderId}
                         </TableCell>
@@ -250,7 +230,23 @@ export default function Orders() {
             </CardFooter>
           </Card>
         </TabsContent>
-      </Tabs>
+      {selectedOrder && (
+        <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Order Details: {selectedOrder.orderId}</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <p><strong>Customer:</strong> {selectedOrder.customerName}</p>
+              <p><strong>Email:</strong> {selectedOrder.customerEmail}</p>
+              <p><strong>Status:</strong> {selectedOrder.status}</p>
+              <p><strong>Date:</strong> {new Date(selectedOrder.createdAt).toLocaleDateString()}</p>
+              <p><strong>Total:</strong> ₹{parseFloat(selectedOrder.totalAmount).toFixed(2)}</p>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </Tabs>
     </div>
   )
 }

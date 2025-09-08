@@ -32,11 +32,11 @@ import {
   PieChart as PieChartIcon
 } from "lucide-react";
 import { formatCurrency, formatNumber, formatPercentage, SAMPLE_SALES_DATA } from "@/lib/data";
-import type { Product, Order, Customer, PosTransaction } from "@shared/schema";
+import type { Service, Order, Customer, PosTransaction } from "@shared/schema";
 
 export default function Analytics() {
-  const { data: products, isLoading: productsLoading } = useQuery<Product[]>({
-    queryKey: ["/api/products"],
+  const { data: services, isLoading: servicesLoading } = useQuery<Service[]>({
+    queryKey: ["/api/services"],
   });
 
   const { data: orders, isLoading: ordersLoading } = useQuery<Order[]>({
@@ -57,7 +57,7 @@ export default function Analytics() {
 
   // Calculate analytics data
   const analyticsData = useMemo(() => {
-    if (!orders || !products || !customers || !posTransactions) {
+    if (!orders || !services || !customers) {
       return null;
     }
 
@@ -69,43 +69,28 @@ export default function Analytics() {
       return acc;
     }, {} as Record<string, number>);
 
-    // Product performance
-    const productSales = products.map(product => {
-      const productOrders = orders.filter(order => 
-        order.items && Array.isArray(order.items) && 
-        order.items.some((item: any) => item.productId === product.id)
-      );
-      const totalSold = productOrders.reduce((sum, order) => {
-        const item = (order.items as any[]).find((item: any) => item.productId === product.id);
-        return sum + (item?.quantity || 0);
-      }, 0);
-      const revenue = productOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
-      
-      return {
-        name: product.name,
-        sold: totalSold,
-        revenue,
-        stock: product.stockQuantity,
-        category: product.category
-      };
+    // Service performance
+    const servicePerformance = services.map(service => {
+        const serviceOrders = orders.filter(order => order.serviceId === service.id);
+        const revenue = serviceOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
+        return {
+            name: service.name,
+            orders: serviceOrders.length,
+            revenue,
+        };
     }).sort((a, b) => b.revenue - a.revenue);
 
     // Category performance
-    const categoryPerformance = products.reduce((acc, product) => {
-      const category = product.category;
-      if (!acc[category]) {
-        acc[category] = { name: category, revenue: 0, products: 0 };
-      }
-      acc[category].products += 1;
-      
-      const productOrders = orders.filter(order => 
-        order.items && Array.isArray(order.items) && 
-        order.items.some((item: any) => item.productId === product.id)
-      );
-      acc[category].revenue += productOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
-      
-      return acc;
-    }, {} as Record<string, { name: string; revenue: number; products: number }>);
+    const categoryPerformance = services.reduce((acc, service) => {
+        const category = service.category;
+        if (!acc[category]) {
+            acc[category] = { name: category, revenue: 0, services: 0 };
+        }
+        acc[category].services += 1;
+        const serviceOrders = orders.filter(order => order.serviceId === service.id);
+        acc[category].revenue += serviceOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
+        return acc;
+    }, {} as Record<string, { name: string; revenue: number; services: number }>);
 
     // Customer segments
     const customerSegments = customers.map(customer => ({
@@ -123,14 +108,14 @@ export default function Analytics() {
 
     return {
       revenueByMonth: Object.entries(revenueByMonth).map(([month, revenue]) => ({ month, revenue })),
-      productSales: productSales.slice(0, 10),
+      servicePerformance: servicePerformance.slice(0, 10),
       categoryPerformance: Object.values(categoryPerformance),
       customerSegments: customerSegments.slice(0, 10),
       orderStatusDistribution: Object.entries(orderStatusDistribution).map(([status, count]) => ({ status, count })),
     };
-  }, [orders, products, customers, posTransactions]);
+  }, [orders, services, customers]);
 
-  const isLoading = productsLoading || ordersLoading || customersLoading || posLoading;
+  const isLoading = servicesLoading || ordersLoading || customersLoading;
 
   const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
@@ -239,7 +224,7 @@ export default function Analytics() {
       <Tabs defaultValue="revenue" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="revenue" data-testid="revenue-tab">Revenue</TabsTrigger>
-          <TabsTrigger value="products" data-testid="products-tab">Products</TabsTrigger>
+          <TabsTrigger value="services" data-testid="services-tab">Services</TabsTrigger>
           <TabsTrigger value="customers" data-testid="customers-tab">Customers</TabsTrigger>
           <TabsTrigger value="operations" data-testid="operations-tab">Operations</TabsTrigger>
         </TabsList>
@@ -259,14 +244,14 @@ export default function Analytics() {
                     <AreaChart data={SAMPLE_SALES_DATA}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" />
-                      <YAxis stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `$${(value / 1000)}k`} />
+                      <YAxis stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `₹${(value / 1000)}k`} />
                       <Tooltip 
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",
                           border: "1px solid hsl(var(--border))",
                           borderRadius: "8px"
                         }}
-                        formatter={(value) => [`$${(value as number / 1000).toFixed(1)}k`, "Revenue"]}
+                        formatter={(value) => [`₹${(value as number / 1000).toFixed(1)}k`, "Revenue"]}
                       />
                       <Area 
                         type="monotone" 
@@ -320,117 +305,80 @@ export default function Analytics() {
           </div>
         </TabsContent>
 
-        {/* Product Analytics */}
-        <TabsContent value="products" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bento-card">
-              <CardHeader>
-                <CardTitle className="font-display font-semibold text-lg text-foreground">
-                  Top Performing Products
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="chart-container">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analyticsData?.productSales || []}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis 
-                        dataKey="name" 
-                        stroke="hsl(var(--muted-foreground))"
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                      />
-                      <YAxis stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `$${value}`} />
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px"
-                        }}
-                        formatter={(value) => [formatCurrency(value as number), "Revenue"]}
-                      />
-                      <Bar dataKey="revenue" fill="hsl(var(--chart-2))" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bento-card">
-              <CardHeader>
-                <CardTitle className="font-display font-semibold text-lg text-foreground">
-                  Category Performance
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="chart-container">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={analyticsData?.categoryPerformance || []}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="revenue"
-                      >
-                        {analyticsData?.categoryPerformance.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px"
-                        }}
-                        formatter={(value) => [formatCurrency(value as number), "Revenue"]}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Product Performance Table */}
-          <Card className="bento-card">
-            <CardHeader>
-              <CardTitle className="font-display font-semibold text-lg text-foreground">
-                Product Performance Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {analyticsData?.productSales.slice(0, 5).map((product, index) => (
-                  <div 
-                    key={product.name}
-                    className="flex items-center justify-between p-4 border border-border rounded-lg"
-                    data-testid={`product-performance-${index}`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="text-center">
-                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                          <span className="text-xs text-primary-foreground font-bold">#{index + 1}</span>
+        {/* Service Analytics */}
+        <TabsContent value="services" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="bento-card">
+                    <CardHeader>
+                        <CardTitle className="font-display font-semibold text-lg text-foreground">
+                            Top Performing Services
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="chart-container">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={analyticsData?.servicePerformance || []}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                                    <XAxis 
+                                        dataKey="name" 
+                                        stroke="hsl(var(--muted-foreground))"
+                                        angle={-45}
+                                        textAnchor="end"
+                                        height={80}
+                                    />
+                                    <YAxis stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `₹${value}`} />
+                                    <Tooltip 
+                                        contentStyle={{
+                                            backgroundColor: "hsl(var(--card))",
+                                            border: "1px solid hsl(var(--border))",
+                                            borderRadius: "8px"
+                                        }}
+                                        formatter={(value) => [formatCurrency(value as number), "Revenue"]}
+                                    />
+                                    <Bar dataKey="revenue" fill="hsl(var(--chart-2))" />
+                                </BarChart>
+                            </ResponsiveContainer>
                         </div>
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{product.name}</p>
-                        <p className="text-sm text-muted-foreground">{product.category}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-foreground">{formatCurrency(product.revenue)}</p>
-                      <p className="text-sm text-muted-foreground">{product.sold} units sold</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                    </CardContent>
+                </Card>
+                <Card className="bento-card">
+                    <CardHeader>
+                        <CardTitle className="font-display font-semibold text-lg text-foreground">
+                            Category Performance
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="chart-container">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={analyticsData?.categoryPerformance || []}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                        outerRadius={80}
+                                        fill="#8884d8"
+                                        dataKey="revenue"
+                                    >
+                                        {analyticsData?.categoryPerformance.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip 
+                                        contentStyle={{
+                                            backgroundColor: "hsl(var(--card))",
+                                            border: "1px solid hsl(var(--border))",
+                                            borderRadius: "8px"
+                                        }}
+                                        formatter={(value) => [formatCurrency(value as number), "Revenue"]}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
         </TabsContent>
 
         {/* Customer Analytics */}
@@ -454,7 +402,7 @@ export default function Analytics() {
                         textAnchor="end"
                         height={80}
                       />
-                      <YAxis stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `$${value}`} />
+                      <YAxis stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `₹${value}`} />
                       <Tooltip 
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",
@@ -499,7 +447,7 @@ export default function Analytics() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Customer Acquisition Cost</span>
-                      <span className="font-medium text-foreground">$47.20</span>
+                      <span className="font-medium text-foreground">₹47.20</span>
                     </div>
                   </div>
                 </div>
@@ -648,7 +596,7 @@ export default function Analytics() {
                 <div className="text-center p-6 border border-border rounded-lg">
                   <Package className="w-8 h-8 mx-auto mb-3 text-purple-500" />
                   <p className="text-xl font-display font-bold text-foreground mb-1">
-                    {products?.filter(p => p.stockQuantity <= p.reorderLevel).length || 0}
+                    {services?.filter(s => s.stockQuantity <= s.reorderLevel).length || 0}
                   </p>
                   <p className="text-sm text-muted-foreground">Items Need Restocking</p>
                   <div className="flex items-center justify-center gap-1 mt-2">

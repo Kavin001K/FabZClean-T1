@@ -10,6 +10,10 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 const revenueData = [
   { name: 'Week 1', revenue: 4000 },
@@ -70,58 +74,181 @@ export default function SuperAdminDashboard() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Super Admin Dashboard</h1>
-        <Select>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Franchises" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Franchises</SelectItem>
-            <SelectItem value="fr-1">Franchise 1</SelectItem>
-            <SelectItem value="fr-2">Franchise 2</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+            <h1 className="text-2xl font-bold tracking-tight">Super Admin Dashboard</h1>
+            <Select>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="All Franchises" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Franchises</SelectItem>
+                    <SelectItem value="fr-1">Franchise 1</SelectItem>
+                    <SelectItem value="fr-2">Franchise 2</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
 
       <div>
         <h2 className="text-lg font-semibold mb-2">Quick Actions</h2>
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-4">
-              <PlusCircle className="h-8 w-8 text-primary" />
-              <div>
-                <h3 className="font-semibold">New Order</h3>
-                <p className="text-sm text-muted-foreground">Create a new service order</p>
-              </div>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <Landmark className="h-8 w-8 text-primary" />
+                  <div>
+                    <h3 className="font-semibold">Onboard Franchise</h3>
+                    <p className="text-sm text-muted-foreground">Add a new franchise location</p>
+                  </div>
             </CardContent>
-          </Card>
-          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-4">
-              <UserPlus className="h-8 w-8 text-primary" />
-              <div>
-                <h3 className="font-semibold">New Customer</h3>
-                <p className="text-sm text-muted-foreground">Add a new customer profile</p>
+        </Card>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Onboard New Franchise</DialogTitle>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
+                <div>
+                  <Label htmlFor="franchiseName">Franchise Name</Label>
+                  <Input id="franchiseName" placeholder="e.g., Downtown Central" />
+                </div>
+                <div>
+                  <Label htmlFor="franchiseLocation">Location</Label>
+                  <Input id="franchiseLocation" placeholder="e.g., 123 Main St, Anytown" />
+                </div>
+                <div>
+                  <Label htmlFor="ownerName">Owner Name</Label>
+                  <Input id="ownerName" placeholder="e.g., John Doe" />
+                </div>
+                <Button>Save Franchise</Button>
               </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <ClipboardList className="h-8 w-8 text-primary" />
+                  <div>
+                    <h3 className="font-semibold">Add New Service</h3>
+                    <p className="text-sm text-muted-foreground">Create a new service offering</p>
+                  </div>
             </CardContent>
-          </Card>
-          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-4">
-              <Building className="h-8 w-8 text-primary" />
-              <div>
-                <h3 className="font-semibold">Manage Franchises</h3>
-                <p className="text-sm text-muted-foreground">Oversee franchise operations</p>
+        </Card>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Service</DialogTitle>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
+                <div>
+                  <Label htmlFor="serviceName">Service Name</Label>
+                  <Input id="serviceName" placeholder="e.g., Premium Dry Cleaning" />
+                </div>
+                <div>
+                  <Label htmlFor="serviceCategory">Category</Label>
+                  <Input id="serviceCategory" placeholder="e.g., Dry Cleaning" />
+                </div>
+                <div>
+                  <Label htmlFor="servicePrice">Price</Label>
+                  <Input id="servicePrice" type="number" placeholder="e.g., 250.00" />
+                </div>
+                <Button>Save Service</Button>
               </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <Building className="h-8 w-8 text-primary" />
+                  <div>
+                    <h3 className="font-semibold">Manage Franchises</h3>
+                    <p className="text-sm text-muted-foreground">Oversee franchise operations</p>
+                  </div>
             </CardContent>
-          </Card>
-          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-4">
-              <FileText className="h-8 w-8 text-primary" />
-              <div>
-                <h3 className="font-semibold">Generate Report</h3>
-                <p className="text-sm text-muted-foreground">Create and export reports</p>
+        </Card>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Manage Franchises</DialogTitle>
+              </DialogHeader>
+              <div className="py-4">
+                <Input placeholder="Search franchises..." className="mb-4" />
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {franchiseDetailsData.map((franchise) => (
+                      <TableRow key={franchise.name}>
+                        <TableCell className="font-medium">{franchise.name}</TableCell>
+                        <TableCell>{franchise.status}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm">View</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <FileText className="h-8 w-8 text-primary" />
+                  <div>
+                    <h3 className="font-semibold">Generate Report</h3>
+                    <p className="text-sm text-muted-foreground">Create and export reports</p>
+                  </div>
             </CardContent>
-          </Card>
+        </Card>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Generate Report</DialogTitle>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
+                <div>
+                  <Label htmlFor="reportType">Report Type</Label>
+                  <Select>
+                    <SelectTrigger id="reportType">
+                      <SelectValue placeholder="Select a report type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sales">Sales Report</SelectItem>
+                      <SelectItem value="revenue">Revenue Report</SelectItem>
+                      <SelectItem value="customers">Customer Report</SelectItem>
+                      <SelectItem value="inventory">Inventory Report</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="dateRange">Date Range</Label>
+                  <Input id="dateRange" type="date" />
+                </div>
+                <div>
+                  <Label htmlFor="format">Format</Label>
+                  <Select>
+                    <SelectTrigger id="format">
+                      <SelectValue placeholder="Select a format" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pdf">PDF</SelectItem>
+                      <SelectItem value="csv">CSV</SelectItem>
+                      <SelectItem value="xlsx">XLSX</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button>Generate</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -374,26 +501,26 @@ export default function SuperAdminDashboard() {
             </div>
           }
         />
-      </div>
+    </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
         <Card className="lg:col-span-4 animate-fade-in" style={{ animationDelay: "600ms" }}>
-          <CardHeader>
-            <CardTitle>Overview</CardTitle>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <SalesChart />
-          </CardContent>
+            <CardHeader>
+                <CardTitle>Overview</CardTitle>
+            </CardHeader>
+            <CardContent className="pl-2">
+                <SalesChart />
+            </CardContent>
         </Card>
         <Card className="lg:col-span-3 animate-fade-in" style={{ animationDelay: "700ms" }}>
-          <CardHeader>
-            <CardTitle>Recent Orders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <RecentOrders />
-          </CardContent>
+            <CardHeader>
+                <CardTitle>Recent Orders</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <RecentOrders />
+            </CardContent>
         </Card>
-      </div>
+    </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <OrderStatusChart />

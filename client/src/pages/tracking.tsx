@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useQuery } from "@tanstack/react-query";
 import { 
   Search, 
   Filter, 
@@ -47,79 +48,28 @@ interface Shipment {
   estimatedDelivery: string;
 }
 
+const kpiData = [
+    { title: "Total Shipments", value: "42", change: "+15 today", changeType: "positive" },
+    { title: "In Transit", value: "28", change: "+5 from yesterday", changeType: "positive" },
+    { title: "Delivered", value: "1,289", change: "+2.5% this week", changeType: "positive" },
+    { title: "Delayed", value: "3", change: "-1 from yesterday", changeType: "negative" },
+];
+
 export default function Tracking() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [isCreateShipmentOpen, setIsCreateShipmentOpen] = useState(false);
+  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
 
-  // Mock data for orders
-  const mockOrders: Order[] = [
-    {
-      id: "ORD-001",
-      customerName: "Rajesh Kumar",
-      phoneNumber: "+91 98765 43210",
-      address: "123 MG Road, Bangalore",
-      status: "ready",
-      items: 3,
-      services: ["Dry Cleaning - Suits", "Wash & Press - Shirts"],
-      totalAmount: 175,
-      createdAt: "2025-01-15",
-      estimatedDelivery: "2025-01-18"
-    },
-    {
-      id: "ORD-002", 
-      customerName: "Priya Sharma",
-      phoneNumber: "+91 87654 32109",
-      address: "456 Brigade Road, Bangalore",
-      status: "ready",
-      items: 2,
-      services: ["Dry Cleaning - Dresses"],
-      totalAmount: 120,
-      createdAt: "2025-01-15",
-      estimatedDelivery: "2025-01-18"
-    },
-    {
-      id: "ORD-003",
-      customerName: "Amit Patel",
-      phoneNumber: "+91 76543 21098",
-      address: "789 Commercial Street, Bangalore",
-      status: "ready",
-      items: 4,
-      services: ["Wash & Press - Shirts", "Wash & Press - Pants"],
-      totalAmount: 110,
-      createdAt: "2025-01-14",
-      estimatedDelivery: "2025-01-17"
-    },
-    {
-      id: "ORD-004",
-      customerName: "Sunita Reddy",
-      phoneNumber: "+91 65432 10987",
-      address: "321 Indiranagar, Bangalore",
-      status: "processing",
-      items: 1,
-      services: ["Wedding Dress Cleaning"],
-      totalAmount: 500,
-      createdAt: "2025-01-13",
-      estimatedDelivery: "2025-01-20"
-    }
-  ];
+  const { data: orders, isLoading: ordersLoading } = useQuery<Order[]>({
+    queryKey: ["/api/orders"],
+  });
 
-  // Mock data for shipments
-  const mockShipments: Shipment[] = [
-    {
-      id: "SHIP-001",
-      uti: "UTI-2025-001",
-      storeId: "STORE-001",
-      staffName: "John Doe",
-      packageCount: 3,
-      orders: ["ORD-001", "ORD-002", "ORD-003"],
-      status: "in_transit",
-      createdAt: "2025-01-15",
-      estimatedDelivery: "2025-01-18"
-    }
-  ];
+  const { data: shipments, isLoading: shipmentsLoading } = useQuery<Shipment[]>({
+    queryKey: ["/api/shipments"],
+  });
 
-  const filteredOrders = mockOrders.filter(order => {
+  const filteredOrders = orders?.filter(order => {
     const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          order.phoneNumber.includes(searchTerm);
@@ -182,7 +132,7 @@ export default function Tracking() {
       return;
     }
     
-    const uti = `UTI-2025-${String(mockShipments.length + 1).padStart(3, '0')}`;
+    const uti = `UTI-2025-${String(shipments?.length || 0 + 1).padStart(3, '0')}`;
     alert(`Shipment created successfully!\n\nUnified Tracking ID: ${uti}\nOrders: ${selectedOrders.join(', ')}\n\nTransport Order has been generated and is ready for printing.`);
     
     setSelectedOrders([]);
@@ -191,6 +141,21 @@ export default function Tracking() {
 
   return (
     <div className="p-8" data-testid="tracking-page">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {kpiData.map((kpi, index) => (
+          <Card key={index}>
+            <CardHeader>
+              <CardTitle>{kpi.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{kpi.value}</div>
+              <p className={`text-xs ${kpi.changeType === "positive" ? "text-green-500" : "text-red-500"}`}>{kpi.change}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
       {/* Tracking Management Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
@@ -239,7 +204,7 @@ export default function Tracking() {
                     <h4 className="font-medium">Selected Orders ({selectedOrders.length})</h4>
                     <div className="space-y-1">
                       {selectedOrders.map(orderId => {
-                        const order = mockOrders.find(o => o.id === orderId);
+                        const order = orders?.find(o => o.id === orderId);
                         return order ? (
                           <div key={orderId} className="flex items-center justify-between p-2 bg-muted rounded">
                             <span className="text-sm">{order.id} - {order.customerName}</span>
@@ -279,7 +244,7 @@ export default function Tracking() {
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Total Orders</p>
                 <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
-                  {mockOrders.length}
+                  {orders?.length || 0}
                 </p>
               </div>
               <Package className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
@@ -293,7 +258,7 @@ export default function Tracking() {
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Ready for Shipment</p>
                 <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
-                  {mockOrders.filter(o => o.status === 'ready').length}
+                  {orders?.filter(o => o.status === 'ready').length || 0}
                 </p>
               </div>
               <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
@@ -307,7 +272,7 @@ export default function Tracking() {
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Active Shipments</p>
                 <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
-                  {mockShipments.filter(s => s.status === 'in_transit').length}
+                  {shipments?.filter(s => s.status === 'in_transit').length || 0}
                 </p>
               </div>
               <Truck className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
@@ -321,7 +286,7 @@ export default function Tracking() {
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Delivered Today</p>
                 <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
-                  {mockShipments.filter(s => s.status === 'delivered').length}
+                  {shipments?.filter(s => s.status === 'delivered').length || 0}
                 </p>
               </div>
               <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
@@ -351,7 +316,12 @@ export default function Tracking() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockShipments.map((shipment) => (
+              {shipmentsLoading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center">Loading shipments...</TableCell>
+                </TableRow>
+              ) : (
+                shipments?.map((shipment) => (
                 <TableRow key={shipment.id}>
                   <TableCell className="font-mono font-medium">{shipment.uti}</TableCell>
                   <TableCell>{shipment.storeId}</TableCell>
@@ -369,13 +339,14 @@ export default function Tracking() {
                         <Printer className="w-4 h-4 mr-1" />
                         Print
                       </Button>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={() => setSelectedShipment(shipment)}>
                         Track
                       </Button>
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -422,7 +393,12 @@ export default function Tracking() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredOrders.map((order) => (
+              {ordersLoading ? (
+                <TableRow>
+                    <TableCell colSpan={9} className="text-center">Loading orders...</TableCell>
+                </TableRow>
+              ) : (
+                filteredOrders?.map((order) => (
                 <TableRow key={order.id}>
                   <TableCell>
                     <input
@@ -455,7 +431,8 @@ export default function Tracking() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -523,6 +500,19 @@ export default function Tracking() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Detailed Tracking View */}
+      <Dialog open={!!selectedShipment} onOpenChange={() => setSelectedShipment(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Track Shipment: {selectedShipment?.uti}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            {/* Shipment details and tracking visualization will go here */}
+            <p>Details for shipment {selectedShipment?.id} will be displayed here.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
