@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 
 export default function SuperAdminDashboard() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Super Admin Dashboard</h1>
         <Select>
@@ -30,7 +30,7 @@ export default function SuperAdminDashboard() {
         </Select>
       </div>
 
-      <Card>
+      <Card className="animate-slide-in-from-left">
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
@@ -61,6 +61,7 @@ export default function SuperAdminDashboard() {
           change="+20.1% from last month"
           changeType="positive"
           icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+          animationDelay={0}
         />
         <KpiCard
           title="Total Franchises"
@@ -68,6 +69,7 @@ export default function SuperAdminDashboard() {
           change="+2 this month"
           changeType="positive"
           icon={<Landmark className="h-4 w-4 text-muted-foreground" />}
+          animationDelay={100}
         />
         <KpiCard
           title="Total Orders"
@@ -75,6 +77,7 @@ export default function SuperAdminDashboard() {
           change="+19% from last month"
           changeType="positive"
           icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
+          animationDelay={200}
         />
         <KpiCard
           title="Pending Pickups"
@@ -82,6 +85,7 @@ export default function SuperAdminDashboard() {
           change="+201 since last hour"
           changeType="positive"
           icon={<Package className="h-4 w-4 text-muted-foreground" />}
+          animationDelay={300}
         />
         <KpiCard
           title="Total Services"
@@ -89,6 +93,7 @@ export default function SuperAdminDashboard() {
           change="+5 this month"
           changeType="positive"
           icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
+          animationDelay={400}
         />
         <KpiCard
           title="Shipments in Transit"
@@ -96,11 +101,12 @@ export default function SuperAdminDashboard() {
           change="15 arriving today"
           changeType="positive"
           icon={<Truck className="h-4 w-4 text-muted-foreground" />}
+          animationDelay={500}
         />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="lg:col-span-4">
+        <Card className="lg:col-span-4 animate-fade-in" style={{ animationDelay: "600ms" }}>
           <CardHeader>
             <CardTitle>Overview</CardTitle>
           </CardHeader>
@@ -108,7 +114,7 @@ export default function SuperAdminDashboard() {
             <SalesChart />
           </CardContent>
         </Card>
-        <Card className="lg:col-span-3">
+        <Card className="lg:col-span-3 animate-fade-in" style={{ animationDelay: "700ms" }}>
           <CardHeader>
             <CardTitle>Recent Orders</CardTitle>
           </CardHeader>

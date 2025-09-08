@@ -7,11 +7,12 @@ interface KpiCardProps {
   change: string;
   changeType: "positive" | "negative";
   icon: React.ReactNode;
+  animationDelay?: number;
 }
 
-export default function KpiCard({ title, value, change, changeType, icon }: KpiCardProps) {
+export default function KpiCard({ title, value, change, changeType, icon, animationDelay = 0 }: KpiCardProps) {
   return (
-    <Card>
+    <Card className="animate-fade-in" style={{ animationDelay: `${animationDelay}ms` }}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         {icon}
