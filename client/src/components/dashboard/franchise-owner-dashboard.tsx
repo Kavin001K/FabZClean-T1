@@ -9,6 +9,13 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "wouter";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 const dailyRevenueData = [
   { day: "Mon", revenue: 1250 },
@@ -41,6 +48,19 @@ const employeeSalaryData = [
 ];
 
 export default function FranchiseOwnerDashboard() {
+  const { toast } = useToast();
+  const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
+
+  const handleSaveCustomer = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("Saving customer...");
+    toast({
+      title: "Success!",
+      description: "New customer has been created.",
+    });
+    setIsCustomerDialogOpen(false);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <h1 className="text-2xl font-bold tracking-tight">Franchise Owner Dashboard</h1>
@@ -48,33 +68,57 @@ export default function FranchiseOwnerDashboard() {
       <div>
         <h2 className="text-lg font-semibold mb-2">Quick Actions</h2>
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-4">
-              <PlusCircle className="h-8 w-8 text-primary" />
-              <div>
-                <h3 className="font-semibold">New Order</h3>
-                <p className="text-sm text-muted-foreground">Create a new service order</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-4">
-              <UserPlus className="h-8 w-8 text-primary" />
-              <div>
-                <h3 className="font-semibold">New Customer</h3>
-                <p className="text-sm text-muted-foreground">Add a new customer profile</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-4">
-              <Truck className="h-8 w-8 text-primary" />
-              <div>
-                <h3 className="font-semibold">New Shipment</h3>
-                <p className="text-sm text-muted-foreground">Dispatch a new shipment</p>
-              </div>
-            </CardContent>
-          </Card>
+          <Link to="/create-order">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-4">
+                <PlusCircle className="h-8 w-8 text-primary" />
+                <div>
+                  <h3 className="font-semibold">New Order</h3>
+                  <p className="text-sm text-muted-foreground">Create a new service order</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Dialog open={isCustomerDialogOpen} onOpenChange={setIsCustomerDialogOpen}>
+            <DialogTrigger asChild>
+              <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <UserPlus className="h-8 w-8 text-primary" />
+                  <div>
+                    <h3 className="font-semibold">New Customer</h3>
+                    <p className="text-sm text-muted-foreground">Add a new customer profile</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Customer</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSaveCustomer} className="py-4 space-y-4">
+                <div>
+                  <Label htmlFor="customerName">Name</Label>
+                  <Input id="customerName" placeholder="e.g., Jane Doe" required />
+                </div>
+                <div>
+                  <Label htmlFor="customerPhone">Phone</Label>
+                  <Input id="customerPhone" type="tel" placeholder="e.g., +91 98765 43210" required />
+                </div>
+                <Button type="submit">Save Customer</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+          <Link to="/tracking">
+            <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-4">
+                <Truck className="h-8 w-8 text-primary" />
+                <div>
+                  <h3 className="font-semibold">New Shipment</h3>
+                  <p className="text-sm text-muted-foreground">Dispatch a new shipment</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
       </div>
         

@@ -14,6 +14,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 
 const revenueData = [
   { name: 'Week 1', revenue: 4000 },
@@ -71,6 +74,43 @@ const consolidatedSalaryData = [
 ];
 
 export default function SuperAdminDashboard() {
+  const { toast } = useToast();
+  const [isFranchiseDialogOpen, setIsFranchiseDialogOpen] = useState(false);
+  const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false);
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+
+  const handleSaveFranchise = (e: React.FormEvent) => {
+    e.preventDefault();
+    // In a real app, you'd use a mutation to send this to the server.
+    // Here, we'll just simulate it.
+    console.log("Saving franchise...");
+    toast({
+      title: "Success!",
+      description: "New franchise has been onboarded.",
+    });
+    setIsFranchiseDialogOpen(false);
+  };
+
+  const handleSaveService = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("Saving service...");
+    toast({
+      title: "Success!",
+      description: "New service has been created.",
+    });
+    setIsServiceDialogOpen(false);
+  };
+
+  const handleGenerateReport = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("Generating report...");
+    toast({
+      title: "Generating Report...",
+      description: "Your report is being prepared and will be available shortly.",
+    });
+    setIsReportDialogOpen(false);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -90,7 +130,7 @@ export default function SuperAdminDashboard() {
       <div>
         <h2 className="text-lg font-semibold mb-2">Quick Actions</h2>
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-          <Dialog>
+          <Dialog open={isFranchiseDialogOpen} onOpenChange={setIsFranchiseDialogOpen}>
             <DialogTrigger asChild>
               <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
                 <CardContent className="p-4 flex items-center gap-4">
@@ -106,24 +146,24 @@ export default function SuperAdminDashboard() {
               <DialogHeader>
                 <DialogTitle>Onboard New Franchise</DialogTitle>
               </DialogHeader>
-              <div className="py-4 space-y-4">
+              <form onSubmit={handleSaveFranchise} className="py-4 space-y-4">
                 <div>
                   <Label htmlFor="franchiseName">Franchise Name</Label>
-                  <Input id="franchiseName" placeholder="e.g., Downtown Central" />
+                  <Input id="franchiseName" placeholder="e.g., Downtown Central" required />
                 </div>
                 <div>
                   <Label htmlFor="franchiseLocation">Location</Label>
-                  <Input id="franchiseLocation" placeholder="e.g., 123 Main St, Anytown" />
+                  <Input id="franchiseLocation" placeholder="e.g., 123 Main St, Anytown" required />
                 </div>
                 <div>
                   <Label htmlFor="ownerName">Owner Name</Label>
-                  <Input id="ownerName" placeholder="e.g., John Doe" />
+                  <Input id="ownerName" placeholder="e.g., John Doe" required />
                 </div>
-                <Button>Save Franchise</Button>
-              </div>
+                <Button type="submit">Save Franchise</Button>
+              </form>
             </DialogContent>
           </Dialog>
-          <Dialog>
+          <Dialog open={isServiceDialogOpen} onOpenChange={setIsServiceDialogOpen}>
             <DialogTrigger asChild>
               <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
                 <CardContent className="p-4 flex items-center gap-4">
@@ -139,21 +179,21 @@ export default function SuperAdminDashboard() {
               <DialogHeader>
                 <DialogTitle>Add New Service</DialogTitle>
               </DialogHeader>
-              <div className="py-4 space-y-4">
+              <form onSubmit={handleSaveService} className="py-4 space-y-4">
                 <div>
                   <Label htmlFor="serviceName">Service Name</Label>
-                  <Input id="serviceName" placeholder="e.g., Premium Dry Cleaning" />
+                  <Input id="serviceName" placeholder="e.g., Premium Dry Cleaning" required />
                 </div>
                 <div>
                   <Label htmlFor="serviceCategory">Category</Label>
-                  <Input id="serviceCategory" placeholder="e.g., Dry Cleaning" />
+                  <Input id="serviceCategory" placeholder="e.g., Dry Cleaning" required />
                 </div>
                 <div>
                   <Label htmlFor="servicePrice">Price</Label>
-                  <Input id="servicePrice" type="number" placeholder="e.g., 250.00" />
+                  <Input id="servicePrice" type="number" placeholder="e.g., 250.00" required />
                 </div>
-                <Button>Save Service</Button>
-              </div>
+                <Button type="submit">Save Service</Button>
+              </form>
             </DialogContent>
           </Dialog>
           <Dialog>
@@ -188,7 +228,9 @@ export default function SuperAdminDashboard() {
                         <TableCell className="font-medium">{franchise.name}</TableCell>
                         <TableCell>{franchise.status}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="outline" size="sm">View</Button>
+                          <Link to={`/analytics?franchise=${franchise.name}`}>
+                            <Button variant="outline" size="sm">View</Button>
+                          </Link>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -197,7 +239,7 @@ export default function SuperAdminDashboard() {
               </div>
             </DialogContent>
           </Dialog>
-          <Dialog>
+          <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
             <DialogTrigger asChild>
               <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
                 <CardContent className="p-4 flex items-center gap-4">
@@ -213,7 +255,7 @@ export default function SuperAdminDashboard() {
               <DialogHeader>
                 <DialogTitle>Generate Report</DialogTitle>
               </DialogHeader>
-              <div className="py-4 space-y-4">
+              <form onSubmit={handleGenerateReport} className="py-4 space-y-4">
                 <div>
                   <Label htmlFor="reportType">Report Type</Label>
                   <Select>
@@ -230,7 +272,7 @@ export default function SuperAdminDashboard() {
                 </div>
                 <div>
                   <Label htmlFor="dateRange">Date Range</Label>
-                  <Input id="dateRange" type="date" />
+                  <Input id="dateRange" type="date" required />
                 </div>
                 <div>
                   <Label htmlFor="format">Format</Label>
@@ -245,8 +287,8 @@ export default function SuperAdminDashboard() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button>Generate</Button>
-              </div>
+                <Button type="submit">Generate</Button>
+              </form>
             </DialogContent>
           </Dialog>
         </div>
