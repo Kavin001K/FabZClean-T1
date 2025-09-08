@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 const data = [
   { name: "Pending", value: 400 },
@@ -11,9 +11,9 @@ const COLORS = ["#FFBB28", "#00C49F", "#0088FE"];
 
 export default function OrderStatusChart() {
   return (
-    <Card>
+    <Card className="hover:shadow-lg transition-shadow duration-200">
       <CardHeader>
-        <CardTitle>Order Status</CardTitle>
+        <CardTitle>Order Status Distribution</CardTitle>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
@@ -23,7 +23,7 @@ export default function OrderStatusChart() {
               cx="50%"
               cy="50%"
               labelLine={false}
-              outerRadius={80}
+              outerRadius={100}
               fill="#8884d8"
               dataKey="value"
             >
@@ -31,6 +31,13 @@ export default function OrderStatusChart() {
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "hsl(var(--background))",
+                borderColor: "hsl(var(--border))",
+                borderRadius: "var(--radius)",
+              }}
+            />
             <Legend />
           </PieChart>
         </ResponsiveContainer>
