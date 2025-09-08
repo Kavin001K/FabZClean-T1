@@ -30,7 +30,7 @@ interface Order {
   address: string;
   status: 'placed' | 'accepted' | 'processing' | 'ready' | 'out_for_delivery' | 'delivered';
   items: number;
-  services: string[];
+  services?: string[];
   totalAmount: number;
   createdAt: string;
   estimatedDelivery: string;

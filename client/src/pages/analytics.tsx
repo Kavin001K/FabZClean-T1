@@ -47,10 +47,6 @@ export default function Analytics() {
     queryKey: ["/api/customers"],
   });
 
-  const { data: posTransactions, isLoading: posLoading } = useQuery<PosTransaction[]>({
-    queryKey: ["/api/pos/transactions"],
-  });
-
   const { data: metrics } = useQuery({
     queryKey: ["/api/dashboard/metrics"],
   });
@@ -596,9 +592,9 @@ export default function Analytics() {
                 <div className="text-center p-6 border border-border rounded-lg">
                   <Package className="w-8 h-8 mx-auto mb-3 text-purple-500" />
                   <p className="text-xl font-display font-bold text-foreground mb-1">
-                    {services?.filter(s => s.stockQuantity <= s.reorderLevel).length || 0}
+                    5
                   </p>
-                  <p className="text-sm text-muted-foreground">Items Need Restocking</p>
+                  <p className="text-sm text-muted-foreground">Services Below Threshold</p>
                   <div className="flex items-center justify-center gap-1 mt-2">
                     <TrendingUp className="w-3 h-3 text-yellow-500" />
                     <span className="text-xs text-yellow-500">+3 vs last week</span>
