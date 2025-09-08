@@ -1,7 +1,9 @@
-import { DollarSign, Users, CreditCard, Activity, Package, Landmark, ClipboardList, Truck, UserPlus, PlusCircle } from "lucide-react";
+import { DollarSign, Landmark, CreditCard, Package, ClipboardList, Truck, UserPlus, PlusCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SalesChart from "@/components/dashboard/sales-chart";
 import RecentOrders from "@/components/dashboard/recent-orders";
+import KpiCard from "@/components/dashboard/kpi-card";
+import OrderStatusChart from "@/components/dashboard/order-status-chart";
 import {
     Select,
     SelectContent,
@@ -53,66 +55,48 @@ export default function SuperAdminDashboard() {
       </Card>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹1,259,430.50</div>
-            <p className="text-xs text-muted-foreground">+20.1% from last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Franchises</CardTitle>
-            <Landmark className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">+2</div>
-            <p className="text-xs text-muted-foreground">+2 this month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">+12,234</div>
-            <p className="text-xs text-muted-foreground">+19% from last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Pickups</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">+573</div>
-            <p className="text-xs text-muted-foreground">+201 since last hour</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Services</CardTitle>
-            <ClipboardList className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">24</div>
-            <p className="text-xs text-muted-foreground">+5 this month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Shipments in Transit</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">42</div>
-            <p className="text-xs text-muted-foreground">15 arriving today</p>
-          </CardContent>
-        </Card>
+        <KpiCard
+          title="Total Revenue"
+          value="₹1,259,430.50"
+          change="+20.1% from last month"
+          changeType="positive"
+          icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+        />
+        <KpiCard
+          title="Total Franchises"
+          value="+2"
+          change="+2 this month"
+          changeType="positive"
+          icon={<Landmark className="h-4 w-4 text-muted-foreground" />}
+        />
+        <KpiCard
+          title="Total Orders"
+          value="+12,234"
+          change="+19% from last month"
+          changeType="positive"
+          icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
+        />
+        <KpiCard
+          title="Pending Pickups"
+          value="+573"
+          change="+201 since last hour"
+          changeType="positive"
+          icon={<Package className="h-4 w-4 text-muted-foreground" />}
+        />
+        <KpiCard
+          title="Total Services"
+          value="24"
+          change="+5 this month"
+          changeType="positive"
+          icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
+        />
+        <KpiCard
+          title="Shipments in Transit"
+          value="42"
+          change="15 arriving today"
+          changeType="positive"
+          icon={<Truck className="h-4 w-4 text-muted-foreground" />}
+        />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
@@ -132,6 +116,11 @@ export default function SuperAdminDashboard() {
             <RecentOrders />
           </CardContent>
         </Card>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <OrderStatusChart />
+        {/* Other charts can be added here */}
       </div>
     </div>
   );
