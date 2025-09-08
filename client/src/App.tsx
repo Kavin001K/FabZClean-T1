@@ -19,6 +19,7 @@ import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import Inventory from "@/pages/inventory";
 import Logistics from "@/pages/logistics";
+import SpeedInsights from "@/components/speed-insights";
 
 function Router() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -67,6 +68,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <SpeedInsights />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
