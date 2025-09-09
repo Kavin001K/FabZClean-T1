@@ -52,7 +52,7 @@ export default function Sidebar({ isOpen, isCollapsed, onToggle, onClose }: Side
         <div className="flex h-16 items-center justify-between p-4">
           <Link href="/">
             <div className="flex items-center gap-2">
-              <img src="/assets/logo.webp" alt="FabZClean" className="h-12 w-auto" />
+              <img src="/assets/logo.webp" alt="FabZClean" className="h-100 w-auto" />
             </div>
           </Link>
           <button onClick={onToggle} className="hidden lg:block">
