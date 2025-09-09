@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - FabZClean</title>
+    
+    <!-- Netlify Identity Widget -->
+    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .login-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        
+        .logo {
+            margin-bottom: 30px;
+        }
+        
+        .logo h1 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        
+        .logo p {
+            color: #666;
+            font-size: 1rem;
+            font-weight: 400;
+        }
+        
+        .login-form {
+            margin-bottom: 30px;
+        }
+        
+        .login-form h2 {
+            color: #333;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        
+        .login-form p {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+        
+        /* Netlify Identity Widget Styling */
+        .netlify-identity-widget {
+            margin: 20px 0;
+        }
+        
+        .netlify-identity-widget button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        .netlify-identity-widget button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .netlify-identity-widget input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin: 10px 0;
+            transition: border-color 0.3s ease;
+        }
+        
+        .netlify-identity-widget input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .netlify-identity-widget a {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        
+        .netlify-identity-widget a:hover {
+            text-decoration: underline;
+        }
+        
+        /* User menu styling */
+        .user-menu {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .user-menu.show {
+            display: block;
+        }
+        
+        .user-info {
+            margin-bottom: 15px;
+        }
+        
+        .user-info h3 {
+            color: #333;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+        
+        .user-info p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        .logout-btn:hover {
+            background: #c82333;
+        }
+        
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-size: 0.9rem;
+        }
+        
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 30px 20px;
+                margin: 10px;
+            }
+            
+            .logo h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>FabZClean</h1>
+            <p>Professional Cleaning Management System</p>
+        </div>
+        
+        <div class="login-form">
+            <h2>Welcome Back</h2>
+            <p>Please sign in to access your dashboard and manage your cleaning operations.</p>
+            
+            <!-- Loading indicator -->
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+            </div>
+            
+            <!-- Netlify Identity Widget will be inserted here -->
+            <div class="netlify-identity-widget" id="netlify-identity-widget"></div>
+            
+            <!-- User menu (shown after login) -->
+            <div class="user-menu" id="user-menu">
+                <div class="user-info">
+                    <h3 id="user-name">Welcome!</h3>
+                    <p id="user-email"></p>
+                </div>
+                <button class="logout-btn" onclick="logout()">Sign Out</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Netlify Identity
+        if (window.netlifyIdentity) {
+            window.netlifyIdentity.on("init", user => {
+                console.log("Netlify Identity initialized");
+                hideLoading();
+                updateUI(user);
+            });
+            
+            // Listen for login events
+            window.netlifyIdentity.on("login", user => {
+                console.log("User logged in:", user);
+                updateUI(user);
+                showSuccessMessage("Login successful! Redirecting...");
+                
+                // Redirect to main application after successful login
+                setTimeout(() => {
+                    window.location.href = "/";
+                }, 1500);
+            });
+            
+            // Listen for logout events
+            window.netlifyIdentity.on("logout", () => {
+                console.log("User logged out");
+                updateUI(null);
+                showSuccessMessage("You have been logged out successfully.");
+            });
+            
+            // Listen for error events
+            window.netlifyIdentity.on("error", err => {
+                console.error("Netlify Identity error:", err);
+                hideLoading();
+                showErrorMessage("An error occurred. Please try again.");
+            });
+        } else {
+            // Fallback if Netlify Identity doesn't load
+            hideLoading();
+            showErrorMessage("Authentication service is not available. Please refresh the page.");
+        }
+        
+        function hideLoading() {
+            const loading = document.getElementById('loading');
+            if (loading) {
+                loading.style.display = 'none';
+            }
+        }
+        
+        function updateUI(user) {
+            const userMenu = document.getElementById('user-menu');
+            const userName = document.getElementById('user-name');
+            const userEmail = document.getElementById('user-email');
+            const widget = document.getElementById('netlify-identity-widget');
+            
+            if (user) {
+                // User is logged in
+                userName.textContent = `Welcome, ${user.user_metadata?.full_name || user.email || 'User'}!`;
+                userEmail.textContent = user.email;
+                userMenu.classList.add('show');
+                if (widget) {
+                    widget.style.display = 'none';
+                }
+            } else {
+                // User is not logged in
+                userMenu.classList.remove('show');
+                if (widget) {
+                    widget.style.display = 'block';
+                }
+            }
+        }
+        
+        function logout() {
+            if (window.netlifyIdentity) {
+                window.netlifyIdentity.logout();
+            }
+        }
+        
+        function showErrorMessage(message) {
+            const existingMessage = document.querySelector('.error-message');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            
+            const loginForm = document.querySelector('.login-form');
+            loginForm.appendChild(errorDiv);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.remove();
+                }
+            }, 5000);
+        }
+        
+        function showSuccessMessage(message) {
+            const existingMessage = document.querySelector('.success-message');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+            
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success-message';
+            successDiv.textContent = message;
+            
+            const loginForm = document.querySelector('.login-form');
+            loginForm.appendChild(successDiv);
+            
+            // Auto-remove after 3 seconds
+            setTimeout(() => {
+                if (successDiv.parentNode) {
+                    successDiv.remove();
+                }
+            }, 3000);
+        }
+        
+        // Handle page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if user is already logged in
+            if (window.netlifyIdentity) {
+                const user = window.netlifyIdentity.currentUser();
+                if (user) {
+                    // User is already logged in, redirect to main app
+                    window.location.href = "/";
+                }
+            }
+        });
+    </script>
+</body>
+</html>
