@@ -88,15 +88,15 @@
 
   /* Enhanced Typography Hierarchy */
   h1, .h1 {
-    @apply text-h1;
+    @apply text-h1 font-bold;
   }
 
   h2, .h2 {
-    @apply text-h2;
+    @apply text-h2 font-bold;
   }
 
   h3, .h3 {
-    @apply text-h3;
+    @apply text-h3 font-semibold;
   }
 
   p, .body {
@@ -108,7 +108,7 @@
   }
 
   .label {
-    @apply text-label;
+    @apply text-label font-medium;
   }
 
   .caption {

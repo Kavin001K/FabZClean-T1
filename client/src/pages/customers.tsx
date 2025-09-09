@@ -164,7 +164,9 @@ export default function Customers() {
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">{customer.totalOrders}</TableCell>
                     <TableCell className="hidden sm:table-cell">₹{parseFloat(customer.totalSpent).toFixed(2)}</TableCell>
-                    <TableCell className="hidden md:table-cell">{customer.lastOrder}</TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {customer.lastOrder ? new Date(customer.lastOrder).toLocaleDateString() : 'No orders'}
+                    </TableCell>
                     <TableCell>
                         <AlertDialog>
                             <DropdownMenu>
@@ -226,7 +228,7 @@ export default function Customers() {
                             <p><strong>Email:</strong> {selectedCustomer.email}</p>
                             <p><strong>Total Orders:</strong> {selectedCustomer.totalOrders}</p>
                             <p><strong>Total Spent:</strong> ₹{parseFloat(selectedCustomer.totalSpent).toFixed(2)}</p>
-                            <p><strong>Last Order:</strong> {selectedCustomer.lastOrder}</p>
+                            <p><strong>Last Order:</strong> {selectedCustomer.lastOrder ? new Date(selectedCustomer.lastOrder).toLocaleDateString() : 'No orders'}</p>
                         </div>
                     </DialogContent>
                 </Dialog>

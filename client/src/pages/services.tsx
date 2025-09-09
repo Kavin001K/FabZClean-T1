@@ -181,38 +181,38 @@ export default function Services() {
                                 </Badge>
                             </TableCell>
                             <TableCell>
-                                <AlertDialog>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                <MoreHorizontal className="h-4 w-4" />
-                                                <span className="sr-only">Toggle menu</span>
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                            <DropdownMenuItem onClick={() => {
-                                                setSelectedService(service);
-                                                setIsEditDialogOpen(true);
-                                            }}>Edit</DropdownMenuItem>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button aria-haspopup="true" size="icon" variant="ghost">
+                                            <MoreHorizontal className="h-4 w-4" />
+                                            <span className="sr-only">Toggle menu</span>
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                        <DropdownMenuItem onClick={() => {
+                                            setSelectedService(service);
+                                            setIsEditDialogOpen(true);
+                                        }}>Edit</DropdownMenuItem>
+                                        <AlertDialog>
                                             <AlertDialogTrigger asChild>
                                                 <DropdownMenuItem className="text-red-500" onSelect={(e) => e.preventDefault()}>Delete</DropdownMenuItem>
                                             </AlertDialogTrigger>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                    <AlertDialogContent>
-                                       <AlertDialogHeader>
-                                           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                           <AlertDialogDescription>
-                                               This action cannot be undone. This will permanently delete the service.
-                                           </AlertDialogDescription>
-                                       </AlertDialogHeader>
-                                       <AlertDialogFooter>
-                                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                           <AlertDialogAction>Delete</AlertDialogAction>
-                                       </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
+                                            <AlertDialogContent>
+                                               <AlertDialogHeader>
+                                                   <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                   <AlertDialogDescription>
+                                                       This action cannot be undone. This will permanently delete the service.
+                                                   </AlertDialogDescription>
+                                               </AlertDialogHeader>
+                                               <AlertDialogFooter>
+                                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                   <AlertDialogAction>Delete</AlertDialogAction>
+                                               </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </TableCell>
                         </TableRow>
                     ))

@@ -7,10 +7,12 @@ import {
   type InsertOrder,
   type Delivery,
   type InsertDelivery,
-  type PosTransaction,
-  type InsertPosTransaction,
+  type OrderTransaction,
+  type InsertOrderTransaction,
   type Customer,
-  type InsertCustomer
+  type InsertCustomer,
+  type Service,
+  type InsertService
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -49,6 +51,13 @@ export interface IStorage {
   createCustomer(customer: InsertCustomer): Promise<Customer>;
   updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined>;
 
+  // Services
+  getServices(): Promise<Service[]>;
+  getService(id: string): Promise<Service | undefined>;
+  createService(service: InsertService): Promise<Service>;
+  updateService(id: string, service: Partial<InsertService>): Promise<Service | undefined>;
+  deleteService(id: string): Promise<boolean>;
+
   // Analytics
   getDashboardMetrics(): Promise<{
     totalRevenue: number;
@@ -66,8 +75,9 @@ export class MemStorage implements IStorage {
   private products: Map<string, Product>;
   private orders: Map<string, Order>;
   private deliveries: Map<string, Delivery>;
-  private posTransactions: Map<string, PosTransaction>;
+  private posTransactions: Map<string, OrderTransaction>;
   private customers: Map<string, Customer>;
+  private services: Map<string, Service>;
 
   constructor() {
     this.users = new Map();
@@ -76,6 +86,7 @@ export class MemStorage implements IStorage {
     this.deliveries = new Map();
     this.posTransactions = new Map();
     this.customers = new Map();
+    this.services = new Map();
     this.initializeData();
   }
 
@@ -315,6 +326,102 @@ export class MemStorage implements IStorage {
 
     sampleCustomers.forEach(customer => {
       this.customers.set(customer.id, customer);
+    });
+
+    // Sample Services
+    const sampleServices: Service[] = [
+      {
+        id: randomUUID(),
+        name: "Dry Cleaning",
+        category: "Cleaning",
+        description: "Professional dry cleaning service for delicate fabrics",
+        price: "15.00",
+        duration: "2-3 days",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Premium Laundry",
+        category: "Laundry",
+        description: "High-quality laundry service with premium detergents",
+        price: "8.00",
+        duration: "1-2 days",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Leather Care",
+        category: "Specialty",
+        description: "Specialized cleaning and conditioning for leather items",
+        price: "25.00",
+        duration: "3-5 days",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Stain Removal",
+        category: "Specialty",
+        description: "Professional stain removal for tough stains",
+        price: "12.00",
+        duration: "1-2 days",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Express Service",
+        category: "Express",
+        description: "Same-day cleaning service for urgent needs",
+        price: "20.00",
+        duration: "Same day",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Wedding Dress Cleaning",
+        category: "Specialty",
+        description: "Specialized cleaning for wedding dresses and formal wear",
+        price: "50.00",
+        duration: "5-7 days",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Rug Cleaning",
+        category: "Home",
+        description: "Professional rug and carpet cleaning service",
+        price: "30.00",
+        duration: "3-4 days",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Alterations",
+        category: "Tailoring",
+        description: "Basic alterations and repairs",
+        price: "10.00",
+        duration: "2-3 days",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    ];
+
+    sampleServices.forEach(service => {
+      this.services.set(service.id, service);
     });
 
     // Sample Orders
@@ -786,6 +893,44 @@ export class MemStorage implements IStorage {
     };
     this.customers.set(id, updatedCustomer);
     return updatedCustomer;
+  }
+
+  // Service methods
+  async getServices(): Promise<Service[]> {
+    return Array.from(this.services.values());
+  }
+
+  async getService(id: string): Promise<Service | undefined> {
+    return this.services.get(id);
+  }
+
+  async createService(insertService: InsertService): Promise<Service> {
+    const id = randomUUID();
+    const service: Service = { 
+      ...insertService, 
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.services.set(id, service);
+    return service;
+  }
+
+  async updateService(id: string, updates: Partial<InsertService>): Promise<Service | undefined> {
+    const service = this.services.get(id);
+    if (!service) return undefined;
+    
+    const updatedService = { 
+      ...service, 
+      ...updates, 
+      updatedAt: new Date() 
+    };
+    this.services.set(id, updatedService);
+    return updatedService;
+  }
+
+  async deleteService(id: string): Promise<boolean> {
+    return this.services.delete(id);
   }
 
   // Analytics methods
