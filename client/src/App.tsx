@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import ErrorBoundary from "@/components/ui/error-boundary";
+import AuthWrapper from "@/components/auth/AuthWrapper";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Orders from "@/pages/orders";
@@ -47,7 +48,9 @@ function App() {
       <ThemeProvider defaultTheme="light" storageKey="fab-z-ui-theme">
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <AuthWrapper>
+            <Router />
+          </AuthWrapper>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
