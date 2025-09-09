@@ -1,6 +1,4 @@
 # Netlify Identity Authentication Redirects
-# This file redirects unauthenticated users to the login page
-# while allowing authenticated users to access the main application
 
 # Redirect all unauthenticated users to login page
 /*    /login.html    200!   Role=*
@@ -11,6 +9,5 @@
 # Allow access to Netlify Identity callback
 /.netlify/identity    /.netlify/identity    200
 
-# Allow access to static assets (CSS, JS, images, etc.)
+# Allow access to static assets
 /assets/*    /assets/*    200
-/dist/*      /dist/*      200

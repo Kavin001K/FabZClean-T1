@@ -1,40 +1,14 @@
 [build]
-  # Build command
   command = "npm run build"
-  
-  # Publish directory - this is where the built files are located
   publish = "dist/public"
-  
-  # Functions directory (if you have any Netlify functions)
-  # functions = "netlify/functions"
 
 [build.environment]
-  # Node.js version
   NODE_VERSION = "18"
 
-# Redirect rules for Netlify Identity
+# SPA redirect rule - required for client-side routing
 [[redirects]]
   from = "/*"
   to = "/index.html"
-  status = 200
-  conditions = {Role = ["*"]}
-
-# Allow access to login page for everyone
-[[redirects]]
-  from = "/login.html"
-  to = "/login.html"
-  status = 200
-
-# Allow access to Netlify Identity callback
-[[redirects]]
-  from = "/.netlify/identity"
-  to = "/.netlify/identity"
-  status = 200
-
-# Allow access to static assets
-[[redirects]]
-  from = "/assets/*"
-  to = "/assets/:splat"
   status = 200
 
 # Headers for security
