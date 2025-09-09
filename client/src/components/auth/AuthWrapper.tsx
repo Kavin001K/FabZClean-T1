@@ -22,6 +22,20 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Function to check for invitation tokens in URL
+  const checkForInvitationToken = () => {
+    const hash = window.location.hash;
+    const search = window.location.search;
+    
+    // Check for invitation tokens in hash or search params
+    const hasInviteToken = hash.includes('invite_token=') || 
+                          hash.includes('confirmation_token=') ||
+                          search.includes('invite_token=') || 
+                          search.includes('confirmation_token=');
+    
+    return hasInviteToken;
+  };
+
   useEffect(() => {
     // Initialize Netlify Identity
     if (window.netlifyIdentity) {
@@ -32,8 +46,19 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
       if (currentUser) {
         setIsAuthenticated(true);
         setIsLoading(false);
+        return;
+      }
+
+      // Check for invitation tokens in URL
+      const hasInvitationToken = checkForInvitationToken();
+      
+      if (hasInvitationToken) {
+        // If there's an invitation token, let Netlify Identity handle it automatically
+        // The widget will automatically show the appropriate modal (invite acceptance or password setup)
+        console.log('Invitation token detected, letting Netlify Identity handle it');
+        setIsLoading(false);
       } else {
-        // If no user is logged in, open the login modal
+        // Only open login modal if there's no invitation token
         window.netlifyIdentity.open();
         setIsLoading(false);
       }
@@ -43,34 +68,50 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
         if (user) {
           setIsAuthenticated(true);
           window.netlifyIdentity?.close();
+          // Clear any invitation tokens from URL after successful login
+          if (window.location.hash.includes('invite_token=') || 
+              window.location.hash.includes('confirmation_token=')) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
         }
       };
 
       // Listen for logout events
       const handleLogout = () => {
         setIsAuthenticated(false);
-        window.netlifyIdentity?.open();
+        // Don't automatically open login modal on logout, let user decide
       };
 
       // Listen for close events (when user closes modal without logging in)
       const handleClose = () => {
         if (!window.netlifyIdentity?.currentUser()) {
-          // If user closes modal without logging in, keep showing login
-          setTimeout(() => {
-            window.netlifyIdentity?.open();
-          }, 100);
+          // Only reopen login if there's no invitation token
+          const hasInvitationToken = checkForInvitationToken();
+          if (!hasInvitationToken) {
+            setTimeout(() => {
+              window.netlifyIdentity?.open();
+            }, 100);
+          }
         }
+      };
+
+      // Listen for invitation events
+      const handleInvite = () => {
+        console.log('Invitation modal opened');
+        // Don't change authentication state during invitation process
       };
 
       window.netlifyIdentity.on('login', handleLogin);
       window.netlifyIdentity.on('logout', handleLogout);
       window.netlifyIdentity.on('close', handleClose);
+      window.netlifyIdentity.on('invite', handleInvite);
 
       // Cleanup event listeners
       return () => {
         window.netlifyIdentity?.off('login', handleLogin);
         window.netlifyIdentity?.off('logout', handleLogout);
         window.netlifyIdentity?.off('close', handleClose);
+        window.netlifyIdentity?.off('invite', handleInvite);
       };
     } else {
       // If Netlify Identity is not available, show error
