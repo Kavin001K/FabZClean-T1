@@ -1,39 +1,27 @@
-import { useState } from "react";
-import { Sidebar } from "./sidebar";
-import { Header } from "./header";
-import { Footer } from "./footer";
-import ErrorBoundary from "@/components/ui/error-boundary";
+import { Sidebar } from './sidebar';
+import { Header } from './header';
+import ErrorBoundary from '@/components/ui/error-boundary';
 
 interface MainLayoutProps {
   children: React.ReactNode;
 }
 
+/**
+ * Establishes the primary desktop layout with a fixed sidebar and main content area.
+ * The main content div has a left padding (`pl-60`) equal to the sidebar's
+ * width to prevent overlap.
+ */
 export function MainLayout({ children }: MainLayoutProps) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden">
-      <Sidebar 
-        isOpen={isSidebarOpen}
-        isCollapsed={isSidebarCollapsed} 
-        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
-        onClose={() => setIsSidebarOpen(false)}
-      />
-      <div className={`flex flex-1 flex-col transition-all duration-300 ease-in-out ${
-        isSidebarCollapsed ? "lg:ml-16" : "lg:ml-72"
-      }`}>
-        <Header 
-          onSidebarToggle={() => setIsSidebarOpen(!isSidebarOpen)} 
-        />
-        <main className="flex-1 overflow-y-auto bg-muted/20 px-6 pb-6 lg:px-8 lg:pb-8">
-          <div className="max-w-none mx-auto">
-            <ErrorBoundary>
-              {children}
-            </ErrorBoundary>
-          </div>
+    <div className="flex min-h-screen w-full bg-muted/40">
+      <Sidebar />
+      <div className="flex flex-col w-full pl-60"> {/* pl-60 must match sidebar width */}
+        <Header />
+        <main className="flex-1 overflow-y-auto p-6">
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </main>
-        <Footer isSidebarCollapsed={isSidebarCollapsed} />
       </div>
     </div>
   );
