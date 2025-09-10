@@ -2,14 +2,18 @@ import { useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { SAMPLE_SALES_DATA } from "@/lib/data";
 
-export default function SalesChart() {
-  const data = useMemo(() => SAMPLE_SALES_DATA, []);
+interface SalesChartProps {
+  data?: Array<{ month: string; revenue: number }>;
+}
+
+export default function SalesChart({ data }: SalesChartProps) {
+  const chartData = useMemo(() => data || SAMPLE_SALES_DATA, [data]);
 
   return (
     <div className="h-[350px]">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
-          data={data}
+          data={chartData}
           margin={{
             top: 5,
             right: 10,
@@ -19,7 +23,7 @@ export default function SalesChart() {
         >
           <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.5} />
           <XAxis
-            dataKey="day"
+            dataKey="month"
             stroke="rgb(var(--muted-foreground))"
             fontSize={12}
             tickLine={false}

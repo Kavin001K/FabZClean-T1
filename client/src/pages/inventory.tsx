@@ -1,44 +1,61 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Filter, Plus, Package, AlertTriangle, CheckCircle, Brain, TrendingUp, Zap, Target, BarChart3, Clock } from "lucide-react";
+import { Search, Filter, Plus, Package, AlertTriangle, CheckCircle, Brain, TrendingUp, Zap, Target, BarChart3, Clock, Bell } from "lucide-react";
 import { getStockStatusColor, getStockStatusText, formatCurrency } from "@/lib/data";
-import type { Product } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
+// Import dummy data
+import { dummyInventory, type InventoryItem } from '@/lib/dummy-data';
 
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [products, setProducts] = useState<InventoryItem[]>([]);
+  const [lowStockAlerts, setLowStockAlerts] = useState<InventoryItem[]>([]);
+  const { toast } = useToast();
 
-  const { data: products, isLoading } = useQuery<Product[]>({
-    queryKey: ["/api/products"],
-  });
+  // Use dummy data instead of API calls
+  useEffect(() => {
+    setProducts(dummyInventory);
+    // Check for low stock items
+    const lowStock = dummyInventory.filter(item => item.status === 'Low Stock' || item.status === 'Out of Stock');
+    setLowStockAlerts(lowStock);
+    
+    // Show alerts for low stock items
+    if (lowStock.length > 0) {
+      lowStock.forEach(item => {
+        toast({
+          title: "Low Stock Alert",
+          description: `${item.name} is ${item.status.toLowerCase()}. Current stock: ${item.stock}`,
+          variant: item.status === 'Out of Stock' ? 'destructive' : 'default',
+        });
+      });
+    }
+  }, [toast]);
 
   const filteredProducts = products?.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.category.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
     
     let matchesStatus = true;
     if (statusFilter === "in_stock") {
-      matchesStatus = product.stockQuantity > product.reorderLevel;
+      matchesStatus = product.status === 'In Stock';
     } else if (statusFilter === "low_stock") {
-      matchesStatus = product.stockQuantity > 0 && product.stockQuantity <= product.reorderLevel;
+      matchesStatus = product.status === 'Low Stock';
     } else if (statusFilter === "out_of_stock") {
-      matchesStatus = product.stockQuantity === 0;
+      matchesStatus = product.status === 'Out of Stock';
     }
     
     return matchesSearch && matchesStatus;
   }) || [];
 
   const inventoryStats = products?.reduce((acc, product) => {
-    const totalValue = acc.totalValue + (parseFloat(product.price) * product.stockQuantity);
-    if (product.stockQuantity === 0) {
+    const totalValue = acc.totalValue + (product.stock * 100); // Mock price calculation
+    if (product.status === 'Out of Stock') {
       acc.outOfStock++;
-    } else if (product.stockQuantity <= product.reorderLevel) {
+    } else if (product.status === 'Low Stock') {
       acc.lowStock++;
     } else {
       acc.inStock++;
@@ -46,26 +63,23 @@ export default function Inventory() {
     return { ...acc, totalValue };
   }, { inStock: 0, lowStock: 0, outOfStock: 0, totalValue: 0 }) || { inStock: 0, lowStock: 0, outOfStock: 0, totalValue: 0 };
 
-  if (isLoading) {
-    return (
-      <div className="p-8" data-testid="inventory-page">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="font-display font-bold text-3xl text-foreground">Inventory</h1>
-            <p className="text-muted-foreground mt-1">Manage products and stock levels</p>
-          </div>
-        </div>
-        <div className="animate-pulse space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-muted rounded-lg"></div>
-            ))}
-          </div>
-          <div className="h-96 bg-muted rounded-lg"></div>
-        </div>
-      </div>
-    );
-  }
+  // Add a function to manually trigger low stock alerts
+  const triggerLowStockAlerts = () => {
+    if (lowStockAlerts.length > 0) {
+      lowStockAlerts.forEach(item => {
+        toast({
+          title: "Low Stock Alert",
+          description: `${item.name} is ${item.status.toLowerCase()}. Current stock: ${item.stock}`,
+          variant: item.status === 'Out of Stock' ? 'destructive' : 'default',
+        });
+      });
+    } else {
+      toast({
+        title: "Stock Status",
+        description: "All items are well stocked!",
+      });
+    }
+  };
 
   return (
     <div className="p-8" data-testid="inventory-page">
@@ -109,6 +123,52 @@ export default function Inventory() {
           </Button>
         </div>
       </div>
+
+      {/* Low Stock Alerts Section */}
+      {lowStockAlerts.length > 0 && (
+        <Card className="mb-6 border-orange-200 bg-orange-50">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-orange-800">
+                <Bell className="h-5 w-5" />
+                Low Stock Alerts ({lowStockAlerts.length})
+              </CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={triggerLowStockAlerts}
+                className="border-orange-300 text-orange-700 hover:bg-orange-100"
+              >
+                <Bell className="h-4 w-4 mr-2" />
+                Show Alerts
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {lowStockAlerts.map((item) => (
+                <div key={item.id} className="p-3 bg-white rounded-lg border border-orange-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900">{item.name}</p>
+                      <p className="text-sm text-gray-600">Stock: {item.stock}</p>
+                    </div>
+                    <Badge 
+                      className={
+                        item.status === 'Out of Stock' 
+                          ? 'bg-red-100 text-red-800' 
+                          : 'bg-orange-100 text-orange-800'
+                      }
+                    >
+                      {item.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* AI Predictive Analytics Banner */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
@@ -280,49 +340,41 @@ export default function Inventory() {
             <TableHeader>
               <TableRow>
                 <TableHead>Product</TableHead>
-                <TableHead>SKU</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Price</TableHead>
+                <TableHead>ID</TableHead>
                 <TableHead>Stock</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Supplier</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredProducts.map((product) => (
-                <TableRow key={product.id} data-testid={`product-row-${product.sku}`}>
+                <TableRow key={product.id} data-testid={`product-row-${product.id}`}>
                   <TableCell>
                     <div>
                       <p className="font-medium">{product.name}</p>
-                      <p className="text-sm text-muted-foreground">{product.description}</p>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-sm">{product.sku}</TableCell>
-                  <TableCell>{product.category}</TableCell>
-                  <TableCell className="font-medium">
-                    {formatCurrency(parseFloat(product.price))}
-                  </TableCell>
+                  <TableCell className="font-mono text-sm">{product.id}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${getStockStatusColor(product.stockQuantity, product.reorderLevel)}`}></div>
-                      <span className="font-medium">{product.stockQuantity}</span>
+                      <span className="font-medium">{product.stock}</span>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge className={
-                      product.stockQuantity === 0 
-                        ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
-                        : product.stockQuantity <= product.reorderLevel 
-                          ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
-                          : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
-                    }>
-                      {getStockStatusText(product.stockQuantity, product.reorderLevel)}
+                    <Badge 
+                      className={
+                        product.status === 'In Stock' 
+                          ? 'bg-green-100 text-green-800' 
+                          : product.status === 'Low Stock'
+                          ? 'bg-orange-100 text-orange-800'
+                          : 'bg-red-100 text-red-800'
+                      }
+                    >
+                      {product.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{product.supplier}</TableCell>
                   <TableCell>
-                    <Button variant="outline" size="sm" data-testid={`edit-product-${product.sku}`}>
+                    <Button variant="outline" size="sm" data-testid={`edit-product-${product.id}`}>
                       Edit
                     </Button>
                   </TableCell>

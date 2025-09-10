@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/use-theme";
-import { Moon, Sun, User, Menu } from "lucide-react";
-import { useState } from "react";
+import { Moon, Sun, User, Menu, Search, Bell, Settings, Command, Maximize2, Minimize2, Square } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,32 @@ interface HeaderProps {
 export default function Header({ onSidebarToggle }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [notifications, setNotifications] = useState(3);
+
+  // Desktop keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey) {
+        switch (event.key) {
+          case 'k':
+            event.preventDefault();
+            // Focus global search
+            const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
+            searchInput?.focus();
+            break;
+          case 'b':
+            event.preventDefault();
+            // Toggle sidebar
+            onSidebarToggle();
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onSidebarToggle]);
 
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +57,7 @@ export default function Header({ onSidebarToggle }: HeaderProps) {
   };
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-card px-4 md:px-6">
+    <header className="flex h-16 items-center justify-between border-b bg-card px-4 md:px-6 desktop-optimized">
       <div className="flex items-center gap-4">
         <Button
           variant="outline"
@@ -42,19 +68,48 @@ export default function Header({ onSidebarToggle }: HeaderProps) {
           <Menu className="h-6 w-6" />
           <span className="sr-only">Toggle sidebar</span>
         </Button>
-        <h1 className="text-xl font-bold">Dashboard</h1>
+        
+        {/* Desktop Global Search */}
+        <div className="hidden lg:flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search anything... (⌘K)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-80 pl-10 pr-4 py-2 text-sm border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary desktop-search"
+            />
+          </div>
+        </div>
+        
+        <h1 className="text-xl font-bold desktop-only">Dashboard</h1>
       </div>
       
       <div className="flex items-center gap-4">
-        <div className="text-right hidden sm:block">
+        {/* Desktop Status Info */}
+        <div className="text-right hidden lg:block">
           <p className="text-xs text-muted-foreground">Last updated</p>
           <p className="text-sm font-medium">2 minutes ago</p>
+        </div>
+        
+        {/* Desktop Notifications */}
+        <div className="hidden lg:flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="relative">
+            <Bell className="h-4 w-4" />
+            {notifications > 0 && (
+              <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                {notifications}
+              </Badge>
+            )}
+          </Button>
         </div>
         
         <Button
           variant="outline"
           size="icon"
           onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+          className="desktop-button"
         >
           <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
           <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />

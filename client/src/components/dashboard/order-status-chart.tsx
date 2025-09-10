@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
-const data = [
+const defaultData = [
   { name: "Pending", value: 400 },
   { name: "In Progress", value: 300 },
   { name: "Completed", value: 300 },
@@ -9,7 +9,12 @@ const data = [
 
 const COLORS = ["#FFBB28", "#00C49F", "#0088FE"];
 
-export default function OrderStatusChart() {
+interface OrderStatusChartProps {
+  data?: Array<{ status: string; value: number }>;
+}
+
+export default function OrderStatusChart({ data }: OrderStatusChartProps) {
+  const chartData = data || defaultData;
   return (
     <Card className="hover:shadow-lg transition-shadow duration-200">
       <CardHeader>
@@ -19,7 +24,7 @@ export default function OrderStatusChart() {
         <ResponsiveContainer width="100%" height={300}>
           <PieChart>
             <Pie
-              data={data}
+              data={chartData}
               cx="50%"
               cy="50%"
               labelLine={false}
@@ -27,7 +32,7 @@ export default function OrderStatusChart() {
               fill="#8884d8"
               dataKey="value"
             >
-              {data.map((entry, index) => (
+              {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>

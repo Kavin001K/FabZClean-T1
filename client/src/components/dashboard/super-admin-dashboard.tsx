@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+// Import the dummy data
+import { dummyOrders, dummySalesData, dummyOrderStatusData, dummyServicePopularityData, dummyCustomers } from '@/lib/dummy-data';
 
 const revenueData = [
   { name: 'Week 1', revenue: 4000 },
@@ -78,6 +80,16 @@ export default function SuperAdminDashboard() {
   const [isFranchiseDialogOpen, setIsFranchiseDialogOpen] = useState(false);
   const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+
+  // --- TODO: Replace with API call to fetch real-time dashboard data ---
+  const totalRevenue = dummySalesData.reduce((acc, item) => acc + item.revenue, 0);
+  const totalOrders = dummyOrders.length;
+  const newCustomers = dummyCustomers.filter(customer => {
+    const joinDate = new Date(customer.joinDate);
+    const currentDate = new Date();
+    const oneMonthAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, currentDate.getDate());
+    return joinDate >= oneMonthAgo;
+  }).length;
 
   const handleSaveFranchise = (e: React.FormEvent) => {
     e.preventDefault();
@@ -229,7 +241,7 @@ export default function SuperAdminDashboard() {
                         <TableCell>{franchise.status}</TableCell>
                         <TableCell className="text-right">
                           <Link to={`/analytics?franchise=${franchise.name}`}>
-                            <Button variant="outline" size="sm">View</Button>
+                            <Button>View</Button>
                           </Link>
                         </TableCell>
                       </TableRow>
@@ -297,7 +309,7 @@ export default function SuperAdminDashboard() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <KpiCard
           title="Total Revenue"
-          value="₹1,259,430.50"
+          value={`₹${totalRevenue.toLocaleString()}`}
           change="+20.1% from last month"
           changeType="positive"
           icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
@@ -306,9 +318,9 @@ export default function SuperAdminDashboard() {
             <div className="py-4">
               <h4 className="font-semibold mb-2 text-center">Monthly Revenue Trend</h4>
               <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={revenueData}>
+                <LineChart data={dummySalesData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
+                  <XAxis dataKey="month" />
                   <YAxis />
                   <Tooltip />
                   <Legend />
@@ -350,7 +362,7 @@ export default function SuperAdminDashboard() {
         />
         <KpiCard
           title="Total Orders"
-          value="+12,234"
+          value={totalOrders.toString()}
           change="+19% from last month"
           changeType="positive"
           icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
@@ -367,12 +379,12 @@ export default function SuperAdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentOrdersData.map((order) => (
-                    <TableRow key={order.orderId}>
-                      <TableCell className="font-medium">{order.orderId}</TableCell>
-                      <TableCell>{order.customer}</TableCell>
+                  {dummyOrders.slice(0, 5).map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">{order.id}</TableCell>
+                      <TableCell>{order.customerName}</TableCell>
                       <TableCell>{order.status}</TableCell>
-                      <TableCell className="text-right">{order.amount}</TableCell>
+                      <TableCell className="text-right">₹{order.total.toLocaleString()}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -551,7 +563,7 @@ export default function SuperAdminDashboard() {
                 <CardTitle>Overview</CardTitle>
             </CardHeader>
             <CardContent className="pl-2">
-                <SalesChart />
+                <SalesChart data={dummySalesData} />
             </CardContent>
         </Card>
         <Card className="lg:col-span-3 animate-fade-in" style={{ animationDelay: "700ms" }}>
@@ -559,15 +571,15 @@ export default function SuperAdminDashboard() {
                 <CardTitle>Recent Orders</CardTitle>
             </CardHeader>
             <CardContent>
-                <RecentOrders />
+                <RecentOrders orders={dummyOrders.slice(0, 5)} />
             </CardContent>
         </Card>
     </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <OrderStatusChart />
+        <OrderStatusChart data={dummyOrderStatusData} />
         <FranchisePerformance />
-        <ServicePopularityChart />
+        <ServicePopularityChart data={dummyServicePopularityData} />
         <Card>
           <CardHeader>
             <CardTitle>Consolidated Payroll</CardTitle>

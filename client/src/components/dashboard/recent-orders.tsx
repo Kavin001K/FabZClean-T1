@@ -35,21 +35,41 @@ const RECENT_ORDERS_DATA = [
   },
 ];
 
+interface Order {
+  id: string;
+  customerName: string;
+  date: string;
+  status: 'Pending' | 'Processing' | 'Completed' | 'Cancelled';
+  total: number;
+  service: string;
+}
 
-export default function RecentOrders() {
+interface RecentOrdersProps {
+  orders?: Order[];
+}
+
+export default function RecentOrders({ orders }: RecentOrdersProps) {
+  const displayOrders = orders || RECENT_ORDERS_DATA.map((order, i) => ({
+    id: `ORD${i + 1}`,
+    customerName: order.name,
+    date: new Date().toISOString().split('T')[0],
+    status: 'Completed' as const,
+    total: order.totalAmount,
+    service: 'Dry Cleaning'
+  }));
+
   return (
     <div className="space-y-8">
-      {RECENT_ORDERS_DATA.map((order, i) => (
-        <div key={i} className="flex items-center">
+      {displayOrders.map((order, i) => (
+        <div key={order.id || i} className="flex items-center">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={order.avatar} alt="Avatar" />
-            <AvatarFallback>{order.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+            <AvatarFallback>{order.customerName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
           </Avatar>
           <div className="ml-4 space-y-1">
-            <p className="text-sm font-medium leading-none">{order.name}</p>
-            <p className="text-sm text-muted-foreground">{order.email}</p>
+            <p className="text-sm font-medium leading-none">{order.customerName}</p>
+            <p className="text-sm text-muted-foreground">{order.service}</p>
           </div>
-          <div className="ml-auto font-medium">{formatCurrency(order.totalAmount)}</div>
+          <div className="ml-auto font-medium">{formatCurrency(order.total)}</div>
         </div>
       ))}
     </div>

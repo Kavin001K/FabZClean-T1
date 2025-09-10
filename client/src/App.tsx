@@ -26,7 +26,7 @@ function Router() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="flex h-screen w-full bg-background overflow-hidden">
       <Sidebar 
         isOpen={isSidebarOpen}
         isCollapsed={isSidebarCollapsed} 
@@ -34,26 +34,28 @@ function Router() {
         onClose={() => setIsSidebarOpen(false)}
       />
       <div className={`flex flex-1 flex-col transition-all duration-300 ease-in-out ${
-        isSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
+        isSidebarCollapsed ? "lg:ml-16" : "lg:ml-72"
       }`}>
         <Header 
           onSidebarToggle={() => setIsSidebarOpen(!isSidebarOpen)} 
         />
-        <main className="flex-1 overflow-y-auto bg-muted/30 p-4 md:p-6 lg:p-8 border-t">
-          <ErrorBoundary>
-            <Switch>
-              <Route path="/" component={Dashboard} />
-              <Route path="/orders" component={Orders} />
-              <Route path="/inventory" component={Inventory} />
-              <Route path="/customers" component={Customers} />
-              <Route path="/analytics" component={Analytics} />
-              <Route path="/services" component={Services} />
-              <Route path="/create-order" component={CreateOrder} />
-              <Route path="/tracking" component={Tracking} />
-              <Route path="/logistics" component={Logistics} />
-              <Route component={NotFound} />
-            </Switch>
-          </ErrorBoundary>
+        <main className="flex-1 overflow-y-auto bg-muted/20 p-6 lg:p-8">
+          <div className="max-w-none mx-auto">
+            <ErrorBoundary>
+              <Switch>
+                <Route path="/" component={Dashboard} />
+                <Route path="/orders" component={Orders} />
+                <Route path="/inventory" component={Inventory} />
+                <Route path="/customers" component={Customers} />
+                <Route path="/analytics" component={Analytics} />
+                <Route path="/services" component={Services} />
+                <Route path="/create-order" component={CreateOrder} />
+                <Route path="/tracking" component={Tracking} />
+                <Route path="/logistics" component={Logistics} />
+                <Route component={NotFound} />
+              </Switch>
+            </ErrorBoundary>
+          </div>
         </main>
         <Footer isSidebarCollapsed={isSidebarCollapsed} />
       </div>

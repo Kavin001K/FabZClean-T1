@@ -1,7 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   BarChart, 
   Bar, 
@@ -29,89 +34,92 @@ import {
   Calendar,
   Target,
   BarChart3,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  Download,
+  Filter,
+  FileText
 } from "lucide-react";
 import { formatCurrency, formatNumber, formatPercentage, SAMPLE_SALES_DATA } from "@/lib/data";
 import type { Service, Order, Customer, PosTransaction } from "@shared/schema";
+// Import the dummy data
+import { 
+  dummyOrders, 
+  dummySalesData, 
+  dummyOrderStatusData, 
+  dummyServicePopularityData, 
+  dummyCustomers,
+  dummyInventory,
+  generateInsights,
+  type Order as DummyOrder,
+  type Customer as DummyCustomer,
+  type InventoryItem
+} from '@/lib/dummy-data';
 
 export default function Analytics() {
-  const { data: services, isLoading: servicesLoading } = useQuery<Service[]>({
-    queryKey: ["/api/services"],
-  });
+  // Filter states
+  const [dateRange, setDateRange] = useState("last-30-days");
+  const [franchise, setFranchise] = useState("all");
+  const [serviceType, setServiceType] = useState("all");
+  const [insights, setInsights] = useState<string[]>([]);
+  const [showInsights, setShowInsights] = useState(false);
 
-  const { data: orders, isLoading: ordersLoading } = useQuery<Order[]>({
-    queryKey: ["/api/orders"],
-  });
+  // Use dummy data instead of API calls for now
+  const services = [
+    { id: "1", name: "Dry Cleaning", category: "Premium", price: 250 },
+    { id: "2", name: "Wash & Fold", category: "Standard", price: 150 },
+    { id: "3", name: "Ironing", category: "Standard", price: 100 },
+    { id: "4", name: "Premium Laundry", category: "Premium", price: 300 },
+  ];
 
-  const { data: customers, isLoading: customersLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/customers"],
-  });
+  const orders = dummyOrders;
+  const customers = dummyCustomers;
+  const metrics = {
+    onTimeDelivery: 95.2,
+    inventoryTurnover: 4.2,
+  };
 
-  const { data: metrics } = useQuery({
-    queryKey: ["/api/dashboard/metrics"],
-  });
+  const isLoading = false; // No loading state needed with dummy data
 
-  // Calculate analytics data
+  // Calculate analytics data using dummy data
   const analyticsData = useMemo(() => {
-    if (!orders || !services || !customers) {
-      return null;
-    }
+    // Revenue by time period (using dummy sales data)
+    const revenueByMonth = dummySalesData;
 
-    // Revenue by time period
-    const revenueByMonth = orders.reduce((acc, order) => {
-      if (!order.createdAt) return acc;
-      const month = new Date(order.createdAt).toLocaleString('default', { month: 'short' });
-      acc[month] = (acc[month] || 0) + parseFloat(order.totalAmount);
-      return acc;
-    }, {} as Record<string, number>);
-
-    // Service performance
-    const servicePerformance = services.map(service => {
-        const serviceOrders = orders.filter(order => order.serviceId === service.id);
-        const revenue = serviceOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
-        return {
-            name: service.name,
-            orders: serviceOrders.length,
-            revenue,
-        };
-    }).sort((a, b) => b.revenue - a.revenue);
+    // Service performance (using dummy service popularity data)
+    const servicePerformance = dummyServicePopularityData.map(item => ({
+      name: item.name,
+      orders: item.value,
+      revenue: item.value * 50, // Approximate revenue calculation
+    }));
 
     // Category performance
-    const categoryPerformance = services.reduce((acc, service) => {
-        const category = service.category;
-        if (!acc[category]) {
-            acc[category] = { name: category, revenue: 0, services: 0 };
-        }
-        acc[category].services += 1;
-        const serviceOrders = orders.filter(order => order.serviceId === service.id);
-        acc[category].revenue += serviceOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
-        return acc;
-    }, {} as Record<string, { name: string; revenue: number; services: number }>);
+    const categoryPerformance = [
+      { name: "Premium", revenue: 120000, services: 2 },
+      { name: "Standard", revenue: 80000, services: 2 },
+    ];
 
-    // Customer segments
+    // Customer segments (using dummy customers)
     const customerSegments = customers.map(customer => ({
       name: customer.name,
-      totalSpent: parseFloat(customer.totalSpent || "0"),
-      totalOrders: customer.totalOrders || 0,
-      avgOrderValue: (customer.totalOrders || 0) > 0 ? parseFloat(customer.totalSpent || "0") / (customer.totalOrders || 1) : 0
+      totalSpent: customer.totalOrders * 2000, // Approximate calculation
+      totalOrders: customer.totalOrders,
+      avgOrderValue: 2000,
     })).sort((a, b) => b.totalSpent - a.totalSpent);
 
-    // Order status distribution
-    const orderStatusDistribution = orders.reduce((acc, order) => {
-      acc[order.status] = (acc[order.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    // Order status distribution (using dummy order status data)
+    const orderStatusDistribution = dummyOrderStatusData.map(item => ({
+      status: item.status,
+      count: item.value,
+    }));
 
     return {
-      revenueByMonth: Object.entries(revenueByMonth).map(([month, revenue]) => ({ month, revenue })),
+      revenueByMonth,
       servicePerformance: servicePerformance.slice(0, 10),
-      categoryPerformance: Object.values(categoryPerformance),
+      categoryPerformance,
       customerSegments: customerSegments.slice(0, 10),
-      orderStatusDistribution: Object.entries(orderStatusDistribution).map(([status, count]) => ({ status, count })),
+      orderStatusDistribution,
     };
-  }, [orders, services, customers]);
-
-  const isLoading = servicesLoading || ordersLoading || customersLoading;
+  }, [customers]);
 
   const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
@@ -140,7 +148,7 @@ export default function Analytics() {
     <div className="p-8" data-testid="analytics-page">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-display font-bold text-3xl text-foreground">Analytics</h1>
+          <h1 className="font-display font-bold text-3xl text-foreground">Analytics & Reports</h1>
           <p className="text-muted-foreground mt-1">Business intelligence and performance insights</p>
         </div>
         <div className="flex items-center gap-2">
@@ -148,6 +156,117 @@ export default function Analytics() {
           <span className="text-sm text-muted-foreground">Real-time Data</span>
         </div>
       </div>
+
+      {/* Filters and Export Section */}
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Filters:</span>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="date-range" className="text-sm">Date Range:</Label>
+                  <Select value={dateRange} onValueChange={setDateRange}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="last-7-days">Last 7 Days</SelectItem>
+                      <SelectItem value="last-30-days">Last 30 Days</SelectItem>
+                      <SelectItem value="last-90-days">Last 90 Days</SelectItem>
+                      <SelectItem value="this-year">This Year</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="franchise" className="text-sm">Franchise:</Label>
+                  <Select value={franchise} onValueChange={setFranchise}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Franchises</SelectItem>
+                      <SelectItem value="downtown">Downtown Central</SelectItem>
+                      <SelectItem value="northside">Northside Hub</SelectItem>
+                      <SelectItem value="eastwood">Eastwood Branch</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="service-type" className="text-sm">Service:</Label>
+                  <Select value={serviceType} onValueChange={setServiceType}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Services</SelectItem>
+                      <SelectItem value="dry-cleaning">Dry Cleaning</SelectItem>
+                      <SelectItem value="wash-fold">Wash & Fold</SelectItem>
+                      <SelectItem value="ironing">Ironing</SelectItem>
+                      <SelectItem value="premium">Premium Laundry</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  const generatedInsights = generateInsights();
+                  setInsights(generatedInsights);
+                  setShowInsights(true);
+                }}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Generate Insights
+              </Button>
+              <Button variant="outline" size="sm">
+                <FileText className="h-4 w-4 mr-2" />
+                Export as PDF
+              </Button>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                Export as CSV
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* AI Insights Section */}
+      {showInsights && insights.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                AI-Powered Business Insights
+              </CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowInsights(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {insights.map((insight, index) => (
+                <div key={index} className="p-4 bg-muted/50 rounded-lg border-l-4 border-primary">
+                  <p className="text-sm leading-relaxed">{insight}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Key Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
@@ -237,9 +356,9 @@ export default function Analytics() {
               <CardContent>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={SAMPLE_SALES_DATA}>
+                    <AreaChart data={analyticsData?.revenueByMonth || []}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" />
+                      <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" />
                       <YAxis stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `₹${(value / 1000)}k`} />
                       <Tooltip 
                         contentStyle={{
@@ -296,6 +415,76 @@ export default function Analytics() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Revenue Data Tables */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="bento-card">
+              <CardHeader>
+                <CardTitle className="font-display font-semibold text-lg text-foreground">
+                  Monthly Revenue Data
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Month</TableHead>
+                      <TableHead className="text-right">Revenue</TableHead>
+                      <TableHead className="text-right">Growth</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {analyticsData?.revenueByMonth.map((item, index) => (
+                      <TableRow key={item.month}>
+                        <TableCell className="font-medium">{item.month}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(item.revenue)}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={`text-sm ${index > 0 && item.revenue > analyticsData.revenueByMonth[index - 1].revenue ? 'text-green-500' : 'text-red-500'}`}>
+                            {index > 0 ? 
+                              `${(((item.revenue - analyticsData.revenueByMonth[index - 1].revenue) / analyticsData.revenueByMonth[index - 1].revenue) * 100).toFixed(1)}%` 
+                              : '-'
+                            }
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Card className="bento-card">
+              <CardHeader>
+                <CardTitle className="font-display font-semibold text-lg text-foreground">
+                  Order Status Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Count</TableHead>
+                      <TableHead className="text-right">Percentage</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {analyticsData?.orderStatusDistribution.map((item) => {
+                      const total = analyticsData.orderStatusDistribution.reduce((sum, order) => sum + order.count, 0);
+                      const percentage = ((item.count / total) * 100).toFixed(1);
+                      return (
+                        <TableRow key={item.status}>
+                          <TableCell className="font-medium">{item.status}</TableCell>
+                          <TableCell className="text-right">{item.count}</TableCell>
+                          <TableCell className="text-right">{percentage}%</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </div>
@@ -375,6 +564,73 @@ export default function Analytics() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Service Data Tables */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="bento-card">
+                    <CardHeader>
+                        <CardTitle className="font-display font-semibold text-lg text-foreground">
+                            Service Performance Details
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Service</TableHead>
+                                    <TableHead className="text-right">Orders</TableHead>
+                                    <TableHead className="text-right">Revenue</TableHead>
+                                    <TableHead className="text-right">Avg. Order Value</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {analyticsData?.servicePerformance.map((service) => (
+                                    <TableRow key={service.name}>
+                                        <TableCell className="font-medium">{service.name}</TableCell>
+                                        <TableCell className="text-right">{service.orders}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(service.revenue)}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(service.revenue / service.orders)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+
+                <Card className="bento-card">
+                    <CardHeader>
+                        <CardTitle className="font-display font-semibold text-lg text-foreground">
+                            Category Breakdown
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Category</TableHead>
+                                    <TableHead className="text-right">Services</TableHead>
+                                    <TableHead className="text-right">Revenue</TableHead>
+                                    <TableHead className="text-right">Market Share</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {analyticsData?.categoryPerformance.map((category) => {
+                                    const totalRevenue = analyticsData.categoryPerformance.reduce((sum, cat) => sum + cat.revenue, 0);
+                                    const marketShare = ((category.revenue / totalRevenue) * 100).toFixed(1);
+                                    return (
+                                        <TableRow key={category.name}>
+                                            <TableCell className="font-medium">{category.name}</TableCell>
+                                            <TableCell className="text-right">{category.services}</TableCell>
+                                            <TableCell className="text-right">{formatCurrency(category.revenue)}</TableCell>
+                                            <TableCell className="text-right">{marketShare}%</TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </div>
         </TabsContent>
 
         {/* Customer Analytics */}
@@ -451,45 +707,76 @@ export default function Analytics() {
             </Card>
           </div>
 
-          {/* Top Customers */}
-          <Card className="bento-card">
-            <CardHeader>
-              <CardTitle className="font-display font-semibold text-lg text-foreground">
-                High-Value Customers
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {analyticsData?.customerSegments.slice(0, 5).map((customer, index) => (
-                  <div 
-                    key={customer.name}
-                    className="flex items-center justify-between p-4 border border-border rounded-lg"
-                    data-testid={`top-customer-${index}`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="text-center">
-                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                          <span className="text-xs text-primary-foreground font-medium">
-                            {customer.name.split(' ').map(n => n[0]).join('')}
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{customer.name}</p>
-                        <p className="text-sm text-muted-foreground">{customer.totalOrders} orders</p>
-                      </div>
+          {/* Customer Data Tables */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="bento-card">
+              <CardHeader>
+                <CardTitle className="font-display font-semibold text-lg text-foreground">
+                  Customer Value Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Customer</TableHead>
+                      <TableHead className="text-right">Total Orders</TableHead>
+                      <TableHead className="text-right">Total Spent</TableHead>
+                      <TableHead className="text-right">Avg. Order Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {analyticsData?.customerSegments.slice(0, 8).map((customer) => (
+                      <TableRow key={customer.name}>
+                        <TableCell className="font-medium">{customer.name}</TableCell>
+                        <TableCell className="text-right">{customer.totalOrders}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(customer.totalSpent)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(customer.avgOrderValue)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Card className="bento-card">
+              <CardHeader>
+                <CardTitle className="font-display font-semibold text-lg text-foreground">
+                  Customer Insights Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-muted/50 rounded-lg text-center">
+                      <p className="text-2xl font-bold text-foreground">{customers?.length || 0}</p>
+                      <p className="text-sm text-muted-foreground">Total Customers</p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-foreground">{formatCurrency(customer.totalSpent)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Avg: {formatCurrency(customer.avgOrderValue)}
+                    <div className="p-4 bg-muted/50 rounded-lg text-center">
+                      <p className="text-2xl font-bold text-foreground">
+                        {formatCurrency(analyticsData?.customerSegments.reduce((sum, c) => sum + c.totalSpent, 0) / (analyticsData?.customerSegments.length || 1) || 0)}
                       </p>
+                      <p className="text-sm text-muted-foreground">Avg. Customer Value</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Repeat Purchase Rate</span>
+                      <span className="font-medium text-foreground">76.3%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Customer Acquisition Cost</span>
+                      <span className="font-medium text-foreground">₹47.20</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Customer Lifetime Value</span>
+                      <span className="font-medium text-foreground">₹2,450</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Operations Analytics */}
@@ -570,49 +857,88 @@ export default function Analytics() {
             </Card>
           </div>
 
-          {/* Key Performance Indicators */}
-          <Card className="bento-card">
-            <CardHeader>
-              <CardTitle className="font-display font-semibold text-lg text-foreground">
-                Key Performance Indicators
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center p-6 border border-border rounded-lg">
-                  <Calendar className="w-8 h-8 mx-auto mb-3 text-blue-500" />
-                  <p className="text-xl font-display font-bold text-foreground mb-1">24</p>
-                  <p className="text-sm text-muted-foreground">Avg. Days to Fulfill</p>
-                  <div className="flex items-center justify-center gap-1 mt-2">
-                    <TrendingDown className="w-3 h-3 text-green-500" />
-                    <span className="text-xs text-green-500">-2 days vs last month</span>
+          {/* Operations Data Tables */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="bento-card">
+              <CardHeader>
+                <CardTitle className="font-display font-semibold text-lg text-foreground">
+                  Inventory Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead className="text-right">Stock</TableHead>
+                      <TableHead className="text-right">Status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dummyInventory.slice(0, 6).map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell className="text-right">{item.stock}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={`text-sm px-2 py-1 rounded-full ${
+                            item.status === 'In Stock' ? 'bg-green-100 text-green-800' :
+                            item.status === 'Low Stock' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {item.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {item.status === 'Out of Stock' && (
+                            <Button size="sm" variant="outline">Reorder</Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Card className="bento-card">
+              <CardHeader>
+                <CardTitle className="font-display font-semibold text-lg text-foreground">
+                  Key Performance Indicators
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-4 bg-muted/50 rounded-lg">
+                      <Calendar className="w-6 h-6 mx-auto mb-2 text-blue-500" />
+                      <p className="text-lg font-bold text-foreground">24</p>
+                      <p className="text-xs text-muted-foreground">Avg. Days to Fulfill</p>
+                    </div>
+                    <div className="text-center p-4 bg-muted/50 rounded-lg">
+                      <Package className="w-6 h-6 mx-auto mb-2 text-purple-500" />
+                      <p className="text-lg font-bold text-foreground">5</p>
+                      <p className="text-xs text-muted-foreground">Low Stock Items</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Order Processing Time</span>
+                      <span className="font-medium text-foreground">2.4 hours</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Inventory Accuracy</span>
+                      <span className="font-medium text-foreground">98.7%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Quality Score</span>
+                      <span className="font-medium text-foreground">95.2%</span>
+                    </div>
                   </div>
                 </div>
-                
-                <div className="text-center p-6 border border-border rounded-lg">
-                  <Package className="w-8 h-8 mx-auto mb-3 text-purple-500" />
-                  <p className="text-xl font-display font-bold text-foreground mb-1">
-                    5
-                  </p>
-                  <p className="text-sm text-muted-foreground">Services Below Threshold</p>
-                  <div className="flex items-center justify-center gap-1 mt-2">
-                    <TrendingUp className="w-3 h-3 text-yellow-500" />
-                    <span className="text-xs text-yellow-500">+3 vs last week</span>
-                  </div>
-                </div>
-                
-                <div className="text-center p-6 border border-border rounded-lg">
-                  <Target className="w-8 h-8 mx-auto mb-3 text-red-500" />
-                  <p className="text-xl font-display font-bold text-foreground mb-1">95.2%</p>
-                  <p className="text-sm text-muted-foreground">Quality Score</p>
-                  <div className="flex items-center justify-center gap-1 mt-2">
-                    <TrendingUp className="w-3 h-3 text-green-500" />
-                    <span className="text-xs text-green-500">+1.3% this month</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

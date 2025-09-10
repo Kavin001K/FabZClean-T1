@@ -34,11 +34,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { useQuery } from "@tanstack/react-query"
-import type { Customer } from "@shared/schema"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useToast } from "@/hooks/use-toast"
+// Import dummy data
+import { dummyCustomers, type Customer as DummyCustomer } from '@/lib/dummy-data'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -59,10 +60,54 @@ const kpiData = [
 ];
 
 export default function Customers() {
-    const { data: customers, isLoading } = useQuery<Customer[]>({
-        queryKey: ["/api/customers"],
+  const [customers, setCustomers] = useState<DummyCustomer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<DummyCustomer | null>(null);
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    email: '',
+    phone: '',
+  });
+  const { toast } = useToast();
+
+  // Use dummy data instead of API calls
+  useEffect(() => {
+    setCustomers(dummyCustomers);
+  }, []);
+
+  // Customer onboarding function
+  const handleCreateCustomer = () => {
+    if (!newCustomer.name || !newCustomer.email || !newCustomer.phone) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const customer: DummyCustomer = {
+      id: `CUST${String(customers.length + 1).padStart(3, '0')}`,
+      name: newCustomer.name,
+      email: newCustomer.email,
+      phone: newCustomer.phone,
+      joinDate: new Date().toISOString().split('T')[0],
+      totalOrders: 0,
+    };
+
+    setCustomers(prev => [...prev, customer]);
+    
+    // Simulate welcome email
+    console.log(`Welcome email sent to ${customer.email}`);
+    console.log(`Customer ${customer.name} has been added to the system`);
+    
+    toast({
+      title: "Customer Created Successfully",
+      description: `Welcome email sent to ${customer.email}. Customer ID: ${customer.id}`,
     });
-    const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+
+    // Reset form
+    setNewCustomer({ name: '', email: '', phone: '' });
+  };
     const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   return (
@@ -119,18 +164,42 @@ export default function Customers() {
                         </DialogHeader>
                         <div className="py-4 space-y-4">
                             <div>
-                                <Label htmlFor="customerName">Name</Label>
-                                <Input id="customerName" />
+                                <Label htmlFor="customerName">Name *</Label>
+                                <Input 
+                                    id="customerName" 
+                                    value={newCustomer.name}
+                                    onChange={(e) => setNewCustomer(prev => ({ ...prev, name: e.target.value }))}
+                                    placeholder="Enter customer name"
+                                />
                             </div>
                             <div>
-                                <Label htmlFor="customerEmail">Email</Label>
-                                <Input id="customerEmail" type="email" />
+                                <Label htmlFor="customerEmail">Email *</Label>
+                                <Input 
+                                    id="customerEmail" 
+                                    type="email" 
+                                    value={newCustomer.email}
+                                    onChange={(e) => setNewCustomer(prev => ({ ...prev, email: e.target.value }))}
+                                    placeholder="Enter email address"
+                                />
                             </div>
                             <div>
-                                <Label htmlFor="customerPhone">Phone</Label>
-                                <Input id="customerPhone" type="tel" />
+                                <Label htmlFor="customerPhone">Phone *</Label>
+                                <Input 
+                                    id="customerPhone" 
+                                    type="tel" 
+                                    value={newCustomer.phone}
+                                    onChange={(e) => setNewCustomer(prev => ({ ...prev, phone: e.target.value }))}
+                                    placeholder="Enter phone number"
+                                />
                             </div>
-                            <Button>Save Customer</Button>
+                            <div className="bg-blue-50 p-3 rounded-lg">
+                                <p className="text-sm text-blue-800">
+                                    <strong>Welcome Package:</strong> New customers will receive a welcome email with special offers and service information.
+                                </p>
+                            </div>
+                            <Button onClick={handleCreateCustomer} className="w-full">
+                                Create Customer & Send Welcome Email
+                            </Button>
                         </div>
                     </DialogContent>
                 </Dialog>
@@ -141,20 +210,20 @@ export default function Customers() {
               <TableRow>
                 <TableHead>Customer</TableHead>
                 <TableHead className="hidden sm:table-cell">Total Orders</TableHead>
-                <TableHead className="hidden sm:table-cell">Total Spent</TableHead>
-                <TableHead className="hidden md:table-cell">Last Order</TableHead>
+                <TableHead className="hidden sm:table-cell">Join Date</TableHead>
+                <TableHead className="hidden md:table-cell">Phone</TableHead>
                 <TableHead>
                   <span className="sr-only">Actions</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {customers.length === 0 ? (
                 <TableRow>
-                    <TableCell colSpan={5} className="text-center">Loading customers...</TableCell>
+                    <TableCell colSpan={5} className="text-center">No customers found</TableCell>
                 </TableRow>
               ) : (
-                customers?.map((customer) => (
+                customers.map((customer) => (
                     <TableRow key={customer.id} className="interactive-row">
                     <TableCell>
                         <div className="font-medium">{customer.name}</div>
@@ -163,9 +232,11 @@ export default function Customers() {
                         </div>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">{customer.totalOrders}</TableCell>
-                    <TableCell className="hidden sm:table-cell">₹{parseFloat(customer.totalSpent).toFixed(2)}</TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      {new Date(customer.joinDate).toLocaleDateString()}
+                    </TableCell>
                     <TableCell className="hidden md:table-cell">
-                      {customer.lastOrder ? new Date(customer.lastOrder).toLocaleDateString() : 'No orders'}
+                      {customer.phone}
                     </TableCell>
                     <TableCell>
                         <AlertDialog>

@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+// Import the dummy data
+import { dummyOrders, dummySalesData, dummyOrderStatusData, dummyServicePopularityData, dummyCustomers } from '@/lib/dummy-data';
 
 const dailyRevenueData = [
   { day: "Mon", revenue: 1250 },
@@ -50,6 +52,16 @@ const employeeSalaryData = [
 export default function FranchiseOwnerDashboard() {
   const { toast } = useToast();
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
+
+  // --- TODO: Replace with API call to fetch real-time dashboard data ---
+  const totalRevenue = dummySalesData.reduce((acc, item) => acc + item.revenue, 0);
+  const totalOrders = dummyOrders.length;
+  const newCustomers = dummyCustomers.filter(customer => {
+    const joinDate = new Date(customer.joinDate);
+    const currentDate = new Date();
+    const oneMonthAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, currentDate.getDate());
+    return joinDate >= oneMonthAgo;
+  }).length;
 
   const handleSaveCustomer = (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,16 +137,16 @@ export default function FranchiseOwnerDashboard() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <KpiCard
           title="My Store Revenue"
-          value="₹629,715.25"
+          value={`₹${totalRevenue.toLocaleString()}`}
           change="+25.5% from last month"
           changeType="positive"
           icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
           details={
             <div className="py-4">
-              <h4 className="font-semibold mb-2 text-center">Daily Revenue</h4>
+              <h4 className="font-semibold mb-2 text-center">Monthly Revenue</h4>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={dailyRevenueData}>
-                  <XAxis dataKey="day" />
+                <BarChart data={dummySalesData}>
+                  <XAxis dataKey="month" />
                   <YAxis />
                   <Tooltip />
                   <Bar dataKey="revenue" fill="hsl(var(--primary))" />
@@ -145,7 +157,7 @@ export default function FranchiseOwnerDashboard() {
         />
         <KpiCard
           title="New Customers"
-          value="+1,175"
+          value={newCustomers.toString()}
           change="+190.5% from last month"
           changeType="positive"
           icon={<Users className="h-4 w-4 text-muted-foreground" />}
@@ -156,15 +168,15 @@ export default function FranchiseOwnerDashboard() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Join Date</TableHead>
-                    <TableHead className="text-right">Total Spent</TableHead>
+                    <TableHead className="text-right">Total Orders</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {newCustomersData.map((customer) => (
-                    <TableRow key={customer.name}>
+                  {dummyCustomers.slice(0, 5).map((customer) => (
+                    <TableRow key={customer.id}>
                       <TableCell className="font-medium">{customer.name}</TableCell>
                       <TableCell>{customer.joinDate}</TableCell>
-                      <TableCell className="text-right">{customer.totalSpent}</TableCell>
+                      <TableCell className="text-right">{customer.totalOrders}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -174,11 +186,34 @@ export default function FranchiseOwnerDashboard() {
         />
         <KpiCard
           title="Active Orders"
-          value="+6,117"
+          value={totalOrders.toString()}
           change="+22% from last month"
           changeType="positive"
           icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
-          details={<p className="py-4">A detailed list of active orders will be shown here.</p>}
+          details={
+            <div className="py-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order ID</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dummyOrders.slice(0, 5).map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">{order.id}</TableCell>
+                      <TableCell>{order.customerName}</TableCell>
+                      <TableCell>{order.status}</TableCell>
+                      <TableCell className="text-right">₹{order.total.toLocaleString()}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          }
         />
         <KpiCard
           title="Pending Pickups"
@@ -212,7 +247,7 @@ export default function FranchiseOwnerDashboard() {
             <CardTitle>Overview</CardTitle>
           </CardHeader>
           <CardContent className="pl-2">
-            <SalesChart />
+            <SalesChart data={dummySalesData} />
           </CardContent>
         </Card>
         <Card className="lg:col-span-3">
@@ -220,14 +255,14 @@ export default function FranchiseOwnerDashboard() {
             <CardTitle>Recent Orders</CardTitle>
           </CardHeader>
           <CardContent>
-            <RecentOrders />
+            <RecentOrders orders={dummyOrders.slice(0, 5)} />
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <OrderStatusChart />
-        <ServicePopularityChart />
+        <OrderStatusChart data={dummyOrderStatusData} />
+        <ServicePopularityChart data={dummyServicePopularityData} />
         <Card>
           <CardHeader>
             <CardTitle>Employee Attendance</CardTitle>
