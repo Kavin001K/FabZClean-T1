@@ -47,13 +47,9 @@ import {
   ordersApi,
   customersApi,
   inventoryApi,
-  formatCurrency,
   formatDate,
-  formatNumber,
   getStatusColor,
   getPriorityColor,
-  type Order,
-  type Customer,
   type InventoryItem
 } from '@/lib/data-service';
 

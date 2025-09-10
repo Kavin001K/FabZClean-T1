@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Filter, Plus, Package, AlertTriangle, CheckCircle, Brain, TrendingUp, Zap, Target, BarChart3, Clock, Bell } from "lucide-react";
-import { getStockStatusColor, getStockStatusText, formatCurrency } from "@/lib/data";
+import { formatCurrency } from "@/lib/data";
 import { useToast } from "@/hooks/use-toast";
 // Import data service
-import { inventoryApi, type InventoryItem, getStockStatusColor, getStockStatusText } from '@/lib/data-service';
+import { inventoryApi, type InventoryItem } from '@/lib/data-service';
 
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");

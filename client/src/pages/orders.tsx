@@ -59,10 +59,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { useState, useEffect } from "react"
 import { Link } from "wouter"
 import { useToast } from "@/hooks/use-toast"
+// Import Order type from shared schema
+import type { Order } from "@shared/schema";
 // Import data service
 import { 
   ordersApi,
-  type Order,
   getNextStatus,
   getStatusColor,
   getPriorityColor,

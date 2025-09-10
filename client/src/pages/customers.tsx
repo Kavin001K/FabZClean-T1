@@ -38,8 +38,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label"
 import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
+// Import Customer type from shared schema
+import type { Customer } from "@shared/schema";
 // Import data service
-import { customersApi, type Customer, formatDate } from '@/lib/data-service'
+import { customersApi, formatDate } from '@/lib/data-service'
 import {
     AlertDialog,
     AlertDialogAction,

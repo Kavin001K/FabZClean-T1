@@ -1,25 +1,8 @@
 // Data service for connecting to the database API
 // This replaces all dummy data with real database queries
 
-export type Order = {
-  id: string;
-  customerName: string;
-  date: string;
-  status: 'Pending' | 'Processing' | 'Quality Check' | 'Ready for Delivery' | 'Out for Delivery' | 'Completed' | 'Cancelled';
-  total: number;
-  service: string;
-  priority?: 'Normal' | 'High' | 'Urgent';
-  notes?: string;
-};
-
-export type Customer = {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  joinDate: string;
-  totalOrders: number;
-};
+// Import types from shared schema instead of defining them here
+import type { Order, Customer } from "@shared/schema";
 
 export type InventoryItem = {
   id: string;
@@ -262,11 +245,7 @@ export const getStatusColor = (status: string): string => {
     pending: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400",
     processing: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
     completed: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
-    delivered: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
     cancelled: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400",
-    'quality check': "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400",
-    'ready for delivery': "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400",
-    'out for delivery': "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400",
   };
   
   return statusColors[status.toLowerCase() as keyof typeof statusColors] || statusColors.pending;
@@ -296,21 +275,21 @@ export const getStockStatusText = (quantity: number, reorderLevel: number = 10):
 
 // Order workflow helpers
 export const orderWorkflow = [
-  'Pending', 'Processing', 'Quality Check', 'Ready for Delivery', 'Out for Delivery', 'Completed'
+  'pending', 'processing', 'completed'
 ] as const;
 
 export const getNextStatus = (currentStatus: Order['status']): Order['status'] | null => {
-  const currentIndex = orderWorkflow.indexOf(currentStatus);
+  const currentIndex = orderWorkflow.indexOf(currentStatus as any);
   if (currentIndex === -1 || currentIndex === orderWorkflow.length - 1) {
     return null;
   }
-  return orderWorkflow[currentIndex + 1];
+  return orderWorkflow[currentIndex + 1] as Order['status'];
 };
 
 export const getPreviousStatus = (currentStatus: Order['status']): Order['status'] | null => {
-  const currentIndex = orderWorkflow.indexOf(currentStatus);
+  const currentIndex = orderWorkflow.indexOf(currentStatus as any);
   if (currentIndex <= 0) {
     return null;
   }
-  return orderWorkflow[currentIndex - 1];
+  return orderWorkflow[currentIndex - 1] as Order['status'];
 };
