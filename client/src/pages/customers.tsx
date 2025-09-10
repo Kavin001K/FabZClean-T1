@@ -38,8 +38,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label"
 import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
-// Import dummy data
-import { dummyCustomers, type Customer as DummyCustomer } from '@/lib/dummy-data'
+// Import data service
+import { customersApi, type Customer, formatDate } from '@/lib/data-service'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -69,10 +69,24 @@ export default function Customers() {
   });
   const { toast } = useToast();
 
-  // Use dummy data instead of API calls
+  // Fetch real data from database
   useEffect(() => {
-    setCustomers(dummyCustomers);
-  }, []);
+    const fetchCustomers = async () => {
+      try {
+        const customersData = await customersApi.getAll();
+        setCustomers(customersData);
+      } catch (error) {
+        console.error('Failed to fetch customers:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load customers. Please try again.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    fetchCustomers();
+  }, [toast]);
 
   // Customer onboarding function
   const handleCreateCustomer = () => {

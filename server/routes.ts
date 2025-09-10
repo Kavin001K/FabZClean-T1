@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertProductSchema, insertOrderSchema, insertCustomerSchema, insertOrderTransactionSchema, insertServiceSchema } from "@shared/schema";
 import { z } from "zod";
+import { getDatabaseHealth, pingDatabase, getDatabaseInfo } from "./db-utils";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -13,6 +14,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(metrics);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch dashboard metrics" });
+    }
+  });
+
+  // Database health check endpoints
+  app.get("/api/health/database", async (req, res) => {
+    try {
+      const health = await getDatabaseHealth();
+      res.json(health);
+    } catch (error) {
+      res.status(500).json({ status: "unhealthy", error: error.message });
+    }
+  });
+
+  app.get("/api/health/ping", async (req, res) => {
+    try {
+      const ping = await pingDatabase();
+      res.json(ping);
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/database/info", async (req, res) => {
+    try {
+      const info = await getDatabaseInfo();
+      res.json(info);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
     }
   });
 

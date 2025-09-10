@@ -59,22 +59,24 @@ import { Textarea } from "@/components/ui/textarea"
 import { useState, useEffect } from "react"
 import { Link } from "wouter"
 import { useToast } from "@/hooks/use-toast"
-// Import dummy data
+// Import data service
 import { 
-  dummyOrders, 
-  type Order as DummyOrder,
+  ordersApi,
+  type Order,
   getNextStatus,
   getStatusColor,
-  getPriorityColor
-} from '@/lib/dummy-data'
+  getPriorityColor,
+  formatCurrency,
+  formatDate
+} from '@/lib/data-service'
 
 export default function Orders() {
-  const [orders, setOrders] = useState<DummyOrder[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<DummyOrder[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<DummyOrder | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortField, setSortField] = useState<keyof DummyOrder | null>(null);
+  const [sortField, setSortField] = useState<keyof Order | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
     'id', 'customerName', 'service', 'priority', 'status', 'date', 'total', 'actions'
@@ -110,10 +112,23 @@ export default function Orders() {
   ];
 
   useEffect(() => {
-    // --- TODO: Replace with an API call to fetch orders ---
-    setOrders(dummyOrders);
-    setFilteredOrders(dummyOrders);
-  }, []);
+    const fetchOrders = async () => {
+      try {
+        const ordersData = await ordersApi.getAll();
+        setOrders(ordersData);
+        setFilteredOrders(ordersData);
+      } catch (error) {
+        console.error('Failed to fetch orders:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load orders. Please try again.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    fetchOrders();
+  }, [toast]);
 
   // Filter and sort orders
   useEffect(() => {
@@ -180,11 +195,20 @@ export default function Orders() {
           case 'r':
             event.preventDefault();
             // Refresh data
-            setOrders([...dummyOrders]);
-            toast({
-              title: "Data Refreshed",
-              description: "Orders data has been refreshed",
-            });
+            const refreshOrders = async () => {
+              try {
+                const ordersData = await ordersApi.getAll();
+                setOrders(ordersData);
+                setFilteredOrders(ordersData);
+                toast({
+                  title: "Data Refreshed",
+                  description: "Orders data has been refreshed",
+                });
+              } catch (error) {
+                console.error('Failed to refresh orders:', error);
+              }
+            };
+            refreshOrders();
             break;
         }
       }
@@ -330,12 +354,18 @@ export default function Orders() {
               </span>
             </Button>
             
-            <Button size="sm" variant="outline" className="h-7 gap-1" onClick={() => {
-              setOrders([...dummyOrders]);
-              toast({
-                title: "Data Refreshed",
-                description: "Orders data has been refreshed",
-              });
+            <Button size="sm" variant="outline" className="h-7 gap-1" onClick={async () => {
+              try {
+                const ordersData = await ordersApi.getAll();
+                setOrders(ordersData);
+                setFilteredOrders(ordersData);
+                toast({
+                  title: "Data Refreshed",
+                  description: "Orders data has been refreshed",
+                });
+              } catch (error) {
+                console.error('Failed to refresh orders:', error);
+              }
             }}>
               <RefreshCw className="h-3.5 w-3.5" />
               <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
@@ -344,12 +374,12 @@ export default function Orders() {
             </Button>
             
             <Link to="/create-order">
-              <Button size="sm" className="h-7 gap-1 bg-accent text-accent-foreground hover:bg-accent/90">
-                <PlusCircle className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                <Button size="sm" className="h-7 gap-1 bg-accent text-accent-foreground hover:bg-accent/90">
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                   Create Order
-                </span>
-              </Button>
+                  </span>
+                </Button>
             </Link>
           </div>
         </div>
@@ -516,7 +546,7 @@ export default function Orders() {
             </CardContent>
             <CardFooter>
               <div className="flex items-center justify-between w-full">
-                <div className="text-xs text-muted-foreground">
+              <div className="text-xs text-muted-foreground">
                   Showing <strong>1-{filteredOrders.length}</strong> of <strong>{filteredOrders.length}</strong> orders
                   {searchQuery && (
                     <span className="ml-2 text-blue-600">

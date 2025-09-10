@@ -41,19 +41,21 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatNumber, formatPercentage, SAMPLE_SALES_DATA } from "@/lib/data";
 import type { Service, Order, Customer, PosTransaction } from "@shared/schema";
-// Import the dummy data
+// Import the data service
 import { 
-  dummyOrders, 
-  dummySalesData, 
-  dummyOrderStatusData, 
-  dummyServicePopularityData, 
-  dummyCustomers,
-  dummyInventory,
-  generateInsights,
-  type Order as DummyOrder,
-  type Customer as DummyCustomer,
+  analyticsApi,
+  ordersApi,
+  customersApi,
+  inventoryApi,
+  formatCurrency,
+  formatDate,
+  formatNumber,
+  getStatusColor,
+  getPriorityColor,
+  type Order,
+  type Customer,
   type InventoryItem
-} from '@/lib/dummy-data';
+} from '@/lib/data-service';
 
 export default function Analytics() {
   // Filter states
@@ -71,22 +73,71 @@ export default function Analytics() {
     { id: "4", name: "Premium Laundry", category: "Premium", price: 300 },
   ];
 
-  const orders = dummyOrders;
-  const customers = dummyCustomers;
+  // State for real data
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [salesData, setSalesData] = useState<any[]>([]);
+  const [orderStatusData, setOrderStatusData] = useState<any[]>([]);
+  const [servicePopularityData, setServicePopularityData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const metrics = {
     onTimeDelivery: 95.2,
     inventoryTurnover: 4.2,
   };
 
-  const isLoading = false; // No loading state needed with dummy data
+  // Fetch real data from database
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      try {
+        setIsLoading(true);
+        
+        const [
+          ordersData,
+          customersData,
+          inventoryData,
+          salesDataResult,
+          orderStatusDataResult,
+          servicePopularityDataResult
+        ] = await Promise.all([
+          ordersApi.getAll(),
+          customersApi.getAll(),
+          inventoryApi.getAll(),
+          analyticsApi.getSalesData(),
+          analyticsApi.getOrderStatusData(),
+          analyticsApi.getServicePopularityData()
+        ]);
 
-  // Calculate analytics data using dummy data
+        setOrders(ordersData);
+        setCustomers(customersData);
+        setInventory(inventoryData);
+        setSalesData(salesDataResult);
+        setOrderStatusData(orderStatusDataResult);
+        setServicePopularityData(servicePopularityDataResult);
+        
+      } catch (error) {
+        console.error('Failed to fetch analytics data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load analytics data. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAnalyticsData();
+  }, [toast]);
+
+  // Calculate analytics data using real data
   const analyticsData = useMemo(() => {
-    // Revenue by time period (using dummy sales data)
-    const revenueByMonth = dummySalesData;
+    // Revenue by time period (using real sales data)
+    const revenueByMonth = salesData;
 
-    // Service performance (using dummy service popularity data)
-    const servicePerformance = dummyServicePopularityData.map(item => ({
+    // Service performance (using real service popularity data)
+    const servicePerformance = servicePopularityData.map(item => ({
       name: item.name,
       orders: item.value,
       revenue: item.value * 50, // Approximate revenue calculation
@@ -98,7 +149,7 @@ export default function Analytics() {
       { name: "Standard", revenue: 80000, services: 2 },
     ];
 
-    // Customer segments (using dummy customers)
+    // Customer segments (using real customers)
     const customerSegments = customers.map(customer => ({
       name: customer.name,
       totalSpent: customer.totalOrders * 2000, // Approximate calculation
@@ -106,8 +157,8 @@ export default function Analytics() {
       avgOrderValue: 2000,
     })).sort((a, b) => b.totalSpent - a.totalSpent);
 
-    // Order status distribution (using dummy order status data)
-    const orderStatusDistribution = dummyOrderStatusData.map(item => ({
+    // Order status distribution (using real order status data)
+    const orderStatusDistribution = orderStatusData.map(item => ({
       status: item.status,
       count: item.value,
     }));
@@ -119,7 +170,7 @@ export default function Analytics() {
       customerSegments: customerSegments.slice(0, 10),
       orderStatusDistribution,
     };
-  }, [customers]);
+  }, [customers, salesData, orderStatusData, servicePopularityData, orders]);
 
   const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 

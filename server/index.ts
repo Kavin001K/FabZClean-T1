@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { initializeDatabase } from "./db-utils";
 
 const app = express();
 app.use(express.json());
@@ -54,6 +55,15 @@ app.use((req, res, next) => {
     await setupVite(app, server);
   } else {
     serveStatic(app);
+  }
+
+  // Initialize database connection
+  try {
+    await initializeDatabase();
+    log('✅ Database connection established');
+  } catch (error) {
+    log('❌ Database connection failed:', error);
+    process.exit(1);
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT

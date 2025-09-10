@@ -14,11 +14,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
-// Import the dummy data
-import { dummyOrders, dummySalesData, dummyOrderStatusData, dummyServicePopularityData, dummyCustomers } from '@/lib/dummy-data';
+// Import the data service
+import { analyticsApi, ordersApi, customersApi, formatCurrency } from '@/lib/data-service';
 
 const revenueData = [
   { name: 'Week 1', revenue: 4000 },
@@ -80,16 +80,61 @@ export default function SuperAdminDashboard() {
   const [isFranchiseDialogOpen, setIsFranchiseDialogOpen] = useState(false);
   const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+  
+  // State for real data
+  const [dashboardMetrics, setDashboardMetrics] = useState({
+    totalRevenue: 0,
+    totalOrders: 0,
+    newCustomers: 0,
+    inventoryItems: 0
+  });
+  const [salesData, setSalesData] = useState<any[]>([]);
+  const [orderStatusData, setOrderStatusData] = useState<any[]>([]);
+  const [servicePopularityData, setServicePopularityData] = useState<any[]>([]);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // --- TODO: Replace with API call to fetch real-time dashboard data ---
-  const totalRevenue = dummySalesData.reduce((acc, item) => acc + item.revenue, 0);
-  const totalOrders = dummyOrders.length;
-  const newCustomers = dummyCustomers.filter(customer => {
-    const joinDate = new Date(customer.joinDate);
-    const currentDate = new Date();
-    const oneMonthAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, currentDate.getDate());
-    return joinDate >= oneMonthAgo;
-  }).length;
+  // Fetch real data from database
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Fetch all data in parallel
+        const [
+          metrics,
+          sales,
+          orderStatus,
+          servicePopularity,
+          orders
+        ] = await Promise.all([
+          analyticsApi.getDashboardMetrics(),
+          analyticsApi.getSalesData(),
+          analyticsApi.getOrderStatusData(),
+          analyticsApi.getServicePopularityData(),
+          ordersApi.getAll()
+        ]);
+
+        setDashboardMetrics(metrics);
+        setSalesData(sales);
+        setOrderStatusData(orderStatus);
+        setServicePopularityData(servicePopularity);
+        setRecentOrders(orders.slice(0, 5)); // Get latest 5 orders
+        
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load dashboard data. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [toast]);
 
   const handleSaveFranchise = (e: React.FormEvent) => {
     e.preventDefault();
@@ -309,7 +354,7 @@ export default function SuperAdminDashboard() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <KpiCard
           title="Total Revenue"
-          value={`₹${totalRevenue.toLocaleString()}`}
+          value={isLoading ? "Loading..." : formatCurrency(dashboardMetrics.totalRevenue)}
           change="+20.1% from last month"
           changeType="positive"
           icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
@@ -318,7 +363,7 @@ export default function SuperAdminDashboard() {
             <div className="py-4">
               <h4 className="font-semibold mb-2 text-center">Monthly Revenue Trend</h4>
               <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={dummySalesData}>
+                <LineChart data={salesData.length > 0 ? salesData : []}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -362,7 +407,7 @@ export default function SuperAdminDashboard() {
         />
         <KpiCard
           title="Total Orders"
-          value={totalOrders.toString()}
+          value={isLoading ? "Loading..." : dashboardMetrics.totalOrders.toString()}
           change="+19% from last month"
           changeType="positive"
           icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
@@ -379,14 +424,20 @@ export default function SuperAdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dummyOrders.slice(0, 5).map((order) => (
+                  {recentOrders.length > 0 ? recentOrders.map((order) => (
                     <TableRow key={order.id}>
                       <TableCell className="font-medium">{order.id}</TableCell>
                       <TableCell>{order.customerName}</TableCell>
                       <TableCell>{order.status}</TableCell>
-                      <TableCell className="text-right">₹{order.total.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(order.total)}</TableCell>
                     </TableRow>
-                  ))}
+                  )) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        No orders available
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -563,7 +614,13 @@ export default function SuperAdminDashboard() {
                 <CardTitle>Overview</CardTitle>
             </CardHeader>
             <CardContent className="pl-2">
-                <SalesChart data={dummySalesData} />
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-[350px]">
+                    <div className="text-muted-foreground">Loading chart data...</div>
+                  </div>
+                ) : (
+                  <SalesChart data={salesData.length > 0 ? salesData : []} />
+                )}
             </CardContent>
         </Card>
         <Card className="lg:col-span-3 animate-fade-in" style={{ animationDelay: "700ms" }}>
@@ -571,15 +628,29 @@ export default function SuperAdminDashboard() {
                 <CardTitle>Recent Orders</CardTitle>
             </CardHeader>
             <CardContent>
-                <RecentOrders orders={dummyOrders.slice(0, 5)} />
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-[200px]">
+                    <div className="text-muted-foreground">Loading orders...</div>
+                  </div>
+                ) : (
+                  <RecentOrders orders={recentOrders} />
+                )}
             </CardContent>
         </Card>
     </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <OrderStatusChart data={dummyOrderStatusData} />
-        <FranchisePerformance />
-        <ServicePopularityChart data={dummyServicePopularityData} />
+        {isLoading ? (
+          <div className="col-span-3 flex items-center justify-center h-[300px]">
+            <div className="text-muted-foreground">Loading charts...</div>
+          </div>
+        ) : (
+          <>
+            <OrderStatusChart data={orderStatusData.length > 0 ? orderStatusData : []} />
+            <FranchisePerformance />
+            <ServicePopularityChart data={servicePopularityData.length > 0 ? servicePopularityData : []} />
+          </>
+        )}
         <Card>
           <CardHeader>
             <CardTitle>Consolidated Payroll</CardTitle>

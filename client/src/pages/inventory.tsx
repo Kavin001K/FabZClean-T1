@@ -7,8 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Search, Filter, Plus, Package, AlertTriangle, CheckCircle, Brain, TrendingUp, Zap, Target, BarChart3, Clock, Bell } from "lucide-react";
 import { getStockStatusColor, getStockStatusText, formatCurrency } from "@/lib/data";
 import { useToast } from "@/hooks/use-toast";
-// Import dummy data
-import { dummyInventory, type InventoryItem } from '@/lib/dummy-data';
+// Import data service
+import { inventoryApi, type InventoryItem, getStockStatusColor, getStockStatusText } from '@/lib/data-service';
 
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -17,23 +17,37 @@ export default function Inventory() {
   const [lowStockAlerts, setLowStockAlerts] = useState<InventoryItem[]>([]);
   const { toast } = useToast();
 
-  // Use dummy data instead of API calls
+  // Fetch real data from database
   useEffect(() => {
-    setProducts(dummyInventory);
-    // Check for low stock items
-    const lowStock = dummyInventory.filter(item => item.status === 'Low Stock' || item.status === 'Out of Stock');
-    setLowStockAlerts(lowStock);
-    
-    // Show alerts for low stock items
-    if (lowStock.length > 0) {
-      lowStock.forEach(item => {
-        toast({
+    const fetchInventory = async () => {
+      try {
+        const inventoryData = await inventoryApi.getAll();
+        setProducts(inventoryData);
+        // Check for low stock items
+        const lowStock = inventoryData.filter(item => item.status === 'Low Stock' || item.status === 'Out of Stock');
+        setLowStockAlerts(lowStock);
+        
+        // Show alerts for low stock items
+        if (lowStock.length > 0) {
+          lowStock.forEach(item => {
+            toast({
           title: "Low Stock Alert",
           description: `${item.name} is ${item.status.toLowerCase()}. Current stock: ${item.stock}`,
           variant: item.status === 'Out of Stock' ? 'destructive' : 'default',
         });
       });
     }
+      } catch (error) {
+        console.error('Failed to fetch inventory:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load inventory. Please try again.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    fetchInventory();
   }, [toast]);
 
   const filteredProducts = products?.filter(product => {
