@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/use-theme";
-import { Moon, Sun, User, Menu, Search, Bell, Settings, Command, Maximize2, Minimize2, Square } from "lucide-react";
+import { Moon, Sun, User, Menu, Search, Bell, Settings, Command, Maximize2, Minimize2, Square, Home, ShoppingCart, Package, PlusCircle, Truck, Users, BarChart3, Box, HelpCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Link } from "wouter";
 
 interface HeaderProps {
   onSidebarToggle: () => void;
@@ -23,6 +25,20 @@ export default function Header({ onSidebarToggle }: HeaderProps) {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [notifications, setNotifications] = useState(3);
+
+  // Mobile navigation data
+  const mobileNavigation = [
+    { name: "Dashboard", href: "/", icon: Home },
+    { name: "Orders", href: "/orders", icon: ShoppingCart, badge: "5" },
+    { name: "Services", href: "/services", icon: Package },
+    { name: "Create Order", href: "/create-order", icon: PlusCircle },
+    { name: "Tracking", href: "/tracking", icon: Truck, badge: "2" },
+    { name: "Customers", href: "/customers", icon: Users },
+    { name: "Analytics", href: "/analytics", icon: BarChart3 },
+    { name: "Inventory", href: "/inventory", icon: Box, badge: "3" },
+    { name: "Settings", href: "/settings", icon: Settings },
+    { name: "Help", href: "/help", icon: HelpCircle },
+  ];
 
   // Desktop keyboard shortcuts
   useEffect(() => {
@@ -59,15 +75,47 @@ export default function Header({ onSidebarToggle }: HeaderProps) {
   return (
     <header className="flex h-16 items-center justify-between border-b bg-card px-4 md:px-6 desktop-optimized">
       <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          size="icon"
-          className="lg:hidden"
-          onClick={onSidebarToggle}
-        >
-          <Menu className="h-6 w-6" />
-          <span className="sr-only">Toggle sidebar</span>
-        </Button>
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="lg:hidden"
+            >
+              <Menu className="h-6 w-6" />
+              <span className="sr-only">Toggle sidebar</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="sm:max-w-xs">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-4 px-2.5 text-muted-foreground">
+                <img 
+                  src="/assets/logo.webp" 
+                  alt="FabZClean Logo" 
+                  className="h-8 w-auto" 
+                />
+              </SheetTitle>
+              <SheetDescription>Navigation menu</SheetDescription>
+            </SheetHeader>
+            <nav className="grid gap-6 text-lg font-medium mt-6">
+              {mobileNavigation.map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+                >
+                  <item.icon className="h-5 w-5" />
+                  {item.name}
+                  {item.badge && (
+                    <Badge variant="secondary" className="text-xs ml-auto">
+                      {item.badge}
+                    </Badge>
+                  )}
+                </Link>
+              ))}
+            </nav>
+          </SheetContent>
+        </Sheet>
         
         {/* Desktop Global Search */}
         <div className="hidden lg:flex items-center gap-2">
