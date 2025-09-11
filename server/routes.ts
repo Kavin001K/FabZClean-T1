@@ -100,7 +100,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orders", async (req, res) => {
     try {
       const orders = await storage.getOrders();
-      res.json(orders);
+      const products = await storage.getProducts();
+      
+      // Create a product lookup map
+      const productMap = new Map(products.map(product => [product.id, product.name]));
+      
+      // Transform orders to match frontend expectations
+      const transformedOrders = orders.map(order => {
+        const firstItem = order.items?.[0];
+        const productId = firstItem?.productId;
+        const serviceName = productId ? productMap.get(productId) || 'Unknown Service' : 'Unknown Service';
+        
+        return {
+          ...order,
+          date: order.createdAt, // Map createdAt to date
+          total: parseFloat(order.totalAmount), // Map totalAmount to total and convert to number
+          service: serviceName, // Map product ID to actual product name
+          priority: 'Normal' // Default priority
+        };
+      });
+      res.json(transformedOrders);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch orders" });
     }
@@ -112,7 +131,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
       }
-      res.json(order);
+      
+      const products = await storage.getProducts();
+      const productMap = new Map(products.map(product => [product.id, product.name]));
+      
+      const firstItem = order.items?.[0];
+      const productId = firstItem?.productId;
+      const serviceName = productId ? productMap.get(productId) || 'Unknown Service' : 'Unknown Service';
+      
+      // Transform order to match frontend expectations
+      const transformedOrder = {
+        ...order,
+        date: order.createdAt, // Map createdAt to date
+        total: parseFloat(order.totalAmount), // Map totalAmount to total and convert to number
+        service: serviceName, // Map product ID to actual product name
+        priority: 'Normal' // Default priority
+      };
+      res.json(transformedOrder);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch order" });
     }
@@ -151,7 +186,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/customers", async (req, res) => {
     try {
       const customers = await storage.getCustomers();
-      res.json(customers);
+      // Transform customers to match frontend expectations
+      const transformedCustomers = customers.map(customer => ({
+        ...customer,
+        joinDate: customer.createdAt, // Map createdAt to joinDate
+        totalSpent: parseFloat(customer.totalSpent) // Convert totalSpent to number
+      }));
+      res.json(transformedCustomers);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch customers" });
     }
@@ -163,7 +204,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!customer) {
         return res.status(404).json({ message: "Customer not found" });
       }
-      res.json(customer);
+      // Transform customer to match frontend expectations
+      const transformedCustomer = {
+        ...customer,
+        joinDate: customer.createdAt, // Map createdAt to joinDate
+        totalSpent: parseFloat(customer.totalSpent) // Convert totalSpent to number
+      };
+      res.json(transformedCustomer);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch customer" });
     }
