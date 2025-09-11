@@ -15,6 +15,7 @@ import Analytics from "@/pages/analytics";
 import { MainLayout } from "@/components/layout/main-layout";
 import Inventory from "@/pages/inventory";
 import Logistics from "@/pages/logistics";
+import DebugPage from "@/pages/debug";
 import SpeedInsights from "@/components/speed-insights";
 
 function Router() {
@@ -30,6 +31,7 @@ function Router() {
         <Route path="/create-order" component={CreateOrder} />
         <Route path="/tracking" component={Tracking} />
         <Route path="/logistics" component={Logistics} />
+        <Route path="/debug" component={DebugPage} />
         <Route component={NotFound} />
       </Switch>
     </MainLayout>

@@ -11,7 +11,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dashboard/metrics", async (req, res) => {
     try {
       const metrics = await storage.getDashboardMetrics();
-      res.json(metrics);
+      const customers = await storage.getCustomers();
+      
+      // Transform metrics to match frontend expectations
+      const transformedMetrics = {
+        totalRevenue: metrics.totalRevenue,
+        totalOrders: metrics.ordersToday, // Map ordersToday to totalOrders
+        newCustomers: customers.length, // Use total customers as newCustomers for now
+        inventoryItems: 0 // Default value since we don't have inventory count
+      };
+      
+      res.json(transformedMetrics);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch dashboard metrics" });
     }
