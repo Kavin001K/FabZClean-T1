@@ -40,6 +40,7 @@ import {
   FileText
 } from "lucide-react";
 import { formatCurrency, formatNumber, formatPercentage } from "@/lib/data-service";
+import { useToast } from "@/hooks/use-toast";
 import type { Service, Order, Customer, PosTransaction } from "@shared/schema";
 // Import the data service
 import { 

@@ -1,4 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
 
 // Mock data for employee dashboard
 const todayTasks = [
