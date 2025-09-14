@@ -16,7 +16,8 @@ import {
   RefreshCw,
   Filter,
   SortAsc,
-  SortDesc
+  SortDesc,
+  FileText
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
