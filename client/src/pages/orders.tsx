@@ -59,6 +59,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { useState, useEffect } from "react"
 import { Link } from "wouter"
 import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/hooks/use-notifications"
+import { useMutation } from "@tanstack/react-query"
 // Import Order type from shared schema
 import type { Order } from "@shared/schema";
 // Import data service
@@ -70,6 +72,7 @@ import {
   formatCurrency,
   formatDate
 } from '@/lib/data-service'
+import { exportOrdersToCSV, exportOrdersToPDF } from '@/lib/export-utils'
 
 export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -82,7 +85,10 @@ export default function Orders() {
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
     'id', 'customerName', 'service', 'priority', 'status', 'date', 'total', 'actions'
   ]);
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [isBulkActionOpen, setIsBulkActionOpen] = useState(false);
   const { toast } = useToast();
+  const { addNotification } = useNotifications();
 
   // Calculate KPI data from dummy orders
   const kpiData = [
@@ -256,31 +262,159 @@ export default function Orders() {
   };
 
   const handleExport = () => {
+    if (filteredOrders.length === 0) {
+      toast({
+        title: "No Data to Export",
+        description: "There are no orders to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    exportOrdersToCSV(filteredOrders);
     toast({
-      title: "Export Orders",
-      description: "Export functionality coming soon!",
+      title: "Export Started",
+      description: `Exporting ${filteredOrders.length} orders to CSV...`,
     });
   };
 
-  const handleNextStep = (order: DummyOrder) => {
+  const handleExportPDF = () => {
+    if (filteredOrders.length === 0) {
+      toast({
+        title: "No Data to Export",
+        description: "There are no orders to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    exportOrdersToPDF(filteredOrders, 'Orders Report');
+    toast({
+      title: "PDF Export Started",
+      description: `Generating PDF for ${filteredOrders.length} orders...`,
+    });
+  };
+
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: async ({ orderId, newStatus }: { orderId: string; newStatus: string }) => {
+      return await ordersApi.update(orderId, { status: newStatus });
+    },
+    onSuccess: (updatedOrder, { orderId, newStatus }) => {
+      if (updatedOrder) {
+        // Update local state
+        setOrders(prev => prev.map(o => 
+          o.id === orderId ? { ...o, status: newStatus } : o
+        ));
+        setFilteredOrders(prev => prev.map(o => 
+          o.id === orderId ? { ...o, status: newStatus } : o
+        ));
+        
+        // Update selected order if it's the one being updated
+        if (selectedOrder && selectedOrder.id === orderId) {
+          setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
+        }
+
+        // Add notification for status update
+        addNotification({
+          type: 'info',
+          title: 'Order Status Updated',
+          message: `Order ${orderId} has been moved to ${newStatus}`,
+          actionUrl: '/orders',
+          actionText: 'View Orders'
+        });
+
+        toast({
+          title: "Order Status Updated",
+          description: `Order ${orderId} moved to ${newStatus}`,
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to update order status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update order status. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleNextStep = (order: Order) => {
     const nextStatus = getNextStatus(order.status);
     if (nextStatus) {
-      // Update the order status
-      const updatedOrders = orders.map(o => 
-        o.id === order.id ? { ...o, status: nextStatus } : o
-      );
-      setOrders(updatedOrders);
-      
-      // Update filtered orders if needed
-      setFilteredOrders(prev => prev.map(o => 
-        o.id === order.id ? { ...o, status: nextStatus } : o
-      ));
-
-      toast({
-        title: "Order Status Updated",
-        description: `Order ${order.id} moved to ${nextStatus}`,
+      updateOrderStatusMutation.mutate({ 
+        orderId: order.id, 
+        newStatus: nextStatus 
       });
     }
+  };
+
+  // Bulk operations
+  const handleSelectOrder = (orderId: string) => {
+    setSelectedOrders(prev => 
+      prev.includes(orderId) 
+        ? prev.filter(id => id !== orderId)
+        : [...prev, orderId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedOrders.length === filteredOrders.length) {
+      setSelectedOrders([]);
+    } else {
+      setSelectedOrders(filteredOrders.map(order => order.id));
+    }
+  };
+
+  const handleBulkStatusUpdate = (newStatus: string) => {
+    if (selectedOrders.length === 0) {
+      toast({
+        title: "No Orders Selected",
+        description: "Please select at least one order to update.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Update all selected orders
+    selectedOrders.forEach(orderId => {
+      updateOrderStatusMutation.mutate({ 
+        orderId, 
+        newStatus 
+      });
+    });
+
+    addNotification({
+      type: 'info',
+      title: 'Bulk Status Update',
+      message: `${selectedOrders.length} orders updated to ${newStatus}`,
+      actionUrl: '/orders',
+      actionText: 'View Orders'
+    });
+
+    setSelectedOrders([]);
+    setIsBulkActionOpen(false);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedOrders.length === 0) {
+      toast({
+        title: "No Orders Selected",
+        description: "Please select at least one order to delete.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // In a real app, you would call a bulk delete API
+    toast({
+      title: "Bulk Delete",
+      description: `${selectedOrders.length} orders will be deleted. This action cannot be undone.`,
+      variant: "destructive",
+    });
+
+    setSelectedOrders([]);
+    setIsBulkActionOpen(false);
   };
 
   return (
@@ -348,12 +482,45 @@ export default function Orders() {
               </DropdownMenuContent>
             </DropdownMenu>
             
-            <Button size="sm" variant="outline" className="h-7 gap-1" onClick={handleExport}>
-              <Download className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Export
-              </span>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="h-7 gap-1">
+                  <Download className="h-3.5 w-3.5" />
+                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                    Export
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleExport}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPDF}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Export as PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {selectedOrders.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {selectedOrders.length} selected
+                </span>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => setIsBulkActionOpen(true)}
+                  className="h-7 gap-1"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  Bulk Actions
+                </Button>
+              </div>
+            )}
             
             <Button size="sm" variant="outline" className="h-7 gap-1" onClick={async () => {
               try {
@@ -396,6 +563,14 @@ export default function Orders() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <input
+                        type="checkbox"
+                        checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                        onChange={handleSelectAll}
+                        className="rounded"
+                      />
+                    </TableHead>
                     <TableHead 
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort('id')}
@@ -481,11 +656,19 @@ export default function Orders() {
                 <TableBody>
                   {filteredOrders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center">No orders found</TableCell>
+                      <TableCell colSpan={9} className="text-center">No orders found</TableCell>
                     </TableRow>
                   ) : (
                     filteredOrders.map((order) => (
                       <TableRow key={order.id} className="interactive-row">
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={selectedOrders.includes(order.id)}
+                            onChange={() => handleSelectOrder(order.id)}
+                            className="rounded"
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           {order.id}
                         </TableCell>
@@ -824,6 +1007,83 @@ export default function Orders() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Bulk Actions Dialog */}
+      <Dialog open={isBulkActionOpen} onOpenChange={setIsBulkActionOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bulk Actions</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {selectedOrders.length} orders selected
+            </p>
+            
+            <div className="space-y-3">
+              <div>
+                <Label className="text-sm font-medium">Update Status</Label>
+                <div className="flex gap-2 mt-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => handleBulkStatusUpdate('processing')}
+                  >
+                    Mark as Processing
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => handleBulkStatusUpdate('completed')}
+                  >
+                    Mark as Completed
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => handleBulkStatusUpdate('cancelled')}
+                  >
+                    Mark as Cancelled
+                  </Button>
+                </div>
+              </div>
+              
+              <div>
+                <Label className="text-sm font-medium">Other Actions</Label>
+                <div className="flex gap-2 mt-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => {
+                      const selectedOrdersData = filteredOrders.filter(order => selectedOrders.includes(order.id));
+                      exportOrdersToCSV(selectedOrdersData);
+                      toast({
+                        title: "Export Started",
+                        description: `Exporting ${selectedOrdersData.length} selected orders to CSV...`,
+                      });
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Selected
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="destructive"
+                    onClick={handleBulkDelete}
+                  >
+                    Delete Selected
+                  </Button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setIsBulkActionOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

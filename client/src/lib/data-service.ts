@@ -147,7 +147,15 @@ export const customersApi = {
 export const inventoryApi = {
   async getAll(): Promise<InventoryItem[]> {
     try {
-      return await fetchData<InventoryItem[]>('/products');
+      const rawData = await fetchData<any[]>('/products');
+      // Map the API data to match InventoryItem interface
+      return rawData.map(item => ({
+        id: item.id,
+        name: item.name,
+        stock: item.stockQuantity,
+        status: item.stockQuantity === 0 ? 'Out of Stock' as const :
+                item.stockQuantity <= 25 ? 'Low Stock' as const : 'In Stock' as const
+      }));
     } catch (error) {
       console.error('Failed to fetch inventory:', error);
       return [];
@@ -156,7 +164,16 @@ export const inventoryApi = {
 
   async getById(id: string): Promise<InventoryItem | null> {
     try {
-      return await fetchData<InventoryItem>(`/products/${id}`);
+      const rawData = await fetchData<any>(`/products/${id}`);
+      if (!rawData) return null;
+      
+      return {
+        id: rawData.id,
+        name: rawData.name,
+        stock: rawData.stockQuantity,
+        status: rawData.stockQuantity === 0 ? 'Out of Stock' as const :
+                rawData.stockQuantity <= 25 ? 'Low Stock' as const : 'In Stock' as const
+      };
     } catch (error) {
       console.error(`Failed to fetch inventory item ${id}:`, error);
       return null;
@@ -168,7 +185,15 @@ export const inventoryApi = {
 export const analyticsApi = {
   async getSalesData(): Promise<SalesData[]> {
     try {
-      return await fetchData<SalesData[]>('/analytics/sales');
+      // For now, return sample data since we don't have sales analytics endpoint
+      return [
+        { month: "Jan", revenue: 12000 },
+        { month: "Feb", revenue: 15000 },
+        { month: "Mar", revenue: 18000 },
+        { month: "Apr", revenue: 16000 },
+        { month: "May", revenue: 20000 },
+        { month: "Jun", revenue: 22000 },
+      ];
     } catch (error) {
       console.error('Failed to fetch sales data:', error);
       return [];
@@ -177,7 +202,13 @@ export const analyticsApi = {
 
   async getOrderStatusData(): Promise<OrderStatusData[]> {
     try {
-      return await fetchData<OrderStatusData[]>('/analytics/order-status');
+      // For now, return sample data since we don't have order status analytics endpoint
+      return [
+        { status: "Pending", value: 5 },
+        { status: "Processing", value: 8 },
+        { status: "Completed", value: 12 },
+        { status: "Cancelled", value: 2 },
+      ];
     } catch (error) {
       console.error('Failed to fetch order status data:', error);
       return [];
@@ -186,7 +217,13 @@ export const analyticsApi = {
 
   async getServicePopularityData(): Promise<ServicePopularityData[]> {
     try {
-      return await fetchData<ServicePopularityData[]>('/analytics/service-popularity');
+      // For now, return sample data since we don't have service popularity analytics endpoint
+      return [
+        { name: "Dry Cleaning", value: 40, fill: "hsl(var(--primary))" },
+        { name: "Premium Laundry", value: 30, fill: "hsl(var(--primary))" },
+        { name: "Laundry By Kg", value: 20, fill: "hsl(var(--primary))" },
+        { name: "Bags Clean", value: 10, fill: "hsl(var(--primary))" },
+      ];
     } catch (error) {
       console.error('Failed to fetch service popularity data:', error);
       return [];

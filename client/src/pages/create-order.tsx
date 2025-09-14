@@ -5,33 +5,111 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useQuery } from "@tanstack/react-query";
-import type { Service } from "@shared/schema";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { Service, Order } from "@shared/schema";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useNotifications } from "@/hooks/use-notifications";
+import { ordersApi } from "@/lib/data-service";
+import { useLocation } from "wouter";
 
 export default function CreateOrder() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [selectedService, setSelectedService] = useState("");
   const [pickupDate, setPickupDate] = useState("");
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
+  
+  const { toast } = useToast();
+  const { addNotification } = useNotifications();
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
 
   const { data: services, isLoading: servicesLoading } = useQuery<Service[]>({
     queryKey: ["/api/services"],
   });
 
+  const createOrderMutation = useMutation({
+    mutationFn: async (orderData: Partial<Order>) => {
+      return await ordersApi.create(orderData);
+    },
+    onSuccess: (newOrder) => {
+      if (newOrder) {
+        setCreatedOrder(newOrder);
+        setIsModalOpen(true);
+        queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+        
+        // Add notification
+        addNotification({
+          type: 'success',
+          title: 'Order Created Successfully!',
+          message: `Order ${newOrder.orderNumber} has been created for ${newOrder.customerName}`,
+          actionUrl: '/orders',
+          actionText: 'View Orders'
+        });
+        
+        toast({
+          title: "Order Created Successfully!",
+          description: `Order ${newOrder.orderNumber} has been created and saved.`,
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to create order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create order. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreateOrder = () => {
-    // Logic to create the order will go here
-    console.log({
+    if (!customerName || !customerPhone || !selectedService) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields (Name, Phone, Service).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const selectedServiceDetails = services?.find(s => s.id === selectedService);
+    if (!selectedServiceDetails) {
+      toast({
+        title: "Error",
+        description: "Selected service not found.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const orderData: Partial<Order> = {
+      orderNumber: `ORD-${Date.now()}`,
       customerName,
+      customerEmail: customerEmail || undefined,
       customerPhone,
-      selectedService,
-      pickupDate,
-      specialInstructions,
-    });
-    setIsModalOpen(true);
+      status: "pending",
+      paymentStatus: "pending",
+      totalAmount: selectedServiceDetails.price,
+      items: [{
+        productId: selectedServiceDetails.id,
+        productName: selectedServiceDetails.name,
+        quantity: 1,
+        price: selectedServiceDetails.price,
+      }],
+      shippingAddress: {
+        instructions: specialInstructions,
+        pickupDate: pickupDate || undefined,
+      },
+    };
+
+    createOrderMutation.mutate(orderData);
   };
 
   const selectedServiceDetails = services?.find(s => s.id === selectedService);
@@ -40,9 +118,12 @@ export default function CreateOrder() {
     <div className="p-4 md:p-6 lg:p-8 animate-fade-in">
       <header className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Create New Order</h1>
-        <Button onClick={handleCreateOrder}>
+        <Button 
+          onClick={handleCreateOrder}
+          disabled={createOrderMutation.isPending}
+        >
           <PlusCircle className="h-4 w-4 mr-2" />
-          Save Order
+          {createOrderMutation.isPending ? "Creating..." : "Create Order"}
         </Button>
       </header>
 
@@ -67,13 +148,24 @@ export default function CreateOrder() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="customerPhone">Phone Number</Label>
+                <Label htmlFor="customerPhone">Phone Number *</Label>
                 <Input
                     id="customerPhone"
                     placeholder="Enter customer's phone number"
                     type="tel"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
+                    required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customerEmail">Email Address</Label>
+                <Input
+                    id="customerEmail"
+                    placeholder="Enter customer's email (optional)"
+                    type="email"
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
                 />
               </div>
             </CardContent>
@@ -88,8 +180,8 @@ export default function CreateOrder() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Service</Label>
-                <Select onValueChange={setSelectedService} value={selectedService}>
+                <Label>Service *</Label>
+                <Select onValueChange={setSelectedService} value={selectedService} required>
                     <SelectTrigger>
                     <SelectValue placeholder="Select a service..." />
                     </SelectTrigger>
@@ -99,7 +191,7 @@ export default function CreateOrder() {
                     ) : (
                         services?.map((service) => (
                         <SelectItem key={service.id} value={service.id}>
-                            {service.name} - ₹{service.price}
+                            {service.name} - ₹{parseFloat(service.price).toFixed(2)}
                         </SelectItem>
                         ))
                     )}
@@ -156,9 +248,28 @@ export default function CreateOrder() {
             <DialogHeader>
                 <DialogTitle>Order Created Successfully!</DialogTitle>
             </DialogHeader>
-            <div className="py-4">
-                <p>Your new order has been created and saved.</p>
-                <Button onClick={() => setIsModalOpen(false)} className="mt-4">Close</Button>
+            <div className="py-4 space-y-4">
+                <p>Your new order has been created and saved to the database.</p>
+                {createdOrder && (
+                  <div className="bg-muted p-4 rounded-lg space-y-2">
+                    <p><strong>Order Number:</strong> {createdOrder.orderNumber}</p>
+                    <p><strong>Customer:</strong> {createdOrder.customerName}</p>
+                    <p><strong>Service:</strong> {selectedServiceDetails?.name}</p>
+                    <p><strong>Total Amount:</strong> ₹{parseFloat(createdOrder.totalAmount).toFixed(2)}</p>
+                    <p><strong>Status:</strong> <span className="capitalize">{createdOrder.status}</span></p>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button onClick={() => setIsModalOpen(false)} variant="outline">
+                    Close
+                  </Button>
+                  <Button onClick={() => {
+                    setIsModalOpen(false);
+                    setLocation('/orders');
+                  }}>
+                    View Orders
+                  </Button>
+                </div>
             </div>
         </DialogContent>
       </Dialog>

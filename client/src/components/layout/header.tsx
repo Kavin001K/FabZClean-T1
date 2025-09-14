@@ -3,10 +3,15 @@ import { useEffect, useState } from 'react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { NotificationCenter } from '@/components/notification-center';
+import { GlobalSearch } from '@/components/global-search';
 
-const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const capitalize = (s: string) => {
+  // Handle special cases for better display
+  if (s === 'employee-dashboard') return 'Employee Dashboard';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -77,15 +82,12 @@ export function Header({ onToggleSidebar, isSidebarVisible }: HeaderProps) {
           ))}
         </BreadcrumbList>
       </Breadcrumb>
-      <div className="relative ml-auto flex-1 md:grow-0">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          type="search"
-          placeholder="Search..."
-          className="w-full rounded-lg bg-background pl-8"
-        />
+      <div className="ml-auto flex-1 md:max-w-md lg:max-w-lg xl:max-w-xl">
+        <GlobalSearch />
       </div>
-      <DropdownMenu>
+      <div className="flex items-center gap-2">
+        <NotificationCenter />
+        <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="icon" className="overflow-hidden rounded-full">
             <img src="https://placehold.co/36x36/EFEFEF/333333?text=A" width={36} height={36} alt="Avatar" />
@@ -99,7 +101,8 @@ export function Header({ onToggleSidebar, isSidebarVisible }: HeaderProps) {
           <DropdownMenuSeparator />
           <DropdownMenuItem>Logout</DropdownMenuItem>
         </DropdownMenuContent>
-      </DropdownMenu>
+        </DropdownMenu>
+      </div>
     </header>
   );
 }

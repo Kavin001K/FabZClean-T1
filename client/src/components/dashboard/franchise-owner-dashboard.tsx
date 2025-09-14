@@ -217,11 +217,11 @@ export default function FranchiseOwnerDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dummyCustomers.slice(0, 5).map((customer) => (
-                    <TableRow key={customer.id}>
+                  {newCustomersData.slice(0, 5).map((customer, index) => (
+                    <TableRow key={index}>
                       <TableCell className="font-medium">{customer.name}</TableCell>
                       <TableCell>{customer.joinDate}</TableCell>
-                      <TableCell className="text-right">{customer.totalOrders}</TableCell>
+                      <TableCell className="text-right">{customer.totalSpent}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

@@ -1,5 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { formatCurrency } from "@/lib/data";
+import { formatCurrency } from "@/lib/data-service";
 
 // NOTE: We'll use static data for now. We will reconnect this to the API later.
 const RECENT_ORDERS_DATA = [

@@ -4,6 +4,8 @@ import {
   MoreHorizontal,
   PlusCircle,
   Search,
+  Download,
+  FileText,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -38,10 +40,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label"
 import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 // Import Customer type from shared schema
 import type { Customer } from "@shared/schema";
 // Import data service
 import { customersApi, formatDate } from '@/lib/data-service'
+import { exportCustomersToCSV, exportCustomersToPDF } from '@/lib/export-utils'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -62,14 +66,20 @@ const kpiData = [
 ];
 
 export default function Customers() {
-  const [customers, setCustomers] = useState<DummyCustomer[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<DummyCustomer | null>(null);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [newCustomer, setNewCustomer] = useState({
     name: '',
     email: '',
     phone: '',
   });
+  const [editCustomer, setEditCustomer] = useState({
+    name: '',
+    email: '',
+    phone: '',
+  });
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch real data from database
   useEffect(() => {
@@ -90,6 +100,36 @@ export default function Customers() {
     fetchCustomers();
   }, [toast]);
 
+  // Customer creation mutation
+  const createCustomerMutation = useMutation({
+    mutationFn: async (customerData: Partial<Customer>) => {
+      return await customersApi.create(customerData);
+    },
+    onSuccess: (newCustomer) => {
+      if (newCustomer) {
+        setCustomers(prev => [...prev, newCustomer]);
+        queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+        
+        toast({
+          title: "Customer Created Successfully",
+          description: `Customer ${newCustomer.name} has been added to the system.`,
+        });
+
+        // Reset form
+        setNewCustomer({ name: '', email: '', phone: '' });
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to create customer:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create customer. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Customer onboarding function
   const handleCreateCustomer = () => {
     if (!newCustomer.name || !newCustomer.email || !newCustomer.phone) {
@@ -101,31 +141,74 @@ export default function Customers() {
       return;
     }
 
-    const customer: DummyCustomer = {
-      id: `CUST${String(customers.length + 1).padStart(3, '0')}`,
+    const customerData: Partial<Customer> = {
       name: newCustomer.name,
       email: newCustomer.email,
       phone: newCustomer.phone,
-      joinDate: new Date().toISOString().split('T')[0],
+      address: null,
       totalOrders: 0,
+      totalSpent: "0",
     };
 
-    setCustomers(prev => [...prev, customer]);
-    
-    // Simulate welcome email
-    console.log(`Welcome email sent to ${customer.email}`);
-    console.log(`Customer ${customer.name} has been added to the system`);
-    
-    toast({
-      title: "Customer Created Successfully",
-      description: `Welcome email sent to ${customer.email}. Customer ID: ${customer.id}`,
-    });
-
-    // Reset form
-    setNewCustomer({ name: '', email: '', phone: '' });
+    createCustomerMutation.mutate(customerData);
   };
-    const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  // Customer edit mutation
+  const editCustomerMutation = useMutation({
+    mutationFn: async ({ customerId, customerData }: { customerId: string; customerData: Partial<Customer> }) => {
+      // Note: We'll need to add an update method to customersApi
+      return await customersApi.getById(customerId); // Placeholder for now
+    },
+    onSuccess: (updatedCustomer) => {
+      if (updatedCustomer) {
+        setCustomers(prev => prev.map(c => 
+          c.id === updatedCustomer.id ? updatedCustomer : c
+        ));
+        queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+        
+        toast({
+          title: "Customer Updated Successfully",
+          description: `Customer ${updatedCustomer.name} has been updated.`,
+        });
+
+        setIsEditDialogOpen(false);
+        setSelectedCustomer(null);
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to update customer:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update customer. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditCustomer = () => {
+    if (!selectedCustomer) return;
+    
+    editCustomerMutation.mutate({
+      customerId: selectedCustomer.id,
+      customerData: {
+        name: editCustomer.name,
+        email: editCustomer.email,
+        phone: editCustomer.phone,
+      }
+    });
+  };
+
+  const handleOpenEditDialog = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setEditCustomer({
+      name: customer.name,
+      email: customer.email || '',
+      phone: customer.phone || '',
+    });
+    setIsEditDialogOpen(true);
+  };
   return (
     <div className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -165,6 +248,28 @@ export default function Customers() {
                     Filter
                     </span>
                 </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="outline" className="h-8 gap-1">
+                            <Download className="h-3.5 w-3.5" />
+                            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                            Export
+                            </span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => exportCustomersToCSV(customers)}>
+                            <Download className="h-4 w-4 mr-2" />
+                            Export as CSV
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => exportCustomersToPDF(customers)}>
+                            <FileText className="h-4 w-4 mr-2" />
+                            Export as PDF
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 <Dialog>
                     <DialogTrigger asChild>
                         <Button size="sm" className="h-8 gap-1 bg-accent text-accent-foreground hover:bg-accent/90">
@@ -269,10 +374,7 @@ export default function Customers() {
                                         setSelectedCustomer(customer);
                                         setIsViewDialogOpen(true);
                                     }}>View Details</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => {
-                                        setSelectedCustomer(customer);
-                                        setIsEditDialogOpen(true);
-                                    }}>Edit</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleOpenEditDialog(customer)}>Edit</DropdownMenuItem>
                                     <AlertDialogTrigger asChild>
                                         <DropdownMenuItem className="text-red-500" onSelect={(e) => e.preventDefault()}>Delete</DropdownMenuItem>
                                     </AlertDialogTrigger>
@@ -326,14 +428,45 @@ export default function Customers() {
                         </DialogHeader>
                         <div className="py-4 space-y-4">
                             <div>
-                                <Label htmlFor="customerName">Name</Label>
-                                <Input id="customerName" defaultValue={selectedCustomer.name} />
+                                <Label htmlFor="editCustomerName">Name *</Label>
+                                <Input 
+                                    id="editCustomerName" 
+                                    value={editCustomer.name}
+                                    onChange={(e) => setEditCustomer(prev => ({ ...prev, name: e.target.value }))}
+                                />
                             </div>
                             <div>
-                                <Label htmlFor="customerEmail">Email</Label>
-                                <Input id="customerEmail" type="email" defaultValue={selectedCustomer.email} />
+                                <Label htmlFor="editCustomerEmail">Email *</Label>
+                                <Input 
+                                    id="editCustomerEmail" 
+                                    type="email" 
+                                    value={editCustomer.email}
+                                    onChange={(e) => setEditCustomer(prev => ({ ...prev, email: e.target.value }))}
+                                />
                             </div>
-                            <Button>Save Changes</Button>
+                            <div>
+                                <Label htmlFor="editCustomerPhone">Phone *</Label>
+                                <Input 
+                                    id="editCustomerPhone" 
+                                    type="tel" 
+                                    value={editCustomer.phone}
+                                    onChange={(e) => setEditCustomer(prev => ({ ...prev, phone: e.target.value }))}
+                                />
+                            </div>
+                            <div className="flex gap-2">
+                                <Button 
+                                    onClick={handleEditCustomer}
+                                    disabled={editCustomerMutation.isPending}
+                                >
+                                    {editCustomerMutation.isPending ? "Saving..." : "Save Changes"}
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    onClick={() => setIsEditDialogOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
                         </div>
                     </DialogContent>
                 </Dialog>

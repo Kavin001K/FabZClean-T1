@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Filter, Plus, Package, AlertTriangle, CheckCircle, Brain, TrendingUp, Zap, Target, BarChart3, Clock, Bell } from "lucide-react";
-import { formatCurrency } from "@/lib/data";
+import { formatCurrency } from "@/lib/data-service";
 import { useToast } from "@/hooks/use-toast";
+import { useNotifications } from "@/hooks/use-notifications";
 // Import data service
 import { inventoryApi, type InventoryItem } from '@/lib/data-service';
 
@@ -16,6 +17,7 @@ export default function Inventory() {
   const [products, setProducts] = useState<InventoryItem[]>([]);
   const [lowStockAlerts, setLowStockAlerts] = useState<InventoryItem[]>([]);
   const { toast } = useToast();
+  const { addNotification } = useNotifications();
 
   // Fetch real data from database
   useEffect(() => {
@@ -30,13 +32,22 @@ export default function Inventory() {
         // Show alerts for low stock items
         if (lowStock.length > 0) {
           lowStock.forEach(item => {
+            // Add notification for low stock
+            addNotification({
+              type: item.status === 'Out of Stock' ? 'error' : 'warning',
+              title: 'Low Stock Alert',
+              message: `${item.name} is ${item.status.toLowerCase()}. Current stock: ${item.stock}`,
+              actionUrl: '/inventory',
+              actionText: 'View Inventory'
+            });
+
             toast({
-          title: "Low Stock Alert",
-          description: `${item.name} is ${item.status.toLowerCase()}. Current stock: ${item.stock}`,
-          variant: item.status === 'Out of Stock' ? 'destructive' : 'default',
-        });
-      });
-    }
+              title: "Low Stock Alert",
+              description: `${item.name} is ${item.status.toLowerCase()}. Current stock: ${item.stock}`,
+              variant: item.status === 'Out of Stock' ? 'destructive' : 'default',
+            });
+          });
+        }
       } catch (error) {
         console.error('Failed to fetch inventory:', error);
         toast({

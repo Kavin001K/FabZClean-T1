@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ui/theme-provider";
+import { NotificationProvider } from "@/hooks/use-notifications";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Orders from "@/pages/orders";
@@ -16,6 +17,7 @@ import { MainLayout } from "@/components/layout/main-layout";
 import Inventory from "@/pages/inventory";
 import Logistics from "@/pages/logistics";
 import DebugPage from "@/pages/debug";
+import EmployeeDashboardPage from "@/pages/employee-dashboard";
 import SpeedInsights from "@/components/speed-insights";
 
 function Router() {
@@ -31,6 +33,7 @@ function Router() {
         <Route path="/create-order" component={CreateOrder} />
         <Route path="/tracking" component={Tracking} />
         <Route path="/logistics" component={Logistics} />
+        <Route path="/employee-dashboard" component={EmployeeDashboardPage} />
         <Route path="/debug" component={DebugPage} />
         <Route component={NotFound} />
       </Switch>
@@ -43,9 +46,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="fab-z-ui-theme">
         <TooltipProvider>
-          <Toaster />
-          <Router />
-          <SpeedInsights />
+          <NotificationProvider>
+            <Toaster />
+            <Router />
+            <SpeedInsights />
+          </NotificationProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
