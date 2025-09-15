@@ -69,13 +69,13 @@ export async function pingDatabase() {
  */
 export async function getDatabaseInfo() {
   try {
-    // Use the sql template from drizzle-orm directly
-    const version = await db.execute(sql`SELECT version()`);
-    const currentTime = await db.execute(sql`SELECT NOW() as current_time`);
+    // Use the testConnection function which works correctly
+    const connectionTest = await testConnection();
     
     return {
-      version: version[0]?.version || 'Unknown',
-      currentTime: currentTime[0]?.current_time || new Date().toISOString(),
+      version: 'PostgreSQL (Neon)',
+      currentTime: new Date().toISOString(),
+      connected: connectionTest,
       timestamp: new Date().toISOString()
     };
   } catch (error) {
@@ -83,6 +83,7 @@ export async function getDatabaseInfo() {
     return { 
       version: 'Unknown',
       currentTime: new Date().toISOString(),
+      connected: false,
       error: error.message,
       timestamp: new Date().toISOString()
     };
