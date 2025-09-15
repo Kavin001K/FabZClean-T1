@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'wouter';
-import { Home, ShoppingCart, Users2, LineChart, Package, Settings, Truck, Scissors, User } from 'lucide-react';
+import { Home, ShoppingCart, Users2, LineChart, Package, Settings, Truck, Scissors, User, Server } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NavLink = ({ to, icon: Icon, children }: { to: string; icon: any; children: React.ReactNode }) => {
@@ -37,6 +37,7 @@ export function Sidebar() {
         <NavLink to="/logistics" icon={Truck}>Logistics</NavLink>
         <NavLink to="/analytics" icon={LineChart}>Analytics</NavLink>
         <NavLink to="/employee-dashboard" icon={User}>Employee Dashboard</NavLink>
+        <NavLink to="/database-status" icon={Server}>Database Status</NavLink>
       </nav>
       <nav className="mt-auto flex flex-col gap-2 p-4">
         <Link

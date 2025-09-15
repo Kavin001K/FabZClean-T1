@@ -18,6 +18,7 @@ import Inventory from "@/pages/inventory";
 import Logistics from "@/pages/logistics";
 import DebugPage from "@/pages/debug";
 import EmployeeDashboardPage from "@/pages/employee-dashboard";
+import DatabaseStatus from "@/pages/database-status";
 import SpeedInsights from "@/components/speed-insights";
 
 function Router() {
@@ -34,6 +35,7 @@ function Router() {
         <Route path="/tracking" component={Tracking} />
         <Route path="/logistics" component={Logistics} />
         <Route path="/employee-dashboard" component={EmployeeDashboardPage} />
+        <Route path="/database-status" component={DatabaseStatus} />
         <Route path="/debug" component={DebugPage} />
         <Route component={NotFound} />
       </Switch>

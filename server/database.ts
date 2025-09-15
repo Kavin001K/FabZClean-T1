@@ -4,7 +4,7 @@ import * as schema from '../shared/schema';
 
 // Database connection configuration
 const connectionString = process.env.DATABASE_URL || 
-  'postgresql://neondb_owner:npg_8WdTlBKStax0@ep-frosty-sun-a1pdxel5-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+  'postgresql://neondb_owner:npg_8WdTlBKStax0@ep-frosty-sun-a1pdxel5-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
 
 // Create Neon client
 const sql = neon(connectionString);
@@ -41,7 +41,12 @@ export const DATABASE_CONFIG = {
   database: 'neondb',
   user: 'neondb_owner',
   ssl: 'require',
-  connectionString
+  connectionString,
+  restApiUrl: process.env.NEON_REST_API_URL,
+  stackProjectId: process.env.VITE_STACK_PROJECT_ID,
+  stackPublishableKey: process.env.VITE_STACK_PUBLISHABLE_CLIENT_KEY,
+  stackSecretKey: process.env.STACK_SECRET_SERVER_KEY,
+  jwksUrl: process.env.JWKS_URL
 };
 
 export default db;
