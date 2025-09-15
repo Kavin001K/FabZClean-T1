@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import BarcodeScanner from "@/components/barcode-scanner";
 import BarcodeDisplay from "@/components/barcode-display";
 import PrintManager from "@/components/print-manager";
+import { LiveTrackingMap } from "@/components/live-tracking-map";
 import { 
   Search, 
   Filter, 
@@ -641,6 +642,45 @@ export default function Tracking() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Live Tracking Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Live Order Tracking
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Track Your Orders</h3>
+              <p className="text-sm text-muted-foreground">
+                Monitor your orders in real-time with live driver tracking and estimated delivery times.
+              </p>
+              
+              <div className="space-y-2">
+                <Button variant="outline" className="w-full justify-start">
+                  <Truck className="h-4 w-4 mr-2" />
+                  View All Active Deliveries
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Live Driver Locations
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <Clock className="h-4 w-4 mr-2" />
+                  Delivery Schedule
+                </Button>
+              </div>
+            </div>
+            
+            <div className="h-64">
+              <LiveTrackingMap className="h-full" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

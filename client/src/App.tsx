@@ -11,6 +11,8 @@ import Orders from "@/pages/orders";
 import Services from "@/pages/services";
 import CreateOrder from "@/pages/create-order";
 import Tracking from "@/pages/tracking";
+import LiveTracking from "@/pages/live-tracking";
+import Documents from "@/pages/documents";
 import Customers from "@/pages/customers";
 import Analytics from "@/pages/analytics";
 import { MainLayout } from "@/components/layout/main-layout";
@@ -33,6 +35,8 @@ function Router() {
         <Route path="/services" component={Services} />
         <Route path="/create-order" component={CreateOrder} />
         <Route path="/tracking" component={Tracking} />
+        <Route path="/live-tracking" component={LiveTracking} />
+        <Route path="/documents" component={Documents} />
         <Route path="/logistics" component={Logistics} />
         <Route path="/employee-dashboard" component={EmployeeDashboardPage} />
         <Route path="/database-status" component={DatabaseStatus} />

@@ -37,6 +37,7 @@ export interface IStorage {
   getOrder(id: string): Promise<Order | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order | undefined>;
+  deleteOrder(id: string): Promise<boolean>;
 
   // Deliveries
   getDeliveries(): Promise<Delivery[]>;
@@ -54,6 +55,7 @@ export interface IStorage {
   getCustomer(id: string): Promise<Customer | undefined>;
   createCustomer(customer: InsertCustomer): Promise<Customer>;
   updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined>;
+  deleteCustomer(id: string): Promise<boolean>;
 
   // Services
   getServices(): Promise<Service[]>;
@@ -895,6 +897,10 @@ export class MemStorage implements IStorage {
     return updatedOrder;
   }
 
+  async deleteOrder(id: string): Promise<boolean> {
+    return this.orders.delete(id);
+  }
+
   // Delivery methods
   async getDeliveries(): Promise<Delivery[]> {
     return Array.from(this.deliveries.values());
@@ -995,6 +1001,10 @@ export class MemStorage implements IStorage {
     };
     this.customers.set(id, updatedCustomer);
     return updatedCustomer;
+  }
+
+  async deleteCustomer(id: string): Promise<boolean> {
+    return this.customers.delete(id);
   }
 
   // Service methods

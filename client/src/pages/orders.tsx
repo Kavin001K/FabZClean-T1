@@ -53,15 +53,17 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect } from "react"
 import { Link } from "wouter"
 import { useToast } from "@/hooks/use-toast"
 import { useNotifications } from "@/hooks/use-notifications"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 // Import Order type from shared schema
 import type { Order } from "@shared/schema";
 // Import data service
@@ -88,8 +90,19 @@ export default function Orders() {
   ]);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [isBulkActionOpen, setIsBulkActionOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [filters, setFilters] = useState({
+    status: [] as string[],
+    priority: [] as string[],
+    dateRange: {
+      start: '',
+      end: ''
+    }
+  });
   const { toast } = useToast();
   const { addNotification } = useNotifications();
+  const queryClient = useQueryClient();
 
   // Calculate KPI data from dummy orders
   const kpiData = [
@@ -166,6 +179,32 @@ export default function Orders() {
       );
     }
     
+    // Filter by status
+    if (filters.status.length > 0) {
+      filtered = filtered.filter(order => filters.status.includes(order.status));
+    }
+    
+    // Filter by priority
+    if (filters.priority.length > 0) {
+      filtered = filtered.filter(order => {
+        const orderPriority = (order as any).priority || 'Normal';
+        return filters.priority.includes(orderPriority);
+      });
+    }
+    
+    // Filter by date range
+    if (filters.dateRange.start || filters.dateRange.end) {
+      filtered = filtered.filter(order => {
+        const orderDate = new Date(order.createdAt || new Date());
+        const startDate = filters.dateRange.start ? new Date(filters.dateRange.start) : null;
+        const endDate = filters.dateRange.end ? new Date(filters.dateRange.end) : null;
+        
+        if (startDate && orderDate < startDate) return false;
+        if (endDate && orderDate > endDate) return false;
+        return true;
+      });
+    }
+    
     // Sort orders
     if (sortField) {
       filtered = [...filtered].sort((a, b) => {
@@ -187,7 +226,7 @@ export default function Orders() {
     }
     
     setFilteredOrders(filtered);
-  }, [orders, activeTab, searchQuery, sortField, sortDirection]);
+  }, [orders, activeTab, searchQuery, sortField, sortDirection, filters]);
 
   // Desktop keyboard shortcuts
   useEffect(() => {
@@ -240,25 +279,45 @@ export default function Orders() {
   };
 
   const handleEditOrder = (order: Order) => {
-    console.log(`Editing order ${order.id}`);
-    toast({
-      title: "Edit Order",
-      description: `Edit functionality for order ${order.id} coming soon!`,
-    });
+    setEditingOrder(order);
+    setIsEditDialogOpen(true);
   };
 
   const handleCancelOrder = (order: Order) => {
-    console.log(`Cancelling order ${order.id}`);
-    toast({
-      title: "Cancel Order",
-      description: `Cancel functionality for order ${order.id} coming soon!`,
+    updateOrderStatusMutation.mutate({ 
+      orderId: order.id, 
+      newStatus: 'cancelled' 
     });
   };
 
   const handleFilter = () => {
-    toast({
-      title: "Filter Orders",
-      description: "Filter functionality coming soon!",
+    // Filter functionality is now handled by the filters state
+    // This function can be used to show filter options or reset filters
+  };
+
+  const handleStatusFilterChange = (status: string, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      status: checked 
+        ? [...prev.status, status]
+        : prev.status.filter(s => s !== status)
+    }));
+  };
+
+  const handlePriorityFilterChange = (priority: string, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      priority: checked 
+        ? [...prev.priority, priority]
+        : prev.priority.filter(p => p !== priority)
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      status: [],
+      priority: [],
+      dateRange: { start: '', end: '' }
     });
   };
 
@@ -295,6 +354,41 @@ export default function Orders() {
       description: `Generating PDF for ${filteredOrders.length} orders...`,
     });
   };
+
+  const updateOrderMutation = useMutation({
+    mutationFn: async ({ orderId, updates }: { orderId: string; updates: Partial<Order> }) => {
+      return await ordersApi.update(orderId, updates);
+    },
+    onSuccess: (updatedOrder, { orderId }) => {
+      if (updatedOrder) {
+        // Update local state
+        setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+        setFilteredOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+        
+        // Update selected order if it's the one being updated
+        if (selectedOrder && selectedOrder.id === orderId) {
+          setSelectedOrder(updatedOrder);
+        }
+
+        // Close edit dialog
+        setIsEditDialogOpen(false);
+        setEditingOrder(null);
+
+        toast({
+          title: "Order Updated",
+          description: `Order ${orderId} has been updated successfully`,
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to update order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update order. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const updateOrderStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string; newStatus: string }) => {
@@ -397,6 +491,44 @@ export default function Orders() {
     setIsBulkActionOpen(false);
   };
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (orderIds: string[]) => {
+      return await ordersApi.deleteMany(orderIds);
+    },
+    onSuccess: (result, orderIds) => {
+      // Remove successfully deleted orders from local state
+      const successfulIds = orderIds.slice(0, result.successful);
+      setOrders(prev => prev.filter(order => !successfulIds.includes(order.id)));
+      setFilteredOrders(prev => prev.filter(order => !successfulIds.includes(order.id)));
+      
+      // Clear selection
+      setSelectedOrders([]);
+      setIsBulkActionOpen(false);
+      
+      // Add notification
+      addNotification({
+        type: 'success',
+        title: 'Orders Deleted',
+        message: `${result.successful} orders have been deleted successfully${result.failed > 0 ? `, ${result.failed} failed` : ''}`,
+        actionUrl: '/orders',
+        actionText: 'View Orders'
+      });
+      
+      toast({
+        title: "Orders Deleted",
+        description: `${result.successful} orders have been deleted successfully${result.failed > 0 ? `, ${result.failed} failed` : ''}`,
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to delete orders:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete orders. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleBulkDelete = () => {
     if (selectedOrders.length === 0) {
       toast({
@@ -407,15 +539,10 @@ export default function Orders() {
       return;
     }
 
-    // In a real app, you would call a bulk delete API
-    toast({
-      title: "Bulk Delete",
-      description: `${selectedOrders.length} orders will be deleted. This action cannot be undone.`,
-      variant: "destructive",
-    });
-
-    setSelectedOrders([]);
-    setIsBulkActionOpen(false);
+    // Confirm deletion
+    if (window.confirm(`Are you sure you want to delete ${selectedOrders.length} orders? This action cannot be undone.`)) {
+      bulkDeleteMutation.mutate(selectedOrders);
+    }
   };
 
   return (
@@ -467,19 +594,59 @@ export default function Orders() {
                   </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Filter by</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem checked>
+                <DropdownMenuCheckboxItem 
+                  checked={filters.status.includes('completed')}
+                  onCheckedChange={(checked) => handleStatusFilterChange('completed', checked)}
+                >
                   Completed
                 </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem>Processing</DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem 
+                  checked={filters.status.includes('processing')}
+                  onCheckedChange={(checked) => handleStatusFilterChange('processing', checked)}
+                >
+                  Processing
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem 
+                  checked={filters.status.includes('pending')}
+                  onCheckedChange={(checked) => handleStatusFilterChange('pending', checked)}
+                >
                   Pending
                 </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem 
+                  checked={filters.status.includes('cancelled')}
+                  onCheckedChange={(checked) => handleStatusFilterChange('cancelled', checked)}
+                >
                   Cancelled
                 </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Filter by Priority</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem 
+                  checked={filters.priority.includes('High')}
+                  onCheckedChange={(checked) => handlePriorityFilterChange('High', checked)}
+                >
+                  High Priority
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem 
+                  checked={filters.priority.includes('Normal')}
+                  onCheckedChange={(checked) => handlePriorityFilterChange('Normal', checked)}
+                >
+                  Normal Priority
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem 
+                  checked={filters.priority.includes('Low')}
+                  onCheckedChange={(checked) => handlePriorityFilterChange('Low', checked)}
+                >
+                  Low Priority
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={clearFilters}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Clear All Filters
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             
@@ -1083,6 +1250,122 @@ export default function Orders() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Order Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Order: {editingOrder?.id}</DialogTitle>
+          </DialogHeader>
+          {editingOrder && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="customerName">Customer Name</Label>
+                  <Input
+                    id="customerName"
+                    defaultValue={editingOrder.customerName}
+                    onChange={(e) => setEditingOrder(prev => prev ? { ...prev, customerName: e.target.value } : null)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="orderNumber">Order Number</Label>
+                  <Input
+                    id="orderNumber"
+                    defaultValue={editingOrder.orderNumber}
+                    onChange={(e) => setEditingOrder(prev => prev ? { ...prev, orderNumber: e.target.value } : null)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={editingOrder.status}
+                    onValueChange={(value) => setEditingOrder(prev => prev ? { ...prev, status: value as any } : null)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="processing">Processing</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="priority">Priority</Label>
+                  <Select
+                    value={(editingOrder as any).priority || 'Normal'}
+                    onValueChange={(value) => setEditingOrder(prev => prev ? { ...prev, priority: value } : null)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Low">Low</SelectItem>
+                      <SelectItem value="Normal">Normal</SelectItem>
+                      <SelectItem value="High">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="totalAmount">Total Amount</Label>
+                  <Input
+                    id="totalAmount"
+                    type="number"
+                    defaultValue={parseFloat(editingOrder.totalAmount)}
+                    onChange={(e) => setEditingOrder(prev => prev ? { ...prev, totalAmount: e.target.value } : null)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="service">Service</Label>
+                  <Input
+                    id="service"
+                    defaultValue={(editingOrder as any).service || ''}
+                    onChange={(e) => setEditingOrder(prev => prev ? { ...prev, service: e.target.value } : null)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  defaultValue={(editingOrder as any).notes || ''}
+                  onChange={(e) => setEditingOrder(prev => prev ? { ...prev, notes: e.target.value } : null)}
+                  rows={3}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={() => {
+                    if (editingOrder) {
+                      updateOrderMutation.mutate({
+                        orderId: editingOrder.id,
+                        orderData: {
+                          customerName: editingOrder.customerName,
+                          orderNumber: editingOrder.orderNumber,
+                          status: editingOrder.status,
+                          totalAmount: editingOrder.totalAmount,
+                          ...(editingOrder as any).priority && { priority: (editingOrder as any).priority },
+                          ...(editingOrder as any).service && { service: (editingOrder as any).service },
+                          ...(editingOrder as any).notes && { notes: (editingOrder as any).notes },
+                        }
+                      });
+                    }
+                  }}
+                  disabled={updateOrderMutation.isPending}
+                >
+                  {updateOrderMutation.isPending ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

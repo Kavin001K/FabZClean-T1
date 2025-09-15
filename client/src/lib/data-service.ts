@@ -104,6 +104,25 @@ export const ordersApi = {
       console.error(`Failed to delete order ${id}:`, error);
       return false;
     }
+  },
+
+  async deleteMany(orderIds: string[]): Promise<{ successful: number; failed: number; total: number }> {
+    try {
+      const response = await fetch(`${API_BASE}/orders`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderIds }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete orders');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to delete orders:', error);
+      return { successful: 0, failed: orderIds.length, total: orderIds.length };
+    }
   }
 };
 
@@ -139,6 +158,33 @@ export const customersApi = {
     } catch (error) {
       console.error('Failed to create customer:', error);
       return null;
+    }
+  },
+
+  async update(id: string, customer: Partial<Customer>): Promise<Customer | null> {
+    try {
+      const response = await fetch(`${API_BASE}/customers/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(customer),
+      });
+      if (!response.ok) throw new Error('Failed to update customer');
+      return await response.json();
+    } catch (error) {
+      console.error(`Failed to update customer ${id}:`, error);
+      return null;
+    }
+  },
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE}/customers/${id}`, {
+        method: 'DELETE',
+      });
+      return response.ok;
+    } catch (error) {
+      console.error(`Failed to delete customer ${id}:`, error);
+      return false;
     }
   }
 };

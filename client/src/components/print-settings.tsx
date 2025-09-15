@@ -13,7 +13,7 @@ import { PrintSettings, PrintTemplate } from '@/lib/print-driver';
 
 interface PrintSettingsProps {
   template?: PrintTemplate;
-  onSave?: (settings: PrintSettings) => void;
+  onSave?: (settings: PrintSettings, layout: any) => void;
   onReset?: () => void;
   className?: string;
 }
@@ -53,7 +53,7 @@ export default function PrintSettingsComponent({
 
   const handleSave = () => {
     if (onSave) {
-      onSave(settings);
+      onSave(settings, layout);
     }
     toast({
       title: "Settings Saved",
@@ -65,7 +65,8 @@ export default function PrintSettingsComponent({
     if (onReset) {
       onReset();
     }
-    setSettings({
+    // Reset to template defaults or system defaults
+    const defaultSettings = template?.settings || {
       pageSize: 'A4',
       orientation: 'portrait',
       margin: { top: 20, right: 20, bottom: 20, left: 20 },
@@ -73,8 +74,9 @@ export default function PrintSettingsComponent({
       fontFamily: 'Arial',
       color: '#000000',
       backgroundColor: '#FFFFFF'
-    });
-    setLayout({
+    };
+    
+    const defaultLayout = template?.layout || {
       header: true,
       footer: true,
       logo: true,
@@ -83,7 +85,10 @@ export default function PrintSettingsComponent({
       qrCode: true,
       table: true,
       signature: false
-    });
+    };
+    
+    setSettings(defaultSettings);
+    setLayout(defaultLayout);
     toast({
       title: "Settings Reset",
       description: "Print settings have been reset to defaults",

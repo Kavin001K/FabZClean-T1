@@ -17,7 +17,9 @@ import {
   Download,
   Eye,
   Trash2,
-  Plus
+  Plus,
+  Upload,
+  Copy
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -47,9 +49,91 @@ export default function PrintManager({ className }: PrintManagerProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<string>('barcode-label');
   const [showSettings, setShowSettings] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [currentTemplate, setCurrentTemplate] = useState(printDriver.getTemplate('barcode-label'));
   const { toast } = useToast();
 
   const templates = printDriver.getTemplates();
+
+  const handleTemplateChange = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    setCurrentTemplate(printDriver.getTemplate(templateId));
+  };
+
+  const handleSettingsSave = (settings: any, layout: any) => {
+    if (currentTemplate) {
+      printDriver.updateTemplateSettings(currentTemplate.id, settings);
+      printDriver.updateTemplateLayout(currentTemplate.id, layout);
+      setCurrentTemplate(printDriver.getTemplate(currentTemplate.id));
+      toast({
+        title: "Settings Updated",
+        description: `Settings and layout for ${currentTemplate.name} have been updated`,
+      });
+    }
+  };
+
+  const handleSettingsReset = () => {
+    if (currentTemplate) {
+      const defaultTemplate = printDriver.getTemplate(currentTemplate.id);
+      if (defaultTemplate) {
+        setCurrentTemplate(defaultTemplate);
+        toast({
+          title: "Settings Reset",
+          description: `Settings for ${currentTemplate.name} have been reset to defaults`,
+        });
+      }
+    }
+  };
+
+  const exportSettings = () => {
+    if (currentTemplate) {
+      const settingsData = {
+        templateId: currentTemplate.id,
+        templateName: currentTemplate.name,
+        settings: currentTemplate.settings,
+        layout: currentTemplate.layout,
+        exportDate: new Date().toISOString()
+      };
+      
+      const blob = new Blob([JSON.stringify(settingsData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentTemplate.name}-settings.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Settings Exported",
+        description: `Settings for ${currentTemplate.name} have been exported`,
+      });
+    }
+  };
+
+  const copySettingsToClipboard = () => {
+    if (currentTemplate) {
+      const settingsData = {
+        templateId: currentTemplate.id,
+        templateName: currentTemplate.name,
+        settings: currentTemplate.settings,
+        layout: currentTemplate.layout
+      };
+      
+      navigator.clipboard.writeText(JSON.stringify(settingsData, null, 2)).then(() => {
+        toast({
+          title: "Settings Copied",
+          description: `Settings for ${currentTemplate.name} have been copied to clipboard`,
+        });
+      }).catch(() => {
+        toast({
+          title: "Copy Failed",
+          description: "Failed to copy settings to clipboard",
+          variant: "destructive"
+        });
+      });
+    }
+  };
 
   const addPrintJob = (type: PrintJob['type'], data: any, templateId: string) => {
     const job: PrintJob = {
@@ -190,7 +274,41 @@ export default function PrintManager({ className }: PrintManagerProps) {
         {showSettings && (
           <div className="space-y-4">
             <Separator />
-            <PrintSettingsComponent />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Print Settings</h3>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">
+                    {currentTemplate?.name || 'No Template Selected'}
+                  </Badge>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={copySettingsToClipboard}
+                      disabled={!currentTemplate}
+                      title="Copy settings to clipboard"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportSettings}
+                      disabled={!currentTemplate}
+                      title="Export settings to file"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <PrintSettingsComponent 
+                template={currentTemplate}
+                onSave={handleSettingsSave}
+                onReset={handleSettingsReset}
+              />
+            </div>
             <Separator />
           </div>
         )}
@@ -201,7 +319,7 @@ export default function PrintManager({ className }: PrintManagerProps) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Template</Label>
-              <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+              <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -213,6 +331,18 @@ export default function PrintManager({ className }: PrintManagerProps) {
                   ))}
                 </SelectContent>
               </Select>
+              {currentTemplate && (
+                <div className="text-sm text-gray-600 space-y-1">
+                  <p><strong>Category:</strong> {currentTemplate.category}</p>
+                  <p><strong>Description:</strong> {currentTemplate.description}</p>
+                  <div className="mt-2 p-2 bg-gray-50 rounded border">
+                    <p><strong>Current Settings:</strong></p>
+                    <p>• Page: {currentTemplate.settings.pageSize} {currentTemplate.settings.orientation}</p>
+                    <p>• Font: {currentTemplate.settings.fontFamily} {currentTemplate.settings.fontSize}pt</p>
+                    <p>• Margins: {currentTemplate.settings.margin.top}mm all sides</p>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Actions</Label>

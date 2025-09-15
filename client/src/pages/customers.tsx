@@ -158,8 +158,7 @@ export default function Customers() {
   // Customer edit mutation
   const editCustomerMutation = useMutation({
     mutationFn: async ({ customerId, customerData }: { customerId: string; customerData: Partial<Customer> }) => {
-      // Note: We'll need to add an update method to customersApi
-      return await customersApi.getById(customerId); // Placeholder for now
+      return await customersApi.update(customerId, customerData);
     },
     onSuccess: (updatedCustomer) => {
       if (updatedCustomer) {
@@ -182,6 +181,32 @@ export default function Customers() {
       toast({
         title: "Error",
         description: "Failed to update customer. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Customer delete mutation
+  const deleteCustomerMutation = useMutation({
+    mutationFn: async (customerId: string) => {
+      return await customersApi.delete(customerId);
+    },
+    onSuccess: (success, customerId) => {
+      if (success) {
+        setCustomers(prev => prev.filter(c => c.id !== customerId));
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        
+        toast({
+          title: "Customer Deleted Successfully",
+          description: "Customer has been deleted.",
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to delete customer:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete customer. Please try again.",
         variant: "destructive",
       });
     },
@@ -389,7 +414,12 @@ export default function Customers() {
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction>Delete</AlertDialogAction>
+                                    <AlertDialogAction 
+                                        onClick={() => deleteCustomerMutation.mutate(customer.id)}
+                                        disabled={deleteCustomerMutation.isPending}
+                                    >
+                                        {deleteCustomerMutation.isPending ? 'Deleting...' : 'Delete'}
+                                    </AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>

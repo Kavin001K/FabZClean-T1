@@ -50,7 +50,10 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatNumber, formatPercentage } from "@/lib/data-service";
 import { useToast } from "@/hooks/use-toast";
+import { useWebSocket } from "@/hooks/use-websocket";
 import type { Service, Order, Customer } from "@shared/schema";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 // Import the data service
 import { 
   analyticsApi,
@@ -81,7 +84,40 @@ export default function Analytics() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Real-time state
+  const [realtimeKpis, setRealtimeKpis] = useState<any>(null);
+  const [recentActivity, setRecentActivity] = useState<any>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
   const { toast } = useToast();
+
+  // WebSocket connection for real-time updates
+  const { isConnected, connectionStatus, subscribe } = useWebSocket({
+    url: 'ws://localhost:3001',
+    onMessage: (message) => {
+      if (message.type === 'analytics_update') {
+        setRealtimeKpis(message.data.kpis);
+        setRecentActivity(message.data.recentActivity);
+        setLastUpdate(new Date());
+      } else if (message.type === 'order_created' || message.type === 'order_updated') {
+        // Refresh orders when new orders are created/updated
+        fetchAnalyticsData();
+      } else if (message.type === 'customer_created') {
+        // Refresh customers when new customers are added
+        fetchAnalyticsData();
+      }
+    },
+    onOpen: () => {
+      console.log('Connected to real-time analytics');
+      subscribe(['analytics_update', 'order_created', 'order_updated', 'customer_created']);
+    },
+    onClose: () => {
+      console.log('Disconnected from real-time analytics');
+    },
+    onError: (error) => {
+      console.error('WebSocket error:', error);
+    }
+  });
 
   // Fetch real data from database
   useEffect(() => {
@@ -137,8 +173,66 @@ export default function Analytics() {
       };
     }
 
+    // Apply filters to orders
+    let filteredOrders = [...orders];
+    let filteredCustomers = [...customers];
+
+    // Date range filter
+    if (dateRange !== 'all') {
+      const now = new Date();
+      let startDate = new Date();
+      
+      switch (dateRange) {
+        case 'last-7-days':
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case 'last-30-days':
+          startDate.setDate(now.getDate() - 30);
+          break;
+        case 'last-90-days':
+          startDate.setDate(now.getDate() - 90);
+          break;
+        case 'last-year':
+          startDate.setFullYear(now.getFullYear() - 1);
+          break;
+      }
+      
+      filteredOrders = filteredOrders.filter(order => 
+        new Date(order.createdAt || new Date()) >= startDate
+      );
+      
+      filteredCustomers = filteredCustomers.filter(customer => 
+        new Date(customer.createdAt || new Date()) >= startDate
+      );
+    }
+
+    // Service type filter
+    if (serviceType !== 'all') {
+      filteredOrders = filteredOrders.filter(order => {
+        const orderService = (order as any).service || 'Unknown Service';
+        return orderService.toLowerCase().includes(serviceType.toLowerCase());
+      });
+    }
+
+    // Franchise filter (assuming orders have a franchise field or we can derive it)
+    if (franchise !== 'all') {
+      // For now, we'll filter by customer location or some other field
+      // This would need to be implemented based on your actual data structure
+      filteredCustomers = filteredCustomers.filter(customer => {
+        // Assuming customers have a franchise field or location
+        return (customer as any).franchise === franchise || 
+               (customer as any).location?.includes(franchise);
+      });
+      
+      // Filter orders by customers in the selected franchise
+      const franchiseCustomerIds = filteredCustomers.map(c => c.id);
+      filteredOrders = filteredOrders.filter(order => 
+        franchiseCustomerIds.includes(order.customerId)
+      );
+    }
+
     // 1. REVENUE ANALYSIS
-    const revenueByMonth = orders.reduce((acc, order) => {
+    const revenueByMonth = filteredOrders.reduce((acc, order) => {
       const month = new Date(order.createdAt || new Date()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
       const existing = acc.find(item => item.month === month);
       if (existing) {
@@ -151,7 +245,7 @@ export default function Analytics() {
     }, [] as any[]).sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
 
     // 2. SERVICE PERFORMANCE ANALYSIS
-    const servicePerformance = orders.reduce((acc, order) => {
+    const servicePerformance = filteredOrders.reduce((acc, order) => {
       const serviceName = (order as any).service || 'Unknown Service';
       const existing = acc.find(item => item.name === serviceName);
       if (existing) {
@@ -170,7 +264,7 @@ export default function Analytics() {
     }, [] as any[]).sort((a, b) => b.revenue - a.revenue);
 
     // 3. CUSTOMER SEGMENTATION
-    const customerSegments = customers.reduce((acc, customer) => {
+    const customerSegments = filteredCustomers.reduce((acc, customer) => {
       const totalSpent = parseFloat(customer.totalSpent || '0');
       let segment = 'New';
       if (totalSpent > 1000) segment = 'VIP';
@@ -188,7 +282,7 @@ export default function Analytics() {
     }, [] as any[]);
 
     // 4. ORDER STATUS DISTRIBUTION
-    const orderStatusDistribution = orders.reduce((acc, order) => {
+    const orderStatusDistribution = filteredOrders.reduce((acc, order) => {
       const existing = acc.find(item => item.status === order.status);
       if (existing) {
         existing.count += 1;
@@ -200,7 +294,7 @@ export default function Analytics() {
     }, [] as any[]);
 
     // 5. REVENUE TREND (Daily)
-    const revenueTrend = orders.reduce((acc, order) => {
+    const revenueTrend = filteredOrders.reduce((acc, order) => {
       const date = new Date(order.createdAt || new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const existing = acc.find(item => item.date === date);
       if (existing) {
@@ -213,7 +307,7 @@ export default function Analytics() {
     }, [] as any[]).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // 6. CUSTOMER GROWTH
-    const customerGrowth = customers.reduce((acc, customer) => {
+    const customerGrowth = filteredCustomers.reduce((acc, customer) => {
       const month = new Date(customer.createdAt || new Date()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
       const existing = acc.find(item => item.month === month);
       if (existing) {
@@ -226,7 +320,7 @@ export default function Analytics() {
     }, [] as any[]).sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
 
     // 7. TOP CUSTOMERS
-    const topCustomers = customers
+    const topCustomers = filteredCustomers
       .sort((a, b) => parseFloat(b.totalSpent || '0') - parseFloat(a.totalSpent || '0'))
       .slice(0, 10)
       .map(customer => ({
@@ -240,7 +334,7 @@ export default function Analytics() {
     const serviceEfficiency = servicePerformance.map(service => ({
       ...service,
       efficiency: service.orders > 0 ? (service.revenue / service.orders) : 0,
-      marketShare: (service.orders / orders.length) * 100
+      marketShare: (service.orders / filteredOrders.length) * 100
     }));
 
     // 9. INVENTORY ANALYSIS
@@ -252,7 +346,7 @@ export default function Analytics() {
     }));
 
     // 10. TIME ANALYSIS (Hourly distribution)
-    const timeAnalysis = orders.reduce((acc, order) => {
+    const timeAnalysis = filteredOrders.reduce((acc, order) => {
       const hour = new Date(order.createdAt || new Date()).getHours();
       const existing = acc.find(item => item.hour === hour);
       if (existing) {
@@ -265,10 +359,10 @@ export default function Analytics() {
     }, [] as any[]).sort((a, b) => a.hour - b.hour);
 
     // 11. OPERATIONAL METRICS
-    const totalRevenue = orders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
-    const avgOrderValue = totalRevenue / orders.length;
-    const completionRate = (orders.filter(o => o.status === 'completed').length / orders.length) * 100;
-    const customerRetention = customers.filter(c => (c.totalOrders || 0) > 1).length / customers.length * 100;
+    const totalRevenue = filteredOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
+    const avgOrderValue = filteredOrders.length > 0 ? totalRevenue / filteredOrders.length : 0;
+    const completionRate = filteredOrders.length > 0 ? (filteredOrders.filter(o => o.status === 'completed').length / filteredOrders.length) * 100 : 0;
+    const customerRetention = filteredCustomers.length > 0 ? filteredCustomers.filter(c => (c.totalOrders || 0) > 1).length / filteredCustomers.length * 100 : 0;
 
     const operationalMetrics = {
       totalRevenue,
@@ -294,7 +388,7 @@ export default function Analytics() {
       inventoryAnalysis,
       timeAnalysis
     };
-  }, [orders, customers, inventory, isLoading]);
+  }, [orders, customers, inventory, isLoading, dateRange, franchise, serviceType]);
 
   // Generate AI-powered insights
   const generateInsights = () => {
@@ -322,6 +416,110 @@ export default function Analytics() {
     setShowInsights(true);
   };
 
+  // Export analytics as PDF
+  const handleExportPDF = async () => {
+    try {
+      toast({
+        title: "Generating PDF",
+        description: "Please wait while we generate your analytics report...",
+      });
+
+      // Create a new PDF document
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      let yPosition = 20;
+
+      // Add title
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Analytics Dashboard Report', pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 15;
+
+      // Add date and filters info
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Date Range: ${dateRange}`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Franchise: ${franchise}`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Service Type: ${serviceType}`, 20, yPosition);
+      yPosition += 15;
+
+      // Add key metrics
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Key Metrics', 20, yPosition);
+      yPosition += 10;
+
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      const { operationalMetrics } = analyticsData;
+      pdf.text(`Total Revenue: ${formatCurrency((operationalMetrics as any).totalRevenue)}`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Average Order Value: ${formatCurrency((operationalMetrics as any).avgOrderValue)}`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Completion Rate: ${formatPercentage((operationalMetrics as any).completionRate)}`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Customer Retention: ${formatPercentage((operationalMetrics as any).customerRetention)}`, 20, yPosition);
+      yPosition += 15;
+
+      // Add service performance
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Top Services', 20, yPosition);
+      yPosition += 10;
+
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      const topServices = analyticsData.servicePerformance.slice(0, 5);
+      topServices.forEach((service, index) => {
+        if (yPosition > pageHeight - 20) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        pdf.text(`${index + 1}. ${service.name}: ${service.orders} orders, ${formatCurrency(service.revenue)} revenue`, 20, yPosition);
+        yPosition += 8;
+      });
+
+      // Add customer segments
+      yPosition += 10;
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Customer Segments', 20, yPosition);
+      yPosition += 10;
+
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      analyticsData.customerSegments.forEach((segment) => {
+        if (yPosition > pageHeight - 20) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        pdf.text(`${segment.segment}: ${segment.count} customers, ${formatCurrency(segment.revenue)} revenue`, 20, yPosition);
+        yPosition += 8;
+      });
+
+      // Save the PDF
+      const fileName = `analytics-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+
+      toast({
+        title: "PDF Generated",
+        description: "Your analytics report has been downloaded successfully!",
+      });
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -336,70 +534,215 @@ export default function Analytics() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Analytics Dashboard</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Analytics Dashboard</h1>
+          <div className="flex items-center gap-2 mt-2">
+            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="text-sm text-muted-foreground">
+              {isConnected ? 'Live Updates' : 'Offline'}
+            </span>
+            {lastUpdate && (
+              <span className="text-xs text-muted-foreground">
+                Last updated: {lastUpdate.toLocaleTimeString()}
+              </span>
+            )}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={generateInsights}>
                 <FileText className="h-4 w-4 mr-2" />
                 Generate Insights
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={handleExportPDF}>
                 <FileText className="h-4 w-4 mr-2" />
                 Export as PDF
               </Button>
             </div>
           </div>
 
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="dateRange">Date Range</Label>
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select date range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="last-7-days">Last 7 Days</SelectItem>
+                  <SelectItem value="last-30-days">Last 30 Days</SelectItem>
+                  <SelectItem value="last-90-days">Last 90 Days</SelectItem>
+                  <SelectItem value="last-year">Last Year</SelectItem>
+                  <SelectItem value="all">All Time</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="franchise">Franchise</Label>
+              <Select value={franchise} onValueChange={setFranchise}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select franchise" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Franchises</SelectItem>
+                  <SelectItem value="franchise-1">Franchise 1</SelectItem>
+                  <SelectItem value="franchise-2">Franchise 2</SelectItem>
+                  <SelectItem value="franchise-3">Franchise 3</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="serviceType">Service Type</Label>
+              <Select value={serviceType} onValueChange={setServiceType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select service type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Services</SelectItem>
+                  <SelectItem value="cleaning">Cleaning</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="repair">Repair</SelectItem>
+                  <SelectItem value="installation">Installation</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Key Metrics Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className={realtimeKpis ? 'ring-2 ring-green-500 ring-opacity-50' : ''}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              {realtimeKpis && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>}
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency((analyticsData.operationalMetrics as any).totalRevenue)}</div>
+            <div className="text-2xl font-bold transition-all duration-500">
+              {formatCurrency(realtimeKpis?.totalRevenue || (analyticsData.operationalMetrics as any).totalRevenue)}
+            </div>
             <p className="text-xs text-muted-foreground">
-              {(analyticsData.operationalMetrics as any).totalOrders} orders
+              {realtimeKpis?.totalOrders || (analyticsData.operationalMetrics as any).totalOrders} orders
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={realtimeKpis ? 'ring-2 ring-green-500 ring-opacity-50' : ''}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avg Order Value</CardTitle>
-            <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+              {realtimeKpis && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>}
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency((analyticsData.operationalMetrics as any).avgOrderValue)}</div>
+            <div className="text-2xl font-bold transition-all duration-500">
+              {formatCurrency(realtimeKpis?.avgOrderValue || (analyticsData.operationalMetrics as any).avgOrderValue)}
+            </div>
             <p className="text-xs text-muted-foreground">
               Per order
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={realtimeKpis ? 'ring-2 ring-green-500 ring-opacity-50' : ''}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-muted-foreground" />
+              {realtimeKpis && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>}
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatPercentage((analyticsData.operationalMetrics as any).completionRate)}</div>
+            <div className="text-2xl font-bold transition-all duration-500">
+              {formatPercentage(realtimeKpis?.completionRate || (analyticsData.operationalMetrics as any).completionRate)}
+            </div>
             <p className="text-xs text-muted-foreground">
               Orders completed
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={realtimeKpis ? 'ring-2 ring-green-500 ring-opacity-50' : ''}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Customer Retention</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              {realtimeKpis && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>}
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatPercentage((analyticsData.operationalMetrics as any).customerRetention)}</div>
+            <div className="text-2xl font-bold transition-all duration-500">
+              {formatPercentage(realtimeKpis?.customerRetention || (analyticsData.operationalMetrics as any).customerRetention)}
+            </div>
             <p className="text-xs text-muted-foreground">
               Repeat customers
             </p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Recent Activity */}
+      {recentActivity && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Recent Activity (Last 5 Minutes)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-semibold mb-3">New Orders ({recentActivity.newOrders})</h4>
+                <div className="space-y-2">
+                  {recentActivity.orders.length > 0 ? (
+                    recentActivity.orders.map((order: any) => (
+                      <div key={order.id} className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-sm">{order.customerName}</p>
+                          <p className="text-xs text-muted-foreground">{formatCurrency(order.totalAmount)}</p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {order.status}
+                        </Badge>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No new orders in the last 5 minutes</p>
+                  )}
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-3">New Customers ({recentActivity.newCustomers})</h4>
+                <div className="space-y-2">
+                  {recentActivity.customers.length > 0 ? (
+                    recentActivity.customers.map((customer: any) => (
+                      <div key={customer.id} className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-sm">{customer.name}</p>
+                          <p className="text-xs text-muted-foreground">{customer.email}</p>
+                        </div>
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No new customers in the last 5 minutes</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="revenue" className="space-y-4">
         <TabsList>
