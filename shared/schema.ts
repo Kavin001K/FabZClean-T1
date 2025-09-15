@@ -88,6 +88,32 @@ export const services = pgTable("services", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const shipments = pgTable("shipments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shipmentNumber: text("shipment_number").notNull().unique(),
+  orderIds: jsonb("order_ids").notNull(), // Array of order IDs
+  carrier: text("carrier").notNull(),
+  trackingNumber: text("tracking_number"),
+  status: text("status", { enum: ["pending", "in_transit", "delivered", "failed"] }).notNull().default("pending"),
+  estimatedDelivery: timestamp("estimated_delivery"),
+  actualDelivery: timestamp("actual_delivery"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const barcodes = pgTable("barcodes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(), // The actual barcode/QR code value
+  type: text("type", { enum: ["qr", "barcode", "ean13", "code128"] }).notNull(), // Type of code
+  entityType: text("entity_type", { enum: ["order", "shipment", "product"] }).notNull(), // What entity this code represents
+  entityId: varchar("entity_id").notNull(), // ID of the entity (order, shipment, product)
+  data: jsonb("data"), // Additional data stored in the code
+  imagePath: text("image_path"), // Path to stored image file
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -129,6 +155,18 @@ export const insertServiceSchema = createInsertSchema(services).omit({
   updatedAt: true,
 });
 
+export const insertShipmentSchema = createInsertSchema(shipments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertBarcodeSchema = createInsertSchema(barcodes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -150,3 +188,9 @@ export type Customer = typeof customers.$inferSelect;
 
 export type InsertService = z.infer<typeof insertServiceSchema>;
 export type Service = typeof services.$inferSelect;
+
+export type InsertShipment = z.infer<typeof insertShipmentSchema>;
+export type Shipment = typeof shipments.$inferSelect;
+
+export type InsertBarcode = z.infer<typeof insertBarcodeSchema>;
+export type Barcode = typeof barcodes.$inferSelect;

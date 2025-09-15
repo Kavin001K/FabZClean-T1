@@ -12,7 +12,11 @@ import {
   type Customer,
   type InsertCustomer,
   type Service,
-  type InsertService
+  type InsertService,
+  type Shipment,
+  type InsertShipment,
+  type Barcode,
+  type InsertBarcode
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -58,6 +62,21 @@ export interface IStorage {
   updateService(id: string, service: Partial<InsertService>): Promise<Service | undefined>;
   deleteService(id: string): Promise<boolean>;
 
+  // Shipments
+  getShipments(): Promise<Shipment[]>;
+  getShipment(id: string): Promise<Shipment | undefined>;
+  createShipment(shipment: InsertShipment): Promise<Shipment>;
+  updateShipment(id: string, shipment: Partial<InsertShipment>): Promise<Shipment | undefined>;
+
+  // Barcodes
+  getBarcodes(): Promise<Barcode[]>;
+  getBarcode(id: string): Promise<Barcode | undefined>;
+  getBarcodeByCode(code: string): Promise<Barcode | undefined>;
+  getBarcodesByEntity(entityType: string, entityId: string): Promise<Barcode[]>;
+  createBarcode(barcode: InsertBarcode): Promise<Barcode>;
+  updateBarcode(id: string, barcode: Partial<InsertBarcode>): Promise<Barcode | undefined>;
+  deleteBarcode(id: string): Promise<boolean>;
+
   // Analytics
   getDashboardMetrics(): Promise<{
     totalRevenue: number;
@@ -78,6 +97,8 @@ export class MemStorage implements IStorage {
   private posTransactions: Map<string, OrderTransaction>;
   private customers: Map<string, Customer>;
   private services: Map<string, Service>;
+  private shipments: Map<string, Shipment>;
+  private barcodes: Map<string, Barcode>;
 
   constructor() {
     this.users = new Map();
@@ -87,6 +108,8 @@ export class MemStorage implements IStorage {
     this.posTransactions = new Map();
     this.customers = new Map();
     this.services = new Map();
+    this.shipments = new Map();
+    this.barcodes = new Map();
     this.initializeData();
   }
 
@@ -430,6 +453,50 @@ export class MemStorage implements IStorage {
 
     sampleServices.forEach(service => {
       this.services.set(service.id, service);
+    });
+
+    // Sample Shipments
+    const sampleShipments: Shipment[] = [
+      {
+        id: randomUUID(),
+        shipmentNumber: "SHIP-2024-001",
+        orderIds: ["06c2947f-a468-4e69-890c-6d022251efff"],
+        carrier: "FedEx",
+        trackingNumber: "FX123456789",
+        status: "in_transit",
+        estimatedDelivery: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
+        actualDelivery: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        shipmentNumber: "SHIP-2024-002",
+        orderIds: ["06c2947f-a468-4e69-890c-6d022251efff"],
+        carrier: "UPS",
+        trackingNumber: "UPS987654321",
+        status: "delivered",
+        estimatedDelivery: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+        actualDelivery: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        shipmentNumber: "SHIP-2024-003",
+        orderIds: ["06c2947f-a468-4e69-890c-6d022251efff"],
+        carrier: "DHL",
+        trackingNumber: "DHL456789123",
+        status: "pending",
+        estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+        actualDelivery: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    ];
+
+    sampleShipments.forEach(shipment => {
+      this.shipments.set(shipment.id, shipment);
     });
 
     // Sample Orders
@@ -968,6 +1035,88 @@ export class MemStorage implements IStorage {
 
   async deleteService(id: string): Promise<boolean> {
     return this.services.delete(id);
+  }
+
+  // Shipment methods
+  async getShipments(): Promise<Shipment[]> {
+    return Array.from(this.shipments.values());
+  }
+
+  async getShipment(id: string): Promise<Shipment | undefined> {
+    return this.shipments.get(id);
+  }
+
+  async createShipment(insertShipment: InsertShipment): Promise<Shipment> {
+    const id = randomUUID();
+    const shipment: Shipment = {
+      ...insertShipment,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.shipments.set(id, shipment);
+    return shipment;
+  }
+
+  async updateShipment(id: string, updates: Partial<InsertShipment>): Promise<Shipment | undefined> {
+    const shipment = this.shipments.get(id);
+    if (!shipment) return undefined;
+    
+    const updatedShipment = { 
+      ...shipment, 
+      ...updates, 
+      updatedAt: new Date() 
+    };
+    this.shipments.set(id, updatedShipment);
+    return updatedShipment;
+  }
+
+  // Barcode methods
+  async getBarcodes(): Promise<Barcode[]> {
+    return Array.from(this.barcodes.values());
+  }
+
+  async getBarcode(id: string): Promise<Barcode | undefined> {
+    return this.barcodes.get(id);
+  }
+
+  async getBarcodeByCode(code: string): Promise<Barcode | undefined> {
+    return Array.from(this.barcodes.values()).find(barcode => barcode.code === code);
+  }
+
+  async getBarcodesByEntity(entityType: string, entityId: string): Promise<Barcode[]> {
+    return Array.from(this.barcodes.values()).filter(
+      barcode => barcode.entityType === entityType && barcode.entityId === entityId
+    );
+  }
+
+  async createBarcode(insertBarcode: InsertBarcode): Promise<Barcode> {
+    const id = randomUUID();
+    const barcode: Barcode = {
+      ...insertBarcode,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.barcodes.set(id, barcode);
+    return barcode;
+  }
+
+  async updateBarcode(id: string, updates: Partial<InsertBarcode>): Promise<Barcode | undefined> {
+    const barcode = this.barcodes.get(id);
+    if (!barcode) return undefined;
+    
+    const updatedBarcode = { 
+      ...barcode, 
+      ...updates, 
+      updatedAt: new Date() 
+    };
+    this.barcodes.set(id, updatedBarcode);
+    return updatedBarcode;
+  }
+
+  async deleteBarcode(id: string): Promise<boolean> {
+    return this.barcodes.delete(id);
   }
 
   // Analytics methods

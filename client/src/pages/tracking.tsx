@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
+import BarcodeScanner from "@/components/barcode-scanner";
+import BarcodeDisplay from "@/components/barcode-display";
+import PrintManager from "@/components/print-manager";
 import { 
   Search, 
   Filter, 
@@ -20,7 +23,8 @@ import {
   MapPin,
   User,
   Calendar,
-  FileText
+  FileText,
+  Scan
 } from "lucide-react";
 
 interface Order {
@@ -60,6 +64,9 @@ export default function Tracking() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [isCreateShipmentOpen, setIsCreateShipmentOpen] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [scannedOrderId, setScannedOrderId] = useState<string | null>(null);
+  const [generatedBarcodes, setGeneratedBarcodes] = useState<any[]>([]);
 
   const { data: orders, isLoading: ordersLoading } = useQuery<Order[]>({
     queryKey: ["orders"],
@@ -126,6 +133,60 @@ export default function Tracking() {
     );
   };
 
+  const handleBarcodeScan = async (code: string) => {
+    try {
+      // Try to decode the barcode to get order information
+      const response = await fetch('/api/barcodes/decode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ encodedData: code })
+      });
+      
+      if (response.ok) {
+        const { decodedData } = await response.json();
+        if (decodedData.entityType === 'order') {
+          setScannedOrderId(decodedData.entityId);
+          handleOrderSelect(decodedData.entityId);
+          setShowBarcodeScanner(false);
+        }
+      } else {
+        // If decode fails, try to find order by ID directly
+        const order = orders?.find(o => o.id === code);
+        if (order) {
+          setScannedOrderId(code);
+          handleOrderSelect(code);
+          setShowBarcodeScanner(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error processing scanned barcode:', error);
+    }
+  };
+
+  const generateOrderBarcodes = async () => {
+    if (selectedOrders.length === 0) return;
+    
+    try {
+      const barcodePromises = selectedOrders.map(async (orderId) => {
+        const response = await fetch(`/api/barcodes/generate/order/${orderId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: { generatedFor: 'shipment' } })
+        });
+        
+        if (response.ok) {
+          return await response.json();
+        }
+        throw new Error(`Failed to generate barcode for order ${orderId}`);
+      });
+      
+      const barcodes = await Promise.all(barcodePromises);
+      setGeneratedBarcodes(barcodes);
+    } catch (error) {
+      console.error('Error generating barcodes:', error);
+    }
+  };
+
   const handleCreateShipment = () => {
     if (selectedOrders.length === 0) {
       alert("Please select at least one order to create a shipment.");
@@ -179,13 +240,35 @@ export default function Tracking() {
                 Create New Shipment
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New Shipment</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div className="text-sm text-muted-foreground">
-                  Select orders to include in this shipment. You can scan QR codes or manually select orders.
+                  Select orders to include in this shipment. You can scan QR codes, manually select orders, or enter order IDs.
+                </div>
+
+                {/* Barcode Scanner Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Scan Orders</h3>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowBarcodeScanner(!showBarcodeScanner)}
+                    >
+                      <Scan className="w-4 h-4 mr-2" />
+                      {showBarcodeScanner ? 'Hide Scanner' : 'Show Scanner'}
+                    </Button>
+                  </div>
+                  
+                  {showBarcodeScanner && (
+                    <BarcodeScanner
+                      onScan={handleBarcodeScan}
+                      title="Scan Order QR Code"
+                      placeholder="Scan QR code or enter Order ID"
+                    />
+                  )}
                 </div>
                 
                 {/* QR Code Scanner Simulation */}
@@ -222,13 +305,53 @@ export default function Tracking() {
                   </div>
                 )}
 
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setIsCreateShipmentOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateShipment}>
-                    Create Shipment
-                  </Button>
+                {/* Generated Barcodes Section */}
+                {generatedBarcodes.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold">Generated Barcodes</h3>
+                      <Button
+                        variant="outline"
+                        onClick={() => setGeneratedBarcodes([])}
+                      >
+                        Clear All
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {generatedBarcodes.map((barcode) => (
+                        <BarcodeDisplay
+                          key={barcode.id}
+                          barcode={barcode}
+                          onPrint={(barcode) => {
+                            // Handle printing logic
+                            console.log('Print barcode:', barcode);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center">
+                  <div className="flex gap-2">
+                    {selectedOrders.length > 0 && (
+                      <Button
+                        variant="outline"
+                        onClick={generateOrderBarcodes}
+                      >
+                        <QrCode className="w-4 h-4 mr-2" />
+                        Generate Barcodes ({selectedOrders.length})
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setIsCreateShipmentOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleCreateShipment}>
+                      Create Shipment
+                    </Button>
+                  </div>
                 </div>
               </div>
             </DialogContent>
@@ -295,6 +418,11 @@ export default function Tracking() {
         </Card>
       </div>
 
+      {/* Print Manager */}
+      <div className="mb-8">
+        <PrintManager />
+      </div>
+
       {/* Active Shipments */}
       <Card className="bento-card mb-8">
         <CardHeader>
@@ -306,10 +434,10 @@ export default function Tracking() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>UTI</TableHead>
-                <TableHead>Store ID</TableHead>
-                <TableHead>Staff</TableHead>
-                <TableHead>Packages</TableHead>
+                <TableHead>Shipment #</TableHead>
+                <TableHead>Carrier</TableHead>
+                <TableHead>Tracking #</TableHead>
+                <TableHead>Orders</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Actions</TableHead>
@@ -323,16 +451,16 @@ export default function Tracking() {
               ) : (
                 shipments?.map((shipment) => (
                 <TableRow key={shipment.id}>
-                  <TableCell className="font-mono font-medium">{shipment.uti}</TableCell>
-                  <TableCell>{shipment.storeId}</TableCell>
-                  <TableCell>{shipment.staffName}</TableCell>
-                  <TableCell>{shipment.packageCount}</TableCell>
+                  <TableCell className="font-mono font-medium">{shipment.shipmentNumber}</TableCell>
+                  <TableCell>{shipment.carrier}</TableCell>
+                  <TableCell>{shipment.trackingNumber || 'N/A'}</TableCell>
+                  <TableCell>{Array.isArray(shipment.orderIds) ? shipment.orderIds.length : 0}</TableCell>
                   <TableCell>
                     <Badge className={getShipmentStatusColor(shipment.status)}>
                       {getShipmentStatusText(shipment.status)}
                     </Badge>
                   </TableCell>
-                  <TableCell>{shipment.createdAt}</TableCell>
+                  <TableCell>{new Date(shipment.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm">
@@ -412,7 +540,7 @@ export default function Tracking() {
                   <TableCell>{order.customerName}</TableCell>
                   <TableCell>{order.phoneNumber}</TableCell>
                   <TableCell className="max-w-xs truncate">{order.address}</TableCell>
-                  <TableCell>{order.items}</TableCell>
+                  <TableCell>{Array.isArray(order.items) ? order.items.length : 0} items</TableCell>
                   <TableCell className="font-medium">₹{order.totalAmount}</TableCell>
                   <TableCell>
                     <Badge className={getStatusColor(order.status)}>

@@ -1,9 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertProductSchema, insertOrderSchema, insertCustomerSchema, insertOrderTransactionSchema, insertServiceSchema } from "@shared/schema";
+import { insertProductSchema, insertOrderSchema, insertCustomerSchema, insertOrderTransactionSchema, insertServiceSchema, insertShipmentSchema, insertBarcodeSchema } from "@shared/schema";
 import { z } from "zod";
 import { getDatabaseHealth, pingDatabase, getDatabaseInfo } from "./db-utils";
+import { barcodeService } from "./barcode-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -322,6 +323,217 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete service" });
+    }
+  });
+
+  // Shipments endpoints
+  app.get("/api/shipments", async (req, res) => {
+    try {
+      const shipments = await storage.getShipments();
+      res.json(shipments);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch shipments" });
+    }
+  });
+
+  app.get("/api/shipments/:id", async (req, res) => {
+    try {
+      const shipment = await storage.getShipment(req.params.id);
+      if (!shipment) {
+        return res.status(404).json({ message: "Shipment not found" });
+      }
+      res.json(shipment);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch shipment" });
+    }
+  });
+
+  app.post("/api/shipments", async (req, res) => {
+    try {
+      const validatedData = insertShipmentSchema.parse(req.body);
+      const shipment = await storage.createShipment(validatedData);
+      res.status(201).json(shipment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid shipment data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create shipment" });
+    }
+  });
+
+  app.put("/api/shipments/:id", async (req, res) => {
+    try {
+      const validatedData = insertShipmentSchema.partial().parse(req.body);
+      const shipment = await storage.updateShipment(req.params.id, validatedData);
+      if (!shipment) {
+        return res.status(404).json({ message: "Shipment not found" });
+      }
+      res.json(shipment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid shipment data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update shipment" });
+    }
+  });
+
+  // Barcode endpoints
+  app.get("/api/barcodes", async (req, res) => {
+    try {
+      const barcodes = await storage.getBarcodes();
+      res.json(barcodes);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch barcodes" });
+    }
+  });
+
+  app.get("/api/barcodes/:id", async (req, res) => {
+    try {
+      const barcode = await storage.getBarcode(req.params.id);
+      if (!barcode) {
+        return res.status(404).json({ message: "Barcode not found" });
+      }
+      res.json(barcode);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch barcode" });
+    }
+  });
+
+  app.get("/api/barcodes/code/:code", async (req, res) => {
+    try {
+      const barcode = await storage.getBarcodeByCode(req.params.code);
+      if (!barcode) {
+        return res.status(404).json({ message: "Barcode not found" });
+      }
+      res.json(barcode);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch barcode by code" });
+    }
+  });
+
+  app.get("/api/barcodes/entity/:entityType/:entityId", async (req, res) => {
+    try {
+      const barcodes = await storage.getBarcodesByEntity(req.params.entityType, req.params.entityId);
+      res.json(barcodes);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch barcodes by entity" });
+    }
+  });
+
+  app.post("/api/barcodes/generate", async (req, res) => {
+    try {
+      const { type, entityType, entityId, data, size, margin } = req.body;
+      
+      // Generate barcode using the service
+      const generatedBarcode = await barcodeService.generateBarcode({
+        type,
+        entityType,
+        entityId,
+        data,
+        size,
+        margin
+      });
+
+      // Save to storage
+      const barcode = await storage.createBarcode({
+        code: generatedBarcode.code,
+        type: generatedBarcode.type,
+        entityType: generatedBarcode.entityType,
+        entityId: generatedBarcode.entityId,
+        data: generatedBarcode.data,
+        imagePath: generatedBarcode.imagePath,
+        isActive: true
+      });
+
+      res.status(201).json({
+        ...barcode,
+        imageData: generatedBarcode.imageData
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to generate barcode", error: (error as Error).message });
+    }
+  });
+
+  app.post("/api/barcodes/generate/order/:orderId", async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const { data } = req.body;
+      
+      // Generate order barcode
+      const generatedBarcode = await barcodeService.generateOrderBarcode(orderId, data);
+
+      // Save to storage
+      const barcode = await storage.createBarcode({
+        code: generatedBarcode.code,
+        type: generatedBarcode.type,
+        entityType: generatedBarcode.entityType,
+        entityId: generatedBarcode.entityId,
+        data: generatedBarcode.data,
+        imagePath: generatedBarcode.imagePath,
+        isActive: true
+      });
+
+      res.status(201).json({
+        ...barcode,
+        imageData: generatedBarcode.imageData
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to generate order barcode", error: (error as Error).message });
+    }
+  });
+
+  app.post("/api/barcodes/generate/shipment/:shipmentId", async (req, res) => {
+    try {
+      const { shipmentId } = req.params;
+      const { data } = req.body;
+      
+      // Generate shipment barcode
+      const generatedBarcode = await barcodeService.generateShipmentBarcode(shipmentId, data);
+
+      // Save to storage
+      const barcode = await storage.createBarcode({
+        code: generatedBarcode.code,
+        type: generatedBarcode.type,
+        entityType: generatedBarcode.entityType,
+        entityId: generatedBarcode.entityId,
+        data: generatedBarcode.data,
+        imagePath: generatedBarcode.imagePath,
+        isActive: true
+      });
+
+      res.status(201).json({
+        ...barcode,
+        imageData: generatedBarcode.imageData
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to generate shipment barcode", error: (error as Error).message });
+    }
+  });
+
+  app.post("/api/barcodes/decode", async (req, res) => {
+    try {
+      const { encodedData } = req.body;
+      
+      if (!encodedData) {
+        return res.status(400).json({ message: "Encoded data is required" });
+      }
+
+      const decodedData = barcodeService.decodeBarcodeData(encodedData);
+      res.json({ decodedData });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to decode barcode data", error: (error as Error).message });
+    }
+  });
+
+  app.delete("/api/barcodes/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteBarcode(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Barcode not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete barcode" });
     }
   });
 
