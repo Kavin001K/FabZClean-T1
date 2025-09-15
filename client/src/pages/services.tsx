@@ -61,7 +61,7 @@ const kpiData = [
 
 export default function Services() {
   const { data: services, isLoading } = useQuery<Service[]>({
-    queryKey: ["/api/services"],
+    queryKey: ["services"],
   });
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);

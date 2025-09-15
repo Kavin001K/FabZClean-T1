@@ -30,7 +30,7 @@ export default function CreateOrder() {
   const queryClient = useQueryClient();
 
   const { data: services, isLoading: servicesLoading } = useQuery<Service[]>({
-    queryKey: ["/api/services"],
+    queryKey: ["services"],
   });
 
   const createOrderMutation = useMutation({
@@ -41,8 +41,8 @@ export default function CreateOrder() {
       if (newOrder) {
         setCreatedOrder(newOrder);
         setIsModalOpen(true);
-        queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
         
         // Add notification
         addNotification({

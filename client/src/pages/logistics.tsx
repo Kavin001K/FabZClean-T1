@@ -21,11 +21,11 @@ import type { Delivery, Order } from "@shared/schema";
 
 export default function Logistics() {
   const { data: deliveries, isLoading: deliveriesLoading } = useQuery<Delivery[]>({
-    queryKey: ["/api/deliveries"],
+    queryKey: ["deliveries"],
   });
 
   const { data: orders, isLoading: ordersLoading } = useQuery<Order[]>({
-    queryKey: ["/api/orders"],
+    queryKey: ["orders"],
   });
 
   const getProgressPercentage = (status: string) => {

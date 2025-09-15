@@ -108,8 +108,8 @@ export default function Customers() {
     onSuccess: (newCustomer) => {
       if (newCustomer) {
         setCustomers(prev => [...prev, newCustomer]);
-        queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/dashboard/metrics"] });
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
         
         toast({
           title: "Customer Created Successfully",
@@ -166,7 +166,7 @@ export default function Customers() {
         setCustomers(prev => prev.map(c => 
           c.id === updatedCustomer.id ? updatedCustomer : c
         ));
-        queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
         
         toast({
           title: "Customer Updated Successfully",

@@ -10,7 +10,7 @@ import type { Delivery } from "@shared/schema";
 
 export default function DeliveryTracking() {
   const { data: deliveries, isLoading } = useQuery<Delivery[]>({
-    queryKey: ["/api/deliveries"],
+    queryKey: ["deliveries"],
     select: (data) => data?.slice(0, 3) || [], // Show only 3 deliveries
   });
 

@@ -7,11 +7,11 @@ import type { OrderTransaction } from "@shared/schema";
 
 export default function OrderSummary() {
   const { data: transactions, isLoading } = useQuery<OrderTransaction[]>({
-    queryKey: ["/api/pos/transactions"],
+    queryKey: ["pos/transactions"],
   });
 
   const { data: metrics } = useQuery({
-    queryKey: ["/api/dashboard/metrics"],
+    queryKey: ["dashboard/metrics"],
   });
 
   const todayTransactions = transactions?.filter(transaction => {

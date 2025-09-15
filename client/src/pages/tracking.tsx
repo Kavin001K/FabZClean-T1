@@ -62,11 +62,11 @@ export default function Tracking() {
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
 
   const { data: orders, isLoading: ordersLoading } = useQuery<Order[]>({
-    queryKey: ["/api/orders"],
+    queryKey: ["orders"],
   });
 
   const { data: shipments, isLoading: shipmentsLoading } = useQuery<Shipment[]>({
-    queryKey: ["/api/shipments"],
+    queryKey: ["shipments"],
   });
 
   const filteredOrders = orders?.filter(order => {
