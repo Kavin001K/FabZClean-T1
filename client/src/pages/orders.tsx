@@ -101,19 +101,19 @@ export default function Orders() {
     },
     { 
       title: "Pending Orders", 
-      value: orders.filter(o => o.status === 'Pending').length.toString(), 
+      value: orders.filter(o => o.status === 'pending').length.toString(), 
       change: "-2.1%", 
       changeType: "negative" 
     },
     { 
       title: "Completed Orders", 
-      value: orders.filter(o => o.status === 'Completed').length.toString(), 
+      value: orders.filter(o => o.status === 'completed').length.toString(), 
       change: "+8.2%", 
       changeType: "positive" 
     },
     { 
       title: "Average Order Value", 
-      value: `₹${orders.length > 0 ? Math.round(orders.reduce((sum, o) => sum + o.total, 0) / orders.length).toLocaleString() : '0'}`, 
+      value: `₹${orders.length > 0 ? Math.round(orders.reduce((sum, o) => sum + parseFloat(o.totalAmount), 0) / orders.length).toLocaleString() : '0'}`, 
       change: "+5.7%", 
       changeType: "positive" 
     },
@@ -145,13 +145,13 @@ export default function Orders() {
     // Filter by tab
     switch (activeTab) {
       case "active":
-        filtered = orders.filter(order => order.status === 'Processing' || order.status === 'Pending');
+        filtered = orders.filter(order => order.status === 'processing' || order.status === 'pending');
         break;
       case "draft":
-        filtered = orders.filter(order => order.status === 'Pending');
+        filtered = orders.filter(order => order.status === 'pending');
         break;
       case "archived":
-        filtered = orders.filter(order => order.status === 'Completed' || order.status === 'Cancelled');
+        filtered = orders.filter(order => order.status === 'completed' || order.status === 'cancelled');
         break;
       default:
         filtered = orders;
@@ -677,11 +677,11 @@ export default function Orders() {
                           <div className="font-medium">{order.customerName}</div>
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm">{order.service}</div>
+                          <div className="text-sm">{(order as any).service || 'Unknown Service'}</div>
                         </TableCell>
                         <TableCell>
-                          <Badge className={getPriorityColor(order.priority || 'Normal')}>
-                            {order.priority || 'Normal'}
+                          <Badge className={getPriorityColor((order as any).priority || 'Normal')}>
+                            {(order as any).priority || 'Normal'}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -690,9 +690,9 @@ export default function Orders() {
                           </Badge>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          {new Date(order.date).toLocaleDateString()}
+                          {new Date(order.createdAt || new Date()).toLocaleDateString()}
                         </TableCell>
-                        <TableCell className="text-right">₹{order.total.toLocaleString()}</TableCell>
+                        <TableCell className="text-right">₹{parseFloat(order.totalAmount).toLocaleString()}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <Button
@@ -785,11 +785,11 @@ export default function Orders() {
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">{order.id}</TableCell>
                         <TableCell>{order.customerName}</TableCell>
-                        <TableCell>{order.service}</TableCell>
+                        <TableCell>{(order as any).service || 'Unknown Service'}</TableCell>
                         <TableCell>
                           <Badge 
                             className={
-                              order.status === 'Processing' ? 'bg-blue-100 text-blue-800' :
+                              order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
                               'bg-yellow-100 text-yellow-800'
                             }
                           >
@@ -797,9 +797,9 @@ export default function Orders() {
                           </Badge>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          {new Date(order.date).toLocaleDateString()}
+                          {new Date(order.createdAt || new Date()).toLocaleDateString()}
                         </TableCell>
-                        <TableCell className="text-right">₹{order.total.toLocaleString()}</TableCell>
+                        <TableCell className="text-right">₹{parseFloat(order.totalAmount).toLocaleString()}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <Button size="sm" variant="outline" onClick={() => handleViewOrder(order)} className="h-8 w-8 p-0">
@@ -850,16 +850,16 @@ export default function Orders() {
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">{order.id}</TableCell>
                         <TableCell>{order.customerName}</TableCell>
-                        <TableCell>{order.service}</TableCell>
+                        <TableCell>{(order as any).service || 'Unknown Service'}</TableCell>
                         <TableCell>
                           <Badge className="bg-yellow-100 text-yellow-800">
                             {order.status}
                           </Badge>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          {new Date(order.date).toLocaleDateString()}
+                          {new Date(order.createdAt || new Date()).toLocaleDateString()}
                         </TableCell>
-                        <TableCell className="text-right">₹{order.total.toLocaleString()}</TableCell>
+                        <TableCell className="text-right">₹{parseFloat(order.totalAmount).toLocaleString()}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <Button size="sm" variant="outline" onClick={() => handleViewOrder(order)} className="h-8 w-8 p-0">
@@ -913,11 +913,11 @@ export default function Orders() {
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">{order.id}</TableCell>
                         <TableCell>{order.customerName}</TableCell>
-                        <TableCell>{order.service}</TableCell>
+                        <TableCell>{(order as any).service || 'Unknown Service'}</TableCell>
                         <TableCell>
                           <Badge 
                             className={
-                              order.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                              order.status === 'completed' ? 'bg-green-100 text-green-800' :
                               'bg-red-100 text-red-800'
                             }
                           >
@@ -925,9 +925,9 @@ export default function Orders() {
                           </Badge>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          {new Date(order.date).toLocaleDateString()}
+                          {new Date(order.createdAt || new Date()).toLocaleDateString()}
                         </TableCell>
-                        <TableCell className="text-right">₹{order.total.toLocaleString()}</TableCell>
+                        <TableCell className="text-right">₹{parseFloat(order.totalAmount).toLocaleString()}</TableCell>
                         <TableCell>
                           <Button size="sm" variant="outline" onClick={() => handleViewOrder(order)} className="h-8 w-8 p-0">
                             <Eye className="h-4 w-4" />
@@ -957,12 +957,12 @@ export default function Orders() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Service</p>
-                  <p className="text-lg font-semibold">{selectedOrder.service}</p>
+                  <p className="text-lg font-semibold">{(selectedOrder as any).service || 'Unknown Service'}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Priority</p>
-                  <Badge className={getPriorityColor(selectedOrder.priority || 'Normal')}>
-                    {selectedOrder.priority || 'Normal'}
+                  <Badge className={getPriorityColor((selectedOrder as any).priority || 'Normal')}>
+                    {(selectedOrder as any).priority || 'Normal'}
                   </Badge>
                 </div>
                 <div>
@@ -973,16 +973,16 @@ export default function Orders() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Date</p>
-                  <p className="text-lg font-semibold">{new Date(selectedOrder.date).toLocaleDateString()}</p>
+                  <p className="text-lg font-semibold">{new Date(selectedOrder.createdAt || new Date()).toLocaleDateString()}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
-                  <p className="text-2xl font-bold text-primary">₹{selectedOrder.total.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-primary">₹{parseFloat(selectedOrder.totalAmount).toLocaleString()}</p>
                 </div>
-                {selectedOrder.notes && (
+                {(selectedOrder as any).notes && (
                   <div className="col-span-2">
                     <p className="text-sm font-medium text-muted-foreground">Notes</p>
-                    <p className="text-sm bg-muted p-2 rounded">{selectedOrder.notes}</p>
+                    <p className="text-sm bg-muted p-2 rounded">{(selectedOrder as any).notes}</p>
                   </div>
                 )}
               </div>
@@ -997,7 +997,7 @@ export default function Orders() {
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Order
                 </Button>
-                {selectedOrder.status !== 'Completed' && selectedOrder.status !== 'Cancelled' && (
+                {selectedOrder.status !== 'completed' && selectedOrder.status !== 'cancelled' && (
                   <Button variant="outline" onClick={() => handleCancelOrder(selectedOrder)}>
                     <X className="h-4 w-4 mr-2" />
                     Cancel Order

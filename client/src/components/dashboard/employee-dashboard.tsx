@@ -1,6 +1,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
+import { 
+  CheckCircle, 
+  Clock, 
+  AlertCircle, 
+  TrendingUp, 
+  Calendar, 
+  Users, 
+  Package 
+} from "lucide-react";
 
 // Mock data for employee dashboard
 const todayTasks = [

@@ -50,7 +50,7 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatNumber, formatPercentage } from "@/lib/data-service";
 import { useToast } from "@/hooks/use-toast";
-import type { Service, Order, Customer, PosTransaction } from "@shared/schema";
+import type { Service, Order, Customer } from "@shared/schema";
 // Import the data service
 import { 
   analyticsApi,
@@ -139,7 +139,7 @@ export default function Analytics() {
 
     // 1. REVENUE ANALYSIS
     const revenueByMonth = orders.reduce((acc, order) => {
-      const month = new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const month = new Date(order.createdAt || new Date()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
       const existing = acc.find(item => item.month === month);
       if (existing) {
         existing.revenue += parseFloat(order.totalAmount);
@@ -152,7 +152,7 @@ export default function Analytics() {
 
     // 2. SERVICE PERFORMANCE ANALYSIS
     const servicePerformance = orders.reduce((acc, order) => {
-      const serviceName = order.service || 'Unknown Service';
+      const serviceName = (order as any).service || 'Unknown Service';
       const existing = acc.find(item => item.name === serviceName);
       if (existing) {
         existing.orders += 1;
@@ -171,7 +171,7 @@ export default function Analytics() {
 
     // 3. CUSTOMER SEGMENTATION
     const customerSegments = customers.reduce((acc, customer) => {
-      const totalSpent = parseFloat(customer.totalSpent);
+      const totalSpent = parseFloat(customer.totalSpent || '0');
       let segment = 'New';
       if (totalSpent > 1000) segment = 'VIP';
       else if (totalSpent > 500) segment = 'Premium';
@@ -201,7 +201,7 @@ export default function Analytics() {
 
     // 5. REVENUE TREND (Daily)
     const revenueTrend = orders.reduce((acc, order) => {
-      const date = new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const date = new Date(order.createdAt || new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const existing = acc.find(item => item.date === date);
       if (existing) {
         existing.revenue += parseFloat(order.totalAmount);
@@ -214,26 +214,26 @@ export default function Analytics() {
 
     // 6. CUSTOMER GROWTH
     const customerGrowth = customers.reduce((acc, customer) => {
-      const month = new Date(customer.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const month = new Date(customer.createdAt || new Date()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
       const existing = acc.find(item => item.month === month);
       if (existing) {
         existing.newCustomers += 1;
-        existing.totalSpent += parseFloat(customer.totalSpent);
+        existing.totalSpent += parseFloat(customer.totalSpent || '0');
       } else {
-        acc.push({ month, newCustomers: 1, totalSpent: parseFloat(customer.totalSpent) });
+        acc.push({ month, newCustomers: 1, totalSpent: parseFloat(customer.totalSpent || '0') });
       }
       return acc;
     }, [] as any[]).sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
 
     // 7. TOP CUSTOMERS
     const topCustomers = customers
-      .sort((a, b) => parseFloat(b.totalSpent) - parseFloat(a.totalSpent))
+      .sort((a, b) => parseFloat(b.totalSpent || '0') - parseFloat(a.totalSpent || '0'))
       .slice(0, 10)
       .map(customer => ({
         name: customer.name,
-        totalSpent: parseFloat(customer.totalSpent),
+        totalSpent: parseFloat(customer.totalSpent || '0'),
         orders: customer.totalOrders,
-        avgOrderValue: parseFloat(customer.totalSpent) / customer.totalOrders
+        avgOrderValue: parseFloat(customer.totalSpent || '0') / (customer.totalOrders || 1)
       }));
 
     // 8. SERVICE EFFICIENCY
@@ -253,7 +253,7 @@ export default function Analytics() {
 
     // 10. TIME ANALYSIS (Hourly distribution)
     const timeAnalysis = orders.reduce((acc, order) => {
-      const hour = new Date(order.createdAt).getHours();
+      const hour = new Date(order.createdAt || new Date()).getHours();
       const existing = acc.find(item => item.hour === hour);
       if (existing) {
         existing.orders += 1;
@@ -268,7 +268,7 @@ export default function Analytics() {
     const totalRevenue = orders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
     const avgOrderValue = totalRevenue / orders.length;
     const completionRate = (orders.filter(o => o.status === 'completed').length / orders.length) * 100;
-    const customerRetention = customers.filter(c => c.totalOrders > 1).length / customers.length * 100;
+    const customerRetention = customers.filter(c => (c.totalOrders || 0) > 1).length / customers.length * 100;
 
     const operationalMetrics = {
       totalRevenue,
@@ -301,11 +301,11 @@ export default function Analytics() {
     const insights = [];
     const { operationalMetrics, servicePerformance, customerSegments } = analyticsData;
 
-    if (operationalMetrics.avgOrderValue > 200) {
+    if ((operationalMetrics as any).avgOrderValue > 200) {
       insights.push("High average order value indicates premium service positioning");
     }
     
-    if (operationalMetrics.completionRate > 90) {
+    if ((operationalMetrics as any).completionRate > 90) {
       insights.push("Excellent completion rate shows strong operational efficiency");
     }
     
@@ -357,9 +357,9 @@ export default function Analytics() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(analyticsData.operationalMetrics.totalRevenue)}</div>
+            <div className="text-2xl font-bold">{formatCurrency((analyticsData.operationalMetrics as any).totalRevenue)}</div>
             <p className="text-xs text-muted-foreground">
-              {analyticsData.operationalMetrics.totalOrders} orders
+              {(analyticsData.operationalMetrics as any).totalOrders} orders
             </p>
           </CardContent>
         </Card>
@@ -369,7 +369,7 @@ export default function Analytics() {
             <ShoppingBag className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(analyticsData.operationalMetrics.avgOrderValue)}</div>
+            <div className="text-2xl font-bold">{formatCurrency((analyticsData.operationalMetrics as any).avgOrderValue)}</div>
             <p className="text-xs text-muted-foreground">
               Per order
             </p>
@@ -381,7 +381,7 @@ export default function Analytics() {
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatPercentage(analyticsData.operationalMetrics.completionRate)}</div>
+            <div className="text-2xl font-bold">{formatPercentage((analyticsData.operationalMetrics as any).completionRate)}</div>
             <p className="text-xs text-muted-foreground">
               Orders completed
             </p>
@@ -393,7 +393,7 @@ export default function Analytics() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatPercentage(analyticsData.operationalMetrics.customerRetention)}</div>
+            <div className="text-2xl font-bold">{formatPercentage((analyticsData.operationalMetrics as any).customerRetention)}</div>
             <p className="text-xs text-muted-foreground">
               Repeat customers
             </p>
@@ -686,9 +686,9 @@ export default function Analytics() {
                 <div key={index} className="flex items-start gap-2 p-3 bg-muted rounded-lg">
                   <Star className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
                   <p className="text-sm">{insight}</p>
-                </div>
+                    </div>
               ))}
-            </div>
+                    </div>
             <div className="flex justify-end mt-4">
               <Button variant="outline" onClick={() => setShowInsights(false)}>
                 Close

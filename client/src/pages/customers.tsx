@@ -354,7 +354,7 @@ export default function Customers() {
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">{customer.totalOrders}</TableCell>
                     <TableCell className="hidden sm:table-cell">
-                      {new Date(customer.joinDate).toLocaleDateString()}
+                      {new Date(customer.createdAt || new Date()).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       {customer.phone}
@@ -416,7 +416,7 @@ export default function Customers() {
                         <div className="py-4 space-y-2">
                             <p><strong>Email:</strong> {selectedCustomer.email}</p>
                             <p><strong>Total Orders:</strong> {selectedCustomer.totalOrders}</p>
-                            <p><strong>Total Spent:</strong> ₹{parseFloat(selectedCustomer.totalSpent).toFixed(2)}</p>
+                            <p><strong>Total Spent:</strong> ₹{parseFloat(selectedCustomer.totalSpent || '0').toFixed(2)}</p>
                             <p><strong>Last Order:</strong> {selectedCustomer.lastOrder ? new Date(selectedCustomer.lastOrder).toLocaleDateString() : 'No orders'}</p>
                         </div>
                     </DialogContent>

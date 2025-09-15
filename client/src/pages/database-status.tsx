@@ -50,7 +50,7 @@ export default function DatabaseStatus() {
       setDbStatus({
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
-        error: error.message
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     } finally {
       setIsLoading(false);
