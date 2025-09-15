@@ -162,7 +162,7 @@ export default function Orders() {
       filtered = filtered.filter(order => 
         order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.service.toLowerCase().includes(searchQuery.toLowerCase())
+        order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
     
@@ -226,7 +226,7 @@ export default function Orders() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toast]);
 
-  const handleSort = (field: keyof DummyOrder) => {
+  const handleSort = (field: keyof Order) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -235,11 +235,11 @@ export default function Orders() {
     }
   };
 
-  const handleViewOrder = (order: DummyOrder) => {
+  const handleViewOrder = (order: Order) => {
     setSelectedOrder(order);
   };
 
-  const handleEditOrder = (order: DummyOrder) => {
+  const handleEditOrder = (order: Order) => {
     console.log(`Editing order ${order.id}`);
     toast({
       title: "Edit Order",
@@ -247,7 +247,7 @@ export default function Orders() {
     });
   };
 
-  const handleCancelOrder = (order: DummyOrder) => {
+  const handleCancelOrder = (order: Order) => {
     console.log(`Cancelling order ${order.id}`);
     toast({
       title: "Cancel Order",
@@ -298,21 +298,21 @@ export default function Orders() {
 
   const updateOrderStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string; newStatus: string }) => {
-      return await ordersApi.update(orderId, { status: newStatus });
+      return await ordersApi.update(orderId, { status: newStatus as "pending" | "processing" | "completed" | "cancelled" });
     },
     onSuccess: (updatedOrder, { orderId, newStatus }) => {
       if (updatedOrder) {
         // Update local state
-        setOrders(prev => prev.map(o => 
-          o.id === orderId ? { ...o, status: newStatus } : o
+        setOrders(prev => prev.map(o =>
+          o.id === orderId ? { ...o, status: newStatus as "pending" | "processing" | "completed" | "cancelled" } : o
         ));
         setFilteredOrders(prev => prev.map(o => 
-          o.id === orderId ? { ...o, status: newStatus } : o
+          o.id === orderId ? { ...o, status: newStatus as "pending" | "processing" | "completed" | "cancelled" } : o
         ));
         
         // Update selected order if it's the one being updated
         if (selectedOrder && selectedOrder.id === orderId) {
-          setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
+          setSelectedOrder(prev => prev ? { ...prev, status: newStatus as "pending" | "processing" | "completed" | "cancelled" } : null);
         }
 
         // Add notification for status update
@@ -596,22 +596,22 @@ export default function Orders() {
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('service')}
+                      onClick={() => handleSort('orderNumber')}
                     >
                       <div className="flex items-center gap-2">
                         Service
-                        {sortField === 'service' && (
+                        {sortField === 'orderNumber' && (
                           sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                         )}
                       </div>
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('priority')}
+                      onClick={() => handleSort('status')}
                     >
                       <div className="flex items-center gap-2">
                         Priority
-                        {sortField === 'priority' && (
+                        {sortField === 'status' && (
                           sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                         )}
                       </div>
@@ -629,22 +629,22 @@ export default function Orders() {
                     </TableHead>
                     <TableHead 
                       className="hidden md:table-cell cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('date')}
+                      onClick={() => handleSort('createdAt')}
                     >
                       <div className="flex items-center gap-2">
                         Date
-                        {sortField === 'date' && (
+                        {sortField === 'createdAt' && (
                           sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                         )}
                       </div>
                     </TableHead>
                     <TableHead 
                       className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('total')}
+                      onClick={() => handleSort('totalAmount')}
                     >
                       <div className="flex items-center justify-end gap-2">
                         Amount
-                        {sortField === 'total' && (
+                        {sortField === 'totalAmount' && (
                           sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                         )}
                       </div>
@@ -711,7 +711,7 @@ export default function Orders() {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            {order.status !== 'Completed' && order.status !== 'Cancelled' && (
+                            {order.status !== 'completed' && order.status !== 'cancelled' && (
                               <Button
                                 size="sm"
                                 variant="outline"

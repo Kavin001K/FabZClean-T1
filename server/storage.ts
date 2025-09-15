@@ -41,9 +41,9 @@ export interface IStorage {
   updateDelivery(id: string, delivery: Partial<InsertDelivery>): Promise<Delivery | undefined>;
 
   // POS Transactions
-  getPosTransactions(): Promise<PosTransaction[]>;
-  getPosTransaction(id: string): Promise<PosTransaction | undefined>;
-  createPosTransaction(transaction: InsertPosTransaction): Promise<PosTransaction>;
+  getPosTransactions(): Promise<OrderTransaction[]>;
+  getPosTransaction(id: string): Promise<OrderTransaction | undefined>;
+  createPosTransaction(transaction: InsertOrderTransaction): Promise<OrderTransaction>;
 
   // Customers
   getCustomers(): Promise<Customer[]>;
@@ -242,6 +242,7 @@ export class MemStorage implements IStorage {
         address: { street: "123 Main St", city: "Springfield", state: "IL", zip: "62701" },
         totalOrders: 15,
         totalSpent: "1247.89",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -253,6 +254,7 @@ export class MemStorage implements IStorage {
         address: { street: "456 Oak Ave", city: "Springfield", state: "IL", zip: "62702" },
         totalOrders: 8,
         totalSpent: "756.32",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -264,6 +266,7 @@ export class MemStorage implements IStorage {
         address: { street: "789 Pine St", city: "Springfield", state: "IL", zip: "62703" },
         totalOrders: 22,
         totalSpent: "1893.45",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -275,6 +278,7 @@ export class MemStorage implements IStorage {
         address: { street: "321 Elm St", city: "Springfield", state: "IL", zip: "62704" },
         totalOrders: 5,
         totalSpent: "423.78",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -286,6 +290,7 @@ export class MemStorage implements IStorage {
         address: { street: "654 Maple Ave", city: "Springfield", state: "IL", zip: "62705" },
         totalOrders: 31,
         totalSpent: "2156.90",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -297,6 +302,7 @@ export class MemStorage implements IStorage {
         address: { street: "987 Cedar Blvd", city: "Springfield", state: "IL", zip: "62706" },
         totalOrders: 12,
         totalSpent: "892.34",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -308,6 +314,7 @@ export class MemStorage implements IStorage {
         address: { street: "147 Birch St", city: "Springfield", state: "IL", zip: "62707" },
         totalOrders: 18,
         totalSpent: "1345.67",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -319,6 +326,7 @@ export class MemStorage implements IStorage {
         address: { street: "258 Spruce Dr", city: "Springfield", state: "IL", zip: "62708" },
         totalOrders: 7,
         totalSpent: "567.89",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       }
@@ -485,7 +493,7 @@ export class MemStorage implements IStorage {
         customerName: "Lisa Wang",
         customerEmail: "lisa.wang@email.com",
         customerPhone: "+1-555-0127",
-        status: "ready",
+        status: "pending",
         paymentStatus: "paid",
         totalAmount: "178.95",
         items: [
@@ -570,7 +578,7 @@ export class MemStorage implements IStorage {
     });
 
     // Sample POS Transactions
-    const sampleTransactions: PosTransaction[] = [
+    const sampleTransactions: OrderTransaction[] = [
       {
         id: randomUUID(),
         transactionNumber: "POS-2024-001",
@@ -581,6 +589,7 @@ export class MemStorage implements IStorage {
         paymentMethod: "credit",
         cashierId: "DEMO_CASHIER",
         createdAt: new Date(),
+        updatedAt: new Date(),
       },
       {
         id: randomUUID(),
@@ -593,6 +602,7 @@ export class MemStorage implements IStorage {
         paymentMethod: "cash",
         cashierId: "DEMO_CASHIER",
         createdAt: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+        updatedAt: new Date(Date.now() - 30 * 60 * 1000),
       },
       {
         id: randomUUID(),
@@ -605,6 +615,7 @@ export class MemStorage implements IStorage {
         paymentMethod: "debit",
         cashierId: "DEMO_CASHIER",
         createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
       },
       {
         id: randomUUID(),
@@ -616,6 +627,7 @@ export class MemStorage implements IStorage {
         paymentMethod: "credit",
         cashierId: "DEMO_CASHIER",
         createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
+        updatedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
       },
       {
         id: randomUUID(),
@@ -628,6 +640,7 @@ export class MemStorage implements IStorage {
         paymentMethod: "mobile",
         cashierId: "DEMO_CASHIER",
         createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
+        updatedAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
       }
     ];
 
@@ -753,6 +766,10 @@ export class MemStorage implements IStorage {
     const product: Product = { 
       ...insertProduct, 
       id,
+      description: insertProduct.description || null,
+      stockQuantity: insertProduct.stockQuantity || 0,
+      reorderLevel: insertProduct.reorderLevel || 10,
+      supplier: insertProduct.supplier || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -787,6 +804,10 @@ export class MemStorage implements IStorage {
     const order: Order = { 
       ...insertOrder, 
       id,
+      customerEmail: insertOrder.customerEmail || null,
+      customerPhone: insertOrder.customerPhone || null,
+      paymentStatus: insertOrder.paymentStatus || "pending",
+      shippingAddress: insertOrder.shippingAddress || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -821,6 +842,12 @@ export class MemStorage implements IStorage {
     const delivery: Delivery = { 
       ...insertDelivery, 
       id,
+      status: insertDelivery.status || "pending",
+      orderId: insertDelivery.orderId || null,
+      estimatedDelivery: insertDelivery.estimatedDelivery || null,
+      actualDelivery: insertDelivery.actualDelivery || null,
+      location: insertDelivery.location || null,
+      route: insertDelivery.route || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -842,20 +869,22 @@ export class MemStorage implements IStorage {
   }
 
   // POS Transaction methods
-  async getPosTransactions(): Promise<PosTransaction[]> {
+  async getPosTransactions(): Promise<OrderTransaction[]> {
     return Array.from(this.posTransactions.values());
   }
 
-  async getPosTransaction(id: string): Promise<PosTransaction | undefined> {
+  async getPosTransaction(id: string): Promise<OrderTransaction | undefined> {
     return this.posTransactions.get(id);
   }
 
-  async createPosTransaction(insertTransaction: InsertPosTransaction): Promise<PosTransaction> {
+  async createPosTransaction(insertTransaction: InsertOrderTransaction): Promise<OrderTransaction> {
     const id = randomUUID();
-    const transaction: PosTransaction = { 
+    const transaction: OrderTransaction = { 
       ...insertTransaction, 
       id,
+      cashierId: insertTransaction.cashierId || null,
       createdAt: new Date(),
+      updatedAt: new Date(),
     };
     this.posTransactions.set(id, transaction);
     return transaction;
@@ -875,6 +904,12 @@ export class MemStorage implements IStorage {
     const customer: Customer = { 
       ...insertCustomer, 
       id,
+      email: insertCustomer.email || null,
+      phone: insertCustomer.phone || null,
+      address: insertCustomer.address || null,
+      totalOrders: insertCustomer.totalOrders || null,
+      totalSpent: insertCustomer.totalSpent || null,
+      lastOrder: insertCustomer.lastOrder || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -909,6 +944,8 @@ export class MemStorage implements IStorage {
     const service: Service = { 
       ...insertService, 
       id,
+      description: insertService.description || null,
+      status: insertService.status || "Active",
       createdAt: new Date(),
       updatedAt: new Date(),
     };

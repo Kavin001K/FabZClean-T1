@@ -114,3 +114,5 @@ For database-related issues:
 2. Test connection using the provided scripts
 3. Verify Neon console for database status
 4. Check network connectivity and firewall settings
+5. Check the API Integration and password less athu snipet
+

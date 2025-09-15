@@ -361,7 +361,7 @@ export default function Logistics() {
                           </div>
                         )}
                         
-                        {delivery.location && (
+                        {(delivery.location as any) && (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <MapPin className="w-3 h-3" />
                             <span>

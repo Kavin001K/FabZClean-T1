@@ -10,6 +10,7 @@ const connectionString = process.env.DATABASE_URL ||
 const sql = neon(connectionString);
 
 // Create Drizzle database instance
+// @ts-ignore - Type mismatch in drizzle-orm/neon-serverless
 export const db = drizzle(sql, { schema });
 
 // Database connection test function
@@ -18,7 +19,7 @@ export async function testConnection() {
     const result = await sql`SELECT NOW() as current_time`;
     console.log('✅ Database connected successfully:', result[0]);
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Database connection failed:', error);
     return false;
   }
@@ -29,7 +30,7 @@ export async function healthCheck() {
   try {
     const result = await sql`SELECT 1 as status`;
     return { status: 'healthy', timestamp: new Date().toISOString() };
-  } catch (error) {
+  } catch (error: any) {
     return { status: 'unhealthy', error: error.message, timestamp: new Date().toISOString() };
   }
 }

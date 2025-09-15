@@ -11,8 +11,13 @@ import {
   TrendingUp, 
   Calendar, 
   Users, 
-  Package 
+  Package,
+  Target,
+  User
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Link } from "wouter";
 
 // Mock data for employee dashboard
 const todayTasks = [

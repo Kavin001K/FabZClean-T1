@@ -33,7 +33,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const health = await getDatabaseHealth();
       res.json(health);
     } catch (error) {
-      res.status(500).json({ status: "unhealthy", error: error.message });
+      res.status(500).json({ status: "unhealthy", error: (error as Error).message });
     }
   });
 
@@ -42,7 +42,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ping = await pingDatabase();
       res.json(ping);
     } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -51,7 +51,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const info = await getDatabaseInfo();
       res.json(info);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error as Error).message });
     }
   });
 
@@ -117,7 +117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Transform orders to match frontend expectations
       const transformedOrders = orders.map(order => {
-        const firstItem = order.items?.[0];
+        const firstItem = (order.items as any)?.[0];
         const productId = firstItem?.productId;
         const serviceName = productId ? productMap.get(productId) || 'Unknown Service' : 'Unknown Service';
         
@@ -145,7 +145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const products = await storage.getProducts();
       const productMap = new Map(products.map(product => [product.id, product.name]));
       
-      const firstItem = order.items?.[0];
+      const firstItem = (order.items as any)?.[0];
       const productId = firstItem?.productId;
       const serviceName = productId ? productMap.get(productId) || 'Unknown Service' : 'Unknown Service';
       
@@ -200,7 +200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transformedCustomers = customers.map(customer => ({
         ...customer,
         joinDate: customer.createdAt, // Map createdAt to joinDate
-        totalSpent: parseFloat(customer.totalSpent) // Convert totalSpent to number
+        totalSpent: parseFloat(customer.totalSpent || "0") // Convert totalSpent to number
       }));
       res.json(transformedCustomers);
     } catch (error) {
@@ -218,7 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transformedCustomer = {
         ...customer,
         joinDate: customer.createdAt, // Map createdAt to joinDate
-        totalSpent: parseFloat(customer.totalSpent) // Convert totalSpent to number
+        totalSpent: parseFloat(customer.totalSpent || "0") // Convert totalSpent to number
       };
       res.json(transformedCustomer);
     } catch (error) {

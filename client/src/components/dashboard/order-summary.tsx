@@ -3,10 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
-import type { PosTransaction } from "@shared/schema";
+import type { OrderTransaction } from "@shared/schema";
 
 export default function OrderSummary() {
-  const { data: transactions, isLoading } = useQuery<PosTransaction[]>({
+  const { data: transactions, isLoading } = useQuery<OrderTransaction[]>({
     queryKey: ["/api/pos/transactions"],
   });
 

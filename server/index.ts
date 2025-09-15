@@ -61,7 +61,7 @@ app.use((req, res, next) => {
   try {
     await initializeDatabase();
     log('✅ Database connection established');
-  } catch (error) {
+  } catch (error: any) {
     log('❌ Database connection failed:', error);
     process.exit(1);
   }

@@ -33,11 +33,11 @@ export async function getDatabaseHealth() {
  */
 export async function executeQuery(query: string, params: any[] = []) {
   try {
-    const result = await db.execute(sql.raw(query, params));
+    const result = await db.execute(sql.raw(query));
     return { success: true, data: result };
   } catch (error) {
     console.error('Query execution failed:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: (error as Error).message };
   }
 }
 
@@ -58,7 +58,7 @@ export async function pingDatabase() {
   } catch (error) {
     return { 
       success: false, 
-      error: error.message,
+      error: (error as Error).message,
       timestamp: new Date().toISOString()
     };
   }
@@ -84,7 +84,7 @@ export async function getDatabaseInfo() {
       version: 'Unknown',
       currentTime: new Date().toISOString(),
       connected: false,
-      error: error.message,
+      error: (error as Error).message,
       timestamp: new Date().toISOString()
     };
   }
