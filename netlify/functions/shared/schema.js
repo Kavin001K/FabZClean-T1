@@ -116,4 +116,3 @@ exports.insertCustomerSchema = (0, drizzle_zod_1.createInsertSchema)(exports.cus
 exports.insertServiceSchema = (0, drizzle_zod_1.createInsertSchema)(exports.services);
 exports.insertShipmentSchema = (0, drizzle_zod_1.createInsertSchema)(exports.shipments);
 exports.insertBarcodeSchema = (0, drizzle_zod_1.createInsertSchema)(exports.barcodes);
-//# sourceMappingURL=schema.js.map

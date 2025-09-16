@@ -108,4 +108,3 @@ async function createTables() {
     }
 }
 exports.default = database_1.db;
-//# sourceMappingURL=db-utils.js.map

@@ -1,5 +1,5 @@
 import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
-import { registerRoutes } from '../../server/routes';
+import { registerRoutes } from './server/routes';
 import express from 'express';
 import { createServer } from 'http';
 

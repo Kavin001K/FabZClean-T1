@@ -74,4 +74,3 @@ exports.DATABASE_CONFIG = {
     jwksUrl: process.env.JWKS_URL
 };
 exports.default = exports.db;
-//# sourceMappingURL=database.js.map

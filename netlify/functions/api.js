@@ -27,7 +27,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handler = void 0;
-const routes_1 = require("../../server/routes");
+const routes_1 = require("./server/routes");
 const express_1 = __importDefault(require("express"));
 // Create Express app
 const app = (0, express_1.default)();
@@ -93,17 +93,17 @@ const handler = async (event, context) => {
         const path = event.path.replace('/api', '');
         // Handle different API endpoints
         if (path === '/health/database') {
-            const { getDatabaseHealth } = await Promise.resolve().then(() => __importStar(require('../../server/db-utils')));
+            const { getDatabaseHealth } = await Promise.resolve().then(() => __importStar(require('./server/db-utils')));
             const health = await getDatabaseHealth();
             res.json(health);
         }
         else if (path === '/database/info') {
-            const { getDatabaseInfo } = await Promise.resolve().then(() => __importStar(require('../../server/db-utils')));
+            const { getDatabaseInfo } = await Promise.resolve().then(() => __importStar(require('./server/db-utils')));
             const info = await getDatabaseInfo();
             res.json(info);
         }
         else if (path === '/dashboard/metrics') {
-            const { storage } = await Promise.resolve().then(() => __importStar(require('../../server/storage')));
+            const { storage } = await Promise.resolve().then(() => __importStar(require('./server/storage')));
             const metrics = await storage.getDashboardMetrics();
             const customers = await storage.getCustomers();
             const transformedMetrics = {
@@ -115,7 +115,7 @@ const handler = async (event, context) => {
             res.json(transformedMetrics);
         }
         else if (path === '/orders') {
-            const { storage } = await Promise.resolve().then(() => __importStar(require('../../server/storage')));
+            const { storage } = await Promise.resolve().then(() => __importStar(require('./server/storage')));
             const orders = await storage.getOrders();
             const products = await storage.getProducts();
             const productMap = new Map(products.map(product => [product.id, product.name]));
@@ -134,7 +134,7 @@ const handler = async (event, context) => {
             res.json(transformedOrders);
         }
         else if (path === '/customers') {
-            const { storage } = await Promise.resolve().then(() => __importStar(require('../../server/storage')));
+            const { storage } = await Promise.resolve().then(() => __importStar(require('./server/storage')));
             const customers = await storage.getCustomers();
             const transformedCustomers = customers.map(customer => ({
                 ...customer,
@@ -144,17 +144,17 @@ const handler = async (event, context) => {
             res.json(transformedCustomers);
         }
         else if (path === '/products') {
-            const { storage } = await Promise.resolve().then(() => __importStar(require('../../server/storage')));
+            const { storage } = await Promise.resolve().then(() => __importStar(require('./server/storage')));
             const products = await storage.getProducts();
             res.json(products);
         }
         else if (path === '/services') {
-            const { storage } = await Promise.resolve().then(() => __importStar(require('../../server/storage')));
+            const { storage } = await Promise.resolve().then(() => __importStar(require('./server/storage')));
             const services = await storage.getServices();
             res.json(services);
         }
         else if (path === '/deliveries') {
-            const { storage } = await Promise.resolve().then(() => __importStar(require('../../server/storage')));
+            const { storage } = await Promise.resolve().then(() => __importStar(require('./server/storage')));
             const deliveries = await storage.getDeliveries();
             res.json(deliveries);
         }

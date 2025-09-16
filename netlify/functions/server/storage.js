@@ -1002,4 +1002,3 @@ class MemStorage {
 }
 exports.MemStorage = MemStorage;
 exports.storage = new MemStorage();
-//# sourceMappingURL=storage.js.map
