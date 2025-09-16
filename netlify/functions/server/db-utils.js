@@ -35,7 +35,7 @@ async function getDatabaseHealth() {
  */
 async function executeQuery(query, params = []) {
     try {
-        const result = await database_1.db.execute(drizzle_orm_1.sql.raw(query, params));
+        const result = await database_1.db.execute(drizzle_orm_1.sql.raw(query));
         return { success: true, data: result };
     }
     catch (error) {

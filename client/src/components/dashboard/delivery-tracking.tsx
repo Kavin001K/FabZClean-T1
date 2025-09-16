@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Truck } from "lucide-react";
 import { getStatusColor } from "@/lib/data";
 import { format } from "date-fns";
-import type { Delivery } from "@shared/schema";
+import type { Delivery } from "../../../shared/schema";
 
 export default function DeliveryTracking() {
   const { data: deliveries, isLoading } = useQuery<Delivery[]>({

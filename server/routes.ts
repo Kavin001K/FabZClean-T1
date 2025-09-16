@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertProductSchema, insertOrderSchema, insertCustomerSchema, insertOrderTransactionSchema, insertServiceSchema, insertShipmentSchema, insertBarcodeSchema } from "@shared/schema";
+import { insertProductSchema, insertOrderSchema, insertCustomerSchema, insertOrderTransactionSchema, insertServiceSchema, insertShipmentSchema, insertBarcodeSchema } from "../shared/schema";
 import { z } from "zod";
 import { getDatabaseHealth, pingDatabase, getDatabaseInfo } from "./db-utils";
 import { barcodeService } from "./barcode-service";

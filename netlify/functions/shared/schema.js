@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.insertServiceSchema = exports.insertCustomerSchema = exports.insertOrderTransactionSchema = exports.insertDeliverySchema = exports.insertOrderSchema = exports.insertProductSchema = exports.insertUserSchema = exports.services = exports.customers = exports.orderTransactions = exports.deliveries = exports.orders = exports.products = exports.users = void 0;
+exports.insertBarcodeSchema = exports.insertShipmentSchema = exports.insertServiceSchema = exports.insertCustomerSchema = exports.insertOrderTransactionSchema = exports.insertDeliverySchema = exports.insertOrderSchema = exports.insertProductSchema = exports.insertUserSchema = exports.barcodes = exports.shipments = exports.services = exports.customers = exports.orderTransactions = exports.deliveries = exports.orders = exports.products = exports.users = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 const drizzle_zod_1 = require("drizzle-zod");
@@ -82,38 +82,38 @@ exports.services = (0, pg_core_1.pgTable)("services", {
     createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow(),
 });
+exports.shipments = (0, pg_core_1.pgTable)("shipments", {
+    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
+    shipmentNumber: (0, pg_core_1.text)("shipment_number").notNull().unique(),
+    orderIds: (0, pg_core_1.jsonb)("order_ids").notNull(), // Array of order IDs
+    carrier: (0, pg_core_1.text)("carrier").notNull(),
+    trackingNumber: (0, pg_core_1.text)("tracking_number"),
+    status: (0, pg_core_1.text)("status", { enum: ["pending", "in_transit", "delivered", "failed"] }).notNull().default("pending"),
+    estimatedDelivery: (0, pg_core_1.timestamp)("estimated_delivery"),
+    actualDelivery: (0, pg_core_1.timestamp)("actual_delivery"),
+    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow(),
+});
+exports.barcodes = (0, pg_core_1.pgTable)("barcodes", {
+    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
+    code: (0, pg_core_1.text)("code").notNull().unique(), // The actual barcode/QR code value
+    type: (0, pg_core_1.text)("type", { enum: ["qr", "barcode", "ean13", "code128"] }).notNull(), // Type of code
+    entityType: (0, pg_core_1.text)("entity_type", { enum: ["order", "shipment", "product"] }).notNull(), // What entity this code represents
+    entityId: (0, pg_core_1.varchar)("entity_id").notNull(), // ID of the entity (order, shipment, product)
+    data: (0, pg_core_1.jsonb)("data"), // Additional data stored in the code
+    imagePath: (0, pg_core_1.text)("image_path"), // Path to stored image file
+    isActive: (0, pg_core_1.boolean)("is_active").notNull().default(true),
+    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow(),
+});
 // Insert schemas
-exports.insertUserSchema = (0, drizzle_zod_1.createInsertSchema)(exports.users).omit({
-    id: true,
-});
-exports.insertProductSchema = (0, drizzle_zod_1.createInsertSchema)(exports.products).omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-});
-exports.insertOrderSchema = (0, drizzle_zod_1.createInsertSchema)(exports.orders).omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-});
-exports.insertDeliverySchema = (0, drizzle_zod_1.createInsertSchema)(exports.deliveries).omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-});
-exports.insertOrderTransactionSchema = (0, drizzle_zod_1.createInsertSchema)(exports.orderTransactions).omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-});
-exports.insertCustomerSchema = (0, drizzle_zod_1.createInsertSchema)(exports.customers).omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-});
-exports.insertServiceSchema = (0, drizzle_zod_1.createInsertSchema)(exports.services).omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-});
+exports.insertUserSchema = (0, drizzle_zod_1.createInsertSchema)(exports.users);
+exports.insertProductSchema = (0, drizzle_zod_1.createInsertSchema)(exports.products);
+exports.insertOrderSchema = (0, drizzle_zod_1.createInsertSchema)(exports.orders);
+exports.insertDeliverySchema = (0, drizzle_zod_1.createInsertSchema)(exports.deliveries);
+exports.insertOrderTransactionSchema = (0, drizzle_zod_1.createInsertSchema)(exports.orderTransactions);
+exports.insertCustomerSchema = (0, drizzle_zod_1.createInsertSchema)(exports.customers);
+exports.insertServiceSchema = (0, drizzle_zod_1.createInsertSchema)(exports.services);
+exports.insertShipmentSchema = (0, drizzle_zod_1.createInsertSchema)(exports.shipments);
+exports.insertBarcodeSchema = (0, drizzle_zod_1.createInsertSchema)(exports.barcodes);
 //# sourceMappingURL=schema.js.map

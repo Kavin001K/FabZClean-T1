@@ -11,6 +11,8 @@ class MemStorage {
         this.posTransactions = new Map();
         this.customers = new Map();
         this.services = new Map();
+        this.shipments = new Map();
+        this.barcodes = new Map();
         this.initializeData();
     }
     initializeData() {
@@ -162,6 +164,7 @@ class MemStorage {
                 address: { street: "123 Main St", city: "Springfield", state: "IL", zip: "62701" },
                 totalOrders: 15,
                 totalSpent: "1247.89",
+                lastOrder: new Date(),
                 createdAt: new Date(),
                 updatedAt: new Date(),
             },
@@ -173,6 +176,7 @@ class MemStorage {
                 address: { street: "456 Oak Ave", city: "Springfield", state: "IL", zip: "62702" },
                 totalOrders: 8,
                 totalSpent: "756.32",
+                lastOrder: new Date(),
                 createdAt: new Date(),
                 updatedAt: new Date(),
             },
@@ -184,6 +188,7 @@ class MemStorage {
                 address: { street: "789 Pine St", city: "Springfield", state: "IL", zip: "62703" },
                 totalOrders: 22,
                 totalSpent: "1893.45",
+                lastOrder: new Date(),
                 createdAt: new Date(),
                 updatedAt: new Date(),
             },
@@ -195,6 +200,7 @@ class MemStorage {
                 address: { street: "321 Elm St", city: "Springfield", state: "IL", zip: "62704" },
                 totalOrders: 5,
                 totalSpent: "423.78",
+                lastOrder: new Date(),
                 createdAt: new Date(),
                 updatedAt: new Date(),
             },
@@ -206,6 +212,7 @@ class MemStorage {
                 address: { street: "654 Maple Ave", city: "Springfield", state: "IL", zip: "62705" },
                 totalOrders: 31,
                 totalSpent: "2156.90",
+                lastOrder: new Date(),
                 createdAt: new Date(),
                 updatedAt: new Date(),
             },
@@ -217,6 +224,7 @@ class MemStorage {
                 address: { street: "987 Cedar Blvd", city: "Springfield", state: "IL", zip: "62706" },
                 totalOrders: 12,
                 totalSpent: "892.34",
+                lastOrder: new Date(),
                 createdAt: new Date(),
                 updatedAt: new Date(),
             },
@@ -228,6 +236,7 @@ class MemStorage {
                 address: { street: "147 Birch St", city: "Springfield", state: "IL", zip: "62707" },
                 totalOrders: 18,
                 totalSpent: "1345.67",
+                lastOrder: new Date(),
                 createdAt: new Date(),
                 updatedAt: new Date(),
             },
@@ -239,6 +248,7 @@ class MemStorage {
                 address: { street: "258 Spruce Dr", city: "Springfield", state: "IL", zip: "62708" },
                 totalOrders: 7,
                 totalSpent: "567.89",
+                lastOrder: new Date(),
                 createdAt: new Date(),
                 updatedAt: new Date(),
             }
@@ -340,6 +350,48 @@ class MemStorage {
         sampleServices.forEach(service => {
             this.services.set(service.id, service);
         });
+        // Sample Shipments
+        const sampleShipments = [
+            {
+                id: (0, crypto_1.randomUUID)(),
+                shipmentNumber: "SHIP-2024-001",
+                orderIds: ["06c2947f-a468-4e69-890c-6d022251efff"],
+                carrier: "FedEx",
+                trackingNumber: "FX123456789",
+                status: "in_transit",
+                estimatedDelivery: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
+                actualDelivery: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            },
+            {
+                id: (0, crypto_1.randomUUID)(),
+                shipmentNumber: "SHIP-2024-002",
+                orderIds: ["06c2947f-a468-4e69-890c-6d022251efff"],
+                carrier: "UPS",
+                trackingNumber: "UPS987654321",
+                status: "delivered",
+                estimatedDelivery: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+                actualDelivery: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            },
+            {
+                id: (0, crypto_1.randomUUID)(),
+                shipmentNumber: "SHIP-2024-003",
+                orderIds: ["06c2947f-a468-4e69-890c-6d022251efff"],
+                carrier: "DHL",
+                trackingNumber: "DHL456789123",
+                status: "pending",
+                estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+                actualDelivery: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            }
+        ];
+        sampleShipments.forEach(shipment => {
+            this.shipments.set(shipment.id, shipment);
+        });
         // Sample Orders
         const productIds = Array.from(this.products.keys());
         const customerNames = sampleCustomers.map(c => c.name);
@@ -400,7 +452,7 @@ class MemStorage {
                 customerName: "Lisa Wang",
                 customerEmail: "lisa.wang@email.com",
                 customerPhone: "+1-555-0127",
-                status: "ready",
+                status: "pending",
                 paymentStatus: "paid",
                 totalAmount: "178.95",
                 items: [
@@ -494,6 +546,7 @@ class MemStorage {
                 paymentMethod: "credit",
                 cashierId: "DEMO_CASHIER",
                 createdAt: new Date(),
+                updatedAt: new Date(),
             },
             {
                 id: (0, crypto_1.randomUUID)(),
@@ -506,6 +559,7 @@ class MemStorage {
                 paymentMethod: "cash",
                 cashierId: "DEMO_CASHIER",
                 createdAt: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+                updatedAt: new Date(Date.now() - 30 * 60 * 1000),
             },
             {
                 id: (0, crypto_1.randomUUID)(),
@@ -518,6 +572,7 @@ class MemStorage {
                 paymentMethod: "debit",
                 cashierId: "DEMO_CASHIER",
                 createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+                updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
             },
             {
                 id: (0, crypto_1.randomUUID)(),
@@ -529,6 +584,7 @@ class MemStorage {
                 paymentMethod: "credit",
                 cashierId: "DEMO_CASHIER",
                 createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
+                updatedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
             },
             {
                 id: (0, crypto_1.randomUUID)(),
@@ -541,6 +597,7 @@ class MemStorage {
                 paymentMethod: "mobile",
                 cashierId: "DEMO_CASHIER",
                 createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
+                updatedAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
             }
         ];
         sampleTransactions.forEach(transaction => {
@@ -655,6 +712,10 @@ class MemStorage {
         const product = {
             ...insertProduct,
             id,
+            description: insertProduct.description || null,
+            stockQuantity: insertProduct.stockQuantity || 0,
+            reorderLevel: insertProduct.reorderLevel || 10,
+            supplier: insertProduct.supplier || null,
             createdAt: new Date(),
             updatedAt: new Date(),
         };
@@ -685,6 +746,10 @@ class MemStorage {
         const order = {
             ...insertOrder,
             id,
+            customerEmail: insertOrder.customerEmail || null,
+            customerPhone: insertOrder.customerPhone || null,
+            paymentStatus: insertOrder.paymentStatus || "pending",
+            shippingAddress: insertOrder.shippingAddress || null,
             createdAt: new Date(),
             updatedAt: new Date(),
         };
@@ -703,6 +768,9 @@ class MemStorage {
         this.orders.set(id, updatedOrder);
         return updatedOrder;
     }
+    async deleteOrder(id) {
+        return this.orders.delete(id);
+    }
     // Delivery methods
     async getDeliveries() {
         return Array.from(this.deliveries.values());
@@ -715,6 +783,12 @@ class MemStorage {
         const delivery = {
             ...insertDelivery,
             id,
+            status: insertDelivery.status || "pending",
+            orderId: insertDelivery.orderId || null,
+            estimatedDelivery: insertDelivery.estimatedDelivery || null,
+            actualDelivery: insertDelivery.actualDelivery || null,
+            location: insertDelivery.location || null,
+            route: insertDelivery.route || null,
             createdAt: new Date(),
             updatedAt: new Date(),
         };
@@ -745,7 +819,9 @@ class MemStorage {
         const transaction = {
             ...insertTransaction,
             id,
+            cashierId: insertTransaction.cashierId || null,
             createdAt: new Date(),
+            updatedAt: new Date(),
         };
         this.posTransactions.set(id, transaction);
         return transaction;
@@ -762,6 +838,12 @@ class MemStorage {
         const customer = {
             ...insertCustomer,
             id,
+            email: insertCustomer.email || null,
+            phone: insertCustomer.phone || null,
+            address: insertCustomer.address || null,
+            totalOrders: insertCustomer.totalOrders || null,
+            totalSpent: insertCustomer.totalSpent || null,
+            lastOrder: insertCustomer.lastOrder || null,
             createdAt: new Date(),
             updatedAt: new Date(),
         };
@@ -780,6 +862,9 @@ class MemStorage {
         this.customers.set(id, updatedCustomer);
         return updatedCustomer;
     }
+    async deleteCustomer(id) {
+        return this.customers.delete(id);
+    }
     // Service methods
     async getServices() {
         return Array.from(this.services.values());
@@ -792,6 +877,8 @@ class MemStorage {
         const service = {
             ...insertService,
             id,
+            description: insertService.description || null,
+            status: insertService.status || "Active",
             createdAt: new Date(),
             updatedAt: new Date(),
         };
@@ -812,6 +899,75 @@ class MemStorage {
     }
     async deleteService(id) {
         return this.services.delete(id);
+    }
+    // Shipment methods
+    async getShipments() {
+        return Array.from(this.shipments.values());
+    }
+    async getShipment(id) {
+        return this.shipments.get(id);
+    }
+    async createShipment(insertShipment) {
+        const id = (0, crypto_1.randomUUID)();
+        const shipment = {
+            ...insertShipment,
+            id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+        this.shipments.set(id, shipment);
+        return shipment;
+    }
+    async updateShipment(id, updates) {
+        const shipment = this.shipments.get(id);
+        if (!shipment)
+            return undefined;
+        const updatedShipment = {
+            ...shipment,
+            ...updates,
+            updatedAt: new Date()
+        };
+        this.shipments.set(id, updatedShipment);
+        return updatedShipment;
+    }
+    // Barcode methods
+    async getBarcodes() {
+        return Array.from(this.barcodes.values());
+    }
+    async getBarcode(id) {
+        return this.barcodes.get(id);
+    }
+    async getBarcodeByCode(code) {
+        return Array.from(this.barcodes.values()).find(barcode => barcode.code === code);
+    }
+    async getBarcodesByEntity(entityType, entityId) {
+        return Array.from(this.barcodes.values()).filter(barcode => barcode.entityType === entityType && barcode.entityId === entityId);
+    }
+    async createBarcode(insertBarcode) {
+        const id = (0, crypto_1.randomUUID)();
+        const barcode = {
+            ...insertBarcode,
+            id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+        this.barcodes.set(id, barcode);
+        return barcode;
+    }
+    async updateBarcode(id, updates) {
+        const barcode = this.barcodes.get(id);
+        if (!barcode)
+            return undefined;
+        const updatedBarcode = {
+            ...barcode,
+            ...updates,
+            updatedAt: new Date()
+        };
+        this.barcodes.set(id, updatedBarcode);
+        return updatedBarcode;
+    }
+    async deleteBarcode(id) {
+        return this.barcodes.delete(id);
     }
     // Analytics methods
     async getDashboardMetrics() {

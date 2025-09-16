@@ -2,7 +2,7 @@ import QRCode from 'qrcode';
 import { randomUUID } from 'crypto';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
-import type { Barcode, InsertBarcode } from '@shared/schema';
+import type { Barcode, InsertBarcode } from '../shared/schema';
 
 export interface BarcodeOptions {
   type: 'qr' | 'barcode' | 'ean13' | 'code128';

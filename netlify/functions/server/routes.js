@@ -3,9 +3,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerRoutes = registerRoutes;
 const http_1 = require("http");
 const storage_1 = require("./storage");
-const schema_1 = require("@shared/schema");
+const schema_1 = require("../shared/schema");
 const zod_1 = require("zod");
 const db_utils_1 = require("./db-utils");
+const barcode_service_1 = require("./barcode-service");
+const websocket_server_1 = require("./websocket-server");
+const pricing_engine_1 = require("./pricing-engine");
+const loyalty_program_1 = require("./loyalty-program");
+const driver_tracking_1 = require("./driver-tracking");
 async function registerRoutes(app) {
     // Dashboard metrics
     app.get("/api/dashboard/metrics", async (req, res) => {
@@ -159,6 +164,10 @@ async function registerRoutes(app) {
         try {
             const validatedData = schema_1.insertOrderSchema.parse(req.body);
             const order = await storage_1.storage.createOrder(validatedData);
+            // Award loyalty points
+            await loyalty_program_1.loyaltyProgram.processOrderRewards(order.customerId, parseFloat(order.totalAmount));
+            // Trigger real-time update
+            await websocket_server_1.realtimeServer.triggerUpdate('order', 'created', order);
             res.status(201).json(order);
         }
         catch (error) {
@@ -175,6 +184,8 @@ async function registerRoutes(app) {
             if (!order) {
                 return res.status(404).json({ message: "Order not found" });
             }
+            // Trigger real-time update
+            await websocket_server_1.realtimeServer.triggerUpdate('order', 'updated', order);
             res.json(order);
         }
         catch (error) {
@@ -182,6 +193,38 @@ async function registerRoutes(app) {
                 return res.status(400).json({ message: "Invalid order data", errors: error.errors });
             }
             res.status(500).json({ message: "Failed to update order" });
+        }
+    });
+    app.delete("/api/orders/:id", async (req, res) => {
+        try {
+            const success = await storage_1.storage.deleteOrder(req.params.id);
+            if (!success) {
+                return res.status(404).json({ message: "Order not found" });
+            }
+            res.json({ message: "Order deleted successfully" });
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to delete order" });
+        }
+    });
+    app.delete("/api/orders", async (req, res) => {
+        try {
+            const { orderIds } = req.body;
+            if (!Array.isArray(orderIds) || orderIds.length === 0) {
+                return res.status(400).json({ message: "orderIds must be a non-empty array" });
+            }
+            const results = await Promise.allSettled(orderIds.map(id => storage_1.storage.deleteOrder(id)));
+            const successful = results.filter(result => result.status === 'fulfilled' && result.value).length;
+            const failed = results.length - successful;
+            res.json({
+                message: `Deleted ${successful} orders successfully${failed > 0 ? `, ${failed} failed` : ''}`,
+                successful,
+                failed,
+                total: orderIds.length
+            });
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to delete orders" });
         }
     });
     // Customers endpoints
@@ -192,7 +235,7 @@ async function registerRoutes(app) {
             const transformedCustomers = customers.map(customer => ({
                 ...customer,
                 joinDate: customer.createdAt, // Map createdAt to joinDate
-                totalSpent: parseFloat(customer.totalSpent) // Convert totalSpent to number
+                totalSpent: parseFloat(customer.totalSpent || "0") // Convert totalSpent to number
             }));
             res.json(transformedCustomers);
         }
@@ -210,7 +253,7 @@ async function registerRoutes(app) {
             const transformedCustomer = {
                 ...customer,
                 joinDate: customer.createdAt, // Map createdAt to joinDate
-                totalSpent: parseFloat(customer.totalSpent) // Convert totalSpent to number
+                totalSpent: parseFloat(customer.totalSpent || "0") // Convert totalSpent to number
             };
             res.json(transformedCustomer);
         }
@@ -222,6 +265,8 @@ async function registerRoutes(app) {
         try {
             const validatedData = schema_1.insertCustomerSchema.parse(req.body);
             const customer = await storage_1.storage.createCustomer(validatedData);
+            // Trigger real-time update
+            await websocket_server_1.realtimeServer.triggerUpdate('customer', 'created', customer);
             res.status(201).json(customer);
         }
         catch (error) {
@@ -229,6 +274,40 @@ async function registerRoutes(app) {
                 return res.status(400).json({ message: "Invalid customer data", errors: error.errors });
             }
             res.status(500).json({ message: "Failed to create customer" });
+        }
+    });
+    app.put("/api/customers/:id", async (req, res) => {
+        try {
+            const validatedData = schema_1.insertCustomerSchema.partial().parse(req.body);
+            const customer = await storage_1.storage.updateCustomer(req.params.id, validatedData);
+            if (!customer) {
+                return res.status(404).json({ message: "Customer not found" });
+            }
+            // Transform customer to match frontend expectations
+            const transformedCustomer = {
+                ...customer,
+                joinDate: customer.createdAt, // Map createdAt to joinDate
+                totalSpent: parseFloat(customer.totalSpent || "0") // Convert totalSpent to number
+            };
+            res.json(transformedCustomer);
+        }
+        catch (error) {
+            if (error instanceof zod_1.z.ZodError) {
+                return res.status(400).json({ message: "Invalid customer data", errors: error.errors });
+            }
+            res.status(500).json({ message: "Failed to update customer" });
+        }
+    });
+    app.delete("/api/customers/:id", async (req, res) => {
+        try {
+            const success = await storage_1.storage.deleteCustomer(req.params.id);
+            if (!success) {
+                return res.status(404).json({ message: "Customer not found" });
+            }
+            res.json({ message: "Customer deleted successfully" });
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to delete customer" });
         }
     });
     // POS Transactions endpoints
@@ -317,6 +396,206 @@ async function registerRoutes(app) {
             res.status(500).json({ message: "Failed to delete service" });
         }
     });
+    // Shipments endpoints
+    app.get("/api/shipments", async (req, res) => {
+        try {
+            const shipments = await storage_1.storage.getShipments();
+            res.json(shipments);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch shipments" });
+        }
+    });
+    app.get("/api/shipments/:id", async (req, res) => {
+        try {
+            const shipment = await storage_1.storage.getShipment(req.params.id);
+            if (!shipment) {
+                return res.status(404).json({ message: "Shipment not found" });
+            }
+            res.json(shipment);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch shipment" });
+        }
+    });
+    app.post("/api/shipments", async (req, res) => {
+        try {
+            const validatedData = schema_1.insertShipmentSchema.parse(req.body);
+            const shipment = await storage_1.storage.createShipment(validatedData);
+            res.status(201).json(shipment);
+        }
+        catch (error) {
+            if (error instanceof zod_1.z.ZodError) {
+                return res.status(400).json({ message: "Invalid shipment data", errors: error.errors });
+            }
+            res.status(500).json({ message: "Failed to create shipment" });
+        }
+    });
+    app.put("/api/shipments/:id", async (req, res) => {
+        try {
+            const validatedData = schema_1.insertShipmentSchema.partial().parse(req.body);
+            const shipment = await storage_1.storage.updateShipment(req.params.id, validatedData);
+            if (!shipment) {
+                return res.status(404).json({ message: "Shipment not found" });
+            }
+            res.json(shipment);
+        }
+        catch (error) {
+            if (error instanceof zod_1.z.ZodError) {
+                return res.status(400).json({ message: "Invalid shipment data", errors: error.errors });
+            }
+            res.status(500).json({ message: "Failed to update shipment" });
+        }
+    });
+    // Barcode endpoints
+    app.get("/api/barcodes", async (req, res) => {
+        try {
+            const barcodes = await storage_1.storage.getBarcodes();
+            res.json(barcodes);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch barcodes" });
+        }
+    });
+    app.get("/api/barcodes/:id", async (req, res) => {
+        try {
+            const barcode = await storage_1.storage.getBarcode(req.params.id);
+            if (!barcode) {
+                return res.status(404).json({ message: "Barcode not found" });
+            }
+            res.json(barcode);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch barcode" });
+        }
+    });
+    app.get("/api/barcodes/code/:code", async (req, res) => {
+        try {
+            const barcode = await storage_1.storage.getBarcodeByCode(req.params.code);
+            if (!barcode) {
+                return res.status(404).json({ message: "Barcode not found" });
+            }
+            res.json(barcode);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch barcode by code" });
+        }
+    });
+    app.get("/api/barcodes/entity/:entityType/:entityId", async (req, res) => {
+        try {
+            const barcodes = await storage_1.storage.getBarcodesByEntity(req.params.entityType, req.params.entityId);
+            res.json(barcodes);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch barcodes by entity" });
+        }
+    });
+    app.post("/api/barcodes/generate", async (req, res) => {
+        try {
+            const { type, entityType, entityId, data, size, margin } = req.body;
+            // Generate barcode using the service
+            const generatedBarcode = await barcode_service_1.barcodeService.generateBarcode({
+                type,
+                entityType,
+                entityId,
+                data,
+                size,
+                margin
+            });
+            // Save to storage
+            const barcode = await storage_1.storage.createBarcode({
+                code: generatedBarcode.code,
+                type: generatedBarcode.type,
+                entityType: generatedBarcode.entityType,
+                entityId: generatedBarcode.entityId,
+                data: generatedBarcode.data,
+                imagePath: generatedBarcode.imagePath,
+                isActive: true
+            });
+            res.status(201).json({
+                ...barcode,
+                imageData: generatedBarcode.imageData
+            });
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to generate barcode", error: error.message });
+        }
+    });
+    app.post("/api/barcodes/generate/order/:orderId", async (req, res) => {
+        try {
+            const { orderId } = req.params;
+            const { data } = req.body;
+            // Generate order barcode
+            const generatedBarcode = await barcode_service_1.barcodeService.generateOrderBarcode(orderId, data);
+            // Save to storage
+            const barcode = await storage_1.storage.createBarcode({
+                code: generatedBarcode.code,
+                type: generatedBarcode.type,
+                entityType: generatedBarcode.entityType,
+                entityId: generatedBarcode.entityId,
+                data: generatedBarcode.data,
+                imagePath: generatedBarcode.imagePath,
+                isActive: true
+            });
+            res.status(201).json({
+                ...barcode,
+                imageData: generatedBarcode.imageData
+            });
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to generate order barcode", error: error.message });
+        }
+    });
+    app.post("/api/barcodes/generate/shipment/:shipmentId", async (req, res) => {
+        try {
+            const { shipmentId } = req.params;
+            const { data } = req.body;
+            // Generate shipment barcode
+            const generatedBarcode = await barcode_service_1.barcodeService.generateShipmentBarcode(shipmentId, data);
+            // Save to storage
+            const barcode = await storage_1.storage.createBarcode({
+                code: generatedBarcode.code,
+                type: generatedBarcode.type,
+                entityType: generatedBarcode.entityType,
+                entityId: generatedBarcode.entityId,
+                data: generatedBarcode.data,
+                imagePath: generatedBarcode.imagePath,
+                isActive: true
+            });
+            res.status(201).json({
+                ...barcode,
+                imageData: generatedBarcode.imageData
+            });
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to generate shipment barcode", error: error.message });
+        }
+    });
+    app.post("/api/barcodes/decode", async (req, res) => {
+        try {
+            const { encodedData } = req.body;
+            if (!encodedData) {
+                return res.status(400).json({ message: "Encoded data is required" });
+            }
+            const decodedData = barcode_service_1.barcodeService.decodeBarcodeData(encodedData);
+            res.json({ decodedData });
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to decode barcode data", error: error.message });
+        }
+    });
+    app.delete("/api/barcodes/:id", async (req, res) => {
+        try {
+            const success = await storage_1.storage.deleteBarcode(req.params.id);
+            if (!success) {
+                return res.status(404).json({ message: "Barcode not found" });
+            }
+            res.status(204).send();
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to delete barcode" });
+        }
+    });
     // Deliveries endpoints
     app.get("/api/deliveries", async (req, res) => {
         try {
@@ -337,6 +616,287 @@ async function registerRoutes(app) {
         }
         catch (error) {
             res.status(500).json({ message: "Failed to fetch delivery" });
+        }
+    });
+    // Dynamic Pricing endpoints
+    app.get("/api/pricing/services", async (req, res) => {
+        try {
+            const allPricing = pricing_engine_1.pricingEngine.getAllPricing();
+            res.json(allPricing);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch pricing data" });
+        }
+    });
+    app.get("/api/pricing/services/:serviceId", async (req, res) => {
+        try {
+            const pricing = pricing_engine_1.pricingEngine.getServicePricing(req.params.serviceId);
+            if (!pricing) {
+                return res.status(404).json({ message: "Service pricing not found" });
+            }
+            res.json(pricing);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch service pricing" });
+        }
+    });
+    app.get("/api/pricing/services/:serviceId/recommended", async (req, res) => {
+        try {
+            const recommendedPrice = await pricing_engine_1.pricingEngine.getRecommendedPrice(req.params.serviceId);
+            res.json({
+                serviceId: req.params.serviceId,
+                recommendedPrice,
+                timestamp: new Date().toISOString()
+            });
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to get recommended price" });
+        }
+    });
+    app.get("/api/pricing/services/:serviceId/factors", async (req, res) => {
+        try {
+            const factors = pricing_engine_1.pricingEngine.getPricingFactors(req.params.serviceId);
+            if (!factors) {
+                return res.status(404).json({ message: "Service pricing factors not found" });
+            }
+            res.json(factors);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch pricing factors" });
+        }
+    });
+    app.post("/api/pricing/services/:serviceId/update", async (req, res) => {
+        try {
+            await pricing_engine_1.pricingEngine.updateServicePricing(req.params.serviceId);
+            const pricing = pricing_engine_1.pricingEngine.getServicePricing(req.params.serviceId);
+            res.json({
+                message: "Pricing updated successfully",
+                pricing
+            });
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to update service pricing" });
+        }
+    });
+    // Loyalty Program endpoints
+    app.get("/api/loyalty/customers/:customerId", async (req, res) => {
+        try {
+            const customerPoints = loyalty_program_1.loyaltyProgram.getCustomerPoints(req.params.customerId);
+            if (!customerPoints) {
+                return res.status(404).json({ message: "Customer loyalty data not found" });
+            }
+            res.json(customerPoints);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch customer loyalty data" });
+        }
+    });
+    app.get("/api/loyalty/customers/:customerId/transactions", async (req, res) => {
+        try {
+            const transactions = loyalty_program_1.loyaltyProgram.getCustomerTransactions(req.params.customerId);
+            res.json(transactions);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch customer transactions" });
+        }
+    });
+    app.get("/api/loyalty/customers/:customerId/rewards", async (req, res) => {
+        try {
+            const rewards = loyalty_program_1.loyaltyProgram.getAvailableRewards(req.params.customerId);
+            res.json(rewards);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch available rewards" });
+        }
+    });
+    app.post("/api/loyalty/customers/:customerId/redeem", async (req, res) => {
+        try {
+            const { points, rewardId } = req.body;
+            const success = await loyalty_program_1.loyaltyProgram.redeemPoints(req.params.customerId, points, rewardId);
+            if (success) {
+                res.json({ message: "Points redeemed successfully" });
+            }
+            else {
+                res.status(400).json({ message: "Insufficient points or invalid reward" });
+            }
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to redeem points" });
+        }
+    });
+    app.get("/api/loyalty/leaderboard", async (req, res) => {
+        try {
+            const limit = parseInt(req.query.limit) || 10;
+            const leaderboard = loyalty_program_1.loyaltyProgram.getLeaderboard(limit);
+            res.json(leaderboard);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch leaderboard" });
+        }
+    });
+    app.get("/api/loyalty/badges", async (req, res) => {
+        try {
+            const badges = loyalty_program_1.loyaltyProgram.getAllBadges();
+            res.json(badges);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch badges" });
+        }
+    });
+    app.get("/api/loyalty/rewards", async (req, res) => {
+        try {
+            const rewards = loyalty_program_1.loyaltyProgram.getRewards();
+            res.json(rewards);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch rewards" });
+        }
+    });
+    // Global Search endpoint
+    app.get("/api/search", async (req, res) => {
+        try {
+            const query = req.query.q;
+            const limit = parseInt(req.query.limit) || 10;
+            if (!query || query.trim().length < 2) {
+                return res.json({
+                    orders: [],
+                    customers: [],
+                    products: [],
+                    services: [],
+                    totalResults: 0
+                });
+            }
+            const searchTerm = query.toLowerCase().trim();
+            // Search orders
+            const orders = await storage_1.storage.getOrders();
+            const matchingOrders = orders.filter(order => order.customerName?.toLowerCase().includes(searchTerm) ||
+                order.orderNumber?.toLowerCase().includes(searchTerm) ||
+                order.status?.toLowerCase().includes(searchTerm) ||
+                order.service?.toLowerCase().includes(searchTerm)).slice(0, limit);
+            // Search customers
+            const customers = await storage_1.storage.getCustomers();
+            const matchingCustomers = customers.filter(customer => customer.name?.toLowerCase().includes(searchTerm) ||
+                customer.email?.toLowerCase().includes(searchTerm) ||
+                customer.phone?.toLowerCase().includes(searchTerm)).slice(0, limit);
+            // Search products
+            const products = await storage_1.storage.getProducts();
+            const matchingProducts = products.filter(product => product.name?.toLowerCase().includes(searchTerm) ||
+                product.category?.toLowerCase().includes(searchTerm) ||
+                product.description?.toLowerCase().includes(searchTerm)).slice(0, limit);
+            // Search services
+            const services = await storage_1.storage.getServices();
+            const matchingServices = services.filter(service => service.name?.toLowerCase().includes(searchTerm) ||
+                service.description?.toLowerCase().includes(searchTerm) ||
+                service.category?.toLowerCase().includes(searchTerm)).slice(0, limit);
+            const totalResults = matchingOrders.length + matchingCustomers.length +
+                matchingProducts.length + matchingServices.length;
+            res.json({
+                orders: matchingOrders.map(order => ({
+                    id: order.id,
+                    type: 'order',
+                    title: `Order #${order.orderNumber}`,
+                    subtitle: order.customerName,
+                    description: `${order.status} - ₹${order.totalAmount}`,
+                    url: `/orders/${order.id}`,
+                    createdAt: order.createdAt
+                })),
+                customers: matchingCustomers.map(customer => ({
+                    id: customer.id,
+                    type: 'customer',
+                    title: customer.name,
+                    subtitle: customer.email,
+                    description: `₹${customer.totalSpent} total spent`,
+                    url: `/customers/${customer.id}`,
+                    createdAt: customer.createdAt
+                })),
+                products: matchingProducts.map(product => ({
+                    id: product.id,
+                    type: 'product',
+                    title: product.name,
+                    subtitle: product.category,
+                    description: `${product.stockQuantity} in stock`,
+                    url: `/inventory/${product.id}`,
+                    createdAt: product.createdAt
+                })),
+                services: matchingServices.map(service => ({
+                    id: service.id,
+                    type: 'service',
+                    title: service.name,
+                    subtitle: service.category,
+                    description: `₹${service.price}`,
+                    url: `/services/${service.id}`,
+                    createdAt: service.createdAt
+                })),
+                totalResults,
+                query: searchTerm
+            });
+        }
+        catch (error) {
+            res.status(500).json({ message: "Search failed" });
+        }
+    });
+    // Driver Tracking endpoints
+    app.get("/api/tracking/drivers", async (req, res) => {
+        try {
+            const activeDrivers = driver_tracking_1.driverTrackingService.getAllActiveDrivers();
+            res.json(activeDrivers);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch active drivers" });
+        }
+    });
+    app.get("/api/tracking/drivers/:driverId", async (req, res) => {
+        try {
+            const driver = driver_tracking_1.driverTrackingService.getDriverLocation(req.params.driverId);
+            if (!driver) {
+                return res.status(404).json({ message: "Driver not found" });
+            }
+            res.json(driver);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch driver location" });
+        }
+    });
+    app.get("/api/tracking/drivers/:driverId/route", async (req, res) => {
+        try {
+            const route = driver_tracking_1.driverTrackingService.getDriverRoute(req.params.driverId);
+            res.json(route);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch driver route" });
+        }
+    });
+    app.get("/api/tracking/orders/:orderId", async (req, res) => {
+        try {
+            const driver = driver_tracking_1.driverTrackingService.getDriverForOrder(req.params.orderId);
+            if (!driver) {
+                return res.status(404).json({ message: "No driver found for this order" });
+            }
+            res.json(driver);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch order tracking" });
+        }
+    });
+    app.post("/api/tracking/orders/:orderId/start", async (req, res) => {
+        try {
+            const driver = await driver_tracking_1.driverTrackingService.startTrackingForOrder(req.params.orderId);
+            if (!driver) {
+                return res.status(404).json({ message: "Order not found or tracking failed" });
+            }
+            res.json(driver);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to start order tracking" });
+        }
+    });
+    app.delete("/api/tracking/orders/:orderId", async (req, res) => {
+        try {
+            driver_tracking_1.driverTrackingService.stopTrackingForOrder(req.params.orderId);
+            res.json({ message: "Tracking stopped successfully" });
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to stop order tracking" });
         }
     });
     const httpServer = (0, http_1.createServer)(app);

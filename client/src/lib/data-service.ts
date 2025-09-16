@@ -2,7 +2,7 @@
 // This replaces all dummy data with real database queries
 
 // Import types from shared schema instead of defining them here
-import type { Order, Customer } from "@shared/schema";
+import type { Order, Customer } from "../../../shared/schema";
 
 export type InventoryItem = {
   id: string;

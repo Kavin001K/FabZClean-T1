@@ -115,57 +115,23 @@ export const barcodes = pgTable("barcodes", {
 });
 
 // Insert schemas
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-});
+export const insertUserSchema = createInsertSchema(users);
 
-export const insertProductSchema = createInsertSchema(products).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertProductSchema = createInsertSchema(products);
 
-export const insertOrderSchema = createInsertSchema(orders).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertOrderSchema = createInsertSchema(orders);
 
-export const insertDeliverySchema = createInsertSchema(deliveries).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertDeliverySchema = createInsertSchema(deliveries);
 
-export const insertOrderTransactionSchema = createInsertSchema(orderTransactions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertOrderTransactionSchema = createInsertSchema(orderTransactions);
 
-export const insertCustomerSchema = createInsertSchema(customers).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertCustomerSchema = createInsertSchema(customers);
 
-export const insertServiceSchema = createInsertSchema(services).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertServiceSchema = createInsertSchema(services);
 
-export const insertShipmentSchema = createInsertSchema(shipments).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertShipmentSchema = createInsertSchema(shipments);
 
-export const insertBarcodeSchema = createInsertSchema(barcodes).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertBarcodeSchema = createInsertSchema(barcodes);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;

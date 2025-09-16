@@ -42,7 +42,7 @@ import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 // Import Customer type from shared schema
-import type { Customer } from "@shared/schema";
+import type { Customer } from "../../shared/schema";
 // Import data service
 import { customersApi, formatDate } from '@/lib/data-service'
 import { exportCustomersToCSV, exportCustomersToPDF } from '@/lib/export-utils'

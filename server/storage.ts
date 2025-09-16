@@ -17,7 +17,7 @@ import {
   type InsertShipment,
   type Barcode,
   type InsertBarcode
-} from "@shared/schema";
+} from "../shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {

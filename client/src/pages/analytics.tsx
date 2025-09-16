@@ -51,7 +51,7 @@ import {
 import { formatCurrency, formatNumber, formatPercentage } from "@/lib/data-service";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/use-websocket";
-import type { Service, Order, Customer } from "@shared/schema";
+import type { Service, Order, Customer } from "../../shared/schema";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 // Import the data service

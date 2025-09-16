@@ -65,7 +65,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useNotifications } from "@/hooks/use-notifications"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 // Import Order type from shared schema
-import type { Order } from "@shared/schema";
+import type { Order } from "../../shared/schema";
 // Import data service
 import { 
   ordersApi,

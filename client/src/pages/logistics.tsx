@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { getStatusColor, formatCurrency } from "@/lib/data";
 import { format, formatDistanceToNow } from "date-fns";
-import type { Delivery, Order } from "@shared/schema";
+import type { Delivery, Order } from "../../shared/schema";
 
 export default function Logistics() {
   const { data: deliveries, isLoading: deliveriesLoading } = useQuery<Delivery[]>({
