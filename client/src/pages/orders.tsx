@@ -64,6 +64,7 @@ import { Link } from "wouter"
 import { useToast } from "@/hooks/use-toast"
 import { useNotifications } from "@/hooks/use-notifications"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import ErrorBoundary from "@/components/ui/error-boundary"
 // Import Order type from shared schema
 import type { Order } from "../../shared/schema";
 // Import data service
@@ -77,7 +78,7 @@ import {
 } from '@/lib/data-service'
 import { exportOrdersToCSV, exportOrdersToPDF } from '@/lib/export-utils'
 
-export default function Orders() {
+function OrdersComponent() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -1370,4 +1371,12 @@ export default function Orders() {
       </Dialog>
     </div>
   )
+}
+
+export default function Orders() {
+  return (
+    <ErrorBoundary>
+      <OrdersComponent />
+    </ErrorBoundary>
+  );
 }

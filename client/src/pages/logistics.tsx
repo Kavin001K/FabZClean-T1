@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,16 +16,64 @@ import {
 } from "lucide-react";
 import { getStatusColor, formatCurrency } from "@/lib/data";
 import { format, formatDistanceToNow } from "date-fns";
+import { useSafeQuery } from "@/hooks/use-safe-query";
 import type { Delivery, Order } from "../../shared/schema";
 
-export default function Logistics() {
-  const { data: deliveries, isLoading: deliveriesLoading } = useQuery<Delivery[]>({
-    queryKey: ["deliveries"],
-  });
+// Fallback data for when API fails
+const FALLBACK_DELIVERIES: Delivery[] = [
+  {
+    id: "1",
+    orderId: "ORD-001",
+    driverName: "John Doe",
+    vehicleId: "VH-001",
+    status: "in_transit",
+    estimatedDelivery: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours from now
+    actualDelivery: null,
+    location: { lat: 12.9716, lng: 77.5946 },
+    route: [],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: "2",
+    orderId: "ORD-002",
+    driverName: "Jane Smith",
+    vehicleId: "VH-002",
+    status: "delivered",
+    estimatedDelivery: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
+    actualDelivery: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+    location: { lat: 12.9716, lng: 77.5946 },
+    route: [],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+];
 
-  const { data: orders, isLoading: ordersLoading } = useQuery<Order[]>({
+const FALLBACK_ORDERS: Order[] = [
+  {
+    id: "1",
+    orderNumber: "ORD-001",
+    customerName: "Alice Johnson",
+    customerEmail: "alice@example.com",
+    customerPhone: "+1234567890",
+    status: "processing",
+    paymentStatus: "paid",
+    totalAmount: "25.00",
+    items: [{ productId: "1", productName: "Dry Cleaning", quantity: 1, price: "25.00" }],
+    shippingAddress: { instructions: "Leave at door" },
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+];
+
+export default function Logistics() {
+  const { data: deliveries, isLoading: deliveriesLoading, isError: deliveriesError } = useSafeQuery<Delivery[]>({
+    queryKey: ["deliveries"],
+  }, FALLBACK_DELIVERIES);
+
+  const { data: orders, isLoading: ordersLoading, isError: ordersError } = useSafeQuery<Order[]>({
     queryKey: ["orders"],
-  });
+  }, FALLBACK_ORDERS);
 
   const getProgressPercentage = (status: string) => {
     switch (status) {
@@ -64,6 +111,35 @@ export default function Logistics() {
   const vehicles = Array.from(new Set(deliveries?.map(d => d.vehicleId) || []));
 
   const isLoading = deliveriesLoading || ordersLoading;
+  const hasError = deliveriesError || ordersError;
+
+  // Show error state if both queries fail
+  if (hasError && !deliveries && !orders) {
+    return (
+      <div className="p-8" data-testid="logistics-page">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Logistics</h1>
+            <p className="text-gray-600 mt-2">Manage deliveries and track shipments</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <Card className="w-96">
+            <CardContent className="p-6 text-center">
+              <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Data</h3>
+              <p className="text-gray-600 mb-4">
+                There was an issue loading the logistics data. Using fallback data for demonstration.
+              </p>
+              <Button onClick={() => window.location.reload()}>
+                Try Again
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
