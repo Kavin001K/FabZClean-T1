@@ -33,13 +33,34 @@ const API_BASE = '/api';
 // Generic fetch function with error handling
 async function fetchData<T>(endpoint: string): Promise<T> {
   try {
-    const response = await fetch(`${API_BASE}${endpoint}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    clearTimeout(timeoutId);
+    
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
+    
     return await response.json();
   } catch (error) {
-    console.error(`Error fetching ${endpoint}:`, error);
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        console.error(`Request timeout for ${endpoint}`);
+        throw new Error(`Request timeout for ${endpoint}`);
+      }
+      console.error(`Error fetching ${endpoint}:`, error.message);
+    } else {
+      console.error(`Unknown error fetching ${endpoint}:`, error);
+    }
     throw error;
   }
 }

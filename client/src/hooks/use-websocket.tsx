@@ -151,6 +151,18 @@ export function useWebSocket({
     };
   }, [connect, disconnect]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
+
   return {
     isConnected,
     connectionStatus,

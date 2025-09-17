@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { NotificationProvider } from "@/hooks/use-notifications";
+import ErrorBoundary from "@/components/ui/error-boundary";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Orders from "@/pages/orders";
@@ -49,17 +50,19 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light" storageKey="fab-z-ui-theme">
-        <TooltipProvider>
-          <NotificationProvider>
-            <Toaster />
-            <Router />
-            <SpeedInsights />
-          </NotificationProvider>
-        </TooltipProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider defaultTheme="light" storageKey="fab-z-ui-theme">
+          <TooltipProvider>
+            <NotificationProvider>
+              <Toaster />
+              <Router />
+              <SpeedInsights />
+            </NotificationProvider>
+          </TooltipProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
