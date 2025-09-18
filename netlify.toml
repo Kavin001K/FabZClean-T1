@@ -13,7 +13,7 @@
   NEON_REST_API_URL = "https://ep-frosty-sun-a1pdxel5.apirest.ap-southeast-1.aws.neon.tech/neondb/rest/v1"
   JWKS_URL = "https://api.stack-auth.com/api/v1/projects/4ed40039-6db7-498b-a4ff-844327ee0229/.well-known/jwks.json"
 
-# API redirects to serverless functions
+# API redirects to serverless functions (must come before SPA fallback)
 [[redirects]]
   from = "/api/orders"
   to = "/.netlify/functions/orders-simple"
@@ -29,7 +29,6 @@
   to = "/.netlify/functions/dashboard-metrics-simple"
   status = 200
 
-# Additional API endpoints (using sample data)
 [[redirects]]
   from = "/api/products"
   to = "/.netlify/functions/orders-simple"
@@ -55,7 +54,9 @@
   to = "/.netlify/functions/dashboard-metrics-simple"
   status = 200
 
-# SPA fallback for client-side routing
+# SPA fallback for client-side routing - MUST be last
+# This rule catches all unmatched routes and serves index.html
+# allowing React Router to handle client-side routing
 [[redirects]]
   from = "/*"
   to = "/index.html"
