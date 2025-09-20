@@ -29,8 +29,15 @@ export default function CreateOrder() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
-  const { data: services, isLoading: servicesLoading } = useQuery<Service[]>({
+  const { data: services, isLoading: servicesLoading, isError: servicesError } = useQuery<Service[]>({
     queryKey: ["services"],
+    queryFn: async () => {
+      const response = await fetch("/api/services");
+      if (!response.ok) {
+        throw new Error("Failed to fetch services");
+      }
+      return response.json();
+    },
   });
 
   const createOrderMutation = useMutation({
@@ -114,6 +121,40 @@ export default function CreateOrder() {
 
   const selectedServiceDetails = services?.find(s => s.id === selectedService);
 
+  // Handle loading state
+  if (servicesLoading) {
+    return (
+      <div className="p-4 md:p-6 lg:p-8 animate-fade-in">
+        <header className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold tracking-tight">Create New Order</h1>
+        </header>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading services...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle error state
+  if (servicesError) {
+    return (
+      <div className="p-4 md:p-6 lg:p-8 animate-fade-in">
+        <header className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold tracking-tight">Create New Order</h1>
+        </header>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-destructive mb-4">Failed to load services. Please try again.</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-6 lg:p-8 animate-fade-in">
       <header className="flex items-center justify-between mb-6">
@@ -188,12 +229,14 @@ export default function CreateOrder() {
                     <SelectContent>
                     {servicesLoading ? (
                         <SelectItem value="loading" disabled>Loading services...</SelectItem>
-                    ) : (
-                        services?.map((service) => (
+                    ) : services && services.length > 0 ? (
+                        services.map((service) => (
                         <SelectItem key={service.id} value={service.id}>
                             {service.name} - ₹{parseFloat(service.price).toFixed(2)}
                         </SelectItem>
                         ))
+                    ) : (
+                        <SelectItem value="no-services" disabled>No services available</SelectItem>
                     )}
                     </SelectContent>
                 </Select>

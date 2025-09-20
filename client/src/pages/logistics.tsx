@@ -69,10 +69,24 @@ const FALLBACK_ORDERS: Order[] = [
 export default function Logistics() {
   const { data: deliveries, isLoading: deliveriesLoading, isError: deliveriesError } = useSafeQuery<Delivery[]>({
     queryKey: ["deliveries"],
+    queryFn: async () => {
+      const response = await fetch("/api/deliveries");
+      if (!response.ok) {
+        throw new Error("Failed to fetch deliveries");
+      }
+      return response.json();
+    },
   }, FALLBACK_DELIVERIES);
 
   const { data: orders, isLoading: ordersLoading, isError: ordersError } = useSafeQuery<Order[]>({
     queryKey: ["orders"],
+    queryFn: async () => {
+      const response = await fetch("/api/orders");
+      if (!response.ok) {
+        throw new Error("Failed to fetch orders");
+      }
+      return response.json();
+    },
   }, FALLBACK_ORDERS);
 
   const getProgressPercentage = (status: string) => {
