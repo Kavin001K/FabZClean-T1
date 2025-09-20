@@ -47,7 +47,6 @@
     "@radix-ui/react-tooltip": "^1.2.0",
     "@tanstack/react-query": "^5.60.5",
     "@types/leaflet": "^1.9.20",
-    "@vercel/speed-insights": "^1.2.0",
     "bwip-js": "^4.7.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

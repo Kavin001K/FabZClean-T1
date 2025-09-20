@@ -22,7 +22,7 @@ import Logistics from "@/pages/logistics";
 import DebugPage from "@/pages/debug";
 import EmployeeDashboardPage from "@/pages/employee-dashboard";
 import DatabaseStatus from "@/pages/database-status";
-import SpeedInsights from "@/components/speed-insights";
+import PerformanceAnalytics from "@/components/analytics";
 
 function Router() {
   return (
@@ -57,7 +57,7 @@ function App() {
             <NotificationProvider>
               <Toaster />
               <Router />
-              <SpeedInsights />
+              <PerformanceAnalytics />
             </NotificationProvider>
           </TooltipProvider>
         </ThemeProvider>

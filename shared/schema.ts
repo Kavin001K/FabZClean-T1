@@ -114,6 +114,73 @@ export const barcodes = pgTable("barcodes", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const employees = pgTable("employees", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: text("employee_id").notNull().unique(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").unique(),
+  phone: text("phone"),
+  position: text("position").notNull(),
+  department: text("department").notNull(),
+  hireDate: timestamp("hire_date").notNull(),
+  salary: decimal("salary", { precision: 10, scale: 2 }).notNull(),
+  hourlyRate: decimal("hourly_rate", { precision: 8, scale: 2 }),
+  status: text("status", { enum: ["active", "inactive", "terminated"] }).notNull().default("active"),
+  managerId: varchar("manager_id").references(() => employees.id),
+  address: jsonb("address"),
+  emergencyContact: jsonb("emergency_contact"),
+  skills: jsonb("skills"), // Array of skills
+  performanceRating: decimal("performance_rating", { precision: 3, scale: 2 }).default("0.00"),
+  lastReviewDate: timestamp("last_review_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const employeeAttendance = pgTable("employee_attendance", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").references(() => employees.id).notNull(),
+  date: timestamp("date").notNull(),
+  clockIn: timestamp("clock_in"),
+  clockOut: timestamp("clock_out"),
+  breakStart: timestamp("break_start"),
+  breakEnd: timestamp("break_end"),
+  totalHours: decimal("total_hours", { precision: 4, scale: 2 }),
+  status: text("status", { enum: ["present", "absent", "late", "half_day"] }).notNull().default("present"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const employeeTasks = pgTable("employee_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").references(() => employees.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  priority: text("priority", { enum: ["low", "medium", "high", "urgent"] }).notNull().default("medium"),
+  status: text("status", { enum: ["pending", "in_progress", "completed", "cancelled"] }).notNull().default("pending"),
+  estimatedHours: decimal("estimated_hours", { precision: 4, scale: 2 }),
+  actualHours: decimal("actual_hours", { precision: 4, scale: 2 }),
+  dueDate: timestamp("due_date"),
+  completedDate: timestamp("completed_date"),
+  assignedBy: varchar("assigned_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const employeePerformance = pgTable("employee_performance", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").references(() => employees.id).notNull(),
+  reviewPeriod: text("review_period").notNull(), // e.g., "2024-Q1"
+  rating: decimal("rating", { precision: 3, scale: 2 }).notNull(), // 1.00 to 5.00
+  goals: jsonb("goals"), // Array of goals and achievements
+  feedback: text("feedback"),
+  reviewedBy: varchar("reviewed_by").references(() => employees.id),
+  reviewDate: timestamp("review_date").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users);
 
@@ -132,6 +199,14 @@ export const insertServiceSchema = createInsertSchema(services);
 export const insertShipmentSchema = createInsertSchema(shipments);
 
 export const insertBarcodeSchema = createInsertSchema(barcodes);
+
+export const insertEmployeeSchema = createInsertSchema(employees);
+
+export const insertEmployeeAttendanceSchema = createInsertSchema(employeeAttendance);
+
+export const insertEmployeeTaskSchema = createInsertSchema(employeeTasks);
+
+export const insertEmployeePerformanceSchema = createInsertSchema(employeePerformance);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -160,3 +235,15 @@ export type Shipment = typeof shipments.$inferSelect;
 
 export type InsertBarcode = z.infer<typeof insertBarcodeSchema>;
 export type Barcode = typeof barcodes.$inferSelect;
+
+export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
+export type Employee = typeof employees.$inferSelect;
+
+export type InsertEmployeeAttendance = z.infer<typeof insertEmployeeAttendanceSchema>;
+export type EmployeeAttendance = typeof employeeAttendance.$inferSelect;
+
+export type InsertEmployeeTask = z.infer<typeof insertEmployeeTaskSchema>;
+export type EmployeeTask = typeof employeeTasks.$inferSelect;
+
+export type InsertEmployeePerformance = z.infer<typeof insertEmployeePerformanceSchema>;
+export type EmployeePerformance = typeof employeePerformance.$inferSelect;
