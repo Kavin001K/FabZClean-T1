@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
   MapPin, 
   Search, 
@@ -14,10 +15,16 @@ import {
   MessageSquare,
   RefreshCw,
   Eye,
-  EyeOff
+  EyeOff,
+  Plus,
+  Users
 } from 'lucide-react';
 import { LiveTrackingMap } from '@/components/live-tracking-map';
+import { DriverManagement } from '@/components/driver-management';
+import { DriverProfile } from '@/components/driver-profile';
 import { useToast } from '@/hooks/use-toast';
+import { useWebSocket } from '@/hooks/use-websocket';
+import { useNotifications } from '@/hooks/use-notifications';
 
 interface DriverLocation {
   driverId: string;
@@ -49,7 +56,56 @@ export default function LiveTrackingPage() {
   const [drivers, setDrivers] = useState<DriverLocation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAllDrivers, setShowAllDrivers] = useState(false);
+  const [selectedDriverProfile, setSelectedDriverProfile] = useState<any>(null);
+  const [isDriverManagementOpen, setIsDriverManagementOpen] = useState(false);
   const { toast } = useToast();
+  const { addNotification } = useNotifications();
+
+  // WebSocket connection for real-time updates
+  const { isConnected, subscribe } = useWebSocket({
+    url: 'ws://localhost:3003',
+    onMessage: (message) => {
+      if (message.type === 'driver_locations') {
+        const updatedDrivers = message.data.drivers as DriverLocation[];
+        
+        // Check for status changes and send notifications
+        updatedDrivers.forEach(updatedDriver => {
+          const existingDriver = drivers.find(d => d.driverId === updatedDriver.driverId);
+          if (existingDriver && existingDriver.status !== updatedDriver.status) {
+            addNotification({
+              type: 'info',
+              title: 'Driver Status Update',
+              message: `${updatedDriver.driverName} status changed to ${getStatusText(updatedDriver.status)}`,
+              actionUrl: '/live-tracking',
+              actionText: 'View Details'
+            });
+          }
+        });
+        
+        setDrivers(updatedDrivers);
+      } else if (message.type === 'driver_assigned') {
+        const { driverId, orderId, driverName } = message.data;
+        addNotification({
+          type: 'success',
+          title: 'Driver Assigned',
+          message: `${driverName} has been assigned to order #${orderId.slice(-8)}`,
+          actionUrl: '/live-tracking',
+          actionText: 'Track Order'
+        });
+        refreshData();
+      }
+    },
+    onOpen: () => {
+      console.log('Connected to live tracking WebSocket');
+      subscribe(['driver_locations', 'driver_assigned', 'driver_status_update']);
+    },
+    onClose: () => {
+      console.log('Disconnected from live tracking WebSocket');
+    },
+    onError: (error) => {
+      console.error('Live tracking WebSocket error:', error);
+    }
+  });
 
   // Fetch orders and drivers
   useEffect(() => {
@@ -124,6 +180,66 @@ export default function LiveTrackingPage() {
     }
   };
 
+  const handleDriverAssign = async (driverId: string, orderId: string) => {
+    try {
+      const response = await fetch(`/api/orders/${orderId}/assign-driver`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ driverId }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Driver Assigned",
+          description: "Driver has been successfully assigned to the order.",
+        });
+        refreshData(); // Refresh to show updated driver assignment
+      } else {
+        throw new Error('Failed to assign driver');
+      }
+    } catch (error) {
+      console.error('Failed to assign driver:', error);
+      toast({
+        title: "Error",
+        description: "Failed to assign driver to order.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDriverSelect = (driver: any) => {
+    setSelectedDriverProfile(driver);
+  };
+
+  const handleCallDriver = (phone: string) => {
+    // In a real app, this would initiate a phone call
+    toast({
+      title: "Calling Driver",
+      description: `Initiating call to ${phone}`,
+    });
+  };
+
+  const handleMessageDriver = (driverId: string) => {
+    // In a real app, this would open a messaging interface
+    toast({
+      title: "Messaging Driver",
+      description: `Opening message interface for driver ${driverId}`,
+    });
+  };
+
+  const handleTrackDriver = (driverId: string) => {
+    // Find the driver in the active drivers list and select them
+    const driver = drivers.find(d => d.driverId === driverId);
+    if (driver) {
+      handleDriverSelect(driver);
+      // Switch to map view
+      const mapTab = document.querySelector('[value="map"]') as HTMLElement;
+      if (mapTab) mapTab.click();
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'picked_up': return 'bg-blue-500';
@@ -164,7 +280,15 @@ export default function LiveTrackingPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Live Order Tracking</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight">Live Order Tracking</h1>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className="text-sm text-muted-foreground">
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
+          </div>
           <p className="text-muted-foreground">Track your orders in real-time</p>
         </div>
         <div className="flex items-center gap-2">
@@ -180,6 +304,24 @@ export default function LiveTrackingPage() {
             {showAllDrivers ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
             {showAllDrivers ? 'Hide' : 'Show'} All Drivers
           </Button>
+          <Dialog open={isDriverManagementOpen} onOpenChange={setIsDriverManagementOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Users className="h-4 w-4 mr-2" />
+                Manage Drivers
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Driver Management</DialogTitle>
+              </DialogHeader>
+              <DriverManagement 
+                onDriverSelect={handleDriverSelect}
+                onDriverAssign={handleDriverAssign}
+                selectedOrderId={selectedOrder?.id}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -187,6 +329,7 @@ export default function LiveTrackingPage() {
         <TabsList>
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="drivers">Active Drivers</TabsTrigger>
+          <TabsTrigger value="management">Driver Management</TabsTrigger>
           <TabsTrigger value="map">Live Map</TabsTrigger>
         </TabsList>
 
@@ -236,7 +379,7 @@ export default function LiveTrackingPage() {
                               <p className="text-sm text-muted-foreground">₹{order.totalAmount}</p>
                             </div>
                             
-                            {driver && (
+                            {driver ? (
                               <div className="text-right space-y-1">
                                 <div className="flex items-center gap-1 text-sm">
                                   <Truck className="h-3 w-3" />
@@ -250,6 +393,21 @@ export default function LiveTrackingPage() {
                                   <Clock className="h-3 w-3" />
                                   <span>{new Date(driver.estimatedArrival).toLocaleTimeString()}</span>
                                 </div>
+                              </div>
+                            ) : (
+                              <div className="text-right">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedOrder(order);
+                                    setIsDriverManagementOpen(true);
+                                  }}
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Assign Driver
+                                </Button>
                               </div>
                             )}
                           </div>
@@ -324,28 +482,140 @@ export default function LiveTrackingPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="management" className="space-y-4">
+          <DriverManagement 
+            onDriverSelect={handleDriverSelect}
+            onDriverAssign={handleDriverAssign}
+            selectedOrderId={selectedOrder?.id}
+          />
+        </TabsContent>
+
         <TabsContent value="map" className="space-y-4">
-          {selectedOrder || selectedDriver ? (
-            <LiveTrackingMap 
-              orderId={selectedOrder?.id}
-              driverId={selectedDriver?.driverId}
-              className="w-full"
-            />
-          ) : (
-            <Card>
-              <CardContent className="p-8">
-                <div className="text-center">
-                  <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Select an Order or Driver</h3>
-                  <p className="text-muted-foreground">
-                    Choose an order from the Orders tab or a driver from the Active Drivers tab to view live tracking.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2">
+              {selectedOrder || selectedDriver || drivers.length > 0 ? (
+                <LiveTrackingMap 
+                  orderId={selectedOrder?.id}
+                  driverId={selectedDriver?.driverId}
+                  allDrivers={drivers}
+                  showAllDrivers={showAllDrivers}
+                  className="w-full h-[600px]"
+                />
+              ) : (
+                <Card>
+                  <CardContent className="p-8">
+                    <div className="text-center">
+                      <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">No Active Drivers</h3>
+                      <p className="text-muted-foreground">
+                        No drivers are currently active. Add drivers or assign them to orders to see live tracking.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+            
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => setIsDriverManagementOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add New Driver
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={refreshData}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh Data
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => setShowAllDrivers(!showAllDrivers)}
+                  >
+                    {showAllDrivers ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                    {showAllDrivers ? 'Hide' : 'Show'} All Drivers
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Live Statistics</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Active Drivers</span>
+                    <span className="font-semibold">{drivers.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Orders with Drivers</span>
+                    <span className="font-semibold">{ordersWithDrivers.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Available Drivers</span>
+                    <span className="font-semibold text-green-600">
+                      {drivers.filter(d => d.status === 'available').length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">In Transit</span>
+                    <span className="font-semibold text-yellow-600">
+                      {drivers.filter(d => d.status === 'in_transit').length}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {drivers.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Driver Status</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {drivers.slice(0, 5).map((driver) => (
+                        <div key={driver.driverId} className="flex items-center justify-between text-sm">
+                          <span className="truncate">{driver.driverName}</span>
+                          <Badge className={`${getStatusColor(driver.status)} text-white text-xs`}>
+                            {getStatusText(driver.status)}
+                          </Badge>
+                        </div>
+                      ))}
+                      {drivers.length > 5 && (
+                        <p className="text-xs text-muted-foreground text-center">
+                          +{drivers.length - 5} more drivers
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
+
+      {/* Driver Profile Modal */}
+      {selectedDriverProfile && (
+        <DriverProfile
+          driver={selectedDriverProfile}
+          onClose={() => setSelectedDriverProfile(null)}
+          onCall={handleCallDriver}
+          onMessage={handleMessageDriver}
+          onTrack={handleTrackDriver}
+        />
+      )}
     </div>
   );
 }

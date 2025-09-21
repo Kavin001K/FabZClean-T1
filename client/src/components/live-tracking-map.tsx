@@ -38,6 +38,8 @@ interface RoutePoint {
 interface LiveTrackingMapProps {
   orderId?: string;
   driverId?: string;
+  allDrivers?: DriverLocation[];
+  showAllDrivers?: boolean;
   className?: string;
 }
 
@@ -154,6 +156,8 @@ const MapUpdater: React.FC<{ driver: DriverLocation | null }> = ({ driver }) => 
 export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({ 
   orderId, 
   driverId, 
+  allDrivers = [],
+  showAllDrivers = false,
   className = '' 
 }) => {
   const [driver, setDriver] = useState<DriverLocation | null>(null);
@@ -293,6 +297,48 @@ export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
                 </Button>
               )}
             </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show all drivers view if enabled
+  if (showAllDrivers && allDrivers.length > 0) {
+    const routeCoordinates = route.map(point => [point.latitude, point.longitude] as [number, number]);
+    const centerLat = allDrivers.reduce((sum, d) => sum + d.latitude, 0) / allDrivers.length;
+    const centerLng = allDrivers.reduce((sum, d) => sum + d.longitude, 0) / allDrivers.length;
+
+    return (
+      <Card className={className}>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" />
+              Live Tracking - All Drivers ({allDrivers.length})
+            </div>
+            <Badge variant="outline" className="text-xs">
+              {allDrivers.filter(d => d.status === 'available').length} Available
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-96 rounded-lg overflow-hidden border">
+            <MapContainer
+              center={[centerLat, centerLng]}
+              zoom={12}
+              style={{ height: '100%', width: '100%' }}
+              ref={mapRef}
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              />
+              
+              {allDrivers.map((driver) => (
+                <DriverMarker key={driver.driverId} driver={driver} />
+              ))}
+            </MapContainer>
           </div>
         </CardContent>
       </Card>
