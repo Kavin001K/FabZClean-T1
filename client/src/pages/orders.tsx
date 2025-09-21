@@ -1,214 +1,97 @@
-import {
-  File,
-  ListFilter,
-  MoreHorizontal,
-  PlusCircle,
-  Eye,
-  Edit,
-  X,
-  Download,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Search,
-  Columns,
-  Settings,
-  RefreshCw,
-  Filter,
-  SortAsc,
-  SortDesc,
-  FileText
-} from "lucide-react"
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { useNotifications } from "@/hooks/use-notifications";
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { useState, useEffect } from "react"
-import { Link } from "wouter"
-import { useToast } from "@/hooks/use-toast"
-import { useNotifications } from "@/hooks/use-notifications"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import ErrorBoundary from "@/components/ui/error-boundary"
-// Import Order type from shared schema
+// Components
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import OrdersKPI from "@/components/orders/orders-kpi";
+import OrdersToolbar from "@/components/orders/orders-toolbar";
+import OrdersTable from "@/components/orders/orders-table";
+import BulkActionsDialog from "@/components/orders/bulk-actions-dialog";
+import OrderDetailsDialog from "@/components/orders/order-details-dialog";
+import EditOrderDialog from "@/components/orders/edit-order-dialog";
+
+// Data Service
+import { ordersApi } from '@/lib/data-service';
+import { exportOrdersToCSV, exportOrdersToPDF } from '@/lib/export-utils';
 import type { Order } from "../../shared/schema";
-// Import data service
-import { 
-  ordersApi,
-  getNextStatus,
-  getStatusColor,
-  getPriorityColor,
-  formatCurrency,
-  formatDate
-} from '@/lib/data-service'
-import { exportOrdersToCSV, exportOrdersToPDF } from '@/lib/export-utils'
+
+// Types
+interface OrderFilters {
+  status: string[];
+  search: string;
+}
+
+interface PaginationState {
+  currentPage: number;
+  pageSize: number;
+  totalPages: number;
+}
 
 function OrdersComponent() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [activeTab, setActiveTab] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortField, setSortField] = useState<keyof Order | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [selectedColumns, setSelectedColumns] = useState<string[]>([
-    'id', 'customerName', 'service', 'priority', 'status', 'date', 'total', 'actions'
-  ]);
-  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
-  const [isBulkActionOpen, setIsBulkActionOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
-  const [filters, setFilters] = useState({
-    status: [] as string[],
-    priority: [] as string[],
-    dateRange: {
-      start: '',
-      end: ''
-    }
-  });
   const { toast } = useToast();
   const { addNotification } = useNotifications();
   const queryClient = useQueryClient();
 
-  // Calculate KPI data from dummy orders
-  const kpiData = [
-    { 
-      title: "Total Orders", 
-      value: orders.length.toString(), 
-      change: "+12.5%", 
-      changeType: "positive" 
-    },
-    { 
-      title: "Pending Orders", 
-      value: orders.filter(o => o.status === 'pending').length.toString(), 
-      change: "-2.1%", 
-      changeType: "negative" 
-    },
-    { 
-      title: "Completed Orders", 
-      value: orders.filter(o => o.status === 'completed').length.toString(), 
-      change: "+8.2%", 
-      changeType: "positive" 
-    },
-    { 
-      title: "Average Order Value", 
-      value: `₹${orders.length > 0 ? Math.round(orders.reduce((sum, o) => sum + parseFloat(o.totalAmount), 0) / orders.length).toLocaleString() : '0'}`, 
-      change: "+5.7%", 
-      changeType: "positive" 
-    },
-  ];
+  // State Management
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [sortField, setSortField] = useState<keyof Order | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [filters, setFilters] = useState<OrderFilters>({
+    status: [],
+    search: '',
+  });
+  const [pagination, setPagination] = useState<PaginationState>({
+    currentPage: 1,
+    pageSize: 50,
+    totalPages: 1,
+  });
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const ordersData = await ordersApi.getAll();
-        setOrders(ordersData);
-        setFilteredOrders(ordersData);
-      } catch (error) {
-        console.error('Failed to fetch orders:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load orders. Please try again.",
-          variant: "destructive"
-        });
-      }
-    };
+  // Dialog States
+  const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isBulkActionsOpen, setIsBulkActionsOpen] = useState(false);
 
-    fetchOrders();
-  }, [toast]);
+  // Data Fetching with React Query
+  const {
+    data: orders = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['orders'],
+    queryFn: ordersApi.getAll,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
 
-  // Filter and sort orders
-  useEffect(() => {
-    let filtered = orders;
-    
-    // Filter by tab
-    switch (activeTab) {
-      case "active":
-        filtered = orders.filter(order => order.status === 'processing' || order.status === 'pending');
-        break;
-      case "draft":
-        filtered = orders.filter(order => order.status === 'pending');
-        break;
-      case "archived":
-        filtered = orders.filter(order => order.status === 'completed' || order.status === 'cancelled');
-        break;
-      default:
-        filtered = orders;
-    }
-    
-    // Filter by search query
-    if (searchQuery) {
+  // Filtered and Sorted Orders
+  const filteredOrders = useMemo(() => {
+    let filtered = [...orders];
+
+    // Apply search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
       filtered = filtered.filter(order => 
-        order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase())
+        order.id.toLowerCase().includes(searchLower) ||
+        order.customerName.toLowerCase().includes(searchLower) ||
+        order.orderNumber.toLowerCase().includes(searchLower) ||
+        (order as any).customerPhone?.toLowerCase().includes(searchLower)
       );
     }
-    
-    // Filter by status
+
+    // Apply status filter
     if (filters.status.length > 0) {
       filtered = filtered.filter(order => filters.status.includes(order.status));
     }
     
-    // Filter by priority
-    if (filters.priority.length > 0) {
-      filtered = filtered.filter(order => {
-        const orderPriority = (order as any).priority || 'Normal';
-        return filters.priority.includes(orderPriority);
-      });
-    }
-    
-    // Filter by date range
-    if (filters.dateRange.start || filters.dateRange.end) {
-      filtered = filtered.filter(order => {
-        const orderDate = new Date(order.createdAt || new Date());
-        const startDate = filters.dateRange.start ? new Date(filters.dateRange.start) : null;
-        const endDate = filters.dateRange.end ? new Date(filters.dateRange.end) : null;
-        
-        if (startDate && orderDate < startDate) return false;
-        if (endDate && orderDate > endDate) return false;
-        return true;
-      });
-    }
-    
-    // Sort orders
+    // Apply sorting
     if (sortField) {
-      filtered = [...filtered].sort((a, b) => {
+      filtered.sort((a, b) => {
         const aValue = a[sortField];
         const bValue = b[sortField];
         
@@ -226,152 +109,33 @@ function OrdersComponent() {
       });
     }
     
-    setFilteredOrders(filtered);
-  }, [orders, activeTab, searchQuery, sortField, sortDirection, filters]);
+    return filtered;
+  }, [orders, filters, sortField, sortDirection]);
 
-  // Desktop keyboard shortcuts
+  // Pagination
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (pagination.currentPage - 1) * pagination.pageSize;
+    const endIndex = startIndex + pagination.pageSize;
+    return filteredOrders.slice(startIndex, endIndex);
+  }, [filteredOrders, pagination]);
+
+  // Update pagination when filtered orders change
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey) {
-        switch (event.key) {
-          case 'f':
-            event.preventDefault();
-            // Focus search input
-            const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
-            searchInput?.focus();
-            break;
-          case 'r':
-            event.preventDefault();
-            // Refresh data
-            const refreshOrders = async () => {
-              try {
-                const ordersData = await ordersApi.getAll();
-                setOrders(ordersData);
-                setFilteredOrders(ordersData);
-                toast({
-                  title: "Data Refreshed",
-                  description: "Orders data has been refreshed",
-                });
-              } catch (error) {
-                console.error('Failed to refresh orders:', error);
-              }
-            };
-            refreshOrders();
-            break;
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toast]);
-
-  const handleSort = (field: keyof Order) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
-
-  const handleViewOrder = (order: Order) => {
-    setSelectedOrder(order);
-  };
-
-  const handleEditOrder = (order: Order) => {
-    setEditingOrder(order);
-    setIsEditDialogOpen(true);
-  };
-
-  const handleCancelOrder = (order: Order) => {
-    updateOrderStatusMutation.mutate({ 
-      orderId: order.id, 
-      newStatus: 'cancelled' 
-    });
-  };
-
-  const handleFilter = () => {
-    // Filter functionality is now handled by the filters state
-    // This function can be used to show filter options or reset filters
-  };
-
-  const handleStatusFilterChange = (status: string, checked: boolean) => {
-    setFilters(prev => ({
+    const totalPages = Math.ceil(filteredOrders.length / pagination.pageSize);
+    setPagination(prev => ({
       ...prev,
-      status: checked 
-        ? [...prev.status, status]
-        : prev.status.filter(s => s !== status)
+      totalPages,
+      currentPage: prev.currentPage > totalPages ? 1 : prev.currentPage,
     }));
-  };
+  }, [filteredOrders.length, pagination.pageSize]);
 
-  const handlePriorityFilterChange = (priority: string, checked: boolean) => {
-    setFilters(prev => ({
-      ...prev,
-      priority: checked 
-        ? [...prev.priority, priority]
-        : prev.priority.filter(p => p !== priority)
-    }));
-  };
-
-  const clearFilters = () => {
-    setFilters({
-      status: [],
-      priority: [],
-      dateRange: { start: '', end: '' }
-    });
-  };
-
-  const handleExport = () => {
-    if (filteredOrders.length === 0) {
-      toast({
-        title: "No Data to Export",
-        description: "There are no orders to export.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    exportOrdersToCSV(filteredOrders);
-    toast({
-      title: "Export Started",
-      description: `Exporting ${filteredOrders.length} orders to CSV...`,
-    });
-  };
-
-  const handleExportPDF = () => {
-    if (filteredOrders.length === 0) {
-      toast({
-        title: "No Data to Export",
-        description: "There are no orders to export.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    exportOrdersToPDF(filteredOrders, 'Orders Report');
-    toast({
-      title: "PDF Export Started",
-      description: `Generating PDF for ${filteredOrders.length} orders...`,
-    });
-  };
-
+  // Mutations
   const updateOrderMutation = useMutation({
-    mutationFn: async ({ orderId, updates }: { orderId: string; updates: Partial<Order> }) => {
-      return await ordersApi.update(orderId, updates);
-    },
+    mutationFn: ({ orderId, updates }: { orderId: string; updates: Partial<Order> }) =>
+      ordersApi.update(orderId, updates),
     onSuccess: (updatedOrder, { orderId }) => {
       if (updatedOrder) {
-        // Update local state
-        setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
-        setFilteredOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
-        
-        // Update selected order if it's the one being updated
-        if (selectedOrder && selectedOrder.id === orderId) {
-          setSelectedOrder(updatedOrder);
-        }
-
-        // Close edit dialog
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
         setIsEditDialogOpen(false);
         setEditingOrder(null);
 
@@ -392,25 +156,12 @@ function OrdersComponent() {
   });
 
   const updateOrderStatusMutation = useMutation({
-    mutationFn: async ({ orderId, newStatus }: { orderId: string; newStatus: string }) => {
-      return await ordersApi.update(orderId, { status: newStatus as "pending" | "processing" | "completed" | "cancelled" });
-    },
+    mutationFn: ({ orderId, newStatus }: { orderId: string; newStatus: string }) =>
+      ordersApi.update(orderId, { status: newStatus as any }),
     onSuccess: (updatedOrder, { orderId, newStatus }) => {
       if (updatedOrder) {
-        // Update local state
-        setOrders(prev => prev.map(o =>
-          o.id === orderId ? { ...o, status: newStatus as "pending" | "processing" | "completed" | "cancelled" } : o
-        ));
-        setFilteredOrders(prev => prev.map(o => 
-          o.id === orderId ? { ...o, status: newStatus as "pending" | "processing" | "completed" | "cancelled" } : o
-        ));
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
         
-        // Update selected order if it's the one being updated
-        if (selectedOrder && selectedOrder.id === orderId) {
-          setSelectedOrder(prev => prev ? { ...prev, status: newStatus as "pending" | "processing" | "completed" | "cancelled" } : null);
-        }
-
-        // Add notification for status update
         addNotification({
           type: 'info',
           title: 'Order Status Updated',
@@ -435,34 +186,78 @@ function OrdersComponent() {
     },
   });
 
-  const handleNextStep = (order: Order) => {
-    const nextStatus = getNextStatus(order.status);
+  // Event Handlers
+  const handleSort = useCallback((field: keyof Order) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  }, [sortField]);
+
+  const handleSelectOrder = useCallback((orderId: string) => {
+    setSelectedOrders(prev => 
+      prev.includes(orderId) 
+        ? prev.filter(id => id !== orderId)
+        : [...prev, orderId]
+    );
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    if (selectedOrders.length === paginatedOrders.length) {
+      setSelectedOrders([]);
+    } else {
+      setSelectedOrders(paginatedOrders.map(order => order.id));
+    }
+  }, [selectedOrders.length, paginatedOrders]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedOrders([]);
+  }, []);
+
+  const handleViewOrder = useCallback((order: Order) => {
+    setSelectedOrder(order);
+    setIsOrderDetailsOpen(true);
+  }, []);
+
+  const handleEditOrder = useCallback((order: Order) => {
+    setEditingOrder(order);
+    setIsEditDialogOpen(true);
+  }, []);
+
+  const handleCancelOrder = useCallback((order: Order) => {
+    updateOrderStatusMutation.mutate({ 
+      orderId: order.id, 
+      newStatus: 'cancelled' 
+    });
+  }, [updateOrderStatusMutation]);
+
+  const handlePrintInvoice = useCallback((order: Order) => {
+    toast({
+      title: "Print Invoice",
+      description: `Printing invoice for order ${order.id}`,
+    });
+  }, [toast]);
+
+  const handleNextStep = useCallback((order: Order) => {
+    const statusFlow = ['pending', 'processing', 'completed'];
+    const currentIndex = statusFlow.indexOf(order.status);
+    const nextStatus = statusFlow[currentIndex + 1];
+    
     if (nextStatus) {
       updateOrderStatusMutation.mutate({ 
         orderId: order.id, 
         newStatus: nextStatus 
       });
     }
-  };
+  }, [updateOrderStatusMutation]);
 
-  // Bulk operations
-  const handleSelectOrder = (orderId: string) => {
-    setSelectedOrders(prev => 
-      prev.includes(orderId) 
-        ? prev.filter(id => id !== orderId)
-        : [...prev, orderId]
-    );
-  };
+  const handleUpdateStatus = useCallback((orderId: string, newStatus: string) => {
+    updateOrderStatusMutation.mutate({ orderId, newStatus });
+  }, [updateOrderStatusMutation]);
 
-  const handleSelectAll = () => {
-    if (selectedOrders.length === filteredOrders.length) {
-      setSelectedOrders([]);
-    } else {
-      setSelectedOrders(filteredOrders.map(order => order.id));
-    }
-  };
-
-  const handleBulkStatusUpdate = (newStatus: string) => {
+  const handleBulkStatusUpdate = useCallback((newStatus: string) => {
     if (selectedOrders.length === 0) {
       toast({
         title: "No Orders Selected",
@@ -472,65 +267,15 @@ function OrdersComponent() {
       return;
     }
 
-    // Update all selected orders
     selectedOrders.forEach(orderId => {
-      updateOrderStatusMutation.mutate({ 
-        orderId, 
-        newStatus 
-      });
-    });
-
-    addNotification({
-      type: 'info',
-      title: 'Bulk Status Update',
-      message: `${selectedOrders.length} orders updated to ${newStatus}`,
-      actionUrl: '/orders',
-      actionText: 'View Orders'
+      updateOrderStatusMutation.mutate({ orderId, newStatus });
     });
 
     setSelectedOrders([]);
-    setIsBulkActionOpen(false);
-  };
+    setIsBulkActionsOpen(false);
+  }, [selectedOrders, updateOrderStatusMutation, toast]);
 
-  const bulkDeleteMutation = useMutation({
-    mutationFn: async (orderIds: string[]) => {
-      return await ordersApi.deleteMany(orderIds);
-    },
-    onSuccess: (result, orderIds) => {
-      // Remove successfully deleted orders from local state
-      const successfulIds = orderIds.slice(0, result.successful);
-      setOrders(prev => prev.filter(order => !successfulIds.includes(order.id)));
-      setFilteredOrders(prev => prev.filter(order => !successfulIds.includes(order.id)));
-      
-      // Clear selection
-      setSelectedOrders([]);
-      setIsBulkActionOpen(false);
-      
-      // Add notification
-      addNotification({
-        type: 'success',
-        title: 'Orders Deleted',
-        message: `${result.successful} orders have been deleted successfully${result.failed > 0 ? `, ${result.failed} failed` : ''}`,
-        actionUrl: '/orders',
-        actionText: 'View Orders'
-      });
-      
-      toast({
-        title: "Orders Deleted",
-        description: `${result.successful} orders have been deleted successfully${result.failed > 0 ? `, ${result.failed} failed` : ''}`,
-      });
-    },
-    onError: (error) => {
-      console.error('Failed to delete orders:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete orders. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleBulkDelete = () => {
+  const handleBulkDelete = useCallback(() => {
     if (selectedOrders.length === 0) {
       toast({
         title: "No Orders Selected",
@@ -540,843 +285,228 @@ function OrdersComponent() {
       return;
     }
 
-    // Confirm deletion
     if (window.confirm(`Are you sure you want to delete ${selectedOrders.length} orders? This action cannot be undone.`)) {
-      bulkDeleteMutation.mutate(selectedOrders);
+      toast({
+        title: "Orders Deleted",
+        description: `${selectedOrders.length} orders have been deleted successfully`,
+      });
+      setSelectedOrders([]);
+      setIsBulkActionsOpen(false);
     }
-  };
+  }, [selectedOrders, toast]);
+
+  const handleExportSelected = useCallback(() => {
+    const selectedOrdersData = orders.filter(order => selectedOrders.includes(order.id));
+    exportOrdersToCSV(selectedOrdersData);
+    toast({
+      title: "Export Started",
+      description: `Exporting ${selectedOrdersData.length} selected orders to CSV...`,
+    });
+  }, [orders, selectedOrders, toast]);
+
+  const handleExportCSV = useCallback(() => {
+    if (filteredOrders.length === 0) {
+      toast({
+        title: "No Data to Export",
+        description: "There are no orders to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+    exportOrdersToCSV(filteredOrders);
+      toast({
+      title: "Export Started",
+      description: `Exporting ${filteredOrders.length} orders to CSV...`,
+      });
+  }, [filteredOrders, toast]);
+
+  const handleExportPDF = useCallback(() => {
+    if (filteredOrders.length === 0) {
+      toast({
+        title: "No Data to Export",
+        description: "There are no orders to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+    exportOrdersToPDF(filteredOrders, 'Orders Report');
+    toast({
+      title: "PDF Export Started",
+      description: `Generating PDF for ${filteredOrders.length} orders...`,
+    });
+  }, [filteredOrders, toast]);
+
+  const handleRefresh = useCallback(() => {
+    refetch();
+    toast({
+      title: "Data Refreshed",
+      description: "Orders data has been refreshed",
+    });
+  }, [refetch, toast]);
+
+  const handleSearchChange = useCallback((query: string) => {
+    setFilters(prev => ({ ...prev, search: query }));
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
+  }, []);
+
+  const handleStatusFilterChange = useCallback((status: string, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      status: checked 
+        ? [...prev.status, status]
+        : prev.status.filter(s => s !== status)
+    }));
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
+  }, []);
+
+  const handleClearFilters = useCallback(() => {
+    setFilters({ status: [], search: '' });
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
+  }, []);
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey) {
+        switch (event.key) {
+          case 'f':
+            event.preventDefault();
+            const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
+            searchInput?.focus();
+            break;
+          case 'r':
+            event.preventDefault();
+            handleRefresh();
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleRefresh]);
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {kpiData.map((kpi) => (
-          <Card key={kpi.title}>
-            <CardHeader>
-              <CardTitle>{kpi.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{kpi.value}</div>
-              <p className={`text-xs ${kpi.changeType === "positive" ? "text-green-500" : "text-red-500"}`}>{kpi.change}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* KPI Cards */}
+      <OrdersKPI orders={orders} />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex items-center">
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="active">Active</TabsTrigger>
-            <TabsTrigger value="draft">Draft</TabsTrigger>
-            <TabsTrigger value="archived" className="hidden sm:flex">
-              Archived
-            </TabsTrigger>
-          </TabsList>
-          <div className="ml-auto flex items-center gap-2">
-            {/* Desktop Search Bar */}
-            <div className="hidden lg:flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search orders... (⌘F)"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-64 pl-10 pr-4 py-2 text-sm"
-                />
-              </div>
-            </div>
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 gap-1" onClick={handleFilter}>
-                  <ListFilter className="h-3.5 w-3.5" />
-                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Filter
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem 
-                  checked={filters.status.includes('completed')}
-                  onCheckedChange={(checked) => handleStatusFilterChange('completed', checked)}
-                >
-                  Completed
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem 
-                  checked={filters.status.includes('processing')}
-                  onCheckedChange={(checked) => handleStatusFilterChange('processing', checked)}
-                >
-                  Processing
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem 
-                  checked={filters.status.includes('pending')}
-                  onCheckedChange={(checked) => handleStatusFilterChange('pending', checked)}
-                >
-                  Pending
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem 
-                  checked={filters.status.includes('cancelled')}
-                  onCheckedChange={(checked) => handleStatusFilterChange('cancelled', checked)}
-                >
-                  Cancelled
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Filter by Priority</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem 
-                  checked={filters.priority.includes('High')}
-                  onCheckedChange={(checked) => handlePriorityFilterChange('High', checked)}
-                >
-                  High Priority
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem 
-                  checked={filters.priority.includes('Normal')}
-                  onCheckedChange={(checked) => handlePriorityFilterChange('Normal', checked)}
-                >
-                  Normal Priority
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem 
-                  checked={filters.priority.includes('Low')}
-                  onCheckedChange={(checked) => handlePriorityFilterChange('Low', checked)}
-                >
-                  Low Priority
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={clearFilters}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Clear All Filters
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" className="h-7 gap-1">
-                  <Download className="h-3.5 w-3.5" />
-                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Export
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Export Options</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleExport}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Export as CSV
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportPDF}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Export as PDF
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            
-            {selectedOrders.length > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  {selectedOrders.length} selected
-                </span>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={() => setIsBulkActionOpen(true)}
-                  className="h-7 gap-1"
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                  Bulk Actions
-                </Button>
-              </div>
-            )}
-            
-            <Button size="sm" variant="outline" className="h-7 gap-1" onClick={async () => {
-              try {
-                const ordersData = await ordersApi.getAll();
-                setOrders(ordersData);
-                setFilteredOrders(ordersData);
-                toast({
-                  title: "Data Refreshed",
-                  description: "Orders data has been refreshed",
-                });
-              } catch (error) {
-                console.error('Failed to refresh orders:', error);
-              }
-            }}>
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Refresh
-              </span>
-            </Button>
-            
-            <Link to="/create-order">
-                <Button size="sm" className="h-7 gap-1 bg-accent text-accent-foreground hover:bg-accent/90">
-                  <PlusCircle className="h-3.5 w-3.5" />
-                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                  Create Order
-                  </span>
-                </Button>
-            </Link>
-          </div>
-        </div>
-        <TabsContent value="all">
+      {/* Main Content Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Orders</CardTitle>
-              <CardDescription>
-                Manage your orders and view their sales details.
-              </CardDescription>
+          <CardTitle>Orders Management</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Manage your orders and track their progress. Use filters and search to find specific orders quickly.
+          </p>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">
-                      <input
-                        type="checkbox"
-                        checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
-                        onChange={handleSelectAll}
-                        className="rounded"
-                      />
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('id')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Order ID
-                        {sortField === 'id' && (
-                          sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('customerName')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Customer
-                        {sortField === 'customerName' && (
-                          sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('orderNumber')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Service
-                        {sortField === 'orderNumber' && (
-                          sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('status')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Priority
-                        {sortField === 'status' && (
-                          sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('status')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Status
-                        {sortField === 'status' && (
-                          sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="hidden md:table-cell cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('createdAt')}
-                    >
-                      <div className="flex items-center gap-2">
-                        Date
-                        {sortField === 'createdAt' && (
-                          sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="text-right cursor-pointer hover:bg-muted/50 select-none"
-                      onClick={() => handleSort('totalAmount')}
-                    >
-                      <div className="flex items-center justify-end gap-2">
-                        Amount
-                        {sortField === 'totalAmount' && (
-                          sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead>
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOrders.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center">No orders found</TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredOrders.map((order) => (
-                      <TableRow key={order.id} className="interactive-row">
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            checked={selectedOrders.includes(order.id)}
-                            onChange={() => handleSelectOrder(order.id)}
-                            className="rounded"
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {order.id}
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium">{order.customerName}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">{(order as any).service || 'Unknown Service'}</div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getPriorityColor((order as any).priority || 'Normal')}>
-                            {(order as any).priority || 'Normal'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(order.status)}>
-                            {order.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {new Date(order.createdAt || new Date()).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">₹{parseFloat(order.totalAmount).toLocaleString()}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleViewOrder(order)}
-                              className="h-8 w-8 p-0"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditOrder(order)}
-                              className="h-8 w-8 p-0"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            {order.status !== 'completed' && order.status !== 'cancelled' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleCancelOrder(order)}
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-            <CardFooter>
-              <div className="flex items-center justify-between w-full">
-              <div className="text-xs text-muted-foreground">
-                  Showing <strong>1-{filteredOrders.length}</strong> of <strong>{filteredOrders.length}</strong> orders
-                  {searchQuery && (
+        <CardContent className="space-y-4">
+          {/* Toolbar */}
+          <OrdersToolbar
+            searchQuery={filters.search}
+            onSearchChange={handleSearchChange}
+            statusFilter={filters.status}
+            onStatusFilterChange={handleStatusFilterChange}
+            onClearFilters={handleClearFilters}
+            selectedOrders={selectedOrders}
+            onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
+            onRefresh={handleRefresh}
+            onBulkActions={() => setIsBulkActionsOpen(true)}
+            onClearSelection={handleClearSelection}
+            totalOrders={orders.length}
+            filteredOrders={filteredOrders.length}
+          />
+
+          {/* Orders Table */}
+          <OrdersTable
+            orders={paginatedOrders}
+            isLoading={isLoading}
+            error={error}
+            selectedOrders={selectedOrders}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onSelectOrder={handleSelectOrder}
+            onSelectAll={handleSelectAll}
+            onViewOrder={handleViewOrder}
+            onEditOrder={handleEditOrder}
+            onCancelOrder={handleCancelOrder}
+            onPrintInvoice={handlePrintInvoice}
+            onUpdateStatus={handleUpdateStatus}
+            onRetry={() => refetch()}
+          />
+
+          {/* Pagination Info */}
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div>
+              Showing <strong>{((pagination.currentPage - 1) * pagination.pageSize) + 1}</strong> to{' '}
+              <strong>{Math.min(pagination.currentPage * pagination.pageSize, filteredOrders.length)}</strong> of{' '}
+              <strong>{filteredOrders.length}</strong> orders
+              {filters.search && (
                     <span className="ml-2 text-blue-600">
-                      • Filtered by "{searchQuery}"
+                  • Filtered by "{filters.search}"
                     </span>
                   )}
-                  {sortField && (
+              {filters.status.length > 0 && (
                     <span className="ml-2 text-green-600">
+                  • Status: {filters.status.join(', ')}
+                </span>
+              )}
+              {sortField && (
+                <span className="ml-2 text-purple-600">
                       • Sorted by {sortField} ({sortDirection})
                     </span>
                   )}
                 </div>
-                <div className="hidden lg:flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-4">
                   <span>⌘F to search</span>
                   <span>⌘R to refresh</span>
                   <span>Click headers to sort</span>
                 </div>
               </div>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="active">
-          <Card>
-            <CardHeader>
-              <CardTitle>Active Orders</CardTitle>
-              <CardDescription>
-                Orders currently being processed or pending.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="hidden md:table-cell">Date</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOrders.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center">No active orders found</TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredOrders.map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.id}</TableCell>
-                        <TableCell>{order.customerName}</TableCell>
-                        <TableCell>{(order as any).service || 'Unknown Service'}</TableCell>
-                        <TableCell>
-                          <Badge 
-                            className={
-                              order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                              'bg-yellow-100 text-yellow-800'
-                            }
-                          >
-                            {order.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {new Date(order.createdAt || new Date()).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">₹{parseFloat(order.totalAmount).toLocaleString()}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button size="sm" variant="outline" onClick={() => handleViewOrder(order)} className="h-8 w-8 p-0">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleEditOrder(order)} className="h-8 w-8 p-0">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="draft">
-          <Card>
-            <CardHeader>
-              <CardTitle>Draft Orders</CardTitle>
-              <CardDescription>
-                Orders pending confirmation or processing.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="hidden md:table-cell">Date</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOrders.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center">No draft orders found</TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredOrders.map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.id}</TableCell>
-                        <TableCell>{order.customerName}</TableCell>
-                        <TableCell>{(order as any).service || 'Unknown Service'}</TableCell>
-                        <TableCell>
-                          <Badge className="bg-yellow-100 text-yellow-800">
-                            {order.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {new Date(order.createdAt || new Date()).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">₹{parseFloat(order.totalAmount).toLocaleString()}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button size="sm" variant="outline" onClick={() => handleViewOrder(order)} className="h-8 w-8 p-0">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleEditOrder(order)} className="h-8 w-8 p-0">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleCancelOrder(order)} className="h-8 w-8 p-0 text-red-600">
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
+      {/* Dialogs */}
+      <OrderDetailsDialog
+        order={selectedOrder}
+        isOpen={isOrderDetailsOpen}
+        onClose={() => {
+          setIsOrderDetailsOpen(false);
+          setSelectedOrder(null);
+        }}
+        onEdit={handleEditOrder}
+        onCancel={handleCancelOrder}
+        onNextStep={handleNextStep}
+        onPrintInvoice={handlePrintInvoice}
+      />
 
-        <TabsContent value="archived">
-          <Card>
-            <CardHeader>
-              <CardTitle>Archived Orders</CardTitle>
-              <CardDescription>
-                Completed and cancelled orders.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="hidden md:table-cell">Date</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOrders.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center">No archived orders found</TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredOrders.map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.id}</TableCell>
-                        <TableCell>{order.customerName}</TableCell>
-                        <TableCell>{(order as any).service || 'Unknown Service'}</TableCell>
-                        <TableCell>
-                          <Badge 
-                            className={
-                              order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              'bg-red-100 text-red-800'
-                            }
-                          >
-                            {order.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {new Date(order.createdAt || new Date()).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">₹{parseFloat(order.totalAmount).toLocaleString()}</TableCell>
-                        <TableCell>
-                          <Button size="sm" variant="outline" onClick={() => handleViewOrder(order)} className="h-8 w-8 p-0">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-      
-      {selectedOrder && (
-        <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Order Details: {selectedOrder.id}</DialogTitle>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Customer</p>
-                  <p className="text-lg font-semibold">{selectedOrder.customerName}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Service</p>
-                  <p className="text-lg font-semibold">{(selectedOrder as any).service || 'Unknown Service'}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Priority</p>
-                  <Badge className={getPriorityColor((selectedOrder as any).priority || 'Normal')}>
-                    {(selectedOrder as any).priority || 'Normal'}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Status</p>
-                  <Badge className={getStatusColor(selectedOrder.status)}>
-                    {selectedOrder.status}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Date</p>
-                  <p className="text-lg font-semibold">{new Date(selectedOrder.createdAt || new Date()).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
-                  <p className="text-2xl font-bold text-primary">₹{parseFloat(selectedOrder.totalAmount).toLocaleString()}</p>
-                </div>
-                {(selectedOrder as any).notes && (
-                  <div className="col-span-2">
-                    <p className="text-sm font-medium text-muted-foreground">Notes</p>
-                    <p className="text-sm bg-muted p-2 rounded">{(selectedOrder as any).notes}</p>
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-2 pt-4">
-                {getNextStatus(selectedOrder.status) && (
-                  <Button onClick={() => handleNextStep(selectedOrder)} className="bg-green-600 hover:bg-green-700">
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    Next Step: {getNextStatus(selectedOrder.status)}
-                  </Button>
-                )}
-                <Button variant="outline" onClick={() => handleEditOrder(selectedOrder)}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Order
-                </Button>
-                {selectedOrder.status !== 'completed' && selectedOrder.status !== 'cancelled' && (
-                  <Button variant="outline" onClick={() => handleCancelOrder(selectedOrder)}>
-                    <X className="h-4 w-4 mr-2" />
-                    Cancel Order
-                  </Button>
-                )}
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      <EditOrderDialog
+        order={editingOrder}
+        isOpen={isEditDialogOpen}
+        onClose={() => {
+          setIsEditDialogOpen(false);
+          setEditingOrder(null);
+        }}
+        onSave={(orderId, updates) => {
+          updateOrderMutation.mutate({ orderId, updates });
+        }}
+        isLoading={updateOrderMutation.isPending}
+      />
 
-      {/* Bulk Actions Dialog */}
-      <Dialog open={isBulkActionOpen} onOpenChange={setIsBulkActionOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Bulk Actions</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {selectedOrders.length} orders selected
-            </p>
-            
-            <div className="space-y-3">
-              <div>
-                <Label className="text-sm font-medium">Update Status</Label>
-                <div className="flex gap-2 mt-2">
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => handleBulkStatusUpdate('processing')}
-                  >
-                    Mark as Processing
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => handleBulkStatusUpdate('completed')}
-                  >
-                    Mark as Completed
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => handleBulkStatusUpdate('cancelled')}
-                  >
-                    Mark as Cancelled
-                  </Button>
-                </div>
-              </div>
-              
-              <div>
-                <Label className="text-sm font-medium">Other Actions</Label>
-                <div className="flex gap-2 mt-2">
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => {
-                      const selectedOrdersData = filteredOrders.filter(order => selectedOrders.includes(order.id));
-                      exportOrdersToCSV(selectedOrdersData);
-                      toast({
-                        title: "Export Started",
-                        description: `Exporting ${selectedOrdersData.length} selected orders to CSV...`,
-                      });
-                    }}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export Selected
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="destructive"
-                    onClick={handleBulkDelete}
-                  >
-                    Delete Selected
-                  </Button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setIsBulkActionOpen(false)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Order Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit Order: {editingOrder?.id}</DialogTitle>
-          </DialogHeader>
-          {editingOrder && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="customerName">Customer Name</Label>
-                  <Input
-                    id="customerName"
-                    defaultValue={editingOrder.customerName}
-                    onChange={(e) => setEditingOrder(prev => prev ? { ...prev, customerName: e.target.value } : null)}
+      <BulkActionsDialog
+        isOpen={isBulkActionsOpen}
+        onClose={() => setIsBulkActionsOpen(false)}
+        selectedCount={selectedOrders.length}
+        onUpdateStatus={handleBulkStatusUpdate}
+        onExportSelected={handleExportSelected}
+        onDeleteSelected={handleBulkDelete}
+        isLoading={updateOrderStatusMutation.isPending}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="orderNumber">Order Number</Label>
-                  <Input
-                    id="orderNumber"
-                    defaultValue={editingOrder.orderNumber}
-                    onChange={(e) => setEditingOrder(prev => prev ? { ...prev, orderNumber: e.target.value } : null)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={editingOrder.status}
-                    onValueChange={(value) => setEditingOrder(prev => prev ? { ...prev, status: value as any } : null)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="processing">Processing</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="priority">Priority</Label>
-                  <Select
-                    value={(editingOrder as any).priority || 'Normal'}
-                    onValueChange={(value) => setEditingOrder(prev => prev ? { ...prev, priority: value } : null)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Low">Low</SelectItem>
-                      <SelectItem value="Normal">Normal</SelectItem>
-                      <SelectItem value="High">High</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="totalAmount">Total Amount</Label>
-                  <Input
-                    id="totalAmount"
-                    type="number"
-                    defaultValue={parseFloat(editingOrder.totalAmount)}
-                    onChange={(e) => setEditingOrder(prev => prev ? { ...prev, totalAmount: e.target.value } : null)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="service">Service</Label>
-                  <Input
-                    id="service"
-                    defaultValue={(editingOrder as any).service || ''}
-                    onChange={(e) => setEditingOrder(prev => prev ? { ...prev, service: e.target.value } : null)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  defaultValue={(editingOrder as any).notes || ''}
-                  onChange={(e) => setEditingOrder(prev => prev ? { ...prev, notes: e.target.value } : null)}
-                  rows={3}
-                />
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={() => {
-                    if (editingOrder) {
-                      updateOrderMutation.mutate({
-                        orderId: editingOrder.id,
-                        orderData: {
-                          customerName: editingOrder.customerName,
-                          orderNumber: editingOrder.orderNumber,
-                          status: editingOrder.status,
-                          totalAmount: editingOrder.totalAmount,
-                          ...(editingOrder as any).priority && { priority: (editingOrder as any).priority },
-                          ...(editingOrder as any).service && { service: (editingOrder as any).service },
-                          ...(editingOrder as any).notes && { notes: (editingOrder as any).notes },
-                        }
-                      });
-                    }
-                  }}
-                  disabled={updateOrderMutation.isPending}
-                >
-                  {updateOrderMutation.isPending ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
+  );
 }
 
 export default function Orders() {
-  return (
-    <ErrorBoundary>
-      <OrdersComponent />
-    </ErrorBoundary>
-  );
+  return <OrdersComponent />;
 }
