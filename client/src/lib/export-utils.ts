@@ -23,7 +23,7 @@ export function exportToCSV(data: ExportData[], filename: string) {
         const value = row[header];
         // Escape commas and quotes in values
         if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
-          return `"${value.replace(/"/g, '""')}"`;
+          return `"${value ? value.replace(/"/g, '""') : ''}"`;
         }
         return value;
       }).join(',')

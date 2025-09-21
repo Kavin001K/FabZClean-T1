@@ -186,7 +186,7 @@ export default function EmployeeDashboard() {
                     </div>
                   </div>
                   <Badge className={getStatusColor(task.status)}>
-                    {task.status.replace("-", " ")}
+                    {task.status ? task.status.replace("-", " ") : 'Unknown'}
                   </Badge>
                 </div>
               ))}

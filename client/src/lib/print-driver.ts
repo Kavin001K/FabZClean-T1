@@ -436,7 +436,7 @@ export class PrintDriver {
 
     // Print or save
     doc.autoPrint();
-    doc.save(`${data.title.toLowerCase().replace(/\s+/g, '-')}-label.pdf`);
+    doc.save(`${data.title ? data.title.toLowerCase().replace(/\s+/g, '-') : 'document'}-label.pdf`);
   }
 
   public async printInvoice(data: InvoicePrintData, templateId: string = 'invoice'): Promise<void> {
@@ -1238,7 +1238,7 @@ export class PrintDriver {
       }
     }
 
-    pdf.save(`${data.title.replace(/\s+/g, '_')}_Report.pdf`);
+    pdf.save(`${data.title ? data.title.replace(/\s+/g, '_') : 'report'}_Report.pdf`);
   }
 
   private async loadImage(src: string): Promise<string> {

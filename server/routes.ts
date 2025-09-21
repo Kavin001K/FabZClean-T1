@@ -1166,16 +1166,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Create or update delivery record
-      console.log('Creating delivery with data:', {
-        orderId,
-        driverName: driverInfo.name,
-        vehicleId: driverInfo.vehicleNumber,
-        status: "pending",
-        estimatedDelivery: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        location: { latitude: 28.6139, longitude: 77.2090 },
-        route: []
-      });
-      
       const delivery = await storage.createDelivery({
         orderId,
         driverName: driverInfo.name,
@@ -1185,8 +1175,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         location: { latitude: 28.6139, longitude: 77.2090 }, // Default to Delhi
         route: []
       });
-      
-      console.log('Delivery created successfully:', delivery);
 
       // Broadcast the assignment via WebSocket
       realtimeServer.broadcast({
@@ -1210,16 +1198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Failed to assign driver:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      });
-      res.status(500).json({ 
-        message: "Failed to assign driver to order",
-        error: error.message,
-        details: error.stack
-      });
+      res.status(500).json({ message: "Failed to assign driver to order" });
     }
   });
 

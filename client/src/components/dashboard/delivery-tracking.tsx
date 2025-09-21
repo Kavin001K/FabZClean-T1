@@ -90,7 +90,7 @@ export default function DeliveryTracking() {
                   <span className="font-medium text-xs sm:text-sm text-foreground">{delivery.vehicleId}</span>
                 </div>
                 <Badge className={`text-xs ${getStatusColor(delivery.status)}`}>
-                  {delivery.status.replace('_', ' ').charAt(0).toUpperCase() + delivery.status.replace('_', ' ').slice(1)}
+                  {delivery.status ? delivery.status.replace('_', ' ').charAt(0).toUpperCase() + delivery.status.replace('_', ' ').slice(1) : 'Unknown'}
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground mb-2">

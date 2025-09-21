@@ -348,7 +348,7 @@ export default function Logistics() {
                       <div 
                         key={driverName}
                         className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                        data-testid={`driver-${driverName.replace(/\s+/g, '-').toLowerCase()}`}
+                        data-testid={`driver-${driverName ? driverName.replace(/\s+/g, '-').toLowerCase() : 'unknown'}`}
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
@@ -406,7 +406,7 @@ export default function Logistics() {
                           </div>
                         </div>
                         <Badge className={getStatusColor(delivery.status)}>
-                          {delivery.status.replace('_', ' ').charAt(0).toUpperCase() + delivery.status.replace('_', ' ').slice(1)}
+                          {delivery.status ? delivery.status.replace('_', ' ').charAt(0).toUpperCase() + delivery.status.replace('_', ' ').slice(1) : 'Unknown'}
                         </Badge>
                       </div>
                       

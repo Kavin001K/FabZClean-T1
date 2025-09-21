@@ -348,7 +348,7 @@ export default function FranchiseDashboard() {
                         <div className="flex items-center gap-2">
                           {getStatusIcon(employee.status)}
                           <Badge className={getStatusColor(employee.status)}>
-                            {employee.status.replace('_', ' ')}
+                            {employee.status ? employee.status.replace('_', ' ') : 'Unknown'}
                           </Badge>
                         </div>
                         

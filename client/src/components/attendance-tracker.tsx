@@ -474,7 +474,7 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
                         <div className="flex items-center gap-2">
                           {getStatusIcon(record.status)}
                           <Badge className={getStatusColor(record.status)}>
-                            {record.status.replace('_', ' ')}
+                            {record.status ? record.status.replace('_', ' ') : 'Unknown'}
                           </Badge>
                         </div>
                       </div>
