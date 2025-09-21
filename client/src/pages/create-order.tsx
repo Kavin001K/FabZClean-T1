@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { PlusCircle, User, Calendar, Truck, DollarSign } from "lucide-react";
+import { useState, useEffect } from "react";
+import { PlusCircle, User, Calendar, Truck, DollarSign, Search, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,10 @@ export default function CreateOrder() {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
+  const [manuallyEdited, setManuallyEdited] = useState({
+    name: false,
+    email: false
+  });
   
   const { toast } = useToast();
   const { addNotification } = useNotifications();
@@ -42,6 +46,44 @@ export default function CreateOrder() {
       return response.json();
     },
   });
+
+  // Query for fetching customer data by phone number
+  const { data: customerData, isLoading: customerLoading } = useQuery({
+    queryKey: ["customer", customerPhone],
+    queryFn: async () => {
+      if (!customerPhone || customerPhone.length < 10) {
+        return null;
+      }
+      const response = await fetch(`/api/customers?phone=${encodeURIComponent(customerPhone)}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch customer data");
+      }
+      return response.json();
+    },
+    enabled: customerPhone.length >= 10, // Only fetch when phone number is complete
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  // Auto-populate customer data when fetched
+  useEffect(() => {
+    if (customerData && customerData.length > 0) {
+      const customer = customerData[0]; // Get first matching customer
+      
+      // Only auto-fill if fields haven't been manually edited
+      if (!manuallyEdited.name) {
+        setCustomerName(customer.name || "");
+      }
+      if (!manuallyEdited.email) {
+        setCustomerEmail(customer.email || "");
+      }
+      
+      // Show notification that customer data was auto-filled
+      toast({
+        title: "Customer Found!",
+        description: `Auto-filled data for ${customer.name}`,
+      });
+    }
+  }, [customerData, toast, manuallyEdited]);
 
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: Partial<Order>) => {
@@ -190,19 +232,49 @@ export default function CreateOrder() {
                     id="customerName"
                     placeholder="Enter customer's full name"
                     value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
+                    onChange={(e) => {
+                      setCustomerName(e.target.value);
+                      setManuallyEdited(prev => ({ ...prev, name: true }));
+                    }}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customerPhone">Phone Number *</Label>
-                <Input
-                    id="customerPhone"
-                    placeholder="Enter customer's phone number"
-                    type="tel"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    required
-                />
+                <div className="relative">
+                  <Input
+                      id="customerPhone"
+                      placeholder="Enter customer's phone number"
+                      type="tel"
+                      value={customerPhone}
+                      onChange={(e) => {
+                        setCustomerPhone(e.target.value);
+                        // Reset manual edit tracking when phone number changes
+                        setManuallyEdited({ name: false, email: false });
+                      }}
+                      required
+                      className={customerLoading ? "pr-10" : customerData && customerData.length > 0 ? "pr-10 border-green-500" : ""}
+                  />
+                  {customerLoading && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <Search className="w-4 h-4 animate-pulse text-blue-500" />
+                    </div>
+                  )}
+                  {customerData && customerData.length > 0 && !customerLoading && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                    </div>
+                  )}
+                </div>
+                {customerData && customerData.length > 0 && (
+                  <div className="text-sm text-green-600 bg-green-50 dark:bg-green-900/20 p-2 rounded-md">
+                    ✓ Customer found: {customerData[0].name}
+                  </div>
+                )}
+                {customerPhone.length >= 10 && !customerLoading && (!customerData || customerData.length === 0) && (
+                  <div className="text-sm text-blue-600 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-md">
+                    ℹ New customer - fill in the details below
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customerEmail">Email Address</Label>
@@ -211,7 +283,10 @@ export default function CreateOrder() {
                     placeholder="Enter customer's email (optional)"
                     type="email"
                     value={customerEmail}
-                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    onChange={(e) => {
+                      setCustomerEmail(e.target.value);
+                      setManuallyEdited(prev => ({ ...prev, email: true }));
+                    }}
                 />
               </div>
             </CardContent>
