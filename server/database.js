@@ -35,6 +35,7 @@ const connectionString = process.env.DATABASE_URL ||
 // Create Neon client
 const sql = (0, serverless_1.neon)(connectionString);
 // Create Drizzle database instance
+// @ts-ignore - Type mismatch in drizzle-orm/neon-serverless
 exports.db = (0, neon_serverless_1.drizzle)(sql, { schema });
 // Database connection test function
 async function testConnection() {

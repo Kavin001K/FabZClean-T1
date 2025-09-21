@@ -27,13 +27,19 @@
     }
   },
   "include": [
-    "netlify/functions/**/*",
-    "server/**/*",
-    "shared/**/*"
+    "netlify/functions/*.ts",
+    "server/**/*.ts",
+    "shared/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
-    "client"
+    "client",
+    "vite.config.ts",
+    "vite.config.js",
+    "server/vite.ts",
+    "server/vite.js",
+    "*.config.*",
+    "**/vite.config.*"
   ]
 }

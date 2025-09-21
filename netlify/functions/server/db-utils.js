@@ -1,111 +1,88 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.healthCheck = exports.testConnection = void 0;
 exports.initializeDatabase = initializeDatabase;
 exports.getDatabaseHealth = getDatabaseHealth;
-exports.executeQuery = executeQuery;
 exports.pingDatabase = pingDatabase;
 exports.getDatabaseInfo = getDatabaseInfo;
-exports.createTables = createTables;
-const database_1 = require("./database");
-Object.defineProperty(exports, "testConnection", { enumerable: true, get: function () { return database_1.testConnection; } });
-Object.defineProperty(exports, "healthCheck", { enumerable: true, get: function () { return database_1.healthCheck; } });
-const drizzle_orm_1 = require("drizzle-orm");
-// Database utility functions for FabZClean application
-/**
- * Initialize database connection and run health checks
- */
+const db_1 = require("./db");
 async function initializeDatabase() {
-    console.log('🔄 Initializing database connection...');
-    const isConnected = await (0, database_1.testConnection)();
-    if (!isConnected) {
-        throw new Error('Failed to connect to database');
-    }
-    console.log('✅ Database initialized successfully');
-    return true;
-}
-/**
- * Get database health status
- */
-async function getDatabaseHealth() {
-    return await (0, database_1.healthCheck)();
-}
-/**
- * Execute raw SQL queries (use with caution)
- */
-async function executeQuery(query, params = []) {
     try {
-        const result = await database_1.db.execute(drizzle_orm_1.sql.raw(query));
-        return { success: true, data: result };
+        console.log("🔄 Initializing SQLite database...");
+        // Test the database connection by trying to get users
+        await db_1.db.listUsers();
+        console.log("✅ SQLite database initialized successfully");
+        return true;
     }
     catch (error) {
-        console.error('Query execution failed:', error);
-        return { success: false, error: error.message };
+        console.error("❌ SQLite database initialization failed:", error);
+        throw error;
     }
 }
-/**
- * Test database connectivity
- */
+async function getDatabaseHealth() {
+    try {
+        const startTime = Date.now();
+        // Simple health check - try to query users table
+        await db_1.db.listUsers();
+        const responseTime = Date.now() - startTime;
+        return {
+            status: "healthy",
+            database: "sqlite",
+            responseTime: `${responseTime}ms`,
+            timestamp: new Date().toISOString(),
+        };
+    }
+    catch (error) {
+        return {
+            status: "unhealthy",
+            database: "sqlite",
+            error: error.message,
+            timestamp: new Date().toISOString(),
+        };
+    }
+}
 async function pingDatabase() {
     try {
-        const start = Date.now();
-        // Use the testConnection function which works correctly
-        const isConnected = await (0, database_1.testConnection)();
-        const duration = Date.now() - start;
+        const startTime = Date.now();
+        // Simple ping - try to query
+        await db_1.db.listUsers();
+        const responseTime = Date.now() - startTime;
         return {
-            success: isConnected,
-            latency: `${duration}ms`,
-            timestamp: new Date().toISOString()
+            success: true,
+            responseTime: `${responseTime}ms`,
+            database: "sqlite",
+            timestamp: new Date().toISOString(),
         };
     }
     catch (error) {
         return {
             success: false,
             error: error.message,
-            timestamp: new Date().toISOString()
+            database: "sqlite",
+            timestamp: new Date().toISOString(),
         };
     }
 }
-/**
- * Get database information
- */
 async function getDatabaseInfo() {
     try {
-        // Use the testConnection function which works correctly
-        const connectionTest = await (0, database_1.testConnection)();
+        const users = await db_1.db.listUsers();
+        const products = await db_1.db.listProducts();
+        const orders = await db_1.db.listOrders();
+        const customers = await db_1.db.listCustomers();
         return {
-            version: 'PostgreSQL (Neon)',
-            currentTime: new Date().toISOString(),
-            connected: connectionTest,
-            timestamp: new Date().toISOString()
+            database: "sqlite",
+            version: "3.x", // SQLite version
+            tables: {
+                users: users.length,
+                products: products.length,
+                orders: orders.length,
+                customers: customers.length,
+            },
+            status: "connected",
+            timestamp: new Date().toISOString(),
         };
     }
     catch (error) {
-        console.error('Failed to get database info:', error);
-        return {
-            version: 'Unknown',
-            currentTime: new Date().toISOString(),
-            connected: false,
-            error: error.message,
-            timestamp: new Date().toISOString()
-        };
+        throw new Error(`Failed to get database info: ${error.message}`);
     }
 }
-/**
- * Create database tables if they don't exist
- */
-async function createTables() {
-    try {
-        // This would typically use Drizzle migrations
-        // For now, we'll just verify the connection
-        await (0, database_1.testConnection)();
-        console.log('✅ Database tables ready');
-        return true;
-    }
-    catch (error) {
-        console.error('Failed to create tables:', error);
-        return false;
-    }
-}
-exports.default = database_1.db;
 //# sourceMappingURL=db-utils.js.map
