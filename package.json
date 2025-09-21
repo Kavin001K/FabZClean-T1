@@ -1,7 +1,7 @@
 {
   "name": "fabzclean",
   "version": "1.0.0",
-  "main": "electron/main.js",
+  "main": "electron/main.cjs",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -16,8 +16,8 @@
     "db:push": "drizzle-kit push",
     "netlify:dev": "netlify dev",
     "netlify:build": "npm run build:client",
-    "electron": "electron electron/main.js",
-    "electron:dev": "NODE_ENV=development electron electron/main.js",
+    "electron": "electron electron/main.cjs",
+    "electron:dev": "NODE_ENV=development electron electron/main.cjs",
     "electron:build": "npm run build:client && electron-builder",
     "electron:dist": "npm run build:client && electron-builder --publish=never"
   },
@@ -128,5 +128,29 @@
   },
   "overrides": {
     "nanoid": "3.3.11"
+  },
+  "build": {
+    "appId": "com.fabzclean.app",
+    "productName": "FabZClean",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.business",
+      "icon": "public/assets/logo.webp"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "public/assets/logo.webp"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "public/assets/logo.webp"
+    }
   }
 }
