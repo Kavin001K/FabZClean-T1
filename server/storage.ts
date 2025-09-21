@@ -7,11 +7,19 @@ import {
   type InsertOrder,
   type Delivery,
   type InsertDelivery,
-  type PosTransaction,
-  type InsertPosTransaction,
+  type OrderTransaction,
+  type InsertOrderTransaction,
   type Customer,
-  type InsertCustomer
-} from "@shared/schema";
+  type InsertCustomer,
+  type Service,
+  type InsertService,
+  type Shipment,
+  type InsertShipment,
+  type Barcode,
+  type InsertBarcode,
+  type Employee,
+  type InsertEmployee
+} from "../shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -31,6 +39,7 @@ export interface IStorage {
   getOrder(id: string): Promise<Order | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrder(id: string, order: Partial<InsertOrder>): Promise<Order | undefined>;
+  deleteOrder(id: string): Promise<boolean>;
 
   // Deliveries
   getDeliveries(): Promise<Delivery[]>;
@@ -39,15 +48,45 @@ export interface IStorage {
   updateDelivery(id: string, delivery: Partial<InsertDelivery>): Promise<Delivery | undefined>;
 
   // POS Transactions
-  getPosTransactions(): Promise<PosTransaction[]>;
-  getPosTransaction(id: string): Promise<PosTransaction | undefined>;
-  createPosTransaction(transaction: InsertPosTransaction): Promise<PosTransaction>;
+  getPosTransactions(): Promise<OrderTransaction[]>;
+  getPosTransaction(id: string): Promise<OrderTransaction | undefined>;
+  createPosTransaction(transaction: InsertOrderTransaction): Promise<OrderTransaction>;
 
   // Customers
   getCustomers(): Promise<Customer[]>;
   getCustomer(id: string): Promise<Customer | undefined>;
   createCustomer(customer: InsertCustomer): Promise<Customer>;
   updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined>;
+  deleteCustomer(id: string): Promise<boolean>;
+
+  // Services
+  getServices(): Promise<Service[]>;
+  getService(id: string): Promise<Service | undefined>;
+  createService(service: InsertService): Promise<Service>;
+  updateService(id: string, service: Partial<InsertService>): Promise<Service | undefined>;
+  deleteService(id: string): Promise<boolean>;
+
+  // Shipments
+  getShipments(): Promise<Shipment[]>;
+  getShipment(id: string): Promise<Shipment | undefined>;
+  createShipment(shipment: InsertShipment): Promise<Shipment>;
+  updateShipment(id: string, shipment: Partial<InsertShipment>): Promise<Shipment | undefined>;
+
+  // Barcodes
+  getBarcodes(): Promise<Barcode[]>;
+  getBarcode(id: string): Promise<Barcode | undefined>;
+  getBarcodeByCode(code: string): Promise<Barcode | undefined>;
+  getBarcodesByEntity(entityType: string, entityId: string): Promise<Barcode[]>;
+  createBarcode(barcode: InsertBarcode): Promise<Barcode>;
+  updateBarcode(id: string, barcode: Partial<InsertBarcode>): Promise<Barcode | undefined>;
+  deleteBarcode(id: string): Promise<boolean>;
+
+  // Employees
+  getEmployees(): Promise<Employee[]>;
+  getEmployee(id: string): Promise<Employee | undefined>;
+  createEmployee(employee: InsertEmployee): Promise<Employee>;
+  updateEmployee(id: string, employee: Partial<InsertEmployee>): Promise<Employee | undefined>;
+  deleteEmployee(id: string): Promise<boolean>;
 
   // Analytics
   getDashboardMetrics(): Promise<{
@@ -66,8 +105,12 @@ export class MemStorage implements IStorage {
   private products: Map<string, Product>;
   private orders: Map<string, Order>;
   private deliveries: Map<string, Delivery>;
-  private posTransactions: Map<string, PosTransaction>;
+  private posTransactions: Map<string, OrderTransaction>;
   private customers: Map<string, Customer>;
+  private services: Map<string, Service>;
+  private shipments: Map<string, Shipment>;
+  private barcodes: Map<string, Barcode>;
+  private employees: Map<string, Employee>;
 
   constructor() {
     this.users = new Map();
@@ -76,6 +119,10 @@ export class MemStorage implements IStorage {
     this.deliveries = new Map();
     this.posTransactions = new Map();
     this.customers = new Map();
+    this.services = new Map();
+    this.shipments = new Map();
+    this.barcodes = new Map();
+    this.employees = new Map();
     this.initializeData();
   }
 
@@ -231,6 +278,7 @@ export class MemStorage implements IStorage {
         address: { street: "123 Main St", city: "Springfield", state: "IL", zip: "62701" },
         totalOrders: 15,
         totalSpent: "1247.89",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -242,6 +290,7 @@ export class MemStorage implements IStorage {
         address: { street: "456 Oak Ave", city: "Springfield", state: "IL", zip: "62702" },
         totalOrders: 8,
         totalSpent: "756.32",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -253,6 +302,7 @@ export class MemStorage implements IStorage {
         address: { street: "789 Pine St", city: "Springfield", state: "IL", zip: "62703" },
         totalOrders: 22,
         totalSpent: "1893.45",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -264,6 +314,7 @@ export class MemStorage implements IStorage {
         address: { street: "321 Elm St", city: "Springfield", state: "IL", zip: "62704" },
         totalOrders: 5,
         totalSpent: "423.78",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -275,6 +326,7 @@ export class MemStorage implements IStorage {
         address: { street: "654 Maple Ave", city: "Springfield", state: "IL", zip: "62705" },
         totalOrders: 31,
         totalSpent: "2156.90",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -286,6 +338,7 @@ export class MemStorage implements IStorage {
         address: { street: "987 Cedar Blvd", city: "Springfield", state: "IL", zip: "62706" },
         totalOrders: 12,
         totalSpent: "892.34",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -297,6 +350,7 @@ export class MemStorage implements IStorage {
         address: { street: "147 Birch St", city: "Springfield", state: "IL", zip: "62707" },
         totalOrders: 18,
         totalSpent: "1345.67",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -308,6 +362,7 @@ export class MemStorage implements IStorage {
         address: { street: "258 Spruce Dr", city: "Springfield", state: "IL", zip: "62708" },
         totalOrders: 7,
         totalSpent: "567.89",
+        lastOrder: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       }
@@ -315,6 +370,146 @@ export class MemStorage implements IStorage {
 
     sampleCustomers.forEach(customer => {
       this.customers.set(customer.id, customer);
+    });
+
+    // Sample Services
+    const sampleServices: Service[] = [
+      {
+        id: randomUUID(),
+        name: "Dry Cleaning",
+        category: "Cleaning",
+        description: "Professional dry cleaning service for delicate fabrics",
+        price: "15.00",
+        duration: "2-3 days",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Premium Laundry",
+        category: "Laundry",
+        description: "High-quality laundry service with premium detergents",
+        price: "8.00",
+        duration: "1-2 days",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Leather Care",
+        category: "Specialty",
+        description: "Specialized cleaning and conditioning for leather items",
+        price: "25.00",
+        duration: "3-5 days",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Stain Removal",
+        category: "Specialty",
+        description: "Professional stain removal for tough stains",
+        price: "12.00",
+        duration: "1-2 days",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Express Service",
+        category: "Express",
+        description: "Same-day cleaning service for urgent needs",
+        price: "20.00",
+        duration: "Same day",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Wedding Dress Cleaning",
+        category: "Specialty",
+        description: "Specialized cleaning for wedding dresses and formal wear",
+        price: "50.00",
+        duration: "5-7 days",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Rug Cleaning",
+        category: "Home",
+        description: "Professional rug and carpet cleaning service",
+        price: "30.00",
+        duration: "3-4 days",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        name: "Alterations",
+        category: "Tailoring",
+        description: "Basic alterations and repairs",
+        price: "10.00",
+        duration: "2-3 days",
+        status: "Active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    ];
+
+    sampleServices.forEach(service => {
+      this.services.set(service.id, service);
+    });
+
+    // Sample Shipments
+    const sampleShipments: Shipment[] = [
+      {
+        id: randomUUID(),
+        shipmentNumber: "SHIP-2024-001",
+        orderIds: ["06c2947f-a468-4e69-890c-6d022251efff"],
+        carrier: "FedEx",
+        trackingNumber: "FX123456789",
+        status: "in_transit",
+        estimatedDelivery: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
+        actualDelivery: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        shipmentNumber: "SHIP-2024-002",
+        orderIds: ["06c2947f-a468-4e69-890c-6d022251efff"],
+        carrier: "UPS",
+        trackingNumber: "UPS987654321",
+        status: "delivered",
+        estimatedDelivery: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+        actualDelivery: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        shipmentNumber: "SHIP-2024-003",
+        orderIds: ["06c2947f-a468-4e69-890c-6d022251efff"],
+        carrier: "DHL",
+        trackingNumber: "DHL456789123",
+        status: "pending",
+        estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+        actualDelivery: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    ];
+
+    sampleShipments.forEach(shipment => {
+      this.shipments.set(shipment.id, shipment);
     });
 
     // Sample Orders
@@ -378,7 +573,7 @@ export class MemStorage implements IStorage {
         customerName: "Lisa Wang",
         customerEmail: "lisa.wang@email.com",
         customerPhone: "+1-555-0127",
-        status: "ready",
+        status: "pending",
         paymentStatus: "paid",
         totalAmount: "178.95",
         items: [
@@ -463,7 +658,7 @@ export class MemStorage implements IStorage {
     });
 
     // Sample POS Transactions
-    const sampleTransactions: PosTransaction[] = [
+    const sampleTransactions: OrderTransaction[] = [
       {
         id: randomUUID(),
         transactionNumber: "POS-2024-001",
@@ -474,6 +669,7 @@ export class MemStorage implements IStorage {
         paymentMethod: "credit",
         cashierId: "DEMO_CASHIER",
         createdAt: new Date(),
+        updatedAt: new Date(),
       },
       {
         id: randomUUID(),
@@ -486,6 +682,7 @@ export class MemStorage implements IStorage {
         paymentMethod: "cash",
         cashierId: "DEMO_CASHIER",
         createdAt: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+        updatedAt: new Date(Date.now() - 30 * 60 * 1000),
       },
       {
         id: randomUUID(),
@@ -498,6 +695,7 @@ export class MemStorage implements IStorage {
         paymentMethod: "debit",
         cashierId: "DEMO_CASHIER",
         createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
       },
       {
         id: randomUUID(),
@@ -509,6 +707,7 @@ export class MemStorage implements IStorage {
         paymentMethod: "credit",
         cashierId: "DEMO_CASHIER",
         createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
+        updatedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
       },
       {
         id: randomUUID(),
@@ -521,6 +720,7 @@ export class MemStorage implements IStorage {
         paymentMethod: "mobile",
         cashierId: "DEMO_CASHIER",
         createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
+        updatedAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
       }
     ];
 
@@ -646,6 +846,10 @@ export class MemStorage implements IStorage {
     const product: Product = { 
       ...insertProduct, 
       id,
+      description: insertProduct.description || null,
+      stockQuantity: insertProduct.stockQuantity || 0,
+      reorderLevel: insertProduct.reorderLevel || 10,
+      supplier: insertProduct.supplier || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -680,6 +884,10 @@ export class MemStorage implements IStorage {
     const order: Order = { 
       ...insertOrder, 
       id,
+      customerEmail: insertOrder.customerEmail || null,
+      customerPhone: insertOrder.customerPhone || null,
+      paymentStatus: insertOrder.paymentStatus || "pending",
+      shippingAddress: insertOrder.shippingAddress || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -700,6 +908,10 @@ export class MemStorage implements IStorage {
     return updatedOrder;
   }
 
+  async deleteOrder(id: string): Promise<boolean> {
+    return this.orders.delete(id);
+  }
+
   // Delivery methods
   async getDeliveries(): Promise<Delivery[]> {
     return Array.from(this.deliveries.values());
@@ -714,6 +926,12 @@ export class MemStorage implements IStorage {
     const delivery: Delivery = { 
       ...insertDelivery, 
       id,
+      status: insertDelivery.status || "pending",
+      orderId: insertDelivery.orderId || null,
+      estimatedDelivery: insertDelivery.estimatedDelivery || null,
+      actualDelivery: insertDelivery.actualDelivery || null,
+      location: insertDelivery.location || null,
+      route: insertDelivery.route || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -735,20 +953,22 @@ export class MemStorage implements IStorage {
   }
 
   // POS Transaction methods
-  async getPosTransactions(): Promise<PosTransaction[]> {
+  async getPosTransactions(): Promise<OrderTransaction[]> {
     return Array.from(this.posTransactions.values());
   }
 
-  async getPosTransaction(id: string): Promise<PosTransaction | undefined> {
+  async getPosTransaction(id: string): Promise<OrderTransaction | undefined> {
     return this.posTransactions.get(id);
   }
 
-  async createPosTransaction(insertTransaction: InsertPosTransaction): Promise<PosTransaction> {
+  async createPosTransaction(insertTransaction: InsertOrderTransaction): Promise<OrderTransaction> {
     const id = randomUUID();
-    const transaction: PosTransaction = { 
+    const transaction: OrderTransaction = { 
       ...insertTransaction, 
       id,
+      cashierId: insertTransaction.cashierId || null,
       createdAt: new Date(),
+      updatedAt: new Date(),
     };
     this.posTransactions.set(id, transaction);
     return transaction;
@@ -768,6 +988,12 @@ export class MemStorage implements IStorage {
     const customer: Customer = { 
       ...insertCustomer, 
       id,
+      email: insertCustomer.email || null,
+      phone: insertCustomer.phone || null,
+      address: insertCustomer.address || null,
+      totalOrders: insertCustomer.totalOrders || null,
+      totalSpent: insertCustomer.totalSpent || null,
+      lastOrder: insertCustomer.lastOrder || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -786,6 +1012,170 @@ export class MemStorage implements IStorage {
     };
     this.customers.set(id, updatedCustomer);
     return updatedCustomer;
+  }
+
+  async deleteCustomer(id: string): Promise<boolean> {
+    return this.customers.delete(id);
+  }
+
+  // Service methods
+  async getServices(): Promise<Service[]> {
+    return Array.from(this.services.values());
+  }
+
+  async getService(id: string): Promise<Service | undefined> {
+    return this.services.get(id);
+  }
+
+  async createService(insertService: InsertService): Promise<Service> {
+    const id = randomUUID();
+    const service: Service = { 
+      ...insertService, 
+      id,
+      description: insertService.description || null,
+      status: insertService.status || "Active",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.services.set(id, service);
+    return service;
+  }
+
+  async updateService(id: string, updates: Partial<InsertService>): Promise<Service | undefined> {
+    const service = this.services.get(id);
+    if (!service) return undefined;
+    
+    const updatedService = { 
+      ...service, 
+      ...updates, 
+      updatedAt: new Date() 
+    };
+    this.services.set(id, updatedService);
+    return updatedService;
+  }
+
+  async deleteService(id: string): Promise<boolean> {
+    return this.services.delete(id);
+  }
+
+  // Shipment methods
+  async getShipments(): Promise<Shipment[]> {
+    return Array.from(this.shipments.values());
+  }
+
+  async getShipment(id: string): Promise<Shipment | undefined> {
+    return this.shipments.get(id);
+  }
+
+  async createShipment(insertShipment: InsertShipment): Promise<Shipment> {
+    const id = randomUUID();
+    const shipment: Shipment = {
+      ...insertShipment,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.shipments.set(id, shipment);
+    return shipment;
+  }
+
+  async updateShipment(id: string, updates: Partial<InsertShipment>): Promise<Shipment | undefined> {
+    const shipment = this.shipments.get(id);
+    if (!shipment) return undefined;
+    
+    const updatedShipment = { 
+      ...shipment, 
+      ...updates, 
+      updatedAt: new Date() 
+    };
+    this.shipments.set(id, updatedShipment);
+    return updatedShipment;
+  }
+
+  // Barcode methods
+  async getBarcodes(): Promise<Barcode[]> {
+    return Array.from(this.barcodes.values());
+  }
+
+  async getBarcode(id: string): Promise<Barcode | undefined> {
+    return this.barcodes.get(id);
+  }
+
+  async getBarcodeByCode(code: string): Promise<Barcode | undefined> {
+    return Array.from(this.barcodes.values()).find(barcode => barcode.code === code);
+  }
+
+  async getBarcodesByEntity(entityType: string, entityId: string): Promise<Barcode[]> {
+    return Array.from(this.barcodes.values()).filter(
+      barcode => barcode.entityType === entityType && barcode.entityId === entityId
+    );
+  }
+
+  async createBarcode(insertBarcode: InsertBarcode): Promise<Barcode> {
+    const id = randomUUID();
+    const barcode: Barcode = {
+      ...insertBarcode,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.barcodes.set(id, barcode);
+    return barcode;
+  }
+
+  async updateBarcode(id: string, updates: Partial<InsertBarcode>): Promise<Barcode | undefined> {
+    const barcode = this.barcodes.get(id);
+    if (!barcode) return undefined;
+    
+    const updatedBarcode = { 
+      ...barcode, 
+      ...updates, 
+      updatedAt: new Date() 
+    };
+    this.barcodes.set(id, updatedBarcode);
+    return updatedBarcode;
+  }
+
+  async deleteBarcode(id: string): Promise<boolean> {
+    return this.barcodes.delete(id);
+  }
+
+  // Employee methods
+  async getEmployees(): Promise<Employee[]> {
+    return Array.from(this.employees.values());
+  }
+
+  async getEmployee(id: string): Promise<Employee | undefined> {
+    return this.employees.get(id);
+  }
+
+  async createEmployee(insertEmployee: InsertEmployee): Promise<Employee> {
+    const id = randomUUID();
+    const employee: Employee = {
+      ...insertEmployee,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.employees.set(id, employee);
+    return employee;
+  }
+
+  async updateEmployee(id: string, updates: Partial<InsertEmployee>): Promise<Employee | undefined> {
+    const employee = this.employees.get(id);
+    if (!employee) return undefined;
+    
+    const updatedEmployee = { 
+      ...employee, 
+      ...updates, 
+      updatedAt: new Date() 
+    };
+    this.employees.set(id, updatedEmployee);
+    return updatedEmployee;
+  }
+
+  async deleteEmployee(id: string): Promise<boolean> {
+    return this.employees.delete(id);
   }
 
   // Analytics methods

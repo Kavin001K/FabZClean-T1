@@ -1,80 +1,126 @@
-import { cn } from "@/lib/utils";
+import React from 'react';
+import { cn } from '@/lib/utils';
 
-interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
-  className?: string;
-}
+interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {}
 
-function Skeleton({ className, ...props }: SkeletonProps) {
-  return (
-    <div
-      className={cn("animate-pulse rounded-md bg-muted", className)}
-      {...props}
-    />
-  );
-}
+const Skeleton = React.forwardRef<HTMLDivElement, SkeletonProps>(
+  ({ className, ...props }, ref) => {
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          "animate-pulse rounded-md bg-muted/50",
+          className
+        )}
+        {...props}
+      />
+    );
+  }
+);
+Skeleton.displayName = "Skeleton";
 
-// Pre-built skeleton components for common use cases
-export function CardSkeleton() {
-  return (
-    <div className="bento-card">
-      <div className="p-6">
-        <Skeleton className="h-4 w-1/4 mb-4" />
-        <Skeleton className="h-8 w-1/2 mb-2" />
-        <Skeleton className="h-3 w-3/4" />
-      </div>
+// Table row skeleton for customer table
+export const TableRowSkeleton: React.FC<{ columns?: number }> = ({ columns = 5 }) => (
+  <tr className="border-b">
+    {Array.from({ length: columns }).map((_, i) => (
+      <td key={i} className="p-4">
+        <Skeleton className="h-4 w-full" />
+      </td>
+    ))}
+  </tr>
+);
+
+// KPI Card skeleton
+export const KpiCardSkeleton: React.FC = () => (
+  <div className="rounded-lg border bg-card p-6 shadow-sm">
+    <div className="flex items-center justify-between space-y-0 pb-2">
+      <Skeleton className="h-4 w-24" />
+      <Skeleton className="h-4 w-4" />
     </div>
-  );
-}
+    <div className="space-y-2">
+      <Skeleton className="h-8 w-20" />
+      <Skeleton className="h-3 w-16" />
+      <Skeleton className="h-3 w-32" />
+    </div>
+  </div>
+);
 
-export function TableSkeleton({ rows = 5 }: { rows?: number }) {
-  return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-4 gap-4">
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-full" />
+// Customer row skeleton
+export const CustomerRowSkeleton: React.FC = () => (
+  <tr className="border-b hover:bg-muted/50">
+    <td className="p-4">
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-3 w-48" />
       </div>
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="grid grid-cols-4 gap-4">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-full" />
-        </div>
+    </td>
+    <td className="p-4">
+      <Skeleton className="h-4 w-8" />
+    </td>
+    <td className="p-4">
+      <Skeleton className="h-4 w-20" />
+    </td>
+    <td className="p-4">
+      <Skeleton className="h-4 w-24" />
+    </td>
+    <td className="p-4">
+      <Skeleton className="h-8 w-8 rounded" />
+    </td>
+  </tr>
+);
+
+// Chart skeleton for loading states
+export const ChartSkeleton: React.FC = () => (
+  <div className="space-y-4">
+    <div className="flex items-center justify-between">
+      <Skeleton className="h-6 w-32" />
+      <Skeleton className="h-4 w-20" />
+    </div>
+    <div className="space-y-3">
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-5/6" />
+      <Skeleton className="h-4 w-4/6" />
+      <Skeleton className="h-4 w-3/6" />
+      <Skeleton className="h-4 w-5/6" />
+    </div>
+  </div>
+);
+
+// Table skeleton for loading states
+export const TableSkeleton: React.FC<{ rows?: number; columns?: number }> = ({ rows = 5, columns = 4 }) => (
+  <div className="space-y-3">
+    {/* Table header skeleton */}
+    <div className="flex space-x-4">
+      {Array.from({ length: columns }).map((_, i) => (
+        <Skeleton key={i} className="h-4 w-20" />
       ))}
     </div>
-  );
-}
-
-export function ChartSkeleton() {
-  return (
-    <div className="space-y-4">
-      <Skeleton className="h-4 w-1/3" />
-      <Skeleton className="h-64 w-full" />
-      <div className="flex justify-center space-x-4">
-        <Skeleton className="h-3 w-16" />
-        <Skeleton className="h-3 w-16" />
-        <Skeleton className="h-3 w-16" />
+    {/* Table rows skeleton */}
+    {Array.from({ length: rows }).map((_, rowIndex) => (
+      <div key={rowIndex} className="flex space-x-4">
+        {Array.from({ length: columns }).map((_, colIndex) => (
+          <Skeleton key={colIndex} className="h-4 w-16" />
+        ))}
       </div>
-    </div>
-  );
-}
+    ))}
+  </div>
+);
 
-export function KPISkeleton() {
-  return (
-    <div className="bento-card">
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <Skeleton className="h-12 w-12 rounded-xl" />
-          <Skeleton className="h-6 w-16" />
+// Quick action skeleton for loading states
+export const QuickActionSkeleton: React.FC = () => (
+  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+    {Array.from({ length: 4 }).map((_, i) => (
+      <div key={i} className="rounded-lg border bg-card p-4 shadow-sm">
+        <div className="flex items-center space-x-3">
+          <Skeleton className="h-8 w-8 rounded" />
+          <div className="space-y-1">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-3 w-16" />
+          </div>
         </div>
-        <Skeleton className="h-3 w-1/2 mb-2" />
-        <Skeleton className="h-8 w-1/3" />
-        <Skeleton className="h-3 w-1/4 mt-2" />
       </div>
-    </div>
-  );
-}
+    ))}
+  </div>
+);
 
-export { Skeleton };
+export default Skeleton;

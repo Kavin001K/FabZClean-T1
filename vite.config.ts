@@ -13,15 +13,30 @@ export default defineConfig({
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
   },
-  root: path.resolve(import.meta.dirname, "client"),
+  root: "client",
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: "../dist",
     emptyOutDir: true,
+    rollupOptions: {
+      external: ['shelljs'],
+      output: {
+        globals: {
+          shelljs: 'shell'
+        }
+      }
+    }
   },
   server: {
     fs: {
       strict: true,
       deny: ["**/.*"],
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 });

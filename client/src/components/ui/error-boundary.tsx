@@ -1,7 +1,5 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './card';
-import { Button } from './button';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { ErrorFallback } from './error-fallback';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -38,25 +36,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         return <FallbackComponent error={this.state.error} resetError={this.resetError} />;
       }
 
-      return (
-        <Card className="bento-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="w-5 h-5" />
-              Something went wrong
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">
-              An unexpected error occurred. Please try refreshing the page.
-            </p>
-            <Button onClick={this.resetError} className="flex items-center gap-2">
-              <RefreshCw className="w-4 h-4" />
-              Try Again
-            </Button>
-          </CardContent>
-        </Card>
-      );
+      return <ErrorFallback error={this.state.error} resetError={this.resetError} />;
     }
 
     return this.props.children;

@@ -1,7 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   BarChart, 
   Bar, 
@@ -17,7 +22,12 @@ import {
   LineChart,
   Line,
   AreaChart,
-  Area
+  Area,
+  ComposedChart,
+  Scatter,
+  ScatterChart,
+  RadialBarChart,
+  RadialBar
 } from "recharts";
 import { 
   TrendingUp, 
@@ -29,648 +39,1031 @@ import {
   Calendar,
   Target,
   BarChart3,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  Download,
+  Filter,
+  FileText,
+  Activity,
+  Clock,
+  Star,
+  Award
 } from "lucide-react";
-import { formatCurrency, formatNumber, formatPercentage, SAMPLE_SALES_DATA } from "@/lib/data";
-import type { Product, Order, Customer, PosTransaction } from "@shared/schema";
+import { formatCurrency, formatNumber, formatPercentage } from "@/lib/data-service";
+import { useToast } from "@/hooks/use-toast";
+import { useWebSocket } from "@/hooks/use-websocket";
+import type { Service, Order, Customer } from "../../shared/schema";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+// Import the data service
+import { 
+  analyticsApi,
+  ordersApi,
+  customersApi,
+  inventoryApi,
+  formatDate,
+  getStatusColor,
+  getPriorityColor,
+  type InventoryItem
+} from '@/lib/data-service';
+
+// Color schemes for charts
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C'];
+const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
 export default function Analytics() {
-  const { data: products, isLoading: productsLoading } = useQuery<Product[]>({
-    queryKey: ["/api/products"],
+  // Filter states
+  const [dateRange, setDateRange] = useState("last-30-days");
+  const [franchise, setFranchise] = useState("all");
+  const [serviceType, setServiceType] = useState("all");
+  const [insights, setInsights] = useState<string[]>([]);
+  const [showInsights, setShowInsights] = useState(false);
+
+  // Fetch data using React Query
+  const {
+    data: orders = [],
+    isLoading: ordersLoading,
+    isError: ordersError,
+  } = useQuery({
+    queryKey: ['analytics-orders'],
+    queryFn: ordersApi.getAll,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    cacheTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  const { data: orders, isLoading: ordersLoading } = useQuery<Order[]>({
-    queryKey: ["/api/orders"],
+  const {
+    data: customers = [],
+    isLoading: customersLoading,
+    isError: customersError,
+  } = useQuery({
+    queryKey: ['analytics-customers'],
+    queryFn: customersApi.getAll,
+    staleTime: 2 * 60 * 1000,
+    cacheTime: 5 * 60 * 1000,
   });
 
-  const { data: customers, isLoading: customersLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/customers"],
+  const {
+    data: inventory = [],
+    isLoading: inventoryLoading,
+    isError: inventoryError,
+  } = useQuery({
+    queryKey: ['analytics-inventory'],
+    queryFn: inventoryApi.getAll,
+    staleTime: 2 * 60 * 1000,
+    cacheTime: 5 * 60 * 1000,
   });
 
-  const { data: posTransactions, isLoading: posLoading } = useQuery<PosTransaction[]>({
-    queryKey: ["/api/pos/transactions"],
+  const isLoading = ordersLoading || customersLoading || inventoryLoading;
+  const hasError = ordersError || customersError || inventoryError;
+
+  // Real-time state
+  const [realtimeKpis, setRealtimeKpis] = useState<any>(null);
+  const [recentActivity, setRecentActivity] = useState<any>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  const { toast } = useToast();
+
+  // WebSocket connection for real-time updates
+  const { isConnected, connectionStatus, subscribe } = useWebSocket({
+    url: 'ws://localhost:3001',
+    onMessage: (message) => {
+      if (message.type === 'analytics_update') {
+        setRealtimeKpis(message.data.kpis);
+        setRecentActivity(message.data.recentActivity);
+        setLastUpdate(new Date());
+      } else if (message.type === 'order_created' || message.type === 'order_updated') {
+        // Refresh orders when new orders are created/updated
+        fetchAnalyticsData();
+      } else if (message.type === 'customer_created') {
+        // Refresh customers when new customers are added
+        fetchAnalyticsData();
+      }
+    },
+    onOpen: () => {
+      console.log('Connected to real-time analytics');
+      subscribe(['analytics_update', 'order_created', 'order_updated', 'customer_created']);
+    },
+    onClose: () => {
+      console.log('Disconnected from real-time analytics');
+    },
+    onError: (error) => {
+      console.error('WebSocket error:', error);
+    }
   });
 
-  const { data: metrics } = useQuery({
-    queryKey: ["/api/dashboard/metrics"],
-  });
+  // Data fetching is now handled by React Query above
 
-  // Calculate analytics data
+  // Calculate comprehensive analytics data using real data
   const analyticsData = useMemo(() => {
-    if (!orders || !products || !customers || !posTransactions) {
-      return null;
+    if (isLoading || orders.length === 0) {
+      return {
+        revenueByMonth: [],
+        servicePerformance: [],
+        categoryPerformance: [],
+        customerSegments: [],
+        orderStatusDistribution: [],
+        revenueTrend: [],
+        customerGrowth: [],
+        operationalMetrics: {},
+        topCustomers: [],
+        serviceEfficiency: [],
+        inventoryAnalysis: [],
+        timeAnalysis: []
+      };
     }
 
-    // Revenue by time period
-    const revenueByMonth = orders.reduce((acc, order) => {
-      if (!order.createdAt) return acc;
-      const month = new Date(order.createdAt).toLocaleString('default', { month: 'short' });
-      acc[month] = (acc[month] || 0) + parseFloat(order.totalAmount);
-      return acc;
-    }, {} as Record<string, number>);
+    // Apply filters to orders
+    let filteredOrders = [...orders];
+    let filteredCustomers = [...customers];
 
-    // Product performance
-    const productSales = products.map(product => {
-      const productOrders = orders.filter(order => 
-        order.items && Array.isArray(order.items) && 
-        order.items.some((item: any) => item.productId === product.id)
-      );
-      const totalSold = productOrders.reduce((sum, order) => {
-        const item = (order.items as any[]).find((item: any) => item.productId === product.id);
-        return sum + (item?.quantity || 0);
-      }, 0);
-      const revenue = productOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
+    // Date range filter
+    if (dateRange !== 'all') {
+      const now = new Date();
+      let startDate = new Date();
       
-      return {
-        name: product.name,
-        sold: totalSold,
-        revenue,
-        stock: product.stockQuantity,
-        category: product.category
-      };
-    }).sort((a, b) => b.revenue - a.revenue);
-
-    // Category performance
-    const categoryPerformance = products.reduce((acc, product) => {
-      const category = product.category;
-      if (!acc[category]) {
-        acc[category] = { name: category, revenue: 0, products: 0 };
+      switch (dateRange) {
+        case 'last-7-days':
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case 'last-30-days':
+          startDate.setDate(now.getDate() - 30);
+          break;
+        case 'last-90-days':
+          startDate.setDate(now.getDate() - 90);
+          break;
+        case 'last-year':
+          startDate.setFullYear(now.getFullYear() - 1);
+          break;
       }
-      acc[category].products += 1;
       
-      const productOrders = orders.filter(order => 
-        order.items && Array.isArray(order.items) && 
-        order.items.some((item: any) => item.productId === product.id)
+      filteredOrders = filteredOrders.filter(order => 
+        new Date(order.createdAt || new Date()) >= startDate
       );
-      acc[category].revenue += productOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
       
-      return acc;
-    }, {} as Record<string, { name: string; revenue: number; products: number }>);
+      filteredCustomers = filteredCustomers.filter(customer => 
+        new Date(customer.createdAt || new Date()) >= startDate
+      );
+    }
 
-    // Customer segments
-    const customerSegments = customers.map(customer => ({
-      name: customer.name,
-      totalSpent: parseFloat(customer.totalSpent || "0"),
-      totalOrders: customer.totalOrders || 0,
-      avgOrderValue: (customer.totalOrders || 0) > 0 ? parseFloat(customer.totalSpent || "0") / (customer.totalOrders || 1) : 0
-    })).sort((a, b) => b.totalSpent - a.totalSpent);
+    // Service type filter
+    if (serviceType !== 'all') {
+      filteredOrders = filteredOrders.filter(order => {
+        const orderService = (order as any).service || 'Unknown Service';
+        return orderService.toLowerCase().includes(serviceType.toLowerCase());
+      });
+    }
 
-    // Order status distribution
-    const orderStatusDistribution = orders.reduce((acc, order) => {
-      acc[order.status] = (acc[order.status] || 0) + 1;
+    // Franchise filter (assuming orders have a franchise field or we can derive it)
+    if (franchise !== 'all') {
+      // For now, we'll filter by customer location or some other field
+      // This would need to be implemented based on your actual data structure
+      filteredCustomers = filteredCustomers.filter(customer => {
+        // Assuming customers have a franchise field or location
+        return (customer as any).franchise === franchise || 
+               (customer as any).location?.includes(franchise);
+      });
+      
+      // Filter orders by customers in the selected franchise
+      const franchiseCustomerIds = filteredCustomers.map(c => c.id);
+      filteredOrders = filteredOrders.filter(order => 
+        franchiseCustomerIds.includes(order.customerId)
+      );
+    }
+
+    // 1. REVENUE ANALYSIS
+    const revenueByMonth = filteredOrders.reduce((acc, order) => {
+      const month = new Date(order.createdAt || new Date()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const existing = acc.find(item => item.month === month);
+      if (existing) {
+        existing.revenue += parseFloat(order.totalAmount);
+        existing.orders += 1;
+      } else {
+        acc.push({ month, revenue: parseFloat(order.totalAmount), orders: 1 });
+      }
       return acc;
-    }, {} as Record<string, number>);
+    }, [] as any[]).sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
+
+    // 2. SERVICE PERFORMANCE ANALYSIS
+    const servicePerformance = filteredOrders.reduce((acc, order) => {
+      const serviceName = (order as any).service || 'Unknown Service';
+      const existing = acc.find(item => item.name === serviceName);
+      if (existing) {
+        existing.orders += 1;
+        existing.revenue += parseFloat(order.totalAmount);
+        existing.avgOrderValue = existing.revenue / existing.orders;
+      } else {
+        acc.push({ 
+          name: serviceName, 
+          orders: 1, 
+          revenue: parseFloat(order.totalAmount),
+          avgOrderValue: parseFloat(order.totalAmount)
+        });
+      }
+      return acc;
+    }, [] as any[]).sort((a, b) => b.revenue - a.revenue);
+
+    // 3. CUSTOMER SEGMENTATION
+    const customerSegments = filteredCustomers.reduce((acc, customer) => {
+      const totalSpent = parseFloat(customer.totalSpent || '0');
+      let segment = 'New';
+      if (totalSpent > 1000) segment = 'VIP';
+      else if (totalSpent > 500) segment = 'Premium';
+      else if (totalSpent > 100) segment = 'Regular';
+      
+      const existing = acc.find(item => item.segment === segment);
+      if (existing) {
+        existing.count += 1;
+        existing.revenue += totalSpent;
+      } else {
+        acc.push({ segment, count: 1, revenue: totalSpent });
+      }
+      return acc;
+    }, [] as any[]);
+
+    // 4. ORDER STATUS DISTRIBUTION
+    const orderStatusDistribution = filteredOrders.reduce((acc, order) => {
+      const existing = acc.find(item => item.status === order.status);
+      if (existing) {
+        existing.count += 1;
+        existing.revenue += parseFloat(order.totalAmount);
+      } else {
+        acc.push({ status: order.status, count: 1, revenue: parseFloat(order.totalAmount) });
+      }
+      return acc;
+    }, [] as any[]);
+
+    // 5. REVENUE TREND (Daily)
+    const revenueTrend = filteredOrders.reduce((acc, order) => {
+      const date = new Date(order.createdAt || new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const existing = acc.find(item => item.date === date);
+      if (existing) {
+        existing.revenue += parseFloat(order.totalAmount);
+        existing.orders += 1;
+      } else {
+        acc.push({ date, revenue: parseFloat(order.totalAmount), orders: 1 });
+      }
+      return acc;
+    }, [] as any[]).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // 6. CUSTOMER GROWTH
+    const customerGrowth = filteredCustomers.reduce((acc, customer) => {
+      const month = new Date(customer.createdAt || new Date()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const existing = acc.find(item => item.month === month);
+      if (existing) {
+        existing.newCustomers += 1;
+        existing.totalSpent += parseFloat(customer.totalSpent || '0');
+      } else {
+        acc.push({ month, newCustomers: 1, totalSpent: parseFloat(customer.totalSpent || '0') });
+      }
+      return acc;
+    }, [] as any[]).sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
+
+    // 7. TOP CUSTOMERS
+    const topCustomers = filteredCustomers
+      .sort((a, b) => parseFloat(b.totalSpent || '0') - parseFloat(a.totalSpent || '0'))
+      .slice(0, 10)
+      .map(customer => ({
+        name: customer.name,
+        totalSpent: parseFloat(customer.totalSpent || '0'),
+        orders: customer.totalOrders,
+        avgOrderValue: parseFloat(customer.totalSpent || '0') / (customer.totalOrders || 1)
+      }));
+
+    // 8. SERVICE EFFICIENCY
+    const serviceEfficiency = servicePerformance.map(service => ({
+      ...service,
+      efficiency: service.orders > 0 ? (service.revenue / service.orders) : 0,
+      marketShare: (service.orders / filteredOrders.length) * 100
+    }));
+
+    // 9. INVENTORY ANALYSIS
+    const inventoryAnalysis = inventory.map(item => ({
+      name: item.name,
+      stock: item.stock,
+      status: item.status,
+      value: item.stock * 25 // Approximate value per unit
+    }));
+
+    // 10. TIME ANALYSIS (Hourly distribution)
+    const timeAnalysis = filteredOrders.reduce((acc, order) => {
+      const hour = new Date(order.createdAt || new Date()).getHours();
+      const existing = acc.find(item => item.hour === hour);
+      if (existing) {
+        existing.orders += 1;
+        existing.revenue += parseFloat(order.totalAmount);
+      } else {
+        acc.push({ hour, orders: 1, revenue: parseFloat(order.totalAmount) });
+      }
+      return acc;
+    }, [] as any[]).sort((a, b) => a.hour - b.hour);
+
+    // 11. OPERATIONAL METRICS
+    const totalRevenue = filteredOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
+    const avgOrderValue = filteredOrders.length > 0 ? totalRevenue / filteredOrders.length : 0;
+    const completionRate = filteredOrders.length > 0 ? (filteredOrders.filter(o => o.status === 'completed').length / filteredOrders.length) * 100 : 0;
+    const customerRetention = filteredCustomers.length > 0 ? filteredCustomers.filter(c => (c.totalOrders || 0) > 1).length / filteredCustomers.length * 100 : 0;
+
+    const operationalMetrics = {
+      totalRevenue,
+      avgOrderValue,
+      completionRate,
+      customerRetention,
+      totalOrders: orders.length,
+      totalCustomers: customers.length,
+      inventoryValue: inventory.reduce((sum, item) => sum + (item.stock * 25), 0)
+    };
 
     return {
-      revenueByMonth: Object.entries(revenueByMonth).map(([month, revenue]) => ({ month, revenue })),
-      productSales: productSales.slice(0, 10),
-      categoryPerformance: Object.values(categoryPerformance),
-      customerSegments: customerSegments.slice(0, 10),
-      orderStatusDistribution: Object.entries(orderStatusDistribution).map(([status, count]) => ({ status, count })),
+      revenueByMonth,
+      servicePerformance,
+      categoryPerformance: customerSegments,
+      customerSegments,
+      orderStatusDistribution,
+      revenueTrend,
+      customerGrowth,
+      operationalMetrics,
+      topCustomers,
+      serviceEfficiency,
+      inventoryAnalysis,
+      timeAnalysis
     };
-  }, [orders, products, customers, posTransactions]);
+  }, [orders, customers, inventory, isLoading, dateRange, franchise, serviceType]);
 
-  const isLoading = productsLoading || ordersLoading || customersLoading || posLoading;
+  // Generate AI-powered insights
+  const generateInsights = () => {
+    const insights = [];
+    const { operationalMetrics, servicePerformance, customerSegments } = analyticsData;
 
-  const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+    if ((operationalMetrics as any).avgOrderValue > 200) {
+      insights.push("High average order value indicates premium service positioning");
+    }
+    
+    if ((operationalMetrics as any).completionRate > 90) {
+      insights.push("Excellent completion rate shows strong operational efficiency");
+    }
+    
+    if (customerSegments.find(s => s.segment === 'VIP')?.count > 5) {
+      insights.push("Strong VIP customer base indicates high-value service delivery");
+    }
+
+    const topService = servicePerformance[0];
+    if (topService) {
+      insights.push(`${topService.name} is your top-performing service with ${topService.orders} orders`);
+    }
+
+    setInsights(insights);
+    setShowInsights(true);
+  };
+
+  // Export analytics as PDF
+  const handleExportPDF = async () => {
+    try {
+      toast({
+        title: "Generating PDF",
+        description: "Please wait while we generate your analytics report...",
+      });
+
+      // Create a new PDF document
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      let yPosition = 20;
+
+      // Add title
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Analytics Dashboard Report', pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 15;
+
+      // Add date and filters info
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Date Range: ${dateRange}`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Franchise: ${franchise}`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Service Type: ${serviceType}`, 20, yPosition);
+      yPosition += 15;
+
+      // Add key metrics
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Key Metrics', 20, yPosition);
+      yPosition += 10;
+
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      const { operationalMetrics } = analyticsData;
+      pdf.text(`Total Revenue: ${formatCurrency((operationalMetrics as any).totalRevenue)}`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Average Order Value: ${formatCurrency((operationalMetrics as any).avgOrderValue)}`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Completion Rate: ${formatPercentage((operationalMetrics as any).completionRate)}`, 20, yPosition);
+      yPosition += 8;
+      pdf.text(`Customer Retention: ${formatPercentage((operationalMetrics as any).customerRetention)}`, 20, yPosition);
+      yPosition += 15;
+
+      // Add service performance
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Top Services', 20, yPosition);
+      yPosition += 10;
+
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      const topServices = analyticsData.servicePerformance.slice(0, 5);
+      topServices.forEach((service, index) => {
+        if (yPosition > pageHeight - 20) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        pdf.text(`${index + 1}. ${service.name}: ${service.orders} orders, ${formatCurrency(service.revenue)} revenue`, 20, yPosition);
+        yPosition += 8;
+      });
+
+      // Add customer segments
+      yPosition += 10;
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Customer Segments', 20, yPosition);
+      yPosition += 10;
+
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      analyticsData.customerSegments.forEach((segment) => {
+        if (yPosition > pageHeight - 20) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        pdf.text(`${segment.segment}: ${segment.count} customers, ${formatCurrency(segment.revenue)} revenue`, 20, yPosition);
+        yPosition += 8;
+      });
+
+      // Save the PDF
+      const fileName = `analytics-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+
+      toast({
+        title: "PDF Generated",
+        description: "Your analytics report has been downloaded successfully!",
+      });
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Error state
+  if (hasError) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <div className="text-destructive text-lg font-semibold">
+                Failed to load analytics data
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {ordersError?.message || customersError?.message || inventoryError?.message || 'An unexpected error occurred'}
+              </p>
+              <Button 
+                onClick={() => window.location.reload()}
+                variant="outline"
+              >
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
-      <div className="p-8" data-testid="analytics-page">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="font-display font-bold text-3xl text-foreground">Analytics</h1>
-            <p className="text-muted-foreground mt-1">Business intelligence and performance insights</p>
-          </div>
-        </div>
-        <div className="animate-pulse space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-muted rounded-lg"></div>
-            ))}
-          </div>
-          <div className="h-96 bg-muted rounded-lg"></div>
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading analytics data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8" data-testid="analytics-page">
-      <div className="flex items-center justify-between mb-8">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display font-bold text-3xl text-foreground">Analytics</h1>
-          <p className="text-muted-foreground mt-1">Business intelligence and performance insights</p>
+          <h1 className="text-3xl font-bold tracking-tight">Analytics Dashboard</h1>
+          <div className="flex items-center gap-2 mt-2">
+            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="text-sm text-muted-foreground">
+              {isConnected ? 'Live Updates' : 'Offline'}
+            </span>
+            {lastUpdate && (
+              <span className="text-xs text-muted-foreground">
+                Last updated: {lastUpdate.toLocaleTimeString()}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="status-indicator status-online"></div>
-          <span className="text-sm text-muted-foreground">Real-time Data</span>
-        </div>
+          <Button variant="outline" size="sm" onClick={generateInsights}>
+                <FileText className="h-4 w-4 mr-2" />
+                Generate Insights
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportPDF}>
+                <FileText className="h-4 w-4 mr-2" />
+                Export as PDF
+              </Button>
+            </div>
+          </div>
+
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="dateRange">Date Range</Label>
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select date range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="last-7-days">Last 7 Days</SelectItem>
+                  <SelectItem value="last-30-days">Last 30 Days</SelectItem>
+                  <SelectItem value="last-90-days">Last 90 Days</SelectItem>
+                  <SelectItem value="last-year">Last Year</SelectItem>
+                  <SelectItem value="all">All Time</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="franchise">Franchise</Label>
+              <Select value={franchise} onValueChange={setFranchise}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select franchise" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Franchises</SelectItem>
+                  <SelectItem value="franchise-1">Franchise 1</SelectItem>
+                  <SelectItem value="franchise-2">Franchise 2</SelectItem>
+                  <SelectItem value="franchise-3">Franchise 3</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="serviceType">Service Type</Label>
+              <Select value={serviceType} onValueChange={setServiceType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select service type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Services</SelectItem>
+                  <SelectItem value="cleaning">Cleaning</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="repair">Repair</SelectItem>
+                  <SelectItem value="installation">Installation</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Key Metrics Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className={realtimeKpis ? 'ring-2 ring-green-500 ring-opacity-50' : ''}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              {realtimeKpis && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold transition-all duration-500">
+              {formatCurrency(realtimeKpis?.totalRevenue || (analyticsData.operationalMetrics as any).totalRevenue)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {realtimeKpis?.totalOrders || (analyticsData.operationalMetrics as any).totalOrders} orders
+            </p>
+          </CardContent>
+        </Card>
+        <Card className={realtimeKpis ? 'ring-2 ring-green-500 ring-opacity-50' : ''}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg Order Value</CardTitle>
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+              {realtimeKpis && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold transition-all duration-500">
+              {formatCurrency(realtimeKpis?.avgOrderValue || (analyticsData.operationalMetrics as any).avgOrderValue)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Per order
+            </p>
+          </CardContent>
+        </Card>
+        <Card className={realtimeKpis ? 'ring-2 ring-green-500 ring-opacity-50' : ''}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-muted-foreground" />
+              {realtimeKpis && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold transition-all duration-500">
+              {formatPercentage(realtimeKpis?.completionRate || (analyticsData.operationalMetrics as any).completionRate)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Orders completed
+            </p>
+          </CardContent>
+        </Card>
+        <Card className={realtimeKpis ? 'ring-2 ring-green-500 ring-opacity-50' : ''}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Customer Retention</CardTitle>
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              {realtimeKpis && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold transition-all duration-500">
+              {formatPercentage(realtimeKpis?.customerRetention || (analyticsData.operationalMetrics as any).customerRetention)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Repeat customers
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <Card className="bento-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
+      {/* Recent Activity */}
+      {recentActivity && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Recent Activity (Last 5 Minutes)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <p className="text-sm text-muted-foreground">Revenue Growth</p>
-                <p className="text-2xl font-display font-bold text-foreground">+24.3%</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp className="w-3 h-3 text-green-500" />
-                  <span className="text-xs text-green-500">vs last month</span>
+                <h4 className="font-semibold mb-3">New Orders ({recentActivity.newOrders})</h4>
+                <div className="space-y-2">
+                  {recentActivity.orders.length > 0 ? (
+                    recentActivity.orders.map((order: any) => (
+                      <div key={order.id} className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-sm">{order.customerName}</p>
+                          <p className="text-xs text-muted-foreground">{formatCurrency(order.totalAmount)}</p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {order.status}
+                        </Badge>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No new orders in the last 5 minutes</p>
+                  )}
                 </div>
               </div>
-              <DollarSign className="w-8 h-8 text-green-500" />
+              <div>
+                <h4 className="font-semibold mb-3">New Customers ({recentActivity.newCustomers})</h4>
+                <div className="space-y-2">
+                  {recentActivity.customers.length > 0 ? (
+                    recentActivity.customers.map((customer: any) => (
+                      <div key={customer.id} className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-sm">{customer.name}</p>
+                          <p className="text-xs text-muted-foreground">{customer.email}</p>
+                        </div>
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No new customers in the last 5 minutes</p>
+                  )}
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
-        
-        <Card className="bento-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Conversion Rate</p>
-                <p className="text-2xl font-display font-bold text-foreground">3.2%</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp className="w-3 h-3 text-green-500" />
-                  <span className="text-xs text-green-500">+0.4% this week</span>
-                </div>
-              </div>
-              <Target className="w-8 h-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bento-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Customer Retention</p>
-                <p className="text-2xl font-display font-bold text-foreground">89.5%</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <TrendingDown className="w-3 h-3 text-red-500" />
-                  <span className="text-xs text-red-500">-1.2% this month</span>
-                </div>
-              </div>
-              <Users className="w-8 h-8 text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bento-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Inventory Efficiency</p>
-                <p className="text-2xl font-display font-bold text-foreground">94.7%</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp className="w-3 h-3 text-green-500" />
-                  <span className="text-xs text-green-500">+2.1% this week</span>
-                </div>
-              </div>
-              <Package className="w-8 h-8 text-orange-500" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      )}
 
-      {/* Analytics Tabs */}
-      <Tabs defaultValue="revenue" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="revenue" data-testid="revenue-tab">Revenue</TabsTrigger>
-          <TabsTrigger value="products" data-testid="products-tab">Products</TabsTrigger>
-          <TabsTrigger value="customers" data-testid="customers-tab">Customers</TabsTrigger>
-          <TabsTrigger value="operations" data-testid="operations-tab">Operations</TabsTrigger>
+      <Tabs defaultValue="revenue" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="revenue">Revenue Analysis</TabsTrigger>
+          <TabsTrigger value="services">Service Performance</TabsTrigger>
+          <TabsTrigger value="customers">Customer Analytics</TabsTrigger>
+          <TabsTrigger value="operations">Operations</TabsTrigger>
         </TabsList>
 
-        {/* Revenue Analytics */}
-        <TabsContent value="revenue" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bento-card">
+        {/* REVENUE ANALYSIS TAB */}
+        <TabsContent value="revenue" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
               <CardHeader>
-                <CardTitle className="font-display font-semibold text-lg text-foreground">
-                  Revenue Trend
-                </CardTitle>
+                <CardTitle>Revenue Trend</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="chart-container">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={SAMPLE_SALES_DATA}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" />
-                      <YAxis stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `$${(value / 1000)}k`} />
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px"
-                        }}
-                        formatter={(value) => [`$${(value as number / 1000).toFixed(1)}k`, "Revenue"]}
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="revenue" 
-                        stroke="hsl(var(--chart-1))" 
-                        fill="hsl(var(--chart-1) / 0.2)" 
-                        strokeWidth={2}
-                      />
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={analyticsData.revenueByMonth}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Revenue']} />
+                    <Area type="monotone" dataKey="revenue" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
                     </AreaChart>
                   </ResponsiveContainer>
-                </div>
               </CardContent>
             </Card>
 
-            <Card className="bento-card">
+            <Card>
               <CardHeader>
-                <CardTitle className="font-display font-semibold text-lg text-foreground">
-                  Order Status Distribution
-                </CardTitle>
+                <CardTitle>Daily Revenue</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="chart-container">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={analyticsData?.orderStatusDistribution || []}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ status, percent }) => `${status} ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="count"
-                      >
-                        {analyticsData?.orderStatusDistribution.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px"
-                        }}
-                      />
-                    </PieChart>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={analyticsData.revenueTrend}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Revenue']} />
+                    <Line type="monotone" dataKey="revenue" stroke="#82ca9d" strokeWidth={2} />
+                  </LineChart>
                   </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Product Analytics */}
-        <TabsContent value="products" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bento-card">
-              <CardHeader>
-                <CardTitle className="font-display font-semibold text-lg text-foreground">
-                  Top Performing Products
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="chart-container">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analyticsData?.productSales || []}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis 
-                        dataKey="name" 
-                        stroke="hsl(var(--muted-foreground))"
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                      />
-                      <YAxis stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `$${value}`} />
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px"
-                        }}
-                        formatter={(value) => [formatCurrency(value as number), "Revenue"]}
-                      />
-                      <Bar dataKey="revenue" fill="hsl(var(--chart-2))" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bento-card">
-              <CardHeader>
-                <CardTitle className="font-display font-semibold text-lg text-foreground">
-                  Category Performance
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="chart-container">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={analyticsData?.categoryPerformance || []}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="revenue"
-                      >
-                        {analyticsData?.categoryPerformance.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px"
-                        }}
-                        formatter={(value) => [formatCurrency(value as number), "Revenue"]}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Product Performance Table */}
-          <Card className="bento-card">
+          <Card>
             <CardHeader>
-              <CardTitle className="font-display font-semibold text-lg text-foreground">
-                Product Performance Details
-              </CardTitle>
+              <CardTitle>Revenue vs Orders</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {analyticsData?.productSales.slice(0, 5).map((product, index) => (
-                  <div 
-                    key={product.name}
-                    className="flex items-center justify-between p-4 border border-border rounded-lg"
-                    data-testid={`product-performance-${index}`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="text-center">
-                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                          <span className="text-xs text-primary-foreground font-bold">#{index + 1}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{product.name}</p>
-                        <p className="text-sm text-muted-foreground">{product.category}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-foreground">{formatCurrency(product.revenue)}</p>
-                      <p className="text-sm text-muted-foreground">{product.sold} units sold</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <ComposedChart data={analyticsData.revenueByMonth}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis yAxisId="left" />
+                  <YAxis yAxisId="right" orientation="right" />
+                  <Tooltip />
+                  <Legend />
+                  <Bar yAxisId="left" dataKey="revenue" fill="#8884d8" name="Revenue" />
+                  <Line yAxisId="right" type="monotone" dataKey="orders" stroke="#82ca9d" name="Orders" />
+                </ComposedChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Customer Analytics */}
-        <TabsContent value="customers" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bento-card">
+        {/* SERVICE PERFORMANCE TAB */}
+        <TabsContent value="services" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
               <CardHeader>
-                <CardTitle className="font-display font-semibold text-lg text-foreground">
-                  Customer Value Distribution
-                </CardTitle>
+                <CardTitle>Service Performance</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="chart-container">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analyticsData?.customerSegments.slice(0, 8) || []}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis 
-                        dataKey="name" 
-                        stroke="hsl(var(--muted-foreground))"
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                      />
-                      <YAxis stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `$${value}`} />
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px"
-                        }}
-                        formatter={(value) => [formatCurrency(value as number), "Total Spent"]}
-                      />
-                      <Bar dataKey="totalSpent" fill="hsl(var(--chart-3))" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={analyticsData.servicePerformance}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip formatter={(value, name) => [
+                      name === 'revenue' ? formatCurrency(Number(value)) : value,
+                      name === 'revenue' ? 'Revenue' : 'Orders'
+                    ]} />
+                    <Bar dataKey="revenue" fill="#8884d8" name="Revenue" />
+                  </BarChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            <Card className="bento-card">
+            <Card>
               <CardHeader>
-                <CardTitle className="font-display font-semibold text-lg text-foreground">
-                  Customer Insights
-                </CardTitle>
+                <CardTitle>Service Distribution</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  <div className="text-center p-6 bg-muted/50 rounded-lg">
-                    <Users className="w-12 h-12 mx-auto mb-4 text-primary" />
-                    <p className="text-2xl font-display font-bold text-foreground mb-2">
-                      {customers?.length || 0}
-                    </p>
-                    <p className="text-sm text-muted-foreground">Total Customers</p>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Average Customer Value</span>
-                      <span className="font-medium text-foreground">
-                        {formatCurrency(analyticsData?.customerSegments.reduce((sum, c) => sum + c.totalSpent, 0) / (analyticsData?.customerSegments.length || 1) || 0)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Repeat Purchase Rate</span>
-                      <span className="font-medium text-foreground">76.3%</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Customer Acquisition Cost</span>
-                      <span className="font-medium text-foreground">$47.20</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                <ResponsiveContainer width="100%" height={300}>
+                                <PieChart>
+                                    <Pie
+                      data={analyticsData.servicePerformance}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                        outerRadius={80}
+                                        fill="#8884d8"
+                      dataKey="orders"
+                                    >
+                      {analyticsData.servicePerformance.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                    <Tooltip />
+                                </PieChart>
+                            </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+            </div>
 
-          {/* Top Customers */}
-          <Card className="bento-card">
-            <CardHeader>
-              <CardTitle className="font-display font-semibold text-lg text-foreground">
-                High-Value Customers
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {analyticsData?.customerSegments.slice(0, 5).map((customer, index) => (
-                  <div 
-                    key={customer.name}
-                    className="flex items-center justify-between p-4 border border-border rounded-lg"
-                    data-testid={`top-customer-${index}`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="text-center">
-                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                          <span className="text-xs text-primary-foreground font-medium">
-                            {customer.name.split(' ').map(n => n[0]).join('')}
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{customer.name}</p>
-                        <p className="text-sm text-muted-foreground">{customer.totalOrders} orders</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-foreground">{formatCurrency(customer.totalSpent)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Avg: {formatCurrency(customer.avgOrderValue)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <Card>
+                    <CardHeader>
+              <CardTitle>Service Efficiency Analysis</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <ScatterChart data={analyticsData.serviceEfficiency}>
+                  <CartesianGrid />
+                  <XAxis dataKey="orders" name="Orders" />
+                  <YAxis dataKey="efficiency" name="Avg Order Value" />
+                  <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                  <Scatter dataKey="efficiency" fill="#8884d8" />
+                </ScatterChart>
+              </ResponsiveContainer>
+                    </CardContent>
+                </Card>
         </TabsContent>
 
-        {/* Operations Analytics */}
-        <TabsContent value="operations" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bento-card">
+        {/* CUSTOMER ANALYTICS TAB */}
+        <TabsContent value="customers" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
               <CardHeader>
-                <CardTitle className="font-display font-semibold text-lg text-foreground">
-                  Operational Efficiency
-                </CardTitle>
+                <CardTitle>Customer Segments</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  <div className="text-center p-6 bg-muted/50 rounded-lg">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-4 text-primary" />
-                    <p className="text-2xl font-display font-bold text-foreground mb-2">
-                      {formatPercentage(metrics?.onTimeDelivery || 0)}
-                    </p>
-                    <p className="text-sm text-muted-foreground">Overall Efficiency Score</p>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Order Processing Time</span>
-                      <span className="font-medium text-foreground">2.4 hours</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Inventory Accuracy</span>
-                      <span className="font-medium text-foreground">98.7%</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Stock Turnover Rate</span>
-                      <span className="font-medium text-foreground">
-                        {metrics?.inventoryTurnover || 0}x/month
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Return Rate</span>
-                      <span className="font-medium text-foreground">2.1%</span>
-                    </div>
-                  </div>
-                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={analyticsData.customerSegments}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ segment, percent }) => `${segment} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="count"
+                    >
+                      {analyticsData.customerSegments.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                  </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            <Card className="bento-card">
+            <Card>
               <CardHeader>
-                <CardTitle className="font-display font-semibold text-lg text-foreground">
-                  Performance Trends
-                </CardTitle>
+                <CardTitle>Customer Growth</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="chart-container">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={SAMPLE_SALES_DATA}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" />
-                      <YAxis stroke="hsl(var(--muted-foreground))" />
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px"
-                        }}
-                      />
-                      <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="orders" 
-                        stroke="hsl(var(--chart-4))" 
-                        strokeWidth={2}
-                        name="Orders"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={analyticsData.customerGrowth}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Area type="monotone" dataKey="newCustomers" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.6} />
+                  </AreaChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
 
-          {/* Key Performance Indicators */}
-          <Card className="bento-card">
-            <CardHeader>
-              <CardTitle className="font-display font-semibold text-lg text-foreground">
-                Key Performance Indicators
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center p-6 border border-border rounded-lg">
-                  <Calendar className="w-8 h-8 mx-auto mb-3 text-blue-500" />
-                  <p className="text-xl font-display font-bold text-foreground mb-1">24</p>
-                  <p className="text-sm text-muted-foreground">Avg. Days to Fulfill</p>
-                  <div className="flex items-center justify-center gap-1 mt-2">
-                    <TrendingDown className="w-3 h-3 text-green-500" />
-                    <span className="text-xs text-green-500">-2 days vs last month</span>
-                  </div>
-                </div>
-                
-                <div className="text-center p-6 border border-border rounded-lg">
-                  <Package className="w-8 h-8 mx-auto mb-3 text-purple-500" />
-                  <p className="text-xl font-display font-bold text-foreground mb-1">
-                    {products?.filter(p => p.stockQuantity <= p.reorderLevel).length || 0}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Items Need Restocking</p>
-                  <div className="flex items-center justify-center gap-1 mt-2">
-                    <TrendingUp className="w-3 h-3 text-yellow-500" />
-                    <span className="text-xs text-yellow-500">+3 vs last week</span>
-                  </div>
-                </div>
-                
-                <div className="text-center p-6 border border-border rounded-lg">
-                  <Target className="w-8 h-8 mx-auto mb-3 text-red-500" />
-                  <p className="text-xl font-display font-bold text-foreground mb-1">95.2%</p>
-                  <p className="text-sm text-muted-foreground">Quality Score</p>
-                  <div className="flex items-center justify-center gap-1 mt-2">
-                    <TrendingUp className="w-3 h-3 text-green-500" />
-                    <span className="text-xs text-green-500">+1.3% this month</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <Card>
+              <CardHeader>
+              <CardTitle>Top Customers</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Customer</TableHead>
+                    <TableHead>Total Spent</TableHead>
+                    <TableHead>Orders</TableHead>
+                    <TableHead>Avg Order Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                  {analyticsData.topCustomers.map((customer, index) => (
+                    <TableRow key={index}>
+                        <TableCell className="font-medium">{customer.name}</TableCell>
+                      <TableCell>{formatCurrency(customer.totalSpent)}</TableCell>
+                      <TableCell>{customer.orders}</TableCell>
+                      <TableCell>{formatCurrency(customer.avgOrderValue)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+        </TabsContent>
+
+        {/* OPERATIONS TAB */}
+        <TabsContent value="operations" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Status Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={analyticsData.orderStatusDistribution}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="status" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Hourly Order Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={analyticsData.timeAnalysis}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="hour" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="orders" fill="#82ca9d" />
+                  </BarChart>
+                  </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+              <CardHeader>
+              <CardTitle>Inventory Analysis</CardTitle>
+              </CardHeader>
+              <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={analyticsData.inventoryAnalysis}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => [value, 'Stock']} />
+                  <Bar dataKey="stock" fill="#ffc658" />
+                </BarChart>
+              </ResponsiveContainer>
+              </CardContent>
+            </Card>
         </TabsContent>
       </Tabs>
+
+      {/* AI Insights Modal */}
+      {showInsights && (
+        <Card>
+              <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              AI-Powered Business Insights
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+            <div className="space-y-2">
+              {insights.map((insight, index) => (
+                <div key={index} className="flex items-start gap-2 p-3 bg-muted rounded-lg">
+                  <Star className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">{insight}</p>
+                    </div>
+              ))}
+                    </div>
+            <div className="flex justify-end mt-4">
+              <Button variant="outline" onClick={() => setShowInsights(false)}>
+                Close
+              </Button>
+                </div>
+              </CardContent>
+            </Card>
+      )}
     </div>
   );
 }

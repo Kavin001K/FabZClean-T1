@@ -1,410 +1,519 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Filter, Plus, List, Kanban, Calendar, Clock, User, DollarSign, Package } from "lucide-react";
-import { formatCurrency, getStatusColor } from "@/lib/data";
-import { formatDistanceToNow } from "date-fns";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import type { Order } from "@shared/schema";
+import { useNotifications } from "@/hooks/use-notifications";
+import { useInvoicePrint } from "@/hooks/use-invoice-print";
 
-type ViewMode = "list" | "kanban" | "calendar";
+// Components
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import OrdersKPI from "@/components/orders/orders-kpi";
+import OrdersToolbar from "@/components/orders/orders-toolbar";
+import OrdersTable from "@/components/orders/orders-table";
+import BulkActionsDialog from "@/components/orders/bulk-actions-dialog";
+import OrderDetailsDialog from "@/components/orders/order-details-dialog";
+import EditOrderDialog from "@/components/orders/edit-order-dialog";
 
-export default function Orders() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+// Data Service
+import { ordersApi } from '@/lib/data-service';
+import { exportOrdersToCSV, exportOrdersToPDF } from '@/lib/export-utils';
+import type { Order } from "../../shared/schema";
+
+// Types
+interface OrderFilters {
+  status: string[];
+  search: string;
+}
+
+interface PaginationState {
+  currentPage: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+function OrdersComponent() {
   const { toast } = useToast();
+  const { addNotification } = useNotifications();
+  const queryClient = useQueryClient();
 
-  const { data: orders, isLoading } = useQuery<Order[]>({
-    queryKey: ["/api/orders"],
+  // State Management
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [sortField, setSortField] = useState<keyof Order | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [filters, setFilters] = useState<OrderFilters>({
+    status: [],
+    search: '',
+  });
+  const [pagination, setPagination] = useState<PaginationState>({
+    currentPage: 1,
+    pageSize: 50,
+    totalPages: 1,
   });
 
-  const filteredOrders = orders?.filter(order => {
-    const matchesSearch = order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.customerName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  }) || [];
+  // Dialog States
+  const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isBulkActionsOpen, setIsBulkActionsOpen] = useState(false);
 
-  const statusCounts = orders?.reduce((acc, order) => {
-    acc[order.status] = (acc[order.status] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>) || {};
+  // Data Fetching with React Query
+  const {
+    data: orders = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['orders'],
+    queryFn: ordersApi.getAll,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
 
-  // Organize orders by status for Kanban view
-  const kanbanColumns = [
-    { id: "pending", title: "Pending Orders", color: "bg-yellow-500", orders: filteredOrders.filter(order => order.status === "pending") },
-    { id: "processing", title: "In Processing", color: "bg-blue-500", orders: filteredOrders.filter(order => order.status === "processing") },
-    { id: "ready", title: "Ready for Pickup", color: "bg-purple-500", orders: filteredOrders.filter(order => order.status === "ready") },
-    { id: "completed", title: "Completed", color: "bg-green-500", orders: filteredOrders.filter(order => order.status === "completed") }
-  ];
+  // Filtered and Sorted Orders
+  const filteredOrders = useMemo(() => {
+    let filtered = [...orders];
 
-  if (isLoading) {
-    return (
-      <div className="p-8" data-testid="orders-page">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="font-display font-bold text-3xl text-foreground">Orders</h1>
-            <p className="text-muted-foreground mt-1">Manage customer orders and fulfillment</p>
-          </div>
-        </div>
-        <div className="animate-pulse space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-muted rounded-lg"></div>
-            ))}
-          </div>
-          <div className="h-96 bg-muted rounded-lg"></div>
-        </div>
-      </div>
+    // Apply search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter(order => 
+        order.id.toLowerCase().includes(searchLower) ||
+        order.customerName.toLowerCase().includes(searchLower) ||
+        order.orderNumber.toLowerCase().includes(searchLower) ||
+        (order as any).customerPhone?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply status filter
+    if (filters.status.length > 0) {
+      filtered = filtered.filter(order => filters.status.includes(order.status));
+    }
+    
+    // Apply sorting
+    if (sortField) {
+      filtered.sort((a, b) => {
+        const aValue = a[sortField];
+        const bValue = b[sortField];
+        
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          return sortDirection === 'asc' 
+            ? aValue.localeCompare(bValue)
+            : bValue.localeCompare(aValue);
+        }
+        
+        if (typeof aValue === 'number' && typeof bValue === 'number') {
+          return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+        }
+        
+        return 0;
+      });
+    }
+    
+    return filtered;
+  }, [orders, filters, sortField, sortDirection]);
+
+  // Pagination
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (pagination.currentPage - 1) * pagination.pageSize;
+    const endIndex = startIndex + pagination.pageSize;
+    return filteredOrders.slice(startIndex, endIndex);
+  }, [filteredOrders, pagination]);
+
+  // Update pagination when filtered orders change
+  useEffect(() => {
+    const totalPages = Math.ceil(filteredOrders.length / pagination.pageSize);
+    setPagination(prev => ({
+      ...prev,
+      totalPages,
+      currentPage: prev.currentPage > totalPages ? 1 : prev.currentPage,
+    }));
+  }, [filteredOrders.length, pagination.pageSize]);
+
+  // Mutations
+  const updateOrderMutation = useMutation({
+    mutationFn: ({ orderId, updates }: { orderId: string; updates: Partial<Order> }) =>
+      ordersApi.update(orderId, updates),
+    onSuccess: (updatedOrder, { orderId }) => {
+      if (updatedOrder) {
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        setIsEditDialogOpen(false);
+        setEditingOrder(null);
+
+        toast({
+          title: "Order Updated",
+          description: `Order ${orderId} has been updated successfully`,
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to update order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update order. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: ({ orderId, newStatus }: { orderId: string; newStatus: string }) =>
+      ordersApi.update(orderId, { status: newStatus as any }),
+    onSuccess: (updatedOrder, { orderId, newStatus }) => {
+      if (updatedOrder) {
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        
+        addNotification({
+          type: 'info',
+          title: 'Order Status Updated',
+          message: `Order ${orderId} has been moved to ${newStatus}`,
+          actionUrl: '/orders',
+          actionText: 'View Orders'
+        });
+
+        toast({
+          title: "Order Status Updated",
+          description: `Order ${orderId} moved to ${newStatus}`,
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to update order status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update order status. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Event Handlers
+  const handleSort = useCallback((field: keyof Order) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  }, [sortField]);
+
+  const handleSelectOrder = useCallback((orderId: string) => {
+    setSelectedOrders(prev => 
+      prev.includes(orderId) 
+        ? prev.filter(id => id !== orderId)
+        : [...prev, orderId]
     );
-  }
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    if (selectedOrders.length === paginatedOrders.length) {
+      setSelectedOrders([]);
+    } else {
+      setSelectedOrders(paginatedOrders.map(order => order.id));
+    }
+  }, [selectedOrders.length, paginatedOrders]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedOrders([]);
+  }, []);
+
+  const handleViewOrder = useCallback((order: Order) => {
+    setSelectedOrder(order);
+    setIsOrderDetailsOpen(true);
+  }, []);
+
+  const handleEditOrder = useCallback((order: Order) => {
+    setEditingOrder(order);
+    setIsEditDialogOpen(true);
+  }, []);
+
+  const handleCancelOrder = useCallback((order: Order) => {
+    updateOrderStatusMutation.mutate({ 
+      orderId: order.id, 
+      newStatus: 'cancelled' 
+    });
+  }, [updateOrderStatusMutation]);
+
+  const { printInvoice } = useInvoicePrint({
+    onSuccess: (invoiceData) => {
+      console.log('Invoice printed successfully:', invoiceData);
+    },
+    onError: (error) => {
+      console.error('Invoice print failed:', error);
+    }
+  });
+
+  const handlePrintInvoice = useCallback((order: Order) => {
+    printInvoice(order);
+  }, [printInvoice]);
+
+  const handleNextStep = useCallback((order: Order) => {
+    const statusFlow = ['pending', 'processing', 'completed'];
+    const currentIndex = statusFlow.indexOf(order.status);
+    const nextStatus = statusFlow[currentIndex + 1];
+    
+    if (nextStatus) {
+      updateOrderStatusMutation.mutate({ 
+        orderId: order.id, 
+        newStatus: nextStatus 
+      });
+    }
+  }, [updateOrderStatusMutation]);
+
+  const handleUpdateStatus = useCallback((orderId: string, newStatus: string) => {
+    updateOrderStatusMutation.mutate({ orderId, newStatus });
+  }, [updateOrderStatusMutation]);
+
+  const handleBulkStatusUpdate = useCallback((newStatus: string) => {
+    if (selectedOrders.length === 0) {
+      toast({
+        title: "No Orders Selected",
+        description: "Please select at least one order to update.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    selectedOrders.forEach(orderId => {
+      updateOrderStatusMutation.mutate({ orderId, newStatus });
+    });
+
+    setSelectedOrders([]);
+    setIsBulkActionsOpen(false);
+  }, [selectedOrders, updateOrderStatusMutation, toast]);
+
+  const handleBulkDelete = useCallback(() => {
+    if (selectedOrders.length === 0) {
+      toast({
+        title: "No Orders Selected",
+        description: "Please select at least one order to delete.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to delete ${selectedOrders.length} orders? This action cannot be undone.`)) {
+      toast({
+        title: "Orders Deleted",
+        description: `${selectedOrders.length} orders have been deleted successfully`,
+      });
+      setSelectedOrders([]);
+      setIsBulkActionsOpen(false);
+    }
+  }, [selectedOrders, toast]);
+
+  const handleExportSelected = useCallback(() => {
+    const selectedOrdersData = orders.filter(order => selectedOrders.includes(order.id));
+    exportOrdersToCSV(selectedOrdersData);
+    toast({
+      title: "Export Started",
+      description: `Exporting ${selectedOrdersData.length} selected orders to CSV...`,
+    });
+  }, [orders, selectedOrders, toast]);
+
+  const handleExportCSV = useCallback(() => {
+    if (filteredOrders.length === 0) {
+      toast({
+        title: "No Data to Export",
+        description: "There are no orders to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+    exportOrdersToCSV(filteredOrders);
+      toast({
+      title: "Export Started",
+      description: `Exporting ${filteredOrders.length} orders to CSV...`,
+      });
+  }, [filteredOrders, toast]);
+
+  const handleExportPDF = useCallback(() => {
+    if (filteredOrders.length === 0) {
+      toast({
+        title: "No Data to Export",
+        description: "There are no orders to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+    exportOrdersToPDF(filteredOrders, 'Orders Report');
+    toast({
+      title: "PDF Export Started",
+      description: `Generating PDF for ${filteredOrders.length} orders...`,
+    });
+  }, [filteredOrders, toast]);
+
+  const handleRefresh = useCallback(() => {
+    refetch();
+    toast({
+      title: "Data Refreshed",
+      description: "Orders data has been refreshed",
+    });
+  }, [refetch, toast]);
+
+  const handleSearchChange = useCallback((query: string) => {
+    setFilters(prev => ({ ...prev, search: query }));
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
+  }, []);
+
+  const handleStatusFilterChange = useCallback((status: string, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      status: checked 
+        ? [...prev.status, status]
+        : prev.status.filter(s => s !== status)
+    }));
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
+  }, []);
+
+  const handleClearFilters = useCallback(() => {
+    setFilters({ status: [], search: '' });
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
+  }, []);
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey) {
+        switch (event.key) {
+          case 'f':
+            event.preventDefault();
+            const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
+            searchInput?.focus();
+            break;
+          case 'r':
+            event.preventDefault();
+            handleRefresh();
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleRefresh]);
 
   return (
-    <div className="p-8" data-testid="orders-page">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="font-display font-bold text-3xl text-foreground">Order Lifecycle Management</h1>
-          <p className="text-muted-foreground mt-1">Track orders through their complete lifecycle with intelligent workflow management</p>
-        </div>
-        <div className="flex items-center gap-4">
-          {/* View Mode Toggle */}
-          <div className="flex items-center bg-muted rounded-lg p-1">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className="h-8 px-3"
-            >
-              <List className="w-4 h-4 mr-1" />
-              List
-            </Button>
-            <Button
-              variant={viewMode === "kanban" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("kanban")}
-              className="h-8 px-3"
-            >
-              <Kanban className="w-4 h-4 mr-1" />
-              Kanban
-            </Button>
-            <Button
-              variant={viewMode === "calendar" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("calendar")}
-              className="h-8 px-3"
-            >
-              <Calendar className="w-4 h-4 mr-1" />
-              Calendar
-            </Button>
-          </div>
-          <Button 
-            data-testid="create-order"
-            onClick={() => {
-              // In a real app, this would open a modal or navigate to order creation
-              console.log("Creating new order...");
-              toast({
-                title: "Order Creation",
-                description: "Order creation feature coming soon! This would open a modal to create a new order.",
-              });
-            }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            New Order
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      {/* KPI Cards */}
+      <OrdersKPI orders={orders} />
 
-      {/* Order Status Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <Card className="bento-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Pending</p>
-                <p className="text-2xl font-display font-bold text-foreground">
-                  {statusCounts.pending || 0}
-                </p>
-              </div>
-              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bento-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Processing</p>
-                <p className="text-2xl font-display font-bold text-foreground">
-                  {statusCounts.processing || 0}
-                </p>
-              </div>
-              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bento-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Completed</p>
-                <p className="text-2xl font-display font-bold text-foreground">
-                  {statusCounts.completed || 0}
-                </p>
-              </div>
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bento-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Orders</p>
-                <p className="text-2xl font-display font-bold text-foreground">
-                  {orders?.length || 0}
-                </p>
-              </div>
-              <div className="w-3 h-3 rounded-full bg-primary"></div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Main Content Card */}
+          <Card>
+            <CardHeader>
+          <CardTitle>Orders Management</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Manage your orders and track their progress. Use filters and search to find specific orders quickly.
+          </p>
+            </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Toolbar */}
+          <OrdersToolbar
+            searchQuery={filters.search}
+            onSearchChange={handleSearchChange}
+            statusFilter={filters.status}
+            onStatusFilterChange={handleStatusFilterChange}
+            onClearFilters={handleClearFilters}
+            selectedOrders={selectedOrders}
+            onExportCSV={handleExportCSV}
+            onExportPDF={handleExportPDF}
+            onRefresh={handleRefresh}
+            onBulkActions={() => setIsBulkActionsOpen(true)}
+            onClearSelection={handleClearSelection}
+            totalOrders={orders.length}
+            filteredOrders={filteredOrders.length}
+          />
 
-      {/* Search and Filter Controls */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search orders..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-64"
-              data-testid="search-orders"
-            />
-          </div>
-          <Button variant="outline" size="sm" data-testid="filter-orders">
-            <Filter className="w-4 h-4 mr-2" />
-            Filter
-          </Button>
-        </div>
-      </div>
+          {/* Orders Table */}
+          <OrdersTable
+            orders={paginatedOrders}
+            isLoading={isLoading}
+            error={error}
+            selectedOrders={selectedOrders}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onSelectOrder={handleSelectOrder}
+            onSelectAll={handleSelectAll}
+            onViewOrder={handleViewOrder}
+            onEditOrder={handleEditOrder}
+            onCancelOrder={handleCancelOrder}
+            onPrintInvoice={handlePrintInvoice}
+            onUpdateStatus={handleUpdateStatus}
+            onRetry={() => refetch()}
+          />
 
-      {/* Conditional View Rendering */}
-      {viewMode === "list" && (
-        <Card className="bento-card">
-          <CardHeader>
-            <CardTitle className="font-display font-semibold text-xl text-foreground">
-              All Orders
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order Number</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Payment</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow key={order.id} data-testid={`order-row-${order.orderNumber}`}>
-                    <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{order.customerName}</p>
-                        <p className="text-sm text-muted-foreground">{order.customerEmail}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(order.status)}>
-                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(order.paymentStatus)}>
-                        {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {formatCurrency(parseFloat(order.totalAmount))}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {order.createdAt && formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="outline" size="sm" data-testid={`view-order-${order.orderNumber}`}>
-                        View
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Kanban Board View */}
-      {viewMode === "kanban" && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {kanbanColumns.map((column) => (
-            <Card key={column.id} className="bento-card h-fit">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="font-display font-semibold text-lg text-foreground flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${column.color}`}></div>
-                    {column.title}
-                  </CardTitle>
-                  <Badge variant="secondary" className="text-xs">
-                    {column.orders.length}
-                  </Badge>
+          {/* Pagination Info */}
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div>
+              Showing <strong>{((pagination.currentPage - 1) * pagination.pageSize) + 1}</strong> to{' '}
+              <strong>{Math.min(pagination.currentPage * pagination.pageSize, filteredOrders.length)}</strong> of{' '}
+              <strong>{filteredOrders.length}</strong> orders
+              {filters.search && (
+                    <span className="ml-2 text-blue-600">
+                  • Filtered by "{filters.search}"
+                    </span>
+                  )}
+              {filters.status.length > 0 && (
+                    <span className="ml-2 text-green-600">
+                  • Status: {filters.status.join(', ')}
+                </span>
+              )}
+              {sortField && (
+                <span className="ml-2 text-purple-600">
+                      • Sorted by {sortField} ({sortDirection})
+                    </span>
+                  )}
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {column.orders.map((order) => (
-                  <Card key={order.id} className="kanban-order-card p-4 hover:shadow-md transition-all duration-200 cursor-pointer border border-border/50 hover:border-primary/20">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm text-foreground">{order.orderNumber}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {formatCurrency(parseFloat(order.totalAmount))}
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <User className="w-3 h-3" />
-                        <span className="truncate">{order.customerName}</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="w-3 h-3" />
-                        <span>{order.createdAt && formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}</span>
-                      </div>
-                      
-                      <div className="flex items-center justify-between pt-2 border-t border-border/30">
-                        <Badge className={getStatusColor(order.paymentStatus)} variant="outline">
-                          <DollarSign className="w-3 h-3 mr-1" />
-                          {order.paymentStatus}
-                        </Badge>
-                        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                          View
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-                
-                {column.orders.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No orders in this stage</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Calendar View */}
-      {viewMode === "calendar" && (
-        <Card className="bento-card">
-          <CardHeader>
-            <CardTitle className="font-display font-semibold text-xl text-foreground flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Order Calendar
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">Track orders by delivery dates and schedule pickups</p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-7 gap-2 mb-4">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="text-center text-sm font-medium text-muted-foreground p-2">
-                  {day}
+            <div className="flex items-center gap-4">
+                  <span>⌘F to search</span>
+                  <span>⌘R to refresh</span>
+                  <span>Click headers to sort</span>
                 </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-2">
-              {Array.from({ length: 35 }, (_, i) => {
-                const date = new Date();
-                date.setDate(date.getDate() - date.getDay() + i);
-                const dayOrders = orders?.filter(order => {
-                  if (!order.createdAt) return false;
-                  const orderDate = new Date(order.createdAt);
-                  return orderDate.toDateString() === date.toDateString();
-                }) || [];
-                
-                return (
-                  <div 
-                    key={i} 
-                    className={`min-h-[80px] p-2 border border-border rounded-lg ${
-                      date.toDateString() === new Date().toDateString() 
-                        ? 'bg-primary/10 border-primary' 
-                        : 'bg-muted/30'
-                    }`}
-                  >
-                    <div className="text-sm font-medium text-foreground mb-1">
-                      {date.getDate()}
-                    </div>
-                    <div className="space-y-1">
-                      {dayOrders.slice(0, 2).map((order, idx) => (
-                        <div 
-                          key={idx}
-                          className={`text-xs p-1 rounded ${
-                            order.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
-                            order.status === 'processing' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' :
-                            order.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' :
-                            'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-                          }`}
-                        >
-                          {order.orderNumber}
-                        </div>
-                      ))}
-                      {dayOrders.length > 2 && (
-                        <div className="text-xs text-muted-foreground">
-                          +{dayOrders.length - 2} more
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-4 flex items-center justify-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span>Completed</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                <span>Processing</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                <span>Pending</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <span>Cancelled</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+            </CardContent>
+          </Card>
+
+      {/* Dialogs */}
+      <OrderDetailsDialog
+        order={selectedOrder}
+        isOpen={isOrderDetailsOpen}
+        onClose={() => {
+          setIsOrderDetailsOpen(false);
+          setSelectedOrder(null);
+        }}
+        onEdit={handleEditOrder}
+        onCancel={handleCancelOrder}
+        onNextStep={handleNextStep}
+        onPrintInvoice={handlePrintInvoice}
+      />
+
+      <EditOrderDialog
+        order={editingOrder}
+        isOpen={isEditDialogOpen}
+        onClose={() => {
+          setIsEditDialogOpen(false);
+          setEditingOrder(null);
+        }}
+        onSave={(orderId, updates) => {
+          updateOrderMutation.mutate({ orderId, updates });
+        }}
+        isLoading={updateOrderMutation.isPending}
+      />
+
+      <BulkActionsDialog
+        isOpen={isBulkActionsOpen}
+        onClose={() => setIsBulkActionsOpen(false)}
+        selectedCount={selectedOrders.length}
+        onUpdateStatus={handleBulkStatusUpdate}
+        onExportSelected={handleExportSelected}
+        onDeleteSelected={handleBulkDelete}
+        isLoading={updateOrderStatusMutation.isPending}
+                  />
+                </div>
   );
+}
+
+export default function Orders() {
+  return <OrdersComponent />;
 }

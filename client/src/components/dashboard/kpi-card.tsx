@@ -1,76 +1,142 @@
-import { ReactNode } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { LucideIcon } from "lucide-react";
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrendingUp, TrendingDown, HelpCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
-interface KPICardProps {
+interface KpiCardProps {
   title: string;
   value: string | number;
   change?: string;
   changeType?: "positive" | "negative" | "neutral";
-  icon: LucideIcon;
-  iconColor?: string;
-  subtitle?: string;
+  icon: React.ReactNode;
+  animationDelay?: number;
+  details?: React.ReactNode;
+  description?: string;
+  isLoading?: boolean;
+  className?: string;
 }
 
-export default function KPICard({
-  title,
-  value,
-  change,
-  changeType = "neutral",
-  icon: Icon,
-  iconColor = "text-primary",
-  subtitle
-}: KPICardProps) {
-  const changeColors = {
-    positive: "kpi-positive status-badge-success",
-    negative: "kpi-negative status-badge-danger",
-    neutral: "text-muted-foreground bg-muted"
+export default React.memo(function KpiCard({ 
+  title, 
+  value, 
+  change, 
+  changeType = "neutral", 
+  icon, 
+  animationDelay = 0, 
+  details,
+  description,
+  isLoading = false,
+  className 
+}: KpiCardProps) {
+  const formatValue = (val: string | number) => {
+    if (typeof val === 'number') {
+      if (val >= 1000000) {
+        return `₹${(val / 1000000).toFixed(1)}M`;
+      } else if (val >= 1000) {
+        return `₹${(val / 1000).toFixed(1)}K`;
+      }
+      return `₹${val.toLocaleString()}`;
+    }
+    return val;
   };
 
-  return (
-    <Card className="bento-card metric-card interactive-press animate-scale-in" data-testid={`kpi-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      <CardContent className="p-6 relative">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`w-14 h-14 rounded-xl flex items-center justify-center relative overflow-hidden`}
-               style={{
-                 background: `linear-gradient(135deg, ${iconColor.includes('primary') ? 'hsl(var(--primary))' : 
-                   iconColor.includes('blue') ? 'hsl(221, 83%, 53%)' :
-                   iconColor.includes('green') ? 'hsl(142, 71%, 45%)' :
-                   iconColor.includes('purple') ? 'hsl(280, 65%, 60%)' : 'hsl(var(--primary))'}/10, ${
-                   iconColor.includes('primary') ? 'hsl(var(--primary))' : 
-                   iconColor.includes('blue') ? 'hsl(221, 83%, 53%)' :
-                   iconColor.includes('green') ? 'hsl(142, 71%, 45%)' :
-                   iconColor.includes('purple') ? 'hsl(280, 65%, 60%)' : 'hsl(var(--primary))'}/5)`
-               }}>
-            <Icon className={`${iconColor} text-xl relative z-10`} />
-            <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-50"></div>
-          </div>
-          {change && (
-            <div className={`text-xs px-3 py-1.5 rounded-full font-semibold ${changeColors[changeType]} backdrop-blur-sm`}>
-              {change}
-            </div>
-          )}
-        </div>
-        
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground tracking-wide uppercase">
+  const getChangeColor = () => {
+    switch (changeType) {
+      case "positive": return "text-green-600";
+      case "negative": return "text-red-600";
+      default: return "text-muted-foreground";
+    }
+  };
+
+  const getChangeIcon = () => {
+    switch (changeType) {
+      case "positive": return <TrendingUp className="h-3 w-3" />;
+      case "negative": return <TrendingDown className="h-3 w-3" />;
+      default: return null;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card className={cn("animate-pulse", className)}>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div className="h-4 w-24 bg-muted rounded" />
+          <div className="h-4 w-4 bg-muted rounded" />
+        </CardHeader>
+        <CardContent>
+          <div className="h-8 w-16 bg-muted rounded mb-2" />
+          <div className="h-3 w-20 bg-muted rounded" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const cardContent = (
+    <Card className={cn(
+      "group hover:shadow-lg transition-all duration-200 cursor-pointer border-l-4",
+      changeType === "positive" && "border-l-green-500 hover:border-l-green-600",
+      changeType === "negative" && "border-l-red-500 hover:border-l-red-600",
+      changeType === "neutral" && "border-l-blue-500 hover:border-l-blue-600",
+      className
+    )} style={{ animationDelay: `${animationDelay}ms` }}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div className="flex items-center space-x-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             {title}
-          </p>
-          <p className="kpi-value text-4xl leading-none" 
-             data-testid={`kpi-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-            {value}
-          </p>
-          {subtitle && (
-            <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
-              <span className="w-1 h-1 bg-current rounded-full opacity-50"></span>
-              {subtitle}
-            </p>
+          </CardTitle>
+          {description && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs">{description}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
-        
-        {/* Subtle highlight line */}
-        <div className="absolute bottom-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent"></div>
+        <div className="text-muted-foreground group-hover:text-primary transition-colors">
+          {icon}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold mb-1">
+          {formatValue(value)}
+        </div>
+        {change && (
+          <p className={cn("text-xs flex items-center", getChangeColor())}>
+            {getChangeIcon() && <span className="mr-1">{getChangeIcon()}</span>}
+            {change}
+          </p>
+        )}
       </CardContent>
     </Card>
   );
-}
+
+  if (details) {
+    return (
+      <Dialog>
+        <DialogTrigger asChild>
+          {cardContent}
+        </DialogTrigger>
+        <DialogContent className="max-w-[800px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <span>{title}</span>
+              {icon}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            {details}
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return cardContent;
+});

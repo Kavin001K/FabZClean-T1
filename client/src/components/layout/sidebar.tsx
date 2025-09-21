@@ -1,76 +1,56 @@
-import { Link, useLocation } from "wouter";
-import { 
-  BarChart3, 
-  Package, 
-  ShoppingCart, 
-  CreditCard, 
-  Truck, 
-  Users, 
-  Home,
-  Zap 
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Link, useLocation } from 'wouter';
+import { Home, ShoppingCart, Users2, LineChart, Package, Settings, Truck, Scissors, User, Server, MapPin, FileText } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-const navigation = [
-  { name: "Dashboard", href: "/", icon: Home },
-  { name: "Orders", href: "/orders", icon: ShoppingCart },
-  { name: "Inventory", href: "/inventory", icon: Package },
-  { name: "POS", href: "/pos", icon: CreditCard },
-  { name: "Logistics", href: "/logistics", icon: Truck },
-  { name: "Customers", href: "/customers", icon: Users },
-  { name: "Analytics", href: "/analytics", icon: BarChart3 },
-];
-
-export default function Sidebar() {
+const NavLink = ({ to, icon: Icon, children }: { to: string; icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) => {
   const [location] = useLocation();
+  const isActive = location === to;
 
   return (
-    <aside className="w-64 bg-card border-r border-border flex-shrink-0">
-      <div className="p-6">
-        {/* Logo */}
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-            <Zap className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="sidebar-brand">Fab-Z</h1>
-            <p className="text-xs text-muted-foreground">Fab Clean Operations</p>
-          </div>
-        </div>
+    <Link
+      href={to}
+      className={cn(
+        "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
+        isActive && "bg-muted text-primary"
+      )}
+    >
+      <Icon className="h-4 w-4" />
+      {children}
+    </Link>
+  );
+};
 
-        {/* Navigation */}
-        <nav className="space-y-2">
-          {navigation.map((item) => {
-            const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium transition-colors sidebar-item",
-                  isActive
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                )}
-                data-testid={`nav-${item.name.toLowerCase()}`}
-              >
-                <item.icon className="w-4 h-4" />
-                <span>{item.name}</span>
-              </Link>
-            );
-          })}
-        </nav>
+export function Sidebar() {
+  return (
+    <aside className="fixed inset-y-0 left-0 z-10 flex h-full w-60 flex-col border-r bg-background">
+      <div className="flex h-16 items-center justify-center border-b px-6">
+        <Link href="/" className="flex items-center gap-2 font-semibold">
+          <img src="/assets/logo.webp" alt="FabzClean Logo" className="h-10 w-auto" />
+        </Link>
       </div>
-
-      {/* Sidebar Footer */}
-      <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-border">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="status-indicator status-online"></div>
-            <span className="text-sm text-muted-foreground">System Online</span>
-          </div>
-        </div>
-      </div>
+      <nav className="flex flex-col gap-2 p-4 font-medium flex-1">
+        <NavLink to="/" icon={Home}>Dashboard</NavLink>
+        <NavLink to="/orders" icon={ShoppingCart}>Orders</NavLink>
+        <NavLink to="/customers" icon={Users2}>Customers</NavLink>
+        <NavLink to="/services" icon={Scissors}>Services</NavLink>
+        <NavLink to="/inventory" icon={Package}>Inventory</NavLink>
+        <NavLink to="/logistics" icon={Truck}>Logistics</NavLink>
+        <NavLink to="/live-tracking" icon={MapPin}>Live Tracking</NavLink>
+        <NavLink to="/documents" icon={FileText}>Documents</NavLink>
+        <NavLink to="/analytics" icon={LineChart}>Analytics</NavLink>
+        <NavLink to="/employee-dashboard" icon={User}>Employee Dashboard</NavLink>
+        <NavLink to="/franchise-dashboard" icon={Users2}>Franchise Dashboard</NavLink>
+        <NavLink to="/database-status" icon={Server}>Database Status</NavLink>
+      </nav>
+      <nav className="mt-auto flex flex-col gap-2 p-4">
+        <Link
+          href="/settings"
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+        >
+          <Settings className="h-4 w-4" />
+          <span>Settings</span>
+        </Link>
+      </nav>
     </aside>
   );
 }

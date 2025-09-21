@@ -29,7 +29,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const res = await fetch(`/api/${queryKey.join("/")}` as string, {
       credentials: "include",
     });
 
@@ -47,11 +47,24 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes instead of Infinity
+      retry: (failureCount, error) => {
+        // Retry on network errors but not on 4xx client errors
+        if (error instanceof Error && error.message.includes('4')) {
+          return false;
+        }
+        return failureCount < 3;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     },
     mutations: {
-      retry: false,
+      retry: (failureCount, error) => {
+        // Don't retry mutations on client errors
+        if (error instanceof Error && error.message.includes('4')) {
+          return false;
+        }
+        return failureCount < 2;
+      },
     },
   },
 });

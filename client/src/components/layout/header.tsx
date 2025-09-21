@@ -1,43 +1,107 @@
-import { Button } from "@/components/ui/button";
-import { useTheme } from "@/hooks/use-theme";
-import { Moon, Sun, User } from "lucide-react";
+import { Link, useLocation } from 'wouter';
+import { useEffect, useState } from 'react';
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { NotificationCenter } from '@/components/notification-center';
+import { GlobalSearch } from '@/components/global-search';
 
-export default function Header() {
-  const { theme, setTheme } = useTheme();
+const capitalize = (s: string) => {
+  // Handle special cases for better display
+  if (s === 'employee-dashboard') return 'Employee Dashboard';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
+
+interface HeaderProps {
+  onToggleSidebar: () => void;
+  isSidebarVisible: boolean;
+}
+
+export function Header({ onToggleSidebar, isSidebarVisible }: HeaderProps) {
+  const [location] = useLocation();
+  const [paths, setPaths] = useState(['Dashboard']);
+
+  useEffect(() => {
+    const pathSegments = location.split('/').filter(p => p);
+    if (pathSegments.length === 0) {
+      setPaths(['Dashboard']);
+    } else {
+      setPaths(pathSegments.map(capitalize));
+    }
+  }, [location]);
+
+  // Keyboard shortcut for toggling sidebar (Ctrl/Cmd + B)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
+        event.preventDefault();
+        onToggleSidebar();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onToggleSidebar]);
 
   return (
-    <header className="glass-effect border-b border-border px-8 py-6 sticky top-0 z-10">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display font-bold text-3xl text-foreground">
-            Operations Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Real-time business intelligence and command center
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground">Last updated</p>
-            <p className="font-medium text-foreground">2 minutes ago</p>
-          </div>
-          
-          {/* Theme Toggle */}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-            data-testid="theme-toggle"
-          >
-            <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Toggle theme</span>
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onToggleSidebar}
+        className="h-8 w-8"
+        title={isSidebarVisible ? "Hide sidebar (⌘B)" : "Show sidebar (⌘B)"}
+      >
+        {isSidebarVisible ? (
+          <PanelLeftClose className="h-4 w-4" />
+        ) : (
+          <PanelLeftOpen className="h-4 w-4" />
+        )}
+      </Button>
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/">Home</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          {paths.map((path, index) => (
+            <div key={path} className="flex items-center">
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                {index === paths.length - 1 ? (
+                  <BreadcrumbPage>{path}</BreadcrumbPage>
+                ) : (
+                  <BreadcrumbLink asChild>
+                    <Link href={`/${path.toLowerCase()}`}>{path}</Link>
+                  </BreadcrumbLink>
+                )}
+              </BreadcrumbItem>
+            </div>
+          ))}
+        </BreadcrumbList>
+      </Breadcrumb>
+      <div className="ml-auto flex-1 md:max-w-md lg:max-w-lg xl:max-w-xl">
+        <GlobalSearch />
+      </div>
+      <div className="flex items-center gap-2">
+        <NotificationCenter />
+        <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="icon" className="overflow-hidden rounded-full">
+            <img src="https://placehold.co/36x36/EFEFEF/333333?text=A" width={36} height={36} alt="Avatar" />
           </Button>
-
-          <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-            <User className="w-5 h-5 text-primary-foreground" />
-          </div>
-        </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>Settings</DropdownMenuItem>
+          <DropdownMenuItem>Support</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>Logout</DropdownMenuItem>
+        </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );
