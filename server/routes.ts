@@ -320,6 +320,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customer KPIs endpoint
+  app.get("/api/customers/kpis", async (req, res) => {
+    try {
+      const customers = await storage.getCustomers();
+      const orders = await storage.getOrders();
+
+      const totalCustomers = customers.length;
+      const newCustomersThisMonth = customers.filter(customer => {
+        const customerDate = new Date(customer.createdAt);
+        const currentDate = new Date();
+        return customerDate.getMonth() === currentDate.getMonth() &&
+               customerDate.getFullYear() === currentDate.getFullYear();
+      }).length;
+
+      const totalRevenue = customers.reduce((sum, customer) => sum + parseFloat(customer.totalSpent || "0"), 0);
+      const avgOrderValue = orders.length > 0 ?
+        orders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0) / orders.length : 0;
+
+      const repeatCustomers = customers.filter(customer => (customer.totalOrders || 0) > 1).length;
+      const retentionRate = totalCustomers > 0 ? (repeatCustomers / totalCustomers) * 100 : 0;
+
+      res.json({
+        totalCustomers,
+        newCustomersThisMonth,
+        totalRevenue,
+        avgOrderValue,
+        retentionRate,
+      });
+    } catch (error) {
+      console.error('Failed to fetch customer KPIs:', error);
+      res.status(500).json({ message: "Failed to fetch customer KPIs" });
+    }
+  });
+
   // Customers endpoints
   app.get("/api/customers", async (req, res) => {
     try {

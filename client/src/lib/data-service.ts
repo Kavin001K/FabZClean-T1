@@ -212,6 +212,27 @@ export const customersApi = {
       console.error(`Failed to delete customer ${id}:`, error);
       return false;
     }
+  },
+
+  async getKPIs(): Promise<{
+    totalCustomers: number;
+    newCustomersThisMonth: number;
+    totalRevenue: number;
+    avgOrderValue: number;
+    retentionRate: number;
+  }> {
+    try {
+      return await fetchData('/customers/kpis');
+    } catch (error) {
+      console.error('Failed to fetch customer KPIs:', error);
+      return {
+        totalCustomers: 0,
+        newCustomersThisMonth: 0,
+        totalRevenue: 0,
+        avgOrderValue: 0,
+        retentionRate: 0,
+      };
+    }
   }
 };
 
