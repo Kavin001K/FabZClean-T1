@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertProductSchema, insertOrderSchema, insertCustomerSchema, insertOrderTransactionSchema, insertServiceSchema, insertShipmentSchema, insertBarcodeSchema, insertEmployeeSchema } from "../shared/schema";
+import { insertProductSchema, insertOrderSchema, insertCustomerSchema, insertOrderTransactionSchema, insertServiceSchema, insertShipmentSchema, insertBarcodeSchema, insertEmployeeSchema, insertDeliverySchema } from "../shared/schema";
 import { z } from "zod";
 import { getDatabaseHealth, pingDatabase, getDatabaseInfo } from "./db-utils";
 import { barcodeService } from "./barcode-service";
@@ -1018,6 +1018,208 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Tracking stopped successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to stop order tracking" });
+    }
+  });
+
+  // Driver Management endpoints
+  app.get("/api/drivers", async (req, res) => {
+    try {
+      // Return mock driver data for now
+      const drivers = [
+        {
+          id: "1",
+          name: "Rajesh Kumar",
+          phone: "+91 98765 43210",
+          email: "rajesh@example.com",
+          licenseNumber: "DL123456789",
+          vehicleNumber: "DL-01-AB-1234",
+          vehicleType: "bike",
+          vehicleModel: "Honda Activa",
+          status: "available",
+          rating: 4.8,
+          totalDeliveries: 156,
+          totalEarnings: 45200,
+          experience: 18,
+          specialties: ["Dry Cleaning", "Ironing"],
+          lastActive: new Date().toISOString()
+        },
+        {
+          id: "2",
+          name: "Priya Sharma",
+          phone: "+91 98765 43211",
+          email: "priya@example.com",
+          licenseNumber: "DL987654321",
+          vehicleNumber: "DL-01-CD-5678",
+          vehicleType: "car",
+          vehicleModel: "Maruti Swift",
+          status: "busy",
+          rating: 4.9,
+          totalDeliveries: 203,
+          totalEarnings: 67800,
+          experience: 24,
+          specialties: ["Premium Dry Cleaning", "Wedding Dresses"],
+          lastActive: new Date().toISOString()
+        },
+        {
+          id: "3",
+          name: "Amit Singh",
+          phone: "+91 98765 43212",
+          email: "amit@example.com",
+          licenseNumber: "DL456789123",
+          vehicleNumber: "DL-01-EF-9012",
+          vehicleType: "van",
+          vehicleModel: "Mahindra Bolero",
+          status: "available",
+          rating: 4.6,
+          totalDeliveries: 89,
+          totalEarnings: 32100,
+          experience: 12,
+          specialties: ["Bulk Orders", "Corporate Pickup"],
+          lastActive: new Date().toISOString()
+        }
+      ];
+      res.json(drivers);
+    } catch (error) {
+      console.error('Failed to fetch drivers:', error);
+      res.status(500).json({ message: "Failed to fetch drivers" });
+    }
+  });
+
+  app.post("/api/drivers", async (req, res) => {
+    try {
+      const driverData = req.body;
+      // In a real implementation, you would save this to the database
+      const newDriver = {
+        id: Date.now().toString(),
+        ...driverData,
+        status: "available",
+        rating: 0,
+        totalDeliveries: 0,
+        totalEarnings: 0,
+        lastActive: new Date().toISOString()
+      };
+      
+      res.status(201).json(newDriver);
+    } catch (error) {
+      console.error('Failed to create driver:', error);
+      res.status(500).json({ message: "Failed to create driver" });
+    }
+  });
+
+  app.put("/api/drivers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+      
+      // In a real implementation, you would update this in the database
+      const updatedDriver = {
+        id,
+        ...updateData,
+        lastActive: new Date().toISOString()
+      };
+      
+      res.json(updatedDriver);
+    } catch (error) {
+      console.error('Failed to update driver:', error);
+      res.status(500).json({ message: "Failed to update driver" });
+    }
+  });
+
+  app.delete("/api/drivers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // In a real implementation, you would delete this from the database
+      res.json({ message: "Driver deleted successfully" });
+    } catch (error) {
+      console.error('Failed to delete driver:', error);
+      res.status(500).json({ message: "Failed to delete driver" });
+    }
+  });
+
+  // Driver assignment endpoint
+  app.post("/api/orders/:orderId/assign-driver", async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const { driverId } = req.body;
+
+      if (!driverId) {
+        return res.status(400).json({ message: "Driver ID is required" });
+      }
+
+      // Get the order to verify it exists
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Mock driver data - in a real app, you'd fetch this from the database
+      const mockDrivers = {
+        "1": { name: "Rajesh Kumar", vehicleNumber: "DL-01-AB-1234" },
+        "2": { name: "Priya Sharma", vehicleNumber: "DL-01-CD-5678" },
+        "3": { name: "Amit Singh", vehicleNumber: "DL-01-EF-9012" }
+      };
+
+      const driverInfo = mockDrivers[driverId] || { 
+        name: `Driver ${driverId}`, 
+        vehicleNumber: `Vehicle-${driverId}` 
+      };
+
+      // Create or update delivery record
+      console.log('Creating delivery with data:', {
+        orderId,
+        driverName: driverInfo.name,
+        vehicleId: driverInfo.vehicleNumber,
+        status: "pending",
+        estimatedDelivery: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        location: { latitude: 28.6139, longitude: 77.2090 },
+        route: []
+      });
+      
+      const delivery = await storage.createDelivery({
+        orderId,
+        driverName: driverInfo.name,
+        vehicleId: driverInfo.vehicleNumber,
+        status: "pending",
+        estimatedDelivery: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+        location: { latitude: 28.6139, longitude: 77.2090 }, // Default to Delhi
+        route: []
+      });
+      
+      console.log('Delivery created successfully:', delivery);
+
+      // Broadcast the assignment via WebSocket
+      realtimeServer.broadcast({
+        type: 'driver_assigned',
+        data: {
+          orderId,
+          driverId,
+          driverName: delivery.driverName,
+          deliveryId: delivery.id
+        }
+      });
+
+      res.json({
+        message: "Driver assigned successfully",
+        delivery: {
+          id: delivery.id,
+          orderId: delivery.orderId,
+          driverName: delivery.driverName,
+          status: delivery.status
+        }
+      });
+    } catch (error) {
+      console.error('Failed to assign driver:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      res.status(500).json({ 
+        message: "Failed to assign driver to order",
+        error: error.message,
+        details: error.stack
+      });
     }
   });
 

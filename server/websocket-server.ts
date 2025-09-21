@@ -181,6 +181,11 @@ class RealtimeServer {
     await this.broadcastAnalyticsUpdate();
   }
 
+  // Method to broadcast custom messages
+  public broadcast(message: { type: string; data: any }) {
+    this.broadcastToSubscribers(message.type, message.data);
+  }
+
   public stop() {
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
