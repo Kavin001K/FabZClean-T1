@@ -2,13 +2,18 @@
 // This replaces all dummy data with real database queries
 
 // Import types from shared schema instead of defining them here
-import type { Order, Customer } from "../../../shared/schema";
+import type { Order, Customer, Service, Product } from "../../../shared/schema";
 
 export type InventoryItem = {
   id: string;
   name: string;
   stock: number;
   status: 'In Stock' | 'Low Stock' | 'Out of Stock';
+  category?: string;
+  sku?: string;
+  price?: number;
+  reorderLevel?: number;
+  supplier?: string;
 };
 
 export type SalesData = {
@@ -239,10 +244,93 @@ export const inventoryApi = {
         name: rawData.name,
         stock: rawData.stockQuantity,
         status: rawData.stockQuantity === 0 ? 'Out of Stock' as const :
-                rawData.stockQuantity <= 25 ? 'Low Stock' as const : 'In Stock' as const
+                rawData.stockQuantity <= (rawData.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const
       };
     } catch (error) {
       console.error(`Failed to fetch inventory item ${id}:`, error);
+      return null;
+    }
+  },
+
+  async create(item: Partial<InventoryItem>): Promise<InventoryItem | null> {
+    try {
+      const response = await fetch(`${API_BASE}/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: item.name,
+          sku: item.sku || `SKU-${Date.now()}`,
+          category: item.category || 'General',
+          price: item.price?.toString() || '0',
+          stockQuantity: item.stock || 0,
+          reorderLevel: item.reorderLevel || 10,
+          supplier: item.supplier || '',
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to create inventory item');
+      const product = await response.json();
+      return {
+        id: product.id,
+        name: product.name,
+        stock: product.stockQuantity,
+        status: product.stockQuantity === 0 ? 'Out of Stock' as const :
+                product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const
+      };
+    } catch (error) {
+      console.error('Failed to create inventory item:', error);
+      return null;
+    }
+  },
+
+  async update(id: string, item: Partial<InventoryItem>): Promise<InventoryItem | null> {
+    try {
+      const response = await fetch(`${API_BASE}/products/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: item.name,
+          sku: item.sku,
+          category: item.category,
+          price: item.price?.toString(),
+          stockQuantity: item.stock,
+          reorderLevel: item.reorderLevel,
+          supplier: item.supplier,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to update inventory item');
+      const product = await response.json();
+      return {
+        id: product.id,
+        name: product.name,
+        stock: product.stockQuantity,
+        status: product.stockQuantity === 0 ? 'Out of Stock' as const :
+                product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const
+      };
+    } catch (error) {
+      console.error('Failed to update inventory item:', error);
+      return null;
+    }
+  },
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE}/products/${id}`, {
+        method: 'DELETE',
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Failed to delete inventory item:', error);
+      return false;
+    }
+  },
+
+  async updateStock(id: string, newStock: number): Promise<InventoryItem | null> {
+    try {
+      const item = await this.getById(id);
+      if (!item) return null;
+      return await this.update(id, { stock: newStock });
+    } catch (error) {
+      console.error('Failed to update stock:', error);
       return null;
     }
   }
@@ -396,4 +484,67 @@ export const getPreviousStatus = (currentStatus: Order['status']): Order['status
     return null;
   }
   return orderWorkflow[currentIndex - 1] as Order['status'];
+};
+
+// Services API
+export const servicesApi = {
+  async getAll(): Promise<Service[]> {
+    try {
+      return await fetchData<Service[]>('/services');
+    } catch (error) {
+      console.error('Failed to fetch services:', error);
+      return [];
+    }
+  },
+
+  async getById(id: string): Promise<Service | null> {
+    try {
+      return await fetchData<Service>(`/services/${id}`);
+    } catch (error) {
+      console.error(`Failed to fetch service ${id}:`, error);
+      return null;
+    }
+  },
+
+  async create(service: Partial<Service>): Promise<Service | null> {
+    try {
+      const response = await fetch(`${API_BASE}/services`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(service),
+      });
+      if (!response.ok) throw new Error('Failed to create service');
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to create service:', error);
+      return null;
+    }
+  },
+
+  async update(id: string, service: Partial<Service>): Promise<Service | null> {
+    try {
+      const response = await fetch(`${API_BASE}/services/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(service),
+      });
+      if (!response.ok) throw new Error('Failed to update service');
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to update service:', error);
+      return null;
+    }
+  },
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE}/services/${id}`, {
+        method: 'DELETE',
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Failed to delete service:', error);
+      return false;
+    }
+  },
 };

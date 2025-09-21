@@ -64,30 +64,36 @@ const CustomerRow: React.FC<CustomerRowProps> = React.memo(({
 
   return (
     <TableRow 
-      className="cursor-pointer hover:bg-muted/50 transition-colors"
+      className="cursor-pointer hover:bg-muted/50 transition-all duration-200 group"
       onClick={() => onView(customer)}
     >
       <TableCell>
         <div className="space-y-1">
-          <div className="font-medium flex items-center gap-2">
+          <div className="font-medium flex items-center gap-2 group-hover:text-primary transition-colors">
             {customer.name}
-            <Badge variant={status.variant} className="text-xs">
+            <Badge variant={status.variant} className="text-xs group-hover:scale-105 transition-transform">
               {status.label}
             </Badge>
           </div>
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground group-hover:text-muted-foreground/80 transition-colors">
             {customer.email}
           </div>
         </div>
       </TableCell>
       <TableCell className="text-center">
-        <span className="font-medium">{customer.totalOrders || 0}</span>
+        <span className="font-medium group-hover:text-primary transition-colors">
+          {customer.totalOrders || 0}
+        </span>
       </TableCell>
       <TableCell className="text-center">
-        {formatDate(customer.createdAt || new Date())}
+        <span className="group-hover:text-primary transition-colors">
+          {formatDate(customer.createdAt || new Date())}
+        </span>
       </TableCell>
       <TableCell className="text-center">
-        {customer.phone || 'N/A'}
+        <span className="group-hover:text-primary transition-colors">
+          {customer.phone || 'N/A'}
+        </span>
       </TableCell>
       <TableCell>
         <div onClick={(e) => e.stopPropagation()}>

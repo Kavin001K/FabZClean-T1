@@ -20,6 +20,7 @@ import {
 import { formatCurrency, formatDate, getNextStatus } from "@/lib/data-service";
 import type { Order } from "../../../shared/schema";
 import { cn } from "@/lib/utils";
+import { useInvoicePrint } from "@/hooks/use-invoice-print";
 
 export interface OrderDetailsDialogProps {
   order: Order | null;
@@ -69,6 +70,23 @@ export default React.memo(function OrderDetailsDialog({
   onNextStep,
   onPrintInvoice,
 }: OrderDetailsDialogProps) {
+  const { printInvoice } = useInvoicePrint({
+    onSuccess: (invoiceData) => {
+      console.log('Invoice printed successfully:', invoiceData);
+      // Call the original onPrintInvoice callback if provided
+      onPrintInvoice(order);
+    },
+    onError: (error) => {
+      console.error('Invoice print failed:', error);
+    }
+  });
+
+  const handlePrintInvoice = () => {
+    if (order) {
+      printInvoice(order);
+    }
+  };
+
   if (!order) return null;
 
   const nextStatus = getNextStatus(order.status);
@@ -214,7 +232,7 @@ export default React.memo(function OrderDetailsDialog({
             
             <Button 
               variant="outline" 
-              onClick={() => onPrintInvoice(order)}
+              onClick={handlePrintInvoice}
               className="gap-2"
             >
               <Printer className="h-4 w-4" />

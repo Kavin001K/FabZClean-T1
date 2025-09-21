@@ -1,29 +1,23 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Users, UserPlus, Repeat, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, Package, DollarSign, Clock, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
+import type { Service } from '../../../shared/schema';
 
-interface CustomerKpiData {
-  totalCustomers: number;
-  newCustomers: number;
-  repeatCustomers: number;
-  averageSpend: number;
-  totalCustomersChange: number;
-  newCustomersChange: number;
-  repeatCustomersChange: number;
-  averageSpendChange: number;
-  // Additional metrics for demo
+interface ServiceKpiData {
+  totalServices: number;
+  activeServices: number;
+  averagePrice: number;
   totalRevenue: number;
+  totalServicesChange: number;
+  activeServicesChange: number;
+  averagePriceChange: number;
   totalRevenueChange: number;
-  averageOrderValue: number;
-  averageOrderValueChange: number;
-  customerRetentionRate: number;
-  customerRetentionRateChange: number;
 }
 
-interface CustomerKPIsProps {
-  data?: CustomerKpiData;
+interface ServiceKPIsProps {
+  data?: ServiceKpiData;
   isLoading: boolean;
   isError: boolean;
 }
@@ -85,7 +79,7 @@ const KpiCard: React.FC<KpiCardProps> = React.memo(({
   );
 });
 
-export const CustomerKPIs: React.FC<CustomerKPIsProps> = React.memo(({ 
+export const ServiceKPIs: React.FC<ServiceKPIsProps> = React.memo(({ 
   data, 
   isLoading, 
   isError 
@@ -141,39 +135,39 @@ export const CustomerKPIs: React.FC<CustomerKPIsProps> = React.memo(({
 
   const kpiData = [
     {
-      title: "Total Customers",
-      value: formatNumber(data.totalCustomers),
-      change: `${formatPercentage(data.totalCustomersChange)} this month`,
-      changeType: getChangeType(data.totalCustomersChange),
-      icon: <Users className="h-5 w-5" />,
-      description: "All registered customers",
+      title: "Total Services",
+      value: formatNumber(data.totalServices),
+      change: `${formatPercentage(data.totalServicesChange)} this month`,
+      changeType: getChangeType(data.totalServicesChange),
+      icon: <Package className="h-5 w-5" />,
+      description: "All available services",
       color: "text-blue-600"
     },
     {
-      title: "New Customers",
-      value: formatNumber(data.newCustomers),
-      change: `${formatPercentage(data.newCustomersChange)} this week`,
-      changeType: getChangeType(data.newCustomersChange),
-      icon: <UserPlus className="h-5 w-5" />,
-      description: "Customers joined recently",
+      title: "Active Services",
+      value: formatNumber(data.activeServices),
+      change: `${formatPercentage(data.activeServicesChange)} this week`,
+      changeType: getChangeType(data.activeServicesChange),
+      icon: <Star className="h-5 w-5" />,
+      description: "Currently available",
       color: "text-green-600"
     },
     {
-      title: "Repeat Rate",
-      value: `${data.repeatCustomers.toFixed(1)}%`,
-      change: `${formatPercentage(data.repeatCustomersChange)} this month`,
-      changeType: getChangeType(data.repeatCustomersChange),
-      icon: <Repeat className="h-5 w-5" />,
-      description: "Customers with multiple orders",
+      title: "Average Price",
+      value: formatCurrency(data.averagePrice),
+      change: `${formatPercentage(data.averagePriceChange)} from last month`,
+      changeType: getChangeType(data.averagePriceChange),
+      icon: <DollarSign className="h-5 w-5" />,
+      description: "Per service pricing",
       color: "text-purple-600"
     },
     {
-      title: "Average Spend",
-      value: formatCurrency(data.averageSpend),
-      change: `${formatPercentage(data.averageSpendChange)} from last month`,
-      changeType: getChangeType(data.averageSpendChange),
-      icon: <DollarSign className="h-5 w-5" />,
-      description: "Per customer lifetime value",
+      title: "Total Revenue",
+      value: formatCurrency(data.totalRevenue),
+      change: `${formatPercentage(data.totalRevenueChange)} this month`,
+      changeType: getChangeType(data.totalRevenueChange),
+      icon: <TrendingUp className="h-5 w-5" />,
+      description: "From all services",
       color: "text-orange-600"
     }
   ];
@@ -187,4 +181,4 @@ export const CustomerKPIs: React.FC<CustomerKPIsProps> = React.memo(({
   );
 });
 
-export default CustomerKPIs;
+export default ServiceKPIs;

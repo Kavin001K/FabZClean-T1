@@ -1,29 +1,26 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Users, UserPlus, Repeat, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, Package, DollarSign, AlertTriangle, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
+import { formatCurrency } from '@/lib/data-service';
+import type { InventoryItem } from '@/lib/data-service';
 
-interface CustomerKpiData {
-  totalCustomers: number;
-  newCustomers: number;
-  repeatCustomers: number;
-  averageSpend: number;
-  totalCustomersChange: number;
-  newCustomersChange: number;
-  repeatCustomersChange: number;
-  averageSpendChange: number;
-  // Additional metrics for demo
-  totalRevenue: number;
-  totalRevenueChange: number;
-  averageOrderValue: number;
-  averageOrderValueChange: number;
-  customerRetentionRate: number;
-  customerRetentionRateChange: number;
+interface InventoryKpiData {
+  totalItems: number;
+  totalValue: number;
+  inStockItems: number;
+  lowStockItems: number;
+  outOfStockItems: number;
+  totalItemsChange: number;
+  totalValueChange: number;
+  inStockItemsChange: number;
+  lowStockItemsChange: number;
+  outOfStockItemsChange: number;
 }
 
-interface CustomerKPIsProps {
-  data?: CustomerKpiData;
+interface InventoryKPIsProps {
+  data?: InventoryKpiData;
   isLoading: boolean;
   isError: boolean;
 }
@@ -85,7 +82,7 @@ const KpiCard: React.FC<KpiCardProps> = React.memo(({
   );
 });
 
-export const CustomerKPIs: React.FC<CustomerKPIsProps> = React.memo(({ 
+export const InventoryKPIs: React.FC<InventoryKPIsProps> = React.memo(({ 
   data, 
   isLoading, 
   isError 
@@ -116,15 +113,6 @@ export const CustomerKPIs: React.FC<CustomerKPIsProps> = React.memo(({
     );
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat('en-IN').format(num);
   };
@@ -141,39 +129,39 @@ export const CustomerKPIs: React.FC<CustomerKPIsProps> = React.memo(({
 
   const kpiData = [
     {
-      title: "Total Customers",
-      value: formatNumber(data.totalCustomers),
-      change: `${formatPercentage(data.totalCustomersChange)} this month`,
-      changeType: getChangeType(data.totalCustomersChange),
-      icon: <Users className="h-5 w-5" />,
-      description: "All registered customers",
+      title: "Total Items",
+      value: formatNumber(data.totalItems),
+      change: `${formatPercentage(data.totalItemsChange)} this month`,
+      changeType: getChangeType(data.totalItemsChange),
+      icon: <Package className="h-5 w-5" />,
+      description: "All inventory items",
       color: "text-blue-600"
     },
     {
-      title: "New Customers",
-      value: formatNumber(data.newCustomers),
-      change: `${formatPercentage(data.newCustomersChange)} this week`,
-      changeType: getChangeType(data.newCustomersChange),
-      icon: <UserPlus className="h-5 w-5" />,
-      description: "Customers joined recently",
+      title: "Total Value",
+      value: formatCurrency(data.totalValue),
+      change: `${formatPercentage(data.totalValueChange)} this month`,
+      changeType: getChangeType(data.totalValueChange),
+      icon: <DollarSign className="h-5 w-5" />,
+      description: "Inventory value",
       color: "text-green-600"
     },
     {
-      title: "Repeat Rate",
-      value: `${data.repeatCustomers.toFixed(1)}%`,
-      change: `${formatPercentage(data.repeatCustomersChange)} this month`,
-      changeType: getChangeType(data.repeatCustomersChange),
-      icon: <Repeat className="h-5 w-5" />,
-      description: "Customers with multiple orders",
-      color: "text-purple-600"
+      title: "In Stock",
+      value: formatNumber(data.inStockItems),
+      change: `${formatPercentage(data.inStockItemsChange)} this week`,
+      changeType: getChangeType(data.inStockItemsChange),
+      icon: <CheckCircle className="h-5 w-5" />,
+      description: "Items available",
+      color: "text-green-600"
     },
     {
-      title: "Average Spend",
-      value: formatCurrency(data.averageSpend),
-      change: `${formatPercentage(data.averageSpendChange)} from last month`,
-      changeType: getChangeType(data.averageSpendChange),
-      icon: <DollarSign className="h-5 w-5" />,
-      description: "Per customer lifetime value",
+      title: "Low Stock",
+      value: formatNumber(data.lowStockItems),
+      change: `${formatPercentage(data.lowStockItemsChange)} this week`,
+      changeType: getChangeType(data.lowStockItemsChange),
+      icon: <AlertTriangle className="h-5 w-5" />,
+      description: "Items need restocking",
       color: "text-orange-600"
     }
   ];
@@ -187,4 +175,4 @@ export const CustomerKPIs: React.FC<CustomerKPIsProps> = React.memo(({
   );
 });
 
-export default CustomerKPIs;
+export default InventoryKPIs;

@@ -10,6 +10,13 @@ interface CustomerKpiData {
   newCustomersChange: number;
   repeatCustomersChange: number;
   averageSpendChange: number;
+  // Additional metrics for demo
+  totalRevenue: number;
+  totalRevenueChange: number;
+  averageOrderValue: number;
+  averageOrderValueChange: number;
+  customerRetentionRate: number;
+  customerRetentionRateChange: number;
 }
 
 // Mock API function for customer KPIs - in real app this would be a proper endpoint
@@ -44,11 +51,19 @@ const fetchCustomerKPIs = async (): Promise<CustomerKpiData> => {
   // Calculate repeat rate percentage
   const repeatRate = totalCustomers > 0 ? (repeatCustomers / totalCustomers) * 100 : 0;
   
+  // Calculate additional metrics
+  const totalRevenue = totalSpent;
+  const averageOrderValue = totalRevenue / Math.max(totalOrders, 1);
+  const customerRetentionRate = repeatRate;
+
   // Mock change percentages (in real app, these would be calculated from historical data)
   const totalCustomersChange = Math.random() * 20 - 5; // -5% to +15%
   const newCustomersChange = Math.random() * 30 - 10; // -10% to +20%
   const repeatCustomersChange = Math.random() * 10 - 2; // -2% to +8%
   const averageSpendChange = Math.random() * 25 - 5; // -5% to +20%
+  const totalRevenueChange = Math.random() * 30 - 8; // -8% to +22%
+  const averageOrderValueChange = Math.random() * 15 - 3; // -3% to +12%
+  const customerRetentionRateChange = Math.random() * 8 - 2; // -2% to +6%
   
   return {
     totalCustomers,
@@ -59,6 +74,12 @@ const fetchCustomerKPIs = async (): Promise<CustomerKpiData> => {
     newCustomersChange,
     repeatCustomersChange,
     averageSpendChange,
+    totalRevenue,
+    totalRevenueChange,
+    averageOrderValue,
+    averageOrderValueChange,
+    customerRetentionRate,
+    customerRetentionRateChange,
   };
 };
 

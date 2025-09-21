@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
+import { useInvoicePrint } from "@/hooks/use-invoice-print";
 
 // Components
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -233,12 +234,18 @@ function OrdersComponent() {
     });
   }, [updateOrderStatusMutation]);
 
+  const { printInvoice } = useInvoicePrint({
+    onSuccess: (invoiceData) => {
+      console.log('Invoice printed successfully:', invoiceData);
+    },
+    onError: (error) => {
+      console.error('Invoice print failed:', error);
+    }
+  });
+
   const handlePrintInvoice = useCallback((order: Order) => {
-    toast({
-      title: "Print Invoice",
-      description: `Printing invoice for order ${order.id}`,
-    });
-  }, [toast]);
+    printInvoice(order);
+  }, [printInvoice]);
 
   const handleNextStep = useCallback((order: Order) => {
     const statusFlow = ['pending', 'processing', 'completed'];

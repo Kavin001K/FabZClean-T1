@@ -9,6 +9,7 @@ import ErrorBoundary from "@/components/ui/error-boundary";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Orders from "@/pages/orders";
+import OrderDetail from "@/pages/order-detail";
 import Services from "@/pages/services";
 import CreateOrder from "@/pages/create-order";
 import Tracking from "@/pages/tracking";
@@ -32,6 +33,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/orders" component={Orders} />
+        <Route path="/orders/:id" component={OrderDetail} />
         <Route path="/inventory" component={Inventory} />
         <Route path="/customers" component={Customers} />
         <Route path="/analytics" component={Analytics} />

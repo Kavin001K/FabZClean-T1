@@ -1,255 +1,327 @@
-import {
-  File,
-  ListFilter,
-  MoreHorizontal,
-  PlusCircle,
-  Search,
-} from "lucide-react"
+import React, { useState, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { PlusCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { useQuery } from "@tanstack/react-query"
-import type { Service } from "../../shared/schema"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { useState } from "react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from '@/components/ui/card';
 
-const kpiData = [
-    { title: "Total Services", value: "24", change: "+5 this month", changeType: "positive" },
-    { title: "Most Popular", value: "Dry Cleaning", change: "1,200 orders", changeType: "positive" },
-    { title: "Highest Revenue", value: "Premium Laundry", change: "₹150,000", changeType: "positive" },
-    { title: "Newest Service", value: "Leather Care", change: "Added 2 weeks ago", changeType: "positive" },
-];
+// Import child components
+import { ServiceKPIs } from '@/components/services/service-kpis';
+import { ServiceAccordion } from '@/components/services/service-accordion';
+import { ServiceSearchFilter } from '@/components/services/service-search-filter';
+import { ServiceDialogs } from '@/components/services/service-dialogs';
+
+// Import hooks
+import { useServiceKPIs } from '@/hooks/use-service-kpis';
+import { useServiceFilters } from '@/hooks/use-service-filters';
+
+// Import data service and types
+import { servicesApi } from '@/lib/data-service';
+import type { Service } from '../../shared/schema';
 
 export default function Services() {
-  const { data: services, isLoading } = useQuery<Service[]>({
-    queryKey: ["services"],
-  });
+  // State for dialog management
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
 
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch services data with React Query
+  const {
+    data: services = [],
+    isLoading: servicesLoading,
+    isError: servicesError,
+    error: servicesErrorDetails,
+  } = useQuery({
+    queryKey: ['services'],
+    queryFn: servicesApi.getAll,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 10 * 60 * 1000, // 10 minutes
+    retry: 3,
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
+
+  // Fetch service KPIs
+  const {
+    data: kpiData,
+    isLoading: kpisLoading,
+    isError: kpisError,
+  } = useServiceKPIs();
+
+  // Service filtering and search
+  const {
+    searchQuery,
+    setSearchQuery,
+    activeFilters,
+    setActiveFilters,
+    filteredServices,
+    clearFilters,
+  } = useServiceFilters(services);
+
+  // Service creation mutation
+  const createServiceMutation = useMutation({
+    mutationFn: async (serviceData: Partial<Service>) => {
+      return await servicesApi.create(serviceData);
+    },
+    onSuccess: (newService) => {
+      if (newService) {
+        // Invalidate queries to refetch data
+        queryClient.invalidateQueries({ queryKey: ["services"] });
+        queryClient.invalidateQueries({ queryKey: ["service-kpis"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
+        
+        toast({
+          title: "Service Created Successfully",
+          description: `Service ${newService.name} has been added to the catalog.`,
+        });
+
+        setIsCreateDialogOpen(false);
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to create service:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create service. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Service edit mutation
+  const editServiceMutation = useMutation({
+    mutationFn: async ({ serviceId, serviceData }: { serviceId: string; serviceData: Partial<Service> }) => {
+      return await servicesApi.update(serviceId, serviceData);
+    },
+    onSuccess: (updatedService) => {
+      if (updatedService) {
+        // Invalidate queries to refetch data
+        queryClient.invalidateQueries({ queryKey: ["services"] });
+        queryClient.invalidateQueries({ queryKey: ["service-kpis"] });
+        
+        toast({
+          title: "Service Updated Successfully",
+          description: `Service ${updatedService.name} has been updated.`,
+        });
+
+        setIsEditDialogOpen(false);
+        setSelectedService(null);
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to update service:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update service. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Service delete mutation
+  const deleteServiceMutation = useMutation({
+    mutationFn: async (serviceId: string) => {
+      return await servicesApi.delete(serviceId);
+    },
+    onSuccess: (success, serviceId) => {
+      if (success) {
+        // Invalidate queries to refetch data
+        queryClient.invalidateQueries({ queryKey: ["services"] });
+        queryClient.invalidateQueries({ queryKey: ["service-kpis"] });
+        
+        toast({
+          title: "Service Deleted Successfully",
+          description: "Service has been removed from the catalog.",
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to delete service:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete service. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handler functions
+  const handleEditService = (service: Service) => {
+    setSelectedService(service);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteService = (serviceId: string) => {
+    deleteServiceMutation.mutate(serviceId);
+  };
+
+  const handleCreateService = (serviceData: Partial<Service>) => {
+    createServiceMutation.mutate(serviceData);
+  };
+
+  const handleUpdateService = (serviceData: Partial<Service>) => {
+    if (!selectedService) return;
+    editServiceMutation.mutate({
+      serviceId: selectedService.id,
+      serviceData,
+    });
+  };
+
+  const handleAddProduct = useCallback((serviceId: string) => {
+    // In a real app, this would open a product dialog
+    toast({
+      title: "Add Product",
+      description: `Adding product to service ${serviceId}. This feature will be implemented with the products API.`,
+    });
+  }, [toast]);
+
+  const handleEditProduct = useCallback((serviceId: string, productId: string) => {
+    // In a real app, this would open a product edit dialog
+    toast({
+      title: "Edit Product",
+      description: `Editing product ${productId} in service ${serviceId}. This feature will be implemented with the products API.`,
+    });
+  }, [toast]);
+
+  const handleDeleteProduct = useCallback((serviceId: string, productId: string) => {
+    // In a real app, this would delete the product
+    toast({
+      title: "Delete Product",
+      description: `Deleting product ${productId} from service ${serviceId}. This feature will be implemented with the products API.`,
+    });
+  }, [toast]);
+
+  const handleExportCSV = useCallback(() => {
+    // In a real app, this would export services to CSV
+    toast({
+      title: "Export CSV",
+      description: "Exporting services to CSV. This feature will be implemented with export utilities.",
+    });
+  }, [toast]);
+
+  const handleExportPDF = useCallback(() => {
+    // In a real app, this would export services to PDF
+    toast({
+      title: "Export PDF",
+      description: "Exporting services to PDF. This feature will be implemented with export utilities.",
+    });
+  }, [toast]);
+
+  // Error state
+  if (servicesError) {
   return (
-    <div className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {kpiData.map((kpi) => (
-                <Card key={kpi.title}>
-                    <CardHeader>
-                        <CardTitle>{kpi.title}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{kpi.value}</div>
-                        <p className={`text-xs ${kpi.changeType === "positive" ? "text-green-500" : "text-red-500"}`}>{kpi.change}</p>
+      <div className="flex flex-1 items-center justify-center p-8">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <div className="text-destructive text-lg font-semibold">
+                Failed to load services
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {servicesErrorDetails?.message || 'An unexpected error occurred'}
+              </p>
+              <Button 
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['services'] })}
+                variant="outline"
+              >
+                Try Again
+              </Button>
+            </div>
                     </CardContent>
                 </Card>
-            ))}
         </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+      {/* KPI Cards */}
+      <ServiceKPIs 
+        data={kpiData} 
+        isLoading={kpisLoading} 
+        isError={kpisError} 
+      />
+
+      {/* Main Service Management Card */}
       <Card>
         <CardHeader>
-          <div className="flex items-center">
+          <div className="flex items-center justify-between">
             <div>
-                <CardTitle>Services</CardTitle>
+              <CardTitle>Service Management</CardTitle>
                 <CardDescription>
-                Manage your services and view their details.
+                Manage your services, add products, and track service performance.
                 </CardDescription>
             </div>
-            <div className="ml-auto flex items-center gap-2">
-                <Button variant="outline" size="sm" className="h-8 gap-1">
-                    <File className="h-3.5 w-3.5" />
-                    <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                    Export
-                    </span>
-                </Button>
-                <Dialog>
-                    <DialogTrigger asChild>
-                        <Button size="sm" className="h-8 gap-1 bg-accent text-accent-foreground hover:bg-accent/90">
-                            <PlusCircle className="h-3.5 w-3.5" />
-                            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+            <Button 
+              onClick={() => setIsCreateDialogOpen(true)}
+              className="gap-2"
+            >
+              <PlusCircle className="h-4 w-4" />
                             Add Service
-                            </span>
                         </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Add New Service</DialogTitle>
-                        </DialogHeader>
-                        <div className="py-4 space-y-4">
-                            <div>
-                                <Label htmlFor="serviceName">Service Name</Label>
-                                <Input id="serviceName" />
-                            </div>
-                            <div>
-                                <Label htmlFor="servicePrice">Price</Label>
-                                <Input id="servicePrice" type="number" />
-                            </div>
-                            <div>
-                                <Label htmlFor="serviceDuration">Duration</Label>
-                                <Input id="serviceDuration" />
-                            </div>
-                            <Button>Save Service</Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-            </div>
           </div>
         </CardHeader>
+        
         <CardContent>
-        <div className="flex items-center justify-between mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search services..."
-                className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
-              />
-            </div>
-            <Button variant="outline" size="sm" className="h-8 gap-1">
-                <ListFilter className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Filter
-                </span>
-            </Button>
+          {/* Search and Filter Controls */}
+          <div className="mb-6">
+            <ServiceSearchFilter
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              activeFilters={activeFilters}
+              onFilterChange={setActiveFilters}
+              onExportCSV={handleExportCSV}
+              onExportPDF={handleExportPDF}
+              services={services}
+              filteredCount={filteredServices.length}
+            />
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Service</TableHead>
-                <TableHead className="hidden sm:table-cell">Category</TableHead>
-                <TableHead className="hidden sm:table-cell">Price</TableHead>
-                <TableHead className="hidden md:table-cell">Duration</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-                {isLoading ? (
-                    <TableRow>
-                        <TableCell colSpan={6} className="text-center">Loading services...</TableCell>
-                    </TableRow>
-                ) : (
-                    services?.map((service) => (
-                        <TableRow key={service.id} className="interactive-row">
-                            <TableCell className="font-medium">{service.name}</TableCell>
-                            <TableCell className="hidden sm:table-cell">{service.category}</TableCell>
-                            <TableCell className="hidden sm:table-cell">₹{parseFloat(service.price).toFixed(2)}</TableCell>
-                            <TableCell className="hidden md:table-cell">{service.duration}</TableCell>
-                            <TableCell>
-                                <Badge 
-                                  variant={service.status === 'Active' ? 'default' : 'secondary'}
-                                  className={service.status === 'Active' ? 'bg-accent text-accent-foreground' : ''}
-                                >
-                                  {service.status}
-                                </Badge>
-                            </TableCell>
-                            <TableCell>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button aria-haspopup="true" size="icon" variant="ghost">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                            <span className="sr-only">Toggle menu</span>
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                        <DropdownMenuItem onClick={() => {
-                                            setSelectedService(service);
-                                            setIsEditDialogOpen(true);
-                                        }}>Edit</DropdownMenuItem>
-                                        <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                                <DropdownMenuItem className="text-red-500" onSelect={(e) => e.preventDefault()}>Delete</DropdownMenuItem>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent>
-                                               <AlertDialogHeader>
-                                                   <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                   <AlertDialogDescription>
-                                                       This action cannot be undone. This will permanently delete the service.
-                                                   </AlertDialogDescription>
-                                               </AlertDialogHeader>
-                                               <AlertDialogFooter>
-                                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                   <AlertDialogAction>Delete</AlertDialogAction>
-                                               </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </TableCell>
-                        </TableRow>
-                    ))
-                )}
-              </TableBody>
-            </Table>
+
+          {/* Services Accordion */}
+          <ServiceAccordion
+            services={filteredServices}
+            isLoading={servicesLoading}
+            onEditService={handleEditService}
+            onDeleteService={handleDeleteService}
+            onAddProduct={handleAddProduct}
+            onEditProduct={handleEditProduct}
+            onDeleteProduct={handleDeleteProduct}
+            isDeleting={deleteServiceMutation.isPending}
+          />
           </CardContent>
-          <CardFooter>
-            <div className="text-xs text-muted-foreground">
-              Showing <strong>1-{services?.length || 0}</strong> of <strong>{services?.length || 0}</strong> services
-            </div>
-          </CardFooter>
       </Card>
-      {selectedService && (
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Edit Service</DialogTitle>
-                </DialogHeader>
-                <div className="py-4 space-y-4">
-                    <div>
-                        <Label htmlFor="serviceName">Service Name</Label>
-                        <Input id="serviceName" defaultValue={selectedService.name} />
-                    </div>
-                    <div>
-                        <Label htmlFor="servicePrice">Price</Label>
-                        <Input id="servicePrice" type="number" defaultValue={selectedService.price} />
-                    </div>
-                    <div>
-                        <Label htmlFor="serviceDuration">Duration</Label>
-                        <Input id="serviceDuration" defaultValue={selectedService.duration} />
-                    </div>
-                    <Button>Save Changes</Button>
-                </div>
-            </DialogContent>
-        </Dialog>
-      )}
+
+      {/* Service Dialogs */}
+      <ServiceDialogs
+        selectedService={selectedService}
+        isEditDialogOpen={isEditDialogOpen}
+        isCreateDialogOpen={isCreateDialogOpen}
+        isProductDialogOpen={isProductDialogOpen}
+        isCreating={createServiceMutation.isPending}
+        isUpdating={editServiceMutation.isPending}
+        onCloseEditDialog={() => setIsEditDialogOpen(false)}
+        onCloseCreateDialog={() => setIsCreateDialogOpen(false)}
+        onCloseProductDialog={() => setIsProductDialogOpen(false)}
+        onEditService={handleUpdateService}
+        onCreateService={handleCreateService}
+        onCreateProduct={() => {
+          // This would handle product creation
+          toast({
+            title: "Create Product",
+            description: "Product creation will be implemented with the products API.",
+          });
+        }}
+      />
     </div>
-  )
+  );
 }

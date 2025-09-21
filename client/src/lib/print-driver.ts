@@ -137,23 +137,105 @@ export interface LabelPrintData {
 
 export interface InvoicePrintData {
   invoiceNumber: string;
+  invoiceDate: string;
+  dueDate?: string;
+  orderNumber?: string;
   customerInfo: {
     name: string;
     address: string;
     phone: string;
     email: string;
   };
+  companyInfo: {
+    name: string;
+    address: string;
+    phone: string;
+    email: string;
+    website?: string;
+    taxId?: string;
+  };
   items: Array<{
     name: string;
+    description?: string;
     quantity: number;
-    price: number;
+    unitPrice: number;
     total: number;
+    taxRate?: number;
   }>;
   subtotal: number;
   tax: number;
+  discount?: number;
   total: number;
-  paymentMethod: string;
+  paymentMethod?: string;
+  paymentStatus?: string;
   notes?: string;
+  terms?: string;
+  status?: string;
+}
+
+// Utility function to convert Order data to InvoicePrintData
+export function convertOrderToInvoiceData(order: any): InvoicePrintData {
+  // Default company information
+  const companyInfo = {
+    name: "FabZClean",
+    address: "123 Business Street, City, State 12345",
+    phone: "+1 (555) 123-4567",
+    email: "info@fabzclean.com",
+    website: "www.fabzclean.com",
+    taxId: "TAX-123456789"
+  };
+
+  // Parse order items
+  let items: InvoicePrintData['items'] = [];
+  if (order.items && Array.isArray(order.items)) {
+    items = order.items.map((item: any) => ({
+      name: item.name || item.description || 'Service Item',
+      description: item.description,
+      quantity: item.quantity || 1,
+      unitPrice: item.unitPrice || item.price || 0,
+      total: (item.quantity || 1) * (item.unitPrice || item.price || 0),
+      taxRate: item.taxRate || 0.1 // Default 10% tax
+    }));
+  } else {
+    // Fallback for orders without structured items
+    items = [{
+      name: 'Dry Cleaning Service',
+      description: `Order ${order.orderNumber}`,
+      quantity: 1,
+      unitPrice: parseFloat(order.totalAmount) || 0,
+      total: parseFloat(order.totalAmount) || 0,
+      taxRate: 0.1
+    }];
+  }
+
+  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+  const tax = items.reduce((sum, item) => sum + (item.total * (item.taxRate || 0.1)), 0);
+  const total = subtotal + tax;
+
+  return {
+    invoiceNumber: `INV-${order.orderNumber || order.id}`,
+    invoiceDate: new Date().toISOString().split('T')[0],
+    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+    orderNumber: order.orderNumber,
+    customerInfo: {
+      name: order.customerName || 'Customer',
+      address: order.shippingAddress ? 
+        (typeof order.shippingAddress === 'string' ? order.shippingAddress : JSON.stringify(order.shippingAddress)) : 
+        'Address not provided',
+      phone: order.customerPhone || 'N/A',
+      email: order.customerEmail || 'N/A'
+    },
+    companyInfo,
+    items,
+    subtotal,
+    tax,
+    total,
+    paymentMethod: order.paymentMethod || 'Cash',
+    paymentStatus: order.paymentStatus || 'Pending',
+    notes: order.notes || `Order Status: ${order.status}`,
+    terms: 'Payment due within 30 days of invoice date.',
+    status: order.status
+  };
 }
 
 export class PrintDriver {
@@ -236,16 +318,41 @@ export class PrintDriver {
     // Invoice Template
     this.templates.set('invoice', {
       id: 'invoice',
-      name: 'Invoice',
-      description: 'Professional invoice template',
+      name: 'Professional Invoice',
+      description: 'Professional invoice template with company branding',
       category: 'invoice',
       settings: {
         pageSize: 'A4',
         orientation: 'portrait',
-        margin: { top: 25, right: 25, bottom: 25, left: 25 },
-        fontSize: 12,
-        fontFamily: 'Arial',
+        margin: { top: 20, right: 20, bottom: 20, left: 20 },
+        fontSize: 10,
+        fontFamily: 'helvetica',
         color: '#000000',
+        backgroundColor: '#FFFFFF'
+      },
+      layout: {
+        header: true,
+        footer: true,
+        logo: true,
+        companyInfo: true,
+        table: true,
+        signature: true
+      }
+    });
+
+    // Modern Invoice Template
+    this.templates.set('modern-invoice', {
+      id: 'modern-invoice',
+      name: 'Modern Invoice',
+      description: 'Modern invoice template with clean design',
+      category: 'invoice',
+      settings: {
+        pageSize: 'A4',
+        orientation: 'portrait',
+        margin: { top: 15, right: 15, bottom: 15, left: 15 },
+        fontSize: 9,
+        fontFamily: 'helvetica',
+        color: '#2C3E50',
         backgroundColor: '#FFFFFF'
       },
       layout: {
@@ -363,7 +470,7 @@ export class PrintDriver {
 
     // Add company info
     if (template.layout.companyInfo) {
-      this.addCompanyInfo(doc, template);
+      this.addCompanyInfo(doc, template, data);
     }
 
     // Add barcode/QR code
@@ -463,7 +570,7 @@ export class PrintDriver {
 
     // Add company info
     if (template.layout.companyInfo) {
-      this.addCompanyInfo(doc, template);
+      this.addCompanyInfo(doc, template, data);
     }
 
     // Add invoice details
@@ -516,7 +623,7 @@ export class PrintDriver {
 
     // Add company info
     if (template.layout.companyInfo) {
-      this.addCompanyInfo(doc, template);
+      this.addCompanyInfo(doc, template, data);
     }
 
     // Add receipt details
@@ -596,22 +703,43 @@ export class PrintDriver {
       doc.internal.pageSize.width - margin.right - 50, margin.top + 10);
   }
 
-  private addCompanyInfo(doc: jsPDF, template: PrintTemplate): void {
+  private addCompanyInfo(doc: jsPDF, template: PrintTemplate, data?: any): void {
     const { margin } = template.settings;
     
+    // Use company info from data if available, otherwise use default
+    const companyInfo = data?.companyInfo || {
+      name: 'FabZClean Services',
+      address: '123 Business Street',
+      phone: '(555) 123-4567',
+      email: 'info@fabzclean.com',
+      website: 'www.fabzclean.com'
+    };
+    
+    // Company name (larger, bold)
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text(companyInfo.name, margin.left, margin.top + 15);
+    
+    // Company details (smaller, normal)
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
     
-    const companyInfo = [
-      'FabZClean Services',
-      '123 Business Street',
-      'City, State 12345',
-      'Phone: (555) 123-4567',
-      'Email: info@fabzclean.com'
+    const details = [
+      companyInfo.address,
+      `Phone: ${companyInfo.phone}`,
+      `Email: ${companyInfo.email}`
     ];
+    
+    if (companyInfo.website) {
+      details.push(`Website: ${companyInfo.website}`);
+    }
+    
+    if (companyInfo.taxId) {
+      details.push(`Tax ID: ${companyInfo.taxId}`);
+    }
 
-    companyInfo.forEach((line, index) => {
-      doc.text(line, margin.left, margin.top + 30 + (index * 5));
+    details.forEach((line, index) => {
+      doc.text(line, margin.left, margin.top + 25 + (index * 5));
     });
   }
 
@@ -683,60 +811,171 @@ export class PrintDriver {
   private addInvoiceDetails(doc: jsPDF, template: PrintTemplate, data: InvoicePrintData): void {
     const { margin } = template.settings;
     
-    // Invoice number and date
-    doc.setFontSize(template.settings.fontSize);
-    doc.setFont(undefined, 'bold');
-    doc.text(`Invoice #: ${data.invoiceNumber}`, margin.left, margin.top + 80);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, margin.left, margin.top + 90);
+    // Invoice header section
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const rightMargin = pageWidth - margin.right;
     
-    // Customer info
-    doc.text('Bill To:', margin.left, margin.top + 110);
+    // Invoice number and date (right aligned)
+    doc.setFontSize(template.settings.fontSize + 2);
+    doc.setFont(undefined, 'bold');
+    doc.text(`INVOICE`, rightMargin - doc.getTextWidth('INVOICE'), margin.top + 20);
+    
+    doc.setFontSize(template.settings.fontSize);
+    doc.text(`Invoice #: ${data.invoiceNumber}`, rightMargin - doc.getTextWidth(`Invoice #: ${data.invoiceNumber}`), margin.top + 30);
+    doc.text(`Date: ${data.invoiceDate}`, rightMargin - doc.getTextWidth(`Date: ${data.invoiceDate}`), margin.top + 40);
+    
+    if (data.orderNumber) {
+      doc.text(`Order #: ${data.orderNumber}`, rightMargin - doc.getTextWidth(`Order #: ${data.orderNumber}`), margin.top + 50);
+    }
+    
+    if (data.dueDate) {
+      doc.text(`Due Date: ${data.dueDate}`, rightMargin - doc.getTextWidth(`Due Date: ${data.dueDate}`), margin.top + 60);
+    }
+    
+    // Customer info section
+    doc.setFont(undefined, 'bold');
+    doc.text('Bill To:', margin.left, margin.top + 80);
     doc.setFont(undefined, 'normal');
-    doc.text(data.customerInfo.name, margin.left, margin.top + 120);
-    doc.text(data.customerInfo.address, margin.left, margin.top + 130);
-    doc.text(data.customerInfo.phone, margin.left, margin.top + 140);
-    doc.text(data.customerInfo.email, margin.left, margin.top + 150);
+    
+    const customerY = margin.top + 90;
+    doc.text(data.customerInfo.name, margin.left, customerY);
+    doc.text(data.customerInfo.address, margin.left, customerY + 10);
+    doc.text(data.customerInfo.phone, margin.left, customerY + 20);
+    doc.text(data.customerInfo.email, margin.left, customerY + 30);
+    
+    // Payment status
+    if (data.paymentStatus) {
+      doc.setFont(undefined, 'bold');
+      const statusColor = data.paymentStatus.toLowerCase() === 'paid' ? '#27AE60' : '#E74C3C';
+      doc.setTextColor(statusColor);
+      doc.text(`Status: ${data.paymentStatus.toUpperCase()}`, rightMargin - doc.getTextWidth(`Status: ${data.paymentStatus.toUpperCase()}`), customerY + 20);
+      doc.setTextColor(template.settings.color); // Reset color
+    }
   }
 
   private addItemsTable(doc: jsPDF, template: PrintTemplate, data: InvoicePrintData): void {
     const { margin } = template.settings;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const rightMargin = pageWidth - margin.right;
+    
+    // Calculate column positions
+    const itemWidth = 80;
+    const qtyWidth = 25;
+    const priceWidth = 35;
+    const totalWidth = 35;
+    
+    const startY = margin.top + 140;
+    
+    // Draw table header background
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin.left, startY - 5, pageWidth - margin.left - margin.right, 10, 'F');
     
     // Table headers
     doc.setFontSize(template.settings.fontSize);
     doc.setFont(undefined, 'bold');
-    const startY = margin.top + 170;
+    doc.text('Item/Description', margin.left + 2, startY);
+    doc.text('Qty', margin.left + itemWidth + 2, startY);
+    doc.text('Unit Price', margin.left + itemWidth + qtyWidth + 2, startY);
+    doc.text('Total', rightMargin - totalWidth + 2, startY);
     
-    doc.text('Item', margin.left, startY);
-    doc.text('Qty', margin.left + 80, startY);
-    doc.text('Price', margin.left + 100, startY);
-    doc.text('Total', margin.left + 130, startY);
+    // Draw header underline
+    doc.setLineWidth(0.5);
+    doc.line(margin.left, startY + 2, rightMargin, startY + 2);
     
     // Table rows
     doc.setFont(undefined, 'normal');
+    let currentY = startY + 15;
+    
     data.items.forEach((item, index) => {
-      const y = startY + 15 + (index * 10);
-      doc.text(item.name, margin.left, y);
-      doc.text(item.quantity.toString(), margin.left + 80, y);
-      doc.text(`$${item.price.toFixed(2)}`, margin.left + 100, y);
-      doc.text(`$${item.total.toFixed(2)}`, margin.left + 130, y);
+      // Alternate row colors
+      if (index % 2 === 0) {
+        doc.setFillColor(250, 250, 250);
+        doc.rect(margin.left, currentY - 3, pageWidth - margin.left - margin.right, 10, 'F');
+      }
+      
+      // Item name and description
+      const itemText = item.description ? `${item.name}\n${item.description}` : item.name;
+      doc.text(itemText, margin.left + 2, currentY);
+      
+      // Quantity
+      doc.text(item.quantity.toString(), margin.left + itemWidth + 2, currentY);
+      
+      // Unit price
+      doc.text(`₹${item.unitPrice.toFixed(2)}`, margin.left + itemWidth + qtyWidth + 2, currentY);
+      
+      // Total
+      doc.text(`₹${item.total.toFixed(2)}`, rightMargin - totalWidth + 2, currentY);
+      
+      currentY += 12;
+      
+      // Check if we need a new page
+      if (currentY > pageWidth - margin.bottom - 50) {
+        doc.addPage();
+        currentY = margin.top + 20;
+      }
     });
   }
 
   private addInvoiceTotals(doc: jsPDF, template: PrintTemplate, data: InvoicePrintData): void {
     const { margin } = template.settings;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const rightMargin = pageWidth - margin.right;
     
-    const startY = margin.top + 170 + (data.items.length * 10) + 30;
+    // Calculate totals section position
+    const tableEndY = margin.top + 140 + (data.items.length * 12) + 20;
+    const startY = Math.max(tableEndY, margin.top + 200);
     
+    // Draw totals box
+    const totalsWidth = 80;
+    const totalsX = rightMargin - totalsWidth;
+    const totalsHeight = data.discount ? 60 : 50;
+    
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.rect(totalsX - 5, startY - 5, totalsWidth, totalsHeight, 'S');
+    
+    // Subtotal
     doc.setFontSize(template.settings.fontSize);
     doc.setFont(undefined, 'normal');
-    doc.text(`Subtotal: $${data.subtotal.toFixed(2)}`, margin.left + 100, startY);
-    doc.text(`Tax: $${data.tax.toFixed(2)}`, margin.left + 100, startY + 10);
-    doc.setFont(undefined, 'bold');
-    doc.text(`Total: $${data.total.toFixed(2)}`, margin.left + 100, startY + 20);
+    doc.text('Subtotal:', totalsX, startY + 10);
+    doc.text(`₹${data.subtotal.toFixed(2)}`, totalsX + 50, startY + 10);
     
-    if (data.paymentMethod) {
+    // Discount (if applicable)
+    if (data.discount && data.discount > 0) {
+      doc.text('Discount:', totalsX, startY + 20);
+      doc.text(`-₹${data.discount.toFixed(2)}`, totalsX + 50, startY + 20);
+    }
+    
+    // Tax
+    doc.text('Tax:', totalsX, startY + (data.discount ? 30 : 20));
+    doc.text(`₹${data.tax.toFixed(2)}`, totalsX + 50, startY + (data.discount ? 30 : 20));
+    
+    // Total
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(template.settings.fontSize + 1);
+    const totalY = startY + (data.discount ? 45 : 35);
+    doc.text('Total:', totalsX, totalY);
+    doc.text(`₹${data.total.toFixed(2)}`, totalsX + 50, totalY);
+    
+    // Payment information
+    if (data.paymentMethod || data.paymentStatus) {
       doc.setFont(undefined, 'normal');
-      doc.text(`Payment Method: ${data.paymentMethod}`, margin.left, startY + 40);
+      doc.setFontSize(template.settings.fontSize - 1);
+      
+      const paymentY = totalY + 25;
+      if (data.paymentMethod) {
+        doc.text(`Payment Method: ${data.paymentMethod}`, margin.left, paymentY);
+      }
+      if (data.paymentStatus) {
+        doc.text(`Payment Status: ${data.paymentStatus}`, margin.left, paymentY + 10);
+      }
+    }
+    
+    // Terms and conditions
+    if (data.terms) {
+      doc.setFontSize(template.settings.fontSize - 2);
+      doc.text('Terms:', margin.left, startY + 80);
+      doc.text(data.terms, margin.left, startY + 90);
     }
   }
 
