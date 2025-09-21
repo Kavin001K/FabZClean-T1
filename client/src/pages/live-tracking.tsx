@@ -414,7 +414,7 @@ export default function LiveTrackingPage() {
                                 </div>
                                 <div className="flex items-center gap-1 text-sm">
                                   <Navigation className="h-3 w-3" />
-                                  <span>{driver.speed.toFixed(0)} km/h</span>
+                                  <span>{driver.speed ? driver.speed.toFixed(0) : '0'} km/h</span>
                                 </div>
                                 <div className="flex items-center gap-1 text-sm">
                                   <Clock className="h-3 w-3" />
@@ -488,7 +488,7 @@ export default function LiveTrackingPage() {
                           <div className="text-right space-y-1">
                             <div className="flex items-center gap-1 text-sm">
                               <Navigation className="h-3 w-3" />
-                              <span>{driver.speed.toFixed(0)} km/h</span>
+                              <span>{driver.speed ? driver.speed.toFixed(0) : '0'} km/h</span>
                             </div>
                             <div className="flex items-center gap-1 text-sm">
                               <Clock className="h-3 w-3" />
@@ -496,7 +496,7 @@ export default function LiveTrackingPage() {
                             </div>
                             <div className="flex items-center gap-1 text-sm">
                               <MapPin className="h-3 w-3" />
-                              <span>{driver.latitude.toFixed(4)}, {driver.longitude.toFixed(4)}</span>
+                              <span>{driver.latitude ? driver.latitude.toFixed(4) : '0.0000'}, {driver.longitude ? driver.longitude.toFixed(4) : '0.0000'}</span>
                             </div>
                           </div>
                         </div>

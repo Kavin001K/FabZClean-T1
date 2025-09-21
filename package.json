@@ -16,8 +16,8 @@
     "db:push": "drizzle-kit push",
     "netlify:dev": "netlify dev",
     "netlify:build": "npm run build:client",
-    "electron": "electron electron/main.cjs",
-    "electron:dev": "NODE_ENV=development electron electron/main.cjs",
+    "electron": "electron .",
+    "electron:dev": "NODE_ENV=development electron .",
     "electron:build": "npm run build:client && electron-builder",
     "electron:dist": "npm run build:client && electron-builder --publish=never"
   },

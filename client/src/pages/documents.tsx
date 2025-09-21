@@ -126,7 +126,7 @@ export default function DocumentsPage() {
     totalDocuments: documents.length,
     totalInvoices: documents.filter(d => d.type === 'invoice').length,
     totalReports: documents.filter(d => d.type === 'report').length,
-    totalAmount: documents.reduce((sum, d) => sum + (d.amount || 0), 0),
+    totalAmount: documents.reduce((sum, d) => sum + (d.amount || 0), 0) || 0,
     pendingInvoices: documents.filter(d => d.type === 'invoice' && d.status === 'sent').length,
     overdueInvoices: documents.filter(d => d.type === 'invoice' && d.status === 'overdue').length
   };
@@ -177,7 +177,7 @@ export default function DocumentsPage() {
                   <DollarSign className="h-4 w-4 text-green-600" />
                   <span className="text-sm font-medium">Total Amount</span>
                 </div>
-                <div className="text-2xl font-bold">₹{stats.totalAmount.toLocaleString()}</div>
+                <div className="text-2xl font-bold">₹{stats.totalAmount?.toLocaleString() || '0'}</div>
               </CardContent>
             </Card>
             
@@ -251,7 +251,7 @@ export default function DocumentsPage() {
                           {doc.amount && (
                             <span className="flex items-center gap-1">
                               <DollarSign className="h-3 w-3" />
-                              ₹{doc.amount.toLocaleString()}
+                              ₹{doc.amount?.toLocaleString() || '0'}
                             </span>
                           )}
                         </div>
@@ -297,7 +297,7 @@ export default function DocumentsPage() {
                         <p className="text-sm text-gray-600">{invoice.description}</p>
                         <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
                           <span>Customer: {invoice.customer}</span>
-                          <span>Amount: ₹{invoice.amount?.toLocaleString()}</span>
+                          <span>Amount: ₹{invoice.amount?.toLocaleString() || '0'}</span>
                           <span>Date: {invoice.createdAt}</span>
                         </div>
                       </div>

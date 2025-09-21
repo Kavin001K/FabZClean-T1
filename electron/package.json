@@ -1,0 +1,12 @@
+{
+  "name": "fabzclean-electron",
+  "version": "1.0.0",
+  "main": "main.cjs",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^38.1.2"
+  }
+}
