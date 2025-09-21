@@ -21,7 +21,8 @@ import {
   Fuel,
   Gauge,
   User,
-  Car
+  Car,
+  Eye
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
