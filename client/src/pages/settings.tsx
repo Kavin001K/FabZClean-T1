@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
 import { 
-  Settings, 
+  Settings as SettingsIcon, 
   User, 
   Bell, 
   Shield, 
