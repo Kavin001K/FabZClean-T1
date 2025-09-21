@@ -5,7 +5,7 @@ const ws_1 = require("ws");
 const http_1 = require("http");
 const storage_1 = require("./storage");
 class RealtimeServer {
-    constructor(port = 3001) {
+    constructor(port = 3003) {
         this.clients = new Map();
         this.updateInterval = null;
         const server = (0, http_1.createServer)();
@@ -155,6 +155,10 @@ class RealtimeServer {
         // Also trigger analytics update
         await this.broadcastAnalyticsUpdate();
     }
+    // Method to broadcast custom messages
+    broadcast(message) {
+        this.broadcastToSubscribers(message.type, message.data);
+    }
     stop() {
         if (this.updateInterval) {
             clearInterval(this.updateInterval);
@@ -162,6 +166,7 @@ class RealtimeServer {
         this.wss.close();
     }
 }
-// Export singleton instance
-exports.realtimeServer = new RealtimeServer();
+// Export singleton instance with WebSocket port
+const wsPort = parseInt(process.env.WS_PORT || '3003', 10);
+exports.realtimeServer = new RealtimeServer(wsPort);
 //# sourceMappingURL=websocket-server.js.map

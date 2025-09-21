@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const routes_1 = require("./routes");
-// const vite_1 = require("./vite"); // Removed for Netlify Functions
+const vite_1 = require("./vite");
 const db_utils_1 = require("./db-utils");
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -29,8 +29,7 @@ app.use((req, res, next) => {
             if (logLine.length > 80) {
                 logLine = logLine.slice(0, 79) + "…";
             }
-            // (0, vite_1.log)(logLine); // Removed for Netlify Functions
-            console.log(logLine);
+            (0, vite_1.log)(logLine);
         }
     });
     next();
@@ -47,20 +46,18 @@ app.use((req, res, next) => {
     // setting up all the other routes so the catch-all route
     // doesn't interfere with the other routes
     if (app.get("env") === "development") {
-        // await (0, vite_1.setupVite)(app, server); // Removed for Netlify Functions
+        await (0, vite_1.setupVite)(app, server);
     }
     else {
-        // (0, vite_1.serveStatic)(app); // Removed for Netlify Functions
+        (0, vite_1.serveStatic)(app);
     }
     // Initialize database connection
     try {
         await (0, db_utils_1.initializeDatabase)();
-        // (0, vite_1.log)('✅ Database connection established'); // Removed for Netlify Functions
-        console.log('✅ Database connection established');
+        (0, vite_1.log)('✅ Database connection established');
     }
     catch (error) {
-        // (0, vite_1.log)('❌ Database connection failed:', error); // Removed for Netlify Functions
-        console.log('❌ Database connection failed:', error);
+        (0, vite_1.log)('❌ Database connection failed:', error);
         process.exit(1);
     }
     // ALWAYS serve the app on the port specified in the environment variable PORT
@@ -69,8 +66,7 @@ app.use((req, res, next) => {
     // It is the only port that is not firewalled.
     const port = parseInt(process.env.PORT || '5000', 10);
     server.listen(port, () => {
-        // (0, vite_1.log)(`serving on port ${port}`); // Removed for Netlify Functions
-        console.log(`serving on port ${port}`);
+        (0, vite_1.log)(`serving on port ${port}`);
     });
 })();
 //# sourceMappingURL=index.js.map

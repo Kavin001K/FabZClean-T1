@@ -41,7 +41,9 @@ import type { Customer } from '../../../shared/schema';
 // Form validation schemas
 const customerFormSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name must be less than 50 characters'),
-  email: z.string().email('Please enter a valid email address'),
+  email: z.string().refine((val) => !val || z.string().email().safeParse(val).success, {
+    message: 'Please enter a valid email address',
+  }).optional(),
   phone: z.string().min(10, 'Phone number must be at least 10 digits').max(15, 'Phone number must be less than 15 digits'),
   address: z.string().optional(),
   notes: z.string().optional(),
@@ -104,7 +106,7 @@ const getStatusColor = (status: string) => {
   }
 };
 
-export const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
+const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   selectedCustomer,
   isViewDialogOpen,
   isEditDialogOpen,
@@ -368,7 +370,7 @@ export const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-email">Email *</Label>
+              <Label htmlFor="edit-email">Email</Label>
               <Input
                 id="edit-email"
                 type="email"
@@ -481,7 +483,7 @@ export const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="create-email">Email *</Label>
+              <Label htmlFor="create-email">Email</Label>
               <Input
                 id="create-email"
                 type="email"
@@ -577,4 +579,5 @@ export const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   );
 });
 
+export { CustomerDialogs };
 export default CustomerDialogs;

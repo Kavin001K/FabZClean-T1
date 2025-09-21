@@ -13,6 +13,7 @@ class MemStorage {
         this.services = new Map();
         this.shipments = new Map();
         this.barcodes = new Map();
+        this.employees = new Map();
         this.initializeData();
     }
     initializeData() {
@@ -969,6 +970,39 @@ class MemStorage {
     async deleteBarcode(id) {
         return this.barcodes.delete(id);
     }
+    // Employee methods
+    async getEmployees() {
+        return Array.from(this.employees.values());
+    }
+    async getEmployee(id) {
+        return this.employees.get(id);
+    }
+    async createEmployee(insertEmployee) {
+        const id = (0, crypto_1.randomUUID)();
+        const employee = {
+            ...insertEmployee,
+            id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+        this.employees.set(id, employee);
+        return employee;
+    }
+    async updateEmployee(id, updates) {
+        const employee = this.employees.get(id);
+        if (!employee)
+            return undefined;
+        const updatedEmployee = {
+            ...employee,
+            ...updates,
+            updatedAt: new Date()
+        };
+        this.employees.set(id, updatedEmployee);
+        return updatedEmployee;
+    }
+    async deleteEmployee(id) {
+        return this.employees.delete(id);
+    }
     // Analytics methods
     async getDashboardMetrics() {
         const orders = Array.from(this.orders.values());
@@ -1002,3 +1036,4 @@ class MemStorage {
 }
 exports.MemStorage = MemStorage;
 exports.storage = new MemStorage();
+//# sourceMappingURL=storage.js.map

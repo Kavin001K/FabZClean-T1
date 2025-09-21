@@ -58,6 +58,75 @@ async function registerRoutes(app) {
             res.status(500).json({ error: error.message });
         }
     });
+    // Employees endpoints
+    app.get("/api/employees", async (req, res) => {
+        try {
+            const employees = await storage_1.storage.getEmployees();
+            res.json(employees);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch employees" });
+        }
+    });
+    app.get("/api/employees/:id", async (req, res) => {
+        try {
+            const employee = await storage_1.storage.getEmployee(req.params.id);
+            if (!employee) {
+                return res.status(404).json({ message: "Employee not found" });
+            }
+            res.json(employee);
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to fetch employee" });
+        }
+    });
+    app.post("/api/employees", async (req, res) => {
+        try {
+            const validatedData = schema_1.insertEmployeeSchema.parse(req.body);
+            const employee = await storage_1.storage.createEmployee(validatedData);
+            // Trigger real-time update
+            websocket_server_1.realtimeServer.broadcast('employee_created', employee);
+            res.status(201).json(employee);
+        }
+        catch (error) {
+            if (error instanceof zod_1.z.ZodError) {
+                return res.status(400).json({ message: "Validation error", errors: error.errors });
+            }
+            res.status(500).json({ message: "Failed to create employee" });
+        }
+    });
+    app.put("/api/employees/:id", async (req, res) => {
+        try {
+            const validatedData = schema_1.insertEmployeeSchema.partial().parse(req.body);
+            const employee = await storage_1.storage.updateEmployee(req.params.id, validatedData);
+            if (!employee) {
+                return res.status(404).json({ message: "Employee not found" });
+            }
+            // Trigger real-time update
+            websocket_server_1.realtimeServer.broadcast('employee_updated', employee);
+            res.json(employee);
+        }
+        catch (error) {
+            if (error instanceof zod_1.z.ZodError) {
+                return res.status(400).json({ message: "Validation error", errors: error.errors });
+            }
+            res.status(500).json({ message: "Failed to update employee" });
+        }
+    });
+    app.delete("/api/employees/:id", async (req, res) => {
+        try {
+            const success = await storage_1.storage.deleteEmployee(req.params.id);
+            if (!success) {
+                return res.status(404).json({ message: "Employee not found" });
+            }
+            // Trigger real-time update
+            websocket_server_1.realtimeServer.broadcast('employee_deleted', { id: req.params.id });
+            res.json({ message: "Employee deleted successfully" });
+        }
+        catch (error) {
+            res.status(500).json({ message: "Failed to delete employee" });
+        }
+    });
     // Products endpoints
     app.get("/api/products", async (req, res) => {
         try {
@@ -225,6 +294,36 @@ async function registerRoutes(app) {
         }
         catch (error) {
             res.status(500).json({ message: "Failed to delete orders" });
+        }
+    });
+    // Customer KPIs endpoint
+    app.get("/api/customers/kpis", async (req, res) => {
+        try {
+            const customers = await storage_1.storage.getCustomers();
+            const orders = await storage_1.storage.getOrders();
+            const totalCustomers = customers.length;
+            const newCustomersThisMonth = customers.filter(customer => {
+                const customerDate = new Date(customer.createdAt);
+                const currentDate = new Date();
+                return customerDate.getMonth() === currentDate.getMonth() &&
+                    customerDate.getFullYear() === currentDate.getFullYear();
+            }).length;
+            const totalRevenue = customers.reduce((sum, customer) => sum + parseFloat(customer.totalSpent || "0"), 0);
+            const avgOrderValue = orders.length > 0 ?
+                orders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0) / orders.length : 0;
+            const repeatCustomers = customers.filter(customer => (customer.totalOrders || 0) > 1).length;
+            const retentionRate = totalCustomers > 0 ? (repeatCustomers / totalCustomers) * 100 : 0;
+            res.json({
+                totalCustomers,
+                newCustomersThisMonth,
+                totalRevenue,
+                avgOrderValue,
+                retentionRate,
+            });
+        }
+        catch (error) {
+            console.error('Failed to fetch customer KPIs:', error);
+            res.status(500).json({ message: "Failed to fetch customer KPIs" });
         }
     });
     // Customers endpoints
@@ -897,6 +996,176 @@ async function registerRoutes(app) {
         }
         catch (error) {
             res.status(500).json({ message: "Failed to stop order tracking" });
+        }
+    });
+    // Driver Management endpoints
+    app.get("/api/drivers", async (req, res) => {
+        try {
+            // Return mock driver data for now
+            const drivers = [
+                {
+                    id: "1",
+                    name: "Rajesh Kumar",
+                    phone: "+91 98765 43210",
+                    email: "rajesh@example.com",
+                    licenseNumber: "DL123456789",
+                    vehicleNumber: "DL-01-AB-1234",
+                    vehicleType: "bike",
+                    vehicleModel: "Honda Activa",
+                    status: "available",
+                    rating: 4.8,
+                    totalDeliveries: 156,
+                    totalEarnings: 45200,
+                    experience: 18,
+                    specialties: ["Dry Cleaning", "Ironing"],
+                    lastActive: new Date().toISOString()
+                },
+                {
+                    id: "2",
+                    name: "Priya Sharma",
+                    phone: "+91 98765 43211",
+                    email: "priya@example.com",
+                    licenseNumber: "DL987654321",
+                    vehicleNumber: "DL-01-CD-5678",
+                    vehicleType: "car",
+                    vehicleModel: "Maruti Swift",
+                    status: "busy",
+                    rating: 4.9,
+                    totalDeliveries: 203,
+                    totalEarnings: 67800,
+                    experience: 24,
+                    specialties: ["Premium Dry Cleaning", "Wedding Dresses"],
+                    lastActive: new Date().toISOString()
+                },
+                {
+                    id: "3",
+                    name: "Amit Singh",
+                    phone: "+91 98765 43212",
+                    email: "amit@example.com",
+                    licenseNumber: "DL456789123",
+                    vehicleNumber: "DL-01-EF-9012",
+                    vehicleType: "van",
+                    vehicleModel: "Mahindra Bolero",
+                    status: "available",
+                    rating: 4.6,
+                    totalDeliveries: 89,
+                    totalEarnings: 32100,
+                    experience: 12,
+                    specialties: ["Bulk Orders", "Corporate Pickup"],
+                    lastActive: new Date().toISOString()
+                }
+            ];
+            res.json(drivers);
+        }
+        catch (error) {
+            console.error('Failed to fetch drivers:', error);
+            res.status(500).json({ message: "Failed to fetch drivers" });
+        }
+    });
+    app.post("/api/drivers", async (req, res) => {
+        try {
+            const driverData = req.body;
+            // In a real implementation, you would save this to the database
+            const newDriver = {
+                id: Date.now().toString(),
+                ...driverData,
+                status: "available",
+                rating: 0,
+                totalDeliveries: 0,
+                totalEarnings: 0,
+                lastActive: new Date().toISOString()
+            };
+            res.status(201).json(newDriver);
+        }
+        catch (error) {
+            console.error('Failed to create driver:', error);
+            res.status(500).json({ message: "Failed to create driver" });
+        }
+    });
+    app.put("/api/drivers/:id", async (req, res) => {
+        try {
+            const { id } = req.params;
+            const updateData = req.body;
+            // In a real implementation, you would update this in the database
+            const updatedDriver = {
+                id,
+                ...updateData,
+                lastActive: new Date().toISOString()
+            };
+            res.json(updatedDriver);
+        }
+        catch (error) {
+            console.error('Failed to update driver:', error);
+            res.status(500).json({ message: "Failed to update driver" });
+        }
+    });
+    app.delete("/api/drivers/:id", async (req, res) => {
+        try {
+            const { id } = req.params;
+            // In a real implementation, you would delete this from the database
+            res.json({ message: "Driver deleted successfully" });
+        }
+        catch (error) {
+            console.error('Failed to delete driver:', error);
+            res.status(500).json({ message: "Failed to delete driver" });
+        }
+    });
+    // Driver assignment endpoint
+    app.post("/api/orders/:orderId/assign-driver", async (req, res) => {
+        try {
+            const { orderId } = req.params;
+            const { driverId } = req.body;
+            if (!driverId) {
+                return res.status(400).json({ message: "Driver ID is required" });
+            }
+            // Get the order to verify it exists
+            const order = await storage_1.storage.getOrder(orderId);
+            if (!order) {
+                return res.status(404).json({ message: "Order not found" });
+            }
+            // Mock driver data - in a real app, you'd fetch this from the database
+            const mockDrivers = {
+                "1": { name: "Rajesh Kumar", vehicleNumber: "DL-01-AB-1234" },
+                "2": { name: "Priya Sharma", vehicleNumber: "DL-01-CD-5678" },
+                "3": { name: "Amit Singh", vehicleNumber: "DL-01-EF-9012" }
+            };
+            const driverInfo = mockDrivers[driverId] || {
+                name: `Driver ${driverId}`,
+                vehicleNumber: `Vehicle-${driverId}`
+            };
+            // Create or update delivery record
+            const delivery = await storage_1.storage.createDelivery({
+                orderId,
+                driverName: driverInfo.name,
+                vehicleId: driverInfo.vehicleNumber,
+                status: "pending",
+                estimatedDelivery: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+                location: { latitude: 28.6139, longitude: 77.2090 }, // Default to Delhi
+                route: []
+            });
+            // Broadcast the assignment via WebSocket
+            websocket_server_1.realtimeServer.broadcast({
+                type: 'driver_assigned',
+                data: {
+                    orderId,
+                    driverId,
+                    driverName: delivery.driverName,
+                    deliveryId: delivery.id
+                }
+            });
+            res.json({
+                message: "Driver assigned successfully",
+                delivery: {
+                    id: delivery.id,
+                    orderId: delivery.orderId,
+                    driverName: delivery.driverName,
+                    status: delivery.status
+                }
+            });
+        }
+        catch (error) {
+            console.error('Failed to assign driver:', error);
+            res.status(500).json({ message: "Failed to assign driver to order" });
         }
     });
     const httpServer = (0, http_1.createServer)(app);
