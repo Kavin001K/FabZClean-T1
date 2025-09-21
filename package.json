@@ -7,7 +7,7 @@
     "dev": "npx tsx server/index.ts",
     "build": "npm run build:client && npm run build:functions",
     "build:client": "vite build",
-    "build:functions": "tsc --project tsconfig.functions.json && rm -f netlify/functions/vite.config.js netlify/functions/vite.config.js.map vite.config.js vite.config.js.map",
+    "build:functions": "tsc --project tsconfig.functions.json; rm -f netlify/functions/vite.config.js netlify/functions/vite.config.js.map vite.config.js vite.config.js.map",
     "build:server": "tsc --project tsconfig.server.json",
     "start": "node dist/server/index.js",
     "start:client": "vite preview --port 3000",
