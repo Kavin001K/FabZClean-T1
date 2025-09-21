@@ -12,7 +12,7 @@ class RealtimeServer {
   private clients: Map<string, ClientSubscription> = new Map();
   private updateInterval: NodeJS.Timeout | null = null;
 
-  constructor(port: number = 3001) {
+  constructor(port: number = 3003) {
     const server = createServer();
     this.wss = new WebSocketServer({ server });
     
@@ -189,5 +189,6 @@ class RealtimeServer {
   }
 }
 
-// Export singleton instance
-export const realtimeServer = new RealtimeServer();
+// Export singleton instance with WebSocket port
+const wsPort = parseInt(process.env.WS_PORT || '3003', 10);
+export const realtimeServer = new RealtimeServer(wsPort);
