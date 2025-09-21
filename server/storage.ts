@@ -16,7 +16,9 @@ import {
   type Shipment,
   type InsertShipment,
   type Barcode,
-  type InsertBarcode
+  type InsertBarcode,
+  type Employee,
+  type InsertEmployee
 } from "../shared/schema";
 import { randomUUID } from "crypto";
 
@@ -79,6 +81,13 @@ export interface IStorage {
   updateBarcode(id: string, barcode: Partial<InsertBarcode>): Promise<Barcode | undefined>;
   deleteBarcode(id: string): Promise<boolean>;
 
+  // Employees
+  getEmployees(): Promise<Employee[]>;
+  getEmployee(id: string): Promise<Employee | undefined>;
+  createEmployee(employee: InsertEmployee): Promise<Employee>;
+  updateEmployee(id: string, employee: Partial<InsertEmployee>): Promise<Employee | undefined>;
+  deleteEmployee(id: string): Promise<boolean>;
+
   // Analytics
   getDashboardMetrics(): Promise<{
     totalRevenue: number;
@@ -101,6 +110,7 @@ export class MemStorage implements IStorage {
   private services: Map<string, Service>;
   private shipments: Map<string, Shipment>;
   private barcodes: Map<string, Barcode>;
+  private employees: Map<string, Employee>;
 
   constructor() {
     this.users = new Map();
@@ -112,6 +122,7 @@ export class MemStorage implements IStorage {
     this.services = new Map();
     this.shipments = new Map();
     this.barcodes = new Map();
+    this.employees = new Map();
     this.initializeData();
   }
 
@@ -1127,6 +1138,44 @@ export class MemStorage implements IStorage {
 
   async deleteBarcode(id: string): Promise<boolean> {
     return this.barcodes.delete(id);
+  }
+
+  // Employee methods
+  async getEmployees(): Promise<Employee[]> {
+    return Array.from(this.employees.values());
+  }
+
+  async getEmployee(id: string): Promise<Employee | undefined> {
+    return this.employees.get(id);
+  }
+
+  async createEmployee(insertEmployee: InsertEmployee): Promise<Employee> {
+    const id = randomUUID();
+    const employee: Employee = {
+      ...insertEmployee,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.employees.set(id, employee);
+    return employee;
+  }
+
+  async updateEmployee(id: string, updates: Partial<InsertEmployee>): Promise<Employee | undefined> {
+    const employee = this.employees.get(id);
+    if (!employee) return undefined;
+    
+    const updatedEmployee = { 
+      ...employee, 
+      ...updates, 
+      updatedAt: new Date() 
+    };
+    this.employees.set(id, updatedEmployee);
+    return updatedEmployee;
+  }
+
+  async deleteEmployee(id: string): Promise<boolean> {
+    return this.employees.delete(id);
   }
 
   // Analytics methods

@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 // Import the data service
 import { analyticsApi, ordersApi, customersApi, formatCurrency } from '@/lib/data-service';
 
@@ -51,7 +52,31 @@ const employeeSalaryData = [
 
 export default function FranchiseOwnerDashboard() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
+  const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false);
+  
+  // Form states
+  const [customerForm, setCustomerForm] = useState({
+    name: '',
+    phone: '',
+    email: ''
+  });
+  const [orderForm, setOrderForm] = useState({
+    customerName: '',
+    customerPhone: '',
+    service: '',
+    quantity: 1,
+    pickupDate: ''
+  });
+  const [employeeForm, setEmployeeForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    position: '',
+    salary: ''
+  });
 
   // State for real data
   const [dashboardMetrics, setDashboardMetrics] = useState({
@@ -108,14 +133,151 @@ export default function FranchiseOwnerDashboard() {
     fetchDashboardData();
   }, [toast]);
 
-  const handleSaveCustomer = (e: React.FormEvent) => {
+  const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Saving customer...");
-    toast({
-      title: "Success!",
-      description: "New customer has been created.",
-    });
-    setIsCustomerDialogOpen(false);
+    try {
+      const customerData = {
+        name: customerForm.name,
+        phone: customerForm.phone,
+        email: customerForm.email || undefined,
+        joinDate: new Date().toISOString(),
+        totalSpent: 0,
+        loyaltyPoints: 0
+      };
+
+      const newCustomer = await customersApi.create(customerData);
+      
+      if (newCustomer) {
+        toast({
+          title: "Success!",
+          description: `Customer ${newCustomer.name} has been created successfully.`,
+        });
+        
+        // Refresh dashboard data
+        queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        
+        // Reset form
+        setCustomerForm({ name: '', phone: '', email: '' });
+        setIsCustomerDialogOpen(false);
+        
+        // Refresh dashboard metrics
+        const metrics = await analyticsApi.getDashboardMetrics();
+        setDashboardMetrics(metrics);
+      }
+    } catch (error) {
+      console.error('Failed to create customer:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create customer. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const orderData = {
+        customerName: orderForm.customerName,
+        customerPhone: orderForm.customerPhone,
+        customerEmail: undefined,
+        serviceId: orderForm.service,
+        quantity: orderForm.quantity,
+        pickupDate: orderForm.pickupDate,
+        status: 'pending',
+        paymentStatus: 'pending',
+        totalAmount: 0, // Will be calculated by server
+        orderNumber: `ORD-${Date.now()}`
+      };
+
+      const newOrder = await ordersApi.create(orderData);
+      
+      if (newOrder) {
+        toast({
+          title: "Success!",
+          description: `Order ${newOrder.orderNumber} has been created successfully.`,
+        });
+        
+        // Refresh dashboard data
+        queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+        
+        // Reset form
+        setOrderForm({
+          customerName: '',
+          customerPhone: '',
+          service: '',
+          quantity: 1,
+          pickupDate: ''
+        });
+        setIsOrderDialogOpen(false);
+        
+        // Refresh dashboard metrics
+        const metrics = await analyticsApi.getDashboardMetrics();
+        setDashboardMetrics(metrics);
+      }
+    } catch (error) {
+      console.error('Failed to create order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create order. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const employeeData = {
+        name: employeeForm.name,
+        phone: employeeForm.phone,
+        email: employeeForm.email,
+        position: employeeForm.position,
+        salary: parseFloat(employeeForm.salary),
+        joinDate: new Date().toISOString(),
+        status: 'active'
+      };
+
+      // For now, we'll use a mock API call since we don't have employee API yet
+      const response = await fetch('/api/employees', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(employeeData),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Success!",
+          description: `Employee ${employeeForm.name} has been created successfully.`,
+        });
+        
+        // Refresh dashboard data
+        queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
+        
+        // Reset form
+        setEmployeeForm({
+          name: '',
+          phone: '',
+          email: '',
+          position: '',
+          salary: ''
+        });
+        setIsEmployeeDialogOpen(false);
+      } else {
+        throw new Error('Failed to create employee');
+      }
+    } catch (error) {
+      console.error('Failed to create employee:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create employee. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -124,18 +286,86 @@ export default function FranchiseOwnerDashboard() {
       
       <div>
         <h2 className="text-lg font-semibold mb-2">Quick Actions</h2>
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-          <Link to="/create-order">
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
-              <CardContent className="p-4 flex items-center gap-4">
-                <PlusCircle className="h-8 w-8 text-primary" />
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+          {/* New Order Quick Action */}
+          <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
+            <DialogTrigger asChild>
+              <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <PlusCircle className="h-8 w-8 text-primary" />
+                  <div>
+                    <h3 className="font-semibold">Quick Order</h3>
+                    <p className="text-sm text-muted-foreground">Create a new service order</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Create New Order</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSaveOrder} className="py-4 space-y-4">
                 <div>
-                  <h3 className="font-semibold">New Order</h3>
-                  <p className="text-sm text-muted-foreground">Create a new service order</p>
+                  <Label htmlFor="orderCustomerName">Customer Name</Label>
+                  <Input 
+                    id="orderCustomerName" 
+                    placeholder="e.g., Jane Doe" 
+                    value={orderForm.customerName}
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, customerName: e.target.value }))}
+                    required 
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          </Link>
+                <div>
+                  <Label htmlFor="orderCustomerPhone">Customer Phone</Label>
+                  <Input 
+                    id="orderCustomerPhone" 
+                    type="tel" 
+                    placeholder="e.g., +91 98765 43210" 
+                    value={orderForm.customerPhone}
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                    required 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="orderService">Service</Label>
+                  <Input 
+                    id="orderService" 
+                    placeholder="e.g., Dry Cleaning" 
+                    value={orderForm.service}
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, service: e.target.value }))}
+                    required 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="orderQuantity">Quantity</Label>
+                  <Input 
+                    id="orderQuantity" 
+                    type="number" 
+                    min="1"
+                    value={orderForm.quantity}
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                    required 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="orderPickupDate">Pickup Date</Label>
+                  <Input 
+                    id="orderPickupDate" 
+                    type="date" 
+                    value={orderForm.pickupDate}
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, pickupDate: e.target.value }))}
+                    required 
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" className="flex-1">Create Order</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsOrderDialogOpen(false)}>Cancel</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* New Customer Quick Action */}
           <Dialog open={isCustomerDialogOpen} onOpenChange={setIsCustomerDialogOpen}>
             <DialogTrigger asChild>
               <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
@@ -148,30 +378,137 @@ export default function FranchiseOwnerDashboard() {
                 </CardContent>
               </Card>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Add New Customer</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSaveCustomer} className="py-4 space-y-4">
                 <div>
                   <Label htmlFor="customerName">Name</Label>
-                  <Input id="customerName" placeholder="e.g., Jane Doe" required />
+                  <Input 
+                    id="customerName" 
+                    placeholder="e.g., Jane Doe" 
+                    value={customerForm.name}
+                    onChange={(e) => setCustomerForm(prev => ({ ...prev, name: e.target.value }))}
+                    required 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="customerPhone">Phone</Label>
-                  <Input id="customerPhone" type="tel" placeholder="e.g., +91 98765 43210" required />
+                  <Input 
+                    id="customerPhone" 
+                    type="tel" 
+                    placeholder="e.g., +91 98765 43210" 
+                    value={customerForm.phone}
+                    onChange={(e) => setCustomerForm(prev => ({ ...prev, phone: e.target.value }))}
+                    required 
+                  />
                 </div>
-                <Button type="submit">Save Customer</Button>
+                <div>
+                  <Label htmlFor="customerEmail">Email (Optional)</Label>
+                  <Input 
+                    id="customerEmail" 
+                    type="email" 
+                    placeholder="e.g., jane@example.com" 
+                    value={customerForm.email}
+                    onChange={(e) => setCustomerForm(prev => ({ ...prev, email: e.target.value }))}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" className="flex-1">Save Customer</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsCustomerDialogOpen(false)}>Cancel</Button>
+                </div>
               </form>
             </DialogContent>
           </Dialog>
-          <Link to="/tracking">
+
+          {/* New Employee Quick Action */}
+          <Dialog open={isEmployeeDialogOpen} onOpenChange={setIsEmployeeDialogOpen}>
+            <DialogTrigger asChild>
+              <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <Users className="h-8 w-8 text-primary" />
+                  <div>
+                    <h3 className="font-semibold">New Employee</h3>
+                    <p className="text-sm text-muted-foreground">Add a new employee</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add New Employee</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSaveEmployee} className="py-4 space-y-4">
+                <div>
+                  <Label htmlFor="employeeName">Name</Label>
+                  <Input 
+                    id="employeeName" 
+                    placeholder="e.g., John Smith" 
+                    value={employeeForm.name}
+                    onChange={(e) => setEmployeeForm(prev => ({ ...prev, name: e.target.value }))}
+                    required 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="employeePhone">Phone</Label>
+                  <Input 
+                    id="employeePhone" 
+                    type="tel" 
+                    placeholder="e.g., +91 98765 43210" 
+                    value={employeeForm.phone}
+                    onChange={(e) => setEmployeeForm(prev => ({ ...prev, phone: e.target.value }))}
+                    required 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="employeeEmail">Email</Label>
+                  <Input 
+                    id="employeeEmail" 
+                    type="email" 
+                    placeholder="e.g., john@fabzclean.com" 
+                    value={employeeForm.email}
+                    onChange={(e) => setEmployeeForm(prev => ({ ...prev, email: e.target.value }))}
+                    required 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="employeePosition">Position</Label>
+                  <Input 
+                    id="employeePosition" 
+                    placeholder="e.g., Driver, Manager" 
+                    value={employeeForm.position}
+                    onChange={(e) => setEmployeeForm(prev => ({ ...prev, position: e.target.value }))}
+                    required 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="employeeSalary">Salary (₹)</Label>
+                  <Input 
+                    id="employeeSalary" 
+                    type="number" 
+                    placeholder="e.g., 25000" 
+                    value={employeeForm.salary}
+                    onChange={(e) => setEmployeeForm(prev => ({ ...prev, salary: e.target.value }))}
+                    required 
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" className="flex-1">Save Employee</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsEmployeeDialogOpen(false)}>Cancel</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Advanced Order Creation */}
+          <Link to="/create-order">
             <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center gap-4">
-                <Truck className="h-8 w-8 text-primary" />
+                <ShoppingBag className="h-8 w-8 text-primary" />
                 <div>
-                  <h3 className="font-semibold">New Shipment</h3>
-                  <p className="text-sm text-muted-foreground">Dispatch a new shipment</p>
+                  <h3 className="font-semibold">Advanced Order</h3>
+                  <p className="text-sm text-muted-foreground">Create order with full details</p>
                 </div>
               </CardContent>
             </Card>

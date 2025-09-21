@@ -209,7 +209,7 @@ export default function LiveTrackingPage() {
     }
   };
 
-  const handleDriverSelect = (driver: any) => {
+  const handleDriverProfileSelect = (driver: any) => {
     setSelectedDriverProfile(driver);
   };
 
@@ -233,7 +233,7 @@ export default function LiveTrackingPage() {
     // Find the driver in the active drivers list and select them
     const driver = drivers.find(d => d.driverId === driverId);
     if (driver) {
-      handleDriverSelect(driver);
+      handleDriverProfileSelect(driver);
       // Switch to map view
       const mapTab = document.querySelector('[value="map"]') as HTMLElement;
       if (mapTab) mapTab.click();
@@ -316,7 +316,7 @@ export default function LiveTrackingPage() {
                 <DialogTitle>Driver Management</DialogTitle>
               </DialogHeader>
               <DriverManagement 
-                onDriverSelect={handleDriverSelect}
+                onDriverSelect={handleDriverProfileSelect}
                 onDriverAssign={handleDriverAssign}
                 selectedOrderId={selectedOrder?.id}
               />
@@ -484,7 +484,7 @@ export default function LiveTrackingPage() {
 
         <TabsContent value="management" className="space-y-4">
           <DriverManagement 
-            onDriverSelect={handleDriverSelect}
+            onDriverSelect={handleDriverProfileSelect}
             onDriverAssign={handleDriverAssign}
             selectedOrderId={selectedOrder?.id}
           />
