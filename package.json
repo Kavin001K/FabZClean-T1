@@ -1,26 +1,30 @@
 {
-  "name": "rest-express",
+  "name": "fabzclean",
   "version": "1.0.0",
+  "main": "electron/main.js",
   "type": "module",
   "license": "MIT",
   "scripts": {
     "dev": "npx tsx server/index.ts",
     "build": "npm run build:client && npm run build:functions",
     "build:client": "vite build",
-    "build:functions": "tsc --project tsconfig.functions.json; rm -f netlify/functions/vite.config.js netlify/functions/vite.config.js.map vite.config.js vite.config.js.map",
+    "build:functions": "tsc --project tsconfig.functions.json",
     "build:server": "tsc --project tsconfig.server.json",
     "start": "node dist/server/index.js",
     "start:client": "vite preview --port 3000",
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "netlify:dev": "netlify dev",
-    "netlify:build": "npm run build:client"
+    "netlify:build": "npm run build:client",
+    "electron": "electron electron/main.js",
+    "electron:dev": "NODE_ENV=development electron electron/main.js",
+    "electron:build": "npm run build:client && electron-builder",
+    "electron:dist": "npm run build:client && electron-builder --publish=never"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@neondatabase/serverless": "^0.10.4",
-    "@prisma/client": "^6.16.2",
     "@radix-ui/react-accordion": "^1.2.4",
     "@radix-ui/react-alert-dialog": "^1.1.7",
     "@radix-ui/react-aspect-ratio": "^1.1.3",
@@ -50,7 +54,6 @@
     "@radix-ui/react-tooltip": "^1.2.0",
     "@tanstack/react-query": "^5.60.5",
     "@types/leaflet": "^1.9.20",
-    "better-sqlite3": "^12.2.0",
     "bwip-js": "^4.7.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -69,12 +72,10 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^0.453.0",
     "memorystore": "^1.6.7",
-    "mysql2": "^3.15.0",
     "nanoid": "3.3.11",
     "next-themes": "^0.4.6",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
-    "pg": "^8.16.3",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
@@ -85,7 +86,6 @@
     "react-resizable": "^3.0.5",
     "react-resizable-panels": "^2.1.7",
     "recharts": "^2.15.2",
-    "shelljs": "^0.8.5",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "tw-animate-css": "^1.2.5",
@@ -93,13 +93,13 @@
     "wouter": "^3.3.5",
     "ws": "^8.18.0",
     "zod": "^3.24.2",
-    "zod-validation-error": "^3.4.0"
+    "zod-validation-error": "^3.4.0",
+    "shelljs": "^0.8.5"
   },
   "devDependencies": {
     "@netlify/functions": "^4.2.5",
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "^4.1.3",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/connect-pg-simple": "^7.0.3",
     "@types/express": "4.17.21",
     "@types/express-session": "^1.18.0",
@@ -114,9 +114,10 @@
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.30.4",
+    "electron": "^38.1.2",
+    "electron-builder": "^26.0.12",
     "esbuild": "^0.25.9",
     "postcss": "^8.4.47",
-    "prisma": "^6.16.2",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.1",
     "typescript": "5.6.3",
@@ -127,5 +128,29 @@
   },
   "overrides": {
     "nanoid": "3.3.11"
+  },
+  "build": {
+    "appId": "com.fabzclean.app",
+    "productName": "FabZClean",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.business",
+      "icon": "public/assets/logo.webp"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "public/assets/logo.webp"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "public/assets/logo.webp"
+    }
   }
 }
