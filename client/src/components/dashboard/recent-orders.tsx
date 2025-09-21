@@ -7,7 +7,7 @@ import { formatCurrency } from "@/lib/data-service";
 import { Eye, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
-import { TableSkeleton } from "@/components/ui/loading-skeleton";
+import * as LoadingSkeleton from "@/components/ui/loading-skeleton";
 
 export interface Order {
   id: string;
@@ -79,7 +79,7 @@ export default React.memo(function RecentOrders({
           <CardTitle>Recent Orders</CardTitle>
         </CardHeader>
         <CardContent>
-          <TableSkeleton rows={5} />
+          <LoadingSkeleton.TableSkeleton rows={5} />
         </CardContent>
       </Card>
     );

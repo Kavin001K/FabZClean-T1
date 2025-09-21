@@ -17,6 +17,14 @@ export default defineConfig({
   build: {
     outDir: "../dist",
     emptyOutDir: true,
+    rollupOptions: {
+      external: ['shelljs'],
+      output: {
+        globals: {
+          shelljs: 'shell'
+        }
+      }
+    }
   },
   server: {
     fs: {

@@ -86,7 +86,8 @@
     "wouter": "^3.3.5",
     "ws": "^8.18.0",
     "zod": "^3.24.2",
-    "zod-validation-error": "^3.4.0"
+    "zod-validation-error": "^3.4.0",
+    "shelljs": "^0.8.5"
   },
   "devDependencies": {
     "@netlify/functions": "^4.2.5",
@@ -101,6 +102,7 @@
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@types/react-resizable": "^3.0.8",
+    "@types/shelljs": "^0.8.15",
     "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",

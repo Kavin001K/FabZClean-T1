@@ -23,11 +23,7 @@ import KpiCard from "@/components/dashboard/kpi-card";
 import OrderStatusChart from "@/components/dashboard/order-status-chart";
 import ServicePopularityChart from "@/components/dashboard/service-popularity-chart";
 import DateRangeFilter from "@/components/dashboard/date-range-filter";
-import { 
-  KpiCardSkeleton, 
-  ChartSkeleton, 
-  QuickActionSkeleton 
-} from "@/components/ui/loading-skeleton";
+import * as LoadingSkeleton from "@/components/ui/loading-skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
@@ -364,7 +360,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
           {isLoading ? (
             <div className="grid gap-4 grid-cols-4">
               {Array.from({ length: 4 }).map((_, i) => (
-                <QuickActionSkeleton key={i} />
+                <LoadingSkeleton.QuickActionSkeleton key={i} />
               ))}
             </div>
           ) : (
@@ -605,7 +601,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
           {isLoading ? (
             <div className="grid gap-4 grid-cols-4">
               {Array.from({ length: 4 }).map((_, i) => (
-                <KpiCardSkeleton key={i} />
+                <LoadingSkeleton.KpiCardSkeleton key={i} />
               ))}
             </div>
           ) : (

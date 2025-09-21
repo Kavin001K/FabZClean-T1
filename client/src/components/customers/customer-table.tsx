@@ -22,7 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { CustomerRowSkeleton } from '@/components/ui/loading-skeleton';
+import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
 import { formatDate } from '@/lib/data-service';
 import type { Customer } from '../../../shared/schema';
 
@@ -176,7 +176,7 @@ export const CustomerTable: React.FC<CustomerTableProps> = React.memo(({
         </TableHeader>
         <TableBody>
           {Array.from({ length: 5 }).map((_, i) => (
-            <CustomerRowSkeleton key={i} />
+            <LoadingSkeleton.CustomerRowSkeleton key={i} />
           ))}
         </TableBody>
       </Table>

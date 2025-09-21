@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, Users, UserPlus, Repeat, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { KpiCardSkeleton } from '@/components/ui/loading-skeleton';
+import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
 
 interface CustomerKpiData {
   totalCustomers: number;
@@ -81,7 +81,7 @@ export const CustomerKPIs: React.FC<CustomerKPIsProps> = React.memo(({
     return (
       <div className="grid gap-6 grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <KpiCardSkeleton key={i} />
+          <LoadingSkeleton.KpiCardSkeleton key={i} />
         ))}
       </div>
     );

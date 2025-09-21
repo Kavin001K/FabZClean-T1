@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
-import { TableSkeleton } from "@/components/ui/loading-skeleton";
+import * as LoadingSkeleton from "@/components/ui/loading-skeleton";
 import {
   Eye,
   Edit,
@@ -191,7 +191,7 @@ export default React.memo(function OrdersTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableSkeleton rows={5} />
+            <LoadingSkeleton.TableSkeleton rows={5} />
           </TableBody>
         </Table>
       </div>

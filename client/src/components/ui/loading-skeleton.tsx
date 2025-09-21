@@ -69,4 +69,58 @@ export const CustomerRowSkeleton: React.FC = () => (
   </tr>
 );
 
+// Chart skeleton for loading states
+export const ChartSkeleton: React.FC = () => (
+  <div className="space-y-4">
+    <div className="flex items-center justify-between">
+      <Skeleton className="h-6 w-32" />
+      <Skeleton className="h-4 w-20" />
+    </div>
+    <div className="space-y-3">
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-5/6" />
+      <Skeleton className="h-4 w-4/6" />
+      <Skeleton className="h-4 w-3/6" />
+      <Skeleton className="h-4 w-5/6" />
+    </div>
+  </div>
+);
+
+// Table skeleton for loading states
+export const TableSkeleton: React.FC<{ rows?: number; columns?: number }> = ({ rows = 5, columns = 4 }) => (
+  <div className="space-y-3">
+    {/* Table header skeleton */}
+    <div className="flex space-x-4">
+      {Array.from({ length: columns }).map((_, i) => (
+        <Skeleton key={i} className="h-4 w-20" />
+      ))}
+    </div>
+    {/* Table rows skeleton */}
+    {Array.from({ length: rows }).map((_, rowIndex) => (
+      <div key={rowIndex} className="flex space-x-4">
+        {Array.from({ length: columns }).map((_, colIndex) => (
+          <Skeleton key={colIndex} className="h-4 w-16" />
+        ))}
+      </div>
+    ))}
+  </div>
+);
+
+// Quick action skeleton for loading states
+export const QuickActionSkeleton: React.FC = () => (
+  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+    {Array.from({ length: 4 }).map((_, i) => (
+      <div key={i} className="rounded-lg border bg-card p-4 shadow-sm">
+        <div className="flex items-center space-x-3">
+          <Skeleton className="h-8 w-8 rounded" />
+          <div className="space-y-1">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
 export default Skeleton;

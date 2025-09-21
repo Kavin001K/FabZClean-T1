@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartSkeleton } from "@/components/ui/loading-skeleton";
+import * as LoadingSkeleton from "@/components/ui/loading-skeleton";
 
 const SAMPLE_SALES_DATA = [
   { month: "Jan", revenue: 12000, orders: 45 },
@@ -77,7 +77,7 @@ export default React.memo(function SalesChart({
   }, [chartData]);
 
   if (isLoading) {
-    return <ChartSkeleton />;
+    return <LoadingSkeleton.ChartSkeleton />;
   }
 
   if (!chartData || chartData.length === 0) {
