@@ -1,6 +1,7 @@
 {
-  "name": "rest-express",
+  "name": "fabzclean",
   "version": "1.0.0",
+  "main": "electron/main.js",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -14,7 +15,11 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "netlify:dev": "netlify dev",
-    "netlify:build": "npm run build:client"
+    "netlify:build": "npm run build:client",
+    "electron": "electron electron/main.js",
+    "electron:dev": "NODE_ENV=development electron electron/main.js",
+    "electron:build": "npm run build:client && electron-builder",
+    "electron:dist": "npm run build:client && electron-builder --publish=never"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
