@@ -93,7 +93,7 @@ export default React.memo(function SalesChart({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+          <div className="flex items-center justify-center h-[400px] text-muted-foreground">
             <div className="text-center">
               <p className="text-lg font-medium">No sales data available</p>
               <p className="text-sm">Data will appear here once orders are created</p>
@@ -131,15 +131,15 @@ export default React.memo(function SalesChart({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div style={{ height: `${height}px` }}>
+        <div style={{ height: `${Math.max(height, 400)}px` }}>
           <ResponsiveContainer width="100%" height="100%">
             <ChartComponent
               data={chartData}
               margin={{
-                top: 10,
-                right: 20,
-                left: 10,
-                bottom: 10,
+                top: 20,
+                right: 30,
+                left: 20,
+                bottom: 20,
               }}
             >
               <CartesianGrid 

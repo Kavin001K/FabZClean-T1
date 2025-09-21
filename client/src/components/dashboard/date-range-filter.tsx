@@ -139,10 +139,10 @@ export default function DateRangeFilter({
   };
 
   return (
-    <div className={cn('flex flex-col sm:flex-row gap-2', className)}>
+    <div className={cn('flex items-center gap-3', className)}>
       {/* Preset Selector */}
       <Select onValueChange={handlePresetSelect}>
-        <SelectTrigger className="w-full sm:w-[180px]">
+        <SelectTrigger className="w-[180px]">
           <SelectValue placeholder="Quick select" />
         </SelectTrigger>
         <SelectContent>
@@ -160,7 +160,7 @@ export default function DateRangeFilter({
           <Button
             variant="outline"
             className={cn(
-              'w-full sm:w-[300px] justify-start text-left font-normal',
+              'w-[300px] justify-start text-left font-normal',
               !dateRange.from && 'text-muted-foreground'
             )}
           >

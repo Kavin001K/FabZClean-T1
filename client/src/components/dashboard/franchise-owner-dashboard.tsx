@@ -316,17 +316,17 @@ export default React.memo(function FranchiseOwnerDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-4 sm:p-6 space-y-6">
+      <div className="container mx-auto p-6 space-y-6">
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Franchise Owner Dashboard</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Franchise Owner Dashboard</h1>
             <p className="text-muted-foreground mt-1">
               Welcome back! Here's what's happening with your business today.
             </p>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex items-center gap-4">
             <Button 
               onClick={refreshData}
               variant="outline" 
@@ -346,7 +346,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
         </div>
 
         {/* Date Range Filter */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">Date Range:</span>
@@ -354,7 +354,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
           <DateRangeFilter 
             dateRange={filters.dateRange}
             onDateRangeChange={handleDateRangeChange}
-            className="flex-1"
+            className="w-96"
           />
         </div>
 
@@ -362,13 +362,13 @@ export default React.memo(function FranchiseOwnerDashboard() {
         <div className="space-y-4">
           <h2 className="text-lg font-semibold">Quick Actions</h2>
           {isLoading ? (
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-4">
               {Array.from({ length: 4 }).map((_, i) => (
                 <QuickActionSkeleton key={i} />
               ))}
             </div>
           ) : (
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-4">
               {/* New Order Quick Action */}
               <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
                 <DialogTrigger asChild>
@@ -603,13 +603,13 @@ export default React.memo(function FranchiseOwnerDashboard() {
         <div className="space-y-4">
           <h2 className="text-lg font-semibold">Key Performance Indicators</h2>
           {isLoading ? (
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-4">
               {Array.from({ length: 4 }).map((_, i) => (
                 <KpiCardSkeleton key={i} />
               ))}
             </div>
           ) : (
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-4">
               {kpiCards.map((kpi, index) => (
                 <KpiCard
                   key={kpi.title}
@@ -629,13 +629,13 @@ export default React.memo(function FranchiseOwnerDashboard() {
             </div>
 
         {/* Charts Section */}
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        <div className="grid gap-6 grid-cols-2">
           {/* Sales Chart */}
           <SalesChart 
             data={salesData} 
             isLoading={isLoading}
             title="Revenue Trend"
-            className="lg:col-span-2"
+            className="col-span-2"
           />
           
           {/* Order Status Chart */}
@@ -652,7 +652,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
       </div>
 
         {/* Recent Orders and Activity */}
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        <div className="grid gap-6 grid-cols-2">
           <RecentOrders 
             orders={recentOrders} 
             isLoading={isLoading}
@@ -678,7 +678,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
                 <div className="text-center p-4 rounded-lg bg-muted/50">
                   <div className="text-2xl font-bold text-green-600">
                     {Math.floor(metrics.totalRevenue / 30).toLocaleString()}
-                  </div>
+              </div>
                   <div className="text-sm text-muted-foreground">Revenue Today</div>
               </div>
       </div>

@@ -123,7 +123,7 @@ export default React.memo(function KpiCard({
         <DialogTrigger asChild>
           {cardContent}
         </DialogTrigger>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-[800px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <span>{title}</span>

@@ -117,21 +117,21 @@ export default React.memo(function RecentOrders({
         )}
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-3">
           {displayOrders.map((order, index) => (
             <div 
               key={order.id || index} 
               className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
             >
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-4">
                 <Avatar className="h-10 w-10">
                   <AvatarFallback className="text-xs">
                     {order.customerName.split(' ').map(n => n[0]).join('').toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <p className="text-sm font-medium leading-none">
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center space-x-3">
+                    <p className="text-sm font-medium leading-none truncate">
                       {order.customerName}
                     </p>
                     <Badge 
@@ -144,7 +144,7 @@ export default React.memo(function RecentOrders({
                       </span>
                     </Badge>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-3">
                     <p className="text-xs text-muted-foreground">
                       #{order.orderNumber || order.id.slice(-8)}
                     </p>
@@ -165,9 +165,11 @@ export default React.memo(function RecentOrders({
                   </Badge>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="font-semibold text-sm">
-                  {formatCurrency(order.total)}
+              <div className="flex items-center space-x-3">
+                <div className="text-right">
+                  <div className="font-semibold text-sm">
+                    {formatCurrency(order.total)}
+                  </div>
                 </div>
                 <Link to={`/orders/${order.id}`}>
                   <Button variant="ghost" size="sm" className="text-xs">
