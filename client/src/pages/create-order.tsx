@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PlusCircle, User, Calendar, Truck } from "lucide-react";
+import { PlusCircle, User, Calendar, Truck, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,8 @@ export default function CreateOrder() {
   const [selectedService, setSelectedService] = useState("");
   const [pickupDate, setPickupDate] = useState("");
   const [specialInstructions, setSpecialInstructions] = useState("");
+  const [advancePayment, setAdvancePayment] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   
@@ -114,6 +116,8 @@ export default function CreateOrder() {
         instructions: specialInstructions,
         pickupDate: pickupDate || undefined,
       },
+      advancePaid: advancePayment ? advancePayment : "0",
+      paymentMethod: paymentMethod,
     };
 
     createOrderMutation.mutate(orderData);
@@ -259,6 +263,60 @@ export default function CreateOrder() {
                     onChange={(e) => setSpecialInstructions(e.target.value)}
                 />
               </div>
+              
+              {/* Advance Payment Section */}
+              <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5" />
+                  <Label className="text-base font-semibold">Advance Payment (Optional)</Label>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="advancePayment">Advance Amount</Label>
+                    <Input
+                        id="advancePayment"
+                        type="number"
+                        placeholder="0.00"
+                        value={advancePayment}
+                        onChange={(e) => setAdvancePayment(e.target.value)}
+                        max={selectedServiceDetails ? parseFloat(selectedServiceDetails.price) : undefined}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentMethod">Payment Method</Label>
+                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="card">Credit/Debit Card</SelectItem>
+                        <SelectItem value="upi">UPI</SelectItem>
+                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                {selectedServiceDetails && advancePayment && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="flex justify-between text-sm">
+                      <span>Total Amount:</span>
+                      <span className="font-medium">₹{parseFloat(selectedServiceDetails.price).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Advance Payment:</span>
+                      <span className="font-medium text-green-600">₹{parseFloat(advancePayment || '0').toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-semibold border-t pt-1 mt-1">
+                      <span>Balance Due:</span>
+                      <span className="text-red-600">₹{(parseFloat(selectedServiceDetails.price) - parseFloat(advancePayment || '0')).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -275,13 +333,37 @@ export default function CreateOrder() {
                 <span>{selectedServiceDetails ? selectedServiceDetails.name : "N/A"}</span>
               </div>
               <div className="flex justify-between">
-                <span>Price</span>
+                <span>Service Price</span>
                 <span>{selectedServiceDetails ? `₹${parseFloat(selectedServiceDetails.price).toFixed(2)}` : "₹0.00"}</span>
               </div>
+              
+              {advancePayment && (
+                <>
+                  <div className="flex justify-between text-green-600">
+                    <span>Advance Payment</span>
+                    <span>-₹{parseFloat(advancePayment || '0').toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Balance Due</span>
+                    <span className="text-red-600 font-semibold">
+                      ₹{selectedServiceDetails ? (parseFloat(selectedServiceDetails.price) - parseFloat(advancePayment || '0')).toFixed(2) : "0.00"}
+                    </span>
+                  </div>
+                </>
+              )}
+              
               <div className="border-t pt-4 flex justify-between font-bold text-lg">
-                <span>Total</span>
+                <span>Total Amount</span>
                 <span>{selectedServiceDetails ? `₹${parseFloat(selectedServiceDetails.price).toFixed(2)}` : "₹0.00"}</span>
               </div>
+              
+              {advancePayment && (
+                <div className="text-center">
+                  <Badge variant="outline" className="text-green-600">
+                    {paymentMethod.toUpperCase()} Payment: ₹{parseFloat(advancePayment).toFixed(2)}
+                  </Badge>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

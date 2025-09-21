@@ -21,6 +21,8 @@ import Inventory from "@/pages/inventory";
 import Logistics from "@/pages/logistics";
 import DebugPage from "@/pages/debug";
 import EmployeeDashboardPage from "@/pages/employee-dashboard";
+import FranchiseDashboard from "@/pages/franchise-dashboard";
+import Settings from "@/pages/settings";
 import DatabaseStatus from "@/pages/database-status";
 import PerformanceAnalytics from "@/components/analytics";
 
@@ -40,6 +42,8 @@ function Router() {
         <Route path="/documents" component={Documents} />
         <Route path="/logistics" component={Logistics} />
         <Route path="/employee-dashboard" component={EmployeeDashboardPage} />
+        <Route path="/franchise-dashboard" component={FranchiseDashboard} />
+        <Route path="/settings" component={Settings} />
         <Route path="/database-status" component={DatabaseStatus} />
         <Route path="/debug" component={DebugPage} />
         <Route component={NotFound} />

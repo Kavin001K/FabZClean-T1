@@ -24,6 +24,7 @@ import {
   Briefcase
 } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
+import EmployeeQuickActions from "@/components/employee-quick-actions";
 
 export default function EmployeeDashboardSimple() {
   // Mock employee data - in real app, this would come from API
@@ -59,14 +60,6 @@ export default function EmployeeDashboardSimple() {
     bonus: 150
   };
 
-  const quickActions = [
-    { label: "Clock In/Out", icon: Clock, action: () => console.log("Clock action") },
-    { label: "Request Time Off", icon: Calendar, action: () => console.log("Time off request") },
-    { label: "View Schedule", icon: Timer, action: () => console.log("View schedule") },
-    { label: "Submit Report", icon: FileText, action: () => console.log("Submit report") },
-    { label: "Update Profile", icon: User, action: () => console.log("Update profile") },
-    { label: "View Payslip", icon: DollarSign, action: () => console.log("View payslip") }
-  ];
 
   const currentTasks = [
     {
@@ -170,30 +163,11 @@ export default function EmployeeDashboardSimple() {
         </CardContent>
       </Card>
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Briefcase className="w-5 h-5" />
-            <span>Quick Actions</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {quickActions.map((action, index) => (
-              <Button
-                key={index}
-                variant="outline"
-                className="h-auto p-4 flex flex-col items-center space-y-2"
-                onClick={action.action}
-              >
-                <action.icon className="w-5 h-5" />
-                <span className="text-xs text-center">{action.label}</span>
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Enhanced Quick Actions */}
+      <EmployeeQuickActions 
+        employeeId={employeeData.employeeId} 
+        employeeName={employeeData.name} 
+      />
 
       {/* Main Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

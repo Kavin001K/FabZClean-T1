@@ -39,6 +39,7 @@ export function Sidebar() {
         <NavLink to="/documents" icon={FileText}>Documents</NavLink>
         <NavLink to="/analytics" icon={LineChart}>Analytics</NavLink>
         <NavLink to="/employee-dashboard" icon={User}>Employee Dashboard</NavLink>
+        <NavLink to="/franchise-dashboard" icon={Users2}>Franchise Dashboard</NavLink>
         <NavLink to="/database-status" icon={Server}>Database Status</NavLink>
       </nav>
       <nav className="mt-auto flex flex-col gap-2 p-4">
