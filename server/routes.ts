@@ -2,12 +2,16 @@ import { Express } from 'express';
 import { createServer } from 'http';
 import { insertOrderSchema, insertCustomerSchema, insertProductSchema, insertServiceSchema } from '@shared/schema';
 import { Storage } from './storage';
+import dashboardRoutes from './routes/dashboard';
 
 export function setupRoutes(app: Express, storage: Storage) {
   // Health check
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
+
+  // Dashboard API routes
+  app.use('/api/dashboard', dashboardRoutes);
 
   // Basic API endpoints
   app.get('/api/orders', async (req, res) => {

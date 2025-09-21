@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { PlusCircle, User, Calendar, Truck, DollarSign, Search, CheckCircle } from "lucide-react";
+import { PlusCircle, User, Calendar, Truck, DollarSign, Search, CheckCircle, Scale, Package, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,22 @@ export default function CreateOrder() {
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [advancePayment, setAdvancePayment] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [orderType, setOrderType] = useState<"piece_based" | "weight_based">("piece_based");
+  const [urgency, setUrgency] = useState<"low" | "normal" | "high" | "urgent">("normal");
+  const [garmentItems, setGarmentItems] = useState([
+    {
+      id: Date.now().toString(),
+      garmentType: "",
+      fabric: "",
+      color: "",
+      condition: "good",
+      quantity: 1,
+      weight: "",
+      specialCare: "",
+      stainDetails: "",
+      damageNotes: ""
+    }
+  ]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [manuallyEdited, setManuallyEdited] = useState({
@@ -84,6 +100,41 @@ export default function CreateOrder() {
       });
     }
   }, [customerData, toast, manuallyEdited]);
+
+  // Garment management functions
+  const addGarmentItem = () => {
+    setGarmentItems([...garmentItems, {
+      id: Date.now().toString(),
+      garmentType: "",
+      fabric: "",
+      color: "",
+      condition: "good",
+      quantity: 1,
+      weight: "",
+      specialCare: "",
+      stainDetails: "",
+      damageNotes: ""
+    }]);
+  };
+
+  const removeGarmentItem = (id: string) => {
+    if (garmentItems.length > 1) {
+      setGarmentItems(garmentItems.filter(item => item.id !== id));
+    }
+  };
+
+  const updateGarmentItem = (id: string, field: string, value: any) => {
+    setGarmentItems(garmentItems.map(item =>
+      item.id === id ? { ...item, [field]: value } : item
+    ));
+  };
+
+  // Calculate totals
+  const totalPieces = garmentItems.reduce((sum, item) =>
+    orderType === "piece_based" || orderType === "mixed" ? sum + item.quantity : sum, 0);
+
+  const totalWeight = garmentItems.reduce((sum, item) =>
+    sum + (parseFloat(item.weight) || 0), 0);
 
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: Partial<Order>) => {
@@ -149,12 +200,27 @@ export default function CreateOrder() {
       status: "pending",
       paymentStatus: "pending",
       totalAmount: selectedServiceDetails.price,
-      items: [{
+      orderType,
+      urgency,
+      totalPieces,
+      totalWeight: totalWeight.toString(),
+      specialInstructions,
+      garmentTypes: [...new Set(garmentItems.map(item => item.garmentType).filter(Boolean))],
+      items: garmentItems.map(item => ({
         productId: selectedServiceDetails.id,
         productName: selectedServiceDetails.name,
-        quantity: 1,
+        garmentType: item.garmentType,
+        fabric: item.fabric,
+        color: item.color,
+        condition: item.condition,
+        quantity: item.quantity,
+        weight: item.weight,
         price: selectedServiceDetails.price,
-      }],
+        specialCare: item.specialCare,
+        stainDetails: item.stainDetails,
+        damageNotes: item.damageNotes,
+        itemType: orderType
+      })),
       shippingAddress: {
         instructions: specialInstructions,
         pickupDate: pickupDate || undefined,
@@ -289,6 +355,238 @@ export default function CreateOrder() {
                     }}
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Package className="h-5 w-5 mr-2" />
+                Order Type &amp; Priority
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Order Type *</Label>
+                  <Select value={orderType} onValueChange={(value: any) => setOrderType(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="piece_based">
+                        <div className="flex items-center">
+                          <Package className="h-4 w-4 mr-2" />
+                          Piece-Based
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="weight_based">
+                        <div className="flex items-center">
+                          <Scale className="h-4 w-4 mr-2" />
+                          Weight-Based
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Urgency</Label>
+                  <Select value={urgency} onValueChange={(value: any) => setUrgency(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low Priority</SelectItem>
+                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="high">High Priority</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="p-4 bg-muted/30 rounded-lg">
+                <div className="flex justify-between text-sm">
+                  <span>Total Pieces:</span>
+                  <span className="font-medium">{totalPieces}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Total Weight:</span>
+                  <span className="font-medium">{totalWeight.toFixed(2)} kg</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Shirt className="h-5 w-5 mr-2" />
+                  Garment Details
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={addGarmentItem}>
+                  <PlusCircle className="h-4 w-4 mr-1" />
+                  Add Item
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {garmentItems.map((item, index) => (
+                <div key={item.id} className="p-4 border rounded-lg space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Garment {index + 1}</Label>
+                    {garmentItems.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeGarmentItem(item.id)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor={`garmentType-${item.id}`}>Type</Label>
+                      <Select
+                        value={item.garmentType}
+                        onValueChange={(value) => updateGarmentItem(item.id, 'garmentType', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="shirt">Shirt</SelectItem>
+                          <SelectItem value="pants">Pants</SelectItem>
+                          <SelectItem value="suit">Suit</SelectItem>
+                          <SelectItem value="dress">Dress</SelectItem>
+                          <SelectItem value="jacket">Jacket</SelectItem>
+                          <SelectItem value="curtains">Curtains</SelectItem>
+                          <SelectItem value="comforter">Comforter</SelectItem>
+                          <SelectItem value="carpet">Carpet</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`fabric-${item.id}`}>Fabric</Label>
+                      <Select
+                        value={item.fabric}
+                        onValueChange={(value) => updateGarmentItem(item.id, 'fabric', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select fabric..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cotton">Cotton</SelectItem>
+                          <SelectItem value="silk">Silk</SelectItem>
+                          <SelectItem value="wool">Wool</SelectItem>
+                          <SelectItem value="polyester">Polyester</SelectItem>
+                          <SelectItem value="linen">Linen</SelectItem>
+                          <SelectItem value="cashmere">Cashmere</SelectItem>
+                          <SelectItem value="leather">Leather</SelectItem>
+                          <SelectItem value="mixed">Mixed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`color-${item.id}`}>Color</Label>
+                      <Input
+                        id={`color-${item.id}`}
+                        placeholder="e.g., Blue, White"
+                        value={item.color}
+                        onChange={(e) => updateGarmentItem(item.id, 'color', e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor={`condition-${item.id}`}>Condition</Label>
+                      <Select
+                        value={item.condition}
+                        onValueChange={(value) => updateGarmentItem(item.id, 'condition', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="new">New</SelectItem>
+                          <SelectItem value="good">Good</SelectItem>
+                          <SelectItem value="worn">Worn</SelectItem>
+                          <SelectItem value="damaged">Damaged</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {orderType !== "weight_based" && (
+                      <div className="space-y-2">
+                        <Label htmlFor={`quantity-${item.id}`}>Quantity</Label>
+                        <Input
+                          id={`quantity-${item.id}`}
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => updateGarmentItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                        />
+                      </div>
+                    )}
+
+                    {orderType !== "piece_based" && (
+                      <div className="space-y-2">
+                        <Label htmlFor={`weight-${item.id}`}>Weight (kg)</Label>
+                        <Input
+                          id={`weight-${item.id}`}
+                          type="number"
+                          step="0.1"
+                          placeholder="0.0"
+                          value={item.weight}
+                          onChange={(e) => updateGarmentItem(item.id, 'weight', e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor={`specialCare-${item.id}`}>Special Care</Label>
+                      <Input
+                        id={`specialCare-${item.id}`}
+                        placeholder="e.g., Dry clean only"
+                        value={item.specialCare}
+                        onChange={(e) => updateGarmentItem(item.id, 'specialCare', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`stainDetails-${item.id}`}>Stain Details</Label>
+                      <Input
+                        id={`stainDetails-${item.id}`}
+                        placeholder="e.g., Oil stain on sleeve"
+                        value={item.stainDetails}
+                        onChange={(e) => updateGarmentItem(item.id, 'stainDetails', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`damageNotes-${item.id}`}>Damage Notes</Label>
+                      <Input
+                        id={`damageNotes-${item.id}`}
+                        placeholder="e.g., Small tear"
+                        value={item.damageNotes}
+                        onChange={(e) => updateGarmentItem(item.id, 'damageNotes', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
 

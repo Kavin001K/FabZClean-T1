@@ -1,5 +1,5 @@
-import FranchiseOwnerDashboard from "@/components/dashboard/franchise-owner-dashboard";
+import ManagerDashboard from "@/components/dashboard/manager-dashboard";
 
 export default function Dashboard() {
-  return <FranchiseOwnerDashboard />;
+  return <ManagerDashboard />;
 }
