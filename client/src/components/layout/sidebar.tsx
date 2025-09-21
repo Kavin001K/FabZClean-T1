@@ -2,7 +2,7 @@ import { Link, useLocation } from 'wouter';
 import { Home, ShoppingCart, Users2, LineChart, Package, Settings, Truck, Scissors, User, Server, MapPin, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const NavLink = ({ to, icon: Icon, children }: { to: string; icon: any; children: React.ReactNode }) => {
+const NavLink = ({ to, icon: Icon, children }: { to: string; icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) => {
   const [location] = useLocation();
   const isActive = location === to;
 

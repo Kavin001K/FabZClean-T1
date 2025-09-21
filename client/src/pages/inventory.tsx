@@ -232,11 +232,11 @@ export default function Inventory() {
     deleteItemMutation.mutate(itemId);
   };
 
-  const handleCreateItem = (itemData: any) => {
+  const handleCreateItem = (itemData: Partial<InventoryItem>) => {
     createItemMutation.mutate(itemData);
   };
 
-  const handleUpdateItem = (itemData: any) => {
+  const handleUpdateItem = (itemData: Partial<InventoryItem>) => {
     if (!selectedItem) return;
     editItemMutation.mutate({
       itemId: selectedItem.id,

@@ -122,14 +122,14 @@ export default function Settings() {
     confirm: false
   });
 
-  const handleSettingChange = (key: string, value: any) => {
+  const handleSettingChange = (key: string, value: string | number | boolean) => {
     setSettings(prev => ({
       ...prev,
       [key]: value
     }));
   };
 
-  const handleNestedSettingChange = (parentKey: string, childKey: string, value: any) => {
+  const handleNestedSettingChange = (parentKey: string, childKey: string, value: string | number | boolean) => {
     setSettings(prev => ({
       ...prev,
       [parentKey]: {

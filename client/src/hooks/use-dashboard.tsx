@@ -189,7 +189,7 @@ export function useDashboard() {
     });
   }, [queryClient, toast]);
 
-  const updateQuickActionForm = useCallback((formType: keyof QuickActionForm, updates: any) => {
+  const updateQuickActionForm = useCallback((formType: keyof QuickActionForm, updates: Partial<QuickActionForm[keyof QuickActionForm]>) => {
     setQuickActionForms(prev => ({
       ...prev,
       [formType]: { ...prev[formType], ...updates },

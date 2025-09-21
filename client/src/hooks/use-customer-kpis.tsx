@@ -51,9 +51,14 @@ const fetchCustomerKPIs = async (): Promise<CustomerKpiData> => {
   // Calculate repeat rate percentage
   const repeatRate = totalCustomers > 0 ? (repeatCustomers / totalCustomers) * 100 : 0;
   
+  // Calculate total orders for additional metrics
+  const totalOrders = customers.reduce((sum, customer) => 
+    sum + (customer.totalOrders || 0), 0
+  );
+  
   // Calculate additional metrics
   const totalRevenue = totalSpent;
-  const averageOrderValue = totalRevenue / Math.max(totalOrders, 1);
+  const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
   const customerRetentionRate = repeatRate;
 
   // Mock change percentages (in real app, these would be calculated from historical data)

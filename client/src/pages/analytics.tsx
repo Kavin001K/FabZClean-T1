@@ -78,11 +78,42 @@ export default function Analytics() {
   const [insights, setInsights] = useState<string[]>([]);
   const [showInsights, setShowInsights] = useState(false);
 
-  // State for real data
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Fetch data using React Query
+  const {
+    data: orders = [],
+    isLoading: ordersLoading,
+    isError: ordersError,
+  } = useQuery({
+    queryKey: ['analytics-orders'],
+    queryFn: ordersApi.getAll,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  const {
+    data: customers = [],
+    isLoading: customersLoading,
+    isError: customersError,
+  } = useQuery({
+    queryKey: ['analytics-customers'],
+    queryFn: customersApi.getAll,
+    staleTime: 2 * 60 * 1000,
+    cacheTime: 5 * 60 * 1000,
+  });
+
+  const {
+    data: inventory = [],
+    isLoading: inventoryLoading,
+    isError: inventoryError,
+  } = useQuery({
+    queryKey: ['analytics-inventory'],
+    queryFn: inventoryApi.getAll,
+    staleTime: 2 * 60 * 1000,
+    cacheTime: 5 * 60 * 1000,
+  });
+
+  const isLoading = ordersLoading || customersLoading || inventoryLoading;
+  const hasError = ordersError || customersError || inventoryError;
 
   // Real-time state
   const [realtimeKpis, setRealtimeKpis] = useState<any>(null);
@@ -119,40 +150,7 @@ export default function Analytics() {
     }
   });
 
-  // Fetch real data from database
-  useEffect(() => {
-    const fetchAnalyticsData = async () => {
-      try {
-        setIsLoading(true);
-        
-        const [
-          ordersData,
-          customersData,
-          inventoryData
-        ] = await Promise.all([
-          ordersApi.getAll(),
-          customersApi.getAll(),
-          inventoryApi.getAll()
-        ]);
-
-        setOrders(ordersData);
-        setCustomers(customersData);
-        setInventory(inventoryData);
-        
-      } catch (error) {
-        console.error('Failed to fetch analytics data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load analytics data. Please try again.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAnalyticsData();
-  }, [toast]);
+  // Data fetching is now handled by React Query above
 
   // Calculate comprehensive analytics data using real data
   const analyticsData = useMemo(() => {
@@ -519,6 +517,32 @@ export default function Analytics() {
       });
     }
   };
+
+  // Error state
+  if (hasError) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <div className="text-destructive text-lg font-semibold">
+                Failed to load analytics data
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {ordersError?.message || customersError?.message || inventoryError?.message || 'An unexpected error occurred'}
+              </p>
+              <Button 
+                onClick={() => window.location.reload()}
+                variant="outline"
+              >
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

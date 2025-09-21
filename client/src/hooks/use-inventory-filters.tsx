@@ -43,8 +43,8 @@ export const useInventoryFilters = (inventory: InventoryItem[]) => {
     // Apply sorting
     if (sortField) {
       filtered = [...filtered].sort((a, b) => {
-        let aValue: any;
-        let bValue: any;
+        let aValue: string | number;
+        let bValue: string | number;
 
         switch (sortField) {
           case 'name':

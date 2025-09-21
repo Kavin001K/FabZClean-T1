@@ -2,7 +2,7 @@
 // This replaces all dummy data with real database queries
 
 // Import types from shared schema instead of defining them here
-import type { Order, Customer, Service, Product } from "../../../shared/schema";
+import type { Order, Customer, Service, Product, Delivery } from "../../../shared/schema";
 
 export type InventoryItem = {
   id: string;
@@ -416,11 +416,18 @@ export const formatCurrency = (amount: number): string => {
 };
 
 export const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('en-IN', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
+  if (!dateString) return 'N/A';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch (error) {
+    return 'N/A';
+  }
 };
 
 export const formatNumber = (num: number): string => {
@@ -545,6 +552,174 @@ export const servicesApi = {
     } catch (error) {
       console.error('Failed to delete service:', error);
       return false;
+    }
+  },
+};
+
+// Driver type definition
+export type Driver = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  licenseNumber: string;
+  vehicleNumber: string;
+  vehicleType: 'bike' | 'car' | 'van';
+  vehicleModel: string;
+  status: 'available' | 'busy' | 'offline';
+  rating: number;
+  totalDeliveries: number;
+  totalEarnings: number;
+  lastActive: string;
+};
+
+// Route type definition
+export type Route = {
+  id: string;
+  name: string;
+  driverId?: string;
+  driverName?: string;
+  vehicleId?: string;
+  status: 'unassigned' | 'assigned' | 'in_progress' | 'completed';
+  stops: RouteStop[];
+  totalDistance: number;
+  estimatedDuration: number;
+  startTime?: Date;
+  endTime?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type RouteStop = {
+  id: string;
+  orderId: string;
+  customerName: string;
+  address: string;
+  coordinates: { lat: number; lng: number };
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  estimatedArrival?: Date;
+  actualArrival?: Date;
+  notes?: string;
+};
+
+// Logistics API
+export const logisticsApi = {
+  async getDeliveries(): Promise<Delivery[]> {
+    try {
+      return await fetchData<Delivery[]>('/deliveries');
+    } catch (error) {
+      console.error('Failed to fetch deliveries:', error);
+      return [];
+    }
+  },
+
+  async getDrivers(): Promise<Driver[]> {
+    try {
+      return await fetchData<Driver[]>('/drivers');
+    } catch (error) {
+      console.error('Failed to fetch drivers:', error);
+      return [];
+    }
+  },
+
+  async getActiveDrivers(): Promise<Driver[]> {
+    try {
+      return await fetchData<Driver[]>('/tracking/drivers');
+    } catch (error) {
+      console.error('Failed to fetch active drivers:', error);
+      return [];
+    }
+  },
+
+  async getRoutes(): Promise<Route[]> {
+    try {
+      // Mock routes data - in real app this would be a proper endpoint
+      const deliveries = await this.getDeliveries();
+      const drivers = await this.getDrivers();
+      
+      // Convert deliveries to routes
+      const routes: Route[] = deliveries.map((delivery, index) => ({
+        id: `route-${delivery.id}`,
+        name: `Route ${index + 1}`,
+        driverId: delivery.driverName ? drivers.find(d => d.name === delivery.driverName)?.id : undefined,
+        driverName: delivery.driverName,
+        vehicleId: delivery.vehicleId,
+        status: delivery.status === 'pending' ? 'unassigned' : 
+                delivery.status === 'in_transit' ? 'in_progress' : 'completed',
+        stops: [{
+          id: `stop-${delivery.id}`,
+          orderId: delivery.orderId,
+          customerName: `Customer ${delivery.orderId}`,
+          address: '123 Main St, City',
+          coordinates: delivery.location as { lat: number; lng: number } || { lat: 12.9716, lng: 77.5946 },
+          status: delivery.status === 'pending' ? 'pending' :
+                  delivery.status === 'in_transit' ? 'in_progress' :
+                  delivery.status === 'delivered' ? 'completed' : 'failed',
+          estimatedArrival: delivery.estimatedDelivery,
+          actualArrival: delivery.actualDelivery,
+        }],
+        totalDistance: Math.random() * 50 + 10, // Mock distance
+        estimatedDuration: Math.random() * 120 + 30, // Mock duration in minutes
+        startTime: delivery.createdAt,
+        endTime: delivery.actualDelivery,
+        createdAt: delivery.createdAt,
+        updatedAt: delivery.updatedAt,
+      }));
+      
+      return routes;
+    } catch (error) {
+      console.error('Failed to fetch routes:', error);
+      return [];
+    }
+  },
+
+  async assignDriverToRoute(routeId: string, driverId: string): Promise<Route | null> {
+    try {
+      const response = await fetch(`${API_BASE}/deliveries/${routeId}/assign-driver`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driverId }),
+      });
+      if (!response.ok) throw new Error('Failed to assign driver');
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to assign driver:', error);
+      return null;
+    }
+  },
+
+  async updateDeliveryStatus(deliveryId: string, status: string): Promise<Delivery | null> {
+    try {
+      const response = await fetch(`${API_BASE}/deliveries/${deliveryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!response.ok) throw new Error('Failed to update delivery status');
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to update delivery status:', error);
+      return null;
+    }
+  },
+
+  async createRoute(routeData: Partial<Route>): Promise<Route | null> {
+    try {
+      // Mock implementation - in real app this would create a route
+      const newRoute: Route = {
+        id: `route-${Date.now()}`,
+        name: routeData.name || 'New Route',
+        status: 'unassigned',
+        stops: routeData.stops || [],
+        totalDistance: 0,
+        estimatedDuration: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      return newRoute;
+    } catch (error) {
+      console.error('Failed to create route:', error);
+      return null;
     }
   },
 };

@@ -219,7 +219,7 @@ export default function OrderDetailPage() {
           <CardContent>
             {order.items && Array.isArray(order.items) && order.items.length > 0 ? (
               <div className="space-y-4">
-                {order.items.map((item: any, index: number) => (
+                {order.items.map((item: { name: string; description?: string; quantity: number; price: number }, index: number) => (
                   <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex-1">
                       <h4 className="font-semibold">{item.name || `Item ${index + 1}`}</h4>

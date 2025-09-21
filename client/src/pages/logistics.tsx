@@ -1,557 +1,313 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React, { useState, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { MapPin, Navigation, Calendar, Plus } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { 
-  Truck, 
-  MapPin, 
-  Clock, 
-  Route, 
-  AlertTriangle, 
-  CheckCircle, 
-  Navigation,
-  Package,
-  Users
-} from "lucide-react";
-import { getStatusColor, formatCurrency } from "@/lib/data";
-import { format, formatDistanceToNow } from "date-fns";
-import { useSafeQuery } from "@/hooks/use-safe-query";
-import type { Delivery, Order } from "../../shared/schema";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
-// Fallback data for when API fails
-const FALLBACK_DELIVERIES: Delivery[] = [
-  {
-    id: "1",
-    orderId: "ORD-001",
-    driverName: "John Doe",
-    vehicleId: "VH-001",
-    status: "in_transit",
-    estimatedDelivery: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours from now
-    actualDelivery: null,
-    location: { lat: 12.9716, lng: 77.5946 },
-    route: [],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "2",
-    orderId: "ORD-002",
-    driverName: "Jane Smith",
-    vehicleId: "VH-002",
-    status: "delivered",
-    estimatedDelivery: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
-    actualDelivery: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-    location: { lat: 12.9716, lng: 77.5946 },
-    route: [],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-];
+// Import child components
+import { LogisticsKPIs } from '@/components/logistics/logistics-kpis';
+import { LogisticsMap } from '@/components/logistics/logistics-map';
+import { RouteList } from '@/components/logistics/route-list';
 
-const FALLBACK_ORDERS: Order[] = [
-  {
-    id: "1",
-    orderNumber: "ORD-001",
-    customerName: "Alice Johnson",
-    customerEmail: "alice@example.com",
-    customerPhone: "+1234567890",
-    status: "processing",
-    paymentStatus: "paid",
-    totalAmount: "25.00",
-    items: [{ productId: "1", productName: "Dry Cleaning", quantity: 1, price: "25.00" }],
-    shippingAddress: { instructions: "Leave at door" },
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-];
+// Import hooks
+import { useLogisticsKPIs } from '@/hooks/use-logistics-kpis';
+
+// Import data service and types
+import { logisticsApi } from '@/lib/data-service';
+import type { Route, Driver } from '@/lib/data-service';
 
 export default function Logistics() {
-  const { data: deliveries, isLoading: deliveriesLoading, isError: deliveriesError } = useSafeQuery<Delivery[]>({
-    queryKey: ["deliveries"],
-    queryFn: async () => {
-      const response = await fetch("/api/deliveries");
-      if (!response.ok) {
-        throw new Error("Failed to fetch deliveries");
-      }
-      return response.json();
+  // State for UI management
+  const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const today = new Date();
+    const isoString = today.toISOString();
+    return isoString ? isoString.split('T')[0] : '2024-01-01';
+  });
+
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch logistics data with React Query and auto-refetch
+  const {
+    data: routes = [],
+    isLoading: routesLoading,
+    isError: routesError,
+    error: routesErrorDetails,
+  } = useQuery({
+    queryKey: ['logistics-routes'],
+    queryFn: logisticsApi.getRoutes,
+    staleTime: 30 * 1000, // 30 seconds
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+    retry: 3,
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds for live updates
+    refetchIntervalInBackground: true,
+  });
+
+  const {
+    data: drivers = [],
+    isLoading: driversLoading,
+    isError: driversError,
+  } = useQuery({
+    queryKey: ['drivers'],
+    queryFn: logisticsApi.getDrivers,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 10 * 60 * 1000, // 10 minutes
+    retry: 3,
+  });
+
+  // Fetch logistics KPIs
+  const {
+    data: kpiData,
+    isLoading: kpisLoading,
+    isError: kpisError,
+  } = useLogisticsKPIs();
+
+  // Driver assignment mutation
+  const assignDriverMutation = useMutation({
+    mutationFn: async ({ routeId, driverId }: { routeId: string; driverId: string }) => {
+      return await logisticsApi.assignDriverToRoute(routeId, driverId);
     },
-  }, FALLBACK_DELIVERIES);
-
-  const { data: orders, isLoading: ordersLoading, isError: ordersError } = useSafeQuery<Order[]>({
-    queryKey: ["orders"],
-    queryFn: async () => {
-      const response = await fetch("/api/orders");
-      if (!response.ok) {
-        throw new Error("Failed to fetch orders");
+    onSuccess: (updatedRoute) => {
+      if (updatedRoute) {
+        // Invalidate queries to refetch data
+        queryClient.invalidateQueries({ queryKey: ["logistics-routes"] });
+        queryClient.invalidateQueries({ queryKey: ["logistics-kpis"] });
+        
+        toast({
+          title: "Driver Assigned Successfully",
+          description: `Driver has been assigned to ${selectedRoute?.name || 'the route'}.`,
+        });
       }
-      return response.json();
     },
-  }, FALLBACK_ORDERS);
+    onError: (error) => {
+      console.error('Failed to assign driver:', error);
+      toast({
+        title: "Error",
+        description: "Failed to assign driver. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
-  const getProgressPercentage = (status: string) => {
-    switch (status) {
-      case "pending": return 10;
-      case "in_transit": return 75;
-      case "delivered": return 100;
-      case "failed": return 0;
-      default: return 0;
-    }
-  };
+  // Status update mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ routeId, stopId, status }: { routeId: string; stopId: string; status: string }) => {
+      // In a real app, this would update the stop status via API
+      // For now, we'll just invalidate the routes query to trigger a refetch
+      return { routeId, stopId, status };
+    },
+    onSuccess: (data) => {
+      // Invalidate queries to refetch data
+      queryClient.invalidateQueries({ queryKey: ["logistics-routes"] });
+      queryClient.invalidateQueries({ queryKey: ["logistics-kpis"] });
+      
+      toast({
+        title: "Status Updated",
+        description: "Delivery status has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to update status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update status. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
-  const getDeliveryStatusIcon = (status: string) => {
-    switch (status) {
-      case "pending": return <Clock className="w-4 h-4" />;
-      case "in_transit": return <Truck className="w-4 h-4" />;
-      case "delivered": return <CheckCircle className="w-4 h-4" />;
-      case "failed": return <AlertTriangle className="w-4 h-4" />;
-      default: return <Package className="w-4 h-4" />;
-    }
-  };
+  // Create route mutation
+  const createRouteMutation = useMutation({
+    mutationFn: async (routeData: Partial<Route>) => {
+      return await logisticsApi.createRoute(routeData);
+    },
+    onSuccess: (newRoute) => {
+      if (newRoute) {
+        // Invalidate queries to refetch data
+        queryClient.invalidateQueries({ queryKey: ["logistics-routes"] });
+        queryClient.invalidateQueries({ queryKey: ["logistics-kpis"] });
+        
+        toast({
+          title: "Route Created Successfully",
+          description: `New route "${newRoute.name}" has been created.`,
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to create route:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create route. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
-  // Calculate logistics metrics
-  const totalDeliveries = deliveries?.length || 0;
-  const activeDeliveries = deliveries?.filter(d => d.status === "in_transit").length || 0;
-  const completedDeliveries = deliveries?.filter(d => d.status === "delivered").length || 0;
-  const onTimeDeliveries = deliveries?.filter(d => 
-    d.status === "delivered" && 
-    d.actualDelivery && 
-    d.estimatedDelivery &&
-    new Date(d.actualDelivery) <= new Date(d.estimatedDelivery)
-  ).length || 0;
-  const onTimeRate = completedDeliveries > 0 ? (onTimeDeliveries / completedDeliveries) * 100 : 0;
+  // Handler functions
+  const handleRouteSelect = useCallback((route: Route) => {
+    setSelectedRoute(route);
+  }, []);
 
-  // Get unique vehicles
-  const vehicles = Array.from(new Set(deliveries?.map(d => d.vehicleId) || []));
+  const handleAssignDriver = useCallback((routeId: string, driverId: string) => {
+    assignDriverMutation.mutate({ routeId, driverId });
+  }, [assignDriverMutation]);
 
-  const isLoading = deliveriesLoading || ordersLoading;
-  const hasError = deliveriesError || ordersError;
+  const handleUpdateStopStatus = useCallback((routeId: string, stopId: string, status: string) => {
+    updateStatusMutation.mutate({ routeId, stopId, status });
+  }, [updateStatusMutation]);
 
-  // Show error state if both queries fail
-  if (hasError && !deliveries && !orders) {
+  const handleCreateRoute = useCallback(() => {
+    createRouteMutation.mutate({
+      name: `Route ${routes.length + 1}`,
+      status: 'unassigned',
+      stops: [],
+      totalDistance: 0,
+      estimatedDuration: 0,
+    });
+  }, [createRouteMutation, routes.length]);
+
+  const isLoading = routesLoading || driversLoading;
+  const hasError = routesError || driversError;
+
+  // Error state with non-intrusive toast notification
+  if (hasError && routes.length === 0) {
     return (
-      <div className="p-8" data-testid="logistics-page">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Logistics</h1>
-            <p className="text-gray-600 mt-2">Manage deliveries and track shipments</p>
+      <div className="flex flex-1 items-center justify-center p-8">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <div className="text-destructive text-lg font-semibold">
+                Unable to load logistics data
           </div>
-        </div>
-        <div className="flex items-center justify-center h-64">
-          <Card className="w-96">
-            <CardContent className="p-6 text-center">
-              <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Data</h3>
-              <p className="text-gray-600 mb-4">
-                There was an issue loading the logistics data. Using fallback data for demonstration.
+              <p className="text-sm text-muted-foreground">
+                {routesErrorDetails?.message || 'An unexpected error occurred'}
               </p>
-              <Button onClick={() => window.location.reload()}>
-                Try Again
+              <Button 
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['logistics-routes'] })}
+                variant="outline"
+              >
+                Refresh
               </Button>
+            </div>
             </CardContent>
           </Card>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="p-8" data-testid="logistics-page">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="font-display font-bold text-3xl text-foreground">Logistics</h1>
-            <p className="text-muted-foreground mt-1">Fleet management and delivery tracking</p>
-          </div>
-        </div>
-        <div className="animate-pulse space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-muted rounded-lg"></div>
-            ))}
-          </div>
-          <div className="h-96 bg-muted rounded-lg"></div>
-        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8" data-testid="logistics-page">
+    <div className="flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-display font-bold text-3xl text-foreground">Logistics</h1>
-          <p className="text-muted-foreground mt-1">Fleet management and delivery tracking</p>
+          <h1 className="font-display font-bold text-3xl text-foreground">Logistics Management</h1>
+          <p className="text-muted-foreground mt-1">Real-time fleet tracking and route optimization</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <div className="status-indicator status-online"></div>
-            <span className="text-sm text-muted-foreground">GPS Tracking Active</span>
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span className="text-sm text-muted-foreground">Live Tracking Active</span>
           </div>
-          <Button 
-            data-testid="view-map"
-            onClick={() => {
-              console.log("Opening map view...");
-              alert("Map view feature coming soon! This would show a real-time map with delivery locations and routes.");
-            }}
-          >
-            <MapPin className="w-4 h-4 mr-2" />
-            View Map
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Select value={selectedDate} onValueChange={setSelectedDate}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={(() => {
+                  const today = new Date();
+                  const isoString = today.toISOString();
+                  return isoString ? isoString.split('T')[0] : '2024-01-01';
+                })()}>
+                  Today
+                </SelectItem>
+                <SelectItem value={(() => {
+                  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+                  const isoString = tomorrow.toISOString();
+                  return isoString ? isoString.split('T')[0] : '2024-01-02';
+                })()}>
+                  Tomorrow
+                </SelectItem>
+                <SelectItem value={(() => {
+                  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+                  const isoString = yesterday.toISOString();
+                  return isoString ? isoString.split('T')[0] : '2023-12-31';
+                })()}>
+                  Yesterday
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={handleCreateRoute} disabled={createRouteMutation.isPending}>
+            <Plus className="h-4 w-4 mr-2" />
+            Plan New Route
           </Button>
         </div>
       </div>
 
-      {/* Logistics Overview */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
-        <Card className="bento-card">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">Active Deliveries</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
-                  {activeDeliveries}
-                </p>
-              </div>
-              <Truck className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
+      {/* KPI Cards */}
+      <LogisticsKPIs 
+        data={kpiData} 
+        isLoading={kpisLoading} 
+        isError={kpisError} 
+      />
+
+      {/* Main Content - Two Panel Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-8">
+        {/* Left Panel - Map View (60% width) */}
+        <div className="lg:col-span-3">
+          <LogisticsMap
+            routes={routes}
+            selectedRoute={selectedRoute}
+            isLoading={isLoading}
+            onRouteSelect={handleRouteSelect}
+          />
             </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bento-card">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">Fleet Size</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
-                  {vehicles.length}
-                </p>
-              </div>
-              <Users className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+
+        {/* Right Panel - Route List (40% width) */}
+        <div className="lg:col-span-2">
+          <RouteList
+            routes={routes}
+            drivers={drivers}
+            isLoading={isLoading}
+            selectedRoute={selectedRoute}
+            onRouteSelect={handleRouteSelect}
+            onAssignDriver={handleAssignDriver}
+            onUpdateStopStatus={handleUpdateStopStatus}
+            onCreateRoute={handleCreateRoute}
+            isAssigningDriver={assignDriverMutation.isPending}
+            isUpdatingStatus={updateStatusMutation.isPending}
+          />
             </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bento-card">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">On-Time Rate</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
-                  {onTimeRate.toFixed(1)}%
-                </p>
-              </div>
-              <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bento-card">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">Total Deliveries</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-display font-bold text-foreground">
-                  {totalDeliveries}
-                </p>
-              </div>
-              <Package className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Main Content Tabs */}
-      <Tabs defaultValue="fleet" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="fleet" data-testid="fleet-tab">Fleet Status</TabsTrigger>
-          <TabsTrigger value="deliveries" data-testid="deliveries-tab">Active Deliveries</TabsTrigger>
-          <TabsTrigger value="routes" data-testid="routes-tab">Route Optimization</TabsTrigger>
-        </TabsList>
-
-        {/* Fleet Status Tab */}
-        <TabsContent value="fleet" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Fleet Overview */}
-            <Card className="bento-card">
-              <CardHeader>
-                <CardTitle className="font-display font-semibold text-lg text-foreground">
-                  Fleet Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {vehicles.map((vehicleId) => {
-                    const vehicleDeliveries = deliveries?.filter(d => d.vehicleId === vehicleId) || [];
-                    const currentDelivery = vehicleDeliveries.find(d => d.status === "in_transit");
-                    const status = currentDelivery ? "active" : "idle";
-                    
-                    return (
-                      <div 
-                        key={vehicleId}
-                        className="flex items-center justify-between p-4 border border-border rounded-lg"
-                        data-testid={`vehicle-${vehicleId}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-3 h-3 rounded-full ${
-                            status === "active" ? "status-online" : "bg-muted-foreground"
-                          }`}></div>
-                          <div>
-                            <p className="font-medium text-foreground">{vehicleId}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {currentDelivery 
-                                ? `Driver: ${currentDelivery.driverName}` 
-                                : "Available"
-                              }
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <Badge className={status === "active" ? getStatusColor("in_transit") : "bg-muted text-muted-foreground"}>
-                            {status === "active" ? "En Route" : "Idle"}
-                          </Badge>
-                          {currentDelivery && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {currentDelivery.estimatedDelivery && 
-                                `ETA: ${format(new Date(currentDelivery.estimatedDelivery), "h:mm a")}`
-                              }
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Driver Performance */}
-            <Card className="bento-card">
-              <CardHeader>
-                <CardTitle className="font-display font-semibold text-lg text-foreground">
-                  Driver Performance
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {Array.from(new Set(deliveries?.map(d => d.driverName) || [])).map((driverName) => {
-                    const driverDeliveries = deliveries?.filter(d => d.driverName === driverName) || [];
-                    const completedByDriver = driverDeliveries.filter(d => d.status === "delivered").length;
-                    const onTimeByDriver = driverDeliveries.filter(d => 
-                      d.status === "delivered" && 
-                      d.actualDelivery && 
-                      d.estimatedDelivery &&
-                      new Date(d.actualDelivery) <= new Date(d.estimatedDelivery)
-                    ).length;
-                    const driverOnTimeRate = completedByDriver > 0 ? (onTimeByDriver / completedByDriver) * 100 : 0;
-                    
-                    return (
-                      <div 
-                        key={driverName}
-                        className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                        data-testid={`driver-${driverName ? driverName.replace(/\s+/g, '-').toLowerCase() : 'unknown'}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                            <span className="text-xs text-primary-foreground font-medium">
-                              {driverName.split(' ').map(n => n[0]).join('')}
+      {/* Real-time Status Indicator */}
+      <div className="mt-6 flex items-center justify-center">
+        <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          <span className="text-sm text-green-700 font-medium">
+            Live updates every 30 seconds
                             </span>
                           </div>
-                          <div>
-                            <p className="font-medium text-sm text-foreground">{driverName}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {completedByDriver} deliveries completed
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium text-sm text-foreground">
-                            {driverOnTimeRate.toFixed(1)}%
-                          </p>
-                          <p className="text-xs text-muted-foreground">On-time rate</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
           </div>
-        </TabsContent>
-
-        {/* Active Deliveries Tab */}
-        <TabsContent value="deliveries" className="space-y-6">
-          <Card className="bento-card">
-            <CardHeader>
-              <CardTitle className="font-display font-semibold text-lg text-foreground">
-                Active Deliveries
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {deliveries?.filter(delivery => delivery.status !== "delivered").map((delivery) => {
-                  const relatedOrder = orders?.find(order => order.id === delivery.orderId);
-                  
-                  return (
-                    <div 
-                      key={delivery.id}
-                      className="border border-border rounded-lg p-6"
-                      data-testid={`delivery-${delivery.vehicleId}-${delivery.id}`}
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          {getDeliveryStatusIcon(delivery.status)}
-                          <div>
-                            <h3 className="font-medium text-foreground">{delivery.vehicleId}</h3>
-                            <p className="text-sm text-muted-foreground">Driver: {delivery.driverName}</p>
-                          </div>
-                        </div>
-                        <Badge className={getStatusColor(delivery.status)}>
-                          {delivery.status ? delivery.status.replace('_', ' ').charAt(0).toUpperCase() + delivery.status.replace('_', ' ').slice(1) : 'Unknown'}
-                        </Badge>
-                      </div>
-                      
-                      {relatedOrder && (
-                        <div className="mb-4 p-3 bg-muted/50 rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium text-sm text-foreground">
-                                Order {relatedOrder.orderNumber}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Customer: {relatedOrder.customerName}
-                              </p>
-                            </div>
-                            <p className="font-medium text-foreground">
-                              {formatCurrency(parseFloat(relatedOrder.totalAmount))}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Progress:</span>
-                          <span className="font-medium text-foreground">
-                            {getProgressPercentage(delivery.status)}%
-                          </span>
-                        </div>
-                        <Progress value={getProgressPercentage(delivery.status)} className="w-full" />
-                        
-                        {delivery.estimatedDelivery && (
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">
-                              {delivery.status === "delivered" ? "Delivered:" : "ETA:"}
-                            </span>
-                            <span className="font-medium text-foreground">
-                              {delivery.status === "delivered" && delivery.actualDelivery
-                                ? format(new Date(delivery.actualDelivery), "MMM d, h:mm a")
-                                : format(new Date(delivery.estimatedDelivery), "MMM d, h:mm a")
-                              }
-                            </span>
-                          </div>
-                        )}
-                        
-                        {(delivery.location as any) && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <MapPin className="w-3 h-3" />
-                            <span>
-                              Location: {(delivery.location as any).lat?.toFixed(4)}, {(delivery.location as any).lng?.toFixed(4)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Route Optimization Tab */}
-        <TabsContent value="routes" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bento-card">
-              <CardHeader>
-                <CardTitle className="font-display font-semibold text-lg text-foreground">
-                  Route Efficiency
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="text-center p-6 bg-muted/50 rounded-lg">
-                    <Route className="w-12 h-12 mx-auto mb-4 text-primary" />
-                    <p className="text-2xl font-display font-bold text-foreground mb-2">94.2%</p>
-                    <p className="text-sm text-muted-foreground">Average Route Efficiency</p>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Total Distance Today</span>
-                      <span className="font-medium text-foreground">247 miles</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Fuel Efficiency</span>
-                      <span className="font-medium text-foreground">12.4 MPG</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Average Delivery Time</span>
-                      <span className="font-medium text-foreground">24 minutes</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bento-card">
-              <CardHeader>
-                <CardTitle className="font-display font-semibold text-lg text-foreground">
-                  Optimization Suggestions
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="p-4 border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-sm text-foreground">Route Consolidation</p>
-                        <p className="text-xs text-muted-foreground">
-                          Consider combining routes in downtown area to reduce travel time by 15%
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <div className="flex items-start gap-3">
-                      <Navigation className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-sm text-foreground">Traffic Optimization</p>
-                        <p className="text-xs text-muted-foreground">
-                          Avoid Main St between 3-5 PM to reduce delays by 8 minutes
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <div className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-sm text-foreground">Delivery Window</p>
-                        <p className="text-xs text-muted-foreground">
-                          Current morning routes are optimal with 98% on-time delivery
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }

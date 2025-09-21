@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,14 +53,51 @@ export default function LiveTrackingPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<DriverLocation | null>(null);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [drivers, setDrivers] = useState<DriverLocation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [showAllDrivers, setShowAllDrivers] = useState(false);
   const [selectedDriverProfile, setSelectedDriverProfile] = useState<any>(null);
   const [isDriverManagementOpen, setIsDriverManagementOpen] = useState(false);
   const { toast } = useToast();
   const { addNotification } = useNotifications();
+  const queryClient = useQueryClient();
+
+  // Fetch orders using React Query
+  const {
+    data: orders = [],
+    isLoading: ordersLoading,
+    isError: ordersError,
+    refetch: refetchOrders,
+  } = useQuery({
+    queryKey: ['live-tracking-orders'],
+    queryFn: async () => {
+      const response = await fetch('/api/orders');
+      if (!response.ok) throw new Error('Failed to fetch orders');
+      return response.json();
+    },
+    staleTime: 30 * 1000, // 30 seconds
+    cacheTime: 2 * 60 * 1000, // 2 minutes
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+  });
+
+  // Fetch drivers using React Query
+  const {
+    data: drivers = [],
+    isLoading: driversLoading,
+    isError: driversError,
+    refetch: refetchDrivers,
+  } = useQuery({
+    queryKey: ['live-tracking-drivers'],
+    queryFn: async () => {
+      const response = await fetch('/api/tracking/drivers');
+      if (!response.ok) throw new Error('Failed to fetch drivers');
+      return response.json();
+    },
+    staleTime: 10 * 1000, // 10 seconds
+    cacheTime: 1 * 60 * 1000, // 1 minute
+    refetchInterval: 10 * 1000, // Auto-refetch every 10 seconds
+  });
+
+  const isLoading = ordersLoading || driversLoading;
+  const hasError = ordersError || driversError;
 
   // WebSocket connection for real-time updates
   const { isConnected, subscribe } = useWebSocket({
@@ -92,7 +130,7 @@ export default function LiveTrackingPage() {
           actionUrl: '/live-tracking',
           actionText: 'Track Order'
         });
-        refreshData();
+        refetchDrivers(); // Use React Query refetch instead
       }
     },
     onOpen: () => {
@@ -107,40 +145,7 @@ export default function LiveTrackingPage() {
     }
   });
 
-  // Fetch orders and drivers
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        
-        const [ordersResponse, driversResponse] = await Promise.all([
-          fetch('/api/orders'),
-          fetch('/api/tracking/drivers')
-        ]);
-
-        if (ordersResponse.ok) {
-          const ordersData = await ordersResponse.json();
-          setOrders(ordersData);
-        }
-
-        if (driversResponse.ok) {
-          const driversData = await driversResponse.json();
-          setDrivers(driversData);
-        }
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load tracking data",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [toast]);
+  // Data fetching is now handled by React Query above
 
   // Filter orders based on search
   const filteredOrders = orders.filter(order =>
@@ -166,18 +171,11 @@ export default function LiveTrackingPage() {
   };
 
   const refreshData = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch('/api/tracking/drivers');
-      if (response.ok) {
-        const driversData = await response.json();
-        setDrivers(driversData);
-      }
-    } catch (error) {
-      console.error('Failed to refresh data:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    await Promise.all([refetchOrders(), refetchDrivers()]);
+    toast({
+      title: "Data Refreshed",
+      description: "Live tracking data has been updated",
+    });
   };
 
   const handleDriverAssign = async (driverId: string, orderId: string) => {
@@ -259,6 +257,35 @@ export default function LiveTrackingPage() {
       default: return 'Unknown';
     }
   };
+
+  // Error state
+  if (hasError) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <div className="text-destructive text-lg font-semibold">
+                Failed to load live tracking data
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {ordersError?.message || driversError?.message || 'An unexpected error occurred'}
+              </p>
+              <Button 
+                onClick={() => {
+                  refetchOrders();
+                  refetchDrivers();
+                }}
+                variant="outline"
+              >
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
