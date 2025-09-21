@@ -149,8 +149,8 @@ export default function LiveTrackingPage() {
 
   // Filter orders based on search
   const filteredOrders = orders.filter(order =>
-    order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.customerName.toLowerCase().includes(searchQuery.toLowerCase())
+    (order.orderNumber?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (order.customerName?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
 
   // Get orders with active drivers

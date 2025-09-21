@@ -594,6 +594,27 @@ export type Driver = {
   lastActive: string;
 };
 
+// Delivery type definition
+export type Delivery = {
+  id: string;
+  orderId: string;
+  driverName: string;
+  vehicleId: string;
+  status: 'pending' | 'in_transit' | 'delivered' | 'failed';
+  estimatedDelivery: string | null;
+  actualDelivery: string | null;
+  location: {
+    latitude: number;
+    longitude: number;
+  } | null;
+  route: Array<{
+    latitude: number;
+    longitude: number;
+  }> | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 // Route type definition
 export type Route = {
   id: string;

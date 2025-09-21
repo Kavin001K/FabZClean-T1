@@ -271,7 +271,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
                 <div key={customer.id} className="flex items-center space-x-2">
                   <Avatar className="h-6 w-6">
                     <AvatarFallback className="text-xs">
-                      {customer.name.split(' ').map(n => n[0]).join('')}
+                      {customer.name ? customer.name.split(' ').map(n => n[0]).join('') : 'N/A'}
                     </AvatarFallback>
                   </Avatar>
                   <span className="text-sm">{customer.name}</span>

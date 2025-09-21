@@ -605,7 +605,7 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
                     <span className="text-lg font-medium text-primary-foreground">
-                      {employee.name.split(' ').map(n => n[0]).join('')}
+                      {employee.name ? employee.name.split(' ').map(n => n[0]).join('') : 'N/A'}
                     </span>
                   </div>
                   <div>

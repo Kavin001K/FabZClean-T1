@@ -1115,7 +1115,7 @@ export class PrintDriver {
       
       pdf.setFontSize(10);
       pdf.setFont(template.settings.fontFamily, 'normal');
-      const companyAddress = data.company.address.split('\n');
+      const companyAddress = data.company.address ? data.company.address.split('\n') : [''];
       companyAddress.forEach((line: string) => {
         pdf.text(line, margin.left, yPosition);
         yPosition += 4;
@@ -1148,7 +1148,7 @@ export class PrintDriver {
     pdf.text(data.customer.name, margin.left, yPosition);
     yPosition += 4;
     
-    const customerAddress = data.customer.address.split('\n');
+    const customerAddress = data.customer.address ? data.customer.address.split('\n') : [''];
     customerAddress.forEach((line: string) => {
       pdf.text(line, margin.left, yPosition);
       yPosition += 4;
@@ -1248,7 +1248,7 @@ export class PrintDriver {
     if (data.notes) {
       pdf.text('Notes:', margin.left, yPosition);
       yPosition += 6;
-      const notesLines = data.notes.split('\n');
+      const notesLines = data.notes ? data.notes.split('\n') : [''];
       notesLines.forEach((line: string) => {
         pdf.text(line, margin.left, yPosition);
         yPosition += 4;

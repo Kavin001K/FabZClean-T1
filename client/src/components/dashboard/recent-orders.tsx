@@ -126,7 +126,7 @@ export default React.memo(function RecentOrders({
               <div className="flex items-center space-x-4">
                 <Avatar className="h-10 w-10">
                   <AvatarFallback className="text-xs">
-                    {order.customerName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    {order.customerName ? order.customerName.split(' ').map(n => n[0]).join('').toUpperCase() : 'N/A'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="space-y-1 min-w-0 flex-1">

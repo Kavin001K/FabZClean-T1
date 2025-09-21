@@ -440,7 +440,7 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
                           <span className="text-sm font-medium text-primary-foreground">
-                            {record.employeeName.split(' ').map(n => n[0]).join('')}
+                            {record.employeeName ? record.employeeName.split(' ').map(n => n[0]).join('') : 'N/A'}
                           </span>
                         </div>
                         <div>

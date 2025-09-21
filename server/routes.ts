@@ -991,6 +991,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+<<<<<<< Updated upstream
   // Driver Tracking endpoints
   app.get("/api/tracking/drivers", async (req, res) => {
     try {
@@ -1056,22 +1057,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Driver Management endpoints
+=======
+  // Drivers API
+>>>>>>> Stashed changes
   app.get("/api/drivers", async (req, res) => {
     try {
       // Return mock driver data for now
       const drivers = [
         {
           id: "1",
+<<<<<<< Updated upstream
           name: "Rajesh Kumar",
           phone: "+91 98765 43210",
           email: "rajesh@example.com",
           licenseNumber: "DL123456789",
           vehicleNumber: "DL-01-AB-1234",
+=======
+          name: "John Smith",
+          phone: "+91 98765 43210",
+          email: "john@fabzclean.com",
+          licenseNumber: "DL123456789",
+          vehicleNumber: "KA01AB1234",
+>>>>>>> Stashed changes
           vehicleType: "bike",
           vehicleModel: "Honda Activa",
           status: "available",
           rating: 4.8,
           totalDeliveries: 156,
+<<<<<<< Updated upstream
           totalEarnings: 45200,
           experience: 18,
           specialties: ["Dry Cleaning", "Ironing"],
@@ -1110,15 +1123,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
           experience: 12,
           specialties: ["Bulk Orders", "Corporate Pickup"],
           lastActive: new Date().toISOString()
+=======
+          totalEarnings: 12500,
+          currentLocation: {
+            latitude: 12.9716,
+            longitude: 77.5946
+          },
+          lastActive: new Date().toISOString(),
+          experience: 24,
+          specialties: ["Dry Cleaning", "Laundry"]
+        },
+        {
+          id: "2",
+          name: "Mike Johnson",
+          phone: "+91 98765 43211",
+          email: "mike@fabzclean.com",
+          licenseNumber: "DL123456790",
+          vehicleNumber: "KA01CD5678",
+          vehicleType: "car",
+          vehicleModel: "Maruti Swift",
+          status: "busy",
+          rating: 4.6,
+          totalDeliveries: 89,
+          totalEarnings: 8900,
+          currentLocation: {
+            latitude: 12.9756,
+            longitude: 77.5996
+          },
+          lastActive: new Date().toISOString(),
+          experience: 18,
+          specialties: ["Premium Services", "Bulk Orders"]
+>>>>>>> Stashed changes
         }
       ];
       res.json(drivers);
     } catch (error) {
+<<<<<<< Updated upstream
       console.error('Failed to fetch drivers:', error);
+=======
+      console.error("Error fetching drivers:", error);
+>>>>>>> Stashed changes
       res.status(500).json({ message: "Failed to fetch drivers" });
     }
   });
 
+<<<<<<< Updated upstream
   app.post("/api/drivers", async (req, res) => {
     try {
       const driverData = req.body;
@@ -1233,6 +1282,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Failed to assign driver:', error);
       res.status(500).json({ message: "Failed to assign driver to order" });
+=======
+  // Deliveries API
+  app.get("/api/deliveries", async (req, res) => {
+    try {
+      // Return mock delivery data for now
+      const deliveries = [
+        {
+          id: "1",
+          orderId: "a00d6778-0f59-4021-89b8-d04cf0a89ab8",
+          driverName: "John Smith",
+          vehicleId: "KA01AB1234",
+          status: "in_transit",
+          estimatedDelivery: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          actualDelivery: null,
+          location: {
+            latitude: 12.9716,
+            longitude: 77.5946
+          },
+          route: [
+            { latitude: 12.9716, longitude: 77.5946 },
+            { latitude: 12.9756, longitude: 77.5996 }
+          ],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      ];
+      res.json(deliveries);
+    } catch (error) {
+      console.error("Error fetching deliveries:", error);
+      res.status(500).json({ message: "Failed to fetch deliveries" });
+    }
+  });
+
+  // Tracking drivers API
+  app.get("/api/tracking/drivers", async (req, res) => {
+    try {
+      // Return active drivers with their current locations
+      const activeDrivers = [
+        {
+          id: "1",
+          name: "John Smith",
+          orderId: "a00d6778-0f59-4021-89b8-d04cf0a89ab8",
+          latitude: 12.9716,
+          longitude: 77.5946,
+          heading: 45,
+          speed: 25,
+          status: "in_transit",
+          estimatedArrival: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          lastUpdated: new Date().toISOString()
+        }
+      ];
+      res.json(activeDrivers);
+    } catch (error) {
+      console.error("Error fetching tracking drivers:", error);
+      res.status(500).json({ message: "Failed to fetch tracking drivers" });
+>>>>>>> Stashed changes
     }
   });
 
