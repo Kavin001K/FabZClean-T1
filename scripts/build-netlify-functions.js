@@ -12,9 +12,11 @@ console.log('Building Netlify functions...');
 
 // List of simple functions that don't depend on server modules
 const simpleFunctions = [
+  'db.ts',
   'orders-simple.ts',
   'customers-simple.ts', 
-  'dashboard-metrics-simple.ts'
+  'dashboard-metrics-simple.ts',
+  'test-db.ts'
 ];
 
 // Clean up old compiled files

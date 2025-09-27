@@ -1,19 +1,4 @@
-// Sample data for demonstration
-const sampleCustomers = [
-    {
-        id: "1",
-        name: "John Doe",
-        email: "john@example.com",
-        phone: "+1234567890",
-        address: { street: "123 Main St", city: "New York", state: "NY", zip: "10001" },
-        totalOrders: 5,
-        totalSpent: "125.00",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        joinDate: new Date().toISOString(),
-        lastOrder: new Date().toISOString()
-    }
-];
+import { db } from './db';
 export const handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
@@ -30,22 +15,16 @@ export const handler = async (event, context) => {
     }
     try {
         if (event.httpMethod === 'GET') {
+            const customers = await db.getCustomers();
             return {
                 statusCode: 200,
                 headers,
-                body: JSON.stringify(sampleCustomers),
+                body: JSON.stringify(customers),
             };
         }
         if (event.httpMethod === 'POST') {
             const customerData = JSON.parse(event.body || '{}');
-            const newCustomer = {
-                id: Date.now().toString(),
-                ...customerData,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                joinDate: new Date().toISOString(),
-                lastOrder: new Date().toISOString()
-            };
+            const newCustomer = await db.createCustomer(customerData);
             return {
                 statusCode: 201,
                 headers,

@@ -3,7 +3,7 @@ export const handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Content-Type': 'application/json',
     };
     if (event.httpMethod === 'OPTIONS') {
@@ -15,20 +15,25 @@ export const handler = async (event, context) => {
     }
     try {
         if (event.httpMethod === 'GET') {
+            // Test database connection
+            const connectionTest = await db.testConnection();
+            // Get some sample data
             const orders = await db.getOrders();
+            const customers = await db.getCustomers();
+            const metrics = await db.getDashboardMetrics();
             return {
                 statusCode: 200,
                 headers,
-                body: JSON.stringify(orders),
-            };
-        }
-        if (event.httpMethod === 'POST') {
-            const orderData = JSON.parse(event.body || '{}');
-            const newOrder = await db.createOrder(orderData);
-            return {
-                statusCode: 201,
-                headers,
-                body: JSON.stringify(newOrder),
+                body: JSON.stringify({
+                    message: 'Database integration test successful!',
+                    connection: connectionTest,
+                    data: {
+                        ordersCount: orders.length,
+                        customersCount: customers.length,
+                        metrics
+                    },
+                    timestamp: new Date().toISOString()
+                }),
             };
         }
         return {
@@ -38,13 +43,14 @@ export const handler = async (event, context) => {
         };
     }
     catch (error) {
-        console.error('Orders API Error:', error);
+        console.error('Database test error:', error);
         return {
             statusCode: 500,
             headers,
             body: JSON.stringify({
-                error: 'Internal server error',
-                message: error instanceof Error ? error.message : 'Unknown error'
+                error: 'Database test failed',
+                message: error instanceof Error ? error.message : 'Unknown error',
+                timestamp: new Date().toISOString()
             }),
         };
     }

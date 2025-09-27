@@ -1,4 +1,5 @@
 import { Handler } from '@netlify/functions';
+import { db } from './db';
 
 export const handler: Handler = async (event, context) => {
   const headers = {
@@ -18,12 +19,7 @@ export const handler: Handler = async (event, context) => {
 
   try {
     if (event.httpMethod === 'GET') {
-      const metrics = {
-        totalRevenue: 1250.50,
-        totalOrders: 25,
-        newCustomers: 8,
-        inventoryItems: 15
-      };
+      const metrics = await db.getDashboardMetrics();
 
       return {
         statusCode: 200,

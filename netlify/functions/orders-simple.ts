@@ -1,26 +1,5 @@
 import { Handler } from '@netlify/functions';
-
-// Sample data for demonstration
-const sampleOrders = [
-  {
-    id: "1",
-    orderNumber: "ORD-001",
-    customerName: "John Doe",
-    customerEmail: "john@example.com",
-    customerPhone: "+1234567890",
-    status: "pending",
-    paymentStatus: "pending",
-    totalAmount: "25.00",
-    items: [{ productId: "1", productName: "Dry Cleaning", quantity: 1, price: "25.00" }],
-    shippingAddress: { instructions: "Leave at door", pickupDate: "2024-01-15" },
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    date: new Date().toISOString(),
-    total: 25.00,
-    service: "Dry Cleaning",
-    priority: "Normal"
-  }
-];
+import { db } from './db';
 
 export const handler: Handler = async (event, context) => {
   const headers = {
@@ -40,21 +19,17 @@ export const handler: Handler = async (event, context) => {
 
   try {
     if (event.httpMethod === 'GET') {
+      const orders = await db.getOrders();
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify(sampleOrders),
+        body: JSON.stringify(orders),
       };
     }
 
     if (event.httpMethod === 'POST') {
       const orderData = JSON.parse(event.body || '{}');
-      const newOrder = {
-        id: Date.now().toString(),
-        ...orderData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      const newOrder = await db.createOrder(orderData);
       
       return {
         statusCode: 201,

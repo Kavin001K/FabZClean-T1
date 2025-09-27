@@ -5,7 +5,7 @@ export const handler: Handler = async (event, context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Content-Type': 'application/json',
   };
 
@@ -19,22 +19,27 @@ export const handler: Handler = async (event, context) => {
 
   try {
     if (event.httpMethod === 'GET') {
+      // Test database connection
+      const connectionTest = await db.testConnection();
+      
+      // Get some sample data
+      const orders = await db.getOrders();
       const customers = await db.getCustomers();
+      const metrics = await db.getDashboardMetrics();
+
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify(customers),
-      };
-    }
-
-    if (event.httpMethod === 'POST') {
-      const customerData = JSON.parse(event.body || '{}');
-      const newCustomer = await db.createCustomer(customerData);
-      
-      return {
-        statusCode: 201,
-        headers,
-        body: JSON.stringify(newCustomer),
+        body: JSON.stringify({
+          message: 'Database integration test successful!',
+          connection: connectionTest,
+          data: {
+            ordersCount: orders.length,
+            customersCount: customers.length,
+            metrics
+          },
+          timestamp: new Date().toISOString()
+        }),
       };
     }
 
@@ -44,13 +49,14 @@ export const handler: Handler = async (event, context) => {
       body: JSON.stringify({ message: 'Method not allowed' }),
     };
   } catch (error) {
-    console.error('Customers API Error:', error);
+    console.error('Database test error:', error);
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Database test failed',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
       }),
     };
   }
