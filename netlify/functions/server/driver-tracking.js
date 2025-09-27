@@ -1,8 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.driverTrackingService = void 0;
-const storage_1 = require("./storage");
-const websocket_server_1 = require("./websocket-server");
+import { storage } from './storage';
+import { realtimeServer } from './websocket-server';
 class DriverTrackingService {
     constructor() {
         this.activeDrivers = new Map();
@@ -35,7 +32,7 @@ class DriverTrackingService {
     }
     async updateDriverLocations() {
         try {
-            const orders = await storage_1.storage.getOrders();
+            const orders = await storage.getOrders();
             const activeOrders = orders.filter(order => order.status === 'in_progress' || order.status === 'shipped');
             // Simulate drivers for active orders
             for (const order of activeOrders) {
@@ -196,7 +193,7 @@ class DriverTrackingService {
     broadcastLocationUpdates() {
         const activeDrivers = Array.from(this.activeDrivers.values());
         if (activeDrivers.length > 0) {
-            websocket_server_1.realtimeServer.broadcastToSubscribers('driver_locations', {
+            realtimeServer.broadcastToSubscribers('driver_locations', {
                 drivers: activeDrivers,
                 timestamp: new Date().toISOString()
             });
@@ -221,7 +218,7 @@ class DriverTrackingService {
     }
     async startTrackingForOrder(orderId) {
         try {
-            const order = await storage_1.storage.getOrder(orderId);
+            const order = await storage.getOrder(orderId);
             if (!order) {
                 return null;
             }
@@ -244,5 +241,5 @@ class DriverTrackingService {
     }
 }
 // Export singleton instance
-exports.driverTrackingService = new DriverTrackingService();
+export const driverTrackingService = new DriverTrackingService();
 //# sourceMappingURL=driver-tracking.js.map

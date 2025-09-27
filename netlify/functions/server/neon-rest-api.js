@@ -1,12 +1,9 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.neonRestAPI = exports.NeonRestAPI = void 0;
 // Neon REST API service for direct database operations
-const database_1 = require("./database");
-class NeonRestAPI {
+import { DATABASE_CONFIG } from './database';
+export class NeonRestAPI {
     constructor() {
-        this.baseUrl = database_1.DATABASE_CONFIG.restApiUrl || '';
-        this.apiKey = database_1.DATABASE_CONFIG.stackSecretKey || '';
+        this.baseUrl = DATABASE_CONFIG.restApiUrl || '';
+        this.apiKey = DATABASE_CONFIG.stackSecretKey || '';
     }
     async makeRequest(endpoint, options = {}) {
         const url = `${this.baseUrl}${endpoint}`;
@@ -140,7 +137,6 @@ class NeonRestAPI {
         }
     }
 }
-exports.NeonRestAPI = NeonRestAPI;
 // Export singleton instance
-exports.neonRestAPI = new NeonRestAPI();
+export const neonRestAPI = new NeonRestAPI();
 //# sourceMappingURL=neon-rest-api.js.map

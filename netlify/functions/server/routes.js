@@ -1,21 +1,18 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.registerRoutes = registerRoutes;
-const http_1 = require("http");
-const db_1 = require("./db");
-const schema_1 = require("../shared/schema");
-const zod_1 = require("zod");
-const db_utils_1 = require("./db-utils");
-const websocket_server_1 = require("./websocket-server");
-const loyalty_program_1 = require("./loyalty-program");
-async function registerRoutes(app) {
+import { createServer } from "http";
+import { db as storage } from "./db";
+import { insertProductSchema, insertOrderSchema, insertCustomerSchema, insertOrderTransactionSchema, insertEmployeeSchema, } from "../shared/schema";
+import { z } from "zod";
+import { getDatabaseHealth, pingDatabase, getDatabaseInfo } from "./db-utils";
+import { realtimeServer } from "./websocket-server";
+import { loyaltyProgram } from "./loyalty-program";
+export async function registerRoutes(app) {
     // Dashboard metrics
     app.get("/api/dashboard/metrics", async (req, res) => {
         try {
             // Since getDashboardMetrics doesn't exist in SQLiteStorage, calculate manually
-            const orders = await db_1.db.listOrders();
-            const customers = await db_1.db.listCustomers();
-            const products = await db_1.db.listProducts();
+            const orders = await storage.listOrders();
+            const customers = await storage.listCustomers();
+            const products = await storage.listProducts();
             const totalRevenue = orders.reduce((sum, order) => sum + parseFloat(order.totalAmount || "0"), 0);
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -37,7 +34,7 @@ async function registerRoutes(app) {
     // Database health check endpoints
     app.get("/api/health/database", async (req, res) => {
         try {
-            const health = await (0, db_utils_1.getDatabaseHealth)();
+            const health = await getDatabaseHealth();
             res.json(health);
         }
         catch (error) {
@@ -49,7 +46,7 @@ async function registerRoutes(app) {
     });
     app.get("/api/health/ping", async (req, res) => {
         try {
-            const ping = await (0, db_utils_1.pingDatabase)();
+            const ping = await pingDatabase();
             res.json(ping);
         }
         catch (error) {
@@ -61,7 +58,7 @@ async function registerRoutes(app) {
     });
     app.get("/api/database/info", async (req, res) => {
         try {
-            const info = await (0, db_utils_1.getDatabaseInfo)();
+            const info = await getDatabaseInfo();
             res.json(info);
         }
         catch (error) {
@@ -71,7 +68,7 @@ async function registerRoutes(app) {
     // Employees endpoints - Fixed method names
     app.get("/api/employees", async (req, res) => {
         try {
-            const employees = await db_1.db.listEmployees(); // Changed from getEmployees
+            const employees = await storage.listEmployees(); // Changed from getEmployees
             res.json(employees);
         }
         catch (error) {
@@ -81,7 +78,7 @@ async function registerRoutes(app) {
     });
     app.get("/api/employees/:id", async (req, res) => {
         try {
-            const employee = await db_1.db.getEmployee(req.params.id);
+            const employee = await storage.getEmployee(req.params.id);
             if (!employee) {
                 return res.status(404).json({ message: "Employee not found" });
             }
@@ -94,14 +91,14 @@ async function registerRoutes(app) {
     });
     app.post("/api/employees", async (req, res) => {
         try {
-            const validatedData = schema_1.insertEmployeeSchema.parse(req.body);
-            const employee = await db_1.db.createEmployee(validatedData);
+            const validatedData = insertEmployeeSchema.parse(req.body);
+            const employee = await storage.createEmployee(validatedData);
             // Trigger real-time update
-            websocket_server_1.realtimeServer.broadcast("employee_created", employee);
+            realtimeServer.broadcast("employee_created", employee);
             res.status(201).json(employee);
         }
         catch (error) {
-            if (error instanceof zod_1.z.ZodError) {
+            if (error instanceof z.ZodError) {
                 return res.status(400).json({
                     message: "Validation error",
                     errors: error.errors,
@@ -113,17 +110,17 @@ async function registerRoutes(app) {
     });
     app.put("/api/employees/:id", async (req, res) => {
         try {
-            const validatedData = schema_1.insertEmployeeSchema.partial().parse(req.body);
-            const employee = await db_1.db.updateEmployee(req.params.id, validatedData);
+            const validatedData = insertEmployeeSchema.partial().parse(req.body);
+            const employee = await storage.updateEmployee(req.params.id, validatedData);
             if (!employee) {
                 return res.status(404).json({ message: "Employee not found" });
             }
             // Trigger real-time update
-            websocket_server_1.realtimeServer.broadcast("employee_updated", employee);
+            realtimeServer.broadcast("employee_updated", employee);
             res.json(employee);
         }
         catch (error) {
-            if (error instanceof zod_1.z.ZodError) {
+            if (error instanceof z.ZodError) {
                 return res.status(400).json({
                     message: "Validation error",
                     errors: error.errors,
@@ -135,9 +132,9 @@ async function registerRoutes(app) {
     });
     app.delete("/api/employees/:id", async (req, res) => {
         try {
-            await db_1.db.deleteEmployee(req.params.id);
+            await storage.deleteEmployee(req.params.id);
             // Trigger real-time update
-            websocket_server_1.realtimeServer.broadcast("employee_deleted", { id: req.params.id });
+            realtimeServer.broadcast("employee_deleted", { id: req.params.id });
             res.json({ message: "Employee deleted successfully" });
         }
         catch (error) {
@@ -148,7 +145,7 @@ async function registerRoutes(app) {
     // Products endpoints - Fixed method names
     app.get("/api/products", async (req, res) => {
         try {
-            const products = await db_1.db.listProducts(); // Changed from getProducts
+            const products = await storage.listProducts(); // Changed from getProducts
             res.json(products);
         }
         catch (error) {
@@ -158,7 +155,7 @@ async function registerRoutes(app) {
     });
     app.get("/api/products/:id", async (req, res) => {
         try {
-            const product = await db_1.db.getProduct(req.params.id);
+            const product = await storage.getProduct(req.params.id);
             if (!product) {
                 return res.status(404).json({ message: "Product not found" });
             }
@@ -171,12 +168,12 @@ async function registerRoutes(app) {
     });
     app.post("/api/products", async (req, res) => {
         try {
-            const validatedData = schema_1.insertProductSchema.parse(req.body);
-            const product = await db_1.db.createProduct(validatedData);
+            const validatedData = insertProductSchema.parse(req.body);
+            const product = await storage.createProduct(validatedData);
             res.status(201).json(product);
         }
         catch (error) {
-            if (error instanceof zod_1.z.ZodError) {
+            if (error instanceof z.ZodError) {
                 return res.status(400).json({
                     message: "Invalid product data",
                     errors: error.errors,
@@ -188,15 +185,15 @@ async function registerRoutes(app) {
     });
     app.put("/api/products/:id", async (req, res) => {
         try {
-            const validatedData = schema_1.insertProductSchema.partial().parse(req.body);
-            const product = await db_1.db.updateProduct(req.params.id, validatedData);
+            const validatedData = insertProductSchema.partial().parse(req.body);
+            const product = await storage.updateProduct(req.params.id, validatedData);
             if (!product) {
                 return res.status(404).json({ message: "Product not found" });
             }
             res.json(product);
         }
         catch (error) {
-            if (error instanceof zod_1.z.ZodError) {
+            if (error instanceof z.ZodError) {
                 return res.status(400).json({
                     message: "Invalid product data",
                     errors: error.errors,
@@ -209,8 +206,8 @@ async function registerRoutes(app) {
     // Orders endpoints - Fixed method names and data handling
     app.get("/api/orders", async (req, res) => {
         try {
-            const orders = await db_1.db.listOrders(); // Changed from getOrders
-            const products = await db_1.db.listProducts();
+            const orders = await storage.listOrders(); // Changed from getOrders
+            const products = await storage.listProducts();
             // Create a product lookup map
             const productMap = new Map(products.map((product) => [product.id, product.name]));
             // Transform orders to match frontend expectations
@@ -239,11 +236,11 @@ async function registerRoutes(app) {
     });
     app.get("/api/orders/:id", async (req, res) => {
         try {
-            const order = await db_1.db.getOrder(req.params.id);
+            const order = await storage.getOrder(req.params.id);
             if (!order) {
                 return res.status(404).json({ message: "Order not found" });
             }
-            const products = await db_1.db.listProducts();
+            const products = await storage.listProducts();
             const productMap = new Map(products.map((product) => [product.id, product.name]));
             const items = order.items || [];
             const firstItem = items[0];
@@ -267,16 +264,16 @@ async function registerRoutes(app) {
     });
     app.post("/api/orders", async (req, res) => {
         try {
-            const validatedData = schema_1.insertOrderSchema.parse(req.body);
-            const order = await db_1.db.createOrder(validatedData);
+            const validatedData = insertOrderSchema.parse(req.body);
+            const order = await storage.createOrder(validatedData);
             // Award loyalty points
-            await loyalty_program_1.loyaltyProgram.processOrderRewards(order.customerId, parseFloat(order.totalAmount || "0"));
+            await loyaltyProgram.processOrderRewards(order.customerId, parseFloat(order.totalAmount || "0"));
             // Trigger real-time update
-            await websocket_server_1.realtimeServer.triggerUpdate("order", "created", order);
+            await realtimeServer.triggerUpdate("order", "created", order);
             res.status(201).json(order);
         }
         catch (error) {
-            if (error instanceof zod_1.z.ZodError) {
+            if (error instanceof z.ZodError) {
                 return res.status(400).json({
                     message: "Invalid order data",
                     errors: error.errors,
@@ -288,17 +285,17 @@ async function registerRoutes(app) {
     });
     app.put("/api/orders/:id", async (req, res) => {
         try {
-            const validatedData = schema_1.insertOrderSchema.partial().parse(req.body);
-            const order = await db_1.db.updateOrder(req.params.id, validatedData);
+            const validatedData = insertOrderSchema.partial().parse(req.body);
+            const order = await storage.updateOrder(req.params.id, validatedData);
             if (!order) {
                 return res.status(404).json({ message: "Order not found" });
             }
             // Trigger real-time update
-            await websocket_server_1.realtimeServer.triggerUpdate("order", "updated", order);
+            await realtimeServer.triggerUpdate("order", "updated", order);
             res.json(order);
         }
         catch (error) {
-            if (error instanceof zod_1.z.ZodError) {
+            if (error instanceof z.ZodError) {
                 return res.status(400).json({
                     message: "Invalid order data",
                     errors: error.errors,
@@ -310,7 +307,7 @@ async function registerRoutes(app) {
     });
     app.delete("/api/orders/:id", async (req, res) => {
         try {
-            await db_1.db.deleteOrder(req.params.id);
+            await storage.deleteOrder(req.params.id);
             res.json({ message: "Order deleted successfully" });
         }
         catch (error) {
@@ -326,7 +323,7 @@ async function registerRoutes(app) {
                     message: "orderIds must be a non-empty array",
                 });
             }
-            const results = await Promise.allSettled(orderIds.map((id) => db_1.db.deleteOrder(id)));
+            const results = await Promise.allSettled(orderIds.map((id) => storage.deleteOrder(id)));
             const successful = results.filter((result) => result.status === "fulfilled").length;
             const failed = results.length - successful;
             res.json({
@@ -344,8 +341,8 @@ async function registerRoutes(app) {
     // Customer KPIs endpoint - Fixed method names
     app.get("/api/customers/kpis", async (req, res) => {
         try {
-            const customers = await db_1.db.listCustomers(); // Changed from getCustomers
-            const orders = await db_1.db.listOrders(); // Changed from getOrders
+            const customers = await storage.listCustomers(); // Changed from getCustomers
+            const orders = await storage.listOrders(); // Changed from getOrders
             const totalCustomers = customers.length;
             const newCustomersThisMonth = customers.filter((customer) => {
                 const customerDate = new Date(customer.createdAt);
@@ -375,7 +372,7 @@ async function registerRoutes(app) {
     // Customers endpoints - Fixed method names
     app.get("/api/customers", async (req, res) => {
         try {
-            const customers = await db_1.db.listCustomers(); // Changed from getCustomers
+            const customers = await storage.listCustomers(); // Changed from getCustomers
             const transformedCustomers = customers.map((customer) => ({
                 ...customer,
                 joinDate: customer.createdAt,
@@ -390,7 +387,7 @@ async function registerRoutes(app) {
     });
     app.get("/api/customers/:id", async (req, res) => {
         try {
-            const customer = await db_1.db.getCustomer(req.params.id);
+            const customer = await storage.getCustomer(req.params.id);
             if (!customer) {
                 return res.status(404).json({ message: "Customer not found" });
             }
@@ -408,14 +405,14 @@ async function registerRoutes(app) {
     });
     app.post("/api/customers", async (req, res) => {
         try {
-            const validatedData = schema_1.insertCustomerSchema.parse(req.body);
-            const customer = await db_1.db.createCustomer(validatedData);
+            const validatedData = insertCustomerSchema.parse(req.body);
+            const customer = await storage.createCustomer(validatedData);
             // Trigger real-time update
-            await websocket_server_1.realtimeServer.triggerUpdate("customer", "created", customer);
+            await realtimeServer.triggerUpdate("customer", "created", customer);
             res.status(201).json(customer);
         }
         catch (error) {
-            if (error instanceof zod_1.z.ZodError) {
+            if (error instanceof z.ZodError) {
                 return res.status(400).json({
                     message: "Invalid customer data",
                     errors: error.errors,
@@ -427,8 +424,8 @@ async function registerRoutes(app) {
     });
     app.put("/api/customers/:id", async (req, res) => {
         try {
-            const validatedData = schema_1.insertCustomerSchema.partial().parse(req.body);
-            const customer = await db_1.db.updateCustomer(req.params.id, validatedData);
+            const validatedData = insertCustomerSchema.partial().parse(req.body);
+            const customer = await storage.updateCustomer(req.params.id, validatedData);
             if (!customer) {
                 return res.status(404).json({ message: "Customer not found" });
             }
@@ -440,7 +437,7 @@ async function registerRoutes(app) {
             res.json(transformedCustomer);
         }
         catch (error) {
-            if (error instanceof zod_1.z.ZodError) {
+            if (error instanceof z.ZodError) {
                 return res.status(400).json({
                     message: "Invalid customer data",
                     errors: error.errors,
@@ -452,7 +449,7 @@ async function registerRoutes(app) {
     });
     app.delete("/api/customers/:id", async (req, res) => {
         try {
-            await db_1.db.deleteCustomer(req.params.id);
+            await storage.deleteCustomer(req.params.id);
             res.json({ message: "Customer deleted successfully" });
         }
         catch (error) {
@@ -463,7 +460,7 @@ async function registerRoutes(app) {
     // POS Transactions endpoints - Fixed method names
     app.get("/api/pos/transactions", async (req, res) => {
         try {
-            const transactions = await db_1.db.listPosTransactions(); // Changed from getPosTransactions
+            const transactions = await storage.listPosTransactions(); // Changed from getPosTransactions
             res.json(transactions);
         }
         catch (error) {
@@ -473,12 +470,12 @@ async function registerRoutes(app) {
     });
     app.post("/api/pos/transactions", async (req, res) => {
         try {
-            const validatedData = schema_1.insertOrderTransactionSchema.parse(req.body);
-            const transaction = await db_1.db.createPosTransaction(validatedData);
+            const validatedData = insertOrderTransactionSchema.parse(req.body);
+            const transaction = await storage.createPosTransaction(validatedData);
             res.status(201).json(transaction);
         }
         catch (error) {
-            if (error instanceof zod_1.z.ZodError) {
+            if (error instanceof z.ZodError) {
                 return res.status(400).json({
                     message: "Invalid transaction data",
                     errors: error.errors,
@@ -491,7 +488,7 @@ async function registerRoutes(app) {
     // Services endpoints - Fixed method names
     app.get("/api/services", async (req, res) => {
         try {
-            const services = await db_1.db.listServices(); // Changed from getServices
+            const services = await storage.listServices(); // Changed from getServices
             res.json(services);
         }
         catch (error) {
@@ -517,10 +514,10 @@ async function registerRoutes(app) {
             }
             const searchTerm = query.toLowerCase().trim();
             // Search with fixed method names
-            const orders = await db_1.db.listOrders(); // Changed from getOrders
-            const customers = await db_1.db.listCustomers(); // Changed from getCustomers
-            const products = await db_1.db.listProducts(); // Changed from getProducts
-            const services = await db_1.db.listServices(); // Changed from getServices
+            const orders = await storage.listOrders(); // Changed from getOrders
+            const customers = await storage.listCustomers(); // Changed from getCustomers
+            const products = await storage.listProducts(); // Changed from getProducts
+            const services = await storage.listServices(); // Changed from getServices
             const matchingOrders = orders
                 .filter((order) => order.customerName?.toLowerCase().includes(searchTerm) ||
                 order.orderNumber?.toLowerCase().includes(searchTerm) ||
@@ -591,7 +588,7 @@ async function registerRoutes(app) {
         }
     });
     // Add remaining endpoints here following the same pattern...
-    const httpServer = (0, http_1.createServer)(app);
+    const httpServer = createServer(app);
     return httpServer;
 }
 //# sourceMappingURL=routes.js.map

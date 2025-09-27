@@ -1,7 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.pricingEngine = void 0;
-const storage_1 = require("./storage");
+import { storage } from './storage';
 class DynamicPricingEngine {
     constructor() {
         this.pricingRules = new Map();
@@ -11,7 +8,7 @@ class DynamicPricingEngine {
     }
     async initializePricingRules() {
         try {
-            const services = await storage_1.storage.getServices();
+            const services = await storage.getServices();
             services.forEach(service => {
                 this.pricingRules.set(service.id, {
                     serviceId: service.id,
@@ -43,8 +40,8 @@ class DynamicPricingEngine {
     }
     async updateAllPricing() {
         try {
-            const orders = await storage_1.storage.getOrders();
-            const products = await storage_1.storage.getProducts();
+            const orders = await storage.getOrders();
+            const products = await storage.getProducts();
             for (const [serviceId, pricing] of this.pricingRules) {
                 await this.calculatePricing(serviceId, pricing, orders, products);
             }
@@ -160,7 +157,7 @@ class DynamicPricingEngine {
         const pricing = this.pricingRules.get(serviceId);
         if (!pricing) {
             // If no pricing rule exists, return base price
-            const services = await storage_1.storage.getServices();
+            const services = await storage.getServices();
             const service = services.find(s => s.id === serviceId);
             return parseFloat(service?.price || '100');
         }
@@ -172,8 +169,8 @@ class DynamicPricingEngine {
     }
     async updateServicePricing(serviceId) {
         try {
-            const orders = await storage_1.storage.getOrders();
-            const products = await storage_1.storage.getProducts();
+            const orders = await storage.getOrders();
+            const products = await storage.getProducts();
             const pricing = this.pricingRules.get(serviceId);
             if (pricing) {
                 await this.calculatePricing(serviceId, pricing, orders, products);
@@ -190,5 +187,5 @@ class DynamicPricingEngine {
     }
 }
 // Export singleton instance
-exports.pricingEngine = new DynamicPricingEngine();
+export const pricingEngine = new DynamicPricingEngine();
 //# sourceMappingURL=pricing-engine.js.map

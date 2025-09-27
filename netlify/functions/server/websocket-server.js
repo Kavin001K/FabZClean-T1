@@ -1,15 +1,12 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.realtimeServer = void 0;
-const ws_1 = require("ws");
-const http_1 = require("http");
-const storage_1 = require("./storage");
+import { WebSocketServer, WebSocket } from 'ws';
+import { createServer } from 'http';
+import { storage } from './storage';
 class RealtimeServer {
     constructor(port = 3003) {
         this.clients = new Map();
         this.updateInterval = null;
-        const server = (0, http_1.createServer)();
-        this.wss = new ws_1.WebSocketServer({ server });
+        const server = createServer();
+        this.wss = new WebSocketServer({ server });
         this.wss.on('connection', (ws, req) => {
             const clientId = this.generateClientId();
             console.log(`Client ${clientId} connected`);
@@ -75,14 +72,14 @@ class RealtimeServer {
     }
     sendToClient(clientId, data) {
         const client = this.clients.get(clientId);
-        if (client && client.ws.readyState === ws_1.WebSocket.OPEN) {
+        if (client && client.ws.readyState === WebSocket.OPEN) {
             client.ws.send(JSON.stringify(data));
         }
     }
     broadcastToSubscribers(type, data) {
         const message = JSON.stringify({ type, data, timestamp: new Date().toISOString() });
         this.clients.forEach((client, clientId) => {
-            if (client.subscriptions.includes(type) && client.ws.readyState === ws_1.WebSocket.OPEN) {
+            if (client.subscriptions.includes(type) && client.ws.readyState === WebSocket.OPEN) {
                 client.ws.send(message);
             }
         });
@@ -100,8 +97,8 @@ class RealtimeServer {
     }
     async broadcastAnalyticsUpdate() {
         try {
-            const orders = await storage_1.storage.getOrders();
-            const customers = await storage_1.storage.getCustomers();
+            const orders = await storage.getOrders();
+            const customers = await storage.getCustomers();
             // Calculate real-time KPIs
             const totalRevenue = orders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
             const avgOrderValue = orders.length > 0 ? totalRevenue / orders.length : 0;
@@ -168,5 +165,5 @@ class RealtimeServer {
 }
 // Export singleton instance with WebSocket port
 const wsPort = parseInt(process.env.WS_PORT || '3003', 10);
-exports.realtimeServer = new RealtimeServer(wsPort);
+export const realtimeServer = new RealtimeServer(wsPort);
 //# sourceMappingURL=websocket-server.js.map

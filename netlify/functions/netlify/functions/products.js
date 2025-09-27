@@ -1,8 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.handler = void 0;
-const storage_1 = require("./server/storage");
-const handler = async (event, context) => {
+import { storage } from './server/storage';
+export const handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -18,7 +15,7 @@ const handler = async (event, context) => {
     }
     try {
         if (event.httpMethod === 'GET') {
-            const products = await storage_1.storage.getProducts();
+            const products = await storage.getProducts();
             return {
                 statusCode: 200,
                 headers,
@@ -27,7 +24,7 @@ const handler = async (event, context) => {
         }
         if (event.httpMethod === 'POST') {
             const productData = JSON.parse(event.body || '{}');
-            const newProduct = await storage_1.storage.createProduct(productData);
+            const newProduct = await storage.createProduct(productData);
             return {
                 statusCode: 201,
                 headers,
@@ -36,7 +33,7 @@ const handler = async (event, context) => {
         }
         if (event.httpMethod === 'PUT') {
             const productData = JSON.parse(event.body || '{}');
-            const updatedProduct = await storage_1.storage.updateProduct(productData.id, productData);
+            const updatedProduct = await storage.updateProduct(productData.id, productData);
             return {
                 statusCode: 200,
                 headers,
@@ -61,5 +58,4 @@ const handler = async (event, context) => {
         };
     }
 };
-exports.handler = handler;
 //# sourceMappingURL=products.js.map

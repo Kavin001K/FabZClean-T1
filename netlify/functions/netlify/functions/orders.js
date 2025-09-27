@@ -1,8 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.handler = void 0;
-const storage_1 = require("./server/storage");
-const handler = async (event, context) => {
+import { storage } from './server/storage';
+export const handler = async (event, context) => {
     // Set CORS headers
     const headers = {
         'Access-Control-Allow-Origin': '*',
@@ -20,8 +17,8 @@ const handler = async (event, context) => {
     }
     try {
         if (event.httpMethod === 'GET') {
-            const orders = await storage_1.storage.getOrders();
-            const products = await storage_1.storage.getProducts();
+            const orders = await storage.getOrders();
+            const products = await storage.getProducts();
             const productMap = new Map(products.map(product => [product.id, product.name]));
             const transformedOrders = orders.map(order => {
                 const firstItem = order.items?.[0];
@@ -43,7 +40,7 @@ const handler = async (event, context) => {
         }
         if (event.httpMethod === 'POST') {
             const orderData = JSON.parse(event.body || '{}');
-            const newOrder = await storage_1.storage.createOrder(orderData);
+            const newOrder = await storage.createOrder(orderData);
             return {
                 statusCode: 201,
                 headers,
@@ -52,7 +49,7 @@ const handler = async (event, context) => {
         }
         if (event.httpMethod === 'PUT') {
             const orderData = JSON.parse(event.body || '{}');
-            const updatedOrder = await storage_1.storage.updateOrder(orderData.id, orderData);
+            const updatedOrder = await storage.updateOrder(orderData.id, orderData);
             return {
                 statusCode: 200,
                 headers,
@@ -77,5 +74,4 @@ const handler = async (event, context) => {
         };
     }
 };
-exports.handler = handler;
 //# sourceMappingURL=orders.js.map

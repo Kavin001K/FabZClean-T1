@@ -1,8 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.handler = void 0;
-const storage_1 = require("./server/storage");
-const handler = async (event, context) => {
+import { storage } from './server/storage';
+export const handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -18,7 +15,7 @@ const handler = async (event, context) => {
     }
     try {
         if (event.httpMethod === 'GET') {
-            const services = await storage_1.storage.getServices();
+            const services = await storage.getServices();
             return {
                 statusCode: 200,
                 headers,
@@ -27,7 +24,7 @@ const handler = async (event, context) => {
         }
         if (event.httpMethod === 'POST') {
             const serviceData = JSON.parse(event.body || '{}');
-            const newService = await storage_1.storage.createService(serviceData);
+            const newService = await storage.createService(serviceData);
             return {
                 statusCode: 201,
                 headers,
@@ -36,7 +33,7 @@ const handler = async (event, context) => {
         }
         if (event.httpMethod === 'PUT') {
             const serviceData = JSON.parse(event.body || '{}');
-            const updatedService = await storage_1.storage.updateService(serviceData.id, serviceData);
+            const updatedService = await storage.updateService(serviceData.id, serviceData);
             return {
                 statusCode: 200,
                 headers,
@@ -61,5 +58,4 @@ const handler = async (event, context) => {
         };
     }
 };
-exports.handler = handler;
 //# sourceMappingURL=services.js.map

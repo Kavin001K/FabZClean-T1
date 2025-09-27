@@ -1,6 +1,3 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.handler = void 0;
 // Sample data for demonstration
 const sampleCustomers = [
     {
@@ -17,7 +14,7 @@ const sampleCustomers = [
         lastOrder: new Date().toISOString()
     }
 ];
-const handler = async (event, context) => {
+export const handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -73,5 +70,4 @@ const handler = async (event, context) => {
         };
     }
 };
-exports.handler = handler;
 //# sourceMappingURL=customers-simple.js.map

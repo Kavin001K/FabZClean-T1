@@ -1,7 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.loyaltyProgram = void 0;
-const storage_1 = require("./storage");
+import { storage } from './storage';
 class LoyaltyProgram {
     constructor() {
         this.customerPoints = new Map();
@@ -129,8 +126,8 @@ class LoyaltyProgram {
     }
     async loadCustomerData() {
         try {
-            const customers = await storage_1.storage.getCustomers();
-            const orders = await storage_1.storage.getOrders();
+            const customers = await storage.getCustomers();
+            const orders = await storage.getOrders();
             customers.forEach(customer => {
                 const customerOrders = orders.filter(order => order.customerId === customer.id);
                 const totalSpent = customerOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
@@ -314,7 +311,7 @@ class LoyaltyProgram {
         const customer = this.customerPoints.get(customerId);
         if (!customer)
             return;
-        const orders = await storage_1.storage.getOrders();
+        const orders = await storage.getOrders();
         const customerOrders = orders.filter(order => order.customerId === customerId);
         const totalSpent = customerOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
         const newBadges = this.calculateBadges(customerId, customerOrders, totalSpent);
@@ -333,5 +330,5 @@ class LoyaltyProgram {
     }
 }
 // Export singleton instance
-exports.loyaltyProgram = new LoyaltyProgram();
+export const loyaltyProgram = new LoyaltyProgram();
 //# sourceMappingURL=loyalty-program.js.map

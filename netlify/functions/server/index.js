@@ -1,14 +1,9 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = __importDefault(require("express"));
-const routes_1 = require("./routes");
-const vite_1 = require("./vite");
-const app = (0, express_1.default)();
-app.use(express_1.default.json());
-app.use(express_1.default.urlencoded({ extended: false }));
+import express from "express";
+import { registerRoutes } from "./routes";
+import { setupVite, serveStatic, log } from "./vite";
+const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 app.use((req, res, next) => {
     const start = Date.now();
     const path = req.path;
@@ -28,13 +23,13 @@ app.use((req, res, next) => {
             if (logLine.length > 80) {
                 logLine = logLine.slice(0, 79) + "…";
             }
-            (0, vite_1.log)(logLine);
+            log(logLine);
         }
     });
     next();
 });
 (async () => {
-    const server = await (0, routes_1.registerRoutes)(app);
+    const server = await registerRoutes(app);
     app.use((err, _req, res, _next) => {
         const status = err.status || err.statusCode || 500;
         const message = err.message || "Internal Server Error";
@@ -45,19 +40,19 @@ app.use((req, res, next) => {
     // setting up all the other routes so the catch-all route
     // doesn't interfere with the other routes
     if (app.get("env") === "development") {
-        await (0, vite_1.setupVite)(app, server);
+        await setupVite(app, server);
     }
     else {
-        (0, vite_1.serveStatic)(app);
+        serveStatic(app);
     }
     // Initialize database connection
     try {
         //await initializeDatabase();
         console.log("using sqlite ");
-        (0, vite_1.log)("✅ Database connection established");
+        log("✅ Database connection established");
     }
     catch (error) {
-        (0, vite_1.log)("❌ Database connection failed:", error);
+        log("❌ Database connection failed:", error);
         process.exit(1);
     }
     // ALWAYS serve the app on the port specified in the environment variable PORT
@@ -66,7 +61,7 @@ app.use((req, res, next) => {
     // It is the only port that is not firewalled.
     const port = parseInt(process.env.PORT || "5000", 10);
     server.listen(port, () => {
-        (0, vite_1.log)(`serving on port ${port}`);
+        log(`serving on port ${port}`);
     });
 })();
 //# sourceMappingURL=index.js.map

@@ -1,10 +1,8 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.storage = exports.db = void 0;
-const SQLiteStorage_1 = require("./SQLiteStorage");
+import { SQLiteStorage } from "./SQLiteStorage";
 // Use SQLite as the primary database
-exports.db = new SQLiteStorage_1.SQLiteStorage("./fabzclean.db");
-exports.storage = exports.db;
+export const db = new SQLiteStorage("./fabzclean.db");
+// For compatibility with existing imports
+export { db as storage };
 // Initialize with some logging
 console.log("🗄️  Using SQLite database: ./fabzclean.db");
 //# sourceMappingURL=db.js.map

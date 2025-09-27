@@ -1,8 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.handler = void 0;
-const db_utils_1 = require("./server/db-utils");
-const handler = async (event, context) => {
+import { getDatabaseHealth } from './server/db-utils';
+export const handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -18,7 +15,7 @@ const handler = async (event, context) => {
     }
     try {
         if (event.httpMethod === 'GET') {
-            const health = await (0, db_utils_1.getDatabaseHealth)();
+            const health = await getDatabaseHealth();
             return {
                 statusCode: 200,
                 headers,
@@ -43,5 +40,4 @@ const handler = async (event, context) => {
         };
     }
 };
-exports.handler = handler;
 //# sourceMappingURL=health-database.js.map

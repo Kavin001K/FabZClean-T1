@@ -3,6 +3,11 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[functions]
+  # Exclude config files and other non-function files
+  included_files = ["netlify/functions/**/*.js", "netlify/functions/**/*.ts"]
+  excluded_files = ["**/*.config.*", "**/vite.config.*", "**/tsconfig.*", "**/*.map"]
+
 [build.environment]
   NODE_VERSION = "18"
   NPM_VERSION = "9"

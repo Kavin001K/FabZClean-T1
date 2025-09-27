@@ -1,8 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.handler = void 0;
-const storage_1 = require("./server/storage");
-const handler = async (event, context) => {
+import { storage } from './server/storage';
+export const handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -18,8 +15,8 @@ const handler = async (event, context) => {
     }
     try {
         if (event.httpMethod === 'GET') {
-            const metrics = await storage_1.storage.getDashboardMetrics();
-            const customers = await storage_1.storage.getCustomers();
+            const metrics = await storage.getDashboardMetrics();
+            const customers = await storage.getCustomers();
             const transformedMetrics = {
                 totalRevenue: metrics.totalRevenue,
                 totalOrders: metrics.ordersToday,
@@ -50,5 +47,4 @@ const handler = async (event, context) => {
         };
     }
 };
-exports.handler = handler;
 //# sourceMappingURL=dashboard-metrics.js.map

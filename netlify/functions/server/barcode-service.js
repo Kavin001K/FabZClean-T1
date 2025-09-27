@@ -1,16 +1,10 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.barcodeService = exports.BarcodeService = void 0;
-const qrcode_1 = __importDefault(require("qrcode"));
-const crypto_1 = require("crypto");
-const fs_1 = require("fs");
-const path_1 = require("path");
-class BarcodeService {
+import QRCode from 'qrcode';
+import { randomUUID } from 'crypto';
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { join } from 'path';
+export class BarcodeService {
     constructor() {
-        this.barcodesDir = (0, path_1.join)(process.cwd(), 'public', 'barcodes');
+        this.barcodesDir = join(process.cwd(), 'public', 'barcodes');
         this.ensureBarcodesDirectory();
     }
     static getInstance() {
@@ -20,8 +14,8 @@ class BarcodeService {
         return BarcodeService.instance;
     }
     ensureBarcodesDirectory() {
-        if (!(0, fs_1.existsSync)(this.barcodesDir)) {
-            (0, fs_1.mkdirSync)(this.barcodesDir, { recursive: true });
+        if (!existsSync(this.barcodesDir)) {
+            mkdirSync(this.barcodesDir, { recursive: true });
         }
     }
     /**
@@ -38,7 +32,7 @@ class BarcodeService {
     async generateQRCode(data, options = {}) {
         const { size = 200, margin = 2 } = options;
         try {
-            const qrDataURL = await qrcode_1.default.toDataURL(data, {
+            const qrDataURL = await QRCode.toDataURL(data, {
                 width: size,
                 margin: margin,
                 color: {
@@ -72,9 +66,9 @@ class BarcodeService {
      */
     saveImageToFile(imageData, filename) {
         const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
-        const filePath = (0, path_1.join)(this.barcodesDir, filename);
+        const filePath = join(this.barcodesDir, filename);
         try {
-            (0, fs_1.writeFileSync)(filePath, base64Data, 'base64');
+            writeFileSync(filePath, base64Data, 'base64');
             return `/barcodes/${filename}`;
         }
         catch (error) {
@@ -121,7 +115,7 @@ class BarcodeService {
         // Save image to file system
         const imagePath = this.saveImageToFile(imageData, filename);
         // Generate unique ID
-        const id = (0, crypto_1.randomUUID)();
+        const id = randomUUID();
         return {
             id,
             code,
@@ -206,7 +200,6 @@ class BarcodeService {
         return results;
     }
 }
-exports.BarcodeService = BarcodeService;
 // Export singleton instance
-exports.barcodeService = BarcodeService.getInstance();
+export const barcodeService = BarcodeService.getInstance();
 //# sourceMappingURL=barcode-service.js.map

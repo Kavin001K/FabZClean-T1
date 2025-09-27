@@ -1,14 +1,8 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.SQLiteStorage = void 0;
-const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
-const crypto_1 = require("crypto");
-class SQLiteStorage {
+import Database from "better-sqlite3";
+import { randomUUID } from "crypto";
+export class SQLiteStorage {
     constructor(dbPath = "./fabzclean.db") {
-        this.db = new better_sqlite3_1.default(dbPath);
+        this.db = new Database(dbPath);
         this.createTables();
     }
     createTables() {
@@ -157,7 +151,7 @@ class SQLiteStorage {
     }
     // ======= USERS =======
     async createUser(data) {
-        const id = (0, crypto_1.randomUUID)();
+        const id = randomUUID();
         const now = new Date().toISOString();
         this.db
             .prepare(`
@@ -198,7 +192,7 @@ class SQLiteStorage {
     }
     // ======= GENERIC CRUD HELPERS =======
     insertRecord(table, data) {
-        const id = data.id ?? (0, crypto_1.randomUUID)();
+        const id = data.id ?? randomUUID();
         const now = new Date().toISOString();
         const dataWithTimestamps = { ...data, id, createdAt: now, updatedAt: now };
         // Handle JSON fields for certain tables
@@ -796,5 +790,4 @@ class SQLiteStorage {
         this.db.close();
     }
 }
-exports.SQLiteStorage = SQLiteStorage;
 //# sourceMappingURL=SQLiteStorage.js.map

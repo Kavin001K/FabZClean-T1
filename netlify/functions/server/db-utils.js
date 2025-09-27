@@ -1,15 +1,9 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.initializeDatabase = initializeDatabase;
-exports.getDatabaseHealth = getDatabaseHealth;
-exports.pingDatabase = pingDatabase;
-exports.getDatabaseInfo = getDatabaseInfo;
-const db_1 = require("./db");
-async function initializeDatabase() {
+import { db } from "./db";
+export async function initializeDatabase() {
     try {
         console.log("🔄 Initializing SQLite database...");
         // Test the database connection by trying to get users
-        await db_1.db.listUsers();
+        await db.listUsers();
         console.log("✅ SQLite database initialized successfully");
         return true;
     }
@@ -18,11 +12,11 @@ async function initializeDatabase() {
         throw error;
     }
 }
-async function getDatabaseHealth() {
+export async function getDatabaseHealth() {
     try {
         const startTime = Date.now();
         // Simple health check - try to query users table
-        await db_1.db.listUsers();
+        await db.listUsers();
         const responseTime = Date.now() - startTime;
         return {
             status: "healthy",
@@ -40,11 +34,11 @@ async function getDatabaseHealth() {
         };
     }
 }
-async function pingDatabase() {
+export async function pingDatabase() {
     try {
         const startTime = Date.now();
         // Simple ping - try to query
-        await db_1.db.listUsers();
+        await db.listUsers();
         const responseTime = Date.now() - startTime;
         return {
             success: true,
@@ -62,12 +56,12 @@ async function pingDatabase() {
         };
     }
 }
-async function getDatabaseInfo() {
+export async function getDatabaseInfo() {
     try {
-        const users = await db_1.db.listUsers();
-        const products = await db_1.db.listProducts();
-        const orders = await db_1.db.listOrders();
-        const customers = await db_1.db.listCustomers();
+        const users = await db.listUsers();
+        const products = await db.listProducts();
+        const orders = await db.listOrders();
+        const customers = await db.listCustomers();
         return {
             database: "sqlite",
             version: "3.x", // SQLite version

@@ -1,8 +1,5 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.handler = void 0;
-const storage_1 = require("./server/storage");
-const handler = async (event, context) => {
+import { storage } from './server/storage';
+export const handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -18,7 +15,7 @@ const handler = async (event, context) => {
     }
     try {
         if (event.httpMethod === 'GET') {
-            const deliveries = await storage_1.storage.getDeliveries();
+            const deliveries = await storage.getDeliveries();
             return {
                 statusCode: 200,
                 headers,
@@ -27,7 +24,7 @@ const handler = async (event, context) => {
         }
         if (event.httpMethod === 'POST') {
             const deliveryData = JSON.parse(event.body || '{}');
-            const newDelivery = await storage_1.storage.createDelivery(deliveryData);
+            const newDelivery = await storage.createDelivery(deliveryData);
             return {
                 statusCode: 201,
                 headers,
@@ -36,7 +33,7 @@ const handler = async (event, context) => {
         }
         if (event.httpMethod === 'PUT') {
             const deliveryData = JSON.parse(event.body || '{}');
-            const updatedDelivery = await storage_1.storage.updateDelivery(deliveryData.id, deliveryData);
+            const updatedDelivery = await storage.updateDelivery(deliveryData.id, deliveryData);
             return {
                 statusCode: 200,
                 headers,
@@ -61,5 +58,4 @@ const handler = async (event, context) => {
         };
     }
 };
-exports.handler = handler;
 //# sourceMappingURL=deliveries.js.map

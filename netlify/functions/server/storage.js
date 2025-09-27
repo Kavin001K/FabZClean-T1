@@ -1,10 +1,7 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.storage = exports.MemStorage = void 0;
-const SQLiteStorage_1 = require("./SQLiteStorage");
-class MemStorage {
+import { SQLiteStorage } from "./SQLiteStorage";
+export class MemStorage {
     constructor() {
-        this.sqliteStorage = new SQLiteStorage_1.SQLiteStorage("./fabzclean.db");
+        this.sqliteStorage = new SQLiteStorage("./fabzclean.db");
         this.initializeData();
     }
     async initializeData() {
@@ -528,6 +525,5 @@ class MemStorage {
         this.sqliteStorage.close();
     }
 }
-exports.MemStorage = MemStorage;
-exports.storage = new MemStorage();
+export const storage = new MemStorage();
 //# sourceMappingURL=storage.js.map
