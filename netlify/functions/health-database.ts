@@ -1,5 +1,5 @@
 import { Handler } from '@netlify/functions';
-import { getDatabaseHealth } from '../../server/db-utils';
+import { getDatabaseHealth } from './server/db-utils';
 
 export const handler: Handler = async (event, context) => {
   const headers = {

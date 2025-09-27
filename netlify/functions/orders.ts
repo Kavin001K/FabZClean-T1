@@ -1,5 +1,5 @@
 import { Handler } from '@netlify/functions';
-import { storage } from '../../server/storage';
+import { storage } from './server/storage';
 
 export const handler: Handler = async (event, context) => {
   // Set CORS headers

@@ -1,7 +1,27 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handler = void 0;
-const storage_1 = require("./server/storage");
+// Sample data for demonstration
+const sampleOrders = [
+    {
+        id: "1",
+        orderNumber: "ORD-001",
+        customerName: "John Doe",
+        customerEmail: "john@example.com",
+        customerPhone: "+1234567890",
+        status: "pending",
+        paymentStatus: "pending",
+        totalAmount: "25.00",
+        items: [{ productId: "1", productName: "Dry Cleaning", quantity: 1, price: "25.00" }],
+        shippingAddress: { instructions: "Leave at door", pickupDate: "2024-01-15" },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        date: new Date().toISOString(),
+        total: 25.00,
+        service: "Dry Cleaning",
+        priority: "Normal"
+    }
+];
 const handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
@@ -18,29 +38,24 @@ const handler = async (event, context) => {
     }
     try {
         if (event.httpMethod === 'GET') {
-            const deliveries = await storage_1.storage.getDeliveries();
             return {
                 statusCode: 200,
                 headers,
-                body: JSON.stringify(deliveries),
+                body: JSON.stringify(sampleOrders),
             };
         }
         if (event.httpMethod === 'POST') {
-            const deliveryData = JSON.parse(event.body || '{}');
-            const newDelivery = await storage_1.storage.createDelivery(deliveryData);
+            const orderData = JSON.parse(event.body || '{}');
+            const newOrder = {
+                id: Date.now().toString(),
+                ...orderData,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            };
             return {
                 statusCode: 201,
                 headers,
-                body: JSON.stringify(newDelivery),
-            };
-        }
-        if (event.httpMethod === 'PUT') {
-            const deliveryData = JSON.parse(event.body || '{}');
-            const updatedDelivery = await storage_1.storage.updateDelivery(deliveryData.id, deliveryData);
-            return {
-                statusCode: 200,
-                headers,
-                body: JSON.stringify(updatedDelivery),
+                body: JSON.stringify(newOrder),
             };
         }
         return {
@@ -50,7 +65,7 @@ const handler = async (event, context) => {
         };
     }
     catch (error) {
-        console.error('Deliveries API Error:', error);
+        console.error('Orders API Error:', error);
         return {
             statusCode: 500,
             headers,
@@ -62,4 +77,3 @@ const handler = async (event, context) => {
     }
 };
 exports.handler = handler;
-//# sourceMappingURL=deliveries.js.map

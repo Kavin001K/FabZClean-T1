@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handler = void 0;
-const storage_1 = require("../../server/storage");
+const storage_1 = require("./server/storage");
 const handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',

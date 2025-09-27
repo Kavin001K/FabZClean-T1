@@ -1,12 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handler = void 0;
-const storage_1 = require("./server/storage");
 const handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Content-Type': 'application/json',
     };
     if (event.httpMethod === 'OPTIONS') {
@@ -18,29 +17,16 @@ const handler = async (event, context) => {
     }
     try {
         if (event.httpMethod === 'GET') {
-            const deliveries = await storage_1.storage.getDeliveries();
+            const metrics = {
+                totalRevenue: 1250.50,
+                totalOrders: 25,
+                newCustomers: 8,
+                inventoryItems: 15
+            };
             return {
                 statusCode: 200,
                 headers,
-                body: JSON.stringify(deliveries),
-            };
-        }
-        if (event.httpMethod === 'POST') {
-            const deliveryData = JSON.parse(event.body || '{}');
-            const newDelivery = await storage_1.storage.createDelivery(deliveryData);
-            return {
-                statusCode: 201,
-                headers,
-                body: JSON.stringify(newDelivery),
-            };
-        }
-        if (event.httpMethod === 'PUT') {
-            const deliveryData = JSON.parse(event.body || '{}');
-            const updatedDelivery = await storage_1.storage.updateDelivery(deliveryData.id, deliveryData);
-            return {
-                statusCode: 200,
-                headers,
-                body: JSON.stringify(updatedDelivery),
+                body: JSON.stringify(metrics),
             };
         }
         return {
@@ -50,7 +36,7 @@ const handler = async (event, context) => {
         };
     }
     catch (error) {
-        console.error('Deliveries API Error:', error);
+        console.error('Dashboard Metrics API Error:', error);
         return {
             statusCode: 500,
             headers,
@@ -62,4 +48,3 @@ const handler = async (event, context) => {
     }
 };
 exports.handler = handler;
-//# sourceMappingURL=deliveries.js.map
