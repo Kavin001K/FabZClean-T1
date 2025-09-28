@@ -25,11 +25,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dashboard/metrics", async (req, res) => {
     try {
       // Since getDashboardMetrics doesn't exist in SQLiteStorage, calculate manually
-      const orders = await storage.listOrders();
+      const allOrders = await storage.listOrders();
       const customers = await storage.listCustomers();
       const products = await storage.listProducts();
 
-      const totalRevenue = orders.reduce(
+      const totalRevenue = allOrders.reduce(
         (sum, order) => sum + parseFloat(order.totalAmount || "0"),
         0,
       );
@@ -37,7 +37,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const ordersToday = orders.filter(
+      const ordersToday = allOrders.filter(
         (order) => new Date(order.createdAt) >= today,
       ).length;
 
@@ -45,11 +45,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (customer) => new Date(customer.createdAt) >= today,
       ).length;
 
+      // Calculate due date statistics
+      const currentDate = new Date();
+      const tomorrow = new Date(currentDate.getTime() + (24 * 60 * 60 * 1000));
+      
+      const ordersWithDueDates = allOrders.filter(order => {
+        const pickupDate = order.shippingAddress?.pickupDate;
+        return pickupDate && ['pending', 'processing', 'ready'].includes(order.status);
+      }).map(order => {
+        try {
+          const pickupDate = new Date(order.shippingAddress.pickupDate);
+          const dueDate = new Date(pickupDate.getTime() + (2 * 24 * 60 * 60 * 1000));
+          return { ...order, dueDate: dueDate.toISOString().split('T')[0] };
+        } catch (error) {
+          // Skip orders with invalid pickup dates
+          return null;
+        }
+      }).filter(order => order !== null);
+
+      const todaysDueOrders = ordersWithDueDates.filter(order => {
+        const dueDateStr = order.dueDate;
+        const todayStr = currentDate.toISOString().split('T')[0];
+        return dueDateStr === todayStr;
+      }).length;
+
+      const tomorrowsDueOrders = ordersWithDueDates.filter(order => {
+        const dueDateStr = order.dueDate;
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        return dueDateStr === tomorrowStr;
+      }).length;
+
+      const overdueOrders = ordersWithDueDates.filter(order => {
+        const dueDate = new Date(order.dueDate);
+        return dueDate < currentDate && ['pending', 'processing'].includes(order.status);
+      }).length;
+
       const transformedMetrics = {
         totalRevenue,
         totalOrders: ordersToday,
         newCustomers: newCustomersToday,
         inventoryItems: products.length,
+        dueDateStats: {
+          today: todaysDueOrders,
+          tomorrow: tomorrowsDueOrders,
+          overdue: overdueOrders,
+          upcoming: ordersWithDueDates.length - todaysDueOrders - tomorrowsDueOrders - overdueOrders
+        }
       };
 
       res.json(transformedMetrics);
@@ -90,6 +131,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(info);
     } catch (error) {
       res.status(500).json({ error: (error as Error).message });
+    }
+  });
+
+  // Due date orders endpoint
+  app.get("/api/due-date-orders", async (req, res) => {
+    try {
+      const { type, days } = req.query;
+      
+      let orders;
+      let title;
+      
+      // Get all orders from the database
+      const allOrders = await storage.listOrders();
+      
+      // Add due date logic based on pickup date
+      const ordersWithDueDates = allOrders.map(order => {
+        const pickupDate = order.shippingAddress?.pickupDate;
+        if (pickupDate) {
+          const pickup = new Date(pickupDate);
+          const dueDate = new Date(pickup.getTime() + (2 * 24 * 60 * 60 * 1000)); // 2 days after pickup
+          const estimatedDelivery = new Date(pickup.getTime() + (2 * 24 * 60 * 60 * 1000));
+          
+          return {
+            ...order,
+            pickupDate: pickupDate,
+            dueDate: dueDate.toISOString().split('T')[0],
+            estimatedDelivery: estimatedDelivery.toISOString()
+          };
+        }
+        return {
+          ...order,
+          pickupDate: null,
+          dueDate: null,
+          estimatedDelivery: null
+        };
+      });
+
+      const today = new Date();
+      const tomorrow = new Date(today.getTime() + (24 * 60 * 60 * 1000));
+      
+      switch (type) {
+        case 'today':
+          orders = ordersWithDueDates.filter(order => {
+            if (!order.dueDate) return false;
+            const dueDate = new Date(order.dueDate);
+            const todayStr = today.toISOString().split('T')[0];
+            const dueDateStr = dueDate.toISOString().split('T')[0];
+            return dueDateStr === todayStr && ['pending', 'processing', 'ready'].includes(order.status);
+          });
+          title = "Today's Due Orders";
+          break;
+        case 'tomorrow':
+          orders = ordersWithDueDates.filter(order => {
+            if (!order.dueDate) return false;
+            const dueDate = new Date(order.dueDate);
+            const tomorrowStr = tomorrow.toISOString().split('T')[0];
+            const dueDateStr = dueDate.toISOString().split('T')[0];
+            return dueDateStr === tomorrowStr && ['pending', 'processing', 'ready'].includes(order.status);
+          });
+          title = "Tomorrow's Due Orders";
+          break;
+        case 'overdue':
+          orders = ordersWithDueDates.filter(order => {
+            if (!order.dueDate) return false;
+            const dueDate = new Date(order.dueDate);
+            return dueDate < today && ['pending', 'processing'].includes(order.status);
+          });
+          title = "Overdue Orders";
+          break;
+        case 'upcoming':
+        default:
+          const daysAhead = days ? parseInt(days as string) : 7;
+          const futureDate = new Date(today.getTime() + (daysAhead * 24 * 60 * 60 * 1000));
+          orders = ordersWithDueDates.filter(order => {
+            if (!order.dueDate) return false;
+            const dueDate = new Date(order.dueDate);
+            return dueDate >= today && dueDate <= futureDate && 
+                   ['pending', 'processing', 'ready'].includes(order.status);
+          });
+          title = `Upcoming Orders (Next ${daysAhead} days)`;
+          break;
+      }
+
+      // Add computed fields for better display
+      const enrichedOrders = orders.map(order => {
+        if (!order.dueDate) return order;
+        
+        const dueDate = new Date(order.dueDate);
+        const diffTime = dueDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        let urgency = 'normal';
+        if (diffDays < 0) urgency = 'overdue';
+        else if (diffDays === 0) urgency = 'today';
+        else if (diffDays === 1) urgency = 'tomorrow';
+        else if (diffDays <= 3) urgency = 'urgent';
+        
+        return {
+          ...order,
+          daysUntilDue: diffDays,
+          urgency,
+          isOverdue: diffDays < 0,
+          isToday: diffDays === 0,
+          isTomorrow: diffDays === 1,
+          formattedDueDate: dueDate.toLocaleDateString('en-US', {
+            weekday: 'short',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          }),
+          formattedEstimatedDelivery: order.estimatedDelivery ? new Date(order.estimatedDelivery).toLocaleString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          }) : null
+        };
+      });
+
+      res.json({
+        title,
+        orders: enrichedOrders,
+        count: enrichedOrders.length,
+        summary: {
+          total: enrichedOrders.length,
+          overdue: enrichedOrders.filter(o => o.isOverdue).length,
+          today: enrichedOrders.filter(o => o.isToday).length,
+          tomorrow: enrichedOrders.filter(o => o.isTomorrow).length,
+          urgent: enrichedOrders.filter(o => o.urgency === 'urgent').length
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Due date orders API error:', error);
+      res.status(500).json({ 
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 

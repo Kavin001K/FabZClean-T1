@@ -28,12 +28,15 @@ export default defineConfig({
   },
   server: {
     fs: {
-      strict: true,
-      deny: ["**/.*"],
+      strict: false,
+    },
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin',
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:3002',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },

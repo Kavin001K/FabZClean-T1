@@ -411,6 +411,12 @@ export const analyticsApi = {
     totalOrders: number;
     newCustomers: number;
     inventoryItems: number;
+    dueDateStats?: {
+      today: number;
+      tomorrow: number;
+      overdue: number;
+      upcoming: number;
+    };
   }> {
     try {
       return await fetchData('/dashboard/metrics');
@@ -420,7 +426,13 @@ export const analyticsApi = {
         totalRevenue: 0,
         totalOrders: 0,
         newCustomers: 0,
-        inventoryItems: 0
+        inventoryItems: 0,
+        dueDateStats: {
+          today: 0,
+          tomorrow: 0,
+          overdue: 0,
+          upcoming: 0,
+        }
       };
     }
   }

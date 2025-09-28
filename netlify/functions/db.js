@@ -14,13 +14,20 @@ export const sampleData = {
             paymentStatus: "pending",
             totalAmount: "25.00",
             items: [{ productId: "1", productName: "Dry Cleaning", quantity: 1, price: "25.00" }],
-            shippingAddress: { instructions: "Leave at door", pickupDate: "2024-01-15" },
+            shippingAddress: {
+                instructions: "Leave at door",
+                pickupDate: "2024-01-15",
+                address: "123 Main St, New York, NY 10001"
+            },
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             date: new Date().toISOString(),
             total: 25.00,
             service: "Dry Cleaning",
-            priority: "Normal"
+            priority: "Normal",
+            pickupDate: "2024-01-15",
+            dueDate: "2024-01-17", // 2 days after pickup
+            estimatedDelivery: "2024-01-17T14:00:00Z"
         },
         {
             id: "2",
@@ -28,17 +35,99 @@ export const sampleData = {
             customerName: "Jane Smith",
             customerEmail: "jane@example.com",
             customerPhone: "+1234567891",
-            status: "completed",
+            status: "processing",
             paymentStatus: "paid",
             totalAmount: "45.00",
             items: [{ productId: "2", productName: "Laundry Service", quantity: 2, price: "22.50" }],
-            shippingAddress: { instructions: "Call before delivery", pickupDate: "2024-01-16" },
+            shippingAddress: {
+                instructions: "Call before delivery",
+                pickupDate: "2024-01-16",
+                address: "456 Oak Ave, New York, NY 10002"
+            },
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             date: new Date().toISOString(),
             total: 45.00,
             service: "Laundry Service",
-            priority: "High"
+            priority: "High",
+            pickupDate: "2024-01-16",
+            dueDate: "2024-01-18", // 2 days after pickup
+            estimatedDelivery: "2024-01-18T10:00:00Z"
+        },
+        {
+            id: "3",
+            orderNumber: "ORD-003",
+            customerName: "Mike Johnson",
+            customerEmail: "mike@example.com",
+            customerPhone: "+1234567892",
+            status: "pending",
+            paymentStatus: "pending",
+            totalAmount: "35.00",
+            items: [{ productId: "3", productName: "Express Cleaning", quantity: 1, price: "35.00" }],
+            shippingAddress: {
+                instructions: "Ring doorbell",
+                pickupDate: "2024-01-17",
+                address: "789 Pine St, New York, NY 10003"
+            },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            date: new Date().toISOString(),
+            total: 35.00,
+            service: "Express Cleaning",
+            priority: "Urgent",
+            pickupDate: "2024-01-17",
+            dueDate: "2024-01-18", // 1 day after pickup (express service)
+            estimatedDelivery: "2024-01-18T16:00:00Z"
+        },
+        {
+            id: "4",
+            orderNumber: "ORD-004",
+            customerName: "Sarah Wilson",
+            customerEmail: "sarah@example.com",
+            customerPhone: "+1234567893",
+            status: "ready",
+            paymentStatus: "paid",
+            totalAmount: "28.00",
+            items: [{ productId: "4", productName: "Standard Cleaning", quantity: 1, price: "28.00" }],
+            shippingAddress: {
+                instructions: "Leave with neighbor if not home",
+                pickupDate: "2024-01-14",
+                address: "321 Elm St, New York, NY 10004"
+            },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            date: new Date().toISOString(),
+            total: 28.00,
+            service: "Standard Cleaning",
+            priority: "Normal",
+            pickupDate: "2024-01-14",
+            dueDate: "2024-01-16", // 2 days after pickup
+            estimatedDelivery: "2024-01-16T12:00:00Z"
+        },
+        {
+            id: "5",
+            orderNumber: "ORD-005",
+            customerName: "David Brown",
+            customerEmail: "david@example.com",
+            customerPhone: "+1234567894",
+            status: "pending",
+            paymentStatus: "pending",
+            totalAmount: "42.00",
+            items: [{ productId: "5", productName: "Premium Service", quantity: 1, price: "42.00" }],
+            shippingAddress: {
+                instructions: "Call 30 minutes before delivery",
+                pickupDate: "2024-01-18",
+                address: "654 Maple Ave, New York, NY 10005"
+            },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            date: new Date().toISOString(),
+            total: 42.00,
+            service: "Premium Service",
+            priority: "High",
+            pickupDate: "2024-01-18",
+            dueDate: "2024-01-20", // 2 days after pickup
+            estimatedDelivery: "2024-01-20T15:00:00Z"
         }
     ],
     customers: [
@@ -240,11 +329,13 @@ export const db = {
             //   WHERE created_at >= NOW() - INTERVAL '30 days'
             // `;
             // return metrics[0];
+            const dueDateStats = await this.getDueDateStats();
             return {
                 totalRevenue: 1250.50,
                 totalOrders: 25,
                 newCustomers: 8,
-                inventoryItems: 15
+                inventoryItems: 15,
+                dueDateStats: dueDateStats
             };
         }
         catch (error) {
@@ -253,7 +344,112 @@ export const db = {
                 totalRevenue: 0,
                 totalOrders: 0,
                 newCustomers: 0,
-                inventoryItems: 0
+                inventoryItems: 0,
+                dueDateStats: {
+                    today: 0,
+                    tomorrow: 0,
+                    upcoming: 0,
+                    overdue: 0,
+                    total: 0
+                }
+            };
+        }
+    },
+    // Get orders by due date (upcoming deliveries)
+    async getOrdersByDueDate(daysAhead = 7) {
+        try {
+            // const orders = await sql`
+            //   SELECT * FROM orders 
+            //   WHERE due_date BETWEEN NOW() AND NOW() + INTERVAL '${daysAhead} days'
+            //   AND status IN ('pending', 'processing', 'ready')
+            //   ORDER BY due_date ASC
+            // `;
+            // return orders;
+            const today = new Date();
+            const futureDate = new Date(today.getTime() + (daysAhead * 24 * 60 * 60 * 1000));
+            return sampleData.orders.filter(order => {
+                const dueDate = new Date(order.dueDate);
+                return dueDate >= today && dueDate <= futureDate &&
+                    ['pending', 'processing', 'ready'].includes(order.status);
+            }).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+        }
+        catch (error) {
+            console.error('Error fetching orders by due date:', error);
+            return [];
+        }
+    },
+    // Get overdue orders
+    async getOverdueOrders() {
+        try {
+            // const orders = await sql`
+            //   SELECT * FROM orders 
+            //   WHERE due_date < NOW() AND status IN ('pending', 'processing')
+            //   ORDER BY due_date ASC
+            // `;
+            // return orders;
+            const today = new Date();
+            return sampleData.orders.filter(order => {
+                const dueDate = new Date(order.dueDate);
+                return dueDate < today && ['pending', 'processing'].includes(order.status);
+            }).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+        }
+        catch (error) {
+            console.error('Error fetching overdue orders:', error);
+            return [];
+        }
+    },
+    // Get today's due orders
+    async getTodaysDueOrders() {
+        try {
+            // const orders = await sql`
+            //   SELECT * FROM orders 
+            //   WHERE DATE(due_date) = CURRENT_DATE 
+            //   AND status IN ('pending', 'processing', 'ready')
+            //   ORDER BY estimated_delivery ASC
+            // `;
+            // return orders;
+            const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+            return sampleData.orders.filter(order => {
+                const dueDate = new Date(order.dueDate).toISOString().split('T')[0];
+                return dueDate === today && ['pending', 'processing', 'ready'].includes(order.status);
+            }).sort((a, b) => new Date(a.estimatedDelivery).getTime() - new Date(b.estimatedDelivery).getTime());
+        }
+        catch (error) {
+            console.error('Error fetching today\'s due orders:', error);
+            return [];
+        }
+    },
+    // Get due date statistics
+    async getDueDateStats() {
+        try {
+            const today = new Date();
+            const tomorrow = new Date(today.getTime() + (24 * 60 * 60 * 1000));
+            const weekFromNow = new Date(today.getTime() + (7 * 24 * 60 * 60 * 1000));
+            const todaysOrders = await this.getTodaysDueOrders();
+            const tomorrowsOrders = sampleData.orders.filter(order => {
+                const dueDate = new Date(order.dueDate);
+                const dueDateStr = dueDate.toISOString().split('T')[0];
+                const tomorrowStr = tomorrow.toISOString().split('T')[0];
+                return dueDateStr === tomorrowStr && ['pending', 'processing', 'ready'].includes(order.status);
+            });
+            const upcomingOrders = await this.getOrdersByDueDate(7);
+            const overdueOrders = await this.getOverdueOrders();
+            return {
+                today: todaysOrders.length,
+                tomorrow: tomorrowsOrders.length,
+                upcoming: upcomingOrders.length,
+                overdue: overdueOrders.length,
+                total: sampleData.orders.length
+            };
+        }
+        catch (error) {
+            console.error('Error fetching due date stats:', error);
+            return {
+                today: 0,
+                tomorrow: 0,
+                upcoming: 0,
+                overdue: 0,
+                total: 0
             };
         }
     },

@@ -19,6 +19,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SalesChart from "@/components/dashboard/sales-chart";
 import RecentOrders from "@/components/dashboard/recent-orders";
+import DueTodayOrders from "@/components/dashboard/due-today-orders";
 import KpiCard from "@/components/dashboard/kpi-card";
 import OrderStatusChart from "@/components/dashboard/order-status-chart";
 import ServicePopularityChart from "@/components/dashboard/service-popularity-chart";
@@ -51,6 +52,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
     orderStatusData,
     servicePopularityData,
     recentOrders,
+    dueTodayOrders,
     customers,
     isLoading,
     hasData,
@@ -271,10 +273,10 @@ export default React.memo(function FranchiseOwnerDashboard() {
                 <div key={customer.id} className="flex items-center space-x-2">
                   <Avatar className="h-6 w-6">
                     <AvatarFallback className="text-xs">
-                      {customer.name.split(' ').map(n => n[0]).join('')}
+                      {customer.name ? customer.name.split(' ').map(n => n[0]).join('') : 'N/A'}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-sm">{customer.name}</span>
+                  <span className="text-sm">{customer.name || 'Unknown Customer'}</span>
                   <span className="text-xs text-muted-foreground">
                     {formatCurrency(customer.totalSpent)}
                   </span>
@@ -647,7 +649,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
         />
       </div>
 
-        {/* Recent Orders and Activity */}
+        {/* Recent Orders and Due Today */}
         <div className="grid gap-6 grid-cols-2">
           <RecentOrders 
             orders={recentOrders} 
@@ -655,6 +657,16 @@ export default React.memo(function FranchiseOwnerDashboard() {
             limit={5}
           />
           
+          <DueTodayOrders 
+            orders={dueTodayOrders} 
+            isLoading={isLoading}
+            limit={5}
+            showDateSelector={true}
+          />
+        </div>
+
+        {/* Additional Stats */}
+        <div className="grid gap-6 grid-cols-1">
           {/* Quick Stats Card */}
           <Card>
           <CardHeader>

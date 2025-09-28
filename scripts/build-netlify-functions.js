@@ -16,7 +16,8 @@ const simpleFunctions = [
   'orders-simple.ts',
   'customers-simple.ts', 
   'dashboard-metrics-simple.ts',
-  'test-db.ts'
+  'test-db.ts',
+  'due-date-orders.ts'
 ];
 
 // Clean up old compiled files

@@ -60,6 +60,11 @@
   to = "/.netlify/functions/test-db"
   status = 200
 
+[[redirects]]
+  from = "/api/due-date-orders"
+  to = "/.netlify/functions/due-date-orders"
+  status = 200
+
 # SPA fallback for client-side routing - MUST be last
 # This rule catches all unmatched routes and serves index.html
 # allowing React Router to handle client-side routing

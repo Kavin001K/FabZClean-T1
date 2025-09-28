@@ -20,7 +20,7 @@ export default function CreateOrder() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [selectedService, setSelectedService] = useState("");
-  const [pickupDate, setPickupDate] = useState("");
+  const [pickupDate, setPickupDate] = useState(new Date().toISOString().split('T')[0]);
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [advancePayment, setAdvancePayment] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");

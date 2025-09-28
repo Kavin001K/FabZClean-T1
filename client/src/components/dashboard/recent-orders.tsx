@@ -126,13 +126,16 @@ export default React.memo(function RecentOrders({
               <div className="flex items-center space-x-4">
                 <Avatar className="h-10 w-10">
                   <AvatarFallback className="text-xs">
-                    {order.customerName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    {order.customerName ? 
+                      order.customerName.split(' ').map(n => n[0]).join('').toUpperCase() :
+                      'N/A'
+                    }
                   </AvatarFallback>
                 </Avatar>
                 <div className="space-y-1 min-w-0 flex-1">
                   <div className="flex items-center space-x-3">
                     <p className="text-sm font-medium leading-none truncate">
-                      {order.customerName}
+                      {order.customerName || 'Unknown Customer'}
                     </p>
                     <Badge 
                       variant="outline" 
@@ -146,7 +149,7 @@ export default React.memo(function RecentOrders({
                   </div>
                   <div className="flex items-center space-x-3">
                     <p className="text-xs text-muted-foreground">
-                      #{order.orderNumber || order.id.slice(-8)}
+                      #{order.orderNumber || (order.id ? order.id.slice(-8) : 'N/A')}
                     </p>
                     <span className="text-xs text-muted-foreground">•</span>
                     <p className="text-xs text-muted-foreground">
@@ -154,24 +157,24 @@ export default React.memo(function RecentOrders({
                     </p>
                     <span className="text-xs text-muted-foreground">•</span>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(order.createdAt).toLocaleDateString()}
+                      {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Unknown Date'}
                     </p>
                   </div>
                   <Badge 
                     variant="outline" 
                     className={cn("text-xs border w-fit", getPaymentStatusColor(order.paymentStatus))}
                   >
-                    Payment: {order.paymentStatus}
+                    Payment: {order.paymentStatus || 'Unknown'}
                   </Badge>
                 </div>
               </div>
               <div className="flex items-center space-x-3">
                 <div className="text-right">
                   <div className="font-semibold text-sm">
-                    {formatCurrency(order.total)}
+                    {formatCurrency(order.total || 0)}
                   </div>
                 </div>
-                <Link to={`/orders/${order.id}`}>
+                <Link to={order.id ? `/orders/${order.id}` : '#'}>
                   <Button variant="ghost" size="sm" className="text-xs">
                     <Eye className="h-3 w-3 mr-1" />
                     View

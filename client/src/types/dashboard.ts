@@ -7,6 +7,12 @@ export interface DashboardMetrics {
   averageOrderValue?: number;
   onTimeDelivery?: number;
   customerSatisfaction?: number;
+  dueDateStats?: {
+    today: number;
+    tomorrow: number;
+    overdue: number;
+    upcoming: number;
+  };
 }
 
 export interface SalesData {

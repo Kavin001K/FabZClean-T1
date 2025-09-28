@@ -34,6 +34,7 @@ export const orders = pgTable("orders", {
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   items: jsonb("items").notNull(), // Array of order items
   shippingAddress: jsonb("shipping_address"),
+  pickupDate: timestamp("pickup_date"), // Scheduled pickup date
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

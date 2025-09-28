@@ -31,7 +31,7 @@ export function useDashboard() {
   
   const [quickActionForms, setQuickActionForms] = useState<QuickActionForm>({
     customer: { name: '', phone: '', email: '' },
-    order: { customerName: '', customerPhone: '', service: '', quantity: 1, pickupDate: '' },
+    order: { customerName: '', customerPhone: '', service: '', quantity: 1, pickupDate: new Date().toISOString().split('T')[0] },
     employee: { name: '', phone: '', email: '', position: '', salary: '' },
   });
 
@@ -91,6 +91,21 @@ export function useDashboard() {
     retry: 3,
   });
 
+  // Due today orders - filter from recent orders
+  const dueTodayOrders = useMemo(() => {
+    if (!recentOrders) return [];
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return recentOrders.filter(order => {
+      if (!order.pickupDate) return false;
+      const pickup = new Date(order.pickupDate);
+      pickup.setHours(0, 0, 0, 0);
+      return pickup <= today; // Include overdue and due today
+    });
+  }, [recentOrders]);
+
   const {
     data: customers,
     isLoading: customersLoading,
@@ -108,14 +123,15 @@ export function useDashboard() {
     [metricsLoading, salesLoading, orderStatusLoading, serviceLoading, ordersLoading, customersLoading]
   );
 
-  const error = useMemo(() => 
-    metricsError || salesError || orderStatusError || serviceError || ordersError || customersError,
-    [metricsError, salesError, orderStatusError, serviceError, ordersError, customersError]
-  );
+  const error = useMemo(() => {
+    const errors = [metricsError, salesError, orderStatusError, serviceError, ordersError, customersError];
+    const firstError = errors.find(err => err !== null && err !== undefined);
+    return firstError || null;
+  }, [metricsError, salesError, orderStatusError, serviceError, ordersError, customersError]);
 
   // Enhanced metrics with calculations
   const enhancedMetrics = useMemo((): DashboardMetrics => {
-    if (!dashboardMetrics) {
+    if (!dashboardMetrics || typeof dashboardMetrics !== 'object') {
       return {
         totalRevenue: 0,
         totalOrders: 0,
@@ -124,19 +140,53 @@ export function useDashboard() {
         averageOrderValue: 0,
         onTimeDelivery: 0,
         customerSatisfaction: 0,
+        dueDateStats: {
+          today: 0,
+          tomorrow: 0,
+          overdue: 0,
+          upcoming: 0,
+        },
       };
     }
 
-    const averageOrderValue = dashboardMetrics.totalOrders > 0 
-      ? dashboardMetrics.totalRevenue / dashboardMetrics.totalOrders 
-      : 0;
+    try {
+      const averageOrderValue = (dashboardMetrics.totalOrders && dashboardMetrics.totalOrders > 0) 
+        ? dashboardMetrics.totalRevenue / dashboardMetrics.totalOrders 
+        : 0;
 
-    return {
-      ...dashboardMetrics,
-      averageOrderValue: Math.round(averageOrderValue),
-      onTimeDelivery: 95, // Mock data - would come from delivery tracking
-      customerSatisfaction: 4.2, // Mock data - would come from feedback
-    };
+      return {
+        totalRevenue: dashboardMetrics.totalRevenue || 0,
+        totalOrders: dashboardMetrics.totalOrders || 0,
+        newCustomers: dashboardMetrics.newCustomers || 0,
+        inventoryItems: dashboardMetrics.inventoryItems || 0,
+        averageOrderValue: Math.round(averageOrderValue),
+        onTimeDelivery: 95, // Mock data - would come from delivery tracking
+        customerSatisfaction: 4.2, // Mock data - would come from feedback
+        dueDateStats: dashboardMetrics.dueDateStats || {
+          today: 0,
+          tomorrow: 0,
+          overdue: 0,
+          upcoming: 0,
+        },
+      };
+    } catch (error) {
+      console.error('Error processing dashboard metrics:', error);
+      return {
+        totalRevenue: 0,
+        totalOrders: 0,
+        newCustomers: 0,
+        inventoryItems: 0,
+        averageOrderValue: 0,
+        onTimeDelivery: 0,
+        customerSatisfaction: 0,
+        dueDateStats: {
+          today: 0,
+          tomorrow: 0,
+          overdue: 0,
+          upcoming: 0,
+        },
+      };
+    }
   }, [dashboardMetrics]);
 
   // Processed data with fallbacks
@@ -230,6 +280,7 @@ export function useDashboard() {
     orderStatusData: processedOrderStatusData,
     servicePopularityData: processedServiceData,
     recentOrders: processedRecentOrders,
+    dueTodayOrders: dueTodayOrders || [],
     customers: customers || [],
     
     // Loading states
