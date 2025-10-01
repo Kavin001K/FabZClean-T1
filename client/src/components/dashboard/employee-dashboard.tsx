@@ -61,10 +61,11 @@ export default function EmployeeDashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  const completedTasks = todayTasks.filter(task => task.status === "completed").length;
-  const inProgressTasks = todayTasks.filter(task => task.status === "in-progress").length;
-  const pendingTasks = todayTasks.filter(task => task.status === "pending").length;
-  const totalTasks = todayTasks.length;
+  const safeTasks = todayTasks || [];
+  const completedTasks = safeTasks.filter(task => task.status === "completed").length;
+  const inProgressTasks = safeTasks.filter(task => task.status === "in-progress").length;
+  const pendingTasks = safeTasks.filter(task => task.status === "pending").length;
+  const totalTasks = safeTasks.length;
 
   const getPriorityColor = (priority: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (priority) {
@@ -186,7 +187,7 @@ export default function EmployeeDashboard() {
                     </div>
                   </div>
                   <Badge className={getStatusColor(task.status)}>
-                    {task.status ? task.status.replace("-", " ") : 'Unknown'}
+                    {task.status ? task.status.replace(/-/g, " ") : 'Unknown'}
                   </Badge>
                 </div>
               ))}

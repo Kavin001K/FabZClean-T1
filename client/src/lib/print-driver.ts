@@ -188,22 +188,29 @@ export function convertOrderToInvoiceData(order: any): InvoicePrintData {
   // Parse order items
   let items: InvoicePrintData['items'] = [];
   if (order.items && Array.isArray(order.items)) {
-    items = order.items.map((item: any) => ({
-      name: item.name || item.description || 'Service Item',
-      description: item.description,
-      quantity: item.quantity || 1,
-      unitPrice: item.unitPrice || item.price || 0,
-      total: (item.quantity || 1) * (item.unitPrice || item.price || 0),
-      taxRate: item.taxRate || 0.1 // Default 10% tax
-    }));
+    items = order.items.map((item: any) => {
+      const quantity = parseInt(String(item.quantity)) || 1;
+      const unitPrice = parseFloat(String(item.unitPrice || item.price || 0));
+      const total = quantity * unitPrice;
+
+      return {
+        name: item.name || item.description || 'Service Item',
+        description: item.description,
+        quantity,
+        unitPrice,
+        total,
+        taxRate: parseFloat(String(item.taxRate)) || 0.1 // Default 10% tax
+      };
+    });
   } else {
     // Fallback for orders without structured items
+    const totalAmount = parseFloat(String(order.totalAmount)) || 0;
     items = [{
       name: 'Dry Cleaning Service',
       description: `Order ${order.orderNumber}`,
       quantity: 1,
-      unitPrice: parseFloat(order.totalAmount) || 0,
-      total: parseFloat(order.totalAmount) || 0,
+      unitPrice: totalAmount,
+      total: totalAmount,
       taxRate: 0.1
     }];
   }
@@ -898,13 +905,13 @@ export class PrintDriver {
       doc.text(itemText, margin.left + 2, currentY);
       
       // Quantity
-      doc.text(item.quantity.toString(), margin.left + itemWidth + 2, currentY);
-      
+      doc.text((item.quantity || 0).toString(), margin.left + itemWidth + 2, currentY);
+
       // Unit price
-      doc.text(`₹${item.unitPrice.toFixed(2)}`, margin.left + itemWidth + qtyWidth + 2, currentY);
-      
+      doc.text(`₹${(parseFloat(String(item.unitPrice)) || 0).toFixed(2)}`, margin.left + itemWidth + qtyWidth + 2, currentY);
+
       // Total
-      doc.text(`₹${item.total.toFixed(2)}`, rightMargin - totalWidth + 2, currentY);
+      doc.text(`₹${(parseFloat(String(item.total)) || 0).toFixed(2)}`, rightMargin - totalWidth + 2, currentY);
       
       currentY += 12;
       
@@ -938,24 +945,24 @@ export class PrintDriver {
     doc.setFontSize(template.settings.fontSize);
     doc.setFont(undefined, 'normal');
     doc.text('Subtotal:', totalsX, startY + 10);
-    doc.text(`₹${data.subtotal.toFixed(2)}`, totalsX + 50, startY + 10);
-    
+    doc.text(`₹${(parseFloat(String(data.subtotal)) || 0).toFixed(2)}`, totalsX + 50, startY + 10);
+
     // Discount (if applicable)
     if (data.discount && data.discount > 0) {
       doc.text('Discount:', totalsX, startY + 20);
-      doc.text(`-₹${data.discount.toFixed(2)}`, totalsX + 50, startY + 20);
+      doc.text(`-₹${(parseFloat(String(data.discount)) || 0).toFixed(2)}`, totalsX + 50, startY + 20);
     }
-    
+
     // Tax
     doc.text('Tax:', totalsX, startY + (data.discount ? 30 : 20));
-    doc.text(`₹${data.tax.toFixed(2)}`, totalsX + 50, startY + (data.discount ? 30 : 20));
-    
+    doc.text(`₹${(parseFloat(String(data.tax)) || 0).toFixed(2)}`, totalsX + 50, startY + (data.discount ? 30 : 20));
+
     // Total
     doc.setFont(undefined, 'bold');
     doc.setFontSize(template.settings.fontSize + 1);
     const totalY = startY + (data.discount ? 45 : 35);
     doc.text('Total:', totalsX, totalY);
-    doc.text(`₹${data.total.toFixed(2)}`, totalsX + 50, totalY);
+    doc.text(`₹${(parseFloat(String(data.total)) || 0).toFixed(2)}`, totalsX + 50, totalY);
     
     // Payment information
     if (data.paymentMethod || data.paymentStatus) {
@@ -991,29 +998,29 @@ export class PrintDriver {
 
   private addReceiptItems(doc: jsPDF, template: PrintTemplate, data: InvoicePrintData): void {
     const { margin } = template.settings;
-    
+
     doc.setFontSize(template.settings.fontSize);
     doc.setFont(undefined, 'normal');
-    
+
     data.items.forEach((item, index) => {
       const y = margin.top + 90 + (index * 15);
       doc.text(`${item.name}`, margin.left, y);
-      doc.text(`Qty: ${item.quantity} x $${item.price.toFixed(2)} = $${item.total.toFixed(2)}`, margin.left, y + 8);
+      doc.text(`Qty: ${item.quantity} x ₹${(item.unitPrice || 0).toFixed(2)} = ₹${(item.total || 0).toFixed(2)}`, margin.left, y + 8);
     });
   }
 
   private addReceiptTotals(doc: jsPDF, template: PrintTemplate, data: InvoicePrintData): void {
     const { margin } = template.settings;
-    
+
     const startY = margin.top + 90 + (data.items.length * 15) + 20;
-    
+
     doc.setFontSize(template.settings.fontSize);
     doc.setFont(undefined, 'normal');
-    doc.text(`Subtotal: $${data.subtotal.toFixed(2)}`, margin.left, startY);
-    doc.text(`Tax: $${data.tax.toFixed(2)}`, margin.left, startY + 10);
+    doc.text(`Subtotal: ₹${(parseFloat(String(data.subtotal)) || 0).toFixed(2)}`, margin.left, startY);
+    doc.text(`Tax: ₹${(parseFloat(String(data.tax)) || 0).toFixed(2)}`, margin.left, startY + 10);
     doc.setFont(undefined, 'bold');
-    doc.text(`Total: $${data.total.toFixed(2)}`, margin.left, startY + 20);
-    
+    doc.text(`Total: ₹${(parseFloat(String(data.total)) || 0).toFixed(2)}`, margin.left, startY + 20);
+
     if (data.paymentMethod) {
       doc.setFont(undefined, 'normal');
       doc.text(`Payment: ${data.paymentMethod}`, margin.left, startY + 30);
@@ -1203,13 +1210,13 @@ export class PrintDriver {
         xPosition = margin.left;
         pdf.text(item.description, xPosition + 2, yPosition + 5);
         xPosition += colWidths[0];
-        pdf.text(item.quantity.toString(), xPosition + 2, yPosition + 5);
+        pdf.text((item.quantity || 0).toString(), xPosition + 2, yPosition + 5);
         xPosition += colWidths[1];
-        pdf.text(`₹${item.unitPrice.toFixed(2)}`, xPosition + 2, yPosition + 5);
+        pdf.text(`₹${(parseFloat(String(item.unitPrice)) || 0).toFixed(2)}`, xPosition + 2, yPosition + 5);
         xPosition += colWidths[2];
-        pdf.text(`${(item.taxRate || 0)}%`, xPosition + 2, yPosition + 5);
+        pdf.text(`${(parseFloat(String(item.taxRate)) || 0)}%`, xPosition + 2, yPosition + 5);
         xPosition += colWidths[3];
-        pdf.text(`₹${item.total.toFixed(2)}`, xPosition + 2, yPosition + 5);
+        pdf.text(`₹${(parseFloat(String(item.total)) || 0).toFixed(2)}`, xPosition + 2, yPosition + 5);
         
         yPosition += 8;
       });
@@ -1223,17 +1230,17 @@ export class PrintDriver {
     pdf.setFont(template.settings.fontFamily, 'normal');
     
     pdf.text('Subtotal:', totalsX, yPosition);
-    pdf.text(`₹${data.subtotal.toFixed(2)}`, totalsX + 40, yPosition);
+    pdf.text(`₹${(parseFloat(String(data.subtotal)) || 0).toFixed(2)}`, totalsX + 40, yPosition);
     yPosition += 6;
-    
+
     pdf.text('Tax:', totalsX, yPosition);
-    pdf.text(`₹${data.taxAmount.toFixed(2)}`, totalsX + 40, yPosition);
+    pdf.text(`₹${(parseFloat(String(data.taxAmount)) || 0).toFixed(2)}`, totalsX + 40, yPosition);
     yPosition += 6;
-    
+
     pdf.setFont(template.settings.fontFamily, 'bold');
     pdf.setFontSize(12);
     pdf.text('Total:', totalsX, yPosition);
-    pdf.text(`₹${data.total.toFixed(2)}`, totalsX + 40, yPosition);
+    pdf.text(`₹${(parseFloat(String(data.total)) || 0).toFixed(2)}`, totalsX + 40, yPosition);
     yPosition += 15;
 
     // Payment Terms

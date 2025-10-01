@@ -1,6 +1,23 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusCircle } from 'lucide-react';
+import { safeParseFloat } from '@/lib/safe-utils';
+import {
+  PlusCircle,
+  Download,
+  Printer,
+  Star,
+  Clock,
+  TrendingUp,
+  Package,
+  ShoppingCart,
+  Filter,
+  Search,
+  Grid3x3,
+  List,
+  CheckCircle,
+  XCircle,
+  Sparkles
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 import { Button } from '@/components/ui/button';
@@ -11,27 +28,72 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-
-// Import child components
-import { ServiceKPIs } from '@/components/services/service-kpis';
-import { ServiceAccordion } from '@/components/services/service-accordion';
-import { ServiceSearchFilter } from '@/components/services/service-search-filter';
-import { ServiceDialogs } from '@/components/services/service-dialogs';
-
-// Import hooks
-import { useServiceKPIs } from '@/hooks/use-service-kpis';
-import { useServiceFilters } from '@/hooks/use-service-filters';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 // Import data service and types
 import { servicesApi } from '@/lib/data-service';
 import type { Service } from '../../shared/schema';
+import { EnhancedPDFExport, exportServicesEnhanced } from '@/lib/enhanced-pdf-export';
+
+// Service icon mapping
+const getServiceIcon = (category: string) => {
+  const icons: Record<string, typeof Package> = {
+    'Cleaning': Sparkles,
+    'Maintenance': Package,
+    'Repair': Package,
+    'Installation': Package,
+    'default': Package
+  };
+  return icons[category] || icons.default;
+};
+
+// Format currency
+const formatCurrency = (amount: string | number) => {
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(num);
+};
 
 export default function Services() {
   // State for dialog management
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
+
+  // UI State
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'price' | 'popular'>('name');
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -45,28 +107,69 @@ export default function Services() {
   } = useQuery({
     queryKey: ['services'],
     queryFn: servicesApi.getAll,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000,
     retry: 3,
     retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
-  // Fetch service KPIs
-  const {
-    data: kpiData,
-    isLoading: kpisLoading,
-    isError: kpisError,
-  } = useServiceKPIs();
+  // Get unique categories from services
+  const categories = useMemo(() => {
+    const cats = new Set(services.map(s => s.category));
+    return ['all', ...Array.from(cats)];
+  }, [services]);
 
-  // Service filtering and search
-  const {
-    searchQuery,
-    setSearchQuery,
-    activeFilters,
-    setActiveFilters,
-    filteredServices,
-    clearFilters,
-  } = useServiceFilters(services);
+  // Filter and sort services
+  const filteredServices = useMemo(() => {
+    let filtered = [...services];
+
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter(service =>
+        service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        service.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        service.category.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Category filter
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(service => service.category === selectedCategory);
+    }
+
+    // Status filter
+    if (selectedStatus !== 'all') {
+      filtered = filtered.filter(service => service.status === selectedStatus);
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      if (sortBy === 'name') {
+        return a.name.localeCompare(b.name);
+      } else if (sortBy === 'price') {
+        return parseFloat(a.price) - parseFloat(b.price);
+      }
+      return 0;
+    });
+
+    return filtered;
+  }, [services, searchQuery, selectedCategory, selectedStatus, sortBy]);
+
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const totalServices = services.length;
+    const activeServices = services.filter(s => s.status === 'Active').length;
+    const totalRevenue = services.length > 0
+      ? services.reduce((sum, s) => sum + safeParseFloat(s.price), 0)
+      : 0;
+    const avgPrice = totalServices > 0 ? totalRevenue / totalServices : 0;
+
+    return {
+      totalServices,
+      activeServices,
+      totalRevenue,
+      avgPrice,
+    };
+  }, [services]);
 
   // Service creation mutation
   const createServiceMutation = useMutation({
@@ -75,16 +178,11 @@ export default function Services() {
     },
     onSuccess: (newService) => {
       if (newService) {
-        // Invalidate queries to refetch data
         queryClient.invalidateQueries({ queryKey: ["services"] });
-        queryClient.invalidateQueries({ queryKey: ["service-kpis"] });
-        queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
-        
         toast({
           title: "Service Created Successfully",
           description: `Service ${newService.name} has been added to the catalog.`,
         });
-
         setIsCreateDialogOpen(false);
       }
     },
@@ -98,47 +196,14 @@ export default function Services() {
     },
   });
 
-  // Service edit mutation
-  const editServiceMutation = useMutation({
-    mutationFn: async ({ serviceId, serviceData }: { serviceId: string; serviceData: Partial<Service> }) => {
-      return await servicesApi.update(serviceId, serviceData);
-    },
-    onSuccess: (updatedService) => {
-      if (updatedService) {
-        // Invalidate queries to refetch data
-        queryClient.invalidateQueries({ queryKey: ["services"] });
-        queryClient.invalidateQueries({ queryKey: ["service-kpis"] });
-        
-        toast({
-          title: "Service Updated Successfully",
-          description: `Service ${updatedService.name} has been updated.`,
-        });
-
-        setIsEditDialogOpen(false);
-        setSelectedService(null);
-      }
-    },
-    onError: (error) => {
-      console.error('Failed to update service:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update service. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
   // Service delete mutation
   const deleteServiceMutation = useMutation({
     mutationFn: async (serviceId: string) => {
       return await servicesApi.delete(serviceId);
     },
-    onSuccess: (success, serviceId) => {
+    onSuccess: (success) => {
       if (success) {
-        // Invalidate queries to refetch data
         queryClient.invalidateQueries({ queryKey: ["services"] });
-        queryClient.invalidateQueries({ queryKey: ["service-kpis"] });
-        
         toast({
           title: "Service Deleted Successfully",
           description: "Service has been removed from the catalog.",
@@ -156,70 +221,82 @@ export default function Services() {
   });
 
   // Handler functions
-  const handleEditService = (service: Service) => {
+  const handleAddToOrder = (service: Service) => {
     setSelectedService(service);
-    setIsEditDialogOpen(true);
+    setIsOrderDialogOpen(true);
   };
 
-  const handleDeleteService = (serviceId: string) => {
-    deleteServiceMutation.mutate(serviceId);
-  };
+  const handleExportPDF = () => {
+    exportServicesEnhanced(filteredServices);
 
-  const handleCreateService = (serviceData: Partial<Service>) => {
-    createServiceMutation.mutate(serviceData);
-  };
-
-  const handleUpdateService = (serviceData: Partial<Service>) => {
-    if (!selectedService) return;
-    editServiceMutation.mutate({
-      serviceId: selectedService.id,
-      serviceData,
+    toast({
+      title: "PDF Downloaded",
+      description: "Service catalog has been exported successfully.",
     });
   };
 
-  const handleAddProduct = useCallback((serviceId: string) => {
-    // In a real app, this would open a product dialog
-    toast({
-      title: "Add Product",
-      description: `Adding product to service ${serviceId}. This feature will be implemented with the products API.`,
-    });
-  }, [toast]);
+  const handlePrintPriceList = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
 
-  const handleEditProduct = useCallback((serviceId: string, productId: string) => {
-    // In a real app, this would open a product edit dialog
-    toast({
-      title: "Edit Product",
-      description: `Editing product ${productId} in service ${serviceId}. This feature will be implemented with the products API.`,
-    });
-  }, [toast]);
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Service Price List</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #84cc16; border-bottom: 3px solid #84cc16; padding-bottom: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+          th { background-color: #84cc16; color: white; font-weight: bold; }
+          tr:nth-child(even) { background-color: #f9f9f9; }
+          .footer { margin-top: 30px; text-align: center; color: #666; }
+          @media print { body { margin: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>Service Price List</h1>
+        <p>Generated on: ${new Date().toLocaleString()}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Service Name</th>
+              <th>Category</th>
+              <th>Duration</th>
+              <th>Price</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${services.map(service => `
+              <tr>
+                <td><strong>${service.name}</strong></td>
+                <td>${service.category}</td>
+                <td>${service.duration}</td>
+                <td><strong>${formatCurrency(service.price)}</strong></td>
+                <td>${service.status}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="footer">
+          <p>Total Services: ${services.length} | Generated: ${new Date().toLocaleDateString()}</p>
+        </div>
+      </body>
+      </html>
+    `;
 
-  const handleDeleteProduct = useCallback((serviceId: string, productId: string) => {
-    // In a real app, this would delete the product
-    toast({
-      title: "Delete Product",
-      description: `Deleting product ${productId} from service ${serviceId}. This feature will be implemented with the products API.`,
-    });
-  }, [toast]);
-
-  const handleExportCSV = useCallback(() => {
-    // In a real app, this would export services to CSV
-    toast({
-      title: "Export CSV",
-      description: "Exporting services to CSV. This feature will be implemented with export utilities.",
-    });
-  }, [toast]);
-
-  const handleExportPDF = useCallback(() => {
-    // In a real app, this would export services to PDF
-    toast({
-      title: "Export PDF",
-      description: "Exporting services to PDF. This feature will be implemented with export utilities.",
-    });
-  }, [toast]);
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  };
 
   // Error state
   if (servicesError) {
-  return (
+    return (
       <div className="flex flex-1 items-center justify-center p-8">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
@@ -230,98 +307,591 @@ export default function Services() {
               <p className="text-sm text-muted-foreground">
                 {servicesErrorDetails?.message || 'An unexpected error occurred'}
               </p>
-              <Button 
+              <Button
                 onClick={() => queryClient.invalidateQueries({ queryKey: ['services'] })}
                 variant="outline"
               >
                 Try Again
               </Button>
             </div>
-                    </CardContent>
-                </Card>
-        </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <div className="flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-      {/* KPI Cards */}
-      <ServiceKPIs 
-        data={kpiData} 
-        isLoading={kpisLoading} 
-        isError={kpisError} 
-      />
+    <div className="flex-1 space-y-6 p-4 sm:px-6 sm:py-6 md:gap-8">
+      {/* Header Section */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Service Catalog</h1>
+          <p className="text-muted-foreground">
+            Browse and manage your premium service offerings
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePrintPriceList}
+          >
+            <Printer className="h-4 w-4 mr-2" />
+            Print Price List
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPDF}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export Catalog
+          </Button>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Add Service
+          </Button>
+        </div>
+      </div>
 
-      {/* Main Service Management Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Service Management</CardTitle>
-                <CardDescription>
-                Manage your services, add products, and track service performance.
-                </CardDescription>
+      {/* Statistics Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="border-l-4 border-l-lime-500">
+          <CardHeader className="pb-3">
+            <CardDescription>Total Services</CardDescription>
+            <CardTitle className="text-3xl">{stats.totalServices}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center text-sm text-muted-foreground">
+              <Package className="h-4 w-4 mr-1" />
+              Complete catalog
             </div>
-            <Button 
-              onClick={() => setIsCreateDialogOpen(true)}
-              className="gap-2"
-            >
-              <PlusCircle className="h-4 w-4" />
-                            Add Service
-                        </Button>
-          </div>
-        </CardHeader>
-        
-        <CardContent>
-          {/* Search and Filter Controls */}
-          <div className="mb-6">
-            <ServiceSearchFilter
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              activeFilters={activeFilters}
-              onFilterChange={setActiveFilters}
-              onExportCSV={handleExportCSV}
-              onExportPDF={handleExportPDF}
-              services={services}
-              filteredCount={filteredServices.length}
-            />
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-green-500">
+          <CardHeader className="pb-3">
+            <CardDescription>Active Services</CardDescription>
+            <CardTitle className="text-3xl text-green-600">{stats.activeServices}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center text-sm text-muted-foreground">
+              <CheckCircle className="h-4 w-4 mr-1" />
+              Ready to book
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-blue-500">
+          <CardHeader className="pb-3">
+            <CardDescription>Average Price</CardDescription>
+            <CardTitle className="text-3xl">{formatCurrency(stats.avgPrice)}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center text-sm text-muted-foreground">
+              <TrendingUp className="h-4 w-4 mr-1" />
+              Per service
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-orange-500">
+          <CardHeader className="pb-3">
+            <CardDescription>Categories</CardDescription>
+            <CardTitle className="text-3xl">{categories.length - 1}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center text-sm text-muted-foreground">
+              <Filter className="h-4 w-4 mr-1" />
+              Service types
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search and Filter Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search services by name, description, or category..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat === 'all' ? 'All Categories' : cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="price">Price</SelectItem>
+                  <SelectItem value="popular">Popular</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <div className="flex border rounded-md">
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                  className="rounded-r-none"
+                >
+                  <Grid3x3 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="rounded-l-none"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
 
-          {/* Services Accordion */}
-          <ServiceAccordion
-            services={filteredServices}
-            isLoading={servicesLoading}
-            onEditService={handleEditService}
-            onDeleteService={handleDeleteService}
-            onAddProduct={handleAddProduct}
-            onEditProduct={handleEditProduct}
-            onDeleteProduct={handleDeleteProduct}
-            isDeleting={deleteServiceMutation.isPending}
-          />
-          </CardContent>
+          {(searchQuery || selectedCategory !== 'all' || selectedStatus !== 'all') && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Showing {filteredServices.length} of {services.length} services</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('all');
+                  setSelectedStatus('all');
+                }}
+              >
+                Clear filters
+              </Button>
+            </div>
+          )}
+        </CardContent>
       </Card>
 
-      {/* Service Dialogs */}
-      <ServiceDialogs
-        selectedService={selectedService}
-        isEditDialogOpen={isEditDialogOpen}
-        isCreateDialogOpen={isCreateDialogOpen}
-        isProductDialogOpen={isProductDialogOpen}
-        isCreating={createServiceMutation.isPending}
-        isUpdating={editServiceMutation.isPending}
-        onCloseEditDialog={() => setIsEditDialogOpen(false)}
-        onCloseCreateDialog={() => setIsCreateDialogOpen(false)}
-        onCloseProductDialog={() => setIsProductDialogOpen(false)}
-        onEditService={handleUpdateService}
-        onCreateService={handleCreateService}
-        onCreateProduct={() => {
-          // This would handle product creation
-          toast({
-            title: "Create Product",
-            description: "Product creation will be implemented with the products API.",
-          });
+      {/* Service Cards Grid/List */}
+      {servicesLoading ? (
+        <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-4">
+          {[...Array(8)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-20 bg-gray-200 rounded"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : filteredServices.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-12">
+              <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No services found</h3>
+              <p className="text-muted-foreground mb-4">
+                Try adjusting your filters or add a new service
+              </p>
+              <Button onClick={() => setIsCreateDialogOpen(true)}>
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Add Service
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : viewMode === 'grid' ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filteredServices.map((service) => {
+            const ServiceIcon = getServiceIcon(service.category);
+            const isPopular = parseFloat(service.price) > stats.avgPrice;
+
+            return (
+              <Card
+                key={service.id}
+                className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
+              >
+                {isPopular && (
+                  <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-500 to-amber-400 text-white px-3 py-1 rounded-bl-lg text-xs font-semibold flex items-center gap-1">
+                    <Star className="h-3 w-3 fill-current" />
+                    Popular
+                  </div>
+                )}
+
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="p-3 rounded-lg bg-lime-100 text-lime-600 group-hover:bg-lime-500 group-hover:text-white transition-colors">
+                      <ServiceIcon className="h-6 w-6" />
+                    </div>
+                    <Badge
+                      variant={service.status === 'Active' ? 'default' : 'secondary'}
+                      className={service.status === 'Active' ? 'bg-green-500' : ''}
+                    >
+                      {service.status === 'Active' ? (
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                      ) : (
+                        <XCircle className="h-3 w-3 mr-1" />
+                      )}
+                      {service.status}
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-xl mt-3">{service.name}</CardTitle>
+                  <Badge variant="outline" className="w-fit">
+                    {service.category}
+                  </Badge>
+                </CardHeader>
+
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground line-clamp-2 min-h-[40px]">
+                    {service.description || 'Professional service with quality guarantee'}
+                  </p>
+
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>{service.duration}</span>
+                  </div>
+
+                  <div className="pt-3 border-t">
+                    <div className="flex items-end justify-between mb-3">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Service Price</p>
+                        <p className="text-2xl font-bold text-lime-600">
+                          {formatCurrency(service.price)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button
+                      className="w-full group-hover:bg-lime-600"
+                      onClick={() => handleAddToOrder(service)}
+                      disabled={service.status !== 'Active'}
+                    >
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Add to Order
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredServices.map((service) => {
+            const ServiceIcon = getServiceIcon(service.category);
+            const isPopular = parseFloat(service.price) > stats.avgPrice;
+
+            return (
+              <Card
+                key={service.id}
+                className="hover:shadow-md transition-shadow"
+              >
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-6">
+                    <div className="p-4 rounded-lg bg-lime-100 text-lime-600">
+                      <ServiceIcon className="h-8 w-8" />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-xl font-semibold">{service.name}</h3>
+                        {isPopular && (
+                          <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+                            <Star className="h-3 w-3 mr-1 fill-current" />
+                            Popular
+                          </Badge>
+                        )}
+                        <Badge variant="outline">{service.category}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground line-clamp-1">
+                        {service.description || 'Professional service with quality guarantee'}
+                      </p>
+                      <div className="flex items-center gap-4 mt-2">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          {service.duration}
+                        </div>
+                        <Badge
+                          variant={service.status === 'Active' ? 'default' : 'secondary'}
+                          className={service.status === 'Active' ? 'bg-green-500' : ''}
+                        >
+                          {service.status}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground mb-1">Service Price</p>
+                      <p className="text-3xl font-bold text-lime-600">
+                        {formatCurrency(service.price)}
+                      </p>
+                    </div>
+
+                    <Button
+                      onClick={() => handleAddToOrder(service)}
+                      disabled={service.status !== 'Active'}
+                      className="whitespace-nowrap"
+                    >
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Add to Order
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create Service Dialog */}
+      <CreateServiceDialog
+        open={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onSubmit={(data) => createServiceMutation.mutate(data)}
+        isLoading={createServiceMutation.isPending}
+      />
+
+      {/* Add to Order Dialog */}
+      <AddToOrderDialog
+        open={isOrderDialogOpen}
+        onClose={() => {
+          setIsOrderDialogOpen(false);
+          setSelectedService(null);
         }}
+        service={selectedService}
       />
     </div>
+  );
+}
+
+// Create Service Dialog Component
+function CreateServiceDialog({
+  open,
+  onClose,
+  onSubmit,
+  isLoading
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (data: Partial<Service>) => void;
+  isLoading: boolean;
+}) {
+  const [formData, setFormData] = useState({
+    name: '',
+    category: '',
+    description: '',
+    price: '',
+    duration: '',
+    status: 'Active' as const,
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
+    setFormData({
+      name: '',
+      category: '',
+      description: '',
+      price: '',
+      duration: '',
+      status: 'Active',
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Add New Service</DialogTitle>
+          <DialogDescription>
+            Create a new service in your catalog
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Service Name</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Deep Cleaning Service"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <Input
+                id="category"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                placeholder="e.g., Cleaning"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Describe your service..."
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="price">Price (₹)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="duration">Duration</Label>
+                <Input
+                  id="duration"
+                  value={formData.duration}
+                  onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                  placeholder="e.g., 2 hours"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(v) => setFormData({ ...formData, status: v as 'Active' | 'Inactive' })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? 'Creating...' : 'Create Service'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Add to Order Dialog Component
+function AddToOrderDialog({
+  open,
+  onClose,
+  service
+}: {
+  open: boolean;
+  onClose: () => void;
+  service: Service | null;
+}) {
+  const { toast } = useToast();
+
+  if (!service) return null;
+
+  const handleAddToOrder = () => {
+    toast({
+      title: "Added to Order",
+      description: `${service.name} has been added to your order.`,
+    });
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add Service to Order</DialogTitle>
+          <DialogDescription>
+            Review service details before adding to order
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div>
+            <h3 className="font-semibold text-lg">{service.name}</h3>
+            <Badge variant="outline" className="mt-1">{service.category}</Badge>
+          </div>
+
+          {service.description && (
+            <p className="text-sm text-muted-foreground">{service.description}</p>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Duration</p>
+              <p className="font-medium">{service.duration}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Price</p>
+              <p className="text-xl font-bold text-lime-600">
+                {formatCurrency(service.price)}
+              </p>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleAddToOrder}>
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            Confirm & Add
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

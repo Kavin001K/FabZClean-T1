@@ -61,12 +61,12 @@ app.use((req, res, next) => {
 
   // Initialize database connection
   try {
-    //await initializeDatabase();
-    console.log("using sqlite ");
-    log("✅ Database connection established");
+    await initializeDatabase();
+    log("✅ SQLite database initialized and connected");
   } catch (error: any) {
-    log("❌ Database connection failed:", error);
-    process.exit(1);
+    log("❌ Database initialization failed:", error);
+    // Don't exit - allow app to start even if DB init fails
+    log("⚠️  Continuing without database initialization...");
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT

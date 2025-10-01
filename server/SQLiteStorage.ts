@@ -164,6 +164,15 @@ export class SQLiteStorage implements IStorage {
         updatedAt TEXT
       );
 
+      CREATE TABLE IF NOT EXISTS settings (
+        id TEXT PRIMARY KEY,
+        key TEXT UNIQUE NOT NULL,
+        value TEXT NOT NULL,
+        category TEXT NOT NULL,
+        updatedAt TEXT,
+        updatedBy TEXT
+      );
+
       -- Create indexes for better performance
       CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customerId);
       CREATE INDEX IF NOT EXISTS idx_deliveries_order ON deliveries(orderId);
@@ -174,6 +183,8 @@ export class SQLiteStorage implements IStorage {
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_employees_email ON employees(email);
       CREATE INDEX IF NOT EXISTS idx_barcodes_entity ON barcodes(entityType, entityId);
+      CREATE INDEX IF NOT EXISTS idx_settings_key ON settings(key);
+      CREATE INDEX IF NOT EXISTS idx_settings_category ON settings(category);
     `);
   }
 
@@ -970,6 +981,111 @@ export class SQLiteStorage implements IStorage {
       createdAt: new Date(row.createdAt),
       updatedAt: new Date(row.updatedAt),
     }));
+  }
+
+  // ======= SETTINGS =======
+  async getAllSettings(): Promise<any[]> {
+    const rows = this.db
+      .prepare("SELECT * FROM settings ORDER BY category, key")
+      .all() as any[];
+
+    return rows.map((row) => ({
+      ...row,
+      value: JSON.parse(row.value),
+      updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+    }));
+  }
+
+  async getSettingsByCategory(category: string): Promise<any[]> {
+    const rows = this.db
+      .prepare("SELECT * FROM settings WHERE category = ? ORDER BY key")
+      .all(category) as any[];
+
+    return rows.map((row) => ({
+      ...row,
+      value: JSON.parse(row.value),
+      updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+    }));
+  }
+
+  async getSetting(key: string): Promise<any | null> {
+    const row = this.db
+      .prepare("SELECT * FROM settings WHERE key = ?")
+      .get(key) as any;
+
+    if (!row) return null;
+
+    return {
+      ...row,
+      value: JSON.parse(row.value),
+      updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+    };
+  }
+
+  async updateSetting(
+    key: string,
+    value: any,
+    category: string,
+    updatedBy?: string
+  ): Promise<any> {
+    const now = new Date().toISOString();
+    const existingSetting = await this.getSetting(key);
+
+    if (existingSetting) {
+      this.db
+        .prepare(
+          `UPDATE settings
+           SET value = ?, updatedAt = ?, updatedBy = ?
+           WHERE key = ?`
+        )
+        .run(JSON.stringify(value), now, updatedBy || "system", key);
+    } else {
+      const id = randomUUID();
+      this.db
+        .prepare(
+          `INSERT INTO settings (id, key, value, category, updatedAt, updatedBy)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        )
+        .run(id, key, JSON.stringify(value), category, now, updatedBy || "system");
+    }
+
+    return this.getSetting(key);
+  }
+
+  async updateSettings(settings: Array<{ key: string; value: any; category: string }>, updatedBy?: string): Promise<any[]> {
+    const now = new Date().toISOString();
+
+    for (const setting of settings) {
+      const existingSetting = await this.getSetting(setting.key);
+
+      if (existingSetting) {
+        this.db
+          .prepare(
+            `UPDATE settings
+             SET value = ?, updatedAt = ?, updatedBy = ?
+             WHERE key = ?`
+          )
+          .run(JSON.stringify(setting.value), now, updatedBy || "system", setting.key);
+      } else {
+        const id = randomUUID();
+        this.db
+          .prepare(
+            `INSERT INTO settings (id, key, value, category, updatedAt, updatedBy)
+             VALUES (?, ?, ?, ?, ?, ?)`
+          )
+          .run(id, setting.key, JSON.stringify(setting.value), setting.category, now, updatedBy || "system");
+      }
+    }
+
+    return this.getAllSettings();
+  }
+
+  async deleteSetting(key: string): Promise<void> {
+    this.db.prepare("DELETE FROM settings WHERE key = ?").run(key);
+  }
+
+  async deleteAllSettings(): Promise<void> {
+    this.db.prepare("DELETE FROM settings").run();
   }
 
   // Close database connection

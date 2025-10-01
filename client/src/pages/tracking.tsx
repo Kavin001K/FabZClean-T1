@@ -10,16 +10,17 @@ import BarcodeScanner from "@/components/barcode-scanner";
 import BarcodeDisplay from "@/components/barcode-display";
 import PrintManager from "@/components/print-manager";
 import { LiveTrackingMap } from "@/components/live-tracking-map";
-import { 
-  Search, 
-  Filter, 
-  Plus, 
-  Truck, 
-  Package, 
-  QrCode, 
-  Printer, 
-  CheckCircle, 
-  Clock, 
+import { safeFormatDate } from "@/lib/safe-utils";
+import {
+  Search,
+  Filter,
+  Plus,
+  Truck,
+  Package,
+  QrCode,
+  Printer,
+  CheckCircle,
+  Clock,
   AlertTriangle,
   MapPin,
   User,
@@ -452,16 +453,16 @@ export default function Tracking() {
               ) : (
                 shipments?.map((shipment) => (
                 <TableRow key={shipment.id}>
-                  <TableCell className="font-mono font-medium">{shipment.shipmentNumber}</TableCell>
-                  <TableCell>{shipment.carrier}</TableCell>
+                  <TableCell className="font-mono font-medium">{shipment.shipmentNumber || 'N/A'}</TableCell>
+                  <TableCell>{shipment.carrier || 'N/A'}</TableCell>
                   <TableCell>{shipment.trackingNumber || 'N/A'}</TableCell>
                   <TableCell>{Array.isArray(shipment.orderIds) ? shipment.orderIds.length : 0}</TableCell>
                   <TableCell>
-                    <Badge className={getShipmentStatusColor(shipment.status)}>
-                      {getShipmentStatusText(shipment.status)}
+                    <Badge className={getShipmentStatusColor(shipment.status || 'unknown')}>
+                      {getShipmentStatusText(shipment.status || 'unknown')}
                     </Badge>
                   </TableCell>
-                  <TableCell>{new Date(shipment.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell>{safeFormatDate(shipment.createdAt)}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm">
@@ -541,7 +542,7 @@ export default function Tracking() {
                   <TableCell>{order.customerName}</TableCell>
                   <TableCell>{order.phoneNumber}</TableCell>
                   <TableCell className="max-w-xs truncate">{order.address}</TableCell>
-                  <TableCell>{Array.isArray(order.items) ? order.items.length : 0} items</TableCell>
+                  <TableCell>{order.items?.length ?? 0} items</TableCell>
                   <TableCell className="font-medium">₹{order.totalAmount}</TableCell>
                   <TableCell>
                     <Badge className={getStatusColor(order.status)}>

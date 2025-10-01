@@ -19,6 +19,7 @@ import { realtimeServer } from "./websocket-server";
 import { pricingEngine } from "./pricing-engine";
 import { loyaltyProgram } from "./loyalty-program";
 import { driverTrackingService } from "./driver-tracking";
+import { settingsService } from "./services/settings-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard metrics
@@ -891,6 +892,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add remaining endpoints here following the same pattern...
+
+  // Settings API endpoints
+  // Get all settings
+  app.get("/api/settings", async (req, res) => {
+    try {
+      const settings = await settingsService.getAllSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+      res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+
+  // Get settings by category
+  app.get("/api/settings/category/:category", async (req, res) => {
+    try {
+      const { category } = req.params;
+      const settings = await settingsService.getSettingsByCategory(category);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching settings by category:", error);
+      res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+
+  // Get single setting by key
+  app.get("/api/settings/:key", async (req, res) => {
+    try {
+      const { key } = req.params;
+      const setting = await settingsService.getSetting(key);
+      if (!setting) {
+        return res.status(404).json({ message: "Setting not found" });
+      }
+      res.json(setting);
+    } catch (error) {
+      console.error("Error fetching setting:", error);
+      res.status(500).json({ message: "Failed to fetch setting" });
+    }
+  });
+
+  // Update single setting
+  app.put("/api/settings/:key", async (req, res) => {
+    try {
+      const { key } = req.params;
+      const { value, category } = req.body;
+      const updatedSetting = await settingsService.updateSetting(
+        key,
+        value,
+        category,
+        "user"
+      );
+      res.json(updatedSetting);
+    } catch (error: any) {
+      console.error("Error updating setting:", error);
+      res.status(400).json({ message: error.message || "Failed to update setting" });
+    }
+  });
+
+  // Bulk update settings
+  app.put("/api/settings", async (req, res) => {
+    try {
+      const { settings } = req.body;
+      if (!Array.isArray(settings)) {
+        return res.status(400).json({ message: "Settings must be an array" });
+      }
+      const updatedSettings = await settingsService.updateSettings(settings, "user");
+      res.json(updatedSettings);
+    } catch (error: any) {
+      console.error("Error updating settings:", error);
+      res.status(400).json({ message: error.message || "Failed to update settings" });
+    }
+  });
+
+  // Reset settings to defaults
+  app.post("/api/settings/reset", async (req, res) => {
+    try {
+      const defaultSettings = await settingsService.resetToDefaults();
+      res.json(defaultSettings);
+    } catch (error) {
+      console.error("Error resetting settings:", error);
+      res.status(500).json({ message: "Failed to reset settings" });
+    }
+  });
+
+  // Export settings
+  app.get("/api/settings/export/json", async (req, res) => {
+    try {
+      const exportData = await settingsService.exportSettings();
+      res.json(exportData);
+    } catch (error) {
+      console.error("Error exporting settings:", error);
+      res.status(500).json({ message: "Failed to export settings" });
+    }
+  });
+
+  // Import settings
+  app.post("/api/settings/import", async (req, res) => {
+    try {
+      const { settings } = req.body;
+      if (!Array.isArray(settings)) {
+        return res.status(400).json({ message: "Settings must be an array" });
+      }
+      const importedSettings = await settingsService.importSettings(settings, "user");
+      res.json(importedSettings);
+    } catch (error: any) {
+      console.error("Error importing settings:", error);
+      res.status(400).json({ message: error.message || "Failed to import settings" });
+    }
+  });
+
+  // Get settings as object (for easier frontend consumption)
+  app.get("/api/settings/object/all", async (req, res) => {
+    try {
+      const settingsObject = await settingsService.getSettingsObject();
+      res.json(settingsObject);
+    } catch (error) {
+      console.error("Error fetching settings object:", error);
+      res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+
+  // Initialize default settings on server start
+  settingsService.initializeDefaults().catch(console.error);
 
   const httpServer = createServer(app);
   return httpServer;

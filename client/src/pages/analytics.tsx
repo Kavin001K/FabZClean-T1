@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState, useEffect, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,20 @@ import { useWebSocket } from "@/hooks/use-websocket";
 import type { Service, Order, Customer } from "../../shared/schema";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { exportAnalyticsDashboard } from '@/lib/analytics-pdf-export';
+import {
+  mean,
+  calculateGrowthRate,
+  forecastLinear,
+  confidenceInterval,
+  calculateTrend,
+  getTrendIndicator,
+  customerLifetimeValue,
+  averageOrderValue,
+  movingAverage,
+  linearRegression,
+  statisticalSignificance,
+} from '@/lib/statistics';
 // Import the data service
 import { 
   analyticsApi,
@@ -77,6 +91,7 @@ export default function Analytics() {
   const [serviceType, setServiceType] = useState("all");
   const [insights, setInsights] = useState<string[]>([]);
   const [showInsights, setShowInsights] = useState(false);
+  const queryClient = useQueryClient();
 
   // Fetch data using React Query
   const {
@@ -122,6 +137,14 @@ export default function Analytics() {
 
   const { toast } = useToast();
 
+  // Define refresh function for analytics data
+  const fetchAnalyticsData = useCallback(() => {
+    // Invalidate all analytics queries to trigger a refetch
+    queryClient.invalidateQueries({ queryKey: ['analytics-orders'] });
+    queryClient.invalidateQueries({ queryKey: ['analytics-customers'] });
+    queryClient.invalidateQueries({ queryKey: ['analytics-inventory'] });
+  }, []);
+
   // WebSocket connection for real-time updates
   const { isConnected, connectionStatus, subscribe } = useWebSocket({
     url: 'ws://localhost:3001',
@@ -152,22 +175,12 @@ export default function Analytics() {
 
   // Data fetching is now handled by React Query above
 
-  // Calculate comprehensive analytics data using real data
-  const analyticsData = useMemo(() => {
+  // First, create filtered data that both analytics computations can use
+  const filteredData = useMemo(() => {
     if (isLoading || orders.length === 0) {
       return {
-        revenueByMonth: [],
-        servicePerformance: [],
-        categoryPerformance: [],
-        customerSegments: [],
-        orderStatusDistribution: [],
-        revenueTrend: [],
-        customerGrowth: [],
-        operationalMetrics: {},
-        topCustomers: [],
-        serviceEfficiency: [],
-        inventoryAnalysis: [],
-        timeAnalysis: []
+        filteredOrders: [],
+        filteredCustomers: []
       };
     }
 
@@ -224,9 +237,33 @@ export default function Analytics() {
       
       // Filter orders by customers in the selected franchise
       const franchiseCustomerIds = filteredCustomers.map(c => c.id);
-      filteredOrders = filteredOrders.filter(order => 
+      filteredOrders = filteredOrders.filter(order =>
         franchiseCustomerIds.includes(order.customerId)
       );
+    }
+
+    return { filteredOrders, filteredCustomers };
+  }, [orders, customers, isLoading, dateRange, franchise, serviceType]);
+
+  // Calculate comprehensive analytics data using filtered data
+  const analyticsData = useMemo(() => {
+    const { filteredOrders, filteredCustomers } = filteredData;
+
+    if (filteredOrders.length === 0) {
+      return {
+        revenueByMonth: [],
+        servicePerformance: [],
+        categoryPerformance: [],
+        customerSegments: [],
+        orderStatusDistribution: [],
+        revenueTrend: [],
+        customerGrowth: [],
+        operationalMetrics: {},
+        topCustomers: [],
+        serviceEfficiency: [],
+        inventoryAnalysis: [],
+        timeAnalysis: []
+      };
     }
 
     // 1. REVENUE ANALYSIS
@@ -386,7 +423,155 @@ export default function Analytics() {
       inventoryAnalysis,
       timeAnalysis
     };
-  }, [orders, customers, inventory, isLoading, dateRange, franchise, serviceType]);
+  }, [filteredData, inventory]);
+
+  // Advanced Statistical Analysis
+  const advancedStatistics = useMemo(() => {
+    const { filteredOrders, filteredCustomers } = filteredData;
+
+    if (filteredOrders.length === 0) {
+      return {
+        revenueStats: { mean: 0, forecast: [], confidence: { lower: 0, upper: 0, margin: 0 }, growth: 0 },
+        orderStats: { avgValue: 0, trend: 'stable' as const, movingAvg: [] },
+        customerMetrics: { clv: 0, avgSpend: 0, retentionRate: 0 },
+        insights: [],
+      };
+    }
+
+    // Revenue Statistical Analysis
+    const revenues = analyticsData.revenueByMonth.map(d => d.revenue);
+    const revenueMean = mean(revenues);
+    const revenueForecast = forecastLinear(revenues, 3);
+    const revenueConfidence = confidenceInterval(revenues, 0.95);
+
+    // Calculate MoM growth
+    const momGrowth = revenues.length >= 2
+      ? calculateGrowthRate(revenues[revenues.length - 1], revenues[revenues.length - 2])
+      : 0;
+
+    // Calculate YoY growth (if we have data from 12 months ago)
+    let yoyGrowth = 0;
+    if (revenues.length >= 12) {
+      yoyGrowth = calculateGrowthRate(
+        revenues[revenues.length - 1],
+        revenues[revenues.length - 12]
+      );
+    }
+
+    // Order Value Analysis
+    const orderValues = filteredOrders.map(o => parseFloat(o.totalAmount));
+    const avgOrderVal = averageOrderValue(
+      orderValues.reduce((sum, val) => sum + val, 0),
+      orderValues.length
+    );
+
+    // Calculate trend
+    const revenueTimeSeries = analyticsData.revenueByMonth.map((d, i) => ({
+      date: new Date(d.month),
+      value: d.revenue
+    }));
+    const revenueTrendDirection = calculateTrend(revenueTimeSeries);
+    const trendIndicator = getTrendIndicator(momGrowth);
+
+    // Moving averages
+    const ma7 = movingAverage(orderValues.slice(-30), 7);
+    const ma30 = movingAverage(orderValues, 30);
+
+    // Customer Lifetime Value Calculation
+    const avgCustomerOrders = filteredCustomers.length > 0
+      ? filteredOrders.length / filteredCustomers.length
+      : 0;
+    const avgCustomerSpend = filteredCustomers.length > 0
+      ? filteredOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount), 0) / filteredCustomers.length
+      : 0;
+    const clv = customerLifetimeValue(avgOrderVal, avgCustomerOrders, 3); // 3 year lifespan
+
+    // Statistical Insights Generation
+    const generatedInsights: string[] = [];
+
+    // Revenue insights
+    if (momGrowth > 5) {
+      generatedInsights.push(
+        `Revenue is growing at ${momGrowth.toFixed(1)}% month-over-month (statistically significant)`
+      );
+    } else if (momGrowth < -5) {
+      generatedInsights.push(
+        `Revenue declined by ${Math.abs(momGrowth).toFixed(1)}% this month - attention needed`
+      );
+    }
+
+    // Forecast insights
+    if (revenueForecast.length > 0) {
+      generatedInsights.push(
+        `Projected revenue for next month: ${formatCurrency(revenueForecast[0])} ± ${formatCurrency(revenueConfidence.margin)}`
+      );
+    }
+
+    // Top service insight
+    if (analyticsData.servicePerformance.length > 0) {
+      const topService = analyticsData.servicePerformance[0];
+      const marketShare = (topService.orders / filteredOrders.length) * 100;
+      generatedInsights.push(
+        `Top performing service: ${topService.name} with ${marketShare.toFixed(1)}% market share`
+      );
+    }
+
+    // Peak time insight
+    if (analyticsData.timeAnalysis.length > 0) {
+      const peakHour = analyticsData.timeAnalysis.reduce((max, item) =>
+        item.orders > max.orders ? item : max
+      );
+      const peakPercentage = (peakHour.orders / filteredOrders.length) * 100;
+      generatedInsights.push(
+        `Peak order time: ${peakHour.hour}:00 with ${peakPercentage.toFixed(1)}% of daily orders`
+      );
+    }
+
+    // Customer value insight
+    if (clv > 0) {
+      generatedInsights.push(
+        `Average Customer Lifetime Value: ${formatCurrency(clv)} over 3 years`
+      );
+    }
+
+    // Completion rate insight
+    const completionRate = (analyticsData.operationalMetrics as any).completionRate;
+    if (completionRate >= 90) {
+      generatedInsights.push(
+        `Excellent ${completionRate.toFixed(1)}% order completion rate maintained`
+      );
+    } else if (completionRate < 70) {
+      generatedInsights.push(
+        `Order completion rate at ${completionRate.toFixed(1)}% - consider workflow optimization`
+      );
+    }
+
+    return {
+      revenueStats: {
+        mean: revenueMean,
+        forecast: revenueForecast,
+        confidence: revenueConfidence,
+        growth: momGrowth,
+        yoyGrowth,
+        trend: revenueTrendDirection,
+        trendIndicator,
+      },
+      orderStats: {
+        avgValue: avgOrderVal,
+        trend: revenueTrendDirection,
+        movingAvg: ma7,
+        ma30,
+      },
+      customerMetrics: {
+        clv,
+        avgSpend: avgCustomerSpend,
+        avgOrders: avgCustomerOrders,
+        retentionRate: (analyticsData.operationalMetrics as any).customerRetention,
+      },
+      insights: generatedInsights,
+    };
+  }, [analyticsData, orders, customers, isLoading, dateRange]);
+
 
   // Generate AI-powered insights
   const generateInsights = () => {
@@ -414,105 +599,68 @@ export default function Analytics() {
     setShowInsights(true);
   };
 
-  // Export analytics as PDF
+  // Export analytics as PDF - Enhanced version with professional template
   const handleExportPDF = async () => {
     try {
       toast({
         title: "Generating PDF",
-        description: "Please wait while we generate your analytics report...",
+        description: "Please wait while we generate your professional analytics report...",
       });
 
-      // Create a new PDF document
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      let yPosition = 20;
+      const { operationalMetrics, servicePerformance, customerSegments, revenueByMonth, orderStatusDistribution } = analyticsData;
 
-      // Add title
-      pdf.setFontSize(20);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Analytics Dashboard Report', pageWidth / 2, yPosition, { align: 'center' });
-      yPosition += 15;
+      // Safely get array data
+      const safeRevenueByMonth = revenueByMonth || [];
+      const safeServicePerformance = servicePerformance || [];
+      const safeOrderStatusDistribution = orderStatusDistribution || [];
 
-      // Add date and filters info
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, yPosition);
-      yPosition += 8;
-      pdf.text(`Date Range: ${dateRange}`, 20, yPosition);
-      yPosition += 8;
-      pdf.text(`Franchise: ${franchise}`, 20, yPosition);
-      yPosition += 8;
-      pdf.text(`Service Type: ${serviceType}`, 20, yPosition);
-      yPosition += 15;
+      // Calculate growth metrics with safe array access
+      const revenueGrowth = safeRevenueByMonth.length >= 2
+        ? ((safeRevenueByMonth[safeRevenueByMonth.length - 1]?.revenue || 0) - (safeRevenueByMonth[safeRevenueByMonth.length - 2]?.revenue || 0)) / ((safeRevenueByMonth[safeRevenueByMonth.length - 2]?.revenue || 1)) * 100
+        : 0;
 
-      // Add key metrics
-      pdf.setFontSize(16);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Key Metrics', 20, yPosition);
-      yPosition += 10;
+      const orderGrowth = safeRevenueByMonth.length >= 2
+        ? ((safeRevenueByMonth[safeRevenueByMonth.length - 1]?.orders || 0) - (safeRevenueByMonth[safeRevenueByMonth.length - 2]?.orders || 0)) / ((safeRevenueByMonth[safeRevenueByMonth.length - 2]?.orders || 1)) * 100
+        : 0;
 
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'normal');
-      const { operationalMetrics } = analyticsData;
-      pdf.text(`Total Revenue: ${formatCurrency((operationalMetrics as any).totalRevenue)}`, 20, yPosition);
-      yPosition += 8;
-      pdf.text(`Average Order Value: ${formatCurrency((operationalMetrics as any).avgOrderValue)}`, 20, yPosition);
-      yPosition += 8;
-      pdf.text(`Completion Rate: ${formatPercentage((operationalMetrics as any).completionRate)}`, 20, yPosition);
-      yPosition += 8;
-      pdf.text(`Customer Retention: ${formatPercentage((operationalMetrics as any).customerRetention)}`, 20, yPosition);
-      yPosition += 15;
+      // Prepare data for enhanced PDF export
+      const pdfData = {
+        totalRevenue: (operationalMetrics as any)?.totalRevenue || 0,
+        totalOrders: (operationalMetrics as any)?.totalOrders || 0,
+        avgOrderValue: (operationalMetrics as any)?.avgOrderValue || 0,
+        customerCount: (operationalMetrics as any)?.totalCustomers || 0,
+        revenueGrowth: isNaN(revenueGrowth) ? 0 : revenueGrowth,
+        orderGrowth: isNaN(orderGrowth) ? 0 : orderGrowth,
+        topServices: safeServicePerformance.slice(0, 5).map(service => ({
+          name: service?.name || 'Unknown',
+          revenue: service?.revenue || 0,
+          count: service?.orders || 0,
+        })),
+        revenueByMonth: safeRevenueByMonth.map(item => ({
+          month: item?.month || 'N/A',
+          revenue: item?.revenue || 0,
+        })),
+        ordersByStatus: safeOrderStatusDistribution.reduce((acc, item) => {
+          if (item?.status) {
+            acc[item.status] = item.count || 0;
+          }
+          return acc;
+        }, {} as Record<string, number>),
+        dateRange: `Date Range: ${dateRange} | Franchise: ${franchise} | Service: ${serviceType}`,
+      };
 
-      // Add service performance
-      pdf.setFontSize(16);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Top Services', 20, yPosition);
-      yPosition += 10;
-
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'normal');
-      const topServices = analyticsData.servicePerformance.slice(0, 5);
-      topServices.forEach((service, index) => {
-        if (yPosition > pageHeight - 20) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-        pdf.text(`${index + 1}. ${service.name}: ${service.orders} orders, ${formatCurrency(service.revenue)} revenue`, 20, yPosition);
-        yPosition += 8;
-      });
-
-      // Add customer segments
-      yPosition += 10;
-      pdf.setFontSize(16);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Customer Segments', 20, yPosition);
-      yPosition += 10;
-
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'normal');
-      analyticsData.customerSegments.forEach((segment) => {
-        if (yPosition > pageHeight - 20) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-        pdf.text(`${segment.segment}: ${segment.count} customers, ${formatCurrency(segment.revenue)} revenue`, 20, yPosition);
-        yPosition += 8;
-      });
-
-      // Save the PDF
-      const fileName = `analytics-report-${new Date().toISOString().split('T')[0]}.pdf`;
-      pdf.save(fileName);
+      // Use the enhanced PDF export
+      await exportAnalyticsDashboard(pdfData);
 
       toast({
         title: "PDF Generated",
-        description: "Your analytics report has been downloaded successfully!",
+        description: "Your professional analytics report has been downloaded successfully!",
       });
     } catch (error) {
       console.error('Failed to generate PDF:', error);
       toast({
         title: "Error",
-        description: "Failed to generate PDF. Please try again.",
+        description: `Failed to generate PDF. Please try again. ${error instanceof Error ? error.message : ''}`,
         variant: "destructive",
       });
     }
@@ -713,6 +861,87 @@ export default function Analytics() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Advanced Statistical Metrics */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Revenue Growth (MoM)</CardTitle>
+            <div className="flex items-center gap-2">
+              {advancedStatistics.revenueStats.trendIndicator.arrow === '↑' ? (
+                <TrendingUp className="h-4 w-4 text-green-600" />
+              ) : advancedStatistics.revenueStats.trendIndicator.arrow === '↓' ? (
+                <TrendingDown className="h-4 w-4 text-red-600" />
+              ) : (
+                <Activity className="h-4 w-4 text-gray-600" />
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${advancedStatistics.revenueStats.trendIndicator.color}`}>
+              {advancedStatistics.revenueStats.growth > 0 ? '+' : ''}
+              {advancedStatistics.revenueStats.growth.toFixed(1)}%
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Trend: {advancedStatistics.revenueStats.trend}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Customer Lifetime Value</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(advancedStatistics.customerMetrics.clv)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Avg {advancedStatistics.customerMetrics.avgOrders.toFixed(1)} orders per customer
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Next Month Forecast</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {advancedStatistics.revenueStats.forecast.length > 0
+                ? formatCurrency(advancedStatistics.revenueStats.forecast[0])
+                : 'N/A'}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              ±{formatCurrency(advancedStatistics.revenueStats.confidence.margin)} (95% CI)
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Statistical Insights Panel */}
+      {advancedStatistics.insights.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Real-Time Statistical Insights
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {advancedStatistics.insights.map((insight, index) => (
+                <div key={index} className="flex items-start gap-2 p-3 bg-muted rounded-lg">
+                  <Star className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">{insight}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recent Activity */}
       {recentActivity && (
