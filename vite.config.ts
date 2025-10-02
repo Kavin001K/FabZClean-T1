@@ -9,6 +9,9 @@ export default defineConfig({
   plugins: [
     react(),
   ],
+  define: {
+    global: 'globalThis',
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "client", "src"),
@@ -20,17 +23,26 @@ export default defineConfig({
   build: {
     outDir: "../dist",
     emptyOutDir: true,
+    sourcemap: false,
+    minify: 'esbuild',
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       external: ['shelljs'],
       output: {
         globals: {
           shelljs: 'shell'
+        },
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          ui: ['@radix-ui/react-dialog', '@radix-ui/react-popover', '@radix-ui/react-select']
         }
       }
     }
   },
   esbuild: {
-    logOverride: { 'this-is-undefined-in-esm': 'silent' }
+    logOverride: { 'this-is-undefined-in-esm': 'silent' },
+    target: 'es2020',
+    drop: ['console', 'debugger'],
   },
   server: {
     fs: {

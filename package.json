@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "npx tsx server/index.ts",
     "build": "npm run build:client && npm run build:functions",
-    "build:client": "vite build",
+    "build:client": "vite build --config vite.config.minimal.ts",
     "build:functions": "node scripts/build-netlify-functions.js",
     "build:server": "tsc --project tsconfig.server.json",
     "start": "node dist/server/index.js",
