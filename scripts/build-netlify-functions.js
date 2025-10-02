@@ -18,32 +18,11 @@ const simpleFunctions = [
   'due-date-orders.ts'
 ];
 
-// List of complex functions that should be excluded from build
-const excludeFunctions = [
-  'customers.ts',
-  'dashboard-metrics.ts', 
-  'api.ts',
-  'orders.ts',
-  'products.ts',
-  'services.ts',
-  'deliveries.ts',
-  'health-database.ts',
-  'database-info.ts',
-  'test-db.ts'
-];
-
 // Clean up old compiled files
 const functionsDir = path.join(__dirname, '..', 'netlify', 'functions');
 
-// Remove all .js files and temporarily move problematic .ts files
+// Remove all .js files
 const allFiles = fs.readdirSync(functionsDir);
-const tempDir = path.join(functionsDir, '.temp');
-
-// Create temp directory if it doesn't exist
-if (!fs.existsSync(tempDir)) {
-  fs.mkdirSync(tempDir);
-}
-
 allFiles.forEach(file => {
   const filePath = path.join(functionsDir, file);
   
@@ -51,13 +30,6 @@ allFiles.forEach(file => {
   if (file.endsWith('.js')) {
     fs.unlinkSync(filePath);
     console.log(`Removed old file: ${file}`);
-  }
-  
-  // Temporarily move problematic .ts files to avoid build errors
-  if (excludeFunctions.includes(file)) {
-    const tempPath = path.join(tempDir, file);
-    fs.renameSync(filePath, tempPath);
-    console.log(`Temporarily moved: ${file}`);
   }
 });
 
@@ -76,17 +48,5 @@ simpleFunctions.forEach(file => {
     console.warn(`⚠️  File not found: ${file}`);
   }
 });
-
-// Restore temporarily moved files
-const tempFiles = fs.readdirSync(tempDir);
-tempFiles.forEach(file => {
-  const tempPath = path.join(tempDir, file);
-  const originalPath = path.join(functionsDir, file);
-  fs.renameSync(tempPath, originalPath);
-  console.log(`Restored: ${file}`);
-});
-
-// Remove temp directory
-fs.rmdirSync(tempDir);
 
 console.log('Netlify functions build complete!');
