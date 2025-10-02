@@ -10,48 +10,35 @@ const __dirname = path.dirname(__filename);
 
 console.log('Building Netlify functions...');
 
-// List of simple functions that don't depend on server modules
+// List of simple functions that work standalone
 const simpleFunctions = [
-  'db.ts',
-  'orders-simple.ts',
-  'customers-simple.ts', 
+  'customers-simple.ts',
+  'orders-simple.ts', 
   'dashboard-metrics-simple.ts',
-  'test-db.ts',
   'due-date-orders.ts'
 ];
 
 // Clean up old compiled files
 const functionsDir = path.join(__dirname, '..', 'netlify', 'functions');
-const oldFiles = fs.readdirSync(functionsDir).filter(file => 
-  file.endsWith('.js') && !file.includes('simple')
-);
 
-oldFiles.forEach(file => {
-  const filePath = path.join(functionsDir, file);
-  if (fs.existsSync(filePath)) {
+// Remove all .js files except the ones we want to keep
+const allFiles = fs.readdirSync(functionsDir);
+allFiles.forEach(file => {
+  if (file.endsWith('.js')) {
+    const filePath = path.join(functionsDir, file);
     fs.unlinkSync(filePath);
     console.log(`Removed old file: ${file}`);
   }
 });
 
-// Compile each simple function
-const tscCommand = [
-  'npx tsc',
-  '--target ES2020',
-  '--module ESNext', 
-  '--moduleResolution node',
-  '--allowSyntheticDefaultImports',
-  '--esModuleInterop',
-  '--skipLibCheck',
-  '--outDir netlify/functions'
-].join(' ');
-
+// Compile each simple function individually using esbuild for better compatibility
 simpleFunctions.forEach(file => {
   const filePath = path.join(functionsDir, file);
   if (fs.existsSync(filePath)) {
     try {
-      execSync(`${tscCommand} ${filePath}`, { stdio: 'inherit' });
-      console.log(`✅ Compiled ${file}`);
+      const outputFile = file.replace('.ts', '.js');
+      execSync(`npx esbuild ${filePath} --bundle --platform=node --target=node18 --format=cjs --outfile=netlify/functions/${outputFile}`, { stdio: 'inherit' });
+      console.log(`✅ Compiled ${file} -> ${outputFile}`);
     } catch (error) {
       console.error(`❌ Failed to compile ${file}:`, error.message);
     }
