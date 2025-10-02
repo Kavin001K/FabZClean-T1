@@ -82,6 +82,7 @@ export class SQLiteStorage implements IStorage {
         customerPhone TEXT,
         paymentStatus TEXT,
         shippingAddress TEXT,
+        pickupDate TEXT,
         createdAt TEXT,
         updatedAt TEXT,
         FOREIGN KEY (customerId) REFERENCES customers(id)

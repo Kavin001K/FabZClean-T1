@@ -15,7 +15,7 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "netlify:dev": "netlify dev",
-    "netlify:build": "npm run build:client",
+    "netlify:build": "npm run build",
     "electron": "electron electron/main.js",
     "electron:dev": "NODE_ENV=development electron electron/main.js",
     "electron:build": "npm run build:client && electron-builder",
