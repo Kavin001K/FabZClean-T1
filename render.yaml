@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: fabzclean-app
+    env: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health/database
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=512
+      - key: VITE_BUILD_TARGET
+        value: production
+    disk:
+      name: fabzclean-disk
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
