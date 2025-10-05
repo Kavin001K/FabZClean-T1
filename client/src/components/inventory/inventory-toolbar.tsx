@@ -21,8 +21,9 @@ interface InventoryToolbarProps {
   onSearchChange: (query: string) => void;
   activeFilters: FilterType[];
   onFilterChange: (filters: FilterType[]) => void;
-  onExportCSV: () => void;
-  onExportPDF: () => void;
+  onExportCSV: (data: InventoryItem[]) => void;
+  onExportPDF: (data: InventoryItem[]) => void;
+  onExportExcel?: (data: InventoryItem[]) => void;
   onAddItem: () => void;
   onBulkDelete: () => void;
   selectedItems: string[];
@@ -44,6 +45,7 @@ export const InventoryToolbar: React.FC<InventoryToolbarProps> = React.memo(({
   onFilterChange,
   onExportCSV,
   onExportPDF,
+  onExportExcel,
   onAddItem,
   onBulkDelete,
   selectedItems,
@@ -165,20 +167,29 @@ export const InventoryToolbar: React.FC<InventoryToolbarProps> = React.memo(({
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Export Options</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuCheckboxItem
-              onClick={onExportCSV}
+            <DropdownMenuItem
+              onClick={() => onExportCSV(inventory)}
               className="cursor-pointer"
             >
               <Download className="h-4 w-4 mr-2" />
               Export as CSV
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              onClick={onExportPDF}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onExportPDF(inventory)}
               className="cursor-pointer"
             >
               <FileText className="h-4 w-4 mr-2" />
               Export as PDF
-            </DropdownMenuCheckboxItem>
+            </DropdownMenuItem>
+            {onExportExcel && (
+              <DropdownMenuItem
+                onClick={() => onExportExcel(inventory)}
+                className="cursor-pointer"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Export as Excel
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -218,5 +229,3 @@ export const InventoryToolbar: React.FC<InventoryToolbarProps> = React.memo(({
     </div>
   );
 });
-
-export default InventoryToolbar;

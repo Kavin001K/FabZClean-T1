@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useDebouncedSearch } from './use-debounce';
+import { log } from '@/lib/logger';
 
 export interface SearchResult {
   id: string;
@@ -12,17 +14,17 @@ export interface SearchResult {
 
 export function useGlobalSearch() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const { debouncedQuery, isSearching } = useDebouncedSearch(searchQuery, 300);
 
   // Search function using the dedicated API
-  const search = async (query: string) => {
+  const search = useCallback(async (query: string) => {
     if (!query.trim()) {
       setSearchResults([]);
       return;
     }
 
-    setIsSearching(true);
+    log.debug('Performing global search', { query });
     
     try {
       const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=10`);
@@ -41,27 +43,23 @@ export function useGlobalSearch() {
       ];
       
       setSearchResults(allResults);
+      log.info('Global search completed', { query, resultCount: allResults.length });
     } catch (error) {
-      console.error('Search failed:', error);
+      log.error('Search failed', error as Error, { query });
       setSearchResults([]);
-    } finally {
-      setIsSearching(false);
     }
-  };
+  }, []);
 
-  // Debounced search
+  // Debounced search effect
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      search(searchQuery);
-    }, 300);
+    search(debouncedQuery);
+  }, [debouncedQuery, search]);
 
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
-
-  const clearSearch = () => {
+  const clearSearch = useCallback(() => {
     setSearchQuery('');
     setSearchResults([]);
-  };
+    log.debug('Search cleared');
+  }, []);
 
   return {
     searchQuery,

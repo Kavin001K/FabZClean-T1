@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,11 +10,11 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Calendar, 
-  DollarSign, 
+import {
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  DollarSign,
   ShoppingBag,
   Star,
   Clock
@@ -45,7 +46,7 @@ const customerFormSchema = z.object({
     message: 'Please enter a valid email address',
   }).optional(),
   phone: z.string().min(10, 'Phone number must be at least 10 digits').max(15, 'Phone number must be less than 15 digits'),
-  address: z.string().optional(),
+  address: z.string().optional(), // Simple string for now - matches text input in UI
   notes: z.string().optional(),
 });
 
@@ -166,11 +167,10 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
     onCreateCustomer(data);
   };
 
-  if (!selectedCustomer) return null;
-
-  const totalSpent = parseFloat(selectedCustomer.totalSpent || '0');
-  const totalOrders = selectedCustomer.totalOrders || 0;
-  const customerSince = new Date(selectedCustomer.createdAt || new Date());
+  // Compute customer stats only when we have a selected customer (View/Edit dialogs)
+  const totalSpent = selectedCustomer ? parseFloat(selectedCustomer.totalSpent || '0') : 0;
+  const totalOrders = selectedCustomer?.totalOrders || 0;
+  const customerSince = selectedCustomer ? new Date(selectedCustomer.createdAt || new Date()) : new Date();
   const daysSinceJoined = Math.max(1, Math.floor((Date.now() - customerSince.getTime()) / (1000 * 60 * 60 * 24)));
 
   return (
@@ -178,6 +178,13 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
       {/* View Customer Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={onCloseViewDialog}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          {selectedCustomer ? (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+          >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
@@ -188,9 +195,9 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
               <div>
                 <div className="text-xl font-semibold">{selectedCustomer.name}</div>
                 <div className="text-sm text-muted-foreground">
-                  Customer since {customerSince.toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long' 
+                  Customer since {customerSince.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long'
                   })}
                 </div>
               </div>
@@ -339,12 +346,21 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
               Close
             </Button>
           </DialogFooter>
+          </motion.div>
+          ) : null}
         </DialogContent>
       </Dialog>
 
       {/* Edit Customer Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={onCloseEditDialog}>
         <DialogContent>
+          {selectedCustomer ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+          >
           <DialogHeader>
             <DialogTitle>Edit Customer</DialogTitle>
             <DialogDescription>
@@ -438,9 +454,9 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
             </div>
 
             <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={onCloseEditDialog}
                 disabled={isUpdating}
               >
@@ -451,12 +467,20 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
               </Button>
             </DialogFooter>
           </form>
+          </motion.div>
+          ) : null}
         </DialogContent>
       </Dialog>
 
       {/* Create Customer Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={onCloseCreateDialog}>
         <DialogContent>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+          >
           <DialogHeader>
             <DialogTitle>Add New Customer</DialogTitle>
             <DialogDescription>
@@ -560,9 +584,9 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
             </div>
 
             <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={onCloseCreateDialog}
                 disabled={isCreating}
               >
@@ -573,6 +597,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
               </Button>
             </DialogFooter>
           </form>
+          </motion.div>
         </DialogContent>
       </Dialog>
     </>

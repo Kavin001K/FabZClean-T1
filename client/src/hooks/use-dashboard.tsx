@@ -94,16 +94,32 @@ export function useDashboard() {
   // Due today orders - filter from recent orders
   const dueTodayOrders = useMemo(() => {
     if (!recentOrders) return [];
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     return recentOrders.filter(order => {
       if (!order.pickupDate) return false;
       const pickup = new Date(order.pickupDate);
       pickup.setHours(0, 0, 0, 0);
       return pickup <= today; // Include overdue and due today
     });
+  }, [recentOrders]);
+
+  // Orders created today
+  const ordersTodayCount = useMemo(() => {
+    if (!recentOrders) return 0;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return recentOrders.filter(order => {
+      if (!order.createdAt) return false;
+      const created = new Date(order.createdAt);
+      return created >= today && created < tomorrow;
+    }).length;
   }, [recentOrders]);
 
   const {
@@ -273,7 +289,7 @@ export function useDashboard() {
     // State
     filters,
     quickActionForms,
-    
+
     // Data
     metrics: enhancedMetrics,
     salesData: processedSalesData,
@@ -282,6 +298,7 @@ export function useDashboard() {
     recentOrders: processedRecentOrders,
     dueTodayOrders: dueTodayOrders || [],
     customers: customers || [],
+    ordersTodayCount,
     
     // Loading states
     isLoading,

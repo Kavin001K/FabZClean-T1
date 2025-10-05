@@ -34,13 +34,27 @@ export function useWebSocket({
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const subscriptionsRef = useRef<string[]>([]);
 
+  // Use refs to store callbacks to prevent re-renders
+  const onMessageRef = useRef(onMessage);
+  const onOpenRef = useRef(onOpen);
+  const onCloseRef = useRef(onClose);
+  const onErrorRef = useRef(onError);
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+    onOpenRef.current = onOpen;
+    onCloseRef.current = onClose;
+    onErrorRef.current = onError;
+  }, [onMessage, onOpen, onClose, onError]);
+
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
 
     setConnectionStatus('connecting');
-    
+
     try {
       const ws = new WebSocket(url);
       wsRef.current = ws;
@@ -50,21 +64,21 @@ export function useWebSocket({
         setIsConnected(true);
         setConnectionStatus('connected');
         reconnectAttemptsRef.current = 0;
-        onOpen?.();
+        onOpenRef.current?.();
 
         // Resubscribe to previous subscriptions
         if (subscriptionsRef.current.length > 0) {
-          sendMessage({
+          ws.send(JSON.stringify({
             type: 'subscribe',
             topics: subscriptionsRef.current
-          });
+          }));
         }
       };
 
       ws.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
-          onMessage?.(message);
+          onMessageRef.current?.(message);
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
         }
@@ -74,13 +88,13 @@ export function useWebSocket({
         console.log('WebSocket disconnected');
         setIsConnected(false);
         setConnectionStatus('disconnected');
-        onClose?.();
+        onCloseRef.current?.();
 
         // Attempt to reconnect
         if (reconnectAttemptsRef.current < maxReconnectAttempts) {
           reconnectAttemptsRef.current++;
           console.log(`Attempting to reconnect (${reconnectAttemptsRef.current}/${maxReconnectAttempts})...`);
-          
+
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
           }, reconnectInterval);
@@ -93,14 +107,14 @@ export function useWebSocket({
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
         setConnectionStatus('error');
-        onError?.(error);
+        onErrorRef.current?.(error);
       };
 
     } catch (error) {
       console.error('Error creating WebSocket:', error);
       setConnectionStatus('error');
     }
-  }, [url, onMessage, onOpen, onClose, onError, reconnectInterval, maxReconnectAttempts]);
+  }, [url, reconnectInterval, maxReconnectAttempts]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -126,42 +140,43 @@ export function useWebSocket({
 
   const subscribe = useCallback((topics: string[]) => {
     subscriptionsRef.current = topics;
-    sendMessage({
-      type: 'subscribe',
-      topics
-    });
-  }, [sendMessage]);
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'subscribe',
+        topics
+      }));
+    }
+  }, []);
 
   const unsubscribe = useCallback(() => {
     subscriptionsRef.current = [];
-    sendMessage({
-      type: 'unsubscribe'
-    });
-  }, [sendMessage]);
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'unsubscribe'
+      }));
+    }
+  }, []);
 
   const ping = useCallback(() => {
-    sendMessage({ type: 'ping' });
-  }, [sendMessage]);
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'ping' }));
+    }
+  }, []);
 
   useEffect(() => {
     connect();
-    
-    return () => {
-      disconnect();
-    };
-  }, [connect, disconnect]);
 
-  // Cleanup on unmount
-  useEffect(() => {
     return () => {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
       if (wsRef.current) {
         wsRef.current.close();
+        wsRef.current = null;
       }
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]); // Only reconnect when URL changes
 
   return {
     isConnected,

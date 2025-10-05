@@ -1,0 +1,88 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.initializeDatabase = initializeDatabase;
+exports.getDatabaseHealth = getDatabaseHealth;
+exports.pingDatabase = pingDatabase;
+exports.getDatabaseInfo = getDatabaseInfo;
+const db_1 = require("./db");
+async function initializeDatabase() {
+    try {
+        console.log("🔄 Initializing SQLite database...");
+        // Test the database connection by trying to get users
+        await db_1.db.listUsers();
+        console.log("✅ SQLite database initialized successfully");
+        return true;
+    }
+    catch (error) {
+        console.error("❌ SQLite database initialization failed:", error);
+        throw error;
+    }
+}
+async function getDatabaseHealth() {
+    try {
+        const startTime = Date.now();
+        // Simple health check - try to query users table
+        await db_1.db.listUsers();
+        const responseTime = Date.now() - startTime;
+        return {
+            status: "healthy",
+            database: "sqlite",
+            responseTime: `${responseTime}ms`,
+            timestamp: new Date().toISOString(),
+        };
+    }
+    catch (error) {
+        return {
+            status: "unhealthy",
+            database: "sqlite",
+            error: error.message,
+            timestamp: new Date().toISOString(),
+        };
+    }
+}
+async function pingDatabase() {
+    try {
+        const startTime = Date.now();
+        // Simple ping - try to query
+        await db_1.db.listUsers();
+        const responseTime = Date.now() - startTime;
+        return {
+            success: true,
+            responseTime: `${responseTime}ms`,
+            database: "sqlite",
+            timestamp: new Date().toISOString(),
+        };
+    }
+    catch (error) {
+        return {
+            success: false,
+            error: error.message,
+            database: "sqlite",
+            timestamp: new Date().toISOString(),
+        };
+    }
+}
+async function getDatabaseInfo() {
+    try {
+        const users = await db_1.db.listUsers();
+        const products = await db_1.db.listProducts();
+        const orders = await db_1.db.listOrders();
+        const customers = await db_1.db.listCustomers();
+        return {
+            database: "sqlite",
+            version: "3.x", // SQLite version
+            tables: {
+                users: users.length,
+                products: products.length,
+                orders: orders.length,
+                customers: customers.length,
+            },
+            status: "connected",
+            timestamp: new Date().toISOString(),
+        };
+    }
+    catch (error) {
+        throw new Error(`Failed to get database info: ${error.message}`);
+    }
+}
+//# sourceMappingURL=db-utils.js.map

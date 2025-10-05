@@ -426,7 +426,7 @@ export function exportServicesEnhanced(services: any[]) {
 
   // Calculate statistics
   const totalServices = services.length;
-  const activeServices = services.filter(s => s.status === 'active').length;
+  const activeServices = services.filter(s => s.status === 'Active').length;
   const avgPrice = services.reduce((sum, s) => sum + parseFloat(s.price || 0), 0) / totalServices;
   const categories = new Set(services.map(s => s.category)).size;
 
@@ -463,4 +463,325 @@ export function exportServicesEnhanced(services: any[]) {
 
   // Save PDF
   pdf.save(`services-catalog-${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
+export function exportInventoryEnhanced(inventory: any[]) {
+  const pdf = new EnhancedPDFExport('landscape');
+
+  // Add header
+  pdf.addHeader('Inventory Report', 'Comprehensive overview of all inventory items');
+
+  // Calculate statistics
+  const totalItems = inventory.length;
+  const inStock = inventory.filter(item => item.stock > 0).length;
+  const outOfStock = inventory.filter(item => item.stock === 0).length;
+  const lowStock = inventory.filter(item => item.status === 'Low Stock').length;
+  const totalValue = inventory.reduce((sum, item) => sum + (item.stock * parseFloat(item.price || '0')), 0);
+
+  // Add statistics summary
+  pdf.addStatsSummary([
+    { label: 'Total Items', value: totalItems },
+    { label: 'In Stock', value: inStock },
+    { label: 'Out of Stock', value: outOfStock, color: BRAND_COLORS.accent },
+    { label: 'Total Value', value: `₹${totalValue.toFixed(2)}` },
+  ]);
+
+  // Add inventory section
+  pdf.addSection('Inventory Details');
+
+  // Prepare table data
+  const columns = ['SKU', 'Name', 'Category', 'Stock', 'Price', 'Status'];
+  const data = inventory.map(item => [
+    item.sku || 'N/A',
+    item.name,
+    item.category || 'General',
+    item.stock,
+    `₹${parseFloat(item.price || '0').toFixed(2)}`,
+    item.status,
+  ]);
+
+  pdf.addTable(columns, data);
+
+  // Add summary info
+  pdf.addInfoBox(
+    'Report Summary',
+    `This report contains ${totalItems} unique inventory items with a total estimated value of ₹${totalValue.toFixed(2)}. ` +
+    `${inStock} items are currently in stock, while ${outOfStock} items are out of stock and ${lowStock} are low on stock.`
+  );
+
+  // Save PDF
+  pdf.save(`inventory-report-${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
+// Export accounting reports
+export function exportIncomeStatement(data: any) {
+  const pdf = new EnhancedPDFExport('portrait');
+
+  // Add header
+  pdf.addHeader('Income Statement', `For the period: ${data.period || 'Current Period'}`);
+
+  // Calculate totals
+  const totalRevenue = data.revenue?.reduce((sum: number, item: any) => sum + (item.amount || 0), 0) || 0;
+  const totalExpenses = data.expenses?.reduce((sum: number, item: any) => sum + (item.amount || 0), 0) || 0;
+  const netIncome = totalRevenue - totalExpenses;
+
+  // Add statistics summary
+  pdf.addStatsSummary([
+    { label: 'Total Revenue', value: `$${totalRevenue.toFixed(2)}`, color: BRAND_COLORS.light },
+    { label: 'Total Expenses', value: `$${totalExpenses.toFixed(2)}`, color: BRAND_COLORS.light },
+    { label: 'Net Income', value: `$${netIncome.toFixed(2)}`, color: netIncome >= 0 ? '#d1fae5' : '#fee2e2' },
+    { label: 'Profit Margin', value: `${totalRevenue > 0 ? ((netIncome / totalRevenue) * 100).toFixed(1) : 0}%` },
+  ]);
+
+  // Revenue section
+  if (data.revenue && data.revenue.length > 0) {
+    pdf.addSection('Revenue');
+    const revenueColumns = ['Account', 'Description', 'Amount'];
+    const revenueData = data.revenue.map((item: any) => [
+      item.account || 'N/A',
+      item.description || '-',
+      `$${(item.amount || 0).toFixed(2)}`,
+    ]);
+    revenueData.push(['', 'Total Revenue', `$${totalRevenue.toFixed(2)}`]);
+    pdf.addTable(revenueColumns, revenueData);
+  }
+
+  // Expenses section
+  if (data.expenses && data.expenses.length > 0) {
+    pdf.addSection('Expenses');
+    const expensesColumns = ['Account', 'Description', 'Amount'];
+    const expensesData = data.expenses.map((item: any) => [
+      item.account || 'N/A',
+      item.description || '-',
+      `$${(item.amount || 0).toFixed(2)}`,
+    ]);
+    expensesData.push(['', 'Total Expenses', `$${totalExpenses.toFixed(2)}`]);
+    pdf.addTable(expensesColumns, expensesData);
+  }
+
+  // Net income summary
+  pdf.addInfoBox(
+    'Financial Summary',
+    `Total Revenue: $${totalRevenue.toFixed(2)} | Total Expenses: $${totalExpenses.toFixed(2)} | ` +
+    `Net Income: $${netIncome.toFixed(2)} | Profit Margin: ${totalRevenue > 0 ? ((netIncome / totalRevenue) * 100).toFixed(1) : 0}%`
+  );
+
+  // Save PDF
+  pdf.save(`income-statement-${new Date().toISOString().split('T')[0]}`);
+}
+
+export function exportBalanceSheet(data: any) {
+  const pdf = new EnhancedPDFExport('portrait');
+
+  // Add header
+  pdf.addHeader('Balance Sheet', `As of: ${data.asOfDate || new Date().toLocaleDateString()}`);
+
+  // Calculate totals
+  const totalAssets = data.assets?.reduce((sum: number, item: any) => sum + (item.amount || 0), 0) || 0;
+  const totalLiabilities = data.liabilities?.reduce((sum: number, item: any) => sum + (item.amount || 0), 0) || 0;
+  const totalEquity = data.equity?.reduce((sum: number, item: any) => sum + (item.amount || 0), 0) || 0;
+
+  // Add statistics summary
+  pdf.addStatsSummary([
+    { label: 'Total Assets', value: `$${totalAssets.toFixed(2)}` },
+    { label: 'Total Liabilities', value: `$${totalLiabilities.toFixed(2)}` },
+    { label: 'Total Equity', value: `$${totalEquity.toFixed(2)}` },
+    { label: 'Balance Check', value: totalAssets === (totalLiabilities + totalEquity) ? 'Balanced' : 'Unbalanced', color: totalAssets === (totalLiabilities + totalEquity) ? '#d1fae5' : '#fee2e2' },
+  ]);
+
+  // Assets section
+  if (data.assets && data.assets.length > 0) {
+    pdf.addSection('Assets');
+    const assetsColumns = ['Account', 'Description', 'Amount'];
+    const assetsData = data.assets.map((item: any) => [
+      item.account || 'N/A',
+      item.description || '-',
+      `$${(item.amount || 0).toFixed(2)}`,
+    ]);
+    assetsData.push(['', 'Total Assets', `$${totalAssets.toFixed(2)}`]);
+    pdf.addTable(assetsColumns, assetsData);
+  }
+
+  // Liabilities section
+  if (data.liabilities && data.liabilities.length > 0) {
+    pdf.addSection('Liabilities');
+    const liabilitiesColumns = ['Account', 'Description', 'Amount'];
+    const liabilitiesData = data.liabilities.map((item: any) => [
+      item.account || 'N/A',
+      item.description || '-',
+      `$${(item.amount || 0).toFixed(2)}`,
+    ]);
+    liabilitiesData.push(['', 'Total Liabilities', `$${totalLiabilities.toFixed(2)}`]);
+    pdf.addTable(liabilitiesColumns, liabilitiesData);
+  }
+
+  // Equity section
+  if (data.equity && data.equity.length > 0) {
+    pdf.addSection('Equity');
+    const equityColumns = ['Account', 'Description', 'Amount'];
+    const equityData = data.equity.map((item: any) => [
+      item.account || 'N/A',
+      item.description || '-',
+      `$${(item.amount || 0).toFixed(2)}`,
+    ]);
+    equityData.push(['', 'Total Equity', `$${totalEquity.toFixed(2)}`]);
+    pdf.addTable(equityColumns, equityData);
+  }
+
+  // Balance verification
+  pdf.addInfoBox(
+    'Balance Verification',
+    `Assets: $${totalAssets.toFixed(2)} | Liabilities + Equity: $${(totalLiabilities + totalEquity).toFixed(2)} | ` +
+    `Difference: $${(totalAssets - (totalLiabilities + totalEquity)).toFixed(2)}`
+  );
+
+  // Save PDF
+  pdf.save(`balance-sheet-${new Date().toISOString().split('T')[0]}`);
+}
+
+export function exportTrialBalance(data: any) {
+  const pdf = new EnhancedPDFExport('landscape');
+
+  // Add header
+  pdf.addHeader('Trial Balance', `As of: ${data.asOfDate || new Date().toLocaleDateString()}`);
+
+  // Calculate totals
+  const totalDebits = data.accounts?.reduce((sum: number, item: any) => sum + (item.debit || 0), 0) || 0;
+  const totalCredits = data.accounts?.reduce((sum: number, item: any) => sum + (item.credit || 0), 0) || 0;
+
+  // Add statistics summary
+  pdf.addStatsSummary([
+    { label: 'Total Accounts', value: data.accounts?.length || 0 },
+    { label: 'Total Debits', value: `$${totalDebits.toFixed(2)}` },
+    { label: 'Total Credits', value: `$${totalCredits.toFixed(2)}` },
+    { label: 'Balance Status', value: totalDebits === totalCredits ? 'Balanced' : 'Unbalanced', color: totalDebits === totalCredits ? '#d1fae5' : '#fee2e2' },
+  ]);
+
+  // Accounts section
+  if (data.accounts && data.accounts.length > 0) {
+    pdf.addSection('Account Balances');
+    const columns = ['Account Code', 'Account Name', 'Debit', 'Credit'];
+    const accountsData = data.accounts.map((item: any) => [
+      item.code || 'N/A',
+      item.name || 'N/A',
+      item.debit ? `$${item.debit.toFixed(2)}` : '-',
+      item.credit ? `$${item.credit.toFixed(2)}` : '-',
+    ]);
+    accountsData.push(['', 'TOTALS', `$${totalDebits.toFixed(2)}`, `$${totalCredits.toFixed(2)}`]);
+    pdf.addTable(columns, accountsData);
+  }
+
+  // Balance verification
+  pdf.addInfoBox(
+    'Trial Balance Verification',
+    `Total Debits: $${totalDebits.toFixed(2)} | Total Credits: $${totalCredits.toFixed(2)} | ` +
+    `Difference: $${(totalDebits - totalCredits).toFixed(2)} | ` +
+    `Status: ${totalDebits === totalCredits ? 'Books are in balance' : 'Books are NOT in balance - investigation required'}`
+  );
+
+  // Save PDF
+  pdf.save(`trial-balance-${new Date().toISOString().split('T')[0]}`);
+}
+
+export function exportGeneralLedger(data: any) {
+  const pdf = new EnhancedPDFExport('landscape');
+
+  // Add header
+  pdf.addHeader('General Ledger', data.period || 'All Transactions');
+
+  // Statistics
+  const totalTransactions = data.transactions?.length || 0;
+  const totalDebits = data.transactions?.reduce((sum: number, t: any) => sum + (t.debit || 0), 0) || 0;
+  const totalCredits = data.transactions?.reduce((sum: number, t: any) => sum + (t.credit || 0), 0) || 0;
+
+  pdf.addStatsSummary([
+    { label: 'Total Transactions', value: totalTransactions },
+    { label: 'Total Debits', value: `$${totalDebits.toFixed(2)}` },
+    { label: 'Total Credits', value: `$${totalCredits.toFixed(2)}` },
+    { label: 'Net Change', value: `$${(totalDebits - totalCredits).toFixed(2)}` },
+  ]);
+
+  // Transactions section
+  if (data.transactions && data.transactions.length > 0) {
+    pdf.addSection('Ledger Entries');
+    const columns = ['Date', 'Account', 'Description', 'Debit', 'Credit', 'Balance'];
+    const transactionsData = data.transactions.map((item: any) => [
+      item.date ? new Date(item.date).toLocaleDateString() : 'N/A',
+      item.account || 'N/A',
+      item.description || '-',
+      item.debit ? `$${item.debit.toFixed(2)}` : '-',
+      item.credit ? `$${item.credit.toFixed(2)}` : '-',
+      `$${(item.balance || 0).toFixed(2)}`,
+    ]);
+    pdf.addTable(columns, transactionsData);
+  }
+
+  // Save PDF
+  pdf.save(`general-ledger-${new Date().toISOString().split('T')[0]}`);
+}
+
+export function exportDashboardReport(metrics: any, options?: { includeCharts?: boolean }) {
+  const pdf = new EnhancedPDFExport('portrait');
+
+  // Add header
+  pdf.addHeader('Dashboard Report', 'Business Performance Overview');
+
+  // Add statistics summary
+  pdf.addStatsSummary([
+    { label: 'Total Revenue', value: `₹${(metrics.totalRevenue || 0).toFixed(2)}` },
+    { label: 'Total Orders', value: metrics.totalOrders || 0 },
+    { label: 'Active Customers', value: metrics.activeCustomers || 0 },
+    { label: 'Completion Rate', value: `${(metrics.completionRate || 0).toFixed(1)}%` },
+  ]);
+
+  // Key metrics section
+  pdf.addSection('Key Performance Indicators');
+
+  const kpiData = [
+    ['Metric', 'Value', 'Status'],
+    ['Pending Orders', metrics.pendingOrders || 0, 'Active'],
+    ['Processing Orders', metrics.processingOrders || 0, 'Active'],
+    ['Completed Orders', metrics.completedOrders || 0, 'Completed'],
+    ['Average Order Value', `₹${(metrics.averageOrderValue || 0).toFixed(2)}`, 'Metric'],
+    ['Total Customers', metrics.totalCustomers || 0, 'Active'],
+    ['New Customers (This Month)', metrics.newCustomers || 0, 'Growth'],
+  ];
+  pdf.addTable(kpiData[0], kpiData.slice(1));
+
+  // Revenue breakdown
+  if (metrics.revenueByStatus) {
+    pdf.addSection('Revenue by Order Status');
+    const revenueColumns = ['Status', 'Orders', 'Revenue', 'Percentage'];
+    const totalRevenue = Object.values(metrics.revenueByStatus).reduce((sum: any, val: any) => sum + val, 0) as number;
+    const revenueData = Object.entries(metrics.revenueByStatus).map(([status, revenue]: [string, any]) => [
+      status.charAt(0).toUpperCase() + status.slice(1),
+      metrics.ordersByStatus?.[status] || 0,
+      `₹${revenue.toFixed(2)}`,
+      `${((revenue / (totalRevenue || 1)) * 100).toFixed(1)}%`,
+    ]);
+    pdf.addTable(revenueColumns, revenueData);
+  }
+
+  // Business insights
+  pdf.addSection('Business Insights');
+
+  const insights = `Your business is ${metrics.totalRevenue > 0 ? 'generating revenue' : 'starting up'} with ` +
+    `${metrics.totalOrders || 0} total orders and ${metrics.activeCustomers || 0} active customers. ` +
+    `${metrics.completedOrders ? `You have successfully completed ${metrics.completedOrders} orders with a ` : ''}` +
+    `${metrics.completionRate ? `completion rate of ${metrics.completionRate.toFixed(1)}%.` : 'growing customer base.'}`;
+
+  pdf.addInfoBox('Performance Summary', insights);
+
+  // Financial health
+  if (metrics.totalRevenue && metrics.totalOrders) {
+    pdf.addInfoBox(
+      'Financial Health',
+      `Average Order Value: ₹${(metrics.averageOrderValue || 0).toFixed(2)} | ` +
+      `Total Revenue: ₹${(metrics.totalRevenue || 0).toFixed(2)} | ` +
+      `Customer Lifetime Value: ₹${metrics.totalCustomers > 0 ? ((metrics.totalRevenue || 0) / metrics.totalCustomers).toFixed(2) : '0.00'}`
+    );
+  }
+
+  // Save PDF
+  pdf.save(`dashboard-report-${new Date().toISOString().split('T')[0]}`);
 }

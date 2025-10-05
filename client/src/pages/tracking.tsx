@@ -11,6 +11,9 @@ import BarcodeDisplay from "@/components/barcode-display";
 import PrintManager from "@/components/print-manager";
 import { LiveTrackingMap } from "@/components/live-tracking-map";
 import { safeFormatDate } from "@/lib/safe-utils";
+import { ordersApi, logisticsApi } from "@/lib/data-service";
+import { useToast } from "@/hooks/use-toast";
+import { useDebounce } from "@/hooks/use-debounce";
 import {
   Search,
   Filter,
@@ -52,6 +55,11 @@ interface Shipment {
   status: 'created' | 'in_transit' | 'delivered';
   createdAt: string;
   estimatedDelivery: string;
+  shipmentNumber?: string;
+  carrier?: string;
+  trackingNumber?: string;
+  orderIds?: string[];
+  vehicleId?: string;
 }
 
 const kpiData = [
@@ -62,7 +70,9 @@ const kpiData = [
 ];
 
 export default function Tracking() {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [isCreateShipmentOpen, setIsCreateShipmentOpen] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
@@ -70,18 +80,47 @@ export default function Tracking() {
   const [scannedOrderId, setScannedOrderId] = useState<string | null>(null);
   const [generatedBarcodes, setGeneratedBarcodes] = useState<any[]>([]);
 
-  const { data: orders, isLoading: ordersLoading } = useQuery<Order[]>({
+  const { data: orders, isLoading: ordersLoading, error: ordersError } = useQuery<Order[]>({
     queryKey: ["orders"],
+    queryFn: async () => {
+      const data = await ordersApi.getAll();
+      return data;
+    },
+    retry: 3,
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
-  const { data: shipments, isLoading: shipmentsLoading } = useQuery<Shipment[]>({
+  const { data: shipments, isLoading: shipmentsLoading, error: shipmentsError } = useQuery<Shipment[]>({
     queryKey: ["shipments"],
+    queryFn: async () => {
+      const deliveries = await logisticsApi.getDeliveries();
+      // Map deliveries to shipments format
+      return deliveries.map((delivery, index) => ({
+        id: delivery.id,
+        uti: `UTI-2025-${String(index + 1).padStart(3, '0')}`,
+        storeId: delivery.storeId || 'STORE-001',
+        staffName: delivery.driverName || 'N/A',
+        packageCount: 1,
+        orders: [delivery.orderId],
+        status: delivery.status === 'pending' ? 'created' :
+                delivery.status === 'in_transit' ? 'in_transit' : 'delivered',
+        createdAt: delivery.createdAt.toISOString(),
+        estimatedDelivery: delivery.estimatedDelivery?.toISOString() || new Date().toISOString(),
+        shipmentNumber: `SHP-${String(index + 1).padStart(4, '0')}`,
+        carrier: 'Internal',
+        trackingNumber: `TRK-${String(index + 1).padStart(6, '0')}`,
+        orderIds: [delivery.orderId],
+        vehicleId: delivery.vehicleId,
+      })) as Shipment[];
+    },
+    retry: 3,
+    staleTime: 2 * 60 * 1000,
   });
 
   const filteredOrders = orders?.filter(order => {
-    const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.phoneNumber.includes(searchTerm);
+    const matchesSearch = order.id.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                         order.customerName.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                         order.phoneNumber.includes(debouncedSearchTerm);
     return matchesSearch;
   });
 
@@ -191,13 +230,20 @@ export default function Tracking() {
 
   const handleCreateShipment = () => {
     if (selectedOrders.length === 0) {
-      alert("Please select at least one order to create a shipment.");
+      toast({
+        title: "No Orders Selected",
+        description: "Please select at least one order to create a shipment.",
+        variant: "destructive",
+      });
       return;
     }
-    
-    const uti = `UTI-2025-${String(shipments?.length || 0 + 1).padStart(3, '0')}`;
-    alert(`Shipment created successfully!\n\nUnified Tracking ID: ${uti}\nOrders: ${selectedOrders.join(', ')}\n\nTransport Order has been generated and is ready for printing.`);
-    
+
+    const uti = `UTI-2025-${String((shipments?.length || 0) + 1).padStart(3, '0')}`;
+    toast({
+      title: "Shipment Created",
+      description: `Unified Tracking ID: ${uti}\nOrders: ${selectedOrders.length} order(s)\nTransport Order is ready for printing.`,
+    });
+
     setSelectedOrders([]);
     setIsCreateShipmentOpen(false);
   };
@@ -498,6 +544,7 @@ export default function Tracking() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 w-64"
                   data-testid="search-orders"
+                  aria-label="Search orders by ID, customer name, or phone number"
                 />
               </div>
               <Button variant="outline" size="sm" data-testid="filter-orders">
@@ -536,6 +583,7 @@ export default function Tracking() {
                       checked={selectedOrders.includes(order.id)}
                       onChange={() => handleOrderSelect(order.id)}
                       className="rounded"
+                      aria-label={`Select order ${order.id} for ${order.customerName}`}
                     />
                   </TableCell>
                   <TableCell className="font-mono font-medium">{order.id}</TableCell>

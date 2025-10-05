@@ -17,7 +17,8 @@ import {
   Calendar,
   Filter,
   Clock,
-  Sparkles
+  Sparkles,
+  Download
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageTransition, FadeIn, StaggerChildren, StaggerItem } from "@/components/ui/page-transition";
@@ -39,7 +40,9 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDashboard } from "@/hooks/use-dashboard";
-import { analyticsApi, ordersApi, customersApi, formatCurrency } from '@/lib/data-service';
+import { analyticsApi, ordersApi, customersApi, employeesApi, formatCurrency } from '@/lib/data-service';
+import { exportDashboardReport } from '@/lib/enhanced-pdf-export';
+import { exportDashboardToExcel } from '@/lib/excel-exports';
 import { DateRange } from "@/types/dashboard";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +61,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
     recentOrders,
     dueTodayOrders,
     customers,
+    ordersTodayCount,
     isLoading,
     hasData,
     lastUpdated,
@@ -72,6 +76,11 @@ export default React.memo(function FranchiseOwnerDashboard() {
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false);
 
+  // Form submission states
+  const [isSubmittingCustomer, setIsSubmittingCustomer] = useState(false);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [isSubmittingEmployee, setIsSubmittingEmployee] = useState(false);
+
   // Date range handler
   const handleDateRangeChange = useCallback((dateRange: DateRange) => {
     updateFilters({ dateRange });
@@ -79,6 +88,9 @@ export default React.memo(function FranchiseOwnerDashboard() {
 
   const handleSaveCustomer = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingCustomer) return;
+
+    setIsSubmittingCustomer(true);
     try {
       const customerData = {
         name: quickActionForms.customer.name,
@@ -90,33 +102,39 @@ export default React.memo(function FranchiseOwnerDashboard() {
       };
 
       const newCustomer = await customersApi.create(customerData);
-      
+
       if (newCustomer) {
         toast({
           title: "Success!",
           description: `Customer ${newCustomer.name} has been created successfully.`,
         });
-        
-        // Refresh dashboard data
+
+        // Refresh dashboard data and customers list
         queryClient.invalidateQueries({ queryKey: ["dashboard"] });
         queryClient.invalidateQueries({ queryKey: ["customers"] });
-        
+        queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
+
         // Reset form
         resetQuickActionForm('customer');
         setIsCustomerDialogOpen(false);
       }
-      } catch (error) {
+    } catch (error) {
       console.error('Failed to create customer:', error);
       toast({
         title: "Error",
         description: "Failed to create customer. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmittingCustomer(false);
     }
-  }, [quickActionForms.customer, toast, queryClient, resetQuickActionForm]);
+  }, [quickActionForms.customer, toast, queryClient, resetQuickActionForm, isSubmittingCustomer]);
 
   const handleSaveOrder = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingOrder) return;
+
+    setIsSubmittingOrder(true);
     try {
       const orderData = {
         customerName: quickActionForms.order.customerName,
@@ -132,17 +150,19 @@ export default React.memo(function FranchiseOwnerDashboard() {
       };
 
       const newOrder = await ordersApi.create(orderData);
-      
+
       if (newOrder) {
         toast({
           title: "Success!",
           description: `Order ${newOrder.orderNumber} has been created successfully.`,
         });
-        
-        // Refresh dashboard data
+
+        // Refresh dashboard data and orders list
         queryClient.invalidateQueries({ queryKey: ["dashboard"] });
         queryClient.invalidateQueries({ queryKey: ["orders"] });
-        
+        queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard/recent-orders"] });
+
         // Reset form
         resetQuickActionForm('order');
         setIsOrderDialogOpen(false);
@@ -154,44 +174,43 @@ export default React.memo(function FranchiseOwnerDashboard() {
         description: "Failed to create order. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmittingOrder(false);
     }
-  }, [quickActionForms.order, toast, queryClient, resetQuickActionForm]);
+  }, [quickActionForms.order, toast, queryClient, resetQuickActionForm, isSubmittingOrder]);
 
   const handleSaveEmployee = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingEmployee) return;
+
+    setIsSubmittingEmployee(true);
     try {
       const employeeData = {
         name: quickActionForms.employee.name,
         phone: quickActionForms.employee.phone,
         email: quickActionForms.employee.email,
         position: quickActionForms.employee.position,
-        salary: parseFloat(quickActionForms.employee.salary),
+        salary: parseFloat(quickActionForms.employee.salary).toString(),
         joinDate: new Date().toISOString(),
         status: 'active'
       };
 
-      const response = await fetch('/api/employees', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(employeeData),
-      });
+      const newEmployee = await employeesApi.create(employeeData);
 
-      if (response.ok) {
-    toast({
-      title: "Success!",
-          description: `Employee ${quickActionForms.employee.name} has been created successfully.`,
+      if (newEmployee) {
+        toast({
+          title: "Success!",
+          description: `Employee ${newEmployee.name} has been created successfully.`,
         });
-        
-        // Refresh dashboard data
+
+        // Refresh dashboard data and employees list
         queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-        
+        queryClient.invalidateQueries({ queryKey: ["employees"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
+
         // Reset form
         resetQuickActionForm('employee');
         setIsEmployeeDialogOpen(false);
-      } else {
-        throw new Error('Failed to create employee');
       }
     } catch (error) {
       console.error('Failed to create employee:', error);
@@ -200,8 +219,10 @@ export default React.memo(function FranchiseOwnerDashboard() {
         description: "Failed to create employee. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmittingEmployee(false);
     }
-  }, [quickActionForms.employee, toast, queryClient, resetQuickActionForm]);
+  }, [quickActionForms.employee, toast, queryClient, resetQuickActionForm, isSubmittingEmployee]);
 
   // Memoized KPI cards with proper data
   const kpiCards = useMemo(() => [
@@ -244,7 +265,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Orders Today</p>
-              <p className="text-2xl font-bold">{Math.floor(metrics.totalOrders / 30)}</p>
+              <p className="text-2xl font-bold">{ordersTodayCount}</p>
             </div>
           </div>
           <OrderStatusChart data={orderStatusData} />
@@ -347,6 +368,47 @@ export default React.memo(function FranchiseOwnerDashboard() {
             <div className="flex items-center gap-4">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button
+                  onClick={() => {
+                    const dashboardData = {
+                      metrics,
+                      recentOrders,
+                      topCustomers: customers.slice(0, 10),
+                      salesData,
+                      servicePopularity: servicePopularityData,
+                    };
+                    exportDashboardToExcel(dashboardData);
+                    toast({
+                      title: "Dashboard Exported",
+                      description: "Excel report has been downloaded successfully",
+                    });
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 hover-lift"
+                >
+                  <Download className="h-4 w-4" />
+                  Export Excel
+                </Button>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button
+                  onClick={() => {
+                    exportDashboardReport(metrics);
+                    toast({
+                      title: "Dashboard Report Exported",
+                      description: "PDF report has been downloaded successfully",
+                    });
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 hover-lift"
+                >
+                  <Download className="h-4 w-4" />
+                  Export PDF
+                </Button>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button
                   onClick={refreshData}
                   variant="outline"
                   size="sm"
@@ -395,14 +457,14 @@ export default React.memo(function FranchiseOwnerDashboard() {
               Quick Actions
             </h2>
             {isLoading ? (
-              <div className="grid gap-4 grid-cols-4">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <LoadingSkeleton.QuickActionSkeleton key={i} />
                 ))}
               </div>
             ) : (
               <StaggerChildren>
-                <div className="grid gap-4 grid-cols-4">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {/* New Order Quick Action */}
                   <StaggerItem>
                     <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
@@ -433,62 +495,86 @@ export default React.memo(function FranchiseOwnerDashboard() {
                         <DialogHeader>
                           <DialogTitle>Create New Order</DialogTitle>
                         </DialogHeader>
-                        <form onSubmit={handleSaveOrder} className="py-4 space-y-4">
+                        <form onSubmit={handleSaveOrder} className="py-4 space-y-4" aria-label="Create new order form">
                           <div>
                             <Label htmlFor="orderCustomerName">Customer Name</Label>
                             <Input
                               id="orderCustomerName"
+                              name="customerName"
                               placeholder="e.g., Jane Doe"
                               value={quickActionForms.order.customerName}
                               onChange={(e) => updateQuickActionForm('order', { customerName: e.target.value })}
                               required
+                              aria-required="true"
+                              aria-label="Customer name"
                             />
                           </div>
                           <div>
                             <Label htmlFor="orderCustomerPhone">Customer Phone</Label>
                             <Input
                               id="orderCustomerPhone"
+                              name="customerPhone"
                               type="tel"
                               placeholder="e.g., +91 98765 43210"
                               value={quickActionForms.order.customerPhone}
                               onChange={(e) => updateQuickActionForm('order', { customerPhone: e.target.value })}
                               required
+                              aria-required="true"
+                              aria-label="Customer phone number"
                             />
                           </div>
                           <div>
                             <Label htmlFor="orderService">Service</Label>
                             <Input
                               id="orderService"
+                              name="service"
                               placeholder="e.g., Dry Cleaning"
                               value={quickActionForms.order.service}
                               onChange={(e) => updateQuickActionForm('order', { service: e.target.value })}
                               required
+                              aria-required="true"
+                              aria-label="Service type"
                             />
                           </div>
                           <div>
                             <Label htmlFor="orderQuantity">Quantity</Label>
                             <Input
                               id="orderQuantity"
+                              name="quantity"
                               type="number"
                               min="1"
                               value={quickActionForms.order.quantity}
                               onChange={(e) => updateQuickActionForm('order', { quantity: parseInt(e.target.value) || 1 })}
                               required
+                              aria-required="true"
+                              aria-label="Order quantity"
                             />
                           </div>
                           <div>
                             <Label htmlFor="orderPickupDate">Pickup Date</Label>
                             <Input
                               id="orderPickupDate"
+                              name="pickupDate"
                               type="date"
                               value={quickActionForms.order.pickupDate}
                               onChange={(e) => updateQuickActionForm('order', { pickupDate: e.target.value })}
                               required
+                              aria-required="true"
+                              aria-label="Pickup date"
                             />
                           </div>
                           <div className="flex gap-2">
-                            <Button type="submit" className="flex-1">Create Order</Button>
-                            <Button type="button" variant="outline" onClick={() => setIsOrderDialogOpen(false)}>
+                            <Button type="submit" className="flex-1" disabled={isSubmittingOrder}>
+                              {isSubmittingOrder ? (
+                                <>
+                                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                  Creating...
+                                </>
+                              ) : (
+                                'Create Order'
+                              )}
+                            </Button>
+                            <Button type="button" variant="outline" onClick={() => setIsOrderDialogOpen(false)} disabled={isSubmittingOrder}>
                               Cancel
                             </Button>
                           </div>
@@ -527,44 +613,62 @@ export default React.memo(function FranchiseOwnerDashboard() {
                         <DialogHeader>
                           <DialogTitle>Add New Customer</DialogTitle>
                         </DialogHeader>
-                        <form onSubmit={handleSaveCustomer} className="py-4 space-y-4">
+                        <form onSubmit={handleSaveCustomer} className="py-4 space-y-4" aria-label="Add new customer form">
                           <div>
                             <Label htmlFor="customerName">Name</Label>
                             <Input
                               id="customerName"
+                              name="name"
                               placeholder="e.g., Jane Doe"
                               value={quickActionForms.customer.name}
                               onChange={(e) => updateQuickActionForm('customer', { name: e.target.value })}
                               required
+                              aria-required="true"
+                              aria-label="Customer name"
                             />
                           </div>
                           <div>
                             <Label htmlFor="customerPhone">Phone</Label>
                             <Input
                               id="customerPhone"
+                              name="phone"
                               type="tel"
                               placeholder="e.g., +91 98765 43210"
                               value={quickActionForms.customer.phone}
                               onChange={(e) => updateQuickActionForm('customer', { phone: e.target.value })}
                               required
+                              aria-required="true"
+                              aria-label="Customer phone number"
                             />
                           </div>
                           <div>
                             <Label htmlFor="customerEmail">Email (Optional)</Label>
                             <Input
                               id="customerEmail"
+                              name="email"
                               type="email"
                               placeholder="e.g., jane@example.com"
                               value={quickActionForms.customer.email}
                               onChange={(e) => updateQuickActionForm('customer', { email: e.target.value })}
+                              aria-label="Customer email (optional)"
                             />
                           </div>
                           <div className="flex gap-2">
-                            <Button type="submit" className="flex-1">Save Customer</Button>
+                            <Button type="submit" className="flex-1" disabled={isSubmittingCustomer}>
+                              {isSubmittingCustomer ? (
+                                <>
+                                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                  Saving...
+                                </>
+                              ) : (
+                                'Save Customer'
+                              )}
+                            </Button>
                             <Button
                               type="button"
                               variant="outline"
                               onClick={() => setIsCustomerDialogOpen(false)}
+                              disabled={isSubmittingCustomer}
                             >
                               Cancel
                             </Button>
@@ -604,63 +708,87 @@ export default React.memo(function FranchiseOwnerDashboard() {
                         <DialogHeader>
                           <DialogTitle>Add New Employee</DialogTitle>
                         </DialogHeader>
-                        <form onSubmit={handleSaveEmployee} className="py-4 space-y-4">
+                        <form onSubmit={handleSaveEmployee} className="py-4 space-y-4" aria-label="Add new employee form">
                           <div>
                             <Label htmlFor="employeeName">Name</Label>
                             <Input
                               id="employeeName"
+                              name="name"
                               placeholder="e.g., John Smith"
                               value={quickActionForms.employee.name}
                               onChange={(e) => updateQuickActionForm('employee', { name: e.target.value })}
                               required
+                              aria-required="true"
+                              aria-label="Employee name"
                             />
                           </div>
                           <div>
                             <Label htmlFor="employeePhone">Phone</Label>
                             <Input
                               id="employeePhone"
+                              name="phone"
                               type="tel"
                               placeholder="e.g., +91 98765 43210"
                               value={quickActionForms.employee.phone}
                               onChange={(e) => updateQuickActionForm('employee', { phone: e.target.value })}
                               required
+                              aria-required="true"
+                              aria-label="Employee phone number"
                             />
                           </div>
                           <div>
                             <Label htmlFor="employeeEmail">Email</Label>
                             <Input
                               id="employeeEmail"
+                              name="email"
                               type="email"
                               placeholder="e.g., john@fabzclean.com"
                               value={quickActionForms.employee.email}
                               onChange={(e) => updateQuickActionForm('employee', { email: e.target.value })}
                               required
+                              aria-required="true"
+                              aria-label="Employee email"
                             />
                           </div>
                           <div>
                             <Label htmlFor="employeePosition">Position</Label>
                             <Input
                               id="employeePosition"
+                              name="position"
                               placeholder="e.g., Driver, Manager"
                               value={quickActionForms.employee.position}
                               onChange={(e) => updateQuickActionForm('employee', { position: e.target.value })}
                               required
+                              aria-required="true"
+                              aria-label="Employee position"
                             />
                           </div>
                           <div>
                             <Label htmlFor="employeeSalary">Salary (₹)</Label>
                             <Input
                               id="employeeSalary"
+                              name="salary"
                               type="number"
                               placeholder="e.g., 25000"
                               value={quickActionForms.employee.salary}
                               onChange={(e) => updateQuickActionForm('employee', { salary: e.target.value })}
                               required
+                              aria-required="true"
+                              aria-label="Employee salary"
                             />
                           </div>
                           <div className="flex gap-2">
-                            <Button type="submit" className="flex-1">Save Employee</Button>
-                            <Button type="button" variant="outline" onClick={() => setIsEmployeeDialogOpen(false)}>
+                            <Button type="submit" className="flex-1" disabled={isSubmittingEmployee}>
+                              {isSubmittingEmployee ? (
+                                <>
+                                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                  Saving...
+                                </>
+                              ) : (
+                                'Save Employee'
+                              )}
+                            </Button>
+                            <Button type="button" variant="outline" onClick={() => setIsEmployeeDialogOpen(false)} disabled={isSubmittingEmployee}>
                               Cancel
                             </Button>
                           </div>
@@ -714,14 +842,14 @@ export default React.memo(function FranchiseOwnerDashboard() {
               Key Performance Indicators
             </h2>
             {isLoading ? (
-              <div className="grid gap-4 grid-cols-4">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <LoadingSkeleton.KpiCardSkeleton key={i} />
                 ))}
               </div>
             ) : (
               <StaggerChildren>
-                <div className="grid gap-4 grid-cols-4">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {kpiCards.map((kpi, index) => (
                     <StaggerItem key={kpi.title}>
                       <motion.div
@@ -750,13 +878,13 @@ export default React.memo(function FranchiseOwnerDashboard() {
 
         {/* Charts Section */}
         <FadeIn delay={0.4}>
-          <div className="grid gap-6 grid-cols-2">
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
             {/* Sales Chart */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.5 }}
-              className="col-span-2"
+              className="col-span-1 lg:col-span-2"
             >
               <SalesChart
                 data={salesData}
@@ -794,7 +922,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
 
         {/* Recent Orders and Due Today */}
         <FadeIn delay={0.5}>
-          <div className="grid gap-6 grid-cols-2">
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
             <motion.div
               whileHover={{ scale: 1.01 }}
               transition={{ type: "spring", stiffness: 300 }}

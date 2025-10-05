@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Clock, Navigation, MapPin, Truck, Phone, MessageSquare } from 'lucide-react';
-import { useWebSocket } from '@/hooks/use-websocket';
 import 'leaflet/dist/leaflet.css';
 
 // Fix for default markers in react-leaflet
@@ -36,9 +35,9 @@ interface RoutePoint {
 }
 
 interface LiveTrackingMapProps {
-  orderId?: string;
-  driverId?: string;
+  driver: DriverLocation | null;
   allDrivers?: DriverLocation[];
+  route?: RoutePoint[];
   showAllDrivers?: boolean;
   className?: string;
 }
@@ -154,154 +153,13 @@ const MapUpdater: React.FC<{ driver: DriverLocation | null }> = ({ driver }) => 
 };
 
 export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({ 
-  orderId, 
-  driverId, 
+  driver, 
   allDrivers = [],
+  route = [],
   showAllDrivers = false,
   className = '' 
 }) => {
-  const [driver, setDriver] = useState<DriverLocation | null>(null);
-  const [route, setRoute] = useState<RoutePoint[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const mapRef = useRef<L.Map>(null);
-
-  // WebSocket connection for real-time updates
-  const { isConnected, subscribe } = useWebSocket({
-    url: 'ws://localhost:3001',
-    onMessage: (message) => {
-      if (message.type === 'driver_locations') {
-        const drivers = message.data.drivers as DriverLocation[];
-        
-        if (driverId) {
-          const currentDriver = drivers.find(d => d.driverId === driverId);
-          if (currentDriver) {
-            setDriver(currentDriver);
-          }
-        } else if (orderId) {
-          const currentDriver = drivers.find(d => d.orderId === orderId);
-          if (currentDriver) {
-            setDriver(currentDriver);
-          }
-        }
-      }
-    },
-    onOpen: () => {
-      console.log('Connected to live tracking');
-      subscribe(['driver_locations']);
-    },
-    onClose: () => {
-      console.log('Disconnected from live tracking');
-    },
-    onError: (error) => {
-      console.error('Live tracking WebSocket error:', error);
-    }
-  });
-
-  // Fetch initial driver data
-  useEffect(() => {
-    const fetchDriverData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        let response;
-        if (driverId) {
-          response = await fetch(`/api/tracking/drivers/${driverId}`);
-        } else if (orderId) {
-          response = await fetch(`/api/tracking/orders/${orderId}`);
-        } else {
-          throw new Error('Either driverId or orderId must be provided');
-        }
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch driver data');
-        }
-
-        const driverData = await response.json();
-        setDriver(driverData);
-
-        // Fetch route data
-        if (driverData.driverId) {
-          const routeResponse = await fetch(`/api/tracking/drivers/${driverData.driverId}/route`);
-          if (routeResponse.ok) {
-            const routeData = await routeResponse.json();
-            setRoute(routeData);
-          }
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load tracking data');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchDriverData();
-  }, [orderId, driverId]);
-
-  // Start tracking for order if needed
-  const startTracking = async () => {
-    if (!orderId) return;
-    
-    try {
-      const response = await fetch(`/api/tracking/orders/${orderId}/start`, {
-        method: 'POST'
-      });
-      
-      if (response.ok) {
-        const driverData = await response.json();
-        setDriver(driverData);
-      }
-    } catch (error) {
-      console.error('Failed to start tracking:', error);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <Card className={className}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5" />
-            Live Tracking
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-              <p className="text-sm text-muted-foreground">Loading tracking data...</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className={className}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5" />
-            Live Tracking
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <p className="text-sm text-red-600 mb-4">{error}</p>
-              {orderId && (
-                <Button onClick={startTracking} variant="outline">
-                  Start Tracking
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   // Show all drivers view if enabled
   if (showAllDrivers && allDrivers.length > 0) {
@@ -358,11 +216,6 @@ export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-4">No driver assigned to this order</p>
-              {orderId && (
-                <Button onClick={startTracking} variant="outline">
-                  Start Tracking
-                </Button>
-              )}
             </div>
           </div>
         </CardContent>
@@ -379,7 +232,6 @@ export const LiveTrackingMap: React.FC<LiveTrackingMapProps> = ({
           <div className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
             Live Tracking
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
           </div>
           <Badge variant="outline" className="text-xs">
             {driver.status === 'picked_up' ? 'Picked Up' : 

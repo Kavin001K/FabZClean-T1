@@ -84,6 +84,7 @@ import {
 import { ordersApi, formatCurrency, formatDate } from '@/lib/data-service';
 import { exportOrdersToCSV } from '@/lib/export-utils';
 import { exportOrdersEnhanced } from '@/lib/enhanced-pdf-export';
+import { exportOrdersToExcel } from '@/lib/excel-exports';
 import type { Order } from "../../shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -118,6 +119,7 @@ function OrdersComponent() {
   const [sortField, setSortField] = useState<keyof Order | null>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [isBulkOperationLoading, setIsBulkOperationLoading] = useState(false);
   const [filters, setFilters] = useState<OrderFilters>({
     status: [],
     paymentStatus: [],
@@ -154,57 +156,53 @@ function OrdersComponent() {
 
   // Filtered and Sorted Orders
   const filteredOrders = useMemo(() => {
-    let filtered = [...orders];
+    // Pre-compute filter values once
+    const searchLower = filters.search?.toLowerCase();
+    const hasStatusFilter = filters.status.length > 0;
+    const hasPaymentFilter = filters.paymentStatus.length > 0;
+    const minAmount = filters.amountMin ? safeParseFloat(filters.amountMin) : null;
+    const maxAmount = filters.amountMax ? safeParseFloat(filters.amountMax) : null;
 
-    // Apply search filter
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter(order =>
-        order.id.toLowerCase().includes(searchLower) ||
-        order.customerName.toLowerCase().includes(searchLower) ||
-        order.orderNumber.toLowerCase().includes(searchLower) ||
-        (order as any).customerPhone?.toLowerCase().includes(searchLower) ||
-        (order as any).service?.toLowerCase().includes(searchLower)
-      );
-    }
+    // Single pass filtering for better performance
+    const filtered = orders.filter(order => {
+      // Search filter
+      if (searchLower) {
+        const matchesSearch =
+          order.id.toLowerCase().includes(searchLower) ||
+          order.customerName.toLowerCase().includes(searchLower) ||
+          order.orderNumber.toLowerCase().includes(searchLower) ||
+          (order as any).customerPhone?.toLowerCase().includes(searchLower) ||
+          (order as any).service?.toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
+      }
 
-    // Apply status filter
-    if (filters.status.length > 0) {
-      filtered = filtered.filter(order => filters.status.includes(order.status));
-    }
+      // Status filter
+      if (hasStatusFilter && !filters.status.includes(order.status)) {
+        return false;
+      }
 
-    // Apply payment status filter
-    if (filters.paymentStatus.length > 0) {
-      filtered = filtered.filter(order =>
-        filters.paymentStatus.includes((order as any).paymentStatus || 'pending')
-      );
-    }
+      // Payment status filter
+      if (hasPaymentFilter) {
+        const paymentStatus = (order as any).paymentStatus || 'pending';
+        if (!filters.paymentStatus.includes(paymentStatus)) {
+          return false;
+        }
+      }
 
-    // Apply date range filter
-    if (filters.dateFrom) {
-      filtered = filtered.filter(order => {
+      // Date range filter
+      if (filters.dateFrom || filters.dateTo) {
         const orderDate = new Date(order.createdAt || new Date());
-        return orderDate >= filters.dateFrom!;
-      });
-    }
+        if (filters.dateFrom && orderDate < filters.dateFrom) return false;
+        if (filters.dateTo && orderDate > filters.dateTo) return false;
+      }
 
-    if (filters.dateTo) {
-      filtered = filtered.filter(order => {
-        const orderDate = new Date(order.createdAt || new Date());
-        return orderDate <= filters.dateTo!;
-      });
-    }
+      // Amount range filter
+      const orderAmount = safeParseFloat(order.totalAmount);
+      if (minAmount !== null && !isNaN(minAmount) && orderAmount < minAmount) return false;
+      if (maxAmount !== null && !isNaN(maxAmount) && orderAmount > maxAmount) return false;
 
-    // Apply amount range filter
-    if (filters.amountMin) {
-      const minAmount = parseFloat(filters.amountMin);
-      filtered = filtered.filter(order => parseFloat(order.totalAmount) >= minAmount);
-    }
-
-    if (filters.amountMax) {
-      const maxAmount = parseFloat(filters.amountMax);
-      filtered = filtered.filter(order => parseFloat(order.totalAmount) <= maxAmount);
-    }
+      return true;
+    });
 
     // Apply sorting
     if (sortField) {
@@ -294,7 +292,7 @@ function OrdersComponent() {
     onSuccess: (updatedOrder, { orderId, newStatus }) => {
       if (updatedOrder) {
         queryClient.invalidateQueries({ queryKey: ['orders'] });
-        
+
         addNotification({
           type: 'info',
           title: 'Order Status Updated',
@@ -314,6 +312,26 @@ function OrdersComponent() {
       toast({
         title: "Error",
         description: "Failed to update order status. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteOrderMutation = useMutation({
+    mutationFn: (orderId: string) => ordersApi.delete(orderId),
+    onSuccess: (_, orderId) => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast({
+        title: "Order Deleted",
+        description: "Order has been deleted successfully",
+      });
+      setSelectedOrders(prev => prev.filter(id => id !== orderId));
+    },
+    onError: (error) => {
+      console.error('Failed to delete order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete order. Please try again.",
         variant: "destructive",
       });
     },
@@ -356,15 +374,9 @@ function OrdersComponent() {
 
   const handleDeleteOrder = useCallback((orderId: string) => {
     if (window.confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
-      // Delete order mutation
-      toast({
-        title: "Order Deleted",
-        description: `Order has been deleted successfully`,
-      });
-      // Here you would typically call the delete mutation
-      // deleteOrderMutation.mutate(orderId);
+      deleteOrderMutation.mutate(orderId);
     }
-  }, [toast]);
+  }, [deleteOrderMutation]);
 
   const handleEditOrder = useCallback((order: Order) => {
     setEditingOrder(order);
@@ -408,7 +420,7 @@ function OrdersComponent() {
     updateOrderStatusMutation.mutate({ orderId, newStatus });
   }, [updateOrderStatusMutation]);
 
-  const handleBulkStatusUpdate = useCallback((newStatus: string) => {
+  const handleBulkStatusUpdate = useCallback(async (newStatus: string) => {
     if (selectedOrders.length === 0) {
       toast({
         title: "No Orders Selected",
@@ -418,14 +430,43 @@ function OrdersComponent() {
       return;
     }
 
-    selectedOrders.forEach(orderId => {
-      updateOrderStatusMutation.mutate({ orderId, newStatus });
-    });
+    setIsBulkOperationLoading(true);
+    try {
+      const results = await Promise.allSettled(
+        selectedOrders.map(orderId =>
+          ordersApi.update(orderId, { status: newStatus as any })
+        )
+      );
 
-    setSelectedOrders([]);
-  }, [selectedOrders, updateOrderStatusMutation, toast]);
+      const successful = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
 
-  const handleBulkDelete = useCallback(() => {
+      if (successful > 0) {
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        toast({
+          title: "Bulk Update Complete",
+          description: `${successful} orders updated${failed > 0 ? `, ${failed} failed` : ''}`,
+        });
+      }
+
+      if (failed > 0 && successful === 0) {
+        throw new Error('All updates failed');
+      }
+
+      setSelectedOrders([]);
+    } catch (error) {
+      console.error('Bulk update failed:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update orders. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkOperationLoading(false);
+    }
+  }, [selectedOrders, queryClient, toast]);
+
+  const handleBulkDelete = useCallback(async () => {
     if (selectedOrders.length === 0) {
       toast({
         title: "No Orders Selected",
@@ -436,13 +477,40 @@ function OrdersComponent() {
     }
 
     if (window.confirm(`Are you sure you want to delete ${selectedOrders.length} orders? This action cannot be undone.`)) {
-      toast({
-        title: "Orders Deleted",
-        description: `${selectedOrders.length} orders have been deleted successfully`,
-      });
-      setSelectedOrders([]);
+      setIsBulkOperationLoading(true);
+      try {
+        const results = await Promise.allSettled(
+          selectedOrders.map(orderId => ordersApi.delete(orderId))
+        );
+
+        const successful = results.filter(r => r.status === 'fulfilled').length;
+        const failed = results.filter(r => r.status === 'rejected').length;
+
+        if (successful > 0) {
+          queryClient.invalidateQueries({ queryKey: ['orders'] });
+          toast({
+            title: "Orders Deleted",
+            description: `${successful} orders deleted${failed > 0 ? `, ${failed} failed` : ''}`,
+          });
+        }
+
+        if (failed > 0 && successful === 0) {
+          throw new Error('All deletions failed');
+        }
+
+        setSelectedOrders([]);
+      } catch (error) {
+        console.error('Bulk delete failed:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete orders. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsBulkOperationLoading(false);
+      }
     }
-  }, [selectedOrders, toast]);
+  }, [selectedOrders, queryClient, toast]);
 
   const handleExportCSV = useCallback(() => {
     if (filteredOrders.length === 0) {
@@ -475,6 +543,34 @@ function OrdersComponent() {
       description: `Generating enhanced PDF for ${filteredOrders.length} orders...`,
     });
   }, [filteredOrders, toast]);
+
+  const handleExportExcel = useCallback(() => {
+    if (filteredOrders.length === 0) {
+      toast({
+        title: "No Data to Export",
+        description: "There are no orders to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const filterInfo = {
+      status: filters.status,
+      paymentStatus: filters.paymentStatus,
+      dateRange: filters.dateFrom || filters.dateTo
+        ? `${filters.dateFrom ? formatDate(filters.dateFrom) : 'Any'} - ${filters.dateTo ? formatDate(filters.dateTo) : 'Any'}`
+        : undefined,
+      amountRange: filters.amountMin || filters.amountMax
+        ? `${filters.amountMin || 'Any'} - ${filters.amountMax || 'Any'}`
+        : undefined,
+    };
+
+    exportOrdersToExcel(filteredOrders, filterInfo);
+    toast({
+      title: "Excel Export Successful",
+      description: `Exported ${filteredOrders.length} orders to Excel.`,
+    });
+  }, [filteredOrders, filters, toast]);
 
   const handleExportSelected = useCallback(() => {
     if (selectedOrders.length === 0) {
@@ -1127,21 +1223,39 @@ function OrdersComponent() {
                         {/* Amount Range */}
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <label className="text-sm font-medium">Min Amount</label>
+                            <label htmlFor="filter-amount-min" className="text-sm font-medium">Min Amount</label>
                             <Input
+                              id="filter-amount-min"
                               type="number"
                               placeholder="0"
+                              min="0"
+                              step="0.01"
                               value={filters.amountMin}
-                              onChange={(e) => setFilters(prev => ({ ...prev, amountMin: e.target.value }))}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === '' || parseFloat(value) >= 0) {
+                                  setFilters(prev => ({ ...prev, amountMin: value }));
+                                }
+                              }}
+                              aria-label="Minimum amount filter"
                             />
                           </div>
                           <div className="space-y-2">
-                            <label className="text-sm font-medium">Max Amount</label>
+                            <label htmlFor="filter-amount-max" className="text-sm font-medium">Max Amount</label>
                             <Input
+                              id="filter-amount-max"
                               type="number"
                               placeholder="10000"
+                              min="0"
+                              step="0.01"
                               value={filters.amountMax}
-                              onChange={(e) => setFilters(prev => ({ ...prev, amountMax: e.target.value }))}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === '' || parseFloat(value) >= 0) {
+                                  setFilters(prev => ({ ...prev, amountMax: value }));
+                                }
+                              }}
+                              aria-label="Maximum amount filter"
                             />
                           </div>
                         </div>
@@ -1163,30 +1277,46 @@ function OrdersComponent() {
                         </Badge>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="lg" className="gap-2">
-                              <Settings className="h-5 w-5" />
-                              Bulk Actions
+                            <Button size="lg" className="gap-2" disabled={isBulkOperationLoading}>
+                              {isBulkOperationLoading ? (
+                                <>
+                                  <RefreshCw className="h-5 w-5 animate-spin" />
+                                  Processing...
+                                </>
+                              ) : (
+                                <>
+                                  <Settings className="h-5 w-5" />
+                                  Bulk Actions
+                                </>
+                              )}
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleBulkStatusUpdate('processing')}>
+                            <DropdownMenuItem
+                              onClick={() => handleBulkStatusUpdate('processing')}
+                              disabled={isBulkOperationLoading}
+                            >
                               <Clock className="mr-2 h-4 w-4" />
                               Mark as Processing
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleBulkStatusUpdate('completed')}>
+                            <DropdownMenuItem
+                              onClick={() => handleBulkStatusUpdate('completed')}
+                              disabled={isBulkOperationLoading}
+                            >
                               <CheckCircle className="mr-2 h-4 w-4" />
                               Mark as Completed
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={handleExportSelected}>
+                            <DropdownMenuItem onClick={handleExportSelected} disabled={isBulkOperationLoading}>
                               <Download className="mr-2 h-4 w-4" />
                               Export Selected
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={handleBulkDelete}
+                              disabled={isBulkOperationLoading}
                               className="text-red-600 focus:text-red-600"
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
@@ -1225,6 +1355,10 @@ function OrdersComponent() {
                       <DropdownMenuItem onClick={handleExportPDF}>
                         <FileText className="mr-2 h-4 w-4" />
                         Export as PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleExportExcel}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        Export as Excel
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -1359,13 +1493,15 @@ function OrdersComponent() {
                       </div>
                     </div>
                   ) : (
-                    <Table>
+                    <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
+                      <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/50">
                           <TableHead className="w-12">
                             <Checkbox
                               checked={paginatedOrders.length > 0 && selectedOrders.length === paginatedOrders.length}
                               onCheckedChange={handleSelectAll}
+                              aria-label="Select all orders on this page"
                             />
                           </TableHead>
                           <TableHead
@@ -1446,7 +1582,7 @@ function OrdersComponent() {
                               initial={{ opacity: 0, y: 20 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -20 }}
-                              transition={{ duration: 0.2, delay: index * 0.05 }}
+                              transition={{ duration: 0.15, delay: Math.min(index * 0.02, 0.3) }}
                               className="hover:bg-muted/50 cursor-pointer transition-colors"
                               onClick={() => handleViewOrder(order)}
                             >
@@ -1454,6 +1590,7 @@ function OrdersComponent() {
                                 <Checkbox
                                   checked={selectedOrders.includes(order.id)}
                                   onCheckedChange={() => handleSelectOrder(order.id)}
+                                  aria-label={`Select order ${order.orderNumber}`}
                                 />
                               </TableCell>
                               <TableCell className="font-mono font-medium">
@@ -1494,7 +1631,12 @@ function OrdersComponent() {
                               <TableCell onClick={(e) => e.stopPropagation()}>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0"
+                                      aria-label={`Actions for order ${order.orderNumber}`}
+                                    >
                                       <MoreHorizontal className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
@@ -1543,6 +1685,7 @@ function OrdersComponent() {
                         </AnimatePresence>
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </div>
               ) : (

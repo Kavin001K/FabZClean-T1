@@ -24,7 +24,7 @@ import { LiveTrackingMap } from '@/components/live-tracking-map';
 import { DriverManagement } from '@/components/driver-management';
 import { DriverProfile } from '@/components/driver-profile';
 import { useToast } from '@/hooks/use-toast';
-import { useWebSocket } from '@/hooks/use-websocket';
+import { useRealtime } from '@/contexts/realtime-context';
 import { useNotifications } from '@/hooks/use-notifications';
 
 interface DriverLocation {
@@ -59,6 +59,7 @@ export default function LiveTrackingPage() {
   const { toast } = useToast();
   const { addNotification } = useNotifications();
   const queryClient = useQueryClient();
+  const { driverLocations } = useRealtime();
 
   // Fetch orders using React Query
   const {
@@ -75,7 +76,6 @@ export default function LiveTrackingPage() {
     },
     staleTime: 30 * 1000, // 30 seconds
     cacheTime: 2 * 60 * 1000, // 2 minutes
-    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
   });
 
   // Fetch drivers using React Query
@@ -84,7 +84,7 @@ export default function LiveTrackingPage() {
     isLoading: driversLoading,
     isError: driversError,
     refetch: refetchDrivers,
-  } = useQuery({
+  } = useQuery<DriverLocation[]>({
     queryKey: ['live-tracking-drivers'],
     queryFn: async () => {
       const response = await fetch('/api/tracking/drivers');
@@ -93,59 +93,12 @@ export default function LiveTrackingPage() {
     },
     staleTime: 10 * 1000, // 10 seconds
     cacheTime: 1 * 60 * 1000, // 1 minute
-    refetchInterval: 10 * 1000, // Auto-refetch every 10 seconds
   });
 
   const isLoading = ordersLoading || driversLoading;
   const hasError = ordersError || driversError;
 
-  // WebSocket connection for real-time updates
-  const { isConnected, subscribe } = useWebSocket({
-    url: 'ws://localhost:3003',
-    onMessage: (message) => {
-      if (message.type === 'driver_locations') {
-        const updatedDrivers = message.data.drivers as DriverLocation[];
-        
-        // Check for status changes and send notifications
-        updatedDrivers.forEach(updatedDriver => {
-          const existingDriver = drivers.find(d => d.driverId === updatedDriver.driverId);
-          if (existingDriver && existingDriver.status !== updatedDriver.status) {
-            addNotification({
-              type: 'info',
-              title: 'Driver Status Update',
-              message: `${updatedDriver.driverName} status changed to ${getStatusText(updatedDriver.status)}`,
-              actionUrl: '/live-tracking',
-              actionText: 'View Details'
-            });
-          }
-        });
-        
-        setDrivers(updatedDrivers);
-      } else if (message.type === 'driver_assigned') {
-        const { driverId, orderId, driverName } = message.data;
-        addNotification({
-          type: 'success',
-          title: 'Driver Assigned',
-          message: `${driverName} has been assigned to order #${orderId.slice(-8)}`,
-          actionUrl: '/live-tracking',
-          actionText: 'Track Order'
-        });
-        refetchDrivers(); // Use React Query refetch instead
-      }
-    },
-    onOpen: () => {
-      console.log('Connected to live tracking WebSocket');
-      subscribe(['driver_locations', 'driver_assigned', 'driver_status_update']);
-    },
-    onClose: () => {
-      console.log('Disconnected from live tracking WebSocket');
-    },
-    onError: (error) => {
-      console.error('Live tracking WebSocket error:', error);
-    }
-  });
-
-  // Data fetching is now handled by React Query above
+  const activeDrivers = driverLocations.length > 0 ? driverLocations : drivers;
 
   // Filter orders based on search
   const filteredOrders = orders.filter(order =>
@@ -155,12 +108,12 @@ export default function LiveTrackingPage() {
 
   // Get orders with active drivers
   const ordersWithDrivers = orders.filter(order => 
-    drivers.some(driver => driver.orderId === order.id)
+    activeDrivers.some(driver => driver.orderId === order.id)
   );
 
   const handleOrderSelect = (order: Order) => {
     setSelectedOrder(order);
-    const driver = drivers.find(d => d.orderId === order.id);
+    const driver = activeDrivers.find(d => d.orderId === order.id);
     setSelectedDriver(driver || null);
   };
 
@@ -229,7 +182,7 @@ export default function LiveTrackingPage() {
 
   const handleTrackDriver = (driverId: string) => {
     // Find the driver in the active drivers list and select them
-    const driver = drivers.find(d => d.driverId === driverId);
+    const driver = activeDrivers.find(d => d.driverId === driverId);
     if (driver) {
       handleDriverProfileSelect(driver);
       // Switch to map view
@@ -310,9 +263,9 @@ export default function LiveTrackingPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold tracking-tight">Live Order Tracking</h1>
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <div className={`w-2 h-2 rounded-full ${driverLocations.length > 0 ? 'bg-green-500' : 'bg-red-500'}`}></div>
               <span className="text-sm text-muted-foreground">
-                {isConnected ? 'Connected' : 'Disconnected'}
+                {driverLocations.length > 0 ? 'Connected' : 'Disconnected'}
               </span>
             </div>
           </div>
@@ -382,7 +335,7 @@ export default function LiveTrackingPage() {
 
                 <div className="grid gap-4">
                   {filteredOrders.map((order) => {
-                    const driver = drivers.find(d => d.orderId === order.id);
+                    const driver = activeDrivers.find(d => d.orderId === order.id);
                     return (
                       <Card 
                         key={order.id} 
@@ -453,12 +406,12 @@ export default function LiveTrackingPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Truck className="h-5 w-5" />
-                Active Drivers ({drivers.length})
+                Active Drivers ({activeDrivers.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4">
-                {drivers.map((driver) => {
+                {activeDrivers.map((driver) => {
                   const order = orders.find(o => o.id === driver.orderId);
                   return (
                     <Card 
@@ -520,11 +473,11 @@ export default function LiveTrackingPage() {
         <TabsContent value="map" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2">
-              {selectedOrder || selectedDriver || drivers.length > 0 ? (
+              {selectedOrder || selectedDriver || activeDrivers.length > 0 ? (
                 <LiveTrackingMap 
                   orderId={selectedOrder?.id}
                   driverId={selectedDriver?.driverId}
-                  allDrivers={drivers}
+                  allDrivers={activeDrivers}
                   showAllDrivers={showAllDrivers}
                   className="w-full h-[600px]"
                 />
@@ -583,7 +536,7 @@ export default function LiveTrackingPage() {
                 <CardContent className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Active Drivers</span>
-                    <span className="font-semibold">{drivers.length}</span>
+                    <span className="font-semibold">{activeDrivers.length}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Orders with Drivers</span>
@@ -592,26 +545,26 @@ export default function LiveTrackingPage() {
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Available Drivers</span>
                     <span className="font-semibold text-green-600">
-                      {drivers.filter(d => d.status === 'available').length}
+                      {activeDrivers.filter(d => d.status === 'available').length}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">In Transit</span>
                     <span className="font-semibold text-yellow-600">
-                      {drivers.filter(d => d.status === 'in_transit').length}
+                      {activeDrivers.filter(d => d.status === 'in_transit').length}
                     </span>
                   </div>
                 </CardContent>
               </Card>
 
-              {drivers.length > 0 && (
+              {activeDrivers.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">Driver Status</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {drivers.slice(0, 5).map((driver) => (
+                      {activeDrivers.slice(0, 5).map((driver) => (
                         <div key={driver.driverId} className="flex items-center justify-between text-sm">
                           <span className="truncate">{driver.driverName}</span>
                           <Badge className={`${getStatusColor(driver.status)} text-white text-xs`}>
@@ -619,9 +572,9 @@ export default function LiveTrackingPage() {
                           </Badge>
                         </div>
                       ))}
-                      {drivers.length > 5 && (
+                      {activeDrivers.length > 5 && (
                         <p className="text-xs text-muted-foreground text-center">
-                          +{drivers.length - 5} more drivers
+                          +{activeDrivers.length - 5} more drivers
                         </p>
                       )}
                     </div>

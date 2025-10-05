@@ -2,7 +2,7 @@
 // This replaces all dummy data with real database queries
 
 // Import types from shared schema instead of defining them here
-import type { Order, Customer, Service, Product, Delivery } from "../../../shared/schema";
+import type { Order, Customer, Service, Product, Delivery, Employee } from "../../../shared/schema";
 
 export type InventoryItem = {
   id: string;
@@ -214,26 +214,78 @@ export const customersApi = {
     }
   },
 
-  async getKPIs(): Promise<{
-    totalCustomers: number;
-    newCustomersThisMonth: number;
-    totalRevenue: number;
-    avgOrderValue: number;
-    retentionRate: number;
-  }> {
+  async searchByPhone(phone: string): Promise<Customer | null> {
     try {
-      return await fetchData('/customers/kpis');
+      const customers = await fetchData<Customer[]>(`/customers?phone=${phone}`);
+      return customers.length > 0 ? customers[0] : null;
     } catch (error) {
-      console.error('Failed to fetch customer KPIs:', error);
-      return {
-        totalCustomers: 0,
-        newCustomersThisMonth: 0,
-        totalRevenue: 0,
-        avgOrderValue: 0,
-        retentionRate: 0,
-      };
+      console.error(`Failed to search customer by phone ${phone}:`, error);
+      return null;
     }
-  }
+  },
+};
+
+// Employees API
+export const employeesApi = {
+  async getAll(): Promise<Employee[]> {
+    try {
+      return await fetchData<Employee[]>('/employees');
+    } catch (error) {
+      console.error('Failed to fetch employees:', error);
+      return [];
+    }
+  },
+
+  async getById(id: string): Promise<Employee | null> {
+    try {
+      return await fetchData<Employee>(`/employees/${id}`);
+    } catch (error) {
+      console.error(`Failed to fetch employee ${id}:`, error);
+      return null;
+    }
+  },
+
+  async create(employee: Partial<Employee>): Promise<Employee | null> {
+    try {
+      const response = await fetch(`${API_BASE}/employees`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(employee),
+      });
+      if (!response.ok) throw new Error('Failed to create employee');
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to create employee:', error);
+      return null;
+    }
+  },
+
+  async update(id: string, employee: Partial<Employee>): Promise<Employee | null> {
+    try {
+      const response = await fetch(`${API_BASE}/employees/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(employee),
+      });
+      if (!response.ok) throw new Error('Failed to update employee');
+      return await response.json();
+    } catch (error) {
+      console.error(`Failed to update employee ${id}:`, error);
+      return null;
+    }
+  },
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE}/employees/${id}`, {
+        method: 'DELETE',
+      });
+      return response.ok;
+    } catch (error) {
+      console.error(`Failed to delete employee ${id}:`, error);
+      return false;
+    }
+  },
 };
 
 // Inventory API
@@ -247,7 +299,12 @@ export const inventoryApi = {
         name: item.name,
         stock: item.stockQuantity,
         status: item.stockQuantity === 0 ? 'Out of Stock' as const :
-                item.stockQuantity <= 25 ? 'Low Stock' as const : 'In Stock' as const
+                item.stockQuantity <= (item.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+        category: item.category,
+        sku: item.sku,
+        price: parseFloat(item.price) || 0,
+        reorderLevel: item.reorderLevel || 10,
+        supplier: item.supplier || '',
       }));
     } catch (error) {
       console.error('Failed to fetch inventory:', error);
@@ -259,13 +316,18 @@ export const inventoryApi = {
     try {
       const rawData = await fetchData<any>(`/products/${id}`);
       if (!rawData) return null;
-      
+
       return {
         id: rawData.id,
         name: rawData.name,
         stock: rawData.stockQuantity,
         status: rawData.stockQuantity === 0 ? 'Out of Stock' as const :
-                rawData.stockQuantity <= (rawData.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const
+                rawData.stockQuantity <= (rawData.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+        category: rawData.category,
+        sku: rawData.sku,
+        price: parseFloat(rawData.price) || 0,
+        reorderLevel: rawData.reorderLevel || 10,
+        supplier: rawData.supplier || '',
       };
     } catch (error) {
       console.error(`Failed to fetch inventory item ${id}:`, error);
@@ -295,7 +357,12 @@ export const inventoryApi = {
         name: product.name,
         stock: product.stockQuantity,
         status: product.stockQuantity === 0 ? 'Out of Stock' as const :
-                product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const
+                product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+        category: product.category,
+        sku: product.sku,
+        price: parseFloat(product.price) || 0,
+        reorderLevel: product.reorderLevel || 10,
+        supplier: product.supplier || '',
       };
     } catch (error) {
       console.error('Failed to create inventory item:', error);
@@ -325,7 +392,12 @@ export const inventoryApi = {
         name: product.name,
         stock: product.stockQuantity,
         status: product.stockQuantity === 0 ? 'Out of Stock' as const :
-                product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const
+                product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+        category: product.category,
+        sku: product.sku,
+        price: parseFloat(product.price) || 0,
+        reorderLevel: product.reorderLevel || 10,
+        supplier: product.supplier || '',
       };
     } catch (error) {
       console.error('Failed to update inventory item:', error);

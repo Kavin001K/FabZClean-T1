@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { NotificationProvider } from "@/hooks/use-notifications";
+import { RealtimeProvider } from "@/contexts/realtime-context";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
@@ -26,6 +27,7 @@ import FranchiseDashboard from "@/pages/franchise-dashboard";
 import Settings from "@/pages/settings";
 import DatabaseStatus from "@/pages/database-status";
 import PerformanceAnalytics from "@/components/analytics";
+import Accounting from "@/pages/accounting";
 
 function Router() {
   return (
@@ -42,6 +44,7 @@ function Router() {
         <Route path="/tracking" component={Tracking} />
         <Route path="/live-tracking" component={LiveTracking} />
         <Route path="/documents" component={Documents} />
+        <Route path="/accounting" component={Accounting} />
         <Route path="/logistics" component={Logistics} />
         <Route path="/employee-dashboard" component={EmployeeDashboardPage} />
         <Route path="/franchise-dashboard" component={FranchiseDashboard} />
@@ -58,15 +61,17 @@ function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider defaultTheme="light" storageKey="fab-z-ui-theme">
-          <TooltipProvider>
-            <NotificationProvider>
-              <Toaster />
-              <Router />
-              <PerformanceAnalytics />
-            </NotificationProvider>
-          </TooltipProvider>
-        </ThemeProvider>
+        <RealtimeProvider>
+          <ThemeProvider defaultTheme="light" storageKey="fab-z-ui-theme">
+            <TooltipProvider>
+              <NotificationProvider>
+                <Toaster />
+                <Router />
+                <PerformanceAnalytics />
+              </NotificationProvider>
+            </TooltipProvider>
+          </ThemeProvider>
+        </RealtimeProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

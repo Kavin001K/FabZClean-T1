@@ -184,6 +184,24 @@ export default React.memo(function EditOrderDialog({
               </Select>
             </div>
 
+            {/* Payment Status */}
+            <div className="space-y-2">
+              <Label htmlFor="paymentStatus">Payment Status</Label>
+              <Select
+                value={(formData as any).paymentStatus || 'pending'}
+                onValueChange={(value) => handleInputChange('paymentStatus', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Dates */}
             <div className="space-y-2">
               <Label htmlFor="pickupDate">Pickup Date</Label>

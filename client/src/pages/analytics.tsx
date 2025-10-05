@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { log } from "@/lib/logger";
 import { 
   BarChart, 
   Bar, 
@@ -50,7 +52,7 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatNumber, formatPercentage } from "@/lib/data-service";
 import { useToast } from "@/hooks/use-toast";
-import { useWebSocket } from "@/hooks/use-websocket";
+import { useRealtime } from "@/contexts/realtime-context";
 import type { Service, Order, Customer } from "../../shared/schema";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -92,6 +94,7 @@ export default function Analytics() {
   const [insights, setInsights] = useState<string[]>([]);
   const [showInsights, setShowInsights] = useState(false);
   const queryClient = useQueryClient();
+  const { analyticsData: realtimeData } = useRealtime();
 
   // Fetch data using React Query
   const {
@@ -130,50 +133,11 @@ export default function Analytics() {
   const isLoading = ordersLoading || customersLoading || inventoryLoading;
   const hasError = ordersError || customersError || inventoryError;
 
-  // Real-time state
-  const [realtimeKpis, setRealtimeKpis] = useState<any>(null);
-  const [recentActivity, setRecentActivity] = useState<any>(null);
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const realtimeKpis = realtimeData?.kpis;
+  const recentActivity = realtimeData?.recentActivity;
+  const lastUpdate = realtimeData?.timestamp ? new Date(realtimeData.timestamp) : null;
 
   const { toast } = useToast();
-
-  // Define refresh function for analytics data
-  const fetchAnalyticsData = useCallback(() => {
-    // Invalidate all analytics queries to trigger a refetch
-    queryClient.invalidateQueries({ queryKey: ['analytics-orders'] });
-    queryClient.invalidateQueries({ queryKey: ['analytics-customers'] });
-    queryClient.invalidateQueries({ queryKey: ['analytics-inventory'] });
-  }, []);
-
-  // WebSocket connection for real-time updates
-  const { isConnected, connectionStatus, subscribe } = useWebSocket({
-    url: 'ws://localhost:3001',
-    onMessage: (message) => {
-      if (message.type === 'analytics_update') {
-        setRealtimeKpis(message.data.kpis);
-        setRecentActivity(message.data.recentActivity);
-        setLastUpdate(new Date());
-      } else if (message.type === 'order_created' || message.type === 'order_updated') {
-        // Refresh orders when new orders are created/updated
-        fetchAnalyticsData();
-      } else if (message.type === 'customer_created') {
-        // Refresh customers when new customers are added
-        fetchAnalyticsData();
-      }
-    },
-    onOpen: () => {
-      console.log('Connected to real-time analytics');
-      subscribe(['analytics_update', 'order_created', 'order_updated', 'customer_created']);
-    },
-    onClose: () => {
-      console.log('Disconnected from real-time analytics');
-    },
-    onError: (error) => {
-      console.error('WebSocket error:', error);
-    }
-  });
-
-  // Data fetching is now handled by React Query above
 
   // First, create filtered data that both analytics computations can use
   const filteredData = useMemo(() => {
@@ -709,9 +673,9 @@ export default function Analytics() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Analytics Dashboard</h1>
           <div className="flex items-center gap-2 mt-2">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <div className={`w-2 h-2 rounded-full ${realtimeData ? 'bg-green-500' : 'bg-red-500'}`}></div>
             <span className="text-sm text-muted-foreground">
-              {isConnected ? 'Live Updates' : 'Offline'}
+              {realtimeData ? 'Live Updates' : 'Offline'}
             </span>
             {lastUpdate && (
               <span className="text-xs text-muted-foreground">
@@ -745,7 +709,7 @@ export default function Analytics() {
             <div className="space-y-2">
               <Label htmlFor="dateRange">Date Range</Label>
               <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger>
+                <SelectTrigger id="dateRange" aria-label="Select date range for analytics">
                   <SelectValue placeholder="Select date range" />
                 </SelectTrigger>
                 <SelectContent>
@@ -760,7 +724,7 @@ export default function Analytics() {
             <div className="space-y-2">
               <Label htmlFor="franchise">Franchise</Label>
               <Select value={franchise} onValueChange={setFranchise}>
-                <SelectTrigger>
+                <SelectTrigger id="franchise" aria-label="Select franchise to filter analytics">
                   <SelectValue placeholder="Select franchise" />
                 </SelectTrigger>
                 <SelectContent>
@@ -774,7 +738,7 @@ export default function Analytics() {
             <div className="space-y-2">
               <Label htmlFor="serviceType">Service Type</Label>
               <Select value={serviceType} onValueChange={setServiceType}>
-                <SelectTrigger>
+                <SelectTrigger id="serviceType" aria-label="Select service type to filter analytics">
                   <SelectValue placeholder="Select service type" />
                 </SelectTrigger>
                 <SelectContent>

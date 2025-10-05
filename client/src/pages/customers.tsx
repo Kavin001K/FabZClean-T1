@@ -54,6 +54,7 @@ import { CustomerDialogs } from '@/components/customers/customer-dialogs';
 // Import data service and types
 import { customersApi, ordersApi } from '@/lib/data-service';
 import { exportCustomersEnhanced } from '@/lib/enhanced-pdf-export';
+import { exportCustomersToExcel } from '@/lib/excel-exports';
 import type { Customer, Order } from '../../shared/schema';
 
 // Helper functions
@@ -299,6 +300,18 @@ export default function Customers() {
     });
   };
 
+  const handleExportExcel = () => {
+    const filters = {
+      segment: segmentFilter,
+      search: searchQuery,
+    };
+    exportCustomersToExcel(filteredCustomers, filters);
+    toast({
+      title: "Excel Export Successful",
+      description: `Exported ${filteredCustomers.length} customers to Excel.`,
+    });
+  };
+
   const handleExportSegmented = (segment: string) => {
     const segmentedCustomers = customers.filter(c => {
       const seg = getCustomerSegment(c);
@@ -365,8 +378,13 @@ export default function Customers() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleExportPDF}>
                     <FileText className="mr-2 h-4 w-4" />
-                    All Customers
+                    All Customers (PDF)
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportExcel}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    All Customers (Excel)
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => handleExportSegmented('vip')}>
                     <Award className="mr-2 h-4 w-4" />
                     VIP Customers
@@ -458,7 +476,12 @@ export default function Customers() {
         <FadeIn delay={0.3}>
           <Card className="glass mb-6">
             <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row gap-4">
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="flex flex-col md:flex-row gap-4"
+              >
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -467,16 +490,26 @@ export default function Customers() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
                   />
-                  {searchQuery && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
-                      onClick={() => setSearchQuery('')}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
+                  <AnimatePresence>
+                    {searchQuery && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                      >
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => setSearchQuery('')}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 <Select value={segmentFilter} onValueChange={setSegmentFilter}>
@@ -504,27 +537,41 @@ export default function Customers() {
                     <SelectItem value="recent">Recent Activity</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </motion.div>
 
-              <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.3 }}
+                className="mt-4 flex items-center gap-4 text-sm text-muted-foreground"
+              >
                 <span>
                   Showing <strong className="text-foreground">{filteredCustomers.length}</strong> of{' '}
                   <strong className="text-foreground">{customers.length}</strong> customers
                 </span>
-                {(searchQuery || segmentFilter !== 'all') && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSearchQuery('');
-                      setSegmentFilter('all');
-                    }}
-                    className="h-7"
-                  >
-                    Clear filters
-                  </Button>
-                )}
-              </div>
+                <AnimatePresence>
+                  {(searchQuery || segmentFilter !== 'all') && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setSegmentFilter('all');
+                        }}
+                        className="h-7"
+                      >
+                        Clear filters
+                      </Button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
             </CardContent>
           </Card>
         </FadeIn>
@@ -592,10 +639,19 @@ export default function Customers() {
                   return (
                     <motion.div
                       key={customer.id}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      transition={{ duration: 0.2, delay: index * 0.05 }}
+                      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                      transition={{
+                        duration: 0.3,
+                        delay: index * 0.05,
+                        ease: [0.4, 0, 0.2, 1]
+                      }}
+                      whileHover={{
+                        scale: 1.02,
+                        transition: { duration: 0.2 }
+                      }}
+                      whileTap={{ scale: 0.98 }}
                       layout
                     >
                       <Card
