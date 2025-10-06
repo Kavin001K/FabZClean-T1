@@ -1,20 +1,21 @@
 services:
   - type: web
     name: fabzclean-app
-    env: node
+    runtime: node
     plan: starter
+    region: oregon # Change to your preferred region (oregon, frankfurt, singapore, ohio)
     buildCommand: npm install && npm run build
     startCommand: node start.js
     healthCheckPath: /api/health/database
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
       - key: NODE_OPTIONS
         value: --max-old-space-size=512
       - key: VITE_BUILD_TARGET
         value: production
+      # Render automatically sets PORT - no need to specify it
     disk:
       name: fabzclean-disk
       mountPath: /opt/render/project/src/data
