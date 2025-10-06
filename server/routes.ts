@@ -641,7 +641,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Customers endpoints - Fixed method names
   app.get("/api/customers", async (req, res) => {
     try {
-      const customers = await storage.listCustomers(); // Changed from getCustomers
+      const { phone } = req.query;
+      let customers = await storage.listCustomers();
+
+      // Filter by phone number if provided (exact match)
+      if (phone && typeof phone === 'string') {
+        const normalizedSearchPhone = phone.replace(/\D/g, ''); // Remove non-digits
+        customers = customers.filter(customer => {
+          if (!customer.phone) return false;
+          const normalizedCustomerPhone = customer.phone.replace(/\D/g, '');
+          return normalizedCustomerPhone === normalizedSearchPhone;
+        });
+      }
 
       const transformedCustomers = customers.map((customer) => ({
         ...customer,
