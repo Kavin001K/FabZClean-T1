@@ -13,11 +13,7 @@
     "db:push": "drizzle-kit push",
     "code:cleanup": "node scripts/code-cleanup.js",
     "code:cleanup:fix": "node scripts/code-cleanup.js --fix",
-    "code:cleanup:verbose": "node scripts/code-cleanup.js --verbose",
-    "electron": "electron electron/main.js",
-    "electron:dev": "NODE_ENV=development electron electron/main.js",
-    "electron:build": "npm run build:client && electron-builder",
-    "electron:dist": "npm run build:client && electron-builder --publish=never"
+    "code:cleanup:verbose": "node scripts/code-cleanup.js --verbose"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -104,7 +100,7 @@
     "@types/connect-pg-simple": "^7.0.3",
     "@types/express": "4.17.21",
     "@types/express-session": "^1.18.0",
-    "@types/node": "20.16.11",
+    "@types/node": "^22.12.0",
     "@types/passport": "^1.0.16",
     "@types/passport-local": "^1.0.38",
     "@types/react": "^18.3.11",
@@ -115,8 +111,6 @@
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.31.5",
-    "electron": "^38.1.2",
-    "electron-builder": "^26.0.12",
     "esbuild": "^0.25.9",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
@@ -129,29 +123,5 @@
   },
   "overrides": {
     "nanoid": "3.3.11"
-  },
-  "build": {
-    "appId": "com.fabzclean.app",
-    "productName": "FabZClean",
-    "directories": {
-      "output": "dist-electron"
-    },
-    "files": [
-      "electron/**/*",
-      "dist/**/*",
-      "node_modules/**/*"
-    ],
-    "mac": {
-      "category": "public.app-category.business",
-      "icon": "public/assets/logo.webp"
-    },
-    "win": {
-      "target": "nsis",
-      "icon": "public/assets/logo.webp"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "public/assets/logo.webp"
-    }
   }
 }
