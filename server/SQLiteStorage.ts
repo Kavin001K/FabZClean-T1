@@ -1,5 +1,7 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
+import { mkdirSync, existsSync } from "fs";
+import { dirname } from "path";
 import {
   type User,
   type InsertUser,
@@ -28,6 +30,14 @@ export class SQLiteStorage implements IStorage {
   private db: Database.Database;
 
   constructor(dbPath = "./fabzclean.db") {
+    // Ensure the directory exists
+    const dir = dirname(dbPath);
+    if (!existsSync(dir)) {
+      console.log(`📁 Creating database directory: ${dir}`);
+      mkdirSync(dir, { recursive: true });
+    }
+
+    console.log(`🗄️  Initializing SQLite database at: ${dbPath}`);
     this.db = new Database(dbPath);
     this.createTables();
   }

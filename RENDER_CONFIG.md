@@ -31,6 +31,21 @@ VITE_BUILD_TARGET=production
 ## Health Check
 - **Health Check Path:** `/api/health/database`
 
+## Persistent Disk (IMPORTANT)
+
+For database persistence, you need to create a persistent disk in Render:
+
+1. Go to your service in Render dashboard
+2. Go to **Disks** section
+3. Click **Add Disk**
+4. Configure:
+   - **Name:** `fabzclean-disk`
+   - **Mount Path:** `/opt/render/project/src/data`
+   - **Size:** 1 GB (or as needed)
+5. Click **Create Disk**
+
+**Note:** Without the disk, the app will use `/tmp` which is ephemeral and data will be lost on restart. The disk is already configured in `render.yaml` but must be manually created in the dashboard.
+
 ## Manual Dashboard Override
 
 If you're still seeing the Electron error, you have a **manual override** in your Render dashboard that needs to be updated:
