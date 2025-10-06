@@ -766,10 +766,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Services endpoints - Fixed method names
+  // Services endpoints - Complete CRUD
   app.get("/api/services", async (req, res) => {
     try {
-      const services = await storage.listServices(); // Changed from getServices
+      const services = await storage.listServices();
       res.json(services);
     } catch (error) {
       console.error("Fetch services error:", error);
@@ -777,8 +777,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Continue with rest of the endpoints using similar fixes...
-  // [Rest of the routes continue with the same pattern of fixing method names and adding error logging]
+  app.get("/api/services/:id", async (req, res) => {
+    try {
+      const service = await storage.getService(req.params.id);
+      if (!service) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+      res.json(service);
+    } catch (error) {
+      console.error("Fetch service error:", error);
+      res.status(500).json({ message: "Failed to fetch service" });
+    }
+  });
+
+  app.post("/api/services", async (req, res) => {
+    try {
+      const validatedData = insertServiceSchema.parse(req.body);
+      const service = await storage.createService(validatedData);
+
+      // Trigger real-time update
+      await realtimeServer.triggerUpdate("service", "created", service);
+
+      res.status(201).json(service);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Invalid service data",
+          errors: error.errors,
+        });
+      }
+      console.error("Create service error:", error);
+      res.status(500).json({ message: "Failed to create service" });
+    }
+  });
+
+  app.put("/api/services/:id", async (req, res) => {
+    try {
+      const validatedData = insertServiceSchema.partial().parse(req.body);
+      const service = await storage.updateService(req.params.id, validatedData);
+
+      if (!service) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      // Trigger real-time update
+      await realtimeServer.triggerUpdate("service", "updated", service);
+
+      res.json(service);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Invalid service data",
+          errors: error.errors,
+        });
+      }
+      console.error("Update service error:", error);
+      res.status(500).json({ message: "Failed to update service" });
+    }
+  });
+
+  app.delete("/api/services/:id", async (req, res) => {
+    try {
+      await storage.deleteService(req.params.id);
+      res.json({ message: "Service deleted successfully" });
+    } catch (error) {
+      console.error("Delete service error:", error);
+      res.status(500).json({ message: "Failed to delete service" });
+    }
+  });
 
   // Global Search endpoint - Fixed method names
   app.get("/api/search", async (req, res) => {

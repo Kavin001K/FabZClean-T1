@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { seedDatabase } from "./seed-data";
 
 export async function initializeDatabase() {
   try {
@@ -8,6 +9,10 @@ export async function initializeDatabase() {
     await db.listUsers();
 
     console.log("✅ SQLite database initialized successfully");
+
+    // Seed the database with sample data if empty
+    await seedDatabase();
+
     return true;
   } catch (error) {
     console.error("❌ SQLite database initialization failed:", error);
