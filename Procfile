@@ -1,1 +1,1 @@
-web: npx tsx server/index.ts
+web: node start.js

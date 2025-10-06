@@ -8,10 +8,14 @@ This application has been converted from an Electron desktop app to a pure web a
 
 ### Build Settings
 - **Build Command:** `npm install && npm run build`
-- **Start Command:** `npx tsx server/index.ts` (or `npm start`)
+- **Start Command:** `node start.js` (or `npm start`)
+
+### ✅ What the start.js does:
+The `start.js` wrapper ensures the correct server starts regardless of any dashboard overrides. It automatically launches the Express server using `tsx server/index.ts`.
 
 ### ❌ WRONG Configuration (DO NOT USE)
 - ~~`node electron/main.js`~~ - This will fail as Electron has been removed
+- ~~Any electron-related commands~~ - Electron dependencies have been completely removed
 
 ## Environment Variables
 
@@ -34,9 +38,16 @@ If you're still seeing the Electron error, you have a **manual override** in you
 1. Go to your Render dashboard
 2. Select your service
 3. Go to **Settings** → **Build & Deploy**
-4. Update the **Start Command** to: `npx tsx server/index.ts`
-5. Click **Save Changes**
-6. **Manual Deploy** to trigger a new deployment
+4. Update the **Start Command** to: `node start.js` (or clear it to use render.yaml)
+5. **IMPORTANT**: Make sure the **Branch** is set to `main` (not an old commit)
+6. Click **Save Changes**
+7. **Manual Deploy** to trigger a new deployment
+
+### Branch/Commit Issue
+If Render is checking out an old commit (e.g., `ef7b0266`), ensure:
+- Auto-deploy is enabled for the `main` branch
+- No manual commit hash is specified in settings
+- The service is connected to the correct repository and branch
 
 ## Auto-deploy from Git
 

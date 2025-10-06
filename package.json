@@ -7,7 +7,7 @@
     "dev": "npx tsx server/index.ts",
     "build": "npm run build:client",
     "build:client": "vite build --config vite.config.minimal.ts",
-    "start": "npx tsx server/index.ts",
+    "start": "node start.js",
     "start:client": "vite preview --port 3000",
     "check": "tsc",
     "db:push": "drizzle-kit push",
