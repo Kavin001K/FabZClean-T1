@@ -7,6 +7,7 @@
     "dev": "npx tsx server/index.ts",
     "build": "npm run build:client",
     "build:client": "vite build --config vite.config.minimal.ts",
+    "postinstall": "npm run build:client",
     "start": "node start.js",
     "start:client": "vite preview --port 3000",
     "check": "tsc",
@@ -90,6 +91,7 @@
     "vaul": "^1.1.2",
     "wouter": "^3.3.5",
     "ws": "^8.18.0",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.2",
     "zod-validation-error": "^3.4.0"
   },
