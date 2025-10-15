@@ -21,6 +21,7 @@ import Analytics from "@/pages/analytics";
 import { MainLayout } from "@/components/layout/main-layout";
 import Inventory from "@/pages/inventory";
 import Logistics from "@/pages/logistics";
+import TransitOrders from "@/pages/transit-orders";
 import DebugPage from "@/pages/debug";
 import EmployeeDashboardPage from "@/pages/employee-dashboard";
 import FranchiseDashboard from "@/pages/franchise-dashboard";
@@ -46,6 +47,7 @@ function Router() {
         <Route path="/documents" component={Documents} />
         <Route path="/accounting" component={Accounting} />
         <Route path="/logistics" component={Logistics} />
+        <Route path="/transit-orders" component={TransitOrders} />
         <Route path="/employee-dashboard" component={EmployeeDashboardPage} />
         <Route path="/franchise-dashboard" component={FranchiseDashboard} />
         <Route path="/settings" component={Settings} />

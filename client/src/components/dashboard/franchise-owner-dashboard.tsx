@@ -465,122 +465,31 @@ export default React.memo(function FranchiseOwnerDashboard() {
             ) : (
               <StaggerChildren>
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {/* New Order Quick Action */}
+                  {/* Transit Order Quick Action */}
                   <StaggerItem>
-                    <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
-                      <DialogTrigger asChild>
-                        <motion.div
-                          whileHover={{ scale: 1.03, y: -5 }}
-                          whileTap={{ scale: 0.98 }}
-                          transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                        >
-                          <Card className="cursor-pointer hover:shadow-xl hover-glow transition-all duration-300 border-2 hover:border-primary/50 glass">
-                            <CardContent className="p-6 flex items-center gap-4">
-                              <motion.div
-                                animate={{ rotate: [0, 360] }}
-                                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                                className="bg-primary/10 p-3 rounded-xl"
-                              >
-                                <PlusCircle className="h-8 w-8 text-primary" />
-                              </motion.div>
-                              <div>
-                                <h3 className="font-semibold text-lg">Quick Order</h3>
-                                <p className="text-sm text-muted-foreground">Create a new service order</p>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </motion.div>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Create New Order</DialogTitle>
-                        </DialogHeader>
-                        <form onSubmit={handleSaveOrder} className="py-4 space-y-4" aria-label="Create new order form">
-                          <div>
-                            <Label htmlFor="orderCustomerName">Customer Name</Label>
-                            <Input
-                              id="orderCustomerName"
-                              name="customerName"
-                              placeholder="e.g., Jane Doe"
-                              value={quickActionForms.order.customerName}
-                              onChange={(e) => updateQuickActionForm('order', { customerName: e.target.value })}
-                              required
-                              aria-required="true"
-                              aria-label="Customer name"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="orderCustomerPhone">Customer Phone</Label>
-                            <Input
-                              id="orderCustomerPhone"
-                              name="customerPhone"
-                              type="tel"
-                              placeholder="e.g., +91 98765 43210"
-                              value={quickActionForms.order.customerPhone}
-                              onChange={(e) => updateQuickActionForm('order', { customerPhone: e.target.value })}
-                              required
-                              aria-required="true"
-                              aria-label="Customer phone number"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="orderService">Service</Label>
-                            <Input
-                              id="orderService"
-                              name="service"
-                              placeholder="e.g., Dry Cleaning"
-                              value={quickActionForms.order.service}
-                              onChange={(e) => updateQuickActionForm('order', { service: e.target.value })}
-                              required
-                              aria-required="true"
-                              aria-label="Service type"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="orderQuantity">Quantity</Label>
-                            <Input
-                              id="orderQuantity"
-                              name="quantity"
-                              type="number"
-                              min="1"
-                              value={quickActionForms.order.quantity}
-                              onChange={(e) => updateQuickActionForm('order', { quantity: parseInt(e.target.value) || 1 })}
-                              required
-                              aria-required="true"
-                              aria-label="Order quantity"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="orderPickupDate">Pickup Date</Label>
-                            <Input
-                              id="orderPickupDate"
-                              name="pickupDate"
-                              type="date"
-                              value={quickActionForms.order.pickupDate}
-                              onChange={(e) => updateQuickActionForm('order', { pickupDate: e.target.value })}
-                              required
-                              aria-required="true"
-                              aria-label="Pickup date"
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <Button type="submit" className="flex-1" disabled={isSubmittingOrder}>
-                              {isSubmittingOrder ? (
-                                <>
-                                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                  Creating...
-                                </>
-                              ) : (
-                                'Create Order'
-                              )}
-                            </Button>
-                            <Button type="button" variant="outline" onClick={() => setIsOrderDialogOpen(false)} disabled={isSubmittingOrder}>
-                              Cancel
-                            </Button>
-                          </div>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
+                    <Link to="/transit-orders">
+                      <motion.div
+                        whileHover={{ scale: 1.03, y: -5 }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                      >
+                        <Card className="cursor-pointer hover:shadow-xl hover-glow transition-all duration-300 border-2 hover:border-primary/50 glass">
+                          <CardContent className="p-6 flex items-center gap-4">
+                            <motion.div
+                              animate={{ x: [0, 5, 0] }}
+                              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                              className="bg-primary/10 p-3 rounded-xl"
+                            >
+                              <Truck className="h-8 w-8 text-primary" />
+                            </motion.div>
+                            <div>
+                              <h3 className="font-semibold text-lg">Transit Orders</h3>
+                              <p className="text-sm text-muted-foreground">Manage delivery & logistics</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    </Link>
                   </StaggerItem>
 
                   {/* New Customer Quick Action */}

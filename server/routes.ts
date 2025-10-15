@@ -1093,6 +1093,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize default settings on server start
   settingsService.initializeDefaults().catch(console.error);
 
+  // Driver tracking endpoints
+  app.get("/api/tracking/drivers", async (req, res) => {
+    try {
+      const drivers = driverTrackingService.getAllActiveDrivers();
+      res.json(drivers);
+    } catch (error) {
+      console.error("Fetch active drivers error:", error);
+      res.status(500).json({ message: "Failed to fetch active drivers" });
+    }
+  });
+
+  app.get("/api/tracking/drivers/:driverId", async (req, res) => {
+    try {
+      const driver = driverTrackingService.getDriverLocation(req.params.driverId);
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+      res.json(driver);
+    } catch (error) {
+      console.error("Fetch driver location error:", error);
+      res.status(500).json({ message: "Failed to fetch driver location" });
+    }
+  });
+
+  app.get("/api/tracking/drivers/:driverId/route", async (req, res) => {
+    try {
+      const route = driverTrackingService.getDriverRoute(req.params.driverId);
+      res.json(route);
+    } catch (error) {
+      console.error("Fetch driver route error:", error);
+      res.status(500).json({ message: "Failed to fetch driver route" });
+    }
+  });
+
+  app.get("/api/tracking/orders/:orderId/driver", async (req, res) => {
+    try {
+      const driver = driverTrackingService.getDriverForOrder(req.params.orderId);
+      if (!driver) {
+        return res.status(404).json({ message: "No driver assigned to this order" });
+      }
+      res.json(driver);
+    } catch (error) {
+      console.error("Fetch driver for order error:", error);
+      res.status(500).json({ message: "Failed to fetch driver for order" });
+    }
+  });
+
+  app.post("/api/tracking/orders/:orderId/start", async (req, res) => {
+    try {
+      const driver = await driverTrackingService.startTrackingForOrder(req.params.orderId);
+      if (!driver) {
+        return res.status(404).json({ message: "Order not found or tracking could not be started" });
+      }
+      res.json(driver);
+    } catch (error) {
+      console.error("Start tracking error:", error);
+      res.status(500).json({ message: "Failed to start tracking" });
+    }
+  });
+
+  app.post("/api/tracking/orders/:orderId/stop", async (req, res) => {
+    try {
+      driverTrackingService.stopTrackingForOrder(req.params.orderId);
+      res.json({ message: "Tracking stopped successfully" });
+    } catch (error) {
+      console.error("Stop tracking error:", error);
+      res.status(500).json({ message: "Failed to stop tracking" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

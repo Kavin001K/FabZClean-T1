@@ -1,4 +1,4 @@
-import { storage } from './storage';
+import { db as storage } from './db';
 import { realtimeServer } from './websocket-server';
 
 interface DriverLocation {
@@ -58,8 +58,8 @@ class DriverTrackingService {
 
   private async updateDriverLocations() {
     try {
-      const orders = await storage.getOrders();
-      const activeOrders = orders.filter(order => 
+      const orders = await storage.listOrders();
+      const activeOrders = orders.filter(order =>
         order.status === 'in_progress' || order.status === 'shipped'
       );
 

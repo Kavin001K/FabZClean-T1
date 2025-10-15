@@ -35,13 +35,14 @@
  */
 
 import React from 'react';
-import { PlusCircle, UserPlus, ShoppingBag, Users } from 'lucide-react';
+import { PlusCircle, UserPlus, ShoppingBag, Users, Truck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TEST_IDS, getTestId } from '@/lib/test-ids';
+import { useLocation } from 'wouter';
 
 interface DashboardQuickActionsProps {
   /** Quick action handler */
@@ -93,6 +94,16 @@ const QUICK_ACTIONS = [
     color: 'text-purple-600',
     bgColor: 'bg-purple-50',
   },
+  {
+    id: 'transit',
+    title: 'Create Transit Order',
+    description: 'Create a new transit/delivery order',
+    icon: Truck,
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-50',
+    isNavigationOnly: true,
+    navigateTo: '/logistics',
+  },
 ] as const;
 
 export const DashboardQuickActions: React.FC<DashboardQuickActionsProps> = React.memo(({
@@ -108,8 +119,14 @@ export const DashboardQuickActions: React.FC<DashboardQuickActionsProps> = React
   isSubmittingOrder,
   isSubmittingEmployee,
 }) => {
-  const handleQuickAction = (action: string) => {
-    onQuickAction(action, {});
+  const [, setLocation] = useLocation();
+
+  const handleQuickAction = (action: string, navigateTo?: string) => {
+    if (navigateTo) {
+      setLocation(navigateTo);
+    } else {
+      onQuickAction(action, {});
+    }
   };
 
   const handleFormSubmit = (formType: string, e: React.FormEvent) => {
@@ -159,7 +176,7 @@ export const DashboardQuickActions: React.FC<DashboardQuickActionsProps> = React
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {QUICK_ACTIONS.map((action) => {
             const Icon = action.icon;
             const isDialogOpen = getDialogState(action.id);
@@ -172,7 +189,7 @@ export const DashboardQuickActions: React.FC<DashboardQuickActionsProps> = React
                 <Button
                   variant="outline"
                   className="w-full h-auto p-4 flex flex-col items-center gap-2 hover:bg-muted/50"
-                  onClick={() => handleQuickAction(action.id)}
+                  onClick={() => handleQuickAction(action.id, action.navigateTo)}
                   data-testid={getTestId(TEST_IDS.BUTTON.ADD, action.id)}
                 >
                   <div className={`p-2 rounded-full ${action.bgColor}`}>
@@ -184,15 +201,16 @@ export const DashboardQuickActions: React.FC<DashboardQuickActionsProps> = React
                   </div>
                 </Button>
 
-                {/* Dialog for each action */}
-                <Dialog open={isDialogOpen} onOpenChange={() => onCloseDialog(action.id)}>
-                  <DialogContent 
-                    className="sm:max-w-md"
-                    data-testid={getTestId(TEST_IDS.MODAL.CONTAINER, action.id)}
-                  >
-                    <DialogHeader>
-                      <DialogTitle>{action.title}</DialogTitle>
-                    </DialogHeader>
+                {/* Dialog for each action - only show for non-navigation actions */}
+                {!action.isNavigationOnly && (
+                  <Dialog open={isDialogOpen} onOpenChange={() => onCloseDialog(action.id)}>
+                    <DialogContent
+                      className="sm:max-w-md"
+                      data-testid={getTestId(TEST_IDS.MODAL.CONTAINER, action.id)}
+                    >
+                      <DialogHeader>
+                        <DialogTitle>{action.title}</DialogTitle>
+                      </DialogHeader>
                     
                     <form onSubmit={(e) => handleFormSubmit(action.id, e)} className="space-y-4">
                       {action.id === 'customer' && (
@@ -301,6 +319,7 @@ export const DashboardQuickActions: React.FC<DashboardQuickActionsProps> = React
                     </form>
                   </DialogContent>
                 </Dialog>
+                )}
               </div>
             );
           })}
