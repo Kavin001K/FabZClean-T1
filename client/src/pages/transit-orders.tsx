@@ -647,6 +647,28 @@ export default function TransitOrdersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
+  // Fetch recent orders for smart suggestions
+  const { data: recentOrders = [], isLoading: isLoadingRecentOrders } = useQuery({
+    queryKey: ['recent-orders', batchType],
+    queryFn: async () => {
+      const response = await fetch('/api/orders/recent');
+      if (!response.ok) {
+        throw new Error('Failed to fetch recent orders');
+      }
+      const allOrders = await response.json();
+
+      // Filter orders based on batch type and appropriate statuses
+      const validStatuses = batchType === 'store_to_factory'
+        ? ['in_store', 'ready_for_transit', 'pending']
+        : ['processing', 'completed', 'ready_for_delivery'];
+
+      return allOrders
+        .filter((order: any) => validStatuses.includes(order.status))
+        .slice(0, 10); // Show last 10 recent orders
+    },
+    enabled: isScanning, // Only fetch when scanning is active
+  });
+
   // Fetch transit orders from API
   const { data: transitHistory = [], isLoading } = useQuery<TransitBatch[]>({
     queryKey: ['transit-batches'],
@@ -712,6 +734,41 @@ export default function TransitOrdersPage() {
     }, 100);
   };
 
+  const handleQuickAddOrder = async (orderData: any) => {
+    // Check if already in batch
+    if (currentBatch.some((order) => order.orderNumber === orderData.orderNumber)) {
+      playErrorSound();
+      toast({
+        title: 'Already Added',
+        description: 'Order already in batch',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Calculate total items and weight from order items
+    const itemCount = orderData.items?.length || 0;
+    const totalWeight = orderData.items?.reduce((sum: number, item: any) => sum + (item.weight || 0), 0) || 0;
+
+    const orderInBatch: OrderInBatch = {
+      orderNumber: orderData.orderNumber,
+      customerId: orderData.customerId,
+      customerName: orderData.customerName,
+      itemCount: itemCount,
+      status: orderData.status,
+      serviceType: orderData.serviceType || 'Dry Clean',
+      weight: parseFloat(totalWeight.toFixed(1)),
+    };
+
+    playSuccessSound();
+    setCurrentBatch([...currentBatch, orderInBatch]);
+
+    toast({
+      title: 'Order Added',
+      description: `Order ${orderData.orderNumber} added to batch (${itemCount} items)`,
+    });
+  };
+
   const handleAddOrder = async () => {
     if (!barcodeInput.trim()) return;
 
@@ -747,7 +804,7 @@ export default function TransitOrdersPage() {
 
       // Validate order status for transit type
       const validStatuses = batchType === 'store_to_factory'
-        ? ['in_store', 'ready_for_transit']
+        ? ['in_store', 'ready_for_transit', 'pending']
         : ['processing', 'completed', 'ready_for_delivery'];
 
       if (!validStatuses.includes(orderData.status)) {
@@ -908,20 +965,26 @@ export default function TransitOrdersPage() {
 
       const createdTransitOrder = await response.json();
 
-      // Update all order statuses to in_transit
-      const statusUpdatePromises = currentBatch.map((order) =>
-        fetch(`/api/orders/${order.orderNumber}/status`, {
+      // Update all order statuses based on transit type
+      // Store to Factory: pending/in_store → processing (when transit created)
+      // Factory to Store: Keep current status until delivered
+      const statusUpdatePromises = currentBatch.map((order) => {
+        const newOrderStatus = batchType === 'store_to_factory' ? 'processing' : order.status;
+
+        return fetch(`/api/orders/${order.orderNumber}/status`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            status: 'in_transit',
-            notes: `Added to transit ${transitId}`,
+            status: newOrderStatus,
+            notes: batchType === 'store_to_factory'
+              ? `Added to transit ${transitId} - Processing started at factory`
+              : `Added to transit ${transitId} - Returning to store`,
             updatedBy: employeeDetails.name,
           }),
-        })
-      );
+        });
+      });
 
       await Promise.all(statusUpdatePromises);
 
@@ -1104,6 +1167,51 @@ export default function TransitOrdersPage() {
                   </Button>
                 </div>
               </div>
+
+              {/* Recent Orders Smart Suggestions */}
+              {isScanning && recentOrders.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Quick Add - Recent Orders</Label>
+                    <Badge variant="outline" className="text-xs">
+                      {recentOrders.length} suggested
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto p-2 border rounded-lg bg-muted/30">
+                    {recentOrders.map((order: any) => (
+                      <motion.div
+                        key={order.orderNumber}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className={`p-2 rounded-md border-2 transition-all cursor-pointer ${
+                          currentBatch.some(b => b.orderNumber === order.orderNumber)
+                            ? 'border-green-500 bg-green-50 opacity-50 cursor-not-allowed'
+                            : 'border-border bg-background hover:border-primary hover:shadow-sm'
+                        }`}
+                        onClick={() => handleQuickAddOrder(order)}
+                      >
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-mono font-semibold">{order.orderNumber}</span>
+                            {currentBatch.some(b => b.orderNumber === order.orderNumber) && (
+                              <CheckCircle2 className="h-3 w-3 text-green-600" />
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground truncate">{order.customerName}</span>
+                          <div className="flex items-center justify-between text-xs">
+                            <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                              {order.items?.length || 0} items
+                            </Badge>
+                            <span className="text-[10px] text-muted-foreground">
+                              {new Date(order.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Current Batch List */}
               {currentBatch.length > 0 ? (
@@ -1491,6 +1599,7 @@ export default function TransitOrdersPage() {
                   className="gap-2"
                   onClick={async () => {
                     try {
+                      // Update transit order status to completed
                       const response = await fetch(`/api/transit-orders/${selectedBatch.id}/status`, {
                         method: 'PATCH',
                         headers: {
@@ -1504,16 +1613,41 @@ export default function TransitOrdersPage() {
                       });
 
                       if (!response.ok) {
-                        throw new Error('Failed to update status');
+                        throw new Error('Failed to update transit status');
                       }
 
-                      toast({
-                        title: 'Transit Completed',
-                        description: `Transit ${selectedBatch.transitId} marked as completed`,
-                      });
+                      // If factory to store transit, mark all orders as completed (ready for delivery)
+                      if (selectedBatch.type === 'factory_to_store' && selectedBatch.orders) {
+                        const orderStatusUpdates = selectedBatch.orders.map((order) =>
+                          fetch(`/api/orders/${order.orderNumber}/status`, {
+                            method: 'PATCH',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              status: 'ready_for_delivery',
+                              notes: `Transit ${selectedBatch.transitId} completed - Returned from factory, ready for delivery`,
+                              updatedBy: 'Current User',
+                            }),
+                          })
+                        );
+
+                        await Promise.all(orderStatusUpdates);
+
+                        toast({
+                          title: 'Transit Completed',
+                          description: `Transit ${selectedBatch.transitId} completed and ${selectedBatch.orders.length} orders marked as ready for delivery`,
+                        });
+                      } else {
+                        toast({
+                          title: 'Transit Completed',
+                          description: `Transit ${selectedBatch.transitId} marked as completed`,
+                        });
+                      }
 
                       setShowViewDialog(false);
                       queryClient.invalidateQueries({ queryKey: ['transit-batches'] });
+                      queryClient.invalidateQueries({ queryKey: ['orders'] });
                     } catch (error) {
                       toast({
                         title: 'Error',

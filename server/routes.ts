@@ -496,6 +496,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Recent orders endpoint for transit order suggestions
+  app.get("/api/orders/recent", async (req, res) => {
+    try {
+      const orders = await storage.listOrders();
+      const products = await storage.listProducts();
+
+      // Create a product lookup map
+      const productMap = new Map(
+        products.map((product) => [product.id, product.name]),
+      );
+
+      // Sort by creation date (most recent first) and take last 50
+      const recentOrders = orders
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 50);
+
+      // Transform orders to match frontend expectations
+      const transformedOrders = recentOrders.map((order) => {
+        const items = (order.items as any[]) || [];
+        const firstItem = items[0];
+        const productId = firstItem?.productId;
+        const serviceName = productId
+          ? productMap.get(productId) || "Unknown Service"
+          : "Unknown Service";
+
+        return {
+          ...order,
+          date: order.createdAt,
+          total: parseFloat(order.totalAmount || "0"),
+          service: serviceName,
+          serviceType: serviceName,
+          priority: "Normal",
+        };
+      });
+
+      res.json(transformedOrders);
+    } catch (error) {
+      console.error("Fetch recent orders error:", error);
+      res.status(500).json({ message: "Failed to fetch recent orders" });
+    }
+  });
+
   app.post("/api/orders", async (req, res) => {
     try {
       const validatedData = insertOrderSchema.parse(req.body);
@@ -585,6 +627,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Bulk delete orders error:", error);
       res.status(500).json({ message: "Failed to delete orders" });
+    }
+  });
+
+  // Update order status endpoint
+  app.patch("/api/orders/:id/status", async (req, res) => {
+    try {
+      const { status, notes, updatedBy } = req.body;
+
+      if (!status) {
+        return res.status(400).json({ message: "Status is required" });
+      }
+
+      const order = await storage.updateOrder(req.params.id, { status });
+
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Trigger real-time update
+      await realtimeServer.triggerUpdate("order", "status_updated", {
+        ...order,
+        notes,
+        updatedBy,
+      });
+
+      res.json(order);
+    } catch (error) {
+      console.error("Update order status error:", error);
+      res.status(500).json({ message: "Failed to update order status" });
     }
   });
 
