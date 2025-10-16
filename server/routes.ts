@@ -1163,6 +1163,344 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Transit Orders endpoints
+  app.get("/api/transit-orders", async (req, res) => {
+    try {
+      const { status, type } = req.query;
+      let transitOrders;
+
+      if (status) {
+        transitOrders = await storage.getTransitOrdersByStatus(status as string);
+      } else if (type) {
+        transitOrders = await storage.getTransitOrdersByType(type as string);
+      } else {
+        transitOrders = await storage.listTransitOrders();
+      }
+
+      res.json(transitOrders);
+    } catch (error) {
+      console.error("Fetch transit orders error:", error);
+      res.status(500).json({ message: "Failed to fetch transit orders" });
+    }
+  });
+
+  app.get("/api/transit-orders/:id", async (req, res) => {
+    try {
+      const transitOrder = await storage.getTransitOrder(req.params.id);
+      if (!transitOrder) {
+        return res.status(404).json({ message: "Transit order not found" });
+      }
+
+      // Get status history
+      const statusHistory = await storage.getTransitStatusHistory(req.params.id);
+      transitOrder.statusHistory = statusHistory;
+
+      res.json(transitOrder);
+    } catch (error) {
+      console.error("Fetch transit order error:", error);
+      res.status(500).json({ message: "Failed to fetch transit order" });
+    }
+  });
+
+  app.get("/api/transit-orders/transit-id/:transitId", async (req, res) => {
+    try {
+      const transitOrder = await storage.getTransitOrderByTransitId(req.params.transitId);
+      if (!transitOrder) {
+        return res.status(404).json({ message: "Transit order not found" });
+      }
+
+      // Get status history
+      const statusHistory = await storage.getTransitStatusHistory(transitOrder.id);
+      transitOrder.statusHistory = statusHistory;
+
+      res.json(transitOrder);
+    } catch (error) {
+      console.error("Fetch transit order by transitId error:", error);
+      res.status(500).json({ message: "Failed to fetch transit order" });
+    }
+  });
+
+  app.post("/api/transit-orders", async (req, res) => {
+    try {
+      const transitOrder = await storage.createTransitOrder(req.body);
+
+      // Trigger real-time update
+      await realtimeServer.triggerUpdate("transit_order", "created", transitOrder);
+
+      res.status(201).json(transitOrder);
+    } catch (error) {
+      console.error("Create transit order error:", error);
+      res.status(500).json({ message: "Failed to create transit order" });
+    }
+  });
+
+  app.put("/api/transit-orders/:id", async (req, res) => {
+    try {
+      const transitOrder = await storage.updateTransitOrder(req.params.id, req.body);
+
+      if (!transitOrder) {
+        return res.status(404).json({ message: "Transit order not found" });
+      }
+
+      // Trigger real-time update
+      await realtimeServer.triggerUpdate("transit_order", "updated", transitOrder);
+
+      res.json(transitOrder);
+    } catch (error) {
+      console.error("Update transit order error:", error);
+      res.status(500).json({ message: "Failed to update transit order" });
+    }
+  });
+
+  app.patch("/api/transit-orders/:id/status", async (req, res) => {
+    try {
+      const { status, notes, updatedBy, location } = req.body;
+
+      const transitOrder = await storage.updateTransitOrder(req.params.id, {
+        status,
+        notes,
+        updatedBy,
+      });
+
+      if (!transitOrder) {
+        return res.status(404).json({ message: "Transit order not found" });
+      }
+
+      // Add status history entry
+      await storage.addTransitStatusHistory(req.params.id, status, notes, updatedBy, location);
+
+      // Trigger real-time update
+      await realtimeServer.triggerUpdate("transit_order", "status_updated", transitOrder);
+
+      res.json(transitOrder);
+    } catch (error) {
+      console.error("Update transit order status error:", error);
+      res.status(500).json({ message: "Failed to update transit order status" });
+    }
+  });
+
+  app.get("/api/transit-orders/:id/status-history", async (req, res) => {
+    try {
+      const statusHistory = await storage.getTransitStatusHistory(req.params.id);
+      res.json(statusHistory);
+    } catch (error) {
+      console.error("Fetch status history error:", error);
+      res.status(500).json({ message: "Failed to fetch status history" });
+    }
+  });
+
+  app.delete("/api/transit-orders/:id", async (req, res) => {
+    try {
+      await storage.deleteTransitOrder(req.params.id);
+      res.json({ message: "Transit order deleted successfully" });
+    } catch (error) {
+      console.error("Delete transit order error:", error);
+      res.status(500).json({ message: "Failed to delete transit order" });
+    }
+  });
+
+  // GST Configuration endpoints
+  app.get("/api/gst/config", async (req, res) => {
+    try {
+      const configs = await storage.listGSTConfigs();
+      res.json(configs);
+    } catch (error) {
+      console.error("Fetch GST configs error:", error);
+      res.status(500).json({ message: "Failed to fetch GST configurations" });
+    }
+  });
+
+  app.get("/api/gst/config/active", async (req, res) => {
+    try {
+      const config = await storage.getActiveGSTConfig();
+      if (!config) {
+        return res.status(404).json({ message: "No active GST configuration found" });
+      }
+      res.json(config);
+    } catch (error) {
+      console.error("Fetch active GST config error:", error);
+      res.status(500).json({ message: "Failed to fetch active GST configuration" });
+    }
+  });
+
+  app.get("/api/gst/config/:id", async (req, res) => {
+    try {
+      const config = await storage.getGSTConfig(req.params.id);
+      if (!config) {
+        return res.status(404).json({ message: "GST configuration not found" });
+      }
+      res.json(config);
+    } catch (error) {
+      console.error("Fetch GST config error:", error);
+      res.status(500).json({ message: "Failed to fetch GST configuration" });
+    }
+  });
+
+  app.post("/api/gst/config", async (req, res) => {
+    try {
+      const config = await storage.createGSTConfig(req.body);
+      res.status(201).json(config);
+    } catch (error) {
+      console.error("Create GST config error:", error);
+      res.status(500).json({ message: "Failed to create GST configuration" });
+    }
+  });
+
+  app.put("/api/gst/config/:id", async (req, res) => {
+    try {
+      const config = await storage.updateGSTConfig(req.params.id, req.body);
+      if (!config) {
+        return res.status(404).json({ message: "GST configuration not found" });
+      }
+      res.json(config);
+    } catch (error) {
+      console.error("Update GST config error:", error);
+      res.status(500).json({ message: "Failed to update GST configuration" });
+    }
+  });
+
+  app.delete("/api/gst/config/:id", async (req, res) => {
+    try {
+      await storage.deleteGSTConfig(req.params.id);
+      res.json({ message: "GST configuration deleted successfully" });
+    } catch (error) {
+      console.error("Delete GST config error:", error);
+      res.status(500).json({ message: "Failed to delete GST configuration" });
+    }
+  });
+
+  // GST Calculation endpoint
+  app.post("/api/gst/calculate", async (req, res) => {
+    try {
+      const { calculateOrderGST } = await import('../shared/gst-utils');
+      const { items, isInterState } = req.body;
+
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: "Items must be an array" });
+      }
+
+      const result = calculateOrderGST(items, isInterState || false);
+      res.json(result);
+    } catch (error) {
+      console.error("GST calculation error:", error);
+      res.status(500).json({ message: "Failed to calculate GST" });
+    }
+  });
+
+  // GST Validation endpoints
+  app.post("/api/gst/validate-gstin", async (req, res) => {
+    try {
+      const { validateGSTIN, getStateName } = await import('../shared/gst-utils');
+      const { gstin } = req.body;
+
+      if (!gstin) {
+        return res.status(400).json({ message: "GSTIN is required" });
+      }
+
+      const isValid = validateGSTIN(gstin);
+      const stateName = isValid ? getStateName(gstin) : null;
+
+      res.json({
+        isValid,
+        gstin,
+        stateName,
+        stateCode: isValid ? gstin.substring(0, 2) : null,
+      });
+    } catch (error) {
+      console.error("GSTIN validation error:", error);
+      res.status(500).json({ message: "Failed to validate GSTIN" });
+    }
+  });
+
+  // Advanced Analytics endpoints
+  app.get("/api/analytics/comprehensive", async (req, res) => {
+    try {
+      const { analyticsEngine } = await import('./analytics-engine');
+      const analytics = await analyticsEngine.generateBusinessAnalytics();
+      res.json(analytics);
+    } catch (error) {
+      console.error("Comprehensive analytics error:", error);
+      res.status(500).json({ message: "Failed to generate analytics" });
+    }
+  });
+
+  app.get("/api/analytics/rfm", async (req, res) => {
+    try {
+      const { analyticsEngine } = await import('./analytics-engine');
+      const rfmAnalysis = await analyticsEngine.performRFMAnalysis();
+      res.json(rfmAnalysis);
+    } catch (error) {
+      console.error("RFM analysis error:", error);
+      res.status(500).json({ message: "Failed to perform RFM analysis" });
+    }
+  });
+
+  app.get("/api/analytics/cohort", async (req, res) => {
+    try {
+      const { analyticsEngine } = await import('./analytics-engine');
+      const cohortAnalysis = await analyticsEngine.performCohortAnalysis();
+      res.json(cohortAnalysis);
+    } catch (error) {
+      console.error("Cohort analysis error:", error);
+      res.status(500).json({ message: "Failed to perform cohort analysis" });
+    }
+  });
+
+  app.post("/api/analytics/abc", async (req, res) => {
+    try {
+      const { analyticsEngine } = await import('./analytics-engine');
+      const { items } = req.body;
+
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: "Items must be an array" });
+      }
+
+      const abcAnalysis = analyticsEngine.performABCAnalysis(items);
+      res.json(abcAnalysis);
+    } catch (error) {
+      console.error("ABC analysis error:", error);
+      res.status(500).json({ message: "Failed to perform ABC analysis" });
+    }
+  });
+
+  app.get("/api/analytics/forecast-revenue", async (req, res) => {
+    try {
+      const { analyticsEngine } = await import('./analytics-engine');
+      const days = parseInt(req.query.days as string) || 30;
+      const forecast = await analyticsEngine.forecastRevenue(days);
+      res.json(forecast);
+    } catch (error) {
+      console.error("Revenue forecast error:", error);
+      res.status(500).json({ message: "Failed to generate revenue forecast" });
+    }
+  });
+
+  app.get("/api/analytics/customer-segments", async (req, res) => {
+    try {
+      const { analyticsEngine } = await import('./analytics-engine');
+      const rfmData = await analyticsEngine.performRFMAnalysis();
+
+      // Group by segment
+      const segments: { [segment: string]: number } = {};
+      for (const customer of rfmData) {
+        segments[customer.segment] = (segments[customer.segment] || 0) + 1;
+      }
+
+      res.json({
+        segments,
+        totalCustomers: rfmData.length,
+        breakdown: Object.entries(segments).map(([name, count]) => ({
+          name,
+          count,
+          percentage: (count / rfmData.length) * 100,
+        })),
+      });
+    } catch (error) {
+      console.error("Customer segments error:", error);
+      res.status(500).json({ message: "Failed to analyze customer segments" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -93,6 +93,15 @@ export class SQLiteStorage implements IStorage {
         paymentStatus TEXT,
         shippingAddress TEXT,
         pickupDate TEXT,
+        baseAmount TEXT,
+        cgst TEXT,
+        sgst TEXT,
+        igst TEXT,
+        totalGst TEXT,
+        gstNumber TEXT,
+        isInterState INTEGER DEFAULT 0,
+        invoiceNumber TEXT,
+        invoiceDate TEXT,
         createdAt TEXT,
         updatedAt TEXT,
         FOREIGN KEY (customerId) REFERENCES customers(id)
@@ -184,6 +193,88 @@ export class SQLiteStorage implements IStorage {
         updatedBy TEXT
       );
 
+      CREATE TABLE IF NOT EXISTS gst_config (
+        id TEXT PRIMARY KEY,
+        businessName TEXT NOT NULL,
+        gstin TEXT UNIQUE NOT NULL,
+        pan TEXT,
+        address TEXT,
+        city TEXT,
+        state TEXT,
+        stateCode TEXT,
+        pincode TEXT,
+        phone TEXT,
+        email TEXT,
+        bankName TEXT,
+        bankAccountNumber TEXT,
+        bankIfsc TEXT,
+        sacCode TEXT,
+        logoPath TEXT,
+        isActive INTEGER DEFAULT 1,
+        createdAt TEXT,
+        updatedAt TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS transit_orders (
+        id TEXT PRIMARY KEY,
+        transitId TEXT UNIQUE NOT NULL,
+        type TEXT NOT NULL,
+        status TEXT NOT NULL,
+        origin TEXT,
+        destination TEXT,
+        createdBy TEXT,
+        vehicleNumber TEXT,
+        vehicleType TEXT,
+        driverName TEXT,
+        driverPhone TEXT,
+        driverLicense TEXT,
+        employeeName TEXT,
+        employeeId TEXT,
+        designation TEXT,
+        employeePhone TEXT,
+        totalOrders INTEGER DEFAULT 0,
+        totalItems INTEGER DEFAULT 0,
+        totalWeight REAL DEFAULT 0,
+        orders TEXT,
+        storeDetails TEXT,
+        factoryDetails TEXT,
+        createdAt TEXT,
+        updatedAt TEXT,
+        completedAt TEXT,
+        dispatchedAt TEXT,
+        receivedAt TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS transit_order_items (
+        id TEXT PRIMARY KEY,
+        transitOrderId TEXT NOT NULL,
+        orderId TEXT NOT NULL,
+        orderNumber TEXT,
+        customerId TEXT,
+        customerName TEXT,
+        itemCount INTEGER DEFAULT 0,
+        weight REAL DEFAULT 0,
+        serviceType TEXT,
+        status TEXT,
+        createdAt TEXT,
+        updatedAt TEXT,
+        FOREIGN KEY (transitOrderId) REFERENCES transit_orders(id) ON DELETE CASCADE,
+        FOREIGN KEY (orderId) REFERENCES orders(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS transit_status_history (
+        id TEXT PRIMARY KEY,
+        transitOrderId TEXT NOT NULL,
+        status TEXT NOT NULL,
+        notes TEXT,
+        location TEXT,
+        updatedBy TEXT,
+        latitude REAL,
+        longitude REAL,
+        createdAt TEXT,
+        FOREIGN KEY (transitOrderId) REFERENCES transit_orders(id) ON DELETE CASCADE
+      );
+
       -- Create indexes for better performance
       CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customerId);
       CREATE INDEX IF NOT EXISTS idx_deliveries_order ON deliveries(orderId);
@@ -196,6 +287,12 @@ export class SQLiteStorage implements IStorage {
       CREATE INDEX IF NOT EXISTS idx_barcodes_entity ON barcodes(entityType, entityId);
       CREATE INDEX IF NOT EXISTS idx_settings_key ON settings(key);
       CREATE INDEX IF NOT EXISTS idx_settings_category ON settings(category);
+      CREATE INDEX IF NOT EXISTS idx_transit_orders_transitId ON transit_orders(transitId);
+      CREATE INDEX IF NOT EXISTS idx_transit_orders_status ON transit_orders(status);
+      CREATE INDEX IF NOT EXISTS idx_transit_orders_type ON transit_orders(type);
+      CREATE INDEX IF NOT EXISTS idx_transit_order_items_transitOrderId ON transit_order_items(transitOrderId);
+      CREATE INDEX IF NOT EXISTS idx_transit_order_items_orderId ON transit_order_items(orderId);
+      CREATE INDEX IF NOT EXISTS idx_transit_status_history_transitOrderId ON transit_status_history(transitOrderId);
     `);
   }
 
@@ -1097,6 +1194,350 @@ export class SQLiteStorage implements IStorage {
 
   async deleteAllSettings(): Promise<void> {
     this.db.prepare("DELETE FROM settings").run();
+  }
+
+  // ======= TRANSIT ORDERS =======
+  async createTransitOrder(data: any): Promise<any> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+
+    const transitOrder = {
+      id,
+      ...data,
+      orders: typeof data.orders === 'string' ? data.orders : JSON.stringify(data.orders || []),
+      storeDetails: typeof data.storeDetails === 'string' ? data.storeDetails : JSON.stringify(data.storeDetails || {}),
+      factoryDetails: typeof data.factoryDetails === 'string' ? data.factoryDetails : JSON.stringify(data.factoryDetails || {}),
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const keys = Object.keys(transitOrder);
+    const values = Object.values(transitOrder);
+    const placeholders = keys.map(() => '?').join(',');
+
+    this.db
+      .prepare(`INSERT INTO transit_orders (${keys.join(',')}) VALUES (${placeholders})`)
+      .run(...values);
+
+    // Add status history
+    await this.addTransitStatusHistory(id, data.status, 'Transit order created', data.createdBy);
+
+    return this.getTransitOrder(id);
+  }
+
+  async getTransitOrder(id: string): Promise<any | undefined> {
+    const row = this.db
+      .prepare('SELECT * FROM transit_orders WHERE id = ?')
+      .get(id) as any;
+
+    if (!row) return undefined;
+
+    return {
+      ...row,
+      orders: row.orders ? JSON.parse(row.orders) : [],
+      storeDetails: row.storeDetails ? JSON.parse(row.storeDetails) : {},
+      factoryDetails: row.factoryDetails ? JSON.parse(row.factoryDetails) : {},
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt),
+      completedAt: row.completedAt ? new Date(row.completedAt) : null,
+      dispatchedAt: row.dispatchedAt ? new Date(row.dispatchedAt) : null,
+      receivedAt: row.receivedAt ? new Date(row.receivedAt) : null,
+    };
+  }
+
+  async getTransitOrderByTransitId(transitId: string): Promise<any | undefined> {
+    const row = this.db
+      .prepare('SELECT * FROM transit_orders WHERE transitId = ?')
+      .get(transitId) as any;
+
+    if (!row) return undefined;
+
+    return {
+      ...row,
+      orders: row.orders ? JSON.parse(row.orders) : [],
+      storeDetails: row.storeDetails ? JSON.parse(row.storeDetails) : {},
+      factoryDetails: row.factoryDetails ? JSON.parse(row.factoryDetails) : {},
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt),
+      completedAt: row.completedAt ? new Date(row.completedAt) : null,
+      dispatchedAt: row.dispatchedAt ? new Date(row.dispatchedAt) : null,
+      receivedAt: row.receivedAt ? new Date(row.receivedAt) : null,
+    };
+  }
+
+  async updateTransitOrder(id: string, data: any): Promise<any | undefined> {
+    const now = new Date().toISOString();
+    const processedData = { ...data };
+
+    if (processedData.orders) {
+      processedData.orders = typeof processedData.orders === 'string'
+        ? processedData.orders
+        : JSON.stringify(processedData.orders);
+    }
+    if (processedData.storeDetails) {
+      processedData.storeDetails = typeof processedData.storeDetails === 'string'
+        ? processedData.storeDetails
+        : JSON.stringify(processedData.storeDetails);
+    }
+    if (processedData.factoryDetails) {
+      processedData.factoryDetails = typeof processedData.factoryDetails === 'string'
+        ? processedData.factoryDetails
+        : JSON.stringify(processedData.factoryDetails);
+    }
+
+    const keys = Object.keys(processedData);
+    if (!keys.length) return this.getTransitOrder(id);
+
+    const setStmt = keys.map((k) => `${k} = ?`).join(', ') + ', updatedAt = ?';
+    const values = [...Object.values(processedData), now, id];
+
+    this.db
+      .prepare(`UPDATE transit_orders SET ${setStmt} WHERE id = ?`)
+      .run(...values);
+
+    // Add status history if status changed
+    if (data.status) {
+      await this.addTransitStatusHistory(id, data.status, data.notes || 'Status updated', data.updatedBy);
+    }
+
+    return this.getTransitOrder(id);
+  }
+
+  async deleteTransitOrder(id: string): Promise<boolean> {
+    try {
+      this.db.prepare('DELETE FROM transit_orders WHERE id = ?').run(id);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async listTransitOrders(): Promise<any[]> {
+    const rows = this.db
+      .prepare('SELECT * FROM transit_orders ORDER BY createdAt DESC')
+      .all() as any[];
+
+    return rows.map((row) => ({
+      ...row,
+      orders: row.orders ? JSON.parse(row.orders) : [],
+      storeDetails: row.storeDetails ? JSON.parse(row.storeDetails) : {},
+      factoryDetails: row.factoryDetails ? JSON.parse(row.factoryDetails) : {},
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt),
+      completedAt: row.completedAt ? new Date(row.completedAt) : null,
+      dispatchedAt: row.dispatchedAt ? new Date(row.dispatchedAt) : null,
+      receivedAt: row.receivedAt ? new Date(row.receivedAt) : null,
+    }));
+  }
+
+  async getTransitOrdersByStatus(status: string): Promise<any[]> {
+    const rows = this.db
+      .prepare('SELECT * FROM transit_orders WHERE status = ? ORDER BY createdAt DESC')
+      .all(status) as any[];
+
+    return rows.map((row) => ({
+      ...row,
+      orders: row.orders ? JSON.parse(row.orders) : [],
+      storeDetails: row.storeDetails ? JSON.parse(row.storeDetails) : {},
+      factoryDetails: row.factoryDetails ? JSON.parse(row.factoryDetails) : {},
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt),
+      completedAt: row.completedAt ? new Date(row.completedAt) : null,
+      dispatchedAt: row.dispatchedAt ? new Date(row.dispatchedAt) : null,
+      receivedAt: row.receivedAt ? new Date(row.receivedAt) : null,
+    }));
+  }
+
+  async getTransitOrdersByType(type: string): Promise<any[]> {
+    const rows = this.db
+      .prepare('SELECT * FROM transit_orders WHERE type = ? ORDER BY createdAt DESC')
+      .all(type) as any[];
+
+    return rows.map((row) => ({
+      ...row,
+      orders: row.orders ? JSON.parse(row.orders) : [],
+      storeDetails: row.storeDetails ? JSON.parse(row.storeDetails) : {},
+      factoryDetails: row.factoryDetails ? JSON.parse(row.factoryDetails) : {},
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt),
+      completedAt: row.completedAt ? new Date(row.completedAt) : null,
+      dispatchedAt: row.dispatchedAt ? new Date(row.dispatchedAt) : null,
+      receivedAt: row.receivedAt ? new Date(row.receivedAt) : null,
+    }));
+  }
+
+  // ======= TRANSIT STATUS HISTORY =======
+  async addTransitStatusHistory(
+    transitOrderId: string,
+    status: string,
+    notes?: string,
+    updatedBy?: string,
+    location?: { latitude?: number; longitude?: number }
+  ): Promise<void> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+
+    this.db
+      .prepare(
+        `INSERT INTO transit_status_history
+        (id, transitOrderId, status, notes, location, updatedBy, latitude, longitude, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        id,
+        transitOrderId,
+        status,
+        notes || null,
+        location ? JSON.stringify(location) : null,
+        updatedBy || null,
+        location?.latitude || null,
+        location?.longitude || null,
+        now
+      );
+  }
+
+  async getTransitStatusHistory(transitOrderId: string): Promise<any[]> {
+    const rows = this.db
+      .prepare('SELECT * FROM transit_status_history WHERE transitOrderId = ? ORDER BY createdAt DESC')
+      .all(transitOrderId) as any[];
+
+    return rows.map((row) => ({
+      ...row,
+      location: row.location ? JSON.parse(row.location) : null,
+      createdAt: new Date(row.createdAt),
+    }));
+  }
+
+  // ======= TRANSIT ORDER ITEMS =======
+  async addTransitOrderItem(data: any): Promise<any> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+
+    this.db
+      .prepare(
+        `INSERT INTO transit_order_items
+        (id, transitOrderId, orderId, orderNumber, customerId, customerName, itemCount, weight, serviceType, status, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        id,
+        data.transitOrderId,
+        data.orderId,
+        data.orderNumber,
+        data.customerId,
+        data.customerName,
+        data.itemCount || 0,
+        data.weight || 0,
+        data.serviceType || null,
+        data.status,
+        now,
+        now
+      );
+
+    return this.db.prepare('SELECT * FROM transit_order_items WHERE id = ?').get(id);
+  }
+
+  async getTransitOrderItems(transitOrderId: string): Promise<any[]> {
+    const rows = this.db
+      .prepare('SELECT * FROM transit_order_items WHERE transitOrderId = ?')
+      .all(transitOrderId) as any[];
+
+    return rows.map((row) => ({
+      ...row,
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt),
+    }));
+  }
+
+  // ======= GST CONFIGURATION =======
+  async createGSTConfig(data: any): Promise<any> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+
+    const gstConfig = {
+      id,
+      ...data,
+      isActive: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const keys = Object.keys(gstConfig);
+    const values = Object.values(gstConfig);
+    const placeholders = keys.map(() => '?').join(',');
+
+    this.db
+      .prepare(`INSERT INTO gst_config (${keys.join(',')}) VALUES (${placeholders})`)
+      .run(...values);
+
+    return this.getGSTConfig(id);
+  }
+
+  async getGSTConfig(id: string): Promise<any | undefined> {
+    const row = this.db
+      .prepare('SELECT * FROM gst_config WHERE id = ?')
+      .get(id) as any;
+
+    if (!row) return undefined;
+
+    return {
+      ...row,
+      isActive: row.isActive === 1,
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt),
+    };
+  }
+
+  async getActiveGSTConfig(): Promise<any | undefined> {
+    const row = this.db
+      .prepare('SELECT * FROM gst_config WHERE isActive = 1 ORDER BY createdAt DESC LIMIT 1')
+      .get() as any;
+
+    if (!row) return undefined;
+
+    return {
+      ...row,
+      isActive: row.isActive === 1,
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt),
+    };
+  }
+
+  async updateGSTConfig(id: string, data: any): Promise<any | undefined> {
+    const now = new Date().toISOString();
+    const keys = Object.keys(data);
+    if (!keys.length) return this.getGSTConfig(id);
+
+    const setStmt = keys.map((k) => `${k} = ?`).join(', ') + ', updatedAt = ?';
+    const values = [...Object.values(data), now, id];
+
+    this.db
+      .prepare(`UPDATE gst_config SET ${setStmt} WHERE id = ?`)
+      .run(...values);
+
+    return this.getGSTConfig(id);
+  }
+
+  async listGSTConfigs(): Promise<any[]> {
+    const rows = this.db
+      .prepare('SELECT * FROM gst_config ORDER BY createdAt DESC')
+      .all() as any[];
+
+    return rows.map((row) => ({
+      ...row,
+      isActive: row.isActive === 1,
+      createdAt: new Date(row.createdAt),
+      updatedAt: new Date(row.updatedAt),
+    }));
+  }
+
+  async deleteGSTConfig(id: string): Promise<boolean> {
+    try {
+      this.db.prepare('DELETE FROM gst_config WHERE id = ?').run(id);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // Close database connection

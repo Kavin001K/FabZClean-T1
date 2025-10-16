@@ -146,6 +146,100 @@ const playErrorSound = () => {
   audio.play().catch(() => {});
 };
 
+// Transit Status History Component
+interface StatusHistoryEntry {
+  id: string;
+  status: string;
+  notes?: string;
+  location?: string;
+  updatedBy?: string;
+  createdAt: string;
+}
+
+const TransitStatusHistory: React.FC<{ transitOrderId: string }> = ({ transitOrderId }) => {
+  const { data: statusHistory = [], isLoading } = useQuery<StatusHistoryEntry[]>({
+    queryKey: ['transit-status-history', transitOrderId],
+    queryFn: async () => {
+      const response = await fetch(`/api/transit-orders/${transitOrderId}/status-history`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch status history');
+      }
+      return response.json();
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (statusHistory.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+        <p className="font-medium">No status history available</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="relative border-l-2 border-muted ml-4">
+        {statusHistory.map((entry, index) => (
+          <div key={entry.id} className="ml-6 pb-6 relative">
+            <div
+              className={`absolute -left-[29px] mt-1.5 h-4 w-4 rounded-full border-2 ${
+                index === 0 ? 'bg-primary border-primary' : 'bg-background border-muted'
+              }`}
+            />
+            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+              <div className="flex items-start justify-between">
+                <div>
+                  <Badge
+                    variant={entry.status === 'completed' ? 'default' : 'secondary'}
+                    className={
+                      entry.status === 'completed'
+                        ? 'bg-green-100 text-green-800'
+                        : entry.status === 'in_transit'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-blue-100 text-blue-800'
+                    }
+                  >
+                    {entry.status.replace(/_/g, ' ').toUpperCase()}
+                  </Badge>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date(entry.createdAt).toLocaleString()}
+                </div>
+              </div>
+              {entry.notes && (
+                <p className="text-sm text-muted-foreground">{entry.notes}</p>
+              )}
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                {entry.updatedBy && (
+                  <div className="flex items-center gap-1">
+                    <User className="h-3 w-3" />
+                    {entry.updatedBy}
+                  </div>
+                )}
+                {entry.location && (
+                  <div className="flex items-center gap-1">
+                    <Navigation className="h-3 w-3" />
+                    {entry.location}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // PDF Generation with Comprehensive Details - A4 Format
 const generateTransitPDF = (
   transitId: string,
@@ -553,24 +647,43 @@ export default function TransitOrdersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Mock data - replace with actual API call
+  // Fetch transit orders from API
   const { data: transitHistory = [], isLoading } = useQuery<TransitBatch[]>({
     queryKey: ['transit-batches'],
     queryFn: async () => {
-      return [
-        {
-          id: '1',
-          transitId: 'TRN-2025-001',
-          type: 'store_to_factory',
-          origin: 'Store #1',
-          destination: 'Central Factory',
-          createdBy: 'John Doe',
-          createdAt: '2025-01-15T10:30:00Z',
-          status: 'completed',
-          orders: [],
-          itemCount: 15,
-        },
-      ];
+      const response = await fetch('/api/transit-orders');
+      if (!response.ok) {
+        throw new Error('Failed to fetch transit orders');
+      }
+      const data = await response.json();
+      // Map database format to component format
+      return data.map((order: any) => ({
+        id: order.id,
+        transitId: order.transitId,
+        type: order.type,
+        origin: order.origin,
+        destination: order.destination,
+        createdBy: order.createdBy,
+        createdAt: order.createdAt,
+        status: order.status,
+        orders: order.orders || [],
+        itemCount: order.totalItems || 0,
+        storeDetails: order.storeDetails,
+        factoryDetails: order.factoryDetails,
+        vehicleDetails: order.vehicleNumber ? {
+          vehicleNumber: order.vehicleNumber,
+          vehicleType: order.vehicleType,
+          driverName: order.driverName,
+          driverPhone: order.driverPhone,
+          driverLicense: order.driverLicense,
+        } : undefined,
+        employeeDetails: order.employeeName ? {
+          name: order.employeeName,
+          employeeId: order.employeeId,
+          designation: order.designation,
+          phone: order.employeePhone,
+        } : undefined,
+      }));
     },
   });
 
@@ -616,28 +729,70 @@ export default function TransitOrdersPage() {
       return;
     }
 
-    // Mock validation - replace with actual API call
-    // In real implementation, fetch order details from API
-    const serviceTypes = ['Dry Clean', 'Wash & Iron', 'Steam Iron', 'Wash & Fold', 'Premium Clean'];
-    const mockOrder: OrderInBatch = {
-      orderNumber: orderId,
-      customerId: `CUST-${Math.random().toString(36).substr(2, 9)}`,
-      customerName: `Customer ${currentBatch.length + 1}`,
-      itemCount: Math.floor(Math.random() * 10) + 1,
-      status: batchType === 'store_to_factory' ? 'in_store' : 'processing',
-      serviceType: serviceTypes[Math.floor(Math.random() * serviceTypes.length)],
-      weight: parseFloat((Math.random() * 5 + 0.5).toFixed(1)), // 0.5 to 5.5 kg
-    };
+    try {
+      // Fetch order details from API
+      const response = await fetch(`/api/orders/${orderId}`);
+      if (!response.ok) {
+        playErrorSound();
+        toast({
+          title: 'Error',
+          description: 'Order not found',
+          variant: 'destructive',
+        });
+        setBarcodeInput('');
+        return;
+      }
 
-    playSuccessSound();
-    setCurrentBatch([...currentBatch, mockOrder]);
-    setBarcodeInput('');
-    barcodeInputRef.current?.focus();
+      const orderData = await response.json();
 
-    toast({
-      title: 'Order Added',
-      description: `Order ${orderId} added to batch`,
-    });
+      // Validate order status for transit type
+      const validStatuses = batchType === 'store_to_factory'
+        ? ['in_store', 'ready_for_transit']
+        : ['processing', 'completed', 'ready_for_delivery'];
+
+      if (!validStatuses.includes(orderData.status)) {
+        playErrorSound();
+        toast({
+          title: 'Invalid Order Status',
+          description: `Order status "${orderData.status}" is not valid for ${batchType === 'store_to_factory' ? 'store to factory' : 'factory to store'} transit`,
+          variant: 'destructive',
+        });
+        setBarcodeInput('');
+        return;
+      }
+
+      // Calculate total items and weight from order items
+      const itemCount = orderData.items?.length || 0;
+      const totalWeight = orderData.items?.reduce((sum: number, item: any) => sum + (item.weight || 0), 0) || 0;
+
+      const orderInBatch: OrderInBatch = {
+        orderNumber: orderData.orderNumber,
+        customerId: orderData.customerId,
+        customerName: orderData.customerName,
+        itemCount: itemCount,
+        status: orderData.status,
+        serviceType: orderData.serviceType || 'Dry Clean',
+        weight: parseFloat(totalWeight.toFixed(1)),
+      };
+
+      playSuccessSound();
+      setCurrentBatch([...currentBatch, orderInBatch]);
+      setBarcodeInput('');
+      barcodeInputRef.current?.focus();
+
+      toast({
+        title: 'Order Added',
+        description: `Order ${orderId} added to batch (${itemCount} items)`,
+      });
+    } catch (error) {
+      playErrorSound();
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch order details',
+        variant: 'destructive',
+      });
+      setBarcodeInput('');
+    }
   };
 
   const handleRemoveOrder = (orderNumber: string) => {
@@ -708,6 +863,68 @@ export default function TransitOrdersPage() {
         phone: transitDetails.employeePhone,
       };
 
+      // Calculate totals
+      const totalOrders = currentBatch.length;
+      const totalItems = currentBatch.reduce((sum, order) => sum + order.itemCount, 0);
+      const totalWeight = currentBatch.reduce((sum, order) => sum + (order.weight || 0), 0);
+
+      // Prepare transit order data for database
+      const transitOrderData = {
+        transitId,
+        type: batchType,
+        status: 'in_transit',
+        origin: batchType === 'store_to_factory' ? storeDetails.name : factoryDetails.name,
+        destination: batchType === 'store_to_factory' ? factoryDetails.name : storeDetails.name,
+        createdBy: employeeDetails.name,
+        vehicleNumber: vehicleDetails.vehicleNumber,
+        vehicleType: vehicleDetails.vehicleType,
+        driverName: vehicleDetails.driverName,
+        driverPhone: vehicleDetails.driverPhone,
+        driverLicense: vehicleDetails.driverLicense,
+        employeeName: employeeDetails.name,
+        employeeId: employeeDetails.employeeId,
+        designation: employeeDetails.designation,
+        employeePhone: employeeDetails.phone,
+        totalOrders,
+        totalItems,
+        totalWeight,
+        orders: currentBatch,
+        storeDetails,
+        factoryDetails,
+      };
+
+      // Create transit order in database
+      const response = await fetch('/api/transit-orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(transitOrderData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create transit order');
+      }
+
+      const createdTransitOrder = await response.json();
+
+      // Update all order statuses to in_transit
+      const statusUpdatePromises = currentBatch.map((order) =>
+        fetch(`/api/orders/${order.orderNumber}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            status: 'in_transit',
+            notes: `Added to transit ${transitId}`,
+            updatedBy: employeeDetails.name,
+          }),
+        })
+      );
+
+      await Promise.all(statusUpdatePromises);
+
       // Generate PDF with all details
       generateTransitPDF(
         transitId,
@@ -720,17 +937,9 @@ export default function TransitOrdersPage() {
         employeeDetails
       );
 
-      // In real implementation:
-      // 1. Create transit batch in database via API
-      // 2. Update all order statuses
-      // await fetch('/api/transit-batches', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ transitId, orders: currentBatch, type: batchType })
-      // });
-
       toast({
-        title: 'Transit Copy Generated',
-        description: `Transit ID: ${transitId} - PDF downloaded and ready for printing`,
+        title: 'Transit Order Created',
+        description: `Transit ID: ${transitId} - PDF downloaded and ${totalOrders} orders updated`,
         duration: 5000,
       });
 
@@ -742,10 +951,12 @@ export default function TransitOrdersPage() {
 
       // Refresh transit history
       queryClient.invalidateQueries({ queryKey: ['transit-batches'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
     } catch (error) {
+      console.error('Failed to create transit order:', error);
       toast({
         title: 'Error',
-        description: 'Failed to generate transit copy',
+        description: 'Failed to create transit order. Please try again.',
         variant: 'destructive',
       });
     }
@@ -1146,7 +1357,7 @@ export default function TransitOrdersPage() {
 
         {/* View Batch Details Dialog */}
         <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Transit Batch Details</DialogTitle>
               <DialogDescription>
@@ -1154,41 +1365,168 @@ export default function TransitOrdersPage() {
               </DialogDescription>
             </DialogHeader>
             {selectedBatch && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <Tabs defaultValue="details" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="details">Details</TabsTrigger>
+                  <TabsTrigger value="orders">Orders</TabsTrigger>
+                  <TabsTrigger value="history">Status History</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="details" className="space-y-4 mt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-muted-foreground">Created By</Label>
+                      <p className="font-medium">{selectedBatch.createdBy}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Date Created</Label>
+                      <p className="font-medium">
+                        {new Date(selectedBatch.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Origin</Label>
+                      <p className="font-medium">{selectedBatch.origin}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Destination</Label>
+                      <p className="font-medium">{selectedBatch.destination}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Status</Label>
+                      <Badge
+                        variant={selectedBatch.status === 'completed' ? 'default' : 'secondary'}
+                        className={
+                          selectedBatch.status === 'completed'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }
+                      >
+                        {selectedBatch.status === 'completed' ? 'Completed' : 'In Transit'}
+                      </Badge>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Total Orders</Label>
+                      <p className="font-medium">{selectedBatch.orders?.length || 0}</p>
+                    </div>
+                  </div>
+                  <Separator />
+                  {selectedBatch.vehicleDetails && (
+                    <>
+                      <div>
+                        <h4 className="font-semibold mb-2">Vehicle Details</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-muted-foreground">Vehicle Number</Label>
+                            <p className="font-medium">{selectedBatch.vehicleDetails.vehicleNumber}</p>
+                          </div>
+                          <div>
+                            <Label className="text-muted-foreground">Vehicle Type</Label>
+                            <p className="font-medium">{selectedBatch.vehicleDetails.vehicleType}</p>
+                          </div>
+                          <div>
+                            <Label className="text-muted-foreground">Driver Name</Label>
+                            <p className="font-medium">{selectedBatch.vehicleDetails.driverName}</p>
+                          </div>
+                          <div>
+                            <Label className="text-muted-foreground">Driver Phone</Label>
+                            <p className="font-medium">{selectedBatch.vehicleDetails.driverPhone}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <Separator />
+                    </>
+                  )}
                   <div>
-                    <Label className="text-muted-foreground">Created By</Label>
-                    <p className="font-medium">{selectedBatch.createdBy}</p>
+                    <Label>Transit Barcode</Label>
+                    <div className="mt-2 p-4 bg-muted rounded-lg text-center">
+                      <Barcode className="h-12 w-12 mx-auto mb-2" />
+                      <p className="text-xl font-mono font-bold">{selectedBatch.transitId}</p>
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground">Date Created</Label>
-                    <p className="font-medium">
-                      {new Date(selectedBatch.createdAt).toLocaleString()}
-                    </p>
+                </TabsContent>
+
+                <TabsContent value="orders" className="mt-4">
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>#</TableHead>
+                          <TableHead>Order ID</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Service</TableHead>
+                          <TableHead className="text-right">Items</TableHead>
+                          <TableHead className="text-right">Weight</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedBatch.orders?.map((order, index) => (
+                          <TableRow key={order.orderNumber}>
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                            <TableCell>{order.customerName}</TableCell>
+                            <TableCell>{order.serviceType || 'Dry Clean'}</TableCell>
+                            <TableCell className="text-right">{order.itemCount}</TableCell>
+                            <TableCell className="text-right">
+                              {order.weight ? `${order.weight.toFixed(1)} kg` : 'N/A'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground">Origin</Label>
-                    <p className="font-medium">{selectedBatch.origin}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Destination</Label>
-                    <p className="font-medium">{selectedBatch.destination}</p>
-                  </div>
-                </div>
-                <Separator />
-                <div>
-                  <Label>Transit Barcode</Label>
-                  <div className="mt-2 p-4 bg-muted rounded-lg text-center">
-                    <Barcode className="h-12 w-12 mx-auto mb-2" />
-                    <p className="text-xl font-mono font-bold">{selectedBatch.transitId}</p>
-                  </div>
-                </div>
-              </div>
+                </TabsContent>
+
+                <TabsContent value="history" className="mt-4">
+                  <TransitStatusHistory transitOrderId={selectedBatch.id} />
+                </TabsContent>
+              </Tabs>
             )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowViewDialog(false)}>
                 Close
               </Button>
+              {selectedBatch && selectedBatch.status === 'in_transit' && (
+                <Button
+                  className="gap-2"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`/api/transit-orders/${selectedBatch.id}/status`, {
+                        method: 'PATCH',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          status: 'completed',
+                          notes: 'Transit completed and delivered',
+                          updatedBy: 'Current User',
+                        }),
+                      });
+
+                      if (!response.ok) {
+                        throw new Error('Failed to update status');
+                      }
+
+                      toast({
+                        title: 'Transit Completed',
+                        description: `Transit ${selectedBatch.transitId} marked as completed`,
+                      });
+
+                      setShowViewDialog(false);
+                      queryClient.invalidateQueries({ queryKey: ['transit-batches'] });
+                    } catch (error) {
+                      toast({
+                        title: 'Error',
+                        description: 'Failed to update transit status',
+                        variant: 'destructive',
+                      });
+                    }
+                  }}
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Mark as Completed
+                </Button>
+              )}
               <Button
                 className="gap-2"
                 onClick={() => {
@@ -1197,7 +1535,11 @@ export default function TransitOrdersPage() {
                       selectedBatch.transitId,
                       selectedBatch.orders,
                       selectedBatch.type,
-                      selectedBatch.createdBy
+                      selectedBatch.createdBy,
+                      selectedBatch.storeDetails,
+                      selectedBatch.factoryDetails,
+                      selectedBatch.vehicleDetails,
+                      selectedBatch.employeeDetails
                     );
                     toast({
                       title: 'Transit Copy Reprinted',
