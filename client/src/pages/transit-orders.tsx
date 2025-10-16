@@ -25,6 +25,9 @@ import {
   Eye,
   RefreshCw,
 } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import JsBarcode from 'jsbarcode';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -104,6 +107,157 @@ const playSuccessSound = () => {
 const playErrorSound = () => {
   const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm01IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZUQ0PVK3n77BdGAg+ltjyvW0gBSyBzvLZiTYIGWi77eeeTRAMUKnk8LdlHAU4kNfyzHksBSR3x/DdkEAKFF606+uoVRQKRp/g8r5sIQUxh9Hz04IzBh5uwO/jmVENEFSu5++wXRgI');
   audio.play().catch(() => {});
+};
+
+// PDF Generation with Barcode
+const generateTransitPDF = (
+  transitId: string,
+  orders: OrderInBatch[],
+  batchType: 'store_to_factory' | 'factory_to_store',
+  createdBy: string = 'Current User'
+) => {
+  const doc = new jsPDF();
+
+  // Generate barcode as data URL
+  const canvas = document.createElement('canvas');
+  JsBarcode(canvas, transitId, {
+    format: 'CODE128',
+    width: 2,
+    height: 60,
+    displayValue: true,
+    fontSize: 14,
+    textMargin: 5,
+  });
+  const barcodeDataUrl = canvas.toDataURL('image/png');
+
+  // Header
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.text('TRANSIT COPY', 105, 20, { align: 'center' });
+
+  // Transit ID Barcode
+  doc.addImage(barcodeDataUrl, 'PNG', 55, 30, 100, 25);
+
+  // Transit Information
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString();
+  const timeStr = now.toLocaleTimeString();
+
+  const origin = batchType === 'store_to_factory' ? 'Store #1' : 'Central Factory';
+  const destination = batchType === 'store_to_factory' ? 'Central Factory' : 'Store #1';
+
+  // Information box
+  doc.setDrawColor(200);
+  doc.setFillColor(250, 250, 250);
+  doc.rect(15, 65, 180, 35, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Transit Type:', 20, 72);
+  doc.setFont('helvetica', 'normal');
+  doc.text(batchType === 'store_to_factory' ? 'Store → Factory' : 'Factory → Store', 60, 72);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Origin:', 20, 80);
+  doc.setFont('helvetica', 'normal');
+  doc.text(origin, 60, 80);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Destination:', 20, 88);
+  doc.setFont('helvetica', 'normal');
+  doc.text(destination, 60, 88);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Date:', 120, 72);
+  doc.setFont('helvetica', 'normal');
+  doc.text(dateStr, 150, 72);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Time:', 120, 80);
+  doc.setFont('helvetica', 'normal');
+  doc.text(timeStr, 150, 80);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Created By:', 120, 88);
+  doc.setFont('helvetica', 'normal');
+  doc.text(createdBy, 150, 88);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Total Orders:', 20, 96);
+  doc.setFont('helvetica', 'normal');
+  doc.text(orders.length.toString(), 60, 96);
+
+  const totalItems = orders.reduce((sum, order) => sum + order.itemCount, 0);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Total Items:', 120, 96);
+  doc.setFont('helvetica', 'normal');
+  doc.text(totalItems.toString(), 150, 96);
+
+  // Order Table
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Order Details', 20, 110);
+
+  const tableData = orders.map((order, index) => [
+    (index + 1).toString(),
+    order.orderNumber,
+    order.customerId,
+    order.customerName,
+    order.itemCount.toString(),
+  ]);
+
+  autoTable(doc, {
+    startY: 115,
+    head: [['#', 'Order ID', 'Customer ID', 'Customer Name', 'Items']],
+    body: tableData,
+    theme: 'grid',
+    headStyles: {
+      fillColor: [66, 66, 66],
+      fontSize: 9,
+      fontStyle: 'bold',
+    },
+    bodyStyles: {
+      fontSize: 8,
+    },
+    columnStyles: {
+      0: { cellWidth: 10 },
+      1: { cellWidth: 35 },
+      2: { cellWidth: 40 },
+      3: { cellWidth: 60 },
+      4: { cellWidth: 20, halign: 'center' },
+    },
+  });
+
+  // Signature section
+  const finalY = (doc as any).lastAutoTable.finalY || 200;
+
+  doc.setDrawColor(200);
+  doc.line(15, finalY + 40, 85, finalY + 40);
+  doc.line(110, finalY + 40, 180, finalY + 40);
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Store Manager Signature', 50, finalY + 45, { align: 'center' });
+  doc.text('Factory Manager Signature', 145, finalY + 45, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text('Date: _______________', 20, finalY + 52);
+  doc.text('Date: _______________', 115, finalY + 52);
+
+  // Footer
+  doc.setFontSize(8);
+  doc.setTextColor(128);
+  doc.text('This is a computer-generated document. Please verify all items upon receipt.', 105, 285, {
+    align: 'center',
+  });
+
+  // Save PDF
+  doc.save(`Transit_${transitId}_${dateStr.replace(/\//g, '-')}.pdf`);
+
+  return doc;
 };
 
 export default function TransitOrdersPage() {
@@ -242,24 +396,37 @@ export default function TransitOrdersPage() {
     // Generate Transit ID
     const transitId = `TRN-${Date.now().toString().slice(-6)}`;
 
-    // In real implementation:
-    // 1. Create transit batch in database
-    // 2. Update all order statuses
-    // 3. Generate PDF with Transit Copy
-    // 4. Send to printer
+    try {
+      // Generate PDF with barcode
+      generateTransitPDF(transitId, currentBatch, batchType, 'Current User');
 
-    toast({
-      title: 'Transit Copy Generated',
-      description: `Transit ID: ${transitId} - Sent to printer`,
-    });
+      // In real implementation:
+      // 1. Create transit batch in database via API
+      // 2. Update all order statuses
+      // await fetch('/api/transit-batches', {
+      //   method: 'POST',
+      //   body: JSON.stringify({ transitId, orders: currentBatch, type: batchType })
+      // });
 
-    // Reset batch
-    setCurrentBatch([]);
-    setIsScanning(false);
-    setBarcodeInput('');
+      toast({
+        title: 'Transit Copy Generated',
+        description: `Transit ID: ${transitId} - PDF downloaded successfully`,
+      });
 
-    // In real implementation, trigger PDF generation and print
-    // generateTransitPDF(transitId, currentBatch, batchType);
+      // Reset batch
+      setCurrentBatch([]);
+      setIsScanning(false);
+      setBarcodeInput('');
+
+      // Refresh transit history
+      queryClient.invalidateQueries({ queryKey: ['transit-batches'] });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to generate transit copy',
+        variant: 'destructive',
+      });
+    }
   };
 
   const totalItems = currentBatch.reduce((sum, order) => sum + order.itemCount, 0);
@@ -582,7 +749,23 @@ export default function TransitOrdersPage() {
                             <Eye className="h-3 w-3" />
                             View
                           </Button>
-                          <Button variant="outline" size="sm" className="gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => {
+                              generateTransitPDF(
+                                batch.transitId,
+                                batch.orders,
+                                batch.type,
+                                batch.createdBy
+                              );
+                              toast({
+                                title: 'Transit Copy Printed',
+                                description: `PDF for ${batch.transitId} downloaded successfully`,
+                              });
+                            }}
+                          >
                             <Printer className="h-3 w-3" />
                             Print
                           </Button>
@@ -684,7 +867,23 @@ export default function TransitOrdersPage() {
               <Button variant="outline" onClick={() => setShowViewDialog(false)}>
                 Close
               </Button>
-              <Button className="gap-2">
+              <Button
+                className="gap-2"
+                onClick={() => {
+                  if (selectedBatch) {
+                    generateTransitPDF(
+                      selectedBatch.transitId,
+                      selectedBatch.orders,
+                      selectedBatch.type,
+                      selectedBatch.createdBy
+                    );
+                    toast({
+                      title: 'Transit Copy Reprinted',
+                      description: `PDF for ${selectedBatch.transitId} downloaded successfully`,
+                    });
+                  }
+                }}
+              >
                 <Printer className="h-4 w-4" />
                 Reprint Transit Copy
               </Button>
