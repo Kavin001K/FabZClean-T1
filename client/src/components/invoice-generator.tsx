@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, FileText, Download, Eye } from 'lucide-react';
 import { printDriver, InvoiceData } from '@/lib/print-driver';
 import { useToast } from '@/hooks/use-toast';
+import InvoiceTemplateIN from '@/components/print/invoice-template-in';
 
 interface InvoiceItem {
   description: string;
@@ -17,6 +18,7 @@ interface InvoiceItem {
   unitPrice: number;
   total: number;
   taxRate: number;
+  hsn: string;
 }
 
 export const InvoiceGenerator: React.FC = () => {
@@ -27,9 +29,9 @@ export const InvoiceGenerator: React.FC = () => {
     company: {
       name: 'FabZClean Services',
       address: '123 Business Street\nCity, State 12345',
-      phone: '+1 (555) 123-4567',
+      phone: '+91 9876543210',
       email: 'billing@fabzclean.com',
-      taxId: 'TAX-123456789',
+      taxId: '27ABCDE1234F1Z5',
       logo: '/assets/logo.webp'
     },
     customer: {
@@ -41,18 +43,19 @@ export const InvoiceGenerator: React.FC = () => {
     },
     items: [
       {
-        description: 'Basic Cleaning Service',
+        description: 'Dry Cleaning - Suit',
         quantity: 1,
-        unitPrice: 100,
-        total: 100,
-        taxRate: 10
+        unitPrice: 500,
+        total: 500,
+        taxRate: 18,
+        hsn: '9601'
       }
     ],
-    subtotal: 100,
-    taxAmount: 10,
-    total: 110,
+    subtotal: 500,
+    taxAmount: 90,
+    total: 590,
     paymentTerms: 'Net 30 days',
-    notes: '',
+    notes: 'Thank you for your business!',
     qrCode: 'payment-qr-code'
   });
 
@@ -61,7 +64,8 @@ export const InvoiceGenerator: React.FC = () => {
     quantity: 1,
     unitPrice: 0,
     total: 0,
-    taxRate: 10
+    taxRate: 18,
+    hsn: ''
   });
 
   const { toast } = useToast();
@@ -104,7 +108,8 @@ export const InvoiceGenerator: React.FC = () => {
       quantity: 1,
       unitPrice: 0,
       total: 0,
-      taxRate: 10
+      taxRate: 18,
+      hsn: ''
     });
   };
 
@@ -147,6 +152,23 @@ export const InvoiceGenerator: React.FC = () => {
       toast({
         title: "Error",
         description: "Failed to generate invoice",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const generateIndianInvoice = async () => {
+    try {
+      await printDriver.printComponent(<InvoiceTemplateIN data={invoiceData} />, 'indian-invoice.pdf');
+      toast({
+        title: "Success",
+        description: "Indian Invoice generated successfully!"
+      });
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: "Error",
+        description: "Failed to generate Indian invoice",
         variant: "destructive"
       });
     }
@@ -231,6 +253,7 @@ export const InvoiceGenerator: React.FC = () => {
                   placeholder="Additional notes or terms..."
                 />
               </div>
+.
             </div>
           </div>
 
@@ -276,12 +299,12 @@ export const InvoiceGenerator: React.FC = () => {
                     ...invoiceData,
                     customer: { ...invoiceData.customer, phone: e.target.value }
                   })}
-                  placeholder="+1 (555) 123-4567"
+                  placeholder="+91 9876543210"
                 />
               </div>
               
               <div>
-                <Label htmlFor="customerTaxId">Tax ID (Optional)</Label>
+                <Label htmlFor="customerTaxId">GSTIN (Optional)</Label>
                 <Input
                   id="customerTaxId"
                   value={invoiceData.customer.taxId || ''}
@@ -289,7 +312,7 @@ export const InvoiceGenerator: React.FC = () => {
                     ...invoiceData,
                     customer: { ...invoiceData.customer, taxId: e.target.value }
                   })}
-                  placeholder="Tax identification number"
+                  placeholder="27ABCDE1234F1Z5"
                 />
               </div>
               
@@ -318,12 +341,19 @@ export const InvoiceGenerator: React.FC = () => {
             <div className="space-y-4">
               {invoiceData.items.map((item, index) => (
                 <Card key={index} className="p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                  <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-end">
                     <div className="md:col-span-2">
                       <Label>Description</Label>
                       <Input
                         value={item.description}
                         onChange={(e) => updateItem(index, 'description', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>HSN/SAC</Label>
+                      <Input
+                        value={item.hsn}
+                        onChange={(e) => updateItem(index, 'hsn', e.target.value)}
                       />
                     </div>
                     
@@ -383,13 +413,21 @@ export const InvoiceGenerator: React.FC = () => {
             {/* Add New Item */}
             <Card className="p-4 border-dashed">
               <h4 className="font-semibold mb-4">Add New Item</h4>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                 <div className="md:col-span-2">
                   <Label>Description</Label>
                   <Input
                     value={newItem.description}
                     onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                     placeholder="Item description"
+                  />
+                </div>
+                <div>
+                  <Label>HSN/SAC</Label>
+                  <Input
+                    value={newItem.hsn}
+                    onChange={(e) => setNewItem({ ...newItem, hsn: e.target.value })}
+                    placeholder="e.g. 9601"
                   />
                 </div>
                 
@@ -421,7 +459,7 @@ export const InvoiceGenerator: React.FC = () => {
                   </Button>
                 </div>
               </div>
-            </Card>
+            </Card>.
           </div>
 
           <Separator />
@@ -454,6 +492,10 @@ export const InvoiceGenerator: React.FC = () => {
             <Button onClick={generateInvoice}>
               <Download className="h-4 w-4 mr-2" />
               Generate Invoice
+            </Button>
+            <Button onClick={generateIndianInvoice}>
+              <Download className="h-4 w-4 mr-2" />
+              Generate Indian Invoice
             </Button>
           </div>
         </CardContent>

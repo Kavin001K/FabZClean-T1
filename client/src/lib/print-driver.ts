@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { createRoot } from 'react-dom/client';
 
 export interface PrintSettings {
   pageSize: 'A4' | 'A5' | 'Letter' | 'Legal';
@@ -691,6 +692,24 @@ export class PrintDriver {
       console.error('Error printing from element:', error);
       throw new Error('Failed to print document');
     }
+  }
+
+  public async printComponent(component: React.ReactElement, filename: string = 'document.pdf'): Promise<void> {
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    document.body.appendChild(container);
+
+    const root = createRoot(container);
+    await new Promise<void>((resolve) => {
+      root.render(component);
+      setTimeout(resolve, 500); // Wait for rendering
+    });
+
+    await this.printFromElement(container, filename);
+
+    root.unmount();
+    document.body.removeChild(container);
   }
 
   private addHeader(doc: jsPDF, template: PrintTemplate, data: any): void {

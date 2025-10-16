@@ -29,6 +29,7 @@ import Settings from "@/pages/settings";
 import DatabaseStatus from "@/pages/database-status";
 import PerformanceAnalytics from "@/components/analytics";
 import Accounting from "@/pages/accounting";
+import { InvoiceGenerator } from "@/components/invoice-generator";
 
 function Router() {
   return (
@@ -53,6 +54,7 @@ function Router() {
         <Route path="/settings" component={Settings} />
         <Route path="/database-status" component={DatabaseStatus} />
         <Route path="/debug" component={DebugPage} />
+        <Route path="/invoice-generator" component={InvoiceGenerator} />
         <Route component={NotFound} />
       </Switch>
     </MainLayout>
