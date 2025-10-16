@@ -83,6 +83,39 @@ interface OrderInBatch {
   customerName: string;
   itemCount: number;
   status: string;
+  serviceType?: string;
+  weight?: number;
+}
+
+interface StoreDetails {
+  name: string;
+  address: string;
+  phone: string;
+  managerName: string;
+  storeCode: string;
+}
+
+interface FactoryDetails {
+  name: string;
+  address: string;
+  phone: string;
+  managerName: string;
+  factoryCode: string;
+}
+
+interface VehicleDetails {
+  vehicleNumber: string;
+  vehicleType: string;
+  driverName: string;
+  driverPhone: string;
+  driverLicense: string;
+}
+
+interface EmployeeDetails {
+  name: string;
+  employeeId: string;
+  designation: string;
+  phone: string;
 }
 
 interface TransitBatch {
@@ -96,6 +129,10 @@ interface TransitBatch {
   status: 'in_transit' | 'completed';
   orders: OrderInBatch[];
   itemCount: number;
+  storeDetails?: StoreDetails;
+  factoryDetails?: FactoryDetails;
+  vehicleDetails?: VehicleDetails;
+  employeeDetails?: EmployeeDetails;
 }
 
 // Audio feedback
@@ -109,150 +146,370 @@ const playErrorSound = () => {
   audio.play().catch(() => {});
 };
 
-// PDF Generation with Barcode
+// PDF Generation with Comprehensive Details - A4 Format
 const generateTransitPDF = (
   transitId: string,
   orders: OrderInBatch[],
   batchType: 'store_to_factory' | 'factory_to_store',
-  createdBy: string = 'Current User'
+  createdBy: string = 'Current User',
+  storeDetails?: StoreDetails,
+  factoryDetails?: FactoryDetails,
+  vehicleDetails?: VehicleDetails,
+  employeeDetails?: EmployeeDetails
 ) => {
-  const doc = new jsPDF();
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
 
-  // Generate barcode as data URL
+  const pageWidth = 210; // A4 width in mm
+  const pageHeight = 297; // A4 height in mm
+  const margin = 15;
+  let currentY = margin;
+
+  // Mock data if not provided
+  const store: StoreDetails = storeDetails || {
+    name: 'FabZ Clean - Store #1',
+    address: '123 Main Street, Bangalore - 560001',
+    phone: '+91 98765 43210',
+    managerName: 'Rajesh Kumar',
+    storeCode: 'STR001',
+  };
+
+  const factory: FactoryDetails = factoryDetails || {
+    name: 'FabZ Clean - Central Factory',
+    address: '456 Industrial Area, Bangalore - 560099',
+    phone: '+91 98765 43211',
+    managerName: 'Suresh Patel',
+    factoryCode: 'FAC001',
+  };
+
+  const vehicle: VehicleDetails = vehicleDetails || {
+    vehicleNumber: 'KA-01-AB-1234',
+    vehicleType: 'Tempo Traveller',
+    driverName: 'Vijay Singh',
+    driverPhone: '+91 98765 43212',
+    driverLicense: 'KA0120230012345',
+  };
+
+  const employee: EmployeeDetails = employeeDetails || {
+    name: createdBy,
+    employeeId: 'EMP' + Math.floor(Math.random() * 1000).toString().padStart(3, '0'),
+    designation: 'Store Executive',
+    phone: '+91 98765 43213',
+  };
+
+  // ===== HEADER SECTION =====
+  // Company Logo Area (placeholder)
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.5);
+  doc.rect(margin, currentY, 40, 20);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('FABZ CLEAN', margin + 20, currentY + 10, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6);
+  doc.text('Laundry Services', margin + 20, currentY + 14, { align: 'center' });
+
+  // Document Title
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.text('TRANSIT ORDER', pageWidth / 2, currentY + 8, { align: 'center' });
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(batchType === 'store_to_factory' ? 'Store to Factory' : 'Factory to Store', pageWidth / 2, currentY + 15, { align: 'center' });
+
+  currentY += 25;
+
+  // Transit ID Barcode
   const canvas = document.createElement('canvas');
   JsBarcode(canvas, transitId, {
     format: 'CODE128',
     width: 2,
-    height: 60,
+    height: 50,
     displayValue: true,
-    fontSize: 14,
-    textMargin: 5,
+    fontSize: 16,
+    textMargin: 2,
+    margin: 0,
   });
   const barcodeDataUrl = canvas.toDataURL('image/png');
+  doc.addImage(barcodeDataUrl, 'PNG', (pageWidth - 100) / 2, currentY, 100, 20);
+  currentY += 25;
 
-  // Header
-  doc.setFontSize(20);
-  doc.setFont('helvetica', 'bold');
-  doc.text('TRANSIT COPY', 105, 20, { align: 'center' });
-
-  // Transit ID Barcode
-  doc.addImage(barcodeDataUrl, 'PNG', 55, 30, 100, 25);
-
-  // Transit Information
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-
+  // Date & Time Box
   const now = new Date();
-  const dateStr = now.toLocaleDateString();
-  const timeStr = now.toLocaleTimeString();
+  const dateStr = now.toLocaleDateString('en-IN');
+  const timeStr = now.toLocaleTimeString('en-IN');
 
-  const origin = batchType === 'store_to_factory' ? 'Store #1' : 'Central Factory';
-  const destination = batchType === 'store_to_factory' ? 'Central Factory' : 'Store #1';
-
-  // Information box
-  doc.setDrawColor(200);
-  doc.setFillColor(250, 250, 250);
-  doc.rect(15, 65, 180, 35, 'FD');
+  doc.setFillColor(240, 240, 240);
+  doc.rect(margin, currentY, pageWidth - 2 * margin, 12, 'F');
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Date & Time:', margin + 3, currentY + 5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${dateStr} | ${timeStr}`, margin + 30, currentY + 5);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Transit Type:', 20, 72);
+  doc.text('Transit ID:', pageWidth - margin - 60, currentY + 5);
   doc.setFont('helvetica', 'normal');
-  doc.text(batchType === 'store_to_factory' ? 'Store → Factory' : 'Factory → Store', 60, 72);
+  doc.text(transitId, pageWidth - margin - 35, currentY + 5);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Origin:', 20, 80);
+  doc.text('Status:', margin + 3, currentY + 9);
   doc.setFont('helvetica', 'normal');
-  doc.text(origin, 60, 80);
+  doc.setTextColor(0, 128, 0);
+  doc.text('IN TRANSIT', margin + 30, currentY + 9);
+  doc.setTextColor(0, 0, 0);
 
-  doc.setFont('helvetica', 'bold');
-  doc.text('Destination:', 20, 88);
-  doc.setFont('helvetica', 'normal');
-  doc.text(destination, 60, 88);
+  currentY += 15;
 
+  // ===== ORIGIN & DESTINATION SECTION =====
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('Date:', 120, 72);
-  doc.setFont('helvetica', 'normal');
-  doc.text(dateStr, 150, 72);
+  doc.text('SHIPMENT DETAILS', margin, currentY);
+  currentY += 6;
 
-  doc.setFont('helvetica', 'bold');
-  doc.text('Time:', 120, 80);
-  doc.setFont('helvetica', 'normal');
-  doc.text(timeStr, 150, 80);
+  const origin = batchType === 'store_to_factory' ? store : factory;
+  const destination = batchType === 'store_to_factory' ? factory : store;
 
-  doc.setFont('helvetica', 'bold');
-  doc.text('Created By:', 120, 88);
-  doc.setFont('helvetica', 'normal');
-  doc.text(createdBy, 150, 88);
+  // Origin Box
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.3);
+  doc.rect(margin, currentY, (pageWidth - 2 * margin - 5) / 2, 28);
 
+  doc.setFillColor(52, 152, 219);
+  doc.rect(margin, currentY, (pageWidth - 2 * margin - 5) / 2, 6, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.text('Total Orders:', 20, 96);
+  doc.text('FROM (ORIGIN)', margin + 3, currentY + 4);
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text(origin.name, margin + 3, currentY + 10);
   doc.setFont('helvetica', 'normal');
-  doc.text(orders.length.toString(), 60, 96);
+
+  const originLines = doc.splitTextToSize(origin.address, 80);
+  doc.text(originLines, margin + 3, currentY + 14);
+
+  doc.setFontSize(7);
+  doc.text(`Phone: ${origin.phone}`, margin + 3, currentY + 22);
+  doc.text(`Code: ${batchType === 'store_to_factory' ? origin.storeCode : origin.factoryCode}`, margin + 3, currentY + 26);
+
+  // Destination Box
+  const destX = margin + (pageWidth - 2 * margin - 5) / 2 + 5;
+  doc.rect(destX, currentY, (pageWidth - 2 * margin - 5) / 2, 28);
+
+  doc.setFillColor(231, 76, 60);
+  doc.rect(destX, currentY, (pageWidth - 2 * margin - 5) / 2, 6, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('TO (DESTINATION)', destX + 3, currentY + 4);
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text(destination.name, destX + 3, currentY + 10);
+  doc.setFont('helvetica', 'normal');
+
+  const destLines = doc.splitTextToSize(destination.address, 80);
+  doc.text(destLines, destX + 3, currentY + 14);
+
+  doc.setFontSize(7);
+  doc.text(`Phone: ${destination.phone}`, destX + 3, currentY + 22);
+  doc.text(`Code: ${batchType === 'store_to_factory' ? destination.factoryCode : destination.storeCode}`, destX + 3, currentY + 26);
+
+  currentY += 32;
+
+  // ===== EMPLOYEE & VEHICLE DETAILS =====
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PERSONNEL & VEHICLE DETAILS', margin, currentY);
+  currentY += 6;
+
+  // Employee Details Box
+  doc.setDrawColor(0);
+  doc.rect(margin, currentY, (pageWidth - 2 * margin - 5) / 2, 24);
+
+  doc.setFillColor(155, 89, 182);
+  doc.rect(margin, currentY, (pageWidth - 2 * margin - 5) / 2, 6, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('EMPLOYEE DETAILS', margin + 3, currentY + 4);
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(8);
+  doc.text(`Name: ${employee.name}`, margin + 3, currentY + 10);
+  doc.text(`ID: ${employee.employeeId}`, margin + 3, currentY + 14);
+  doc.text(`Designation: ${employee.designation}`, margin + 3, currentY + 18);
+  doc.text(`Phone: ${employee.phone}`, margin + 3, currentY + 22);
+
+  // Vehicle & Driver Details Box
+  doc.rect(destX, currentY, (pageWidth - 2 * margin - 5) / 2, 24);
+
+  doc.setFillColor(230, 126, 34);
+  doc.rect(destX, currentY, (pageWidth - 2 * margin - 5) / 2, 6, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('VEHICLE & DRIVER DETAILS', destX + 3, currentY + 4);
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(8);
+  doc.text(`Driver: ${vehicle.driverName}`, destX + 3, currentY + 10);
+  doc.text(`Vehicle: ${vehicle.vehicleNumber}`, destX + 3, currentY + 14);
+  doc.text(`Type: ${vehicle.vehicleType}`, destX + 3, currentY + 18);
+  doc.text(`License: ${vehicle.driverLicense}`, destX + 3, currentY + 22);
+
+  currentY += 28;
+
+  // ===== ORDER DETAILS TABLE =====
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('ORDER DETAILS', margin, currentY);
+  currentY += 2;
 
   const totalItems = orders.reduce((sum, order) => sum + order.itemCount, 0);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Total Items:', 120, 96);
-  doc.setFont('helvetica', 'normal');
-  doc.text(totalItems.toString(), 150, 96);
-
-  // Order Table
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Order Details', 20, 110);
+  const totalWeight = orders.reduce((sum, order) => sum + (order.weight || 0), 0);
 
   const tableData = orders.map((order, index) => [
     (index + 1).toString(),
     order.orderNumber,
-    order.customerId,
     order.customerName,
+    order.customerId,
+    order.serviceType || 'Dry Clean',
     order.itemCount.toString(),
+    order.weight ? order.weight.toFixed(1) + ' kg' : 'N/A',
   ]);
 
   autoTable(doc, {
-    startY: 115,
-    head: [['#', 'Order ID', 'Customer ID', 'Customer Name', 'Items']],
+    startY: currentY + 2,
+    head: [['#', 'Order ID', 'Customer Name', 'Customer ID', 'Service', 'Items', 'Weight']],
     body: tableData,
+    foot: [['', '', 'TOTAL', '', '', totalItems.toString(), totalWeight.toFixed(1) + ' kg']],
     theme: 'grid',
     headStyles: {
-      fillColor: [66, 66, 66],
-      fontSize: 9,
+      fillColor: [52, 73, 94],
+      fontSize: 8,
       fontStyle: 'bold',
+      halign: 'center',
     },
     bodyStyles: {
+      fontSize: 7,
+    },
+    footStyles: {
+      fillColor: [236, 240, 241],
+      textColor: [0, 0, 0],
+      fontStyle: 'bold',
       fontSize: 8,
     },
     columnStyles: {
-      0: { cellWidth: 10 },
-      1: { cellWidth: 35 },
+      0: { cellWidth: 10, halign: 'center' },
+      1: { cellWidth: 30 },
       2: { cellWidth: 40 },
-      3: { cellWidth: 60 },
-      4: { cellWidth: 20, halign: 'center' },
+      3: { cellWidth: 30 },
+      4: { cellWidth: 25 },
+      5: { cellWidth: 15, halign: 'center' },
+      6: { cellWidth: 20, halign: 'center' },
     },
+    margin: { left: margin, right: margin },
   });
 
-  // Signature section
-  const finalY = (doc as any).lastAutoTable.finalY || 200;
+  currentY = (doc as any).lastAutoTable.finalY + 8;
 
-  doc.setDrawColor(200);
-  doc.line(15, finalY + 40, 85, finalY + 40);
-  doc.line(110, finalY + 40, 180, finalY + 40);
-
-  doc.setFontSize(9);
+  // ===== SIGNATURE SECTION =====
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('Store Manager Signature', 50, finalY + 45, { align: 'center' });
-  doc.text('Factory Manager Signature', 145, finalY + 45, { align: 'center' });
+  doc.text('SIGNATURES', margin, currentY);
+  currentY += 6;
 
+  const signBoxWidth = (pageWidth - 2 * margin - 10) / 3;
+  const signBoxHeight = 30;
+
+  // Store Manager Signature
+  doc.setDrawColor(0);
+  doc.rect(margin, currentY, signBoxWidth, signBoxHeight);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Store Manager', margin + signBoxWidth / 2, currentY + 4, { align: 'center' });
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.text('Date: _______________', 20, finalY + 52);
-  doc.text('Date: _______________', 115, finalY + 52);
+  doc.setFontSize(7);
+  doc.text(store.managerName, margin + signBoxWidth / 2, currentY + 8, { align: 'center' });
 
-  // Footer
+  doc.setDrawColor(150);
+  doc.line(margin + 3, currentY + signBoxHeight - 10, margin + signBoxWidth - 3, currentY + signBoxHeight - 10);
+  doc.setFontSize(6);
+  doc.text('Signature & Date', margin + signBoxWidth / 2, currentY + signBoxHeight - 5, { align: 'center' });
+  doc.text('Name:', margin + 3, currentY + signBoxHeight - 2);
+
+  // Driver Signature
+  const driverX = margin + signBoxWidth + 5;
+  doc.rect(driverX, currentY, signBoxWidth, signBoxHeight);
   doc.setFontSize(8);
-  doc.setTextColor(128);
-  doc.text('This is a computer-generated document. Please verify all items upon receipt.', 105, 285, {
-    align: 'center',
+  doc.setFont('helvetica', 'bold');
+  doc.text('Driver', driverX + signBoxWidth / 2, currentY + 4, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.text(vehicle.driverName, driverX + signBoxWidth / 2, currentY + 8, { align: 'center' });
+
+  doc.line(driverX + 3, currentY + signBoxHeight - 10, driverX + signBoxWidth - 3, currentY + signBoxHeight - 10);
+  doc.setFontSize(6);
+  doc.text('Signature & Date', driverX + signBoxWidth / 2, currentY + signBoxHeight - 5, { align: 'center' });
+  doc.text('Name:', driverX + 3, currentY + signBoxHeight - 2);
+
+  // Factory Manager Signature
+  const factoryX = driverX + signBoxWidth + 5;
+  doc.rect(factoryX, currentY, signBoxWidth, signBoxHeight);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Factory Manager', factoryX + signBoxWidth / 2, currentY + 4, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.text(factory.managerName, factoryX + signBoxWidth / 2, currentY + 8, { align: 'center' });
+
+  doc.line(factoryX + 3, currentY + signBoxHeight - 10, factoryX + signBoxWidth - 3, currentY + signBoxHeight - 10);
+  doc.setFontSize(6);
+  doc.text('Signature & Date', factoryX + signBoxWidth / 2, currentY + signBoxHeight - 5, { align: 'center' });
+  doc.text('Name:', factoryX + 3, currentY + signBoxHeight - 2);
+
+  currentY += signBoxHeight + 8;
+
+  // ===== IMPORTANT NOTES =====
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('IMPORTANT NOTES:', margin, currentY);
+  currentY += 5;
+
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  const notes = [
+    '1. Please verify all items before accepting the shipment.',
+    '2. Any damages or missing items must be reported immediately.',
+    '3. This document must be signed by all parties involved.',
+    '4. Keep this copy for your records.',
+    '5. Scan the barcode at destination to update order status.',
+  ];
+
+  notes.forEach((note) => {
+    doc.text(note, margin + 2, currentY);
+    currentY += 4;
   });
+
+  // ===== FOOTER =====
+  doc.setDrawColor(52, 73, 94);
+  doc.setLineWidth(0.5);
+  doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+
+  doc.setFontSize(7);
+  doc.setTextColor(100);
+  doc.text('FabZ Clean - Laundry Management System', pageWidth / 2, pageHeight - 10, { align: 'center' });
+  doc.text(`Generated on ${dateStr} at ${timeStr}`, pageWidth / 2, pageHeight - 6, { align: 'center' });
+  doc.text('This is a computer-generated document. For any queries, contact support.', pageWidth / 2, pageHeight - 3, { align: 'center' });
 
   // Save PDF
   doc.save(`Transit_${transitId}_${dateStr.replace(/\//g, '-')}.pdf`);
@@ -277,6 +534,20 @@ export default function TransitOrdersPage() {
   const [orderToRemove, setOrderToRemove] = useState<string | null>(null);
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<TransitBatch | null>(null);
+  const [showTransitDetailsDialog, setShowTransitDetailsDialog] = useState(false);
+
+  // Transit details state
+  const [transitDetails, setTransitDetails] = useState({
+    vehicleNumber: 'KA-01-AB-1234',
+    vehicleType: 'Tempo Traveller',
+    driverName: 'Vijay Singh',
+    driverPhone: '+91 98765 43212',
+    driverLicense: 'KA0120230012345',
+    employeeName: 'Current User',
+    employeeId: 'EMP001',
+    designation: 'Store Executive',
+    employeePhone: '+91 98765 43213',
+  });
 
   // Search and filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -347,12 +618,15 @@ export default function TransitOrdersPage() {
 
     // Mock validation - replace with actual API call
     // In real implementation, fetch order details from API
+    const serviceTypes = ['Dry Clean', 'Wash & Iron', 'Steam Iron', 'Wash & Fold', 'Premium Clean'];
     const mockOrder: OrderInBatch = {
       orderNumber: orderId,
       customerId: `CUST-${Math.random().toString(36).substr(2, 9)}`,
       customerName: `Customer ${currentBatch.length + 1}`,
       itemCount: Math.floor(Math.random() * 10) + 1,
       status: batchType === 'store_to_factory' ? 'in_store' : 'processing',
+      serviceType: serviceTypes[Math.floor(Math.random() * serviceTypes.length)],
+      weight: parseFloat((Math.random() * 5 + 0.5).toFixed(1)), // 0.5 to 5.5 kg
     };
 
     playSuccessSound();
@@ -393,12 +667,58 @@ export default function TransitOrdersPage() {
       return;
     }
 
+    // Show dialog to collect vehicle and employee details
+    setShowTransitDetailsDialog(true);
+  };
+
+  const confirmGenerateTransitCopy = async () => {
     // Generate Transit ID
     const transitId = `TRN-${Date.now().toString().slice(-6)}`;
 
     try {
-      // Generate PDF with barcode
-      generateTransitPDF(transitId, currentBatch, batchType, 'Current User');
+      // Prepare details
+      const storeDetails: StoreDetails = {
+        name: 'FabZ Clean - Store #1',
+        address: '123 Main Street, Bangalore - 560001',
+        phone: '+91 98765 43210',
+        managerName: 'Rajesh Kumar',
+        storeCode: 'STR001',
+      };
+
+      const factoryDetails: FactoryDetails = {
+        name: 'FabZ Clean - Central Factory',
+        address: '456 Industrial Area, Bangalore - 560099',
+        phone: '+91 98765 43211',
+        managerName: 'Suresh Patel',
+        factoryCode: 'FAC001',
+      };
+
+      const vehicleDetails: VehicleDetails = {
+        vehicleNumber: transitDetails.vehicleNumber,
+        vehicleType: transitDetails.vehicleType,
+        driverName: transitDetails.driverName,
+        driverPhone: transitDetails.driverPhone,
+        driverLicense: transitDetails.driverLicense,
+      };
+
+      const employeeDetails: EmployeeDetails = {
+        name: transitDetails.employeeName,
+        employeeId: transitDetails.employeeId,
+        designation: transitDetails.designation,
+        phone: transitDetails.employeePhone,
+      };
+
+      // Generate PDF with all details
+      generateTransitPDF(
+        transitId,
+        currentBatch,
+        batchType,
+        transitDetails.employeeName,
+        storeDetails,
+        factoryDetails,
+        vehicleDetails,
+        employeeDetails
+      );
 
       // In real implementation:
       // 1. Create transit batch in database via API
@@ -410,13 +730,15 @@ export default function TransitOrdersPage() {
 
       toast({
         title: 'Transit Copy Generated',
-        description: `Transit ID: ${transitId} - PDF downloaded successfully`,
+        description: `Transit ID: ${transitId} - PDF downloaded and ready for printing`,
+        duration: 5000,
       });
 
       // Reset batch
       setCurrentBatch([]);
       setIsScanning(false);
       setBarcodeInput('');
+      setShowTransitDetailsDialog(false);
 
       // Refresh transit history
       queryClient.invalidateQueries({ queryKey: ['transit-batches'] });
@@ -886,6 +1208,194 @@ export default function TransitOrdersPage() {
               >
                 <Printer className="h-4 w-4" />
                 Reprint Transit Copy
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Transit Details Dialog - Collect Vehicle & Employee Info */}
+        <Dialog open={showTransitDetailsDialog} onOpenChange={setShowTransitDetailsDialog}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Truck className="h-5 w-5" />
+                Transit Order Details
+              </DialogTitle>
+              <DialogDescription>
+                Please provide vehicle and employee details for this transit order
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6">
+              {/* Vehicle Details Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-5 w-5 text-orange-600" />
+                  <h3 className="text-lg font-semibold">Vehicle & Driver Details</h3>
+                </div>
+                <Separator />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="vehicleNumber">Vehicle Number *</Label>
+                    <Input
+                      id="vehicleNumber"
+                      value={transitDetails.vehicleNumber}
+                      onChange={(e) => setTransitDetails({ ...transitDetails, vehicleNumber: e.target.value })}
+                      placeholder="KA-01-AB-1234"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="vehicleType">Vehicle Type *</Label>
+                    <Select
+                      value={transitDetails.vehicleType}
+                      onValueChange={(value) => setTransitDetails({ ...transitDetails, vehicleType: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Tempo Traveller">Tempo Traveller</SelectItem>
+                        <SelectItem value="Mini Van">Mini Van</SelectItem>
+                        <SelectItem value="Pickup Truck">Pickup Truck</SelectItem>
+                        <SelectItem value="Small Van">Small Van</SelectItem>
+                        <SelectItem value="Large Truck">Large Truck</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="driverName">Driver Name *</Label>
+                    <Input
+                      id="driverName"
+                      value={transitDetails.driverName}
+                      onChange={(e) => setTransitDetails({ ...transitDetails, driverName: e.target.value })}
+                      placeholder="Enter driver name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="driverPhone">Driver Phone *</Label>
+                    <Input
+                      id="driverPhone"
+                      value={transitDetails.driverPhone}
+                      onChange={(e) => setTransitDetails({ ...transitDetails, driverPhone: e.target.value })}
+                      placeholder="+91 98765 43210"
+                    />
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label htmlFor="driverLicense">Driver License Number *</Label>
+                    <Input
+                      id="driverLicense"
+                      value={transitDetails.driverLicense}
+                      onChange={(e) => setTransitDetails({ ...transitDetails, driverLicense: e.target.value })}
+                      placeholder="KA0120230012345"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Employee Details Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <User className="h-5 w-5 text-purple-600" />
+                  <h3 className="text-lg font-semibold">Employee Details</h3>
+                </div>
+                <Separator />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="employeeName">Employee Name *</Label>
+                    <Input
+                      id="employeeName"
+                      value={transitDetails.employeeName}
+                      onChange={(e) => setTransitDetails({ ...transitDetails, employeeName: e.target.value })}
+                      placeholder="Enter employee name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="employeeId">Employee ID *</Label>
+                    <Input
+                      id="employeeId"
+                      value={transitDetails.employeeId}
+                      onChange={(e) => setTransitDetails({ ...transitDetails, employeeId: e.target.value })}
+                      placeholder="EMP001"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="designation">Designation *</Label>
+                    <Select
+                      value={transitDetails.designation}
+                      onValueChange={(value) => setTransitDetails({ ...transitDetails, designation: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Store Executive">Store Executive</SelectItem>
+                        <SelectItem value="Store Manager">Store Manager</SelectItem>
+                        <SelectItem value="Warehouse Manager">Warehouse Manager</SelectItem>
+                        <SelectItem value="Logistics Coordinator">Logistics Coordinator</SelectItem>
+                        <SelectItem value="Supervisor">Supervisor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="employeePhone">Employee Phone *</Label>
+                    <Input
+                      id="employeePhone"
+                      value={transitDetails.employeePhone}
+                      onChange={(e) => setTransitDetails({ ...transitDetails, employeePhone: e.target.value })}
+                      placeholder="+91 98765 43210"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Batch Summary */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-blue-600" />
+                  <h3 className="text-lg font-semibold">Batch Summary</h3>
+                </div>
+                <Separator />
+                <div className="bg-muted p-4 rounded-lg space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium">Transit Type:</span>
+                    <span className="text-sm">{batchType === 'store_to_factory' ? 'Store → Factory' : 'Factory → Store'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium">Total Orders:</span>
+                    <span className="text-sm font-bold">{currentBatch.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium">Total Items:</span>
+                    <span className="text-sm font-bold">{totalItems}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium">Total Weight:</span>
+                    <span className="text-sm font-bold">
+                      {currentBatch.reduce((sum, order) => sum + (order.weight || 0), 0).toFixed(1)} kg
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowTransitDetailsDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmGenerateTransitCopy}
+                className="gap-2"
+                disabled={
+                  !transitDetails.vehicleNumber ||
+                  !transitDetails.driverName ||
+                  !transitDetails.employeeName
+                }
+              >
+                <Printer className="h-4 w-4" />
+                Generate & Print Transit Copy
               </Button>
             </DialogFooter>
           </DialogContent>
