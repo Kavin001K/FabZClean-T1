@@ -24,6 +24,48 @@ import {
   type Employee,
   type InsertEmployee,
 } from "../shared/schema";
+
+// Driver types (not in shared schema yet)
+export interface Driver {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  licenseNumber: string;
+  vehicleNumber: string;
+  vehicleType: 'bike' | 'car' | 'truck' | 'van';
+  vehicleModel?: string;
+  status: 'available' | 'busy' | 'offline' | 'on_break';
+  rating: number;
+  totalDeliveries: number;
+  totalEarnings: number;
+  currentLatitude?: number;
+  currentLongitude?: number;
+  lastActive?: string;
+  experience: number;
+  specialties?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface InsertDriver {
+  name: string;
+  phone: string;
+  email?: string;
+  licenseNumber: string;
+  vehicleNumber: string;
+  vehicleType: 'bike' | 'car' | 'truck' | 'van';
+  vehicleModel?: string;
+  status?: 'available' | 'busy' | 'offline' | 'on_break';
+  rating?: number;
+  totalDeliveries?: number;
+  totalEarnings?: number;
+  currentLatitude?: number;
+  currentLongitude?: number;
+  lastActive?: string;
+  experience?: number;
+  specialties?: string[];
+}
 import { IStorage } from "./storage";
 
 export class SQLiteStorage implements IStorage {
@@ -275,6 +317,28 @@ export class SQLiteStorage implements IStorage {
         FOREIGN KEY (transitOrderId) REFERENCES transit_orders(id) ON DELETE CASCADE
       );
 
+      CREATE TABLE IF NOT EXISTS drivers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        email TEXT,
+        licenseNumber TEXT NOT NULL,
+        vehicleNumber TEXT NOT NULL,
+        vehicleType TEXT NOT NULL,
+        vehicleModel TEXT,
+        status TEXT NOT NULL DEFAULT 'available',
+        rating REAL DEFAULT 5.0,
+        totalDeliveries INTEGER DEFAULT 0,
+        totalEarnings REAL DEFAULT 0,
+        currentLatitude REAL,
+        currentLongitude REAL,
+        lastActive TEXT,
+        experience INTEGER DEFAULT 0,
+        specialties TEXT,
+        createdAt TEXT,
+        updatedAt TEXT
+      );
+
       -- Create indexes for better performance
       CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customerId);
       CREATE INDEX IF NOT EXISTS idx_deliveries_order ON deliveries(orderId);
@@ -293,6 +357,9 @@ export class SQLiteStorage implements IStorage {
       CREATE INDEX IF NOT EXISTS idx_transit_order_items_transitOrderId ON transit_order_items(transitOrderId);
       CREATE INDEX IF NOT EXISTS idx_transit_order_items_orderId ON transit_order_items(orderId);
       CREATE INDEX IF NOT EXISTS idx_transit_status_history_transitOrderId ON transit_status_history(transitOrderId);
+      CREATE INDEX IF NOT EXISTS idx_drivers_status ON drivers(status);
+      CREATE INDEX IF NOT EXISTS idx_drivers_vehicleNumber ON drivers(vehicleNumber);
+      CREATE INDEX IF NOT EXISTS idx_drivers_licenseNumber ON drivers(licenseNumber);
     `);
   }
 
@@ -1538,6 +1605,145 @@ export class SQLiteStorage implements IStorage {
     } catch {
       return false;
     }
+  }
+
+  // ======= DRIVERS =======
+  async createDriver(data: InsertDriver): Promise<Driver> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+
+    const driver = {
+      id,
+      ...data,
+      status: data.status || 'available',
+      rating: data.rating || 5.0,
+      totalDeliveries: data.totalDeliveries || 0,
+      totalEarnings: data.totalEarnings || 0,
+      experience: data.experience || 0,
+      lastActive: data.lastActive || now,
+      specialties: data.specialties ? JSON.stringify(data.specialties) : '[]',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.db
+      .prepare(
+        `
+        INSERT INTO drivers (
+          id, name, phone, email, licenseNumber, vehicleNumber, vehicleType, 
+          vehicleModel, status, rating, totalDeliveries, totalEarnings,
+          currentLatitude, currentLongitude, lastActive, experience, 
+          specialties, createdAt, updatedAt
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      )
+      .run(
+        driver.id,
+        driver.name,
+        driver.phone,
+        driver.email,
+        driver.licenseNumber,
+        driver.vehicleNumber,
+        driver.vehicleType,
+        driver.vehicleModel,
+        driver.status,
+        driver.rating,
+        driver.totalDeliveries,
+        driver.totalEarnings,
+        driver.currentLatitude,
+        driver.currentLongitude,
+        driver.lastActive,
+        driver.experience,
+        driver.specialties,
+        driver.createdAt,
+        driver.updatedAt,
+      );
+
+    return this.getDriver(id)!;
+  }
+
+  async getDriver(id: string): Promise<Driver | null> {
+    const row = this.db
+      .prepare('SELECT * FROM drivers WHERE id = ?')
+      .get(id) as any;
+
+    if (!row) return null;
+
+    return {
+      ...row,
+      specialties: row.specialties ? JSON.parse(row.specialties) : [],
+    };
+  }
+
+  async listDrivers(): Promise<Driver[]> {
+    const rows = this.db
+      .prepare('SELECT * FROM drivers ORDER BY createdAt DESC')
+      .all() as any[];
+
+    return rows.map((row) => ({
+      ...row,
+      specialties: row.specialties ? JSON.parse(row.specialties) : [],
+    }));
+  }
+
+  async updateDriver(id: string, data: Partial<InsertDriver>): Promise<Driver | null> {
+    const existing = this.getDriver(id);
+    if (!existing) return null;
+
+    const updateData = {
+      ...data,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const setStmt = Object.keys(updateData)
+      .map((key) => `${key} = ?`)
+      .join(', ');
+    const values = Object.values(updateData);
+
+    // Handle specialties serialization
+    if (updateData.specialties) {
+      const specialtiesIndex = Object.keys(updateData).indexOf('specialties');
+      values[specialtiesIndex] = JSON.stringify(updateData.specialties);
+    }
+
+    this.db
+      .prepare(`UPDATE drivers SET ${setStmt} WHERE id = ?`)
+      .run(...values, id);
+
+    return this.getDriver(id);
+  }
+
+  async deleteDriver(id: string): Promise<boolean> {
+    try {
+      this.db.prepare('DELETE FROM drivers WHERE id = ?').run(id);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getDriversByStatus(status: string): Promise<Driver[]> {
+    const rows = this.db
+      .prepare('SELECT * FROM drivers WHERE status = ? ORDER BY createdAt DESC')
+      .all(status) as any[];
+
+    return rows.map((row) => ({
+      ...row,
+      specialties: row.specialties ? JSON.parse(row.specialties) : [],
+    }));
+  }
+
+  async updateDriverLocation(id: string, latitude: number, longitude: number): Promise<Driver | null> {
+    const now = new Date().toISOString();
+    
+    this.db
+      .prepare(
+        'UPDATE drivers SET currentLatitude = ?, currentLongitude = ?, lastActive = ?, updatedAt = ? WHERE id = ?'
+      )
+      .run(latitude, longitude, now, now, id);
+
+    return this.getDriver(id);
   }
 
   // Close database connection

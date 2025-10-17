@@ -462,40 +462,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/orders/:id", async (req, res) => {
-    try {
-      const order = await storage.getOrder(req.params.id);
-      if (!order) {
-        return res.status(404).json({ message: "Order not found" });
-      }
-
-      const products = await storage.listProducts();
-      const productMap = new Map(
-        products.map((product) => [product.id, product.name]),
-      );
-
-      const items = (order.items as any[]) || [];
-      const firstItem = items[0];
-      const productId = firstItem?.productId;
-      const serviceName = productId
-        ? productMap.get(productId) || "Unknown Service"
-        : "Unknown Service";
-
-      const transformedOrder = {
-        ...order,
-        date: order.createdAt,
-        total: parseFloat(order.totalAmount || "0"),
-        service: serviceName,
-        priority: "Normal",
-      };
-
-      res.json(transformedOrder);
-    } catch (error) {
-      console.error("Fetch order error:", error);
-      res.status(500).json({ message: "Failed to fetch order" });
-    }
-  });
-
   // Recent orders endpoint for transit order suggestions
   app.get("/api/orders/recent", async (req, res) => {
     try {
@@ -538,16 +504,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/orders/:id", async (req, res) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const products = await storage.listProducts();
+      const productMap = new Map(
+        products.map((product) => [product.id, product.name]),
+      );
+
+      const items = (order.items as any[]) || [];
+      const firstItem = items[0];
+      const productId = firstItem?.productId;
+      const serviceName = productId
+        ? productMap.get(productId) || "Unknown Service"
+        : "Unknown Service";
+
+      const transformedOrder = {
+        ...order,
+        date: order.createdAt,
+        total: parseFloat(order.totalAmount || "0"),
+        service: serviceName,
+        priority: "Normal",
+      };
+
+      res.json(transformedOrder);
+    } catch (error) {
+      console.error("Fetch order error:", error);
+      res.status(500).json({ message: "Failed to fetch order" });
+    }
+  });
+
   app.post("/api/orders", async (req, res) => {
     try {
       const validatedData = insertOrderSchema.parse(req.body);
       const order = await storage.createOrder(validatedData);
 
-      // Award loyalty points
-      await loyaltyProgram.processOrderRewards(
-        order.customerId,
-        parseFloat(order.totalAmount || "0"),
-      );
+      // Award loyalty points (only if customerId exists)
+      if (order.customerId) {
+        await loyaltyProgram.processOrderRewards(
+          order.customerId,
+          parseFloat(order.totalAmount || "0"),
+        );
+      }
 
       // Trigger real-time update
       await realtimeServer.triggerUpdate("order", "created", order);
@@ -1569,6 +1571,240 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Customer segments error:", error);
       res.status(500).json({ message: "Failed to analyze customer segments" });
+    }
+  });
+
+  // ======= DRIVER MANAGEMENT API =======
+  app.get("/api/drivers", async (req, res) => {
+    try {
+      const drivers = await storage.listDrivers();
+      res.json(drivers);
+    } catch (error) {
+      console.error("Fetch drivers error:", error);
+      res.status(500).json({ message: "Failed to fetch drivers" });
+    }
+  });
+
+  app.get("/api/drivers/:id", async (req, res) => {
+    try {
+      const driver = await storage.getDriver(req.params.id);
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+      res.json(driver);
+    } catch (error) {
+      console.error("Fetch driver error:", error);
+      res.status(500).json({ message: "Failed to fetch driver" });
+    }
+  });
+
+  app.post("/api/drivers", async (req, res) => {
+    try {
+      const driver = await storage.createDriver(req.body);
+      res.status(201).json(driver);
+    } catch (error) {
+      console.error("Create driver error:", error);
+      res.status(500).json({ message: "Failed to create driver" });
+    }
+  });
+
+  app.put("/api/drivers/:id", async (req, res) => {
+    try {
+      const driver = await storage.updateDriver(req.params.id, req.body);
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+      res.json(driver);
+    } catch (error) {
+      console.error("Update driver error:", error);
+      res.status(500).json({ message: "Failed to update driver" });
+    }
+  });
+
+  app.delete("/api/drivers/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteDriver(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+      res.json({ message: "Driver deleted successfully" });
+    } catch (error) {
+      console.error("Delete driver error:", error);
+      res.status(500).json({ message: "Failed to delete driver" });
+    }
+  });
+
+  app.get("/api/drivers/status/:status", async (req, res) => {
+    try {
+      const drivers = await storage.getDriversByStatus(req.params.status);
+      res.json(drivers);
+    } catch (error) {
+      console.error("Fetch drivers by status error:", error);
+      res.status(500).json({ message: "Failed to fetch drivers" });
+    }
+  });
+
+  app.post("/api/drivers/:id/location", async (req, res) => {
+    try {
+      const { latitude, longitude } = req.body;
+      const driver = await storage.updateDriverLocation(req.params.id, latitude, longitude);
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+      res.json(driver);
+    } catch (error) {
+      console.error("Update driver location error:", error);
+      res.status(500).json({ message: "Failed to update driver location" });
+    }
+  });
+
+  // ======= DELIVERY MANAGEMENT API =======
+  app.get("/api/deliveries", async (req, res) => {
+    try {
+      const deliveries = await storage.listDeliveries();
+      res.json(deliveries);
+    } catch (error) {
+      console.error("Fetch deliveries error:", error);
+      res.status(500).json({ message: "Failed to fetch deliveries" });
+    }
+  });
+
+  app.get("/api/deliveries/:id", async (req, res) => {
+    try {
+      const delivery = await storage.getDelivery(req.params.id);
+      if (!delivery) {
+        return res.status(404).json({ message: "Delivery not found" });
+      }
+      res.json(delivery);
+    } catch (error) {
+      console.error("Fetch delivery error:", error);
+      res.status(500).json({ message: "Failed to fetch delivery" });
+    }
+  });
+
+  app.post("/api/deliveries", async (req, res) => {
+    try {
+      const delivery = await storage.createDelivery(req.body);
+      res.status(201).json(delivery);
+    } catch (error) {
+      console.error("Create delivery error:", error);
+      res.status(500).json({ message: "Failed to create delivery" });
+    }
+  });
+
+  app.put("/api/deliveries/:id", async (req, res) => {
+    try {
+      const delivery = await storage.updateDelivery(req.params.id, req.body);
+      if (!delivery) {
+        return res.status(404).json({ message: "Delivery not found" });
+      }
+      res.json(delivery);
+    } catch (error) {
+      console.error("Update delivery error:", error);
+      res.status(500).json({ message: "Failed to update delivery" });
+    }
+  });
+
+  app.delete("/api/deliveries/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteDelivery(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "Delivery not found" });
+      }
+      res.json({ message: "Delivery deleted successfully" });
+    } catch (error) {
+      console.error("Delete delivery error:", error);
+      res.status(500).json({ message: "Failed to delete delivery" });
+    }
+  });
+
+  // ======= ORDER-DRIVER ASSIGNMENT API =======
+  app.post("/api/orders/:id/assign-driver", async (req, res) => {
+    try {
+      const { driverId } = req.body;
+      
+      // Get the order
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Get the driver
+      const driver = await storage.getDriver(driverId);
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      // Create or update delivery record
+      const deliveryData = {
+        orderId: order.id,
+        driverName: driver.name,
+        vehicleId: driver.vehicleNumber,
+        status: 'pending',
+        estimatedDelivery: req.body.estimatedDelivery,
+      };
+
+      const delivery = await storage.createDelivery(deliveryData);
+
+      // Update driver status to busy
+      await storage.updateDriver(driverId, { status: 'busy' });
+
+      // Trigger real-time update
+      await realtimeServer.triggerUpdate("delivery", "created", delivery);
+
+      res.json({ message: "Driver assigned successfully", delivery });
+    } catch (error) {
+      console.error("Assign driver error:", error);
+      res.status(500).json({ message: "Failed to assign driver" });
+    }
+  });
+
+  // ======= ACCOUNTING DASHBOARD API =======
+  app.get("/api/accounting/dashboard", async (req, res) => {
+    try {
+      const orders = await storage.listOrders();
+      const customers = await storage.listCustomers();
+      
+      // Calculate financial metrics
+      const totalRevenue = orders.reduce((sum, order) => 
+        sum + parseFloat(order.totalAmount || "0"), 0
+      );
+      
+      const paidOrders = orders.filter(order => order.paymentStatus === 'paid');
+      const pendingPayments = orders.filter(order => order.paymentStatus === 'pending');
+      
+      const totalPaid = paidOrders.reduce((sum, order) => 
+        sum + parseFloat(order.totalAmount || "0"), 0
+      );
+      
+      const totalPending = pendingPayments.reduce((sum, order) => 
+        sum + parseFloat(order.totalAmount || "0"), 0
+      );
+
+      const dashboard = {
+        totalRevenue: totalRevenue.toFixed(2),
+        totalPaid: totalPaid.toFixed(2),
+        totalPending: totalPending.toFixed(2),
+        totalOrders: orders.length,
+        totalCustomers: customers.length,
+        paidOrders: paidOrders.length,
+        pendingOrders: pendingPayments.length,
+        averageOrderValue: orders.length > 0 ? (totalRevenue / orders.length).toFixed(2) : "0.00",
+        monthlyRevenue: orders
+          .filter(order => {
+            const orderDate = new Date(order.createdAt);
+            const currentMonth = new Date().getMonth();
+            const currentYear = new Date().getFullYear();
+            return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
+          })
+          .reduce((sum, order) => sum + parseFloat(order.totalAmount || "0"), 0)
+          .toFixed(2)
+      };
+
+      res.json(dashboard);
+    } catch (error) {
+      console.error("Accounting dashboard error:", error);
+      res.status(500).json({ message: "Failed to fetch accounting data" });
     }
   });
 

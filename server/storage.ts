@@ -1,7 +1,18 @@
 import { randomUUID } from "crypto";
-import { SQLiteStorage } from "./SQLiteStorage";
+import { SQLiteStorage, type Driver, type InsertDriver } from "./SQLiteStorage";
 
-export class MemStorage {
+export interface IStorage {
+  // Driver methods
+  createDriver(data: InsertDriver): Promise<Driver>;
+  getDriver(id: string): Promise<Driver | null>;
+  listDrivers(): Promise<Driver[]>;
+  updateDriver(id: string, data: Partial<InsertDriver>): Promise<Driver | null>;
+  deleteDriver(id: string): Promise<boolean>;
+  getDriversByStatus(status: string): Promise<Driver[]>;
+  updateDriverLocation(id: string, latitude: number, longitude: number): Promise<Driver | null>;
+}
+
+export class MemStorage implements IStorage {
   private sqliteStorage: SQLiteStorage;
 
   constructor() {
@@ -585,6 +596,35 @@ export class MemStorage {
 
   async getDashboardMetrics() {
     return this.sqliteStorage.getDashboardMetrics();
+  }
+
+  // ======= DRIVER METHODS =======
+  async createDriver(data: InsertDriver): Promise<Driver> {
+    return this.sqliteStorage.createDriver(data);
+  }
+
+  async getDriver(id: string): Promise<Driver | null> {
+    return this.sqliteStorage.getDriver(id);
+  }
+
+  async listDrivers(): Promise<Driver[]> {
+    return this.sqliteStorage.listDrivers();
+  }
+
+  async updateDriver(id: string, data: Partial<InsertDriver>): Promise<Driver | null> {
+    return this.sqliteStorage.updateDriver(id, data);
+  }
+
+  async deleteDriver(id: string): Promise<boolean> {
+    return this.sqliteStorage.deleteDriver(id);
+  }
+
+  async getDriversByStatus(status: string): Promise<Driver[]> {
+    return this.sqliteStorage.getDriversByStatus(status);
+  }
+
+  async updateDriverLocation(id: string, latitude: number, longitude: number): Promise<Driver | null> {
+    return this.sqliteStorage.updateDriverLocation(id, latitude, longitude);
   }
 
   // Close database connection

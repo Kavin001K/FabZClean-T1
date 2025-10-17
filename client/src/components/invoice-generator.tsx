@@ -253,7 +253,6 @@ export const InvoiceGenerator: React.FC = () => {
                   placeholder="Additional notes or terms..."
                 />
               </div>
-.
             </div>
           </div>
 
@@ -459,7 +458,7 @@ export const InvoiceGenerator: React.FC = () => {
                   </Button>
                 </div>
               </div>
-            </Card>.
+            </Card>
           </div>
 
           <Separator />
