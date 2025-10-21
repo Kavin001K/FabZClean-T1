@@ -1,659 +1,795 @@
-# Component Documentation
+# FabZClean Component Documentation
 
-This document provides comprehensive documentation for all FabZClean components, including their purpose, usage, props, and examples.
+This document provides comprehensive documentation for all React components in the FabZClean application, including new algorithm-enhanced components and performance optimizations.
 
 ## Table of Contents
 
-1. [Dashboard Components](#dashboard-components)
-2. [Layout Components](#layout-components)
-3. [UI Components](#ui-components)
-4. [Form Components](#form-components)
-5. [Data Display Components](#data-display-components)
-
-## Dashboard Components
-
-### DashboardMetricsSection
-
-**Purpose**: Displays key performance indicators (KPIs) in a responsive grid layout.
-
-**Location**: `client/src/components/dashboard/dashboard-metrics-section.tsx`
-
-**Props**:
-```typescript
-interface DashboardMetricsSectionProps {
-  metrics: DashboardMetric[];
-  isLoading?: boolean;
-  className?: string;
-  columns?: 2 | 3 | 4;
-}
-```
-
-**Usage**:
-```tsx
-import { DashboardMetricsSection, createDefaultMetrics } from '@/components/dashboard/dashboard-metrics-section';
-
-const metrics = createDefaultMetrics({
-  totalRevenue: 12345,
-  totalOrders: 123,
-  totalCustomers: 456,
-  averageOrderValue: 100.37
-});
-
-<DashboardMetricsSection 
-  metrics={metrics}
-  isLoading={false}
-  columns={4}
-  data-testid="dashboard-metrics"
-/>
-```
-
-**Test IDs**:
-- `dashboard-metrics-section` - Main container
-- `dashboard-metrics-loading` - Loading state
-- `metric-card-{id}` - Individual metric cards
-
-**Accessibility**:
-- Uses semantic HTML structure
-- Includes proper ARIA labels
-- Supports keyboard navigation
-
----
-
-### QuickActionsSection
-
-**Purpose**: Provides quick action buttons for creating customers, orders, and employees with modal dialogs.
-
-**Location**: `client/src/components/dashboard/quick-actions-section.tsx`
-
-**Props**:
-```typescript
-interface QuickActionsSectionProps {
-  quickActionForms: QuickActionForm;
-  setQuickActionForms: React.Dispatch<React.SetStateAction<QuickActionForm>>;
-  handleCreateCustomer: () => Promise<void>;
-  handleCreateOrder: () => Promise<void>;
-  handleCreateEmployee: () => Promise<void>;
-  isLoading?: {
-    customer?: boolean;
-    order?: boolean;
-    employee?: boolean;
-  };
-}
-```
-
-**Usage**:
-```tsx
-import { QuickActionsSection } from '@/components/dashboard/quick-actions-section';
-
-<QuickActionsSection
-  quickActionForms={forms}
-  setQuickActionForms={setForms}
-  handleCreateCustomer={handleCreateCustomer}
-  handleCreateOrder={handleCreateOrder}
-  handleCreateEmployee={handleCreateEmployee}
-  isLoading={{ customer: false, order: false, employee: false }}
-/>
-```
-
-**Test IDs**:
-- `quick-actions-section` - Main container
-- `add-customer-trigger` - Customer creation trigger
-- `add-order-trigger` - Order creation trigger
-- `add-employee-trigger` - Employee creation trigger
-- `add-customer-dialog` - Customer creation modal
-- `customer-name-input` - Customer name input field
-- `create-customer-button` - Customer creation submit button
-
-**Features**:
-- Modal dialogs for each action type
-- Form validation
-- Loading states
-- Hover animations
-
----
-
-### DashboardChartsSection
-
-**Purpose**: Displays various charts and visualizations for dashboard analytics.
-
-**Location**: `client/src/components/dashboard/dashboard-charts-section.tsx`
-
-**Props**:
-```typescript
-interface DashboardChartsSectionProps {
-  salesData?: SalesData[];
-  orderStatusData?: OrderStatusData[];
-  servicePopularityData?: ServicePopularityData[];
-  isLoading?: boolean;
-  className?: string;
-  layout?: 'grid' | 'stacked';
-}
-```
-
-**Usage**:
-```tsx
-import { DashboardChartsSection, useChartConfig } from '@/components/dashboard/dashboard-charts-section';
-
-const { generateMockSalesData } = useChartConfig();
-
-<DashboardChartsSection
-  salesData={generateMockSalesData(30)}
-  orderStatusData={orderStatusData}
-  servicePopularityData={serviceData}
-  isLoading={false}
-  layout="grid"
-/>
-```
-
-**Test IDs**:
-- `dashboard-charts-section` - Main container
-- `sales-chart-card` - Sales chart container
-- `order-status-chart-card` - Order status chart container
-- `service-popularity-chart-card` - Service popularity chart container
-
-**Charts Included**:
-- Sales overview (line chart)
-- Order status distribution (pie chart)
-- Service popularity (bar chart)
-
----
-
-### RecentActivitySection
-
-**Purpose**: Displays recent orders and due today orders in a side-by-side layout.
-
-**Location**: `client/src/components/dashboard/recent-activity-section.tsx`
-
-**Props**:
-```typescript
-interface RecentActivitySectionProps {
-  recentOrders?: Order[];
-  dueTodayOrders?: Order[];
-  isLoading?: boolean;
-  className?: string;
-  layout?: 'horizontal' | 'vertical';
-  itemLimit?: number;
-  showViewAll?: boolean;
-}
-```
-
-**Usage**:
-```tsx
-import { RecentActivitySection } from '@/components/dashboard/recent-activity-section';
-
-<RecentActivitySection
-  recentOrders={recentOrders}
-  dueTodayOrders={dueTodayOrders}
-  isLoading={false}
-  layout="horizontal"
-  itemLimit={5}
-  showViewAll={true}
-/>
-```
-
-**Test IDs**:
-- `recent-activity-section` - Main container
-- `recent-orders-card` - Recent orders container
-- `due-today-orders-card` - Due today orders container
-- `recent-orders-list` - Recent orders list
-- `due-today-orders-list` - Due today orders list
-
-**Additional Components**:
-- `ActivitySummary` - Summary metrics
-- `ActivityFilter` - Filter controls
-
-## Layout Components
-
-### Sidebar
-
-**Purpose**: Main navigation sidebar with links to all application sections.
-
-**Location**: `client/src/components/layout/sidebar.tsx`
-
-**Props**: None (self-contained component)
-
-**Usage**:
-```tsx
-import { Sidebar } from '@/components/layout/sidebar';
-
-<Sidebar />
-```
-
-**Test IDs**:
-- `main-sidebar` - Main sidebar container
-- `sidebar-header` - Logo/brand section
-- `brand-logo-link` - Logo link
-- `brand-logo-image` - Logo image
-- `main-navigation` - Primary navigation container
-- `secondary-navigation` - Secondary navigation container
-- `nav-dashboard` - Dashboard navigation link
-- `nav-orders` - Orders navigation link
-- `nav-customers` - Customers navigation link
-- `nav-services` - Services navigation link
-- `nav-inventory` - Inventory navigation link
-- `nav-logistics` - Logistics navigation link
-- `nav-live-tracking` - Live tracking navigation link
-- `nav-documents` - Documents navigation link
-- `nav-analytics` - Analytics navigation link
-- `nav-employee-dashboard` - Employee dashboard navigation link
-- `nav-franchise-dashboard` - Franchise dashboard navigation link
-- `nav-database-status` - Database status navigation link
-- `nav-settings` - Settings navigation link
-
-**Features**:
-- Active state indication
-- Hover effects
-- Keyboard navigation support
-- ARIA labels for accessibility
-- Responsive design
-
-**Accessibility**:
-- `role="navigation"` on sidebar
-- `aria-label` for navigation sections
-- `aria-current="page"` for active links
-- `aria-hidden="true"` on decorative icons
-
----
-
-### Header
-
-**Purpose**: Application header with breadcrumbs, search, and notifications.
-
-**Location**: `client/src/components/layout/header.tsx`
-
-**Props**:
-```typescript
-interface HeaderProps {
-  onToggleSidebar: () => void;
-}
-```
-
-**Usage**:
-```tsx
-import { Header } from '@/components/layout/header';
-
-<Header onToggleSidebar={handleToggleSidebar} />
-```
-
-**Features**:
-- Dynamic breadcrumb generation
-- Global search functionality
-- Notification center
-- Sidebar toggle button
-
----
-
-### MainLayout
-
-**Purpose**: Main application layout wrapper that combines sidebar, header, and content area.
-
-**Location**: `client/src/components/layout/main-layout.tsx`
-
-**Props**:
-```typescript
-interface MainLayoutProps {
-  children: React.ReactNode;
-}
-```
-
-**Usage**:
-```tsx
-import { MainLayout } from '@/components/layout/main-layout';
-
-<MainLayout>
-  <YourPageContent />
-</MainLayout>
-```
-
-**Features**:
-- Responsive layout
-- Sidebar toggle functionality
-- Content area with proper spacing
-- Mobile-friendly design
+1. [UI Components](#ui-components)
+2. [Dashboard Components](#dashboard-components)
+3. [Order Management Components](#order-management-components)
+4. [Customer Portal Components](#customer-portal-components)
+5. [Worker Portal Components](#worker-portal-components)
+6. [Search Components](#search-components)
+7. [Performance Components](#performance-components)
+8. [Hooks](#hooks)
+9. [Utilities](#utilities)
 
 ## UI Components
 
-### Button
+### VirtualScroll
+A high-performance virtual scrolling component for large lists.
 
-**Purpose**: Reusable button component with multiple variants and sizes.
-
-**Location**: `client/src/components/ui/button.tsx`
-
-**Props**:
+**Props:**
 ```typescript
-interface ButtonProps {
-  variant?: 'primary' | 'secondary' | 'destructive' | 'outline' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
-  isLoading?: boolean;
-  disabled?: boolean;
-  children: React.ReactNode;
-  onClick?: () => void;
-  'data-testid'?: string;
+interface VirtualScrollProps<T> {
+  items: T[];
+  itemHeight: number;
+  containerHeight: number;
+  renderItem: (item: T, index: number) => React.ReactNode;
+  className?: string;
+  overscan?: number;
+  onScroll?: (scrollTop: number) => void;
+  loading?: boolean;
+  emptyMessage?: string;
 }
 ```
 
-**Usage**:
+**Usage:**
 ```tsx
-import { Button } from '@/components/ui/button';
+<VirtualScroll
+  items={orders}
+  itemHeight={60}
+  containerHeight={400}
+  renderItem={(order, index) => <OrderItem order={order} />}
+  overscan={5}
+  loading={isLoading}
+  emptyMessage="No orders found"
+/>
+```
 
-<Button 
-  variant="primary" 
-  size="md" 
-  onClick={handleClick}
-  data-testid="submit-button"
+### LazyLoad
+Lazy loading component using Intersection Observer API.
+
+**Props:**
+```typescript
+interface LazyLoadProps {
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+  threshold?: number;
+  rootMargin?: string;
+  className?: string;
+  delay?: number;
+  once?: boolean;
+  onVisible?: () => void;
+}
+```
+
+**Usage:**
+```tsx
+<LazyLoad
+  fallback={<LoadingSpinner />}
+  threshold={0.1}
+  rootMargin="50px"
+  delay={500}
+  onVisible={() => console.log('Component visible')}
 >
-  Submit
-</Button>
+  <ExpensiveChart data={chartData} />
+</LazyLoad>
 ```
 
-**Variants**:
-- `primary` - Main action button (blue)
-- `secondary` - Secondary action (gray)
-- `destructive` - Dangerous actions (red)
-- `outline` - Outlined button
-- `ghost` - Minimal styling
+### LazyImage
+Optimized image loading with lazy loading and error handling.
 
-**Sizes**:
-- `sm` - Small (32px height)
-- `md` - Medium (40px height)
-- `lg` - Large (48px height)
-
----
-
-### Card
-
-**Purpose**: Container component for grouping related content.
-
-**Location**: `client/src/components/ui/card.tsx`
-
-**Components**:
-- `Card` - Main container
-- `CardHeader` - Header section
-- `CardTitle` - Title component
-- `CardDescription` - Description component
-- `CardContent` - Main content area
-- `CardFooter` - Footer section
-
-**Usage**:
-```tsx
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-
-<Card data-testid="user-card">
-  <CardHeader>
-    <CardTitle>User Profile</CardTitle>
-  </CardHeader>
-  <CardContent>
-    <p>User information goes here</p>
-  </CardContent>
-</Card>
-```
-
----
-
-### Input
-
-**Purpose**: Form input component with validation support.
-
-**Location**: `client/src/components/ui/input.tsx`
-
-**Props**:
+**Props:**
 ```typescript
-interface InputProps {
-  type?: 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'date';
+interface LazyImageProps {
+  src: string;
+  alt: string;
+  className?: string;
+  fallbackSrc?: string;
+  threshold?: number;
+  rootMargin?: string;
+  onLoad?: () => void;
+  onError?: () => void;
+}
+```
+
+**Usage:**
+```tsx
+<LazyImage
+  src="/images/product.jpg"
+  alt="Product image"
+  fallbackSrc="/images/placeholder.jpg"
+  threshold={0.1}
+  onLoad={() => console.log('Image loaded')}
+/>
+```
+
+### PerformanceMonitor
+Real-time performance monitoring component.
+
+**Props:**
+```typescript
+interface PerformanceMonitorProps {
+  enabled?: boolean;
+  showDetails?: boolean;
+  position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
+  className?: string;
+}
+```
+
+**Usage:**
+```tsx
+<PerformanceMonitor
+  enabled={process.env.NODE_ENV === 'development'}
+  position="top-right"
+  showDetails={true}
+/>
+```
+
+## Dashboard Components
+
+### EnhancedEmployeeDashboard
+Comprehensive employee dashboard with performance metrics and task management.
+
+**Props:**
+```typescript
+interface EnhancedEmployeeDashboardProps {
+  className?: string;
+  showPerformanceMetrics?: boolean;
+  enableRealTimeUpdates?: boolean;
+}
+```
+
+**Features:**
+- Real-time performance metrics
+- Task management interface
+- Order management integration
+- Transit management tools
+- Analytics and reporting
+- Responsive design
+
+**Usage:**
+```tsx
+<EnhancedEmployeeDashboard
+  showPerformanceMetrics={true}
+  enableRealTimeUpdates={true}
+/>
+```
+
+### DashboardMetrics
+Performance metrics display component.
+
+**Props:**
+```typescript
+interface DashboardMetricsProps {
+  metrics: {
+    totalOrders: number;
+    completedOrders: number;
+    pendingOrders: number;
+    totalRevenue: number;
+    averageOrderValue: number;
+    customerSatisfaction: number;
+  };
+  loading?: boolean;
+  className?: string;
+}
+```
+
+**Usage:**
+```tsx
+<DashboardMetrics
+  metrics={dashboardData}
+  loading={isLoading}
+/>
+```
+
+## Order Management Components
+
+### EmployeeOrderManagement
+Enhanced order management interface for employees.
+
+**Props:**
+```typescript
+interface EmployeeOrderManagementProps {
+  orders: Order[];
+  loading?: boolean;
+  onOrderUpdate?: (orderId: string, updates: Partial<Order>) => void;
+  onOrderDelete?: (orderId: string) => void;
+  className?: string;
+}
+```
+
+**Features:**
+- Advanced search and filtering
+- Bulk operations
+- Real-time updates
+- Export functionality
+- Responsive design
+
+**Usage:**
+```tsx
+<EmployeeOrderManagement
+  orders={orders}
+  loading={isLoading}
+  onOrderUpdate={handleOrderUpdate}
+  onOrderDelete={handleOrderDelete}
+/>
+```
+
+### OrderFilters
+Advanced filtering component for orders.
+
+**Props:**
+```typescript
+interface OrderFiltersProps {
+  filters: OrderFilters;
+  onFiltersChange: (filters: OrderFilters) => void;
+  className?: string;
+}
+```
+
+**Usage:**
+```tsx
+<OrderFilters
+  filters={currentFilters}
+  onFiltersChange={setFilters}
+/>
+```
+
+### OrderSorting
+Sorting component for orders.
+
+**Props:**
+```typescript
+interface OrderSortingProps {
+  sortField: string;
+  sortOrder: 'asc' | 'desc';
+  onSortChange: (field: string, order: 'asc' | 'desc') => void;
+  className?: string;
+}
+```
+
+**Usage:**
+```tsx
+<OrderSorting
+  sortField="createdAt"
+  sortOrder="desc"
+  onSortChange={handleSortChange}
+/>
+```
+
+## Customer Portal Components
+
+### CustomerOrderTracking
+Order tracking interface for customers.
+
+**Props:**
+```typescript
+interface CustomerOrderTrackingProps {
+  orders: Order[];
+  customer: Customer;
+  onOrderSelect?: (order: Order) => void;
+  className?: string;
+}
+```
+
+**Features:**
+- Order status tracking
+- Progress visualization
+- Order details modal
+- Search and filtering
+- Pagination
+
+**Usage:**
+```tsx
+<CustomerOrderTracking
+  orders={customerOrders}
+  customer={currentCustomer}
+  onOrderSelect={handleOrderSelect}
+/>
+```
+
+### CustomerServiceBooking
+Service booking interface for customers.
+
+**Props:**
+```typescript
+interface CustomerServiceBookingProps {
+  customer: Customer;
+  onBookingComplete?: (booking: ServiceBooking) => void;
+  className?: string;
+}
+```
+
+**Features:**
+- Service selection
+- Date/time picker
+- Address management
+- Price calculation
+- Booking confirmation
+
+**Usage:**
+```tsx
+<CustomerServiceBooking
+  customer={currentCustomer}
+  onBookingComplete={handleBookingComplete}
+/>
+```
+
+### CustomerAccountManagement
+Account management interface for customers.
+
+**Props:**
+```typescript
+interface CustomerAccountManagementProps {
+  customer: Customer;
+  onCustomerUpdate?: (updates: Partial<Customer>) => void;
+  className?: string;
+}
+```
+
+**Features:**
+- Profile editing
+- Address management
+- Loyalty points display
+- Order history
+- Preferences settings
+
+**Usage:**
+```tsx
+<CustomerAccountManagement
+  customer={currentCustomer}
+  onCustomerUpdate={handleCustomerUpdate}
+/>
+```
+
+## Worker Portal Components
+
+### WorkerDeliveryManagement
+Delivery management interface for workers.
+
+**Props:**
+```typescript
+interface WorkerDeliveryManagementProps {
+  deliveries: Delivery[];
+  driver: Driver;
+  onDeliveryUpdate?: (deliveryId: string, updates: Partial<Delivery>) => void;
+  className?: string;
+}
+```
+
+**Features:**
+- Delivery list
+- Route optimization
+- QR code scanning
+- Status updates
+- Real-time tracking
+
+**Usage:**
+```tsx
+<WorkerDeliveryManagement
+  deliveries={assignedDeliveries}
+  driver={currentDriver}
+  onDeliveryUpdate={handleDeliveryUpdate}
+/>
+```
+
+### RouteOptimization
+Route optimization component for delivery planning.
+
+**Props:**
+```typescript
+interface RouteOptimizationProps {
+  deliveries: Delivery[];
+  driverLocation: { latitude: number; longitude: number };
+  onRouteOptimized?: (optimizedRoute: OptimizedRoute) => void;
+  className?: string;
+}
+```
+
+**Usage:**
+```tsx
+<RouteOptimization
+  deliveries={pendingDeliveries}
+  driverLocation={currentLocation}
+  onRouteOptimized={handleRouteOptimized}
+/>
+```
+
+## Search Components
+
+### FuzzySearch
+Advanced fuzzy search component with autocomplete.
+
+**Props:**
+```typescript
+interface FuzzySearchProps<T> {
+  items: T[];
+  searchFields: (keyof T)[];
+  onSearch: (query: string, results: T[]) => void;
   placeholder?: string;
-  value?: string;
-  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  disabled?: boolean;
-  error?: string;
-  'data-testid'?: string;
+  className?: string;
+  threshold?: number;
+  maxResults?: number;
 }
 ```
 
-**Usage**:
+**Usage:**
 ```tsx
-import { Input } from '@/components/ui/input';
-
-<Input
-  type="email"
-  placeholder="Enter email address"
-  value={email}
-  onChange={(e) => setEmail(e.target.value)}
-  error={emailError}
-  data-testid="email-input"
+<FuzzySearch
+  items={orders}
+  searchFields={['customerName', 'customerEmail', 'orderNumber']}
+  onSearch={handleSearch}
+  placeholder="Search orders..."
+  threshold={0.7}
+  maxResults={50}
 />
 ```
 
-**Features**:
-- Built-in validation styling
-- Error message display
-- Disabled state support
-- Multiple input types
+### SearchSuggestions
+Search suggestions component with recent searches.
 
-## Form Components
-
-### Form Validation
-
-All form components support validation through error props and visual feedback:
-
-```tsx
-// Error state styling
-<Input 
-  value={value}
-  onChange={onChange}
-  error={error}
-  className={error ? 'border-red-500' : ''}
-/>
-
-// Error message display
-{error && (
-  <span className="text-red-500 text-sm" data-testid="error-message">
-    {error}
-  </span>
-)}
-```
-
-### Form Patterns
-
-**Basic Form Structure**:
-```tsx
-<form onSubmit={handleSubmit} data-testid="user-form">
-  <div className="space-y-4">
-    <div>
-      <Label htmlFor="name">Name</Label>
-      <Input
-        id="name"
-        value={formData.name}
-        onChange={(e) => setFormData({...formData, name: e.target.value})}
-        error={errors.name}
-        data-testid="name-input"
-      />
-      {errors.name && (
-        <span className="text-red-500 text-sm" data-testid="name-error">
-          {errors.name}
-        </span>
-      )}
-    </div>
-    
-    <Button type="submit" data-testid="submit-button">
-      Submit
-    </Button>
-  </div>
-</form>
-```
-
-## Data Display Components
-
-### Table
-
-**Purpose**: Display tabular data with sorting, filtering, and pagination.
-
-**Location**: `client/src/components/ui/table.tsx`
-
-**Components**:
-- `Table` - Main table container
-- `TableHeader` - Header section
-- `TableBody` - Body section
-- `TableRow` - Table row
-- `TableHead` - Header cell
-- `TableCell` - Data cell
-
-**Usage**:
-```tsx
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-
-<Table data-testid="users-table">
-  <TableHeader>
-    <TableRow>
-      <TableHead>Name</TableHead>
-      <TableHead>Email</TableHead>
-      <TableHead>Actions</TableHead>
-    </TableRow>
-  </TableHeader>
-  <TableBody>
-    {users.map((user) => (
-      <TableRow key={user.id} data-testid={`user-row-${user.id}`}>
-        <TableCell data-testid={`user-name-${user.id}`}>{user.name}</TableCell>
-        <TableCell data-testid={`user-email-${user.id}`}>{user.email}</TableCell>
-        <TableCell>
-          <Button data-testid={`edit-user-${user.id}`}>Edit</Button>
-        </TableCell>
-      </TableRow>
-    ))}
-  </TableBody>
-</Table>
-```
-
----
-
-### Badge
-
-**Purpose**: Display status indicators and labels.
-
-**Location**: `client/src/components/ui/badge.tsx`
-
-**Props**:
+**Props:**
 ```typescript
-interface BadgeProps {
-  variant?: 'default' | 'secondary' | 'destructive' | 'outline';
-  children: React.ReactNode;
-  'data-testid'?: string;
+interface SearchSuggestionsProps {
+  suggestions: string[];
+  recentSearches: string[];
+  onSuggestionSelect: (suggestion: string) => void;
+  onRecentSearchSelect: (search: string) => void;
+  className?: string;
 }
 ```
 
-**Usage**:
+**Usage:**
 ```tsx
-import { Badge } from '@/components/ui/badge';
-
-<Badge variant="default" data-testid="status-badge">
-  Active
-</Badge>
+<SearchSuggestions
+  suggestions={searchSuggestions}
+  recentSearches={recentSearches}
+  onSuggestionSelect={handleSuggestionSelect}
+  onRecentSearchSelect={handleRecentSearchSelect}
+/>
 ```
 
-**Variants**:
-- `default` - Primary badge (blue)
-- `secondary` - Secondary badge (gray)
-- `destructive` - Error/warning badge (red)
-- `outline` - Outlined badge
+### AdvancedFilters
+Advanced filtering component with multiple criteria.
 
-## Testing Guidelines
-
-### Component Testing Checklist
-
-For each component, ensure the following tests are included:
-
-1. **Rendering Tests**:
-   - Component renders without crashing
-   - All required props are displayed correctly
-   - Conditional rendering works as expected
-
-2. **Interaction Tests**:
-   - Click handlers work correctly
-   - Form submissions function properly
-   - Keyboard navigation is supported
-
-3. **State Tests**:
-   - Component state updates correctly
-   - Props changes trigger re-renders
-   - Loading states are handled properly
-
-4. **Accessibility Tests**:
-   - ARIA labels are present
-   - Keyboard navigation works
-   - Screen reader compatibility
-
-5. **Error Handling Tests**:
-   - Error states are displayed
-   - Validation messages appear
-   - Graceful degradation
-
-### Test ID Naming Convention
-
-Follow this pattern for consistent test IDs:
-
-```
-[component-name]-[element-type]-[identifier]
-```
-
-Examples:
-- `user-profile-edit-button`
-- `order-list-item-123`
-- `dashboard-metrics-revenue-card`
-- `customer-form-name-input`
-
-## Performance Considerations
-
-### Optimization Techniques
-
-1. **React.memo()**: Use for components with stable props
-2. **useMemo()**: For expensive calculations
-3. **useCallback()**: For event handlers passed to child components
-4. **Code Splitting**: Use dynamic imports for large components
-5. **Lazy Loading**: Implement for components below the fold
-
-### Example Optimized Component
-
-```tsx
-import React, { memo, useMemo, useCallback } from 'react';
-
-interface OptimizedComponentProps {
-  data: DataItem[];
-  onItemClick: (id: string) => void;
+**Props:**
+```typescript
+interface AdvancedFiltersProps {
+  filters: Record<string, any>;
+  onFiltersChange: (filters: Record<string, any>) => void;
+  availableFilters: FilterOption[];
+  className?: string;
 }
+```
 
-export const OptimizedComponent = memo<OptimizedComponentProps>(({ 
-  data, 
-  onItemClick 
-}) => {
-  // Memoize expensive calculations
-  const processedData = useMemo(() => {
-    return data.map(item => ({
-      ...item,
-      displayName: `${item.firstName} ${item.lastName}`
-    }));
-  }, [data]);
+**Usage:**
+```tsx
+<AdvancedFilters
+  filters={currentFilters}
+  onFiltersChange={setFilters}
+  availableFilters={filterOptions}
+/>
+```
 
-  // Memoize event handlers
-  const handleItemClick = useCallback((id: string) => {
-    onItemClick(id);
-  }, [onItemClick]);
+## Performance Components
 
-  return (
-    <div data-testid="optimized-component">
-      {processedData.map(item => (
-        <div 
-          key={item.id}
-          onClick={() => handleItemClick(item.id)}
-          data-testid={`item-${item.id}`}
-        >
-          {item.displayName}
-        </div>
-      ))}
-    </div>
-  );
+### MemoizedList
+Memoized list component for performance optimization.
+
+**Props:**
+```typescript
+interface MemoizedListProps<T> {
+  items: T[];
+  renderItem: (item: T, index: number) => React.ReactNode;
+  keyExtractor: (item: T) => string;
+  className?: string;
+  emptyMessage?: string;
+}
+```
+
+**Usage:**
+```tsx
+<MemoizedList
+  items={orders}
+  renderItem={(order, index) => <OrderItem order={order} />}
+  keyExtractor={(order) => order.id}
+  emptyMessage="No orders found"
+/>
+```
+
+### OptimizedTable
+Performance-optimized table component.
+
+**Props:**
+```typescript
+interface OptimizedTableProps<T> {
+  data: T[];
+  columns: Column<T>[];
+  onSort?: (field: keyof T, order: 'asc' | 'desc') => void;
+  onFilter?: (filters: Record<string, any>) => void;
+  loading?: boolean;
+  className?: string;
+}
+```
+
+**Usage:**
+```tsx
+<OptimizedTable
+  data={orders}
+  columns={orderColumns}
+  onSort={handleSort}
+  onFilter={handleFilter}
+  loading={isLoading}
+/>
+```
+
+## Hooks
+
+### useFuzzySearch
+Hook for fuzzy search functionality.
+
+**Parameters:**
+```typescript
+interface UseFuzzySearchOptions {
+  threshold?: number;
+  maxResults?: number;
+  caseSensitive?: boolean;
+}
+```
+
+**Returns:**
+```typescript
+interface UseFuzzySearchReturn<T> {
+  search: (query: string) => T[];
+  results: T[];
+  loading: boolean;
+  error: string | null;
+}
+```
+
+**Usage:**
+```tsx
+const { search, results, loading } = useFuzzySearch(orders, {
+  threshold: 0.7,
+  maxResults: 50,
+  caseSensitive: false
 });
-
-OptimizedComponent.displayName = 'OptimizedComponent';
 ```
 
-This documentation serves as a comprehensive guide for understanding, using, and maintaining the FabZClean component library.
+### usePagination
+Hook for pagination functionality.
 
+**Parameters:**
+```typescript
+interface UsePaginationOptions {
+  pageSize?: number;
+  initialPage?: number;
+}
+```
+
+**Returns:**
+```typescript
+interface UsePaginationReturn<T> {
+  currentPage: number;
+  totalPages: number;
+  paginatedData: T[];
+  goToPage: (page: number) => void;
+  nextPage: () => void;
+  prevPage: () => void;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+}
+```
+
+**Usage:**
+```tsx
+const {
+  currentPage,
+  totalPages,
+  paginatedData,
+  goToPage,
+  nextPage,
+  prevPage
+} = usePagination(orders, { pageSize: 20 });
+```
+
+### useCache
+Hook for caching functionality.
+
+**Parameters:**
+```typescript
+interface UseCacheOptions {
+  ttl?: number;
+  maxSize?: number;
+}
+```
+
+**Returns:**
+```typescript
+interface UseCacheReturn<T> {
+  get: (key: string) => T | null;
+  set: (key: string, value: T) => void;
+  clear: () => void;
+  has: (key: string) => boolean;
+  size: number;
+}
+```
+
+**Usage:**
+```tsx
+const { get, set, clear } = useCache<Order[]>({ ttl: 3600000 });
+```
+
+### useMemoization
+Hook for memoization utilities.
+
+**Returns:**
+```typescript
+interface UseMemoizationReturn {
+  useDebounce: <T>(value: T, delay: number) => T;
+  useThrottle: <T extends (...args: any[]) => any>(callback: T, delay: number) => T;
+  useMemoizedSearch: <T>(items: T[], searchQuery: string, searchFields: (keyof T)[]) => T[];
+  useMemoizedSort: <T>(items: T[], sortField: keyof T, sortOrder: 'asc' | 'desc') => T[];
+  useMemoizedFilter: <T>(items: T[], filters: Record<string, any>) => T[];
+}
+```
+
+**Usage:**
+```tsx
+const { useDebounce, useMemoizedSearch } = useMemoization();
+const debouncedQuery = useDebounce(searchQuery, 300);
+const searchResults = useMemoizedSearch(orders, debouncedQuery, ['customerName']);
+```
+
+### useProgressiveLoading
+Hook for progressive loading of data.
+
+**Parameters:**
+```typescript
+interface UseProgressiveLoadingOptions {
+  batchSize?: number;
+  delay?: number;
+  initialLoad?: number;
+}
+```
+
+**Returns:**
+```typescript
+interface UseProgressiveLoadingReturn<T> {
+  items: T[];
+  loading: boolean;
+  hasMore: boolean;
+  error: string | null;
+  loadMore: () => void;
+  loadInitial: () => void;
+  reset: () => void;
+}
+```
+
+**Usage:**
+```tsx
+const {
+  items,
+  loading,
+  hasMore,
+  loadMore,
+  loadInitial
+} = useProgressiveLoading(loadOrders, {
+  batchSize: 20,
+  delay: 1000,
+  initialLoad: 50
+});
+```
+
+## Utilities
+
+### Bundle Optimization
+Utilities for bundle optimization and code splitting.
+
+**Functions:**
+```typescript
+// Dynamic imports
+dynamicImports.dashboard()
+dynamicImports.orderManagement()
+dynamicImports.customerPortal()
+
+// Preloading
+preloadComponents.preloadCritical()
+preloadComponents.preloadByRole('admin')
+
+// Resource hints
+addResourceHints()
+
+// Bundle analysis
+bundleAnalyzer.trackBundleSize('main', 1024000)
+bundleAnalyzer.analyzeChunks(chunks)
+```
+
+### Performance Monitoring
+Utilities for performance monitoring and optimization.
+
+**Functions:**
+```typescript
+// Component load measurement
+performanceMonitor.measureComponentLoad('Dashboard', loadFn)
+
+// Bundle size measurement
+performanceMonitor.measureBundleSize(bundle)
+
+// Memory usage monitoring
+performanceMonitor.monitorMemoryUsage()
+```
+
+### Cache Management
+Utilities for cache management and optimization.
+
+**Functions:**
+```typescript
+// Service worker setup
+cacheOptimization.setupServiceWorkerCache()
+
+// Cache headers
+cacheOptimization.getCacheHeaders('static')
+
+// Local storage cache
+cacheOptimization.localStorageCache.set('key', value, ttl)
+cacheOptimization.localStorageCache.get('key')
+cacheOptimization.localStorageCache.clear()
+```
+
+## Component Architecture
+
+### Design Principles
+1. **Performance First**: All components are optimized for performance
+2. **Accessibility**: WCAG 2.1 AA compliance
+3. **Responsive Design**: Mobile-first approach
+4. **Type Safety**: Full TypeScript support
+5. **Reusability**: Modular and reusable components
+6. **Testing**: Comprehensive test coverage
+
+### Component Structure
+```
+components/
+├── ui/                    # Base UI components
+│   ├── virtual-scroll.tsx
+│   ├── lazy-load.tsx
+│   ├── performance-monitor.tsx
+│   └── ...
+├── dashboard/             # Dashboard components
+│   ├── enhanced-employee-dashboard.tsx
+│   ├── dashboard-metrics.tsx
+│   └── ...
+├── orders/                # Order management components
+│   ├── employee-order-management.tsx
+│   ├── order-filters.tsx
+│   └── ...
+├── customer-portal/       # Customer portal components
+│   ├── customer-order-tracking.tsx
+│   ├── customer-service-booking.tsx
+│   └── ...
+├── worker-portal/         # Worker portal components
+│   ├── worker-delivery-management.tsx
+│   ├── route-optimization.tsx
+│   └── ...
+└── search/                # Search components
+    ├── fuzzy-search.tsx
+    ├── search-suggestions.tsx
+    └── ...
+```
+
+### Styling
+- **Tailwind CSS**: Utility-first CSS framework
+- **Shadcn UI**: Component library
+- **Radix UI**: Headless UI components
+- **Framer Motion**: Animation library
+- **Custom CSS**: Component-specific styles
+
+### State Management
+- **React Query**: Server state management
+- **React Context**: Global state management
+- **React Hooks**: Local state management
+- **Zustand**: Alternative state management (optional)
+
+This comprehensive component documentation provides all the information needed to understand and use the FabZClean application's React components effectively.

@@ -1,10 +1,8 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express from "express";
 import cors from "cors";
-import { registerAllRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./db-utils";
 import { realtimeServer } from "./websocket-server";
-import { driverTrackingService } from "./driver-tracking";
 import { corsOptions, errorHandler } from "./middleware/auth";
 
 const app = express();
@@ -16,40 +14,24 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
+// Simple health check route
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    message: 'FabZClean Server is running!'
   });
+});
 
-  next();
+// Simple test route
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    message: 'Server is working!',
+    version: '1.0.0'
+  });
 });
 
 (async () => {
-          // Register all routes
-          registerAllRoutes(app);
-  
   // Create HTTP server
   const server = realtimeServer.createServer(app);
 
@@ -57,10 +39,10 @@ app.use((req, res, next) => {
   app.use(errorHandler);
 
   // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
+  // setting up all the quoter routes so the catch-all route
   // doesn't interfere with the other routes
   const isProduction = process.env.NODE_ENV === "production";
-  
+
   if (!isProduction) {
     await setupVite(app, server);
   } else {
@@ -82,8 +64,10 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
+  const port = parseInt(process.env.PORT || "5001", 10);
   server.listen(port, () => {
-    log(`serving on port ${port}`);
+    log(`🚀 FabZClean Server running on port ${port}`);
+    log(`📊 Health check: http://localhost:${port}/api/health`);
+    log(`🧪 Test endpoint: http://localhost:${port}/api/test`);
   });
 })();

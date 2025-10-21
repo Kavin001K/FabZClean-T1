@@ -1,6 +1,6 @@
-import EmployeeDashboardSimple from "@/components/dashboard/employee-dashboard-simple";
+import EnhancedEmployeeDashboard from "@/components/dashboard/enhanced-employee-dashboard";
 
 export default function EmployeeDashboardPage() {
-  console.log("Loading Employee Dashboard...");
-  return <EmployeeDashboardSimple />;
+  console.log("Loading Enhanced Employee Dashboard...");
+  return <EnhancedEmployeeDashboard />;
 }
