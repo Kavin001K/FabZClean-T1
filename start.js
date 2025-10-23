@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const serverPath = join(__dirname, 'server', 'index.ts');
+const serverPath = join(__dirname, 'server', 'minimal-server.ts');
 
 console.log('🚀 Starting FabZClean Web Server...');
 console.log('📁 Server path:', serverPath);

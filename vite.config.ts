@@ -54,7 +54,7 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:5001',
+        target: process.env.NODE_ENV === 'production' ? 'http://localhost:5000' : 'http://localhost:5001',
         changeOrigin: true,
         secure: false,
       },
