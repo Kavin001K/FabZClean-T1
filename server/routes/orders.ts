@@ -1,27 +1,45 @@
-import { Router } from 'express';
-import { z } from 'zod';
-import { db as storage } from '../db';
-import { insertOrderSchema } from '../schema';
-import { 
-  adminLoginRequired, 
-  jwtRequired, 
+import { Router } from "express";
+import { z } from "zod";
+import { db as storage } from "../db";
+import { insertOrderSchema } from "../schema";
+import {
+  jwtRequired,
   validateInput,
-  rateLimit 
-} from '../middleware/auth';
-import { 
-  serializeOrder, 
-  createPaginatedResponse, 
+  rateLimit,
+  requireRole,
+} from "../middleware/auth";
+import {
+  serializeOrder,
+  createPaginatedResponse,
   createErrorResponse,
-  createSuccessResponse 
-} from '../services/serialization';
-import { realtimeServer } from '../websocket-server';
-import { loyaltyProgram } from '../loyalty-program';
-import { barcodeService } from '../barcode-service';
+  createSuccessResponse,
+} from "../services/serialization";
+import { realtimeServer } from "../websocket-server";
+import { loyaltyProgram } from "../loyalty-program";
+import { barcodeService } from "../barcode-service";
+import { OrderService } from "../services/order.service";
+import type { UserRole } from "../../shared/supabase";
 
 const router = Router();
+const orderService = new OrderService();
+
+const ORDER_CREATE_ROLES: UserRole[] = [
+  "admin",
+  "employee",
+  "factory_manager",
+  "franchise_manager",
+];
+const ORDER_UPDATE_ROLES: UserRole[] = ["admin", "factory_manager"];
+const ORDER_ANALYTICS_ROLES: UserRole[] = [
+  "admin",
+  "factory_manager",
+  "franchise_manager",
+];
+const ADMIN_ONLY: UserRole[] = ["admin"];
 
 // Apply rate limiting to all order routes
 router.use(rateLimit(60000, 100)); // 100 requests per minute
+router.use(jwtRequired);
 
 // Get orders with pagination and search
 router.get('/', async (req, res) => {
@@ -36,42 +54,16 @@ router.get('/', async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
-    let orders;
+    // Use OrderService to fetch and enrich orders
+    const filters = {
+      status: status as string | undefined,
+      search: search as string | undefined,
+      customerEmail: email as string | undefined,
+      sortBy: sortBy as string | undefined,
+      sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+    };
 
-    // If email is provided, get customer orders
-    if (email) {
-      orders = await storage.listOrders();
-      orders = orders.filter(order => order.customerEmail === email);
-    } else {
-      orders = await storage.listOrders();
-    }
-
-    // Apply filters
-    if (status && status !== 'all') {
-      orders = orders.filter(order => order.status === status);
-    }
-
-    // Apply search
-    if (search && typeof search === 'string') {
-      const searchTerm = search.toLowerCase();
-      orders = orders.filter(order => 
-        order.customerName?.toLowerCase().includes(searchTerm) ||
-        order.customerEmail?.toLowerCase().includes(searchTerm) ||
-        order.id.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    // Apply sorting
-    orders.sort((a, b) => {
-      const aValue = a[sortBy as string];
-      const bValue = b[sortBy as string];
-      
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
+    const orders = await orderService.findAllOrders(filters);
 
     // Apply pagination
     const limitNum = parseInt(limit as string) || 20;
@@ -103,27 +95,32 @@ router.get('/', async (req, res) => {
 // Get single order
 router.get('/:id', async (req, res) => {
   try {
-    const order = await storage.getOrder(req.params.id);
-    
-    if (!order) {
-      return res.status(404).json(createErrorResponse('Order not found', 404));
-    }
+    // Use OrderService to fetch and enrich single order
+    const order = await orderService.getOrderById(req.params.id);
 
     const serializedOrder = serializeOrder(order);
     res.json(createSuccessResponse(serializedOrder));
   } catch (error) {
     console.error('Get order error:', error);
-    res.status(500).json(createErrorResponse('Failed to fetch order', 500));
+    if (error instanceof Error && error.message.includes('Order not found')) {
+      res.status(404).json(createErrorResponse('Order not found', 404));
+    } else {
+      res.status(500).json(createErrorResponse('Failed to fetch order', 500));
+    }
   }
 });
 
 // Create new order
-router.post('/', validateInput(insertOrderSchema), async (req, res) => {
+router.post(
+  "/",
+  requireRole(ORDER_CREATE_ROLES),
+  validateInput(insertOrderSchema),
+  async (req, res) => {
   try {
     const orderData = req.body;
 
-    // Create the order
-    const order = await storage.createOrder(orderData);
+    // Use OrderService to create order (includes external validation and enrichment)
+    const order = await orderService.createOrder(orderData);
 
     // Award loyalty points (only if customerId exists)
     if (order.customerId) {
@@ -148,12 +145,24 @@ router.post('/', validateInput(insertOrderSchema), async (req, res) => {
     res.status(201).json(createSuccessResponse(serializedOrder, 'Order created successfully'));
   } catch (error) {
     console.error('Create order error:', error);
+    
+    // Handle specific validation errors
+    if (error instanceof Error) {
+      if (error.message.includes('validation')) {
+        return res.status(400).json(createErrorResponse(error.message, 400));
+      }
+      if (error.message.includes('Customer validation failed')) {
+        return res.status(400).json(createErrorResponse(error.message, 400));
+      }
+    }
+    
     res.status(500).json(createErrorResponse('Failed to create order', 500));
   }
-});
+  },
+);
 
-// Update order (admin only)
-router.put('/:id', adminLoginRequired, async (req, res) => {
+// Update order
+router.put('/:id', requireRole(ORDER_UPDATE_ROLES), async (req, res) => {
   try {
     const orderId = req.params.id;
     const updateData = req.body;
@@ -177,7 +186,10 @@ router.put('/:id', adminLoginRequired, async (req, res) => {
 });
 
 // Update order status
-router.patch('/:id/status', adminLoginRequired, async (req, res) => {
+router.patch(
+  "/:id/status",
+  requireRole(ORDER_UPDATE_ROLES),
+  async (req, res) => {
   try {
     const orderId = req.params.id;
     const { status } = req.body;
@@ -206,10 +218,11 @@ router.patch('/:id/status', adminLoginRequired, async (req, res) => {
     console.error('Update order status error:', error);
     res.status(500).json(createErrorResponse('Failed to update order status', 500));
   }
-});
+  },
+);
 
-// Delete order (admin only)
-router.delete('/:id', adminLoginRequired, async (req, res) => {
+// Delete order
+router.delete('/:id', requireRole(ADMIN_ONLY), async (req, res) => {
   try {
     const orderId = req.params.id;
 
@@ -282,7 +295,10 @@ router.get('/recent', async (req, res) => {
 });
 
 // Get order analytics
-router.get('/analytics/overview', adminLoginRequired, async (req, res) => {
+router.get(
+  "/analytics/overview",
+  requireRole(ORDER_ANALYTICS_ROLES),
+  async (req, res) => {
   try {
     const orders = await storage.listOrders();
 
@@ -307,6 +323,7 @@ router.get('/analytics/overview', adminLoginRequired, async (req, res) => {
     console.error('Get order analytics error:', error);
     res.status(500).json(createErrorResponse('Failed to fetch order analytics', 500));
   }
-});
+  },
+);
 
 export default router;

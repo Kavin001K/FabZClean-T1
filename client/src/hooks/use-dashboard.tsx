@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { analyticsApi, ordersApi, customersApi } from '@/lib/data-service';
+import { useAnalyticsEngine } from '@/hooks/use-analytics-engine';
 import { 
   DashboardState, 
   DashboardFilters, 
@@ -47,38 +48,49 @@ export function useDashboard() {
     retry: 3,
   });
 
+  // ✅ Use the central analytics engine for realtime data processing
   const {
-    data: salesData,
-    isLoading: salesLoading,
-    error: salesError,
-  } = useQuery({
-    queryKey: ['dashboard/sales', filters.dateRange],
-    queryFn: () => analyticsApi.getSalesData(),
-    staleTime: 5 * 60 * 1000,
-    retry: 3,
-  });
+    statusDistribution: rawOrderStatusData,
+    servicePerformance: rawServicePopularityData,
+    kpiMetrics,
+    isLoading: analyticsLoading,
+    error: analyticsError,
+  } = useAnalyticsEngine();
 
-  const {
-    data: orderStatusData,
-    isLoading: orderStatusLoading,
-    error: orderStatusError,
-  } = useQuery({
-    queryKey: ['dashboard/order-status', filters.dateRange],
-    queryFn: () => analyticsApi.getOrderStatusData(),
-    staleTime: 5 * 60 * 1000,
-    retry: 3,
-  });
+  // Sales data is now handled by RevenueChartRealtime component
+  // Keep this for backward compatibility but it will be empty
+  const salesData: SalesData[] = [];
+  const salesLoading = false;
+  const salesError = null;
+  
+  const orderStatusLoading = analyticsLoading;
+  const orderStatusError = analyticsError;
+  
+  const serviceLoading = analyticsLoading;
+  const serviceError = analyticsError;
 
-  const {
-    data: servicePopularityData,
-    isLoading: serviceLoading,
-    error: serviceError,
-  } = useQuery({
-    queryKey: ['dashboard/service-popularity', filters.dateRange],
-    queryFn: () => analyticsApi.getServicePopularityData(),
-    staleTime: 5 * 60 * 1000,
-    retry: 3,
-  });
+  // Convert analytics engine output to expected format
+  const orderStatusData = useMemo(() => {
+    if (!Array.isArray(rawOrderStatusData)) return [];
+    return rawOrderStatusData.map(item => ({
+      status: item.status,
+      value: item.value,
+      name: item.name,
+      color: item.color,
+      percentage: item.percentage,
+    }));
+  }, [rawOrderStatusData]);
+
+  const servicePopularityData = useMemo(() => {
+    if (!Array.isArray(rawServicePopularityData)) return [];
+    return rawServicePopularityData.map(item => ({
+      name: item.name,
+      value: item.revenue, // Use revenue as the main value
+      orders: item.count,
+      revenue: item.revenue,
+      fill: item.fill,
+    }));
+  }, [rawServicePopularityData]);
 
   const {
     data: recentOrders,
@@ -146,64 +158,32 @@ export function useDashboard() {
   }, [metricsError, salesError, orderStatusError, serviceError, ordersError, customersError]);
 
   // Enhanced metrics with calculations
+  // ✅ Use KPI metrics from analytics engine as primary source
   const enhancedMetrics = useMemo((): DashboardMetrics => {
-    if (!dashboardMetrics || typeof dashboardMetrics !== 'object') {
-      return {
-        totalRevenue: 0,
-        totalOrders: 0,
-        newCustomers: 0,
-        inventoryItems: 0,
-        averageOrderValue: 0,
-        onTimeDelivery: 0,
-        customerSatisfaction: 0,
-        dueDateStats: {
-          today: 0,
-          tomorrow: 0,
-          overdue: 0,
-          upcoming: 0,
-        },
-      };
-    }
+    // Merge API metrics with analytics engine KPIs
+    const apiMetrics = dashboardMetrics && typeof dashboardMetrics === 'object' ? dashboardMetrics : null;
+    
+    // Use analytics engine KPIs (realtime) as primary source
+    const totalRevenue = kpiMetrics.totalRevenue || apiMetrics?.totalRevenue || 0;
+    const totalOrders = kpiMetrics.totalOrders || apiMetrics?.totalOrders || 0;
+    const averageOrderValue = kpiMetrics.averageOrderValue || 0;
 
-    try {
-      const averageOrderValue = (dashboardMetrics.totalOrders && dashboardMetrics.totalOrders > 0) 
-        ? dashboardMetrics.totalRevenue / dashboardMetrics.totalOrders 
-        : 0;
-
-      return {
-        totalRevenue: dashboardMetrics.totalRevenue || 0,
-        totalOrders: dashboardMetrics.totalOrders || 0,
-        newCustomers: dashboardMetrics.newCustomers || 0,
-        inventoryItems: dashboardMetrics.inventoryItems || 0,
-        averageOrderValue: Math.round(averageOrderValue),
-        onTimeDelivery: 95, // Mock data - would come from delivery tracking
-        customerSatisfaction: 4.2, // Mock data - would come from feedback
-        dueDateStats: dashboardMetrics.dueDateStats || {
-          today: 0,
-          tomorrow: 0,
-          overdue: 0,
-          upcoming: 0,
-        },
-      };
-    } catch (error) {
-      console.error('Error processing dashboard metrics:', error);
-      return {
-        totalRevenue: 0,
-        totalOrders: 0,
-        newCustomers: 0,
-        inventoryItems: 0,
-        averageOrderValue: 0,
-        onTimeDelivery: 0,
-        customerSatisfaction: 0,
-        dueDateStats: {
-          today: 0,
-          tomorrow: 0,
-          overdue: 0,
-          upcoming: 0,
-        },
-      };
-    }
-  }, [dashboardMetrics]);
+    return {
+      totalRevenue,
+      totalOrders,
+      newCustomers: apiMetrics?.newCustomers || 0,
+      inventoryItems: apiMetrics?.inventoryItems || 0,
+      averageOrderValue: Math.round(averageOrderValue),
+      onTimeDelivery: kpiMetrics.successRate || 0, // Use success rate as proxy for on-time delivery
+      customerSatisfaction: 0, // Will be calculated from feedback data when available
+      dueDateStats: apiMetrics?.dueDateStats || {
+        today: 0,
+        tomorrow: 0,
+        overdue: 0,
+        upcoming: 0,
+      },
+    };
+  }, [dashboardMetrics, kpiMetrics]);
 
   // Processed data with fallbacks
   const processedSalesData = useMemo((): SalesData[] => {
@@ -238,7 +218,11 @@ export function useDashboard() {
   const processedRecentOrders = useMemo(() => {
     if (!recentOrders || !Array.isArray(recentOrders)) return [];
     return recentOrders
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      })
       .slice(0, 10);
   }, [recentOrders]);
 

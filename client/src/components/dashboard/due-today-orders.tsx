@@ -147,7 +147,7 @@ export default React.memo(function DueTodayOrders({
     });
   }, [orders, selectedDate]);
 
-  const displayOrders = filteredOrders.slice(0, limit);
+  const displayOrders = (Array.isArray(filteredOrders) ? filteredOrders : []).slice(0, limit);
 
   // Get date display text
   const getDateDisplayText = () => {

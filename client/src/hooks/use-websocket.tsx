@@ -105,7 +105,11 @@ export function useWebSocket({
       };
 
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        // Silently handle connection errors - WebSocket is optional functionality
+        // Only log if there's an actual error object with details
+        if (error && typeof error === 'object' && 'message' in error) {
+          console.error('WebSocket error:', error);
+        }
         setConnectionStatus('error');
         onErrorRef.current?.(error);
       };

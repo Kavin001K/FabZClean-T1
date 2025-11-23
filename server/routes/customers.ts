@@ -1,28 +1,37 @@
-import { Router } from 'express';
-import { z } from 'zod';
-import { db as storage } from '../db';
-import { insertCustomerSchema } from '../schema';
-import { 
-  adminLoginRequired, 
-  jwtRequired, 
+import { Router } from "express";
+import { z } from "zod";
+import { db as storage } from "../db";
+import { insertCustomerSchema } from "../schema";
+import {
+  jwtRequired,
   validateInput,
-  rateLimit 
-} from '../middleware/auth';
-import { 
-  serializeCustomer, 
-  createPaginatedResponse, 
+  rateLimit,
+  requireRole,
+} from "../middleware/auth";
+import {
+  serializeCustomer,
+  createPaginatedResponse,
   createErrorResponse,
-  createSuccessResponse 
-} from '../services/serialization';
-import { realtimeServer } from '../websocket-server';
+  createSuccessResponse,
+} from "../services/serialization";
+import { realtimeServer } from "../websocket-server";
+import type { UserRole } from "../../shared/supabase";
 
 const router = Router();
 
+const CUSTOMER_EDITOR_ROLES: UserRole[] = [
+  "admin",
+  "employee",
+  "franchise_manager",
+];
+const CUSTOMER_ADMIN_ROLES: UserRole[] = ["admin", "franchise_manager"];
+
 // Apply rate limiting
 router.use(rateLimit(60000, 100));
+router.use(jwtRequired);
 
 // Get customers with pagination and search
-router.get('/', adminLoginRequired, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { 
       cursor, 
@@ -117,7 +126,11 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new customer
-router.post('/', validateInput(insertCustomerSchema), async (req, res) => {
+router.post(
+  "/",
+  requireRole(CUSTOMER_EDITOR_ROLES),
+  validateInput(insertCustomerSchema),
+  async (req, res) => {
   try {
     const customerData = req.body;
 
@@ -140,10 +153,11 @@ router.post('/', validateInput(insertCustomerSchema), async (req, res) => {
     console.error('Create customer error:', error);
     res.status(500).json(createErrorResponse('Failed to create customer', 500));
   }
-});
+  },
+);
 
 // Update customer
-router.put('/:id', adminLoginRequired, async (req, res) => {
+router.put('/:id', requireRole(CUSTOMER_EDITOR_ROLES), async (req, res) => {
   try {
     const customerId = req.params.id;
     const updateData = req.body;
@@ -166,8 +180,8 @@ router.put('/:id', adminLoginRequired, async (req, res) => {
   }
 });
 
-// Delete customer (admin only)
-router.delete('/:id', adminLoginRequired, async (req, res) => {
+// Delete customer
+router.delete('/:id', requireRole(CUSTOMER_ADMIN_ROLES), async (req, res) => {
   try {
     const customerId = req.params.id;
 
@@ -230,7 +244,7 @@ router.get('/:id/orders', async (req, res) => {
 });
 
 // Get customer analytics
-router.get('/analytics/overview', adminLoginRequired, async (req, res) => {
+router.get('/analytics/overview', async (req, res) => {
   try {
     const customers = await storage.listCustomers();
     const orders = await storage.listOrders();
@@ -296,7 +310,10 @@ router.get('/analytics/overview', adminLoginRequired, async (req, res) => {
 });
 
 // Update customer segments
-router.patch('/:id/segments', adminLoginRequired, async (req, res) => {
+router.patch(
+  "/:id/segments",
+  requireRole(CUSTOMER_ADMIN_ROLES),
+  async (req, res) => {
   try {
     const customerId = req.params.id;
     const { segments } = req.body;
@@ -324,10 +341,11 @@ router.patch('/:id/segments', adminLoginRequired, async (req, res) => {
     console.error('Update customer segments error:', error);
     res.status(500).json(createErrorResponse('Failed to update customer segments', 500));
   }
-});
+  },
+);
 
 // Get customer segments list
-router.get('/segments/list', adminLoginRequired, async (req, res) => {
+router.get('/segments/list', async (req, res) => {
   try {
     const customers = await storage.listCustomers();
     const allSegments = new Set<string>();

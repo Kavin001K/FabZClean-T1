@@ -1,10 +1,23 @@
 import { 
   TSPSolver, 
-  VRPOptimizer, 
-  RouteOptimizer,
-  calculateDistance,
-  calculateRouteDistance
+  VRPSolver,
+  RealTimeRouteOptimizer as RouteOptimizer,
+  FabZCleanRouteOptimizer as VRPOptimizer,
+  DistanceCalculator
 } from '../algorithms/route-algorithms';
+
+// Helper functions
+function calculateDistance(point1: { latitude: number; longitude: number }, point2: { latitude: number; longitude: number }): number {
+  return DistanceCalculator.haversineDistance(point1, point2);
+}
+
+function calculateRouteDistance(points: any[]): number {
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    total += calculateDistance(points[i], points[i + 1]);
+  }
+  return total;
+}
 
 export interface DeliveryLocation {
   id: string;

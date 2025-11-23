@@ -34,6 +34,7 @@ export default defineConfig({
   esbuild: {
     target: 'es2020',
     logOverride: { 'this-is-undefined-in-esm': 'silent' },
+    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
   },
   optimizeDeps: {
     include: ['react', 'react-dom'],

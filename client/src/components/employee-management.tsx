@@ -10,30 +10,28 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
-import { 
-  Plus, 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { employeesApi } from '@/lib/data-service';
+import { useAuth } from '@/contexts/auth-context';
+import {
+  Plus,
+  User,
+  Mail,
+  Phone,
   DollarSign,
-  Clock,
-  Calendar,
   Eye,
   Edit,
-  Trash2,
   Download,
   FileText,
   Users,
-  Briefcase,
-  GraduationCap
+  Shield
 } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
 
 interface Employee {
   id: string;
   employeeId: string;
-  name: string;
+  fullName: string;
   email: string;
   phone: string;
   address: string;
@@ -49,25 +47,23 @@ interface Employee {
   qualifications: string;
   notes: string;
   createdAt: string;
+  role: string;
 }
 
-interface EmployeeManagementProps {
-  onEmployeeCreated?: (employee: Employee) => void;
-  onEmployeeUpdated?: (employee: Employee) => void;
-}
-
-export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdated }: EmployeeManagementProps) {
+export default function EmployeeManagement() {
   const { toast } = useToast();
   const { addNotification } = useNotifications();
-  
+  const queryClient = useQueryClient();
+  const { employee: currentUser } = useAuth();
+
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
-  
+
   // Form state
   const [employeeForm, setEmployeeForm] = useState({
-    name: '',
+    fullName: '',
     email: '',
     phone: '',
     address: '',
@@ -82,82 +78,83 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
     qualifications: '',
     notes: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    role: 'employee'
   });
 
-  // Demo employee data
-  const [employees, setEmployees] = useState<Employee[]>([
-    {
-      id: '1',
-      employeeId: 'EMP-001',
-      name: 'Sarah Johnson',
-      email: 'sarah.johnson@fabzclean.com',
-      phone: '+91 98765 43210',
-      address: '123 Main St, Bangalore, KA 560001',
-      position: 'Dry Cleaning Specialist',
-      department: 'Operations',
-      hireDate: '2024-01-15',
-      salaryType: 'monthly',
-      baseSalary: 45000,
-      workingHours: 8,
-      status: 'active',
-      emergencyContact: 'John Johnson - +91 98765 43211',
-      qualifications: 'Bachelor in Textile Engineering, 3 years experience',
-      notes: 'Excellent performance, team player',
-      createdAt: '2024-01-15T00:00:00Z'
+  // Fetch employees
+  const { data: employees = [], isLoading } = useQuery({
+    queryKey: ['employees'],
+    queryFn: () => employeesApi.getAll(),
+  });
+
+  // Mutations
+  const createEmployeeMutation = useMutation({
+    mutationFn: (data: Partial<Employee> & { password?: string; username?: string }) => employeesApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      setIsCreateDialogOpen(false);
+      toast({ title: "Success", description: "Employee created successfully" });
+      resetForm();
     },
-    {
-      id: '2',
-      employeeId: 'EMP-002',
-      name: 'Mike Chen',
-      email: 'mike.chen@fabzclean.com',
-      phone: '+91 98765 43212',
-      address: '456 Oak Ave, Bangalore, KA 560002',
-      position: 'Delivery Driver',
-      department: 'Logistics',
-      hireDate: '2024-02-01',
-      salaryType: 'hourly',
-      baseSalary: 0,
-      hourlyRate: 250,
-      workingHours: 8,
-      status: 'active',
-      emergencyContact: 'Lisa Chen - +91 98765 43213',
-      qualifications: 'Valid Driving License, 5 years experience',
-      notes: 'Reliable driver, good customer service',
-      createdAt: '2024-02-01T00:00:00Z'
+    onError: (error) => {
+      toast({ title: "Error", description: "Failed to create employee", variant: "destructive" });
     }
-  ]);
+  });
+
+  const updateEmployeeMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Employee> }) => employeesApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      setIsEditDialogOpen(false);
+      toast({ title: "Success", description: "Employee updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: "Failed to update employee", variant: "destructive" });
+    }
+  });
 
   const departments = ['Operations', 'Logistics', 'Customer Service', 'Quality Control', 'Management'];
   const positions = [
-    'Dry Cleaning Specialist', 'Driver', 'Customer Service Representative', 
+    'Dry Cleaning Specialist', 'Driver', 'Customer Service Representative',
     'Quality Inspector', 'Machine Operator', 'Supervisor', 'Manager'
   ];
 
+  // Determine available roles based on current user
+  const getAvailableRoles = () => {
+    if (!currentUser) return [];
+    if (currentUser.role === 'admin') {
+      return ['admin', 'franchise_manager', 'factory_manager', 'employee', 'driver'];
+    }
+    if (['franchise_manager', 'factory_manager'].includes(currentUser.role)) {
+      return ['employee', 'driver'];
+    }
+    return [];
+  };
+
+  const resetForm = () => {
+    setEmployeeForm({
+      fullName: '', email: '', phone: '', address: '', position: '', department: '',
+      hireDate: '', salaryType: 'monthly', baseSalary: '', hourlyRate: '',
+      workingHours: '8', emergencyContact: '', qualifications: '', notes: '',
+      password: '', confirmPassword: '', role: 'employee'
+    });
+  };
+
   const handleCreateEmployee = () => {
-    // Validation
-    if (!employeeForm.name || !employeeForm.email || !employeeForm.phone || !employeeForm.position) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
+    if (!employeeForm.fullName || !employeeForm.email || !employeeForm.phone || !employeeForm.position) {
+      toast({ title: "Validation Error", description: "Please fill in all required fields.", variant: "destructive" });
       return;
     }
 
     if (employeeForm.password !== employeeForm.confirmPassword) {
-      toast({
-        title: "Password Mismatch",
-        description: "Passwords do not match.",
-        variant: "destructive",
-      });
+      toast({ title: "Password Mismatch", description: "Passwords do not match.", variant: "destructive" });
       return;
     }
 
-    const newEmployee: Employee = {
-      id: `emp-${Date.now()}`,
-      employeeId: `EMP-${String(employees.length + 1).padStart(3, '0')}`,
-      name: employeeForm.name,
+    createEmployeeMutation.mutate({
+      username: employeeForm.email, // Use email as username
+      fullName: employeeForm.fullName,
       email: employeeForm.email,
       phone: employeeForm.phone,
       address: employeeForm.address,
@@ -172,52 +169,31 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
       emergencyContact: employeeForm.emergencyContact,
       qualifications: employeeForm.qualifications,
       notes: employeeForm.notes,
-      createdAt: new Date().toISOString()
-    };
-
-    setEmployees([...employees, newEmployee]);
-    onEmployeeCreated?.(newEmployee);
-
-    addNotification({
-      type: 'success',
-      title: 'Employee Created Successfully!',
-      message: `${newEmployee.name} has been added to the system with ID ${newEmployee.employeeId}`,
-    });
-
-    toast({
-      title: "Employee Created",
-      description: `${newEmployee.name} has been successfully added.`,
-    });
-
-    // Reset form
-    setEmployeeForm({
-      name: '', email: '', phone: '', address: '', position: '', department: '',
-      hireDate: '', salaryType: 'monthly', baseSalary: '', hourlyRate: '',
-      workingHours: '8', emergencyContact: '', qualifications: '', notes: '',
-      password: '', confirmPassword: ''
-    });
-    setIsCreateDialogOpen(false);
+      role: employeeForm.role,
+      password: employeeForm.password
+    } as any);
   };
 
   const handleEditEmployee = (employee: Employee) => {
     setSelectedEmployee(employee);
     setEmployeeForm({
-      name: employee.name,
+      fullName: employee.fullName,
       email: employee.email,
       phone: employee.phone,
       address: employee.address,
       position: employee.position,
       department: employee.department,
-      hireDate: employee.hireDate,
+      hireDate: employee.hireDate ? new Date(employee.hireDate).toISOString().split('T')[0] : '',
       salaryType: employee.salaryType,
-      baseSalary: employee.baseSalary.toString(),
+      baseSalary: employee.baseSalary?.toString() || '',
       hourlyRate: employee.hourlyRate?.toString() || '',
-      workingHours: employee.workingHours.toString(),
+      workingHours: employee.workingHours?.toString() || '8',
       emergencyContact: employee.emergencyContact,
       qualifications: employee.qualifications,
       notes: employee.notes,
       password: '',
-      confirmPassword: ''
+      confirmPassword: '',
+      role: employee.role
     });
     setIsEditDialogOpen(true);
   };
@@ -225,41 +201,34 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
   const handleUpdateEmployee = () => {
     if (!selectedEmployee) return;
 
-    const updatedEmployee: Employee = {
-      ...selectedEmployee,
-      name: employeeForm.name,
-      email: employeeForm.email,
-      phone: employeeForm.phone,
-      address: employeeForm.address,
-      position: employeeForm.position,
-      department: employeeForm.department,
-      hireDate: employeeForm.hireDate,
-      salaryType: employeeForm.salaryType,
-      baseSalary: employeeForm.salaryType === 'monthly' ? parseFloat(employeeForm.baseSalary) : 0,
-      hourlyRate: employeeForm.salaryType === 'hourly' ? parseFloat(employeeForm.hourlyRate) : undefined,
-      workingHours: parseInt(employeeForm.workingHours),
-      emergencyContact: employeeForm.emergencyContact,
-      qualifications: employeeForm.qualifications,
-      notes: employeeForm.notes
-    };
-
-    setEmployees(employees.map(emp => emp.id === selectedEmployee.id ? updatedEmployee : emp));
-    onEmployeeUpdated?.(updatedEmployee);
-
-    toast({
-      title: "Employee Updated",
-      description: `${updatedEmployee.name}'s information has been updated.`,
+    updateEmployeeMutation.mutate({
+      id: selectedEmployee.id,
+      data: {
+        fullName: employeeForm.fullName,
+        email: employeeForm.email,
+        phone: employeeForm.phone,
+        address: employeeForm.address,
+        position: employeeForm.position,
+        department: employeeForm.department,
+        hireDate: employeeForm.hireDate,
+        salaryType: employeeForm.salaryType,
+        baseSalary: employeeForm.salaryType === 'monthly' ? parseFloat(employeeForm.baseSalary) : 0,
+        hourlyRate: employeeForm.salaryType === 'hourly' ? parseFloat(employeeForm.hourlyRate) : undefined,
+        workingHours: parseInt(employeeForm.workingHours),
+        emergencyContact: employeeForm.emergencyContact,
+        qualifications: employeeForm.qualifications,
+        notes: employeeForm.notes,
+        role: employeeForm.role
+      }
     });
-
-    setIsEditDialogOpen(false);
-    setSelectedEmployee(null);
   };
 
   const exportAttendanceData = () => {
     // Generate CSV data
-    const csvData = employees.map(emp => ({
+    const csvData = employees.map((emp: any) => ({
       'Employee ID': emp.employeeId,
-      'Name': emp.name,
+      'Name': emp.fullName,
+      'Role': emp.role,
       'Position': emp.position,
       'Department': emp.department,
       'Hire Date': emp.hireDate,
@@ -272,10 +241,9 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
 
     const csv = [
       Object.keys(csvData[0]).join(','),
-      ...csvData.map(row => Object.values(row).join(','))
+      ...csvData.map((row: any) => Object.values(row).join(','))
     ].join('\n');
 
-    // Download CSV
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -286,11 +254,7 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
 
-    toast({
-      title: "Export Successful",
-      description: "Employee data has been exported successfully.",
-    });
-
+    toast({ title: "Export Successful", description: "Employee data has been exported successfully." });
     setIsExportDialogOpen(false);
   };
 
@@ -308,9 +272,9 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Employee Management</h2>
+          <h2 className="text-2xl font-bold tracking-tight">User Management</h2>
           <p className="text-muted-foreground">
-            Manage your team members, their information, and compensation
+            Manage system users, employees, and their access roles
           </p>
         </div>
         <div className="flex gap-2">
@@ -322,17 +286,17 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
             <DialogTrigger asChild>
               <Button>
                 <Plus className="w-4 h-4 mr-2" />
-                Add Employee
+                Add User
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <User className="w-5 h-5" />
-                  Create New Employee
+                  Create New User
                 </DialogTitle>
               </DialogHeader>
-              
+
               <Tabs defaultValue="personal" className="space-y-4">
                 <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="personal">Personal Info</TabsTrigger>
@@ -349,8 +313,8 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
                       <Input
                         id="name"
                         placeholder="Enter full name"
-                        value={employeeForm.name}
-                        onChange={(e) => setEmployeeForm({...employeeForm, name: e.target.value})}
+                        value={employeeForm.fullName}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, fullName: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
@@ -360,11 +324,11 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
                         type="email"
                         placeholder="Enter email address"
                         value={employeeForm.email}
-                        onChange={(e) => setEmployeeForm({...employeeForm, email: e.target.value})}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })}
                       />
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="phone">Phone Number *</Label>
@@ -372,7 +336,7 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
                         id="phone"
                         placeholder="Enter phone number"
                         value={employeeForm.phone}
-                        onChange={(e) => setEmployeeForm({...employeeForm, phone: e.target.value})}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, phone: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
@@ -381,28 +345,18 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
                         id="emergencyContact"
                         placeholder="Name and phone number"
                         value={employeeForm.emergencyContact}
-                        onChange={(e) => setEmployeeForm({...employeeForm, emergencyContact: e.target.value})}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, emergencyContact: e.target.value })}
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="address">Address</Label>
                     <Textarea
                       id="address"
                       placeholder="Enter full address"
                       value={employeeForm.address}
-                      onChange={(e) => setEmployeeForm({...employeeForm, address: e.target.value})}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="qualifications">Qualifications & Experience</Label>
-                    <Textarea
-                      id="qualifications"
-                      placeholder="Educational background, certifications, work experience..."
-                      value={employeeForm.qualifications}
-                      onChange={(e) => setEmployeeForm({...employeeForm, qualifications: e.target.value})}
+                      onChange={(e) => setEmployeeForm({ ...employeeForm, address: e.target.value })}
                     />
                   </div>
                 </TabsContent>
@@ -411,21 +365,21 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
                 <TabsContent value="work" className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="position">Position *</Label>
-                      <Select value={employeeForm.position} onValueChange={(value) => setEmployeeForm({...employeeForm, position: value})}>
+                      <Label htmlFor="role">System Role *</Label>
+                      <Select value={employeeForm.role} onValueChange={(value) => setEmployeeForm({ ...employeeForm, role: value })}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select position" />
+                          <SelectValue placeholder="Select role" />
                         </SelectTrigger>
                         <SelectContent>
-                          {positions.map((position) => (
-                            <SelectItem key={position} value={position}>{position}</SelectItem>
+                          {getAvailableRoles().map((role) => (
+                            <SelectItem key={role} value={role}>{role.replace('_', ' ').toUpperCase()}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="department">Department</Label>
-                      <Select value={employeeForm.department} onValueChange={(value) => setEmployeeForm({...employeeForm, department: value})}>
+                      <Select value={employeeForm.department} onValueChange={(value) => setEmployeeForm({ ...employeeForm, department: value })}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select department" />
                         </SelectTrigger>
@@ -437,37 +391,30 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
                       </Select>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="position">Position *</Label>
+                      <Select value={employeeForm.position} onValueChange={(value) => setEmployeeForm({ ...employeeForm, position: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select position" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {positions.map((position) => (
+                            <SelectItem key={position} value={position}>{position}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="hireDate">Hire Date *</Label>
                       <Input
                         id="hireDate"
                         type="date"
                         value={employeeForm.hireDate}
-                        onChange={(e) => setEmployeeForm({...employeeForm, hireDate: e.target.value})}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, hireDate: e.target.value })}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="workingHours">Working Hours per Day</Label>
-                      <Input
-                        id="workingHours"
-                        type="number"
-                        placeholder="8"
-                        value={employeeForm.workingHours}
-                        onChange={(e) => setEmployeeForm({...employeeForm, workingHours: e.target.value})}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="notes">Notes</Label>
-                    <Textarea
-                      id="notes"
-                      placeholder="Additional notes about the employee..."
-                      value={employeeForm.notes}
-                      onChange={(e) => setEmployeeForm({...employeeForm, notes: e.target.value})}
-                    />
                   </div>
                 </TabsContent>
 
@@ -475,7 +422,7 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
                 <TabsContent value="compensation" className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="salaryType">Salary Type *</Label>
-                    <Select value={employeeForm.salaryType} onValueChange={(value: 'hourly' | 'monthly') => setEmployeeForm({...employeeForm, salaryType: value})}>
+                    <Select value={employeeForm.salaryType} onValueChange={(value: 'hourly' | 'monthly') => setEmployeeForm({ ...employeeForm, salaryType: value })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -485,7 +432,7 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   {employeeForm.salaryType === 'monthly' ? (
                     <div className="space-y-2">
                       <Label htmlFor="baseSalary">Monthly Salary (₹) *</Label>
@@ -494,7 +441,7 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
                         type="number"
                         placeholder="Enter monthly salary"
                         value={employeeForm.baseSalary}
-                        onChange={(e) => setEmployeeForm({...employeeForm, baseSalary: e.target.value})}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, baseSalary: e.target.value })}
                       />
                     </div>
                   ) : (
@@ -505,39 +452,10 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
                         type="number"
                         placeholder="Enter hourly rate"
                         value={employeeForm.hourlyRate}
-                        onChange={(e) => setEmployeeForm({...employeeForm, hourlyRate: e.target.value})}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, hourlyRate: e.target.value })}
                       />
                     </div>
                   )}
-                  
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <h4 className="font-semibold mb-2">Salary Calculation Preview</h4>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span>Type:</span>
-                        <span className="capitalize">{employeeForm.salaryType}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Rate:</span>
-                        <span>
-                          {employeeForm.salaryType === 'monthly' 
-                            ? formatCurrency(parseFloat(employeeForm.baseSalary || '0'))
-                            : `₹${employeeForm.hourlyRate || '0'}/hour`
-                          }
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Working Hours:</span>
-                        <span>{employeeForm.workingHours} hours/day</span>
-                      </div>
-                      {employeeForm.salaryType === 'hourly' && employeeForm.hourlyRate && (
-                        <div className="flex justify-between">
-                          <span>Daily Wage:</span>
-                          <span>{formatCurrency(parseFloat(employeeForm.hourlyRate) * parseInt(employeeForm.workingHours))}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </TabsContent>
 
                 {/* Security Tab */}
@@ -550,7 +468,7 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
                         type="password"
                         placeholder="Enter password"
                         value={employeeForm.password}
-                        onChange={(e) => setEmployeeForm({...employeeForm, password: e.target.value})}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
@@ -560,26 +478,16 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
                         type="password"
                         placeholder="Confirm password"
                         value={employeeForm.confirmPassword}
-                        onChange={(e) => setEmployeeForm({...employeeForm, confirmPassword: e.target.value})}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, confirmPassword: e.target.value })}
                       />
                     </div>
-                  </div>
-                  
-                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <h4 className="font-semibold mb-2 text-blue-800 dark:text-blue-400">Security Information</h4>
-                    <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-                      <li>• Employee will use this password to login to their dashboard</li>
-                      <li>• They can change their password after first login</li>
-                      <li>• Password should be at least 8 characters long</li>
-                      <li>• Employee ID will be auto-generated</li>
-                    </ul>
                   </div>
                 </TabsContent>
               </Tabs>
 
               <div className="flex gap-2 pt-4">
-                <Button onClick={handleCreateEmployee} className="flex-1">
-                  Create Employee
+                <Button onClick={handleCreateEmployee} className="flex-1" disabled={createEmployeeMutation.isPending}>
+                  {createEmployeeMutation.isPending ? "Creating..." : "Create User"}
                 </Button>
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
@@ -595,144 +503,93 @@ export default function EmployeeManagement({ onEmployeeCreated, onEmployeeUpdate
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="w-5 h-5" />
-            Employee Directory ({employees.length})
+            User Directory ({employees.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {employees.map((employee) => (
-              <div key={employee.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-                    <span className="text-lg font-medium text-primary-foreground">
-                      {employee.name.split(' ').map(n => n[0]).join('')}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{employee.name}</h3>
-                      <Badge className={getStatusColor(employee.status)}>
-                        {employee.status}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {employee.position} • {employee.department} • {employee.employeeId}
-                    </p>
-                    <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Mail className="w-3 h-3" />
-                        {employee.email}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Phone className="w-3 h-3" />
-                        {employee.phone}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <DollarSign className="w-3 h-3" />
-                        {employee.salaryType === 'monthly' 
-                          ? formatCurrency(employee.baseSalary) + '/month'
-                          : `₹${employee.hourlyRate}/hour`
-                        }
+          {isLoading ? (
+            <div className="text-center py-4">Loading users...</div>
+          ) : (
+            <div className="space-y-4">
+              {employees.map((employee: any) => (
+                <div key={employee.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
+                      <span className="text-lg font-medium text-primary-foreground">
+                        {employee.fullName ? employee.fullName.split(' ').map((n: string) => n[0]).join('') : 'U'}
                       </span>
                     </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold">{employee.fullName}</h3>
+                        <Badge variant="outline" className="ml-2">
+                          <Shield className="w-3 h-3 mr-1" />
+                          {employee.role}
+                        </Badge>
+                        <Badge className={getStatusColor(employee.status)}>
+                          {employee.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {employee.position} • {employee.department} • {employee.employeeId}
+                      </p>
+                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Mail className="w-3 h-3" />
+                          {employee.email}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Phone className="w-3 h-3" />
+                          {employee.phone}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleEditEmployee(employee)}>
+                      <Edit className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
-                
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleEditEmployee(employee)}>
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Edit Employee Dialog */}
+      {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Edit className="w-5 h-5" />
-              Edit Employee: {selectedEmployee?.name}
-            </DialogTitle>
+            <DialogTitle>Edit User</DialogTitle>
           </DialogHeader>
-          
-          {/* Similar form structure as create, but with update functionality */}
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-name">Full Name</Label>
+                <Label>Full Name</Label>
                 <Input
-                  id="edit-name"
-                  value={employeeForm.name}
-                  onChange={(e) => setEmployeeForm({...employeeForm, name: e.target.value})}
+                  value={employeeForm.fullName}
+                  onChange={(e) => setEmployeeForm({ ...employeeForm, fullName: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-email">Email</Label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  value={employeeForm.email}
-                  onChange={(e) => setEmployeeForm({...employeeForm, email: e.target.value})}
-                />
+                <Label>Role</Label>
+                <Select value={employeeForm.role} onValueChange={(value) => setEmployeeForm({ ...employeeForm, role: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getAvailableRoles().map((role) => (
+                      <SelectItem key={role} value={role}>{role.replace('_', ' ').toUpperCase()}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            
-            {/* Add more form fields as needed */}
-            
-            <div className="flex gap-2 pt-4">
-              <Button onClick={handleUpdateEmployee} className="flex-1">
-                Update Employee
-              </Button>
-              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Export Dialog */}
-      <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Download className="w-5 h-5" />
-              Export Employee Data
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Export all employee information including personal details, work information, and compensation data.
-            </p>
-            
-            <div className="p-4 bg-muted/50 rounded-lg">
-              <h4 className="font-semibold mb-2">Export Options</h4>
-              <ul className="text-sm space-y-1">
-                <li>• Employee personal information</li>
-                <li>• Work details and position</li>
-                <li>• Salary and compensation data</li>
-                <li>• Hire date and status</li>
-                <li>• Contact information</li>
-              </ul>
-            </div>
-            
-            <div className="flex gap-2">
-              <Button onClick={exportAttendanceData} className="flex-1">
-                <FileText className="w-4 h-4 mr-2" />
-                Export as CSV
-              </Button>
-              <Button variant="outline" onClick={() => setIsExportDialogOpen(false)}>
-                Cancel
-              </Button>
-            </div>
+            <Button onClick={handleUpdateEmployee} className="w-full" disabled={updateEmployeeMutation.isPending}>
+              {updateEmployeeMutation.isPending ? "Updating..." : "Update User"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

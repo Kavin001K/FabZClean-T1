@@ -219,6 +219,20 @@ export class SerializationService {
       camelCase: true
     });
 
+    // Convert totalSpent to number if it's a string
+    if (serialized.totalSpent !== undefined) {
+      serialized.totalSpent = typeof serialized.totalSpent === 'string' 
+        ? parseFloat(serialized.totalSpent) 
+        : serialized.totalSpent;
+    }
+
+    // Convert totalOrders to number if it's a string
+    if (serialized.totalOrders !== undefined) {
+      serialized.totalOrders = typeof serialized.totalOrders === 'string' 
+        ? parseInt(serialized.totalOrders) 
+        : serialized.totalOrders;
+    }
+
     // Handle loyalty points
     if (includeLoyalty && customer.loyaltyPoints !== undefined) {
       serialized.loyaltyPoints = parseInt(customer.loyaltyPoints) || 0;
@@ -289,12 +303,20 @@ export class SerializationService {
   }
 }
 
-// Export commonly used serialization functions
-export const serializeOrder = SerializationService.serializeOrder;
-export const serializeCustomer = SerializationService.serializeCustomer;
-export const serializeProduct = SerializationService.serializeProduct;
-export const serializeDelivery = SerializationService.serializeDelivery;
-export const createPaginatedResponse = SerializationService.createPaginatedResponse;
-export const createSearchResponse = SerializationService.createSearchResponse;
-export const createErrorResponse = SerializationService.createErrorResponse;
-export const createSuccessResponse = SerializationService.createSuccessResponse;
+// Export commonly used serialization functions with proper binding
+export const serializeOrder = (order: any, includeCustomer = true, includeServices = true) => 
+  SerializationService.serializeOrder(order, includeCustomer, includeServices);
+export const serializeCustomer = (customer: any, includeLoyalty = true) => 
+  SerializationService.serializeCustomer(customer, includeLoyalty);
+export const serializeProduct = (product: any) => 
+  SerializationService.serializeProduct(product);
+export const serializeDelivery = (delivery: any, includeDriver = true, includeRoute = false) => 
+  SerializationService.serializeDelivery(delivery, includeDriver, includeRoute);
+export const createPaginatedResponse = (data: any[], options: any, serializationOptions?: any) => 
+  SerializationService.createPaginatedResponse(data, options, serializationOptions);
+export const createSearchResponse = (data: any[], query: string, options: any, serializationOptions?: any) => 
+  SerializationService.createSearchResponse(data, query, options, serializationOptions);
+export const createErrorResponse = (message: string, statusCode: number = 500, error?: any) => 
+  SerializationService.createErrorResponse(message, statusCode, error);
+export const createSuccessResponse = (data: any, message?: string, meta?: any) => 
+  SerializationService.createSuccessResponse(data, message, meta);

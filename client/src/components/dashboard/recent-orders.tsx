@@ -70,7 +70,8 @@ export default React.memo(function RecentOrders({
   showViewAll = true,
   className 
 }: RecentOrdersProps) {
-  const displayOrders = orders.slice(0, limit);
+  // Ensure orders is an array before calling slice
+  const displayOrders = Array.isArray(orders) ? orders.slice(0, limit) : [];
 
   if (isLoading) {
     return (

@@ -131,7 +131,8 @@ export function safeSlice<T>(
   start = 0,
   end?: number
 ): T[] {
-  const safeArray = arr || [];
+  // Ensure it's actually an array before calling slice
+  const safeArray = Array.isArray(arr) ? arr : [];
   return safeArray.slice(start, end);
 }
 

@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { useWebSocket } from '@/hooks/use-websocket';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { getWebSocketUrl } from '@/api/axios';
 
 interface RealtimeContextType {
   analyticsData: any;
@@ -16,8 +17,13 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [analyticsData, setAnalyticsData] = useState(null);
   const [driverLocations, setDriverLocations] = useState([]);
 
+  // Get WebSocket URL that automatically handles production (wss://) vs development (ws://)
+  // On Vercel, this will use wss:// automatically when on HTTPS
+  const wsUrl = useMemo(() => getWebSocketUrl(), []);
+  
   const { subscribe } = useWebSocket({
-    url: `ws://${window.location.hostname}:3003`,
+    url: wsUrl,
+    maxReconnectAttempts: 5, // Enable reconnection in production but with limit
     onMessage: (message) => {
       console.log('Realtime update:', message);
       const { type, data } = message;

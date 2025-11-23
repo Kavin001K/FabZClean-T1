@@ -9,30 +9,42 @@ import {
   mean,
 } from "@/lib/statistics";
 
-const defaultData = [
-  { name: "Pending", value: 400, status: "pending" },
-  { name: "In Progress", value: 300, status: "in_progress" },
-  { name: "Completed", value: 300, status: "completed" },
-];
-
-const COLORS = ["#FFBB28", "#00C49F", "#0088FE"];
+// ✅ Removed hardcoded defaultData - always use provided data or empty array
+const COLORS = ["#FFBB28", "#00C49F", "#0088FE", "#FF8042", "#8884D8", "#82CA9D"];
 const STATUS_ICONS: Record<string, any> = {
   pending: Clock,
   in_progress: Play,
+  processing: Play,
   completed: CheckCircle,
+  cancelled: TrendingDown,
+  delivered: CheckCircle,
 };
 
 interface OrderStatusChartProps {
-  data?: Array<{ status: string; value: number; name?: string }>;
+  data?: Array<{ status: string; value: number; name?: string; color?: string; percentage?: number }>;
   previousPeriodData?: Array<{ status: string; value: number }>;
 }
 
 export default function OrderStatusChart({ data, previousPeriodData }: OrderStatusChartProps) {
-  const chartData = data || defaultData;
+  // ✅ Safety: Always use provided data or empty array (no mock data)
+  const chartData = Array.isArray(data) && data.length > 0 ? data : [];
 
   // Calculate statistical metrics
   const statistics = useMemo(() => {
-    const total = chartData.reduce((sum, item) => sum + item.value, 0);
+    // ✅ Safety: Handle empty data
+    if (!Array.isArray(chartData) || chartData.length === 0) {
+      return {
+        total: 0,
+        completed: 0,
+        completionRate: 0,
+        distribution: [],
+        avgProcessingTime: 0,
+        completionGrowth: 0,
+        dominantStatus: { name: 'N/A', value: 0, status: 'unknown' },
+      };
+    }
+    
+    const total = chartData.reduce((sum, item) => sum + (item.value || 0), 0);
     const completed = chartData.find(item =>
       item.status === 'completed' || item.name?.toLowerCase().includes('completed')
     )?.value || 0;
@@ -102,8 +114,8 @@ export default function OrderStatusChart({ data, previousPeriodData }: OrderStat
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Order Status Distribution</span>
-          <Badge variant={statistics.completionRate >= 80 ? "default" : "secondary"}>
-            {statistics.completionRate.toFixed(1)}% Complete
+          <Badge variant={(statistics.completionRate ?? 0) >= 80 ? "default" : "secondary"}>
+            {(statistics.completionRate ?? 0).toFixed(1)}% Complete
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -119,7 +131,7 @@ export default function OrderStatusChart({ data, previousPeriodData }: OrderStat
             <div className="text-xs text-muted-foreground">Completed</div>
           </div>
           <div className="p-3 bg-muted rounded-lg text-center">
-            <div className="text-2xl font-bold">{statistics.completionRate.toFixed(0)}%</div>
+            <div className="text-2xl font-bold">{(statistics.completionRate ?? 0).toFixed(0)}%</div>
             <div className="text-xs text-muted-foreground">Success Rate</div>
           </div>
         </div>
@@ -132,7 +144,7 @@ export default function OrderStatusChart({ data, previousPeriodData }: OrderStat
               cx="50%"
               cy="50%"
               labelLine={false}
-              label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
+              label={({ name, percentage }) => `${name}: ${(percentage ?? 0).toFixed(1)}%`}
               outerRadius={100}
               fill="#8884d8"
               dataKey="value"
@@ -161,7 +173,7 @@ export default function OrderStatusChart({ data, previousPeriodData }: OrderStat
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-semibold">{item.value} orders</span>
-                  <Badge variant="outline">{item.percentage.toFixed(1)}%</Badge>
+                  <Badge variant="outline">{(item.percentage ?? 0).toFixed(1)}%</Badge>
                 </div>
               </div>
             );
@@ -180,7 +192,7 @@ export default function OrderStatusChart({ data, previousPeriodData }: OrderStat
               <span className="text-sm">Period Comparison</span>
             </div>
             <div className={`text-sm font-semibold ${statistics.completionGrowth > 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {statistics.completionGrowth > 0 ? '+' : ''}{statistics.completionGrowth.toFixed(1)}%
+              {statistics.completionGrowth > 0 ? '+' : ''}{(statistics.completionGrowth ?? 0).toFixed(1)}%
             </div>
           </div>
         )}
@@ -190,7 +202,7 @@ export default function OrderStatusChart({ data, previousPeriodData }: OrderStat
           {statistics.dominantStatus && statistics.dominantStatus.name && (
             <p>
               <strong>Dominant Status:</strong> {statistics.dominantStatus.name} with{' '}
-              {statistics.distribution.find(d => d.name === statistics.dominantStatus.name)?.percentage.toFixed(1)}% of orders
+              {(statistics.distribution.find(d => d.name === statistics.dominantStatus.name)?.percentage ?? 0).toFixed(1)}% of orders
             </p>
           )}
           {statistics.completionRate >= 90 && (

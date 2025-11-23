@@ -469,7 +469,7 @@ export default function Inventory() {
 
   const handleExportExcel = useCallback(() => {
     const filters = {
-      status: statusFilter,
+      status: stockStatusFilter,
       category: categoryFilter,
     };
     exportInventoryToExcel(filteredAndSortedInventory, filters);
@@ -477,7 +477,7 @@ export default function Inventory() {
       title: "Excel Export Successful",
       description: `Exported ${filteredAndSortedInventory.length} inventory items to Excel.`,
     });
-  }, [filteredAndSortedInventory, statusFilter, categoryFilter, toast]);
+  }, [filteredAndSortedInventory, stockStatusFilter, categoryFilter, toast]);
 
   // Bulk stock adjustment
   const handleBulkStockAdjustment = useCallback(() => {

@@ -120,14 +120,16 @@ export default function StatisticsDashboard({
     };
   }, [data, historicalData, showForecast, showAnomalies]);
 
-  // Format numbers for display
-  const formatNumber = (num: number, decimals: number = 2): string => {
-    if (Math.abs(num) >= 1000000) {
-      return `${(num / 1000000).toFixed(decimals)}M`;
-    } else if (Math.abs(num) >= 1000) {
-      return `${(num / 1000).toFixed(decimals)}K`;
+  // Format numbers for display with safe handling
+  const formatNumber = (num: number | undefined | null, decimals: number = 2): string => {
+    const safeNum = num ?? 0;
+    if (isNaN(safeNum) || !isFinite(safeNum)) return '0.00';
+    if (Math.abs(safeNum) >= 1000000) {
+      return `${(safeNum / 1000000).toFixed(decimals)}M`;
+    } else if (Math.abs(safeNum) >= 1000) {
+      return `${(safeNum / 1000).toFixed(decimals)}K`;
     }
-    return num.toFixed(decimals);
+    return safeNum.toFixed(decimals);
   };
 
   const formatCurrency = (num: number): string => {
@@ -171,7 +173,7 @@ export default function StatisticsDashboard({
             <Badge variant={stats.trend.direction === 'up' ? 'default' : 'secondary'}>
               <span className={stats.trend.color}>{stats.trend.arrow}</span>
               <span className="ml-1">
-                {Math.abs(stats.growth).toFixed(1)}%
+                {Math.abs(stats.growth ?? 0).toFixed(1)}%
               </span>
             </Badge>
           </CardTitle>
@@ -238,7 +240,7 @@ export default function StatisticsDashboard({
                   <div className="flex items-center gap-2">
                     <span className={`text-2xl font-bold ${stats.trend.color}`}>
                       {stats.growth > 0 ? '+' : ''}
-                      {stats.growth.toFixed(1)}%
+                      {(stats.growth ?? 0).toFixed(1)}%
                     </span>
                   </div>
                 </div>
@@ -352,7 +354,7 @@ export default function StatisticsDashboard({
                 <div className="text-sm text-muted-foreground mb-1">Change</div>
                 <div className={`text-2xl font-bold ${stats.trend.color}`}>
                   {stats.growth > 0 ? '+' : ''}
-                  {calculateGrowthRate(mean(data), mean(comparisonData)).toFixed(1)}%
+                  {(calculateGrowthRate(mean(data), mean(comparisonData)) ?? 0).toFixed(1)}%
                 </div>
                 <div className="text-xs text-muted-foreground">Growth</div>
               </div>
@@ -376,7 +378,7 @@ export default function StatisticsDashboard({
                 <TrendingUp className="h-4 w-4 text-green-600 mt-0.5" />
                 <p className="text-green-700">
                   {label} is showing an <strong>increasing trend</strong> with{' '}
-                  <strong>{stats.growth.toFixed(1)}%</strong> growth.
+                  <strong>{(stats.growth ?? 0).toFixed(1)}%</strong> growth.
                 </p>
               </div>
             )}
@@ -385,7 +387,7 @@ export default function StatisticsDashboard({
                 <TrendingDown className="h-4 w-4 text-red-600 mt-0.5" />
                 <p className="text-red-700">
                   {label} is showing a <strong>decreasing trend</strong> with{' '}
-                  <strong>{Math.abs(stats.growth).toFixed(1)}%</strong> decline.
+                  <strong>{Math.abs(stats.growth ?? 0).toFixed(1)}%</strong> decline.
                 </p>
               </div>
             )}
@@ -393,7 +395,7 @@ export default function StatisticsDashboard({
               <div className="flex items-start gap-2 p-2 bg-blue-50 rounded-lg text-sm">
                 <CheckCircle className="h-4 w-4 text-blue-600 mt-0.5" />
                 <p className="text-blue-700">
-                  Low variability detected (CV: {((stats.summary.stdDev / stats.summary.mean) * 100).toFixed(1)}
+                  Low variability detected (CV: {((stats.summary.stdDev / (stats.summary.mean || 1)) * 100).toFixed(1)}
                   %). {label} shows <strong>consistent performance</strong>.
                 </p>
               </div>
@@ -405,7 +407,7 @@ export default function StatisticsDashboard({
                   Forecast predicts <strong>{formatCurrency(stats.forecast[0])}</strong> for next
                   period, which is{' '}
                   <strong>
-                    {calculateGrowthRate(stats.forecast[0], stats.summary.mean).toFixed(1)}% higher
+                    {(calculateGrowthRate(stats.forecast[0], stats.summary.mean) ?? 0).toFixed(1)}% higher
                   </strong>{' '}
                   than current average.
                 </p>

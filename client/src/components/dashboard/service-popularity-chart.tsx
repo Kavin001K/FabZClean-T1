@@ -9,15 +9,7 @@ import {
   correlation,
 } from "@/lib/statistics";
 
-const defaultData = [
-  { name: "Dry Cleaning", orders: 4000, revenue: 80000 },
-  { name: "Premium Laundry", orders: 3000, revenue: 75000 },
-  { name: "Laundry By Kg", orders: 2000, revenue: 30000 },
-  { name: "Bags Clean", orders: 2780, revenue: 55600 },
-  { name: "FootWear Clean", orders: 1890, revenue: 37800 },
-  { name: "Steam Ironing", orders: 2390, revenue: 23900 },
-];
-
+// ✅ Removed hardcoded defaultData - always use provided data or empty array
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
 interface ServicePopularityChartProps {
@@ -27,13 +19,11 @@ interface ServicePopularityChartProps {
 
 export default function ServicePopularityChart({ data, previousPeriodData }: ServicePopularityChartProps) {
   const chartData = useMemo(() => {
-    if (!data || data.length === 0) {
-      return defaultData.map(item => ({
-        ...item,
-        value: item.orders,
-        fill: "hsl(var(--primary))"
-      }));
+    // ✅ Safety: Always use provided data or empty array (no mock data)
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return [];
     }
+    
     return data.map(item => ({
       ...item,
       value: item.value || item.orders || 0,
@@ -45,7 +35,24 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
 
   // Calculate comprehensive statistics
   const statistics = useMemo(() => {
-    const totalOrders = chartData.reduce((sum, item) => sum + item.orders, 0);
+    // ✅ Safety: Handle empty data
+    if (!Array.isArray(chartData) || chartData.length === 0) {
+      return {
+        servicesWithStats: [],
+        sortedByOrders: [],
+        sortedByRevenue: [],
+        totalOrders: 0,
+        totalRevenue: 0,
+        avgOrderValue: 0,
+        topService: null,
+        fastestGrowing: null,
+        orderRevenueCorrelation: 0,
+        avgOrders: 0,
+        avgRevenue: 0,
+      };
+    }
+    
+    const totalOrders = chartData.reduce((sum, item) => sum + (item.orders || 0), 0);
     const totalRevenue = chartData.reduce((sum, item) => sum + (item.revenue || 0), 0);
 
     // Calculate market share for each service
@@ -112,11 +119,11 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
           <div className="space-y-1 text-sm">
             <p>Orders: <span className="font-semibold">{data.orders}</span></p>
             <p>Revenue: <span className="font-semibold">₹{data.revenue?.toLocaleString()}</span></p>
-            <p>Market Share: <span className="font-semibold">{data.marketShare?.toFixed(1)}%</span></p>
-            <p>Avg Order: <span className="font-semibold">₹{data.avgOrderValue?.toFixed(0)}</span></p>
+            <p>Market Share: <span className="font-semibold">{(data.marketShare ?? 0).toFixed(1)}%</span></p>
+            <p>Avg Order: <span className="font-semibold">₹{(data.avgOrderValue ?? 0).toFixed(0)}</span></p>
             {data.growth !== 0 && (
               <p className={data.growth > 0 ? 'text-green-600' : 'text-red-600'}>
-                Growth: <span className="font-semibold">{data.growth > 0 ? '+' : ''}{data.growth.toFixed(1)}%</span>
+                Growth: <span className="font-semibold">{data.growth > 0 ? '+' : ''}{(data.growth ?? 0).toFixed(1)}%</span>
               </p>
             )}
           </div>
@@ -131,10 +138,12 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Service Popularity & Performance</span>
-          <Badge variant="default" className="flex items-center gap-1">
-            <Award className="h-3 w-3" />
-            {statistics.topService.name}
-          </Badge>
+          {statistics.topService && (
+            <Badge variant="default" className="flex items-center gap-1">
+              <Award className="h-3 w-3" />
+              {statistics.topService.name}
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -145,7 +154,7 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
             <div className="text-xs text-muted-foreground">Total Orders</div>
           </div>
           <div className="p-3 bg-muted rounded-lg text-center">
-            <div className="text-xl font-bold">₹{(statistics.totalRevenue / 1000).toFixed(0)}K</div>
+            <div className="text-xl font-bold">₹{((statistics.totalRevenue ?? 0) / 1000).toFixed(0)}K</div>
             <div className="text-xs text-muted-foreground">Total Revenue</div>
           </div>
           <div className="p-3 bg-muted rounded-lg text-center">
@@ -154,7 +163,7 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
           </div>
           <div className="p-3 bg-muted rounded-lg text-center">
             <div className="text-xl font-bold">
-              {(statistics.orderRevenueCorrelation * 100).toFixed(0)}%
+              {((statistics.orderRevenueCorrelation ?? 0) * 100).toFixed(0)}%
             </div>
             <div className="text-xs text-muted-foreground">Correlation</div>
           </div>
@@ -162,7 +171,7 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
 
         {/* Bar Chart */}
         <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={statistics.servicesWithStats}>
+          <BarChart data={statistics.servicesWithStats || []}>
             <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
             <XAxis
               dataKey="name"
@@ -179,7 +188,7 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
             />
             <Tooltip content={<CustomTooltip />} />
             <Bar dataKey="orders" radius={[8, 8, 0, 0]}>
-              {statistics.servicesWithStats.map((entry, index) => (
+              {(statistics.servicesWithStats || []).map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />
               ))}
               <LabelList dataKey="orders" position="top" fontSize={10} />
@@ -210,7 +219,7 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
                 <div className="text-right">
                   <div className="text-sm font-semibold">{service.orders} orders</div>
                   <div className="text-xs text-muted-foreground">
-                    {service.marketShare.toFixed(1)}% share
+                    {(service.marketShare ?? 0).toFixed(1)}% share
                   </div>
                 </div>
                 {service.growth !== 0 && (
@@ -218,7 +227,7 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
                     variant={service.growth > 0 ? "default" : "secondary"}
                     className="flex items-center gap-1"
                   >
-                    {service.growth > 0 ? '+' : ''}{service.growth.toFixed(1)}%
+                    {service.growth > 0 ? '+' : ''}{(service.growth ?? 0).toFixed(1)}%
                   </Badge>
                 )}
               </div>
@@ -235,7 +244,7 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
             </div>
             <p className="text-sm text-green-700">
               <strong>{statistics.fastestGrowing.name}</strong> is growing at{' '}
-              <strong>{statistics.fastestGrowing.growth.toFixed(1)}%</strong> compared to previous period
+              <strong>{(statistics.fastestGrowing.growth ?? 0).toFixed(1)}%</strong> compared to previous period
             </p>
           </div>
         )}
@@ -247,11 +256,11 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
             Market Share Analysis
           </h4>
           <div className="grid grid-cols-2 gap-2">
-            {statistics.servicesWithStats.map((service, index) => (
+            {(statistics.servicesWithStats || []).map((service, index) => (
               <div key={index} className="flex items-center justify-between text-xs p-2 bg-muted rounded">
                 <span className="truncate">{service.name}</span>
                 <Badge variant="outline" className="ml-2">
-                  {service.marketShare.toFixed(1)}%
+                  {(service.marketShare ?? 0).toFixed(1)}%
                 </Badge>
               </div>
             ))}
@@ -259,10 +268,10 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
         </div>
 
         {/* Correlation Insight */}
-        {statistics.orderRevenueCorrelation > 0.7 && (
+        {(statistics.orderRevenueCorrelation ?? 0) > 0.7 && (
           <div className="text-xs text-muted-foreground p-2 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-blue-700">
-              <strong>Strong correlation ({(statistics.orderRevenueCorrelation * 100).toFixed(0)}%)</strong>{' '}
+              <strong>Strong correlation ({((statistics.orderRevenueCorrelation ?? 0) * 100).toFixed(0)}%)</strong>{' '}
               between order volume and revenue indicates consistent pricing strategy.
             </p>
           </div>

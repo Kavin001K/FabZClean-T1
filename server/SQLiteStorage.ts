@@ -360,6 +360,34 @@ export class SQLiteStorage implements IStorage {
       CREATE INDEX IF NOT EXISTS idx_drivers_status ON drivers(status);
       CREATE INDEX IF NOT EXISTS idx_drivers_vehicleNumber ON drivers(vehicleNumber);
       CREATE INDEX IF NOT EXISTS idx_drivers_licenseNumber ON drivers(licenseNumber);
+
+      -- Authentication tables
+      CREATE TABLE IF NOT EXISTS auth_users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'user',
+        name TEXT,
+        is_active INTEGER DEFAULT 1,
+        last_login TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS auth_sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        token TEXT UNIQUE NOT NULL,
+        refresh_token TEXT UNIQUE,
+        expires_at TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES auth_users(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_auth_users_email ON auth_users(email);
+      CREATE INDEX IF NOT EXISTS idx_auth_sessions_token ON auth_sessions(token);
+      CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_auth_sessions_refresh_token ON auth_sessions(refresh_token);
     `);
   }
 
@@ -1744,6 +1772,126 @@ export class SQLiteStorage implements IStorage {
       .run(latitude, longitude, now, now, id);
 
     return this.getDriver(id);
+  }
+
+  // ======= AUTHENTICATION METHODS =======
+  
+  async createAuthUser(data: {
+    email: string;
+    passwordHash: string;
+    role?: string;
+    name?: string;
+  }): Promise<{ id: string; email: string; role: string; name?: string }> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    const role = data.role || 'user';
+
+    this.db
+      .prepare(
+        `INSERT INTO auth_users (id, email, password_hash, role, name, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 1, ?, ?)`
+      )
+      .run(id, data.email, data.passwordHash, role, data.name || null, now, now);
+
+    return { id, email: data.email, role, name: data.name };
+  }
+
+  async getAuthUserByEmail(email: string): Promise<{
+    id: string;
+    email: string;
+    password_hash: string;
+    role: string;
+    name?: string;
+    is_active: number;
+  } | null> {
+    const row = this.db
+      .prepare('SELECT * FROM auth_users WHERE email = ?')
+      .get(email) as any;
+
+    return row || null;
+  }
+
+  async getAuthUserById(id: string): Promise<{
+    id: string;
+    email: string;
+    role: string;
+    name?: string;
+    is_active: number;
+  } | null> {
+    const row = this.db
+      .prepare('SELECT id, email, role, name, is_active FROM auth_users WHERE id = ?')
+      .get(id) as any;
+
+    return row || null;
+  }
+
+  async updateAuthUserLastLogin(userId: string): Promise<void> {
+    const now = new Date().toISOString();
+    this.db
+      .prepare('UPDATE auth_users SET last_login = ?, updated_at = ? WHERE id = ?')
+      .run(now, now, userId);
+  }
+
+  async createSession(data: {
+    userId: string;
+    token: string;
+    refreshToken: string;
+    expiresAt: string;
+  }): Promise<void> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+
+    this.db
+      .prepare(
+        `INSERT INTO auth_sessions (id, user_id, token, refresh_token, expires_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .run(id, data.userId, data.token, data.refreshToken, data.expiresAt, now);
+  }
+
+  async getSessionByToken(token: string): Promise<{
+    id: string;
+    user_id: string;
+    token: string;
+    refresh_token: string;
+    expires_at: string;
+  } | null> {
+    const row = this.db
+      .prepare('SELECT * FROM auth_sessions WHERE token = ?')
+      .get(token) as any;
+
+    return row || null;
+  }
+
+  async getSessionByRefreshToken(refreshToken: string): Promise<{
+    id: string;
+    user_id: string;
+    token: string;
+    refresh_token: string;
+    expires_at: string;
+  } | null> {
+    const row = this.db
+      .prepare('SELECT * FROM auth_sessions WHERE refresh_token = ?')
+      .get(refreshToken) as any;
+
+    return row || null;
+  }
+
+  async deleteSession(token: string): Promise<void> {
+    this.db.prepare('DELETE FROM auth_sessions WHERE token = ?').run(token);
+  }
+
+  async deleteSessionByRefreshToken(refreshToken: string): Promise<void> {
+    this.db.prepare('DELETE FROM auth_sessions WHERE refresh_token = ?').run(refreshToken);
+  }
+
+  async deleteAllUserSessions(userId: string): Promise<void> {
+    this.db.prepare('DELETE FROM auth_sessions WHERE user_id = ?').run(userId);
+  }
+
+  async cleanupExpiredSessions(): Promise<void> {
+    const now = new Date().toISOString();
+    this.db.prepare('DELETE FROM auth_sessions WHERE expires_at < ?').run(now);
   }
 
   // Close database connection

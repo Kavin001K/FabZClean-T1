@@ -89,46 +89,46 @@ export function BalanceSheet() {
       [''],
       ['ASSETS'],
       ['Current Assets'],
-      ...data.assets.currentAssets.accounts.map((acc) => [
+      ...(data.assets?.currentAssets?.accounts || []).map((acc) => [
         `  ${acc.accountName}`,
         parseFloat(acc.balance).toFixed(2),
       ]),
-      ['Total Current Assets', data.assets.currentAssets.subtotal.toFixed(2)],
+      ['Total Current Assets', (data.assets?.currentAssets?.subtotal || 0).toFixed(2)],
       [''],
       ['Fixed Assets'],
-      ...data.assets.fixedAssets.accounts.map((acc) => [
+      ...(data.assets?.fixedAssets?.accounts || []).map((acc) => [
         `  ${acc.accountName}`,
         parseFloat(acc.balance).toFixed(2),
       ]),
-      ['Total Fixed Assets', data.assets.fixedAssets.subtotal.toFixed(2)],
+      ['Total Fixed Assets', (data.assets?.fixedAssets?.subtotal || 0).toFixed(2)],
       [''],
-      ['TOTAL ASSETS', data.assets.totalAssets.toFixed(2)],
+      ['TOTAL ASSETS', (data.assets?.totalAssets || 0).toFixed(2)],
       [''],
       ['LIABILITIES AND EQUITY'],
       ['Current Liabilities'],
-      ...data.liabilities.currentLiabilities.accounts.map((acc) => [
+      ...(data.liabilities?.currentLiabilities?.accounts || []).map((acc) => [
         `  ${acc.accountName}`,
         parseFloat(acc.balance).toFixed(2),
       ]),
-      ['Total Current Liabilities', data.liabilities.currentLiabilities.subtotal.toFixed(2)],
+      ['Total Current Liabilities', (data.liabilities?.currentLiabilities?.subtotal || 0).toFixed(2)],
       [''],
       ['Long-term Liabilities'],
-      ...data.liabilities.longTermLiabilities.accounts.map((acc) => [
+      ...(data.liabilities?.longTermLiabilities?.accounts || []).map((acc) => [
         `  ${acc.accountName}`,
         parseFloat(acc.balance).toFixed(2),
       ]),
-      ['Total Long-term Liabilities', data.liabilities.longTermLiabilities.subtotal.toFixed(2)],
+      ['Total Long-term Liabilities', (data.liabilities?.longTermLiabilities?.subtotal || 0).toFixed(2)],
       [''],
-      ['TOTAL LIABILITIES', data.liabilities.totalLiabilities.toFixed(2)],
+      ['TOTAL LIABILITIES', (data.liabilities?.totalLiabilities || 0).toFixed(2)],
       [''],
       ['EQUITY'],
-      ...data.equity.sections.flatMap((section) => [
-        [section.title],
-        ...section.accounts.map((acc) => [`  ${acc.accountName}`, parseFloat(acc.balance).toFixed(2)]),
+      ...(data.equity?.sections || []).filter(Boolean).flatMap((section) => [
+        [section.title || ''],
+        ...(section.accounts || []).map((acc) => [`  ${acc.accountName}`, parseFloat(acc.balance).toFixed(2)]),
       ]),
-      ['TOTAL EQUITY', data.equity.totalEquity.toFixed(2)],
+      ['TOTAL EQUITY', (data.equity?.totalEquity || 0).toFixed(2)],
       [''],
-      ['TOTAL LIABILITIES AND EQUITY', data.totalLiabilitiesAndEquity.toFixed(2)],
+      ['TOTAL LIABILITIES AND EQUITY', (data.totalLiabilitiesAndEquity || 0).toFixed(2)],
     ]
       .map((row) => row.join(','))
       .join('\n');
@@ -150,12 +150,12 @@ export function BalanceSheet() {
     const pdfData = {
       asOfDate: format(new Date(data.asOfDate), 'MMMM dd, yyyy'),
       assets: [
-        ...data.assets.currentAssets.accounts.map((acc) => ({
+        ...(data.assets?.currentAssets?.accounts || []).map((acc) => ({
           account: acc.accountCode,
           description: acc.accountName,
           amount: parseFloat(acc.balance),
         })),
-        ...data.assets.fixedAssets.accounts.map((acc) => ({
+        ...(data.assets?.fixedAssets?.accounts || []).map((acc) => ({
           account: acc.accountCode,
           description: acc.accountName,
           amount: parseFloat(acc.balance),
@@ -167,19 +167,19 @@ export function BalanceSheet() {
         })),
       ],
       liabilities: [
-        ...data.liabilities.currentLiabilities.accounts.map((acc) => ({
+        ...(data.liabilities?.currentLiabilities?.accounts || []).map((acc) => ({
           account: acc.accountCode,
           description: acc.accountName,
           amount: parseFloat(acc.balance),
         })),
-        ...data.liabilities.longTermLiabilities.accounts.map((acc) => ({
+        ...(data.liabilities?.longTermLiabilities?.accounts || []).map((acc) => ({
           account: acc.accountCode,
           description: acc.accountName,
           amount: parseFloat(acc.balance),
         })),
       ],
-      equity: data.equity.sections.flatMap((section) =>
-        section.accounts.map((acc) => ({
+      equity: (data.equity?.sections || []).filter(Boolean).flatMap((section) =>
+        (section.accounts || []).map((acc) => ({
           account: acc.accountCode,
           description: acc.accountName,
           amount: parseFloat(acc.balance),
@@ -191,37 +191,41 @@ export function BalanceSheet() {
     toast({ title: 'PDF exported successfully', description: 'Balance sheet has been downloaded as PDF' });
   };
 
-  const renderSection = (section: BalanceSheetSection, level: number = 0) => (
-    <>
-      {section.title && (
-        <TableRow className={level === 0 ? 'bg-muted/50 font-semibold' : 'bg-muted/30'}>
-          <TableCell colSpan={2} style={{ paddingLeft: `${level * 2 + 1}rem` }}>
-            {section.title}
-          </TableCell>
-        </TableRow>
-      )}
-      {section.accounts.map((account) => (
-        <TableRow key={account.accountId} className="hover:bg-muted/20">
-          <TableCell style={{ paddingLeft: `${(level + 1) * 2 + 1}rem` }}>
-            {account.accountName}
-          </TableCell>
-          <TableCell className="text-right font-medium">
-            ${formatUSD(account.balance)}
-          </TableCell>
-        </TableRow>
-      ))}
-      {section.subtotal > 0 && (
-        <TableRow className="font-semibold bg-muted/20">
-          <TableCell style={{ paddingLeft: `${level * 2 + 1}rem` }}>
-            Total {section.title}
-          </TableCell>
-          <TableCell className="text-right">
-            ${formatUSD(section.subtotal)}
-          </TableCell>
-        </TableRow>
-      )}
-    </>
-  );
+  const renderSection = (section: BalanceSheetSection | null | undefined, level: number = 0) => {
+    if (!section || !section.accounts) return null;
+    
+    return (
+      <>
+        {section.title && (
+          <TableRow className={level === 0 ? 'bg-muted/50 font-semibold' : 'bg-muted/30'}>
+            <TableCell colSpan={2} style={{ paddingLeft: `${level * 2 + 1}rem` }}>
+              {section.title}
+            </TableCell>
+          </TableRow>
+        )}
+        {section.accounts.map((account) => (
+          <TableRow key={account.accountId} className="hover:bg-muted/20">
+            <TableCell style={{ paddingLeft: `${(level + 1) * 2 + 1}rem` }}>
+              {account.accountName}
+            </TableCell>
+            <TableCell className="text-right font-medium">
+              ${formatUSD(account.balance)}
+            </TableCell>
+          </TableRow>
+        ))}
+        {section.subtotal > 0 && section.title && (
+          <TableRow className="font-semibold bg-muted/20">
+            <TableCell style={{ paddingLeft: `${level * 2 + 1}rem` }}>
+              Total {section.title}
+            </TableCell>
+            <TableCell className="text-right">
+              ${formatUSD(section.subtotal)}
+            </TableCell>
+          </TableRow>
+        )}
+      </>
+    );
+  };
 
   return (
     <Card>
@@ -291,7 +295,7 @@ export function BalanceSheet() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">
-                    ${formatUSD(data.assets.totalAssets)}
+                    ${formatUSD(data.assets?.totalAssets || 0)}
                   </div>
                 </CardContent>
               </Card>
@@ -302,7 +306,7 @@ export function BalanceSheet() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-600">
-                    ${formatUSD(data.liabilities.totalLiabilities)}
+                    ${formatUSD(data.liabilities?.totalLiabilities || 0)}
                   </div>
                 </CardContent>
               </Card>
@@ -313,7 +317,7 @@ export function BalanceSheet() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-blue-600">
-                    ${formatUSD(data.equity.totalEquity)}
+                    ${formatUSD(data.equity?.totalEquity || 0)}
                   </div>
                 </CardContent>
               </Card>
@@ -333,15 +337,15 @@ export function BalanceSheet() {
                     <TableCell colSpan={2}>ASSETS</TableCell>
                   </TableRow>
 
-                  {renderSection(data.assets.currentAssets)}
-                  {renderSection(data.assets.fixedAssets)}
-                  {data.assets.otherAssets.accounts.length > 0 &&
+                  {renderSection(data.assets?.currentAssets)}
+                  {renderSection(data.assets?.fixedAssets)}
+                  {data.assets?.otherAssets?.accounts && data.assets.otherAssets.accounts.length > 0 &&
                     renderSection(data.assets.otherAssets)}
 
                   <TableRow className="bg-primary/20 font-bold border-t-2">
                     <TableCell>TOTAL ASSETS</TableCell>
                     <TableCell className="text-right text-green-600">
-                      ${formatUSD(data.assets.totalAssets)}
+                      ${formatUSD(data.assets?.totalAssets || 0)}
                     </TableCell>
                   </TableRow>
 
@@ -355,13 +359,13 @@ export function BalanceSheet() {
                     <TableCell colSpan={2}>LIABILITIES AND EQUITY</TableCell>
                   </TableRow>
 
-                  {renderSection(data.liabilities.currentLiabilities)}
-                  {renderSection(data.liabilities.longTermLiabilities)}
+                  {renderSection(data.liabilities?.currentLiabilities)}
+                  {renderSection(data.liabilities?.longTermLiabilities)}
 
                   <TableRow className="bg-muted/50 font-bold border-t">
                     <TableCell>TOTAL LIABILITIES</TableCell>
                     <TableCell className="text-right text-red-600">
-                      ${formatUSD(data.liabilities.totalLiabilities)}
+                      ${formatUSD(data.liabilities?.totalLiabilities || 0)}
                     </TableCell>
                   </TableRow>
 
@@ -370,14 +374,14 @@ export function BalanceSheet() {
                     <TableCell colSpan={2}>EQUITY</TableCell>
                   </TableRow>
 
-                  {data.equity.sections.map((section, index) => (
+                  {(data.equity?.sections || []).filter(Boolean).map((section, index) => (
                     <React.Fragment key={index}>{renderSection(section, 1)}</React.Fragment>
                   ))}
 
                   <TableRow className="bg-muted/50 font-bold border-t">
                     <TableCell>TOTAL EQUITY</TableCell>
                     <TableCell className="text-right text-blue-600">
-                      ${formatUSD(data.equity.totalEquity)}
+                      ${formatUSD(data.equity?.totalEquity || 0)}
                     </TableCell>
                   </TableRow>
 
@@ -402,7 +406,7 @@ export function BalanceSheet() {
                   </p>
                 </div>
                 <div className="text-right">
-                  {Math.abs(data.assets.totalAssets - data.totalLiabilitiesAndEquity) < 0.01 ? (
+                  {Math.abs((data.assets?.totalAssets || 0) - (data.totalLiabilitiesAndEquity || 0)) < 0.01 ? (
                     <div className="flex items-center gap-2 text-green-600">
                       <TrendingUp className="h-5 w-5" />
                       <span className="font-bold">Balanced</span>
@@ -413,7 +417,7 @@ export function BalanceSheet() {
                       <span className="font-bold">
                         Out of Balance: $
                         {Math.abs(
-                          data.assets.totalAssets - data.totalLiabilitiesAndEquity
+                          (data.assets?.totalAssets || 0) - (data.totalLiabilitiesAndEquity || 0)
                         ).toFixed(2)}
                       </span>
                     </div>

@@ -84,6 +84,12 @@ interface IncomeStatementData {
   netProfitMargin: number;
 }
 
+// Helper function to safely format numbers
+const safeToFixed = (value: number | undefined | null, decimals: number = 2): string => {
+  if (value === undefined || value === null || isNaN(value)) return '0.00';
+  return value.toFixed(decimals);
+};
+
 export function IncomeStatement() {
   const [dateRange, setDateRange] = useState<'month' | 'quarter' | 'year' | 'custom'>('month');
   const [startDate, setStartDate] = useState<Date>(startOfMonth(new Date()));
@@ -123,7 +129,43 @@ export function IncomeStatement() {
         `/api/accounting/income-statement?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`
       );
       if (!response.ok) throw new Error('Failed to fetch income statement');
-      return response.json();
+      const json = await response.json();
+      // Ensure all sections are properly structured
+      return {
+        ...json,
+        revenue: {
+          sections: (json.revenue?.sections || []).filter(Boolean).map((s: any) => ({
+            ...s,
+            title: s.title || '',
+            accounts: s.accounts || [],
+          })),
+          totalRevenue: json.revenue?.totalRevenue || 0,
+        },
+        costOfGoodsSold: {
+          sections: (json.costOfGoodsSold?.sections || []).filter(Boolean).map((s: any) => ({
+            ...s,
+            title: s.title || '',
+            accounts: s.accounts || [],
+          })),
+          totalCOGS: json.costOfGoodsSold?.totalCOGS || 0,
+        },
+        operatingExpenses: {
+          sections: (json.operatingExpenses?.sections || []).filter(Boolean).map((s: any) => ({
+            ...s,
+            title: s.title || '',
+            accounts: s.accounts || [],
+          })),
+          totalOperatingExpenses: json.operatingExpenses?.totalOperatingExpenses || 0,
+        },
+        otherIncomeExpenses: {
+          sections: (json.otherIncomeExpenses?.sections || []).filter(Boolean).map((s: any) => ({
+            ...s,
+            title: s.title || '',
+            accounts: s.accounts || [],
+          })),
+          totalOther: json.otherIncomeExpenses?.totalOther || 0,
+        },
+      };
     },
   });
 
@@ -140,34 +182,34 @@ export function IncomeStatement() {
       ],
       [''],
       ['REVENUE'],
-      ...data.revenue.sections.flatMap((section) => [
-        [section.title],
-        ...section.accounts.map((acc) => [`  ${acc.accountName}`, acc.amount.toFixed(2)]),
+      ...(data.revenue?.sections || []).filter(Boolean).flatMap((section) => [
+        [section.title || ''],
+        ...(section.accounts || []).map((acc) => [`  ${acc.accountName}`, acc.amount.toFixed(2)]),
       ]),
-      ['Total Revenue', data.revenue.totalRevenue.toFixed(2)],
+      ['Total Revenue', (data.revenue?.totalRevenue || 0).toFixed(2)],
       [''],
       ['COST OF GOODS SOLD'],
-      ...data.costOfGoodsSold.sections.flatMap((section) => [
-        [section.title],
-        ...section.accounts.map((acc) => [`  ${acc.accountName}`, acc.amount.toFixed(2)]),
+      ...(data.costOfGoodsSold?.sections || []).filter(Boolean).flatMap((section) => [
+        [section.title || ''],
+        ...(section.accounts || []).map((acc) => [`  ${acc.accountName}`, acc.amount.toFixed(2)]),
       ]),
-      ['Total Cost of Goods Sold', data.costOfGoodsSold.totalCOGS.toFixed(2)],
+      ['Total Cost of Goods Sold', (data.costOfGoodsSold?.totalCOGS || 0).toFixed(2)],
       [''],
-      ['GROSS PROFIT', data.grossProfit.toFixed(2)],
-      ['Gross Profit Margin', `${data.grossProfitMargin.toFixed(2)}%`],
+      ['GROSS PROFIT', (data.grossProfit || 0).toFixed(2)],
+      ['Gross Profit Margin', `${(data.grossProfitMargin || 0).toFixed(2)}%`],
       [''],
       ['OPERATING EXPENSES'],
-      ...data.operatingExpenses.sections.flatMap((section) => [
-        [section.title],
-        ...section.accounts.map((acc) => [`  ${acc.accountName}`, acc.amount.toFixed(2)]),
+      ...(data.operatingExpenses?.sections || []).filter(Boolean).flatMap((section) => [
+        [section.title || ''],
+        ...(section.accounts || []).map((acc) => [`  ${acc.accountName}`, acc.amount.toFixed(2)]),
       ]),
-      ['Total Operating Expenses', data.operatingExpenses.totalOperatingExpenses.toFixed(2)],
+      ['Total Operating Expenses', (data.operatingExpenses?.totalOperatingExpenses || 0).toFixed(2)],
       [''],
-      ['OPERATING INCOME', data.operatingIncome.toFixed(2)],
-      ['Operating Margin', `${data.operatingMargin.toFixed(2)}%`],
+      ['OPERATING INCOME', (data.operatingIncome || 0).toFixed(2)],
+      ['Operating Margin', `${(data.operatingMargin || 0).toFixed(2)}%`],
       [''],
-      ['NET INCOME', data.netIncome.toFixed(2)],
-      ['Net Profit Margin', `${data.netProfitMargin.toFixed(2)}%`],
+      ['NET INCOME', (data.netIncome || 0).toFixed(2)],
+      ['Net Profit Margin', `${(data.netProfitMargin || 0).toFixed(2)}%`],
     ]
       .map((row) => row.join(','))
       .join('\n');
@@ -194,30 +236,30 @@ export function IncomeStatement() {
         new Date(data.endDate),
         'MMM dd, yyyy'
       )}`,
-      revenue: data.revenue.sections.flatMap((section) =>
-        section.accounts.map((acc) => ({
+      revenue: (data.revenue?.sections || []).filter(Boolean).flatMap((section) =>
+        (section.accounts || []).map((acc) => ({
           account: acc.accountCode,
           description: acc.accountName,
           amount: acc.amount,
         }))
       ),
       expenses: [
-        ...data.costOfGoodsSold.sections.flatMap((section) =>
-          section.accounts.map((acc) => ({
+        ...(data.costOfGoodsSold?.sections || []).filter(Boolean).flatMap((section) =>
+          (section.accounts || []).map((acc) => ({
             account: acc.accountCode,
             description: `COGS - ${acc.accountName}`,
             amount: acc.amount,
           }))
         ),
-        ...data.operatingExpenses.sections.flatMap((section) =>
-          section.accounts.map((acc) => ({
+        ...(data.operatingExpenses?.sections || []).filter(Boolean).flatMap((section) =>
+          (section.accounts || []).map((acc) => ({
             account: acc.accountCode,
             description: acc.accountName,
             amount: acc.amount,
           }))
         ),
-        ...(data.otherIncomeExpenses?.sections || []).flatMap((section: any) =>
-          section.accounts.map((acc: any) => ({
+        ...(data.otherIncomeExpenses?.sections || []).filter(Boolean).flatMap((section: any) =>
+          (section?.accounts || []).map((acc: any) => ({
             account: acc.accountCode,
             description: acc.accountName,
             amount: acc.amount,
@@ -230,27 +272,31 @@ export function IncomeStatement() {
     toast({ title: 'PDF exported successfully', description: 'Income statement has been downloaded as PDF' });
   };
 
-  const renderSection = (section: IncomeStatementSection, level: number = 0) => (
-    <>
-      {section.title && (
-        <TableRow className={level === 0 ? 'bg-muted/50 font-semibold' : 'bg-muted/30'}>
-          <TableCell colSpan={2} style={{ paddingLeft: `${level * 2 + 1}rem` }}>
-            {section.title}
-          </TableCell>
-        </TableRow>
-      )}
-      {section.accounts.map((account) => (
-        <TableRow key={account.accountId} className="hover:bg-muted/20">
-          <TableCell style={{ paddingLeft: `${(level + 1) * 2 + 1}rem` }}>
-            {account.accountName}
-          </TableCell>
-          <TableCell className="text-right font-medium">
-            ${formatUSD(account.amount)}
-          </TableCell>
-        </TableRow>
-      ))}
-    </>
-  );
+  const renderSection = (section: IncomeStatementSection | null | undefined, level: number = 0) => {
+    if (!section || !section.accounts) return null;
+    
+    return (
+      <>
+        {section.title && (
+          <TableRow className={level === 0 ? 'bg-muted/50 font-semibold' : 'bg-muted/30'}>
+            <TableCell colSpan={2} style={{ paddingLeft: `${level * 2 + 1}rem` }}>
+              {section.title}
+            </TableCell>
+          </TableRow>
+        )}
+        {section.accounts.map((account) => (
+          <TableRow key={account.accountId} className="hover:bg-muted/20">
+            <TableCell style={{ paddingLeft: `${(level + 1) * 2 + 1}rem` }}>
+              {account.accountName}
+            </TableCell>
+            <TableCell className="text-right font-medium">
+              ${formatUSD(account.amount)}
+            </TableCell>
+          </TableRow>
+        ))}
+      </>
+    );
+  };
 
   return (
     <Card>
@@ -351,7 +397,7 @@ export function IncomeStatement() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-bold text-green-600">
-                    ${formatUSD(data.revenue.totalRevenue)}
+                    ${formatUSD(data.revenue?.totalRevenue || 0)}
                   </div>
                 </CardContent>
               </Card>
@@ -362,10 +408,10 @@ export function IncomeStatement() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-bold text-blue-600">
-                    ${formatUSD(data.grossProfit)}
+                    ${formatUSD(data.grossProfit || 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Margin: {data.grossProfitMargin.toFixed(1)}%
+                    Margin: {(data.grossProfitMargin || 0).toFixed(1)}%
                   </p>
                 </CardContent>
               </Card>
@@ -376,10 +422,10 @@ export function IncomeStatement() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-bold text-purple-600">
-                    ${formatUSD(data.operatingIncome)}
+                    ${formatUSD(data.operatingIncome || 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Margin: {data.operatingMargin.toFixed(1)}%
+                    Margin: {(data.operatingMargin || 0).toFixed(1)}%
                   </p>
                 </CardContent>
               </Card>
@@ -391,13 +437,13 @@ export function IncomeStatement() {
                 <CardContent>
                   <div
                     className={`text-xl font-bold ${
-                      data.netIncome >= 0 ? 'text-green-600' : 'text-red-600'
+                      (data.netIncome || 0) >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}
                   >
-                    ${formatUSD(data.netIncome)}
+                    ${formatUSD(data.netIncome || 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Margin: {data.netProfitMargin.toFixed(1)}%
+                    Margin: {(data.netProfitMargin || 0).toFixed(1)}%
                   </p>
                 </CardContent>
               </Card>
@@ -417,19 +463,19 @@ export function IncomeStatement() {
                     <TableCell colSpan={2}>REVENUE</TableCell>
                   </TableRow>
 
-                  {data.revenue.sections.map((section, index) => (
+                  {(data.revenue?.sections || []).filter(Boolean).map((section, index) => (
                     <React.Fragment key={index}>{renderSection(section)}</React.Fragment>
                   ))}
 
                   <TableRow className="bg-primary/20 font-bold border-t">
                     <TableCell>Total Revenue</TableCell>
                     <TableCell className="text-right text-green-600">
-                      ${formatUSD(data.revenue.totalRevenue)}
+                      ${formatUSD(data.revenue?.totalRevenue || 0)}
                     </TableCell>
                   </TableRow>
 
                   {/* Cost of Goods Sold */}
-                  {data.costOfGoodsSold.sections.length > 0 && (
+                  {(data.costOfGoodsSold?.sections || []).length > 0 && (
                     <>
                       <TableRow>
                         <TableCell colSpan={2} className="h-4"></TableCell>
@@ -438,22 +484,22 @@ export function IncomeStatement() {
                         <TableCell colSpan={2}>COST OF GOODS SOLD</TableCell>
                       </TableRow>
 
-                      {data.costOfGoodsSold.sections.map((section, index) => (
+                      {(data.costOfGoodsSold?.sections || []).filter(Boolean).map((section, index) => (
                         <React.Fragment key={index}>{renderSection(section)}</React.Fragment>
                       ))}
 
                       <TableRow className="bg-muted/50 font-bold border-t">
                         <TableCell>Total Cost of Goods Sold</TableCell>
                         <TableCell className="text-right text-red-600">
-                          ${formatUSD(data.costOfGoodsSold.totalCOGS)}
+                          ${formatUSD(data.costOfGoodsSold?.totalCOGS || 0)}
                         </TableCell>
                       </TableRow>
 
                       <TableRow className="bg-blue-50 dark:bg-blue-950 font-bold border-t-2">
                         <TableCell>GROSS PROFIT</TableCell>
                         <TableCell className="text-right text-blue-600">
-                          ${formatUSD(data.grossProfit)}{' '}
-                          <span className="text-sm">({data.grossProfitMargin.toFixed(1)}%)</span>
+                          ${formatUSD(data.grossProfit || 0)}{' '}
+                          <span className="text-sm">({(data.grossProfitMargin || 0).toFixed(1)}%)</span>
                         </TableCell>
                       </TableRow>
                     </>
@@ -467,27 +513,27 @@ export function IncomeStatement() {
                     <TableCell colSpan={2}>OPERATING EXPENSES</TableCell>
                   </TableRow>
 
-                  {data.operatingExpenses.sections.map((section, index) => (
+                  {(data.operatingExpenses?.sections || []).filter(Boolean).map((section, index) => (
                     <React.Fragment key={index}>{renderSection(section)}</React.Fragment>
                   ))}
 
                   <TableRow className="bg-muted/50 font-bold border-t">
                     <TableCell>Total Operating Expenses</TableCell>
                     <TableCell className="text-right text-red-600">
-                      ${formatUSD(data.operatingExpenses.totalOperatingExpenses)}
+                      ${formatUSD(data.operatingExpenses?.totalOperatingExpenses || 0)}
                     </TableCell>
                   </TableRow>
 
                   <TableRow className="bg-purple-50 dark:bg-purple-950 font-bold border-t-2">
                     <TableCell>OPERATING INCOME</TableCell>
                     <TableCell className="text-right text-purple-600">
-                      ${formatUSD(data.operatingIncome)}{' '}
-                      <span className="text-sm">({data.operatingMargin.toFixed(1)}%)</span>
+                      ${formatUSD(data.operatingIncome || 0)}{' '}
+                      <span className="text-sm">({(data.operatingMargin || 0).toFixed(1)}%)</span>
                     </TableCell>
                   </TableRow>
 
                   {/* Other Income/Expenses */}
-                  {data.otherIncomeExpenses.sections.length > 0 && (
+                  {data.otherIncomeExpenses?.sections && data.otherIncomeExpenses.sections.length > 0 && (
                     <>
                       <TableRow>
                         <TableCell colSpan={2} className="h-4"></TableCell>
@@ -496,7 +542,7 @@ export function IncomeStatement() {
                         <TableCell colSpan={2}>OTHER INCOME/EXPENSES</TableCell>
                       </TableRow>
 
-                      {data.otherIncomeExpenses.sections.map((section, index) => (
+                      {(data.otherIncomeExpenses?.sections || []).filter(Boolean).map((section, index) => (
                         <React.Fragment key={index}>{renderSection(section)}</React.Fragment>
                       ))}
                     </>
@@ -507,11 +553,11 @@ export function IncomeStatement() {
                     <TableCell>NET INCOME</TableCell>
                     <TableCell
                       className={`text-right ${
-                        data.netIncome >= 0 ? 'text-green-600' : 'text-red-600'
+                        (data.netIncome || 0) >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}
                     >
-                      ${formatUSD(data.netIncome)}{' '}
-                      <span className="text-sm">({data.netProfitMargin.toFixed(1)}%)</span>
+                      ${formatUSD(data.netIncome || 0)}{' '}
+                      <span className="text-sm">({(data.netProfitMargin || 0).toFixed(1)}%)</span>
                     </TableCell>
                   </TableRow>
                 </TableBody>
@@ -529,7 +575,7 @@ export function IncomeStatement() {
                   </p>
                 </div>
                 <div className="text-right">
-                  {data.netIncome >= 0 ? (
+                  {(data.netIncome || 0) >= 0 ? (
                     <div className="flex items-center gap-2 text-green-600">
                       <TrendingUp className="h-5 w-5" />
                       <span className="font-bold">Profitable</span>

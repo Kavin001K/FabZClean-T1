@@ -18,6 +18,7 @@ export default defineConfig({
         },
     },
     root: "client",
+    envDir: "..",
     build: {
         outDir: "../dist",
         emptyOutDir: true,
@@ -52,7 +53,7 @@ export default defineConfig({
         },
         proxy: {
             '/api': {
-                target: 'http://localhost:3000',
+                target: 'http://localhost:5001',
                 changeOrigin: true,
                 secure: false,
             },

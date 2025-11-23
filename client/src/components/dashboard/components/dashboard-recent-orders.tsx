@@ -87,7 +87,8 @@ export const DashboardRecentOrders: React.FC<DashboardRecentOrdersProps> = React
     );
   }
 
-  const displayOrders = recentOrders?.slice(0, 5) || [];
+  // Ensure recentOrders is an array before calling slice
+  const displayOrders = Array.isArray(recentOrders) ? recentOrders.slice(0, 5) : [];
 
   return (
     <Card 

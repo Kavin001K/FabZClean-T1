@@ -30,16 +30,18 @@ export default React.memo(function KpiCard({
   isLoading = false,
   className 
 }: KpiCardProps) {
-  const formatValue = (val: string | number) => {
+  const formatValue = (val: string | number | undefined | null) => {
     if (typeof val === 'number') {
-      if (val >= 1000000) {
-        return `₹${(val / 1000000).toFixed(1)}M`;
-      } else if (val >= 1000) {
-        return `₹${(val / 1000).toFixed(1)}K`;
+      const safeVal = val ?? 0;
+      if (isNaN(safeVal) || !isFinite(safeVal)) return '₹0';
+      if (safeVal >= 1000000) {
+        return `₹${(safeVal / 1000000).toFixed(1)}M`;
+      } else if (safeVal >= 1000) {
+        return `₹${(safeVal / 1000).toFixed(1)}K`;
       }
-      return `₹${val.toLocaleString()}`;
+      return `₹${safeVal.toLocaleString()}`;
     }
-    return val;
+    return val ?? '0';
   };
 
   const getChangeColor = () => {

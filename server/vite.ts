@@ -37,14 +37,25 @@ export async function setupVite(app: Express, server: Server) {
     appType: "custom",
   });
 
+  // Vite middleware handles all module requests (/src/*, /node_modules/*, etc.)
   app.use(vite.middlewares);
+  
+  // Catch-all route for HTML pages (only for non-API, non-asset requests)
   app.use("*", async (req, res, next) => {
-    // Skip the HTML fallback for API routes
-    if (req.originalUrl.startsWith("/api")) {
+    const url = req.originalUrl;
+    
+    // Skip API routes
+    if (url.startsWith("/api")) {
       return next();
     }
-
-    const url = req.originalUrl;
+    
+    // Skip asset requests (Vite middleware handles these)
+    if (url.startsWith("/src/") || 
+        url.startsWith("/node_modules/") || 
+        url.startsWith("/@") ||
+        url.includes(".") && !url.endsWith(".html")) {
+      return next();
+    }
 
     try {
       const clientTemplate = path.resolve(
@@ -54,7 +65,7 @@ export async function setupVite(app: Express, server: Server) {
         "index.html",
       );
 
-      // always reload the index.html file from disk incase it changes
+      // Always reload the index.html file from disk in case it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,

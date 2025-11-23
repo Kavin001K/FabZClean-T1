@@ -27,6 +27,9 @@ export * from './data-structures';
 // Database Optimization
 export * from './database-optimization';
 
+// Order Enrichment Algorithms
+export * from './order-enrichment';
+
 // Algorithm Utilities
 export class AlgorithmUtils {
   /**

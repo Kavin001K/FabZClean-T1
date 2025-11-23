@@ -4,6 +4,13 @@
 // Import types from shared schema instead of defining them here
 import type { Order, Customer, Service, Product, Delivery, Employee } from "../../../shared/schema";
 
+// Get access token from localStorage (employee-based auth)
+function getAccessToken(): string | null {
+  return localStorage.getItem('employee_token') ||
+    localStorage.getItem('access_token') ||
+    localStorage.getItem('supabase.auth.token');
+}
+
 export type InventoryItem = {
   id: string;
   name: string;
@@ -32,33 +39,94 @@ export type ServicePopularityData = {
   fill: string;
 };
 
-// API base URL
-const API_BASE = '/api';
+// API base URL - use environment variable or fallback to relative path
+// In production (Vercel), this will use /api which is handled by rewrites
+// In development, this uses Vite proxy
+const getApiBase = () => {
+  if (import.meta.env.PROD) {
+    // Check for explicit API URL in environment
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (apiUrl) {
+      return apiUrl;
+    }
+    // Default to relative path for production (Vercel handles rewrites)
+    return '/api';
+  }
+  // Development: use relative path (handled by Vite proxy)
+  return '/api';
+};
+
+const API_BASE = getApiBase();
+
+type HeadersMap = Record<string, string>;
+
+function normalizeHeaders(headers?: HeadersInit): HeadersMap {
+  if (!headers) return {};
+  if (headers instanceof Headers) {
+    const result: HeadersMap = {};
+    headers.forEach((value, key) => {
+      result[key] = value;
+    });
+    return result;
+  }
+
+  if (Array.isArray(headers)) {
+    return headers.reduce<HeadersMap>((acc, [key, value]) => {
+      acc[key] = value;
+      return acc;
+    }, {});
+  }
+
+  return { ...(headers as HeadersMap) };
+}
+
+export function withAuth(init: RequestInit = {}): RequestInit {
+  const headers = normalizeHeaders(init.headers);
+  if (!headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+  const token = getAccessToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return {
+    ...init,
+    headers,
+  };
+}
+
+async function authorizedFetch(endpoint: string, init: RequestInit = {}) {
+  const response = await fetch(`${API_BASE}${endpoint}`, withAuth(init));
+  if (!response.ok && response.status === 401) {
+    // Redirect to login when unauthorized
+    window.location.href = '/login';
+  }
+  return response;
+}
 
 // Generic fetch function with error handling
-async function fetchData<T>(endpoint: string): Promise<T> {
+export async function fetchData<T>(endpoint: string, init: RequestInit = {}): Promise<T> {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-    
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+
+    const response = await authorizedFetch(endpoint, {
+      ...init,
       signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-      },
     });
-    
+
     clearTimeout(timeoutId);
-    
+
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
+      const errorText = await response.text().catch(() => "Unknown error");
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
-    
+
     return await response.json();
   } catch (error) {
     if (error instanceof Error) {
-      if (error.name === 'AbortError') {
+      if (error.name === "AbortError") {
         console.error(`Request timeout for ${endpoint}`);
         throw new Error(`Request timeout for ${endpoint}`);
       }
@@ -74,7 +142,9 @@ async function fetchData<T>(endpoint: string): Promise<T> {
 export const ordersApi = {
   async getAll(): Promise<Order[]> {
     try {
-      return await fetchData<Order[]>('/orders');
+      const response = await fetchData<{ data: Order[]; pagination?: any }>("/orders");
+      // Handle paginated response
+      return response.data || response;
     } catch (error) {
       console.error('Failed to fetch orders:', error);
       return [];
@@ -92,27 +162,25 @@ export const ordersApi = {
 
   async create(order: Partial<Order>): Promise<Order | null> {
     try {
-      const response = await fetch(`${API_BASE}/orders`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await authorizedFetch("/orders", {
+        method: "POST",
         body: JSON.stringify(order),
       });
-      if (!response.ok) throw new Error('Failed to create order');
+      if (!response.ok) throw new Error("Failed to create order");
       return await response.json();
     } catch (error) {
-      console.error('Failed to create order:', error);
+      console.error("Failed to create order:", error);
       return null;
     }
   },
 
   async update(id: string, order: Partial<Order>): Promise<Order | null> {
     try {
-      const response = await fetch(`${API_BASE}/orders/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await authorizedFetch(`/orders/${id}`, {
+        method: "PUT",
         body: JSON.stringify(order),
       });
-      if (!response.ok) throw new Error('Failed to update order');
+      if (!response.ok) throw new Error("Failed to update order");
       return await response.json();
     } catch (error) {
       console.error(`Failed to update order ${id}:`, error);
@@ -122,8 +190,8 @@ export const ordersApi = {
 
   async delete(id: string): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE}/orders/${id}`, {
-        method: 'DELETE',
+      const response = await authorizedFetch(`/orders/${id}`, {
+        method: "DELETE",
       });
       return response.ok;
     } catch (error) {
@@ -134,19 +202,18 @@ export const ordersApi = {
 
   async deleteMany(orderIds: string[]): Promise<{ successful: number; failed: number; total: number }> {
     try {
-      const response = await fetch(`${API_BASE}/orders`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await authorizedFetch(`/orders`, {
+        method: "DELETE",
         body: JSON.stringify({ orderIds }),
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to delete orders');
+        throw new Error("Failed to delete orders");
       }
-      
+
       return await response.json();
     } catch (error) {
-      console.error('Failed to delete orders:', error);
+      console.error("Failed to delete orders:", error);
       return { successful: 0, failed: orderIds.length, total: orderIds.length };
     }
   }
@@ -174,27 +241,25 @@ export const customersApi = {
 
   async create(customer: Partial<Customer>): Promise<Customer | null> {
     try {
-      const response = await fetch(`${API_BASE}/customers`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await authorizedFetch(`/customers`, {
+        method: "POST",
         body: JSON.stringify(customer),
       });
-      if (!response.ok) throw new Error('Failed to create customer');
+      if (!response.ok) throw new Error("Failed to create customer");
       return await response.json();
     } catch (error) {
-      console.error('Failed to create customer:', error);
+      console.error("Failed to create customer:", error);
       return null;
     }
   },
 
   async update(id: string, customer: Partial<Customer>): Promise<Customer | null> {
     try {
-      const response = await fetch(`${API_BASE}/customers/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await authorizedFetch(`/customers/${id}`, {
+        method: "PUT",
         body: JSON.stringify(customer),
       });
-      if (!response.ok) throw new Error('Failed to update customer');
+      if (!response.ok) throw new Error("Failed to update customer");
       return await response.json();
     } catch (error) {
       console.error(`Failed to update customer ${id}:`, error);
@@ -204,8 +269,8 @@ export const customersApi = {
 
   async delete(id: string): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE}/customers/${id}`, {
-        method: 'DELETE',
+      const response = await authorizedFetch(`/customers/${id}`, {
+        method: "DELETE",
       });
       return response.ok;
     } catch (error) {
@@ -229,7 +294,12 @@ export const customersApi = {
 export const employeesApi = {
   async getAll(): Promise<Employee[]> {
     try {
-      return await fetchData<Employee[]>('/employees');
+      const response = await fetchData<{ success: boolean; employees: Employee[] } | Employee[]>('/employees');
+      // Handle both response formats: { success: true, employees: [...] } or just [...]
+      if (response && typeof response === 'object' && 'employees' in response) {
+        return response.employees;
+      }
+      return Array.isArray(response) ? response : [];
     } catch (error) {
       console.error('Failed to fetch employees:', error);
       return [];
@@ -247,28 +317,30 @@ export const employeesApi = {
 
   async create(employee: Partial<Employee>): Promise<Employee | null> {
     try {
-      const response = await fetch(`${API_BASE}/employees`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await authorizedFetch(`/employees`, {
+        method: "POST",
         body: JSON.stringify(employee),
       });
-      if (!response.ok) throw new Error('Failed to create employee');
-      return await response.json();
+      if (!response.ok) throw new Error("Failed to create employee");
+      const data = await response.json();
+      // Handle backend response format: { success: true, employee: {...} }
+      return data.employee || data;
     } catch (error) {
-      console.error('Failed to create employee:', error);
+      console.error("Failed to create employee:", error);
       return null;
     }
   },
 
   async update(id: string, employee: Partial<Employee>): Promise<Employee | null> {
     try {
-      const response = await fetch(`${API_BASE}/employees/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await authorizedFetch(`/employees/${id}`, {
+        method: "PUT",
         body: JSON.stringify(employee),
       });
-      if (!response.ok) throw new Error('Failed to update employee');
-      return await response.json();
+      if (!response.ok) throw new Error("Failed to update employee");
+      const data = await response.json();
+      // Handle backend response format: { success: true, employee: {...} }
+      return data.employee || data;
     } catch (error) {
       console.error(`Failed to update employee ${id}:`, error);
       return null;
@@ -277,8 +349,8 @@ export const employeesApi = {
 
   async delete(id: string): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE}/employees/${id}`, {
-        method: 'DELETE',
+      const response = await authorizedFetch(`/employees/${id}`, {
+        method: "DELETE",
       });
       return response.ok;
     } catch (error) {
@@ -299,7 +371,7 @@ export const inventoryApi = {
         name: item.name,
         stock: item.stockQuantity,
         status: item.stockQuantity === 0 ? 'Out of Stock' as const :
-                item.stockQuantity <= (item.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+          item.stockQuantity <= (item.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
         category: item.category,
         sku: item.sku,
         price: parseFloat(item.price) || 0,
@@ -322,7 +394,7 @@ export const inventoryApi = {
         name: rawData.name,
         stock: rawData.stockQuantity,
         status: rawData.stockQuantity === 0 ? 'Out of Stock' as const :
-                rawData.stockQuantity <= (rawData.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+          rawData.stockQuantity <= (rawData.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
         category: rawData.category,
         sku: rawData.sku,
         price: parseFloat(rawData.price) || 0,
@@ -337,27 +409,26 @@ export const inventoryApi = {
 
   async create(item: Partial<InventoryItem>): Promise<InventoryItem | null> {
     try {
-      const response = await fetch(`${API_BASE}/products`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await authorizedFetch(`/products`, {
+        method: "POST",
         body: JSON.stringify({
           name: item.name,
           sku: item.sku || `SKU-${Date.now()}`,
-          category: item.category || 'General',
-          price: item.price?.toString() || '0',
+          category: item.category || "General",
+          price: item.price?.toString() || "0",
           stockQuantity: item.stock || 0,
           reorderLevel: item.reorderLevel || 10,
-          supplier: item.supplier || '',
+          supplier: item.supplier || "",
         }),
       });
-      if (!response.ok) throw new Error('Failed to create inventory item');
+      if (!response.ok) throw new Error("Failed to create inventory item");
       const product = await response.json();
       return {
         id: product.id,
         name: product.name,
         stock: product.stockQuantity,
         status: product.stockQuantity === 0 ? 'Out of Stock' as const :
-                product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+          product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
         category: product.category,
         sku: product.sku,
         price: parseFloat(product.price) || 0,
@@ -372,9 +443,8 @@ export const inventoryApi = {
 
   async update(id: string, item: Partial<InventoryItem>): Promise<InventoryItem | null> {
     try {
-      const response = await fetch(`${API_BASE}/products/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await authorizedFetch(`/products/${id}`, {
+        method: "PUT",
         body: JSON.stringify({
           name: item.name,
           sku: item.sku,
@@ -385,14 +455,14 @@ export const inventoryApi = {
           supplier: item.supplier,
         }),
       });
-      if (!response.ok) throw new Error('Failed to update inventory item');
+      if (!response.ok) throw new Error("Failed to update inventory item");
       const product = await response.json();
       return {
         id: product.id,
         name: product.name,
         stock: product.stockQuantity,
         status: product.stockQuantity === 0 ? 'Out of Stock' as const :
-                product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+          product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
         category: product.category,
         sku: product.sku,
         price: parseFloat(product.price) || 0,
@@ -407,8 +477,8 @@ export const inventoryApi = {
 
   async delete(id: string): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE}/products/${id}`, {
-        method: 'DELETE',
+      const response = await authorizedFetch(`/products/${id}`, {
+        method: "DELETE",
       });
       return response.ok;
     } catch (error) {
@@ -430,52 +500,26 @@ export const inventoryApi = {
 };
 
 // Analytics API
+// ✅ Note: Analytics data is now provided by useAnalyticsEngine hook
+// These functions are kept for backward compatibility but return empty arrays
+// The realtime analytics engine handles all data processing
 export const analyticsApi = {
   async getSalesData(): Promise<SalesData[]> {
-    try {
-      // For now, return sample data since we don't have sales analytics endpoint
-      return [
-        { month: "Jan", revenue: 12000 },
-        { month: "Feb", revenue: 15000 },
-        { month: "Mar", revenue: 18000 },
-        { month: "Apr", revenue: 16000 },
-        { month: "May", revenue: 20000 },
-        { month: "Jun", revenue: 22000 },
-      ];
-    } catch (error) {
-      console.error('Failed to fetch sales data:', error);
-      return [];
-    }
+    // ✅ Removed mock data - use RevenueChartRealtime component instead
+    // This function is kept for backward compatibility
+    return [];
   },
 
   async getOrderStatusData(): Promise<OrderStatusData[]> {
-    try {
-      // For now, return sample data since we don't have order status analytics endpoint
-      return [
-        { status: "Pending", value: 5 },
-        { status: "Processing", value: 8 },
-        { status: "Completed", value: 12 },
-        { status: "Cancelled", value: 2 },
-      ];
-    } catch (error) {
-      console.error('Failed to fetch order status data:', error);
-      return [];
-    }
+    // ✅ Removed mock data - use useAnalyticsEngine hook instead
+    // This function is kept for backward compatibility
+    return [];
   },
 
   async getServicePopularityData(): Promise<ServicePopularityData[]> {
-    try {
-      // For now, return sample data since we don't have service popularity analytics endpoint
-      return [
-        { name: "Dry Cleaning", value: 40, fill: "hsl(var(--primary))" },
-        { name: "Premium Laundry", value: 30, fill: "hsl(var(--primary))" },
-        { name: "Laundry By Kg", value: 20, fill: "hsl(var(--primary))" },
-        { name: "Bags Clean", value: 10, fill: "hsl(var(--primary))" },
-      ];
-    } catch (error) {
-      console.error('Failed to fetch service popularity data:', error);
-      return [];
-    }
+    // ✅ Removed mock data - use useAnalyticsEngine hook instead
+    // This function is kept for backward compatibility
+    return [];
   },
 
   async getDashboardMetrics(): Promise<{
@@ -539,7 +583,8 @@ export const formatNumber = (num: number): string => {
   return new Intl.NumberFormat('en-US').format(num);
 };
 
-export const formatPercentage = (num: number): string => {
+export const formatPercentage = (num: number | undefined | null): string => {
+  if (num === undefined || num === null || isNaN(num)) return '0.0%';
   return `${num.toFixed(1)}%`;
 };
 
@@ -551,7 +596,7 @@ export const getStatusColor = (status: string): string => {
     completed: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
     cancelled: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400",
   };
-  
+
   return statusColors[status.toLowerCase() as keyof typeof statusColors] || statusColors.pending;
 };
 
@@ -561,7 +606,7 @@ export const getPriorityColor = (priority: string): string => {
     high: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400",
     urgent: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400",
   };
-  
+
   return priorityColors[priority.toLowerCase() as keyof typeof priorityColors] || priorityColors.normal;
 };
 
@@ -620,38 +665,36 @@ export const servicesApi = {
 
   async create(service: Partial<Service>): Promise<Service | null> {
     try {
-      const response = await fetch(`${API_BASE}/services`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await authorizedFetch(`/services`, {
+        method: "POST",
         body: JSON.stringify(service),
       });
-      if (!response.ok) throw new Error('Failed to create service');
+      if (!response.ok) throw new Error("Failed to create service");
       return await response.json();
     } catch (error) {
-      console.error('Failed to create service:', error);
+      console.error("Failed to create service:", error);
       return null;
     }
   },
 
   async update(id: string, service: Partial<Service>): Promise<Service | null> {
     try {
-      const response = await fetch(`${API_BASE}/services/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await authorizedFetch(`/services/${id}`, {
+        method: "PUT",
         body: JSON.stringify(service),
       });
-      if (!response.ok) throw new Error('Failed to update service');
+      if (!response.ok) throw new Error("Failed to update service");
       return await response.json();
     } catch (error) {
-      console.error('Failed to update service:', error);
+      console.error("Failed to update service:", error);
       return null;
     }
   },
 
   async delete(id: string): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE}/services/${id}`, {
-        method: 'DELETE',
+      const response = await authorizedFetch(`/services/${id}`, {
+        method: "DELETE",
       });
       return response.ok;
     } catch (error) {
@@ -741,7 +784,7 @@ export const logisticsApi = {
       // Mock routes data - in real app this would be a proper endpoint
       const deliveries = await this.getDeliveries();
       const drivers = await this.getDrivers();
-      
+
       // Convert deliveries to routes
       const routes: Route[] = deliveries.map((delivery, index) => ({
         id: `route-${delivery.id}`,
@@ -749,28 +792,28 @@ export const logisticsApi = {
         driverId: delivery.driverName ? drivers.find(d => d.name === delivery.driverName)?.id : undefined,
         driverName: delivery.driverName,
         vehicleId: delivery.vehicleId,
-        status: delivery.status === 'pending' ? 'unassigned' : 
-                delivery.status === 'in_transit' ? 'in_progress' : 'completed',
+        status: delivery.status === 'pending' ? 'unassigned' :
+          delivery.status === 'in_transit' ? 'in_progress' : 'completed',
         stops: [{
           id: `stop-${delivery.id}`,
-          orderId: delivery.orderId,
-          customerName: `Customer ${delivery.orderId}`,
+          orderId: delivery.orderId || `order-${delivery.id}`, // Ensure orderId is never null
+          customerName: `Customer ${delivery.orderId || delivery.id}`,
           address: '123 Main St, City',
           coordinates: delivery.location as { lat: number; lng: number } || { lat: 12.9716, lng: 77.5946 },
           status: delivery.status === 'pending' ? 'pending' :
-                  delivery.status === 'in_transit' ? 'in_progress' :
-                  delivery.status === 'delivered' ? 'completed' : 'failed',
-          estimatedArrival: delivery.estimatedDelivery,
-          actualArrival: delivery.actualDelivery,
+            delivery.status === 'in_transit' ? 'in_progress' :
+              delivery.status === 'delivered' ? 'completed' : 'failed',
+          estimatedArrival: delivery.estimatedDelivery ? new Date(delivery.estimatedDelivery) : undefined,
+          actualArrival: delivery.actualDelivery ? new Date(delivery.actualDelivery) : undefined,
         }],
         totalDistance: Math.random() * 50 + 10, // Mock distance
         estimatedDuration: Math.random() * 120 + 30, // Mock duration in minutes
-        startTime: delivery.createdAt,
-        endTime: delivery.actualDelivery,
-        createdAt: delivery.createdAt,
-        updatedAt: delivery.updatedAt,
+        startTime: delivery.createdAt ? new Date(delivery.createdAt) : undefined,
+        endTime: delivery.actualDelivery ? new Date(delivery.actualDelivery) : undefined,
+        createdAt: delivery.createdAt ? new Date(delivery.createdAt) : new Date(),
+        updatedAt: delivery.updatedAt ? new Date(delivery.updatedAt) : new Date(),
       }));
-      
+
       return routes;
     } catch (error) {
       console.error('Failed to fetch routes:', error);
@@ -780,30 +823,28 @@ export const logisticsApi = {
 
   async assignDriverToRoute(routeId: string, driverId: string): Promise<Route | null> {
     try {
-      const response = await fetch(`${API_BASE}/deliveries/${routeId}/assign-driver`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await authorizedFetch(`/deliveries/${routeId}/assign-driver`, {
+        method: "POST",
         body: JSON.stringify({ driverId }),
       });
-      if (!response.ok) throw new Error('Failed to assign driver');
+      if (!response.ok) throw new Error("Failed to assign driver");
       return await response.json();
     } catch (error) {
-      console.error('Failed to assign driver:', error);
+      console.error("Failed to assign driver:", error);
       return null;
     }
   },
 
   async updateDeliveryStatus(deliveryId: string, status: string): Promise<Delivery | null> {
     try {
-      const response = await fetch(`${API_BASE}/deliveries/${deliveryId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await authorizedFetch(`/deliveries/${deliveryId}`, {
+        method: "PUT",
         body: JSON.stringify({ status }),
       });
-      if (!response.ok) throw new Error('Failed to update delivery status');
+      if (!response.ok) throw new Error("Failed to update delivery status");
       return await response.json();
     } catch (error) {
-      console.error('Failed to update delivery status:', error);
+      console.error("Failed to update delivery status:", error);
       return null;
     }
   },

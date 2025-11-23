@@ -86,7 +86,8 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
     );
   }
 
-  const displayOrders = dueTodayOrders?.slice(0, 5) || [];
+  // Ensure dueTodayOrders is an array before calling slice
+  const displayOrders = Array.isArray(dueTodayOrders) ? dueTodayOrders.slice(0, 5) : [];
 
   return (
     <Card 

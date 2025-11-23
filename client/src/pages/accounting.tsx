@@ -208,7 +208,10 @@ export default function Accounting() {
                         {metrics?.netIncome !== undefined && metrics?.totalRevenue !== undefined && (
                           <p className="text-xs text-muted-foreground mt-1">
                             Profit Margin:{' '}
-                            {(((metrics.netIncome || 0) / (metrics.totalRevenue || 1)) * 100).toFixed(1)}%
+                            {(() => {
+                              const margin = ((metrics.netIncome || 0) / (metrics.totalRevenue || 1)) * 100;
+                              return isNaN(margin) ? '0.0' : margin.toFixed(1);
+                            })()}%
                           </p>
                         )}
                       </CardContent>

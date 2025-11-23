@@ -3,19 +3,23 @@ import { seedDatabase } from "./seed-data";
 
 export async function initializeDatabase() {
   try {
-    console.log("🔄 Initializing SQLite database...");
+    const dbType = process.env.USE_SUPABASE === 'true' ? 'supabase' : 'sqlite';
+    console.log(`🔄 Initializing ${dbType} database...`);
 
     // Test the database connection by trying to get users
     await db.listUsers();
 
-    console.log("✅ SQLite database initialized successfully");
+    console.log(`✅ ${dbType} database initialized successfully`);
 
     // Seed the database with sample data if empty
-    await seedDatabase();
+    // Note: Seeding might need adjustment for Supabase if not desired
+    if (dbType === 'sqlite') {
+      await seedDatabase();
+    }
 
     return true;
   } catch (error) {
-    console.error("❌ SQLite database initialization failed:", error);
+    console.error("❌ Database initialization failed:", error);
     throw error;
   }
 }
@@ -23,6 +27,7 @@ export async function initializeDatabase() {
 export async function getDatabaseHealth() {
   try {
     const startTime = Date.now();
+    const dbType = process.env.USE_SUPABASE === 'true' ? 'supabase' : 'sqlite';
 
     // Simple health check - try to query users table
     await db.listUsers();
@@ -31,14 +36,15 @@ export async function getDatabaseHealth() {
 
     return {
       status: "healthy",
-      database: "sqlite",
+      database: dbType,
       responseTime: `${responseTime}ms`,
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
+    const dbType = process.env.USE_SUPABASE === 'true' ? 'supabase' : 'sqlite';
     return {
       status: "unhealthy",
-      database: "sqlite",
+      database: dbType,
       error: (error as Error).message,
       timestamp: new Date().toISOString(),
     };
@@ -48,6 +54,7 @@ export async function getDatabaseHealth() {
 export async function pingDatabase() {
   try {
     const startTime = Date.now();
+    const dbType = process.env.USE_SUPABASE === 'true' ? 'supabase' : 'sqlite';
 
     // Simple ping - try to query
     await db.listUsers();
@@ -57,14 +64,15 @@ export async function pingDatabase() {
     return {
       success: true,
       responseTime: `${responseTime}ms`,
-      database: "sqlite",
+      database: dbType,
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
+    const dbType = process.env.USE_SUPABASE === 'true' ? 'supabase' : 'sqlite';
     return {
       success: false,
       error: (error as Error).message,
-      database: "sqlite",
+      database: dbType,
       timestamp: new Date().toISOString(),
     };
   }
@@ -72,14 +80,15 @@ export async function pingDatabase() {
 
 export async function getDatabaseInfo() {
   try {
+    const dbType = process.env.USE_SUPABASE === 'true' ? 'supabase' : 'sqlite';
     const users = await db.listUsers();
     const products = await db.listProducts();
     const orders = await db.listOrders();
     const customers = await db.listCustomers();
 
     return {
-      database: "sqlite",
-      version: "3.x", // SQLite version
+      database: dbType,
+      version: dbType === 'sqlite' ? "3.x" : "PostgreSQL",
       tables: {
         users: users.length,
         products: products.length,

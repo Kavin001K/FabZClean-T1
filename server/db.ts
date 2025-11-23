@@ -1,33 +1,43 @@
 import { SQLiteStorage } from "./SQLiteStorage";
+import { SupabaseStorage } from "./SupabaseStorage";
 import path from "path";
 import { existsSync } from "fs";
 
 // Determine database path with fallbacks
 const isProduction = process.env.NODE_ENV === "production";
+const useSupabase = process.env.USE_SUPABASE === "true";
 
-let dbPath: string;
+let dbInstance: any;
 
-if (isProduction) {
-  // Try Render disk path first
-  const renderDiskPath = process.env.RENDER_DISK_PATH || "/opt/render/project/src/data";
-
-  // If the render disk path directory exists, use it
-  // Otherwise fall back to a writable location
-  if (existsSync(renderDiskPath)) {
-    dbPath = path.join(renderDiskPath, "fabzclean.db");
-  } else {
-    // Fallback to /tmp which is always writable on Render
-    console.warn(`⚠️  Render disk path ${renderDiskPath} not found, using /tmp`);
-    dbPath = "/tmp/fabzclean.db";
-  }
+if (useSupabase) {
+  console.log("🗄️  Using Supabase storage");
+  dbInstance = new SupabaseStorage();
 } else {
-  dbPath = "./fabzclean.db";
+  let dbPath: string;
+
+  if (isProduction) {
+    // Try Render disk path first
+    const renderDiskPath = process.env.RENDER_DISK_PATH || "/opt/render/project/src/data";
+
+    // If the render disk path directory exists, use it
+    // Otherwise fall back to a writable location
+    if (existsSync(renderDiskPath)) {
+      dbPath = path.join(renderDiskPath, "fabzclean.db");
+    } else {
+      // Fallback to /tmp which is always writable on Render
+      console.warn(`⚠️  Render disk path ${renderDiskPath} not found, using /tmp`);
+      dbPath = "/tmp/fabzclean.db";
+    }
+  } else {
+    dbPath = "./fabzclean.db";
+  }
+
+  console.log(`🗄️  Database path: ${dbPath}`);
+  // Use SQLite as the primary database
+  dbInstance = new SQLiteStorage(dbPath);
 }
 
-console.log(`🗄️  Database path: ${dbPath}`);
-
-// Use SQLite as the primary database
-export const db = new SQLiteStorage(dbPath);
+export const db = dbInstance;
 
 // For compatibility with existing imports
 export { db as storage };

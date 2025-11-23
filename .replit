@@ -1,0 +1,10 @@
+run = "bash -lc 'export FLASK_ENV=development && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt && export FLASK_APP=src.app && flask db upgrade && flask run --host=0.0.0.0 --port=3000'"
+
+language = "python3"
+
+[nix]
+channel = "stable-22_11"
+
+[deploy]
+run = ["sh", "-c", "gunicorn -b 0.0.0.0:3000 'src.app:create_app(\"prod\")'"]
+

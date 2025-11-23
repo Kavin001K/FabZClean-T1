@@ -52,6 +52,14 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
+    hmr: {
+      overlay: {
+        warnings: false,
+        errors: true,
+        // Filter out chrome extension errors
+        exclude: [/chrome-extension:/],
+      },
+    },
     proxy: {
       '/api': {
         target: process.env.NODE_ENV === 'production' ? 'http://localhost:5000' : 'http://localhost:5001',

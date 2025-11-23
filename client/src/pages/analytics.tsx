@@ -9,14 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { log } from "@/lib/logger";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -31,12 +31,12 @@ import {
   RadialBarChart,
   RadialBar
 } from "recharts";
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  DollarSign, 
-  ShoppingBag, 
-  Package, 
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  ShoppingBag,
+  Package,
   Users,
   Calendar,
   Target,
@@ -71,7 +71,7 @@ import {
   statisticalSignificance,
 } from '@/lib/statistics';
 // Import the data service
-import { 
+import {
   analyticsApi,
   ordersApi,
   customersApi,
@@ -156,7 +156,7 @@ export default function Analytics() {
     if (dateRange !== 'all') {
       const now = new Date();
       let startDate = new Date();
-      
+
       switch (dateRange) {
         case 'last-7-days':
           startDate.setDate(now.getDate() - 7);
@@ -171,12 +171,12 @@ export default function Analytics() {
           startDate.setFullYear(now.getFullYear() - 1);
           break;
       }
-      
-      filteredOrders = filteredOrders.filter(order => 
+
+      filteredOrders = filteredOrders.filter(order =>
         new Date(order.createdAt || new Date()) >= startDate
       );
-      
-      filteredCustomers = filteredCustomers.filter(customer => 
+
+      filteredCustomers = filteredCustomers.filter(customer =>
         new Date(customer.createdAt || new Date()) >= startDate
       );
     }
@@ -195,10 +195,10 @@ export default function Analytics() {
       // This would need to be implemented based on your actual data structure
       filteredCustomers = filteredCustomers.filter(customer => {
         // Assuming customers have a franchise field or location
-        return (customer as any).franchise === franchise || 
-               (customer as any).location?.includes(franchise);
+        return (customer as any).franchise === franchise ||
+          (customer as any).location?.includes(franchise);
       });
-      
+
       // Filter orders by customers in the selected franchise
       const franchiseCustomerIds = filteredCustomers.map(c => c.id);
       filteredOrders = filteredOrders.filter(order =>
@@ -222,7 +222,15 @@ export default function Analytics() {
         orderStatusDistribution: [],
         revenueTrend: [],
         customerGrowth: [],
-        operationalMetrics: {},
+        operationalMetrics: {
+          totalRevenue: 0,
+          avgOrderValue: 0,
+          completionRate: 0,
+          customerRetention: 0,
+          totalOrders: 0,
+          totalCustomers: 0,
+          inventoryValue: 0
+        },
         topCustomers: [],
         serviceEfficiency: [],
         inventoryAnalysis: [],
@@ -252,9 +260,9 @@ export default function Analytics() {
         existing.revenue += parseFloat(order.totalAmount);
         existing.avgOrderValue = existing.revenue / existing.orders;
       } else {
-        acc.push({ 
-          name: serviceName, 
-          orders: 1, 
+        acc.push({
+          name: serviceName,
+          orders: 1,
           revenue: parseFloat(order.totalAmount),
           avgOrderValue: parseFloat(order.totalAmount)
         });
@@ -269,7 +277,7 @@ export default function Analytics() {
       if (totalSpent > 1000) segment = 'VIP';
       else if (totalSpent > 500) segment = 'Premium';
       else if (totalSpent > 100) segment = 'Regular';
-      
+
       const existing = acc.find(item => item.segment === segment);
       if (existing) {
         existing.count += 1;
@@ -395,9 +403,16 @@ export default function Analytics() {
 
     if (filteredOrders.length === 0) {
       return {
-        revenueStats: { mean: 0, forecast: [], confidence: { lower: 0, upper: 0, margin: 0 }, growth: 0 },
+        revenueStats: {
+          mean: 0,
+          forecast: [],
+          confidence: { lower: 0, upper: 0, margin: 0 },
+          growth: 0,
+          trendIndicator: { arrow: '→', color: 'text-gray-600' },
+          trend: 'stable'
+        },
         orderStats: { avgValue: 0, trend: 'stable' as const, movingAvg: [] },
-        customerMetrics: { clv: 0, avgSpend: 0, retentionRate: 0 },
+        customerMetrics: { clv: 0, avgSpend: 0, retentionRate: 0, avgOrders: 0 },
         insights: [],
       };
     }
@@ -545,11 +560,11 @@ export default function Analytics() {
     if ((operationalMetrics as any).avgOrderValue > 200) {
       insights.push("High average order value indicates premium service positioning");
     }
-    
+
     if ((operationalMetrics as any).completionRate > 90) {
       insights.push("Excellent completion rate shows strong operational efficiency");
     }
-    
+
     if (customerSegments.find(s => s.segment === 'VIP')?.count > 5) {
       insights.push("Strong VIP customer base indicates high-value service delivery");
     }
@@ -643,7 +658,7 @@ export default function Analytics() {
               <p className="text-sm text-muted-foreground">
                 {ordersError?.message || customersError?.message || inventoryError?.message || 'An unexpected error occurred'}
               </p>
-              <Button 
+              <Button
                 onClick={() => window.location.reload()}
                 variant="outline"
               >
@@ -686,15 +701,15 @@ export default function Analytics() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={generateInsights}>
-                <FileText className="h-4 w-4 mr-2" />
-                Generate Insights
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportPDF}>
-                <FileText className="h-4 w-4 mr-2" />
-                Export as PDF
-              </Button>
-            </div>
-          </div>
+            <FileText className="h-4 w-4 mr-2" />
+            Generate Insights
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPDF}>
+            <FileText className="h-4 w-4 mr-2" />
+            Export as PDF
+          </Button>
+        </div>
+      </div>
 
       {/* Filters */}
       <Card>
@@ -800,7 +815,7 @@ export default function Analytics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold transition-all duration-500">
-              {formatPercentage(realtimeKpis?.completionRate || (analyticsData.operationalMetrics as any).completionRate)}
+              {formatPercentage(realtimeKpis?.completionRate || (analyticsData.operationalMetrics as any).completionRate || 0)}
             </div>
             <p className="text-xs text-muted-foreground">
               Orders completed
@@ -984,8 +999,8 @@ export default function Analytics() {
                     <YAxis />
                     <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Revenue']} />
                     <Area type="monotone" dataKey="revenue" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  </AreaChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
 
@@ -1002,7 +1017,7 @@ export default function Analytics() {
                     <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Revenue']} />
                     <Line type="monotone" dataKey="revenue" stroke="#82ca9d" strokeWidth={2} />
                   </LineChart>
-                  </ResponsiveContainer>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
@@ -1057,33 +1072,33 @@ export default function Analytics() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                                <PieChart>
-                                    <Pie
+                  <PieChart>
+                    <Pie
                       data={analyticsData.servicePerformance}
-                                        cx="50%"
-                                        cy="50%"
-                                        labelLine={false}
-                                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                        outerRadius={80}
-                                        fill="#8884d8"
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
                       dataKey="orders"
-                                    >
+                    >
                       {analyticsData.servicePerformance.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                                        ))}
-                                    </Pie>
+                      ))}
+                    </Pie>
                     <Tooltip />
-                                </PieChart>
-                            </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-            </div>
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
 
           <Card>
-                    <CardHeader>
+            <CardHeader>
               <CardTitle>Service Efficiency Analysis</CardTitle>
-                    </CardHeader>
-                    <CardContent>
+            </CardHeader>
+            <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <ScatterChart data={analyticsData.serviceEfficiency}>
                   <CartesianGrid />
@@ -1093,8 +1108,8 @@ export default function Analytics() {
                   <Scatter dataKey="efficiency" fill="#8884d8" />
                 </ScatterChart>
               </ResponsiveContainer>
-                    </CardContent>
-                </Card>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* CUSTOMER ANALYTICS TAB */}
@@ -1123,7 +1138,7 @@ export default function Analytics() {
                     </Pie>
                     <Tooltip />
                   </PieChart>
-                  </ResponsiveContainer>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
 
@@ -1146,32 +1161,32 @@ export default function Analytics() {
           </div>
 
           <Card>
-              <CardHeader>
+            <CardHeader>
               <CardTitle>Top Customers</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Customer</TableHead>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Customer</TableHead>
                     <TableHead>Total Spent</TableHead>
                     <TableHead>Orders</TableHead>
                     <TableHead>Avg Order Value</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {analyticsData.topCustomers.map((customer, index) => (
                     <TableRow key={index}>
-                        <TableCell className="font-medium">{customer.name}</TableCell>
+                      <TableCell className="font-medium">{customer.name}</TableCell>
                       <TableCell>{formatCurrency(customer.totalSpent)}</TableCell>
                       <TableCell>{customer.orders}</TableCell>
                       <TableCell>{formatCurrency(customer.avgOrderValue)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* OPERATIONS TAB */}
@@ -1207,16 +1222,16 @@ export default function Analytics() {
                     <Tooltip />
                     <Bar dataKey="orders" fill="#82ca9d" />
                   </BarChart>
-                  </ResponsiveContainer>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
 
           <Card>
-              <CardHeader>
+            <CardHeader>
               <CardTitle>Inventory Analysis</CardTitle>
-              </CardHeader>
-              <CardContent>
+            </CardHeader>
+            <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={analyticsData.inventoryAnalysis}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -1226,36 +1241,36 @@ export default function Analytics() {
                   <Bar dataKey="stock" fill="#ffc658" />
                 </BarChart>
               </ResponsiveContainer>
-              </CardContent>
-            </Card>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
       {/* AI Insights Modal */}
       {showInsights && (
         <Card>
-              <CardHeader>
+          <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
               AI-Powered Business Insights
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <div className="space-y-2">
               {insights.map((insight, index) => (
                 <div key={index} className="flex items-start gap-2 p-3 bg-muted rounded-lg">
                   <Star className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
                   <p className="text-sm">{insight}</p>
-                    </div>
+                </div>
               ))}
-                    </div>
+            </div>
             <div className="flex justify-end mt-4">
               <Button variant="outline" onClick={() => setShowInsights(false)}>
                 Close
               </Button>
-                </div>
-              </CardContent>
-            </Card>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

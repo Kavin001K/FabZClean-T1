@@ -98,28 +98,43 @@ export default React.memo(function SalesChart({
     const ma7 = movingAverage(revenues, Math.min(7, revenues.length));
     const ma30 = movingAverage(revenues, Math.min(30, revenues.length));
 
-    // Linear regression for trend line
-    const regressionData = revenues.map((revenue, index) => ({ x: index, y: revenue }));
-    const regression = linearRegression(regressionData);
+    // ✅ Minimum 3 months of data required for forecast/trend
+    const hasEnoughData = chartData.length >= 3 && revenues.some(r => r > 0);
 
-    // Calculate trend line values
-    const trendLine = chartData.map((_, index) =>
-      regression.slope * index + regression.intercept
-    );
+    // Linear regression for trend line (only if enough data)
+    let regression = { slope: 0, intercept: 0, r2: 0 };
+    let trendLine: (number | null)[] = [];
+    let forecast: number[] = [];
+    let forecastData: any[] = [];
+    let ci = { lower: 0, upper: 0 };
 
-    // Forecast next 7 periods
-    const forecast = forecastLinear(revenues, 7);
+    if (hasEnoughData) {
+      const regressionData = revenues.map((revenue, index) => ({ x: index, y: revenue }));
+      regression = linearRegression(regressionData);
 
-    // Confidence interval
-    const ci = confidenceInterval(revenues, 0.95);
+      // Calculate trend line values
+      trendLine = chartData.map((_, index) =>
+        regression.slope * index + regression.intercept
+      );
 
-    // Prepare forecast data points (continuing from last actual data point)
-    const forecastData = forecast.map((value, index) => ({
-      month: `F${index + 1}`,
-      revenue: null,
-      forecast: value,
-      isForecast: true,
-    }));
+      // Forecast next 7 periods
+      forecast = forecastLinear(revenues, 7);
+
+      // Confidence interval
+      ci = confidenceInterval(revenues, 0.95);
+
+      // Prepare forecast data points (continuing from last actual data point)
+      forecastData = forecast.map((value, index) => ({
+        month: `F${index + 1}`,
+        revenue: null,
+        forecast: value,
+        isForecast: true,
+      }));
+    } else {
+      // Return null arrays if not enough data
+      trendLine = chartData.map(() => null);
+      forecastData = [];
+    }
 
     return {
       totalRevenue,
@@ -133,6 +148,7 @@ export default React.memo(function SalesChart({
       forecastData,
       ci,
       regression,
+      hasEnoughData, // ✅ Flag to conditionally render forecast/trend lines
     };
   }, [chartData]);
 
@@ -197,7 +213,7 @@ export default React.memo(function SalesChart({
                 <TrendingDown className="h-4 w-4 mr-1 text-red-600" />
               )}
               <span className={statistics.revenueChange >= 0 ? "text-green-600" : "text-red-600"}>
-                {Math.abs(statistics.revenueChange).toFixed(1)}%
+                {Math.abs(statistics.revenueChange ?? 0).toFixed(1)}%
               </span>
             </div>
             <div className="text-right">
@@ -218,11 +234,13 @@ export default React.memo(function SalesChart({
             Std Dev: ₹{statistics.stdDev.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
           </Badge>
           <Badge variant="outline">
-            R²: {(statistics.regression.r2 * 100).toFixed(1)}%
+            R²: {((statistics.regression?.r2 ?? 0) * 100).toFixed(1)}%
           </Badge>
-          <Badge variant="secondary">
-            Next Forecast: ₹{statistics.forecast[0]?.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-          </Badge>
+          {statistics.hasEnoughData && statistics.forecast[0] && (
+            <Badge variant="secondary">
+              Next Forecast: ₹{statistics.forecast[0].toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </Badge>
+          )}
         </div>
 
         <div style={{ height: `${Math.max(height, 400)}px` }}>
@@ -305,28 +323,32 @@ export default React.memo(function SalesChart({
                 connectNulls
               />
 
-              {/* Trend Line */}
-              <Line
-                type="monotone"
-                dataKey="trendLine"
-                name="Trend Line"
-                stroke="#f59e0b"
-                strokeWidth={2}
-                dot={false}
-                strokeDasharray="5 5"
-              />
+              {/* Trend Line - Only show if enough data */}
+              {statistics.hasEnoughData && (
+                <Line
+                  type="monotone"
+                  dataKey="trendLine"
+                  name="Trend Line"
+                  stroke="#f59e0b"
+                  strokeWidth={2}
+                  dot={false}
+                  strokeDasharray="5 5"
+                />
+              )}
 
-              {/* Forecast */}
-              <Line
-                type="monotone"
-                dataKey="forecast"
-                name="Forecast"
-                stroke="#8b5cf6"
-                strokeWidth={2}
-                strokeDasharray="8 4"
-                dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 3 }}
-                connectNulls
-              />
+              {/* Forecast - Only show if enough data */}
+              {statistics.hasEnoughData && (
+                <Line
+                  type="monotone"
+                  dataKey="forecast"
+                  name="Forecast"
+                  stroke="#8b5cf6"
+                  strokeWidth={2}
+                  strokeDasharray="8 4"
+                  dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 3 }}
+                  connectNulls
+                />
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -341,14 +363,18 @@ export default React.memo(function SalesChart({
             <div className="w-3 h-0.5 bg-green-500" style={{ width: '16px', height: '2px', borderTop: '2px dashed' }}></div>
             <span>7-Day MA</span>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-0.5 bg-amber-500" style={{ width: '16px', height: '2px', borderTop: '2px dashed' }}></div>
-            <span>Trend Line</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-0.5 bg-purple-500" style={{ width: '16px', height: '2px', borderTop: '2px dashed' }}></div>
-            <span>Forecast</span>
-          </div>
+          {statistics.hasEnoughData && (
+            <>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-0.5 bg-amber-500" style={{ width: '16px', height: '2px', borderTop: '2px dashed' }}></div>
+                <span>Trend Line</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-0.5 bg-purple-500" style={{ width: '16px', height: '2px', borderTop: '2px dashed' }}></div>
+                <span>Forecast</span>
+              </div>
+            </>
+          )}
         </div>
       </CardContent>
     </Card>

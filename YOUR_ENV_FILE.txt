@@ -1,0 +1,18 @@
+# COPY THIS ENTIRE FILE CONTENT TO A NEW FILE NAMED: .env
+# (Create .env file in the project root directory)
+
+# Supabase Configuration
+VITE_SUPABASE_URL=https://rxyatfvjjnvjxwyhhhqn.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4eWF0ZnZqam52anh3eWhoaHFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMyMTM5NTAsImV4cCI6MjA3ODc4OTk1MH0.-Wl0SbWhsteLfCHOJkBRuqTfq5PaCjrk4RyPboFopnY
+
+# Server Configuration
+PORT=5000
+HOST=0.0.0.0
+NODE_ENV=development
+
+# Session Secret (generate a random string for production)
+SESSION_SECRET=fabzclean-dev-secret-change-in-production
+
+# Optional: Static IP for network access
+STATIC_IP=117.218.59.207
+
