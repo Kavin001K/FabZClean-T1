@@ -1,4 +1,4 @@
-Flask==2.3.4
+Flask==3.0.3
 SQLAlchemy==2.0.19
 Flask-Migrate==4.0.4
 PyMySQL==1.1.0
