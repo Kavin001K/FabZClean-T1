@@ -1,7 +1,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, HelpCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -18,17 +18,17 @@ interface KpiCardProps {
   className?: string;
 }
 
-export default React.memo(function KpiCard({ 
-  title, 
-  value, 
-  change, 
-  changeType = "neutral", 
-  icon, 
-  animationDelay = 0, 
+export default React.memo(function KpiCard({
+  title,
+  value,
+  change,
+  changeType = "neutral",
+  icon,
+  animationDelay = 0,
   details,
   description,
   isLoading = false,
-  className 
+  className
 }: KpiCardProps) {
   const formatValue = (val: string | number | undefined | null) => {
     if (typeof val === 'number') {
@@ -131,6 +131,9 @@ export default React.memo(function KpiCard({
               <span>{title}</span>
               {icon}
             </DialogTitle>
+            <DialogDescription>
+              Detailed breakdown and analytics for {title}
+            </DialogDescription>
           </DialogHeader>
           <div className="mt-4">
             {details}

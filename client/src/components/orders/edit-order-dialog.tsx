@@ -5,6 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Order } from "../../../shared/schema";
+import type { Order } from "../../../../shared/schema";
 
 export interface EditOrderDialogProps {
   order: Order | null;
@@ -39,10 +40,6 @@ export default React.memo(function EditOrderDialog({
   useEffect(() => {
     if (order) {
       setFormData({
-        customerName: order.customerName,
-        orderNumber: order.orderNumber,
-        status: order.status,
-        totalAmount: order.totalAmount,
         ...order,
       });
     }
@@ -68,6 +65,9 @@ export default React.memo(function EditOrderDialog({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Edit Order: {order.id}</DialogTitle>
+          <DialogDescription>
+            Update order details and status.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
@@ -244,7 +244,7 @@ export default React.memo(function EditOrderDialog({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button 
+          <Button
             onClick={handleSave}
             disabled={isLoading}
           >

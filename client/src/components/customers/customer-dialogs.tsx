@@ -179,174 +179,177 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
       <Dialog open={isViewDialogOpen} onOpenChange={onCloseViewDialog}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           {selectedCustomer ? (
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-          >
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                <span className="text-lg font-semibold text-primary">
-                  {selectedCustomer.name.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div>
-                <div className="text-xl font-semibold">{selectedCustomer.name}</div>
-                <div className="text-sm text-muted-foreground">
-                  Customer since {customerSince.toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long'
-                  })}
-                </div>
-              </div>
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-6">
-            {/* Customer Info */}
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Email</Label>
-                  <p className="text-sm">{selectedCustomer.email || 'Not provided'}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
-                  <p className="text-sm">{selectedCustomer.phone || 'Not provided'}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Address</Label>
-                  <p className="text-sm">{selectedCustomer.address || 'Not provided'}</p>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">{totalOrders}</div>
-                    <div className="text-sm text-muted-foreground">Total Orders</div>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                    <span className="text-lg font-semibold text-primary">
+                      {selectedCustomer.name.charAt(0).toUpperCase()}
+                    </span>
                   </div>
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">
-                      ₹{totalSpent.toLocaleString('en-IN')}
+                  <div>
+                    <div className="text-xl font-semibold">{selectedCustomer.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      Customer since {customerSince.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long'
+                      })}
                     </div>
-                    <div className="text-sm text-muted-foreground">Total Spent</div>
+                  </div>
+                </DialogTitle>
+                <DialogDescription className="sr-only">
+                  Detailed view of customer information, order history, and analytics
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-6">
+                {/* Customer Info */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Email</Label>
+                      <p className="text-sm">{selectedCustomer.email || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
+                      <p className="text-sm">{selectedCustomer.phone || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Address</Label>
+                      <p className="text-sm">{selectedCustomer.address || 'Not provided'}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <div className="text-2xl font-bold text-primary">{totalOrders}</div>
+                        <div className="text-sm text-muted-foreground">Total Orders</div>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <div className="text-2xl font-bold text-primary">
+                          ₹{totalSpent.toLocaleString('en-IN')}
+                        </div>
+                        <div className="text-sm text-muted-foreground">Total Spent</div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Badge variant={totalOrders > 5 ? 'default' : 'secondary'}>
+                        {totalOrders > 5 ? 'Loyal Customer' : 'Regular Customer'}
+                      </Badge>
+                      <Badge variant={totalSpent > 10000 ? 'default' : 'outline'}>
+                        {totalSpent > 10000 ? 'High Value' : 'Standard'}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
-                
-                <div className="flex gap-2">
-                  <Badge variant={totalOrders > 5 ? 'default' : 'secondary'}>
-                    {totalOrders > 5 ? 'Loyal Customer' : 'Regular Customer'}
-                  </Badge>
-                  <Badge variant={totalSpent > 10000 ? 'default' : 'outline'}>
-                    {totalSpent > 10000 ? 'High Value' : 'Standard'}
-                  </Badge>
+
+                <Separator />
+
+                {/* Customer Insights */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="border-l-4 border-l-blue-500">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-blue-500" />
+                        Order Frequency
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-blue-600">
+                        {totalOrders > 0 ? `${Math.round(totalOrders / Math.max(daysSinceJoined, 1) * 30)}` : '0'}
+                      </div>
+                      <p className="text-xs text-muted-foreground">orders per month</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-l-4 border-l-green-500">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-green-500" />
+                        Average Order Value
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-green-600">
+                        ₹{totalOrders > 0 ? Math.round(totalSpent / totalOrders).toLocaleString('en-IN') : '0'}
+                      </div>
+                      <p className="text-xs text-muted-foreground">per order</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-l-4 border-l-purple-500">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Star className="h-4 w-4 text-purple-500" />
+                        Customer Rating
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-purple-600">
+                        {totalOrders > 5 ? '4.8' : totalOrders > 2 ? '4.5' : '4.2'}
+                      </div>
+                      <p className="text-xs text-muted-foreground">out of 5.0</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Separator />
+
+                {/* Recent Orders */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Order #</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Services</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead>Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {mockRecentOrders.map((order) => (
+                        <TableRow key={order.id}>
+                          <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(order.status)}>
+                              {order.status ? order.status.replace('_', ' ') : 'Unknown'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {order.services.map((service, index) => (
+                                <Badge key={index} variant="outline" className="text-xs">
+                                  {service}
+                                </Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-medium">{order.total}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDate(order.createdAt)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
-            </div>
 
-            <Separator />
-
-            {/* Customer Insights */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="border-l-4 border-l-blue-500">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-blue-500" />
-                    Order Frequency
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">
-                    {totalOrders > 0 ? `${Math.round(totalOrders / Math.max(daysSinceJoined, 1) * 30)}` : '0'}
-                  </div>
-                  <p className="text-xs text-muted-foreground">orders per month</p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-l-4 border-l-green-500">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-green-500" />
-                    Average Order Value
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">
-                    ₹{totalOrders > 0 ? Math.round(totalSpent / totalOrders).toLocaleString('en-IN') : '0'}
-                  </div>
-                  <p className="text-xs text-muted-foreground">per order</p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-l-4 border-l-purple-500">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <Star className="h-4 w-4 text-purple-500" />
-                    Customer Rating
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-purple-600">
-                    {totalOrders > 5 ? '4.8' : totalOrders > 2 ? '4.5' : '4.2'}
-                  </div>
-                  <p className="text-xs text-muted-foreground">out of 5.0</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Separator />
-
-            {/* Recent Orders */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order #</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Services</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockRecentOrders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(order.status)}>
-                          {order.status ? order.status.replace('_', ' ') : 'Unknown'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {order.services.map((service, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {service}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">{order.total}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDate(order.createdAt)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={onCloseViewDialog}>
-              Close
-            </Button>
-          </DialogFooter>
-          </motion.div>
+              <DialogFooter>
+                <Button variant="outline" onClick={onCloseViewDialog}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </motion.div>
           ) : null}
         </DialogContent>
       </Dialog>
@@ -355,119 +358,119 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
       <Dialog open={isEditDialogOpen} onOpenChange={onCloseEditDialog}>
         <DialogContent>
           {selectedCustomer ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-          >
-          <DialogHeader>
-            <DialogTitle>Edit Customer</DialogTitle>
-            <DialogDescription>
-              Update customer information below.
-            </DialogDescription>
-          </DialogHeader>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <DialogHeader>
+                <DialogTitle>Edit Customer</DialogTitle>
+                <DialogDescription>
+                  Update customer information below.
+                </DialogDescription>
+              </DialogHeader>
 
-          <form onSubmit={editForm.handleSubmit(handleEditSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Name *</Label>
-              <Input
-                id="edit-name"
-                {...editForm.register('name')}
-                className={cn(
-                  editForm.formState.errors.name && 'border-red-500'
-                )}
-              />
-              {editForm.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {editForm.formState.errors.name.message}
-                </p>
-              )}
-            </div>
+              <form onSubmit={editForm.handleSubmit(handleEditSubmit)} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">Name *</Label>
+                  <Input
+                    id="edit-name"
+                    {...editForm.register('name')}
+                    className={cn(
+                      editForm.formState.errors.name && 'border-red-500'
+                    )}
+                  />
+                  {editForm.formState.errors.name && (
+                    <p className="text-sm text-red-500">
+                      {editForm.formState.errors.name.message}
+                    </p>
+                  )}
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                {...editForm.register('email')}
-                className={cn(
-                  editForm.formState.errors.email && 'border-red-500'
-                )}
-              />
-              {editForm.formState.errors.email && (
-                <p className="text-sm text-red-500">
-                  {editForm.formState.errors.email.message}
-                </p>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    {...editForm.register('email')}
+                    className={cn(
+                      editForm.formState.errors.email && 'border-red-500'
+                    )}
+                  />
+                  {editForm.formState.errors.email && (
+                    <p className="text-sm text-red-500">
+                      {editForm.formState.errors.email.message}
+                    </p>
+                  )}
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-phone">Phone *</Label>
-              <Input
-                id="edit-phone"
-                type="tel"
-                {...editForm.register('phone')}
-                className={cn(
-                  editForm.formState.errors.phone && 'border-red-500'
-                )}
-              />
-              {editForm.formState.errors.phone && (
-                <p className="text-sm text-red-500">
-                  {editForm.formState.errors.phone.message}
-                </p>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-phone">Phone *</Label>
+                  <Input
+                    id="edit-phone"
+                    type="tel"
+                    {...editForm.register('phone')}
+                    className={cn(
+                      editForm.formState.errors.phone && 'border-red-500'
+                    )}
+                  />
+                  {editForm.formState.errors.phone && (
+                    <p className="text-sm text-red-500">
+                      {editForm.formState.errors.phone.message}
+                    </p>
+                  )}
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-address">Address</Label>
-              <Textarea
-                id="edit-address"
-                {...editForm.register('address')}
-                placeholder="Enter customer address"
-                className={cn(
-                  editForm.formState.errors.address && 'border-red-500'
-                )}
-              />
-              {editForm.formState.errors.address && (
-                <p className="text-sm text-red-500">
-                  {editForm.formState.errors.address.message}
-                </p>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-address">Address</Label>
+                  <Textarea
+                    id="edit-address"
+                    {...editForm.register('address')}
+                    placeholder="Enter customer address"
+                    className={cn(
+                      editForm.formState.errors.address && 'border-red-500'
+                    )}
+                  />
+                  {editForm.formState.errors.address && (
+                    <p className="text-sm text-red-500">
+                      {editForm.formState.errors.address.message}
+                    </p>
+                  )}
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-notes">Notes</Label>
-              <Textarea
-                id="edit-notes"
-                {...editForm.register('notes')}
-                placeholder="Add any notes about this customer"
-                className={cn(
-                  editForm.formState.errors.notes && 'border-red-500'
-                )}
-              />
-              {editForm.formState.errors.notes && (
-                <p className="text-sm text-red-500">
-                  {editForm.formState.errors.notes.message}
-                </p>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-notes">Notes</Label>
+                  <Textarea
+                    id="edit-notes"
+                    {...editForm.register('notes')}
+                    placeholder="Add any notes about this customer"
+                    className={cn(
+                      editForm.formState.errors.notes && 'border-red-500'
+                    )}
+                  />
+                  {editForm.formState.errors.notes && (
+                    <p className="text-sm text-red-500">
+                      {editForm.formState.errors.notes.message}
+                    </p>
+                  )}
+                </div>
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onCloseEditDialog}
-                disabled={isUpdating}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isUpdating}>
-                {isUpdating ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </DialogFooter>
-          </form>
-          </motion.div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onCloseEditDialog}
+                    disabled={isUpdating}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isUpdating}>
+                    {isUpdating ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </motion.div>
           ) : null}
         </DialogContent>
       </Dialog>
@@ -481,122 +484,122 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
           >
-          <DialogHeader>
-            <DialogTitle>Add New Customer</DialogTitle>
-            <DialogDescription>
-              Enter customer information below. They will receive a welcome email with special offers.
-            </DialogDescription>
-          </DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Add New Customer</DialogTitle>
+              <DialogDescription>
+                Enter customer information below. They will receive a welcome email with special offers.
+              </DialogDescription>
+            </DialogHeader>
 
-          <form onSubmit={createForm.handleSubmit(handleCreateSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="create-name">Name *</Label>
-              <Input
-                id="create-name"
-                {...createForm.register('name')}
-                placeholder="Enter customer name"
-                className={cn(
-                  createForm.formState.errors.name && 'border-red-500'
+            <form onSubmit={createForm.handleSubmit(handleCreateSubmit)} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-name">Name *</Label>
+                <Input
+                  id="create-name"
+                  {...createForm.register('name')}
+                  placeholder="Enter customer name"
+                  className={cn(
+                    createForm.formState.errors.name && 'border-red-500'
+                  )}
+                />
+                {createForm.formState.errors.name && (
+                  <p className="text-sm text-red-500">
+                    {createForm.formState.errors.name.message}
+                  </p>
                 )}
-              />
-              {createForm.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {createForm.formState.errors.name.message}
-                </p>
-              )}
-            </div>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="create-email">Email</Label>
-              <Input
-                id="create-email"
-                type="email"
-                {...createForm.register('email')}
-                placeholder="Enter email address"
-                className={cn(
-                  createForm.formState.errors.email && 'border-red-500'
+              <div className="space-y-2">
+                <Label htmlFor="create-email">Email</Label>
+                <Input
+                  id="create-email"
+                  type="email"
+                  {...createForm.register('email')}
+                  placeholder="Enter email address"
+                  className={cn(
+                    createForm.formState.errors.email && 'border-red-500'
+                  )}
+                />
+                {createForm.formState.errors.email && (
+                  <p className="text-sm text-red-500">
+                    {createForm.formState.errors.email.message}
+                  </p>
                 )}
-              />
-              {createForm.formState.errors.email && (
-                <p className="text-sm text-red-500">
-                  {createForm.formState.errors.email.message}
-                </p>
-              )}
-            </div>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="create-phone">Phone *</Label>
-              <Input
-                id="create-phone"
-                type="tel"
-                {...createForm.register('phone')}
-                placeholder="Enter phone number"
-                className={cn(
-                  createForm.formState.errors.phone && 'border-red-500'
+              <div className="space-y-2">
+                <Label htmlFor="create-phone">Phone *</Label>
+                <Input
+                  id="create-phone"
+                  type="tel"
+                  {...createForm.register('phone')}
+                  placeholder="Enter phone number"
+                  className={cn(
+                    createForm.formState.errors.phone && 'border-red-500'
+                  )}
+                />
+                {createForm.formState.errors.phone && (
+                  <p className="text-sm text-red-500">
+                    {createForm.formState.errors.phone.message}
+                  </p>
                 )}
-              />
-              {createForm.formState.errors.phone && (
-                <p className="text-sm text-red-500">
-                  {createForm.formState.errors.phone.message}
-                </p>
-              )}
-            </div>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="create-address">Address</Label>
-              <Textarea
-                id="create-address"
-                {...createForm.register('address')}
-                placeholder="Enter customer address"
-                className={cn(
-                  createForm.formState.errors.address && 'border-red-500'
+              <div className="space-y-2">
+                <Label htmlFor="create-address">Address</Label>
+                <Textarea
+                  id="create-address"
+                  {...createForm.register('address')}
+                  placeholder="Enter customer address"
+                  className={cn(
+                    createForm.formState.errors.address && 'border-red-500'
+                  )}
+                />
+                {createForm.formState.errors.address && (
+                  <p className="text-sm text-red-500">
+                    {createForm.formState.errors.address.message}
+                  </p>
                 )}
-              />
-              {createForm.formState.errors.address && (
-                <p className="text-sm text-red-500">
-                  {createForm.formState.errors.address.message}
-                </p>
-              )}
-            </div>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="create-notes">Notes</Label>
-              <Textarea
-                id="create-notes"
-                {...createForm.register('notes')}
-                placeholder="Add any notes about this customer"
-                className={cn(
-                  createForm.formState.errors.notes && 'border-red-500'
+              <div className="space-y-2">
+                <Label htmlFor="create-notes">Notes</Label>
+                <Textarea
+                  id="create-notes"
+                  {...createForm.register('notes')}
+                  placeholder="Add any notes about this customer"
+                  className={cn(
+                    createForm.formState.errors.notes && 'border-red-500'
+                  )}
+                />
+                {createForm.formState.errors.notes && (
+                  <p className="text-sm text-red-500">
+                    {createForm.formState.errors.notes.message}
+                  </p>
                 )}
-              />
-              {createForm.formState.errors.notes && (
-                <p className="text-sm text-red-500">
-                  {createForm.formState.errors.notes.message}
+              </div>
+
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Welcome Package:</strong> New customers will receive a welcome email with
+                  special offers and service information.
                 </p>
-              )}
-            </div>
+              </div>
 
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Welcome Package:</strong> New customers will receive a welcome email with 
-                special offers and service information.
-              </p>
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onCloseCreateDialog}
-                disabled={isCreating}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isCreating}>
-                {isCreating ? 'Creating...' : 'Create Customer'}
-              </Button>
-            </DialogFooter>
-          </form>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onCloseCreateDialog}
+                  disabled={isCreating}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isCreating}>
+                  {isCreating ? 'Creating...' : 'Create Customer'}
+                </Button>
+              </DialogFooter>
+            </form>
           </motion.div>
         </DialogContent>
       </Dialog>

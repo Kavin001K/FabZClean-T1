@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -77,8 +78,11 @@ export default React.memo(function BulkActionsDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Bulk Actions</DialogTitle>
+          <DialogDescription>
+            Perform actions on {selectedCount} selected orders.
+          </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-6 py-4">
           <div className="text-center">
             <p className="text-sm text-muted-foreground">

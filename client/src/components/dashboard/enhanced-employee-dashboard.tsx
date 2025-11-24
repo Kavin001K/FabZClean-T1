@@ -51,7 +51,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/data';
@@ -346,7 +346,7 @@ export default function EnhancedEmployeeDashboard() {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Hours Worked</CardTitle>
@@ -359,7 +359,7 @@ export default function EnhancedEmployeeDashboard() {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Monthly Salary</CardTitle>
@@ -372,7 +372,7 @@ export default function EnhancedEmployeeDashboard() {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Efficiency</CardTitle>
@@ -403,13 +403,13 @@ export default function EnhancedEmployeeDashboard() {
                     <span className="text-sm font-bold">{monthlyStats.ordersProcessed}</span>
                   </div>
                   <Progress value={(monthlyStats.ordersProcessed / 120) * 100} className="h-2" />
-                  
+
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Total Hours</span>
                     <span className="text-sm font-bold">{monthlyStats.totalHours}h</span>
                   </div>
                   <Progress value={(monthlyStats.totalHours / 176) * 100} className="h-2" />
-                  
+
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Performance Rating</span>
                     <span className="text-sm font-bold flex items-center space-x-1">
@@ -703,8 +703,8 @@ export default function EnhancedEmployeeDashboard() {
                         </Badge>
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {transit.type === 'store_to_factory' ? 'Store → Factory' : 'Factory → Store'} • 
-                        {transit.totalItems || 0} items • 
+                        {transit.type === 'store_to_factory' ? 'Store → Factory' : 'Factory → Store'} •
+                        {transit.totalItems || 0} items •
                         {new Date(transit.createdAt).toLocaleDateString()}
                       </div>
                     </div>
@@ -798,13 +798,13 @@ export default function EnhancedEmployeeDashboard() {
                     <span className="text-sm font-bold">{todayStats.ordersProcessed}</span>
                   </div>
                   <Progress value={(todayStats.ordersProcessed / 20) * 100} className="h-2" />
-                  
+
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Efficiency Rate</span>
                     <span className="text-sm font-bold">{todayStats.efficiency}%</span>
                   </div>
                   <Progress value={todayStats.efficiency} className="h-2" />
-                  
+
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Task Completion</span>
                     <span className="text-sm font-bold">
@@ -824,6 +824,9 @@ export default function EnhancedEmployeeDashboard() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Order Details</DialogTitle>
+            <DialogDescription>
+              View comprehensive details about the selected order.
+            </DialogDescription>
           </DialogHeader>
           {selectedOrder && (
             <div className="space-y-4">

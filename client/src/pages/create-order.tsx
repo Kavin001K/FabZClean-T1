@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Service, Order, Customer } from "../../../shared/schema";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
 import { ordersApi, customersApi } from "@/lib/data-service";
@@ -389,9 +389,8 @@ export default function CreateOrder() {
       return;
     }
 
-    const orderData: Partial<Order> = {
+    const orderData: any = {
       orderNumber: `ORD-${Date.now()}`,
-      customerId: currentCustomerId,
       customerName,
       customerEmail: customerEmail || undefined,
       customerPhone,
@@ -974,6 +973,9 @@ export default function CreateOrder() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Customer</DialogTitle>
+            <DialogDescription>
+              Enter details to create a new customer record.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1066,6 +1068,9 @@ export default function CreateOrder() {
               </motion.div>
               Order Created Successfully!
             </DialogTitle>
+            <DialogDescription>
+              The order has been successfully processed and saved.
+            </DialogDescription>
           </DialogHeader>
           <motion.div
             initial={{ opacity: 0, y: 20 }}

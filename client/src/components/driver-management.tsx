@@ -4,18 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Truck, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Clock, 
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Truck,
+  Phone,
+  Mail,
+  MapPin,
+  Clock,
   Star,
   Navigation,
   Fuel,
@@ -221,11 +221,11 @@ export const DriverManagement: React.FC<DriverManagementProps> = ({
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       if (editingDriver) {
         // Update existing driver
-        setDrivers(prev => prev.map(driver => 
-          driver.id === editingDriver.id 
+        setDrivers(prev => prev.map(driver =>
+          driver.id === editingDriver.id
             ? { ...driver, ...formData }
             : driver
         ));
@@ -250,7 +250,7 @@ export const DriverManagement: React.FC<DriverManagementProps> = ({
           description: `${formData.name} has been added successfully.`,
         });
       }
-      
+
       setIsDialogOpen(false);
     } catch (error) {
       toast({
@@ -322,6 +322,9 @@ export const DriverManagement: React.FC<DriverManagementProps> = ({
                 <DialogTitle>
                   {editingDriver ? 'Edit Driver' : 'Add New Driver'}
                 </DialogTitle>
+                <DialogDescription>
+                  {editingDriver ? 'Update driver information.' : 'Enter details for the new driver.'}
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -344,7 +347,7 @@ export const DriverManagement: React.FC<DriverManagementProps> = ({
                     />
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address</Label>
@@ -379,9 +382,9 @@ export const DriverManagement: React.FC<DriverManagementProps> = ({
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="vehicleType">Vehicle Type *</Label>
-                    <Select 
-                      value={formData.vehicleType} 
-                      onValueChange={(value: Driver['vehicleType']) => 
+                    <Select
+                      value={formData.vehicleType}
+                      onValueChange={(value: Driver['vehicleType']) =>
                         setFormData(prev => ({ ...prev, vehicleType: value }))
                       }
                     >
@@ -465,34 +468,34 @@ export const DriverManagement: React.FC<DriverManagementProps> = ({
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   {selectedOrderId && driver.status === 'available' && (
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => handleAssignDriver(driver.id)}
                     >
                       Assign to Order
                     </Button>
                   )}
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => onDriverSelect?.(driver)}
                   >
                     <Eye className="h-3 w-3 mr-1" />
                     View Details
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => handleEditDriver(driver)}
                   >
                     <Edit className="h-3 w-3" />
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => handleDeleteDriver(driver.id)}
                   >
@@ -500,7 +503,7 @@ export const DriverManagement: React.FC<DriverManagementProps> = ({
                   </Button>
                 </div>
               </div>
-              
+
               <div className="mt-3 grid grid-cols-4 gap-4 text-sm">
                 <div className="flex items-center gap-1">
                   <Navigation className="h-3 w-3" />

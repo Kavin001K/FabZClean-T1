@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -90,7 +90,7 @@ export default function EmployeeManagement() {
 
   // Mutations
   const createEmployeeMutation = useMutation({
-    mutationFn: (data: Partial<Employee> & { password?: string; username?: string }) => employeesApi.create(data),
+    mutationFn: (data: any) => employeesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       setIsCreateDialogOpen(false);
@@ -103,7 +103,7 @@ export default function EmployeeManagement() {
   });
 
   const updateEmployeeMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Employee> }) => employeesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: any }) => employeesApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       setIsEditDialogOpen(false);
@@ -160,7 +160,7 @@ export default function EmployeeManagement() {
       address: employeeForm.address,
       position: employeeForm.position,
       department: employeeForm.department,
-      hireDate: employeeForm.hireDate,
+      hireDate: new Date(employeeForm.hireDate),
       salaryType: employeeForm.salaryType,
       baseSalary: employeeForm.salaryType === 'monthly' ? parseFloat(employeeForm.baseSalary) : 0,
       hourlyRate: employeeForm.salaryType === 'hourly' ? parseFloat(employeeForm.hourlyRate) : undefined,
@@ -210,7 +210,7 @@ export default function EmployeeManagement() {
         address: employeeForm.address,
         position: employeeForm.position,
         department: employeeForm.department,
-        hireDate: employeeForm.hireDate,
+        hireDate: new Date(employeeForm.hireDate),
         salaryType: employeeForm.salaryType,
         baseSalary: employeeForm.salaryType === 'monthly' ? parseFloat(employeeForm.baseSalary) : 0,
         hourlyRate: employeeForm.salaryType === 'hourly' ? parseFloat(employeeForm.hourlyRate) : undefined,
@@ -295,6 +295,9 @@ export default function EmployeeManagement() {
                   <User className="w-5 h-5" />
                   Create New User
                 </DialogTitle>
+                <DialogDescription>
+                  Enter details to create a new user account.
+                </DialogDescription>
               </DialogHeader>
 
               <Tabs defaultValue="personal" className="space-y-4">
@@ -563,6 +566,9 @@ export default function EmployeeManagement() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update user information and role.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">

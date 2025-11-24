@@ -5,14 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { 
-  MapPin, 
-  Search, 
-  Truck, 
-  Clock, 
-  Navigation, 
-  Phone, 
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import {
+  MapPin,
+  Search,
+  Truck,
+  Clock,
+  Navigation,
+  Phone,
   MessageSquare,
   RefreshCw,
   Eye,
@@ -65,9 +65,9 @@ export default function LiveTrackingPage() {
   const {
     data: orders = [],
     isLoading: ordersLoading,
-    isError: ordersError,
+    error: ordersError,
     refetch: refetchOrders,
-  } = useQuery({
+  } = useQuery<Order[]>({
     queryKey: ['live-tracking-orders'],
     queryFn: async () => {
       const response = await fetch('/api/orders');
@@ -75,14 +75,14 @@ export default function LiveTrackingPage() {
       return response.json();
     },
     staleTime: 30 * 1000, // 30 seconds
-    cacheTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 2 * 60 * 1000, // 2 minutes
   });
 
   // Fetch drivers using React Query
   const {
     data: drivers = [],
     isLoading: driversLoading,
-    isError: driversError,
+    error: driversError,
     refetch: refetchDrivers,
   } = useQuery<DriverLocation[]>({
     queryKey: ['live-tracking-drivers'],
@@ -92,7 +92,7 @@ export default function LiveTrackingPage() {
       return response.json();
     },
     staleTime: 10 * 1000, // 10 seconds
-    cacheTime: 1 * 60 * 1000, // 1 minute
+    gcTime: 1 * 60 * 1000, // 1 minute
   });
 
   const isLoading = ordersLoading || driversLoading;
@@ -107,7 +107,7 @@ export default function LiveTrackingPage() {
   );
 
   // Get orders with active drivers
-  const ordersWithDrivers = orders.filter(order => 
+  const ordersWithDrivers = orders.filter(order =>
     activeDrivers.some(driver => driver.orderId === order.id)
   );
 
@@ -224,7 +224,7 @@ export default function LiveTrackingPage() {
               <p className="text-sm text-muted-foreground">
                 {ordersError?.message || driversError?.message || 'An unexpected error occurred'}
               </p>
-              <Button 
+              <Button
                 onClick={() => {
                   refetchOrders();
                   refetchDrivers();
@@ -276,9 +276,9 @@ export default function LiveTrackingPage() {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setShowAllDrivers(!showAllDrivers)}
           >
             {showAllDrivers ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
@@ -294,8 +294,11 @@ export default function LiveTrackingPage() {
             <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Driver Management</DialogTitle>
+                <DialogDescription>
+                  Manage driver profiles, assignments, and status.
+                </DialogDescription>
               </DialogHeader>
-              <DriverManagement 
+              <DriverManagement
                 onDriverSelect={handleDriverProfileSelect}
                 onDriverAssign={handleDriverAssign}
                 selectedOrderId={selectedOrder?.id}
@@ -337,11 +340,10 @@ export default function LiveTrackingPage() {
                   {filteredOrders.map((order) => {
                     const driver = activeDrivers.find(d => d.orderId === order.id);
                     return (
-                      <Card 
-                        key={order.id} 
-                        className={`cursor-pointer transition-colors ${
-                          selectedOrder?.id === order.id ? 'ring-2 ring-blue-500' : ''
-                        }`}
+                      <Card
+                        key={order.id}
+                        className={`cursor-pointer transition-colors ${selectedOrder?.id === order.id ? 'ring-2 ring-blue-500' : ''
+                          }`}
                         onClick={() => handleOrderSelect(order)}
                       >
                         <CardContent className="p-4">
@@ -358,7 +360,7 @@ export default function LiveTrackingPage() {
                               <p className="text-sm text-muted-foreground">{order.customerName}</p>
                               <p className="text-sm text-muted-foreground">₹{order.totalAmount}</p>
                             </div>
-                            
+
                             {driver ? (
                               <div className="text-right space-y-1">
                                 <div className="flex items-center gap-1 text-sm">
@@ -376,8 +378,8 @@ export default function LiveTrackingPage() {
                               </div>
                             ) : (
                               <div className="text-right">
-                                <Button 
-                                  size="sm" 
+                                <Button
+                                  size="sm"
                                   variant="outline"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -414,11 +416,10 @@ export default function LiveTrackingPage() {
                 {activeDrivers.map((driver) => {
                   const order = orders.find(o => o.id === driver.orderId);
                   return (
-                    <Card 
+                    <Card
                       key={driver.driverId}
-                      className={`cursor-pointer transition-colors ${
-                        selectedDriver?.driverId === driver.driverId ? 'ring-2 ring-blue-500' : ''
-                      }`}
+                      className={`cursor-pointer transition-colors ${selectedDriver?.driverId === driver.driverId ? 'ring-2 ring-blue-500' : ''
+                        }`}
                       onClick={() => handleDriverSelect(driver)}
                     >
                       <CardContent className="p-4">
@@ -437,7 +438,7 @@ export default function LiveTrackingPage() {
                               </>
                             )}
                           </div>
-                          
+
                           <div className="text-right space-y-1">
                             <div className="flex items-center gap-1 text-sm">
                               <Navigation className="h-3 w-3" />
@@ -463,7 +464,7 @@ export default function LiveTrackingPage() {
         </TabsContent>
 
         <TabsContent value="management" className="space-y-4">
-          <DriverManagement 
+          <DriverManagement
             onDriverSelect={handleDriverProfileSelect}
             onDriverAssign={handleDriverAssign}
             selectedOrderId={selectedOrder?.id}
@@ -474,9 +475,8 @@ export default function LiveTrackingPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2">
               {selectedOrder || selectedDriver || activeDrivers.length > 0 ? (
-                <LiveTrackingMap 
-                  orderId={selectedOrder?.id}
-                  driverId={selectedDriver?.driverId}
+                <LiveTrackingMap
+                  driver={selectedDriver}
                   allDrivers={activeDrivers}
                   showAllDrivers={showAllDrivers}
                   className="w-full h-[600px]"
@@ -495,31 +495,31 @@ export default function LiveTrackingPage() {
                 </Card>
               )}
             </div>
-            
+
             <div className="space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full justify-start"
                     onClick={() => setIsDriverManagementOpen(true)}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add New Driver
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full justify-start"
                     onClick={refreshData}
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Refresh Data
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full justify-start"
                     onClick={() => setShowAllDrivers(!showAllDrivers)}
                   >

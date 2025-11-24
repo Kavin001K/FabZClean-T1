@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,12 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
-import { 
-  DollarSign, 
-  CreditCard, 
-  Smartphone, 
-  Banknote, 
-  CheckCircle, 
+import {
+  DollarSign,
+  CreditCard,
+  Smartphone,
+  Banknote,
+  CheckCircle,
   AlertCircle,
   Receipt,
   Calculator
@@ -71,7 +71,7 @@ const paymentMethods: PaymentMethod[] = [
 export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPaymentModalProps) {
   const { toast } = useToast();
   const { addNotification } = useNotifications();
-  
+
   const [isOpen, setIsOpen] = useState(false);
   const [paymentType, setPaymentType] = useState<'advance' | 'delivery' | 'full'>('advance');
   const [selectedMethod, setSelectedMethod] = useState<string>('cash');
@@ -149,8 +149,8 @@ export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPayme
 
       const updatedOrder = {
         ...order,
-        advancePaid: paymentType === 'advance' ? 
-          (advancePaid + parseFloat(amount)).toString() : 
+        advancePaid: paymentType === 'advance' ?
+          (advancePaid + parseFloat(amount)).toString() :
           order.advancePaid,
         paymentStatus: newPaymentStatus
       };
@@ -223,6 +223,9 @@ export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPayme
             <Receipt className="w-5 h-5" />
             Payment for Order {order.orderNumber}
           </DialogTitle>
+          <DialogDescription>
+            Process payment for order #{order.orderNumber}. Choose payment type and method.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -398,9 +401,9 @@ export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPayme
 
           {/* Action Buttons */}
           <div className="flex gap-2">
-            <Button 
-              onClick={handlePayment} 
-              className="flex-1" 
+            <Button
+              onClick={handlePayment}
+              className="flex-1"
               disabled={isProcessing || !amount}
             >
               {isProcessing ? (

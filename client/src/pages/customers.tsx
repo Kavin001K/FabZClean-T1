@@ -55,7 +55,7 @@ import { CustomerDialogs } from '@/components/customers/customer-dialogs';
 import { customersApi, ordersApi } from '@/lib/data-service';
 import { exportCustomersEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportCustomersToExcel } from '@/lib/excel-exports';
-import type { Customer, Order } from '../../shared/schema';
+import type { Customer, Order } from '../../../shared/schema';
 
 // Helper functions
 const getInitials = (name: string) => {
@@ -99,7 +99,7 @@ export default function Customers() {
 
   // Fetch customers data
   const {
-    data: customers = [],
+    data: customersData,
     isLoading: customersLoading,
     isError: customersError,
     error: customersErrorDetails,
@@ -109,6 +109,20 @@ export default function Customers() {
     staleTime: 5 * 60 * 1000,
     retry: 3,
   });
+
+  // Ensure customers is always an array
+  const customers = useMemo(() => {
+    if (!customersData) return [];
+    if (Array.isArray(customersData)) return customersData;
+    // Handle case where API returns wrapped data
+    if (customersData && typeof customersData === 'object') {
+      const wrappedData = customersData as { data?: unknown };
+      if ('data' in wrappedData && Array.isArray(wrappedData.data)) {
+        return wrappedData.data as Customer[];
+      }
+    }
+    return [];
+  }, [customersData]);
 
   // Fetch orders for customer analytics
   const {

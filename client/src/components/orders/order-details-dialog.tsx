@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +19,7 @@ import {
   Printer,
 } from "lucide-react";
 import { formatCurrency, formatDate, getNextStatus } from "@/lib/data-service";
-import type { Order } from "../../../shared/schema";
+import type { Order } from "../../../../shared/schema";
 import { cn } from "@/lib/utils";
 import { useInvoicePrint } from "@/hooks/use-invoice-print";
 
@@ -74,7 +75,7 @@ export default React.memo(function OrderDetailsDialog({
     onSuccess: (invoiceData) => {
       console.log('Invoice printed successfully:', invoiceData);
       // Call the original onPrintInvoice callback if provided
-      onPrintInvoice(order);
+      if (order) onPrintInvoice(order);
     },
     onError: (error) => {
       console.error('Invoice print failed:', error);
@@ -104,6 +105,9 @@ export default React.memo(function OrderDetailsDialog({
               </span>
             </Badge>
           </DialogTitle>
+          <DialogDescription>
+            View detailed information about the order.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
@@ -144,14 +148,14 @@ export default React.memo(function OrderDetailsDialog({
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Order Date</p>
                 <p className="text-lg font-semibold">
-                  {formatDate(order.createdAt || new Date())}
+                  {formatDate(order.createdAt ? order.createdAt.toString() : new Date().toString())}
                 </p>
               </div>
 
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Pickup Date</p>
                 <p className="text-lg font-semibold">
-                  {formatDate((order as any).pickupDate || order.createdAt || new Date())}
+                  {formatDate((order as any).pickupDate ? new Date((order as any).pickupDate).toString() : (order.createdAt ? order.createdAt.toString() : new Date().toString()))}
                 </p>
               </div>
 
@@ -212,36 +216,36 @@ export default React.memo(function OrderDetailsDialog({
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2 pt-4 border-t">
             {nextStatus && (
-              <Button 
-                onClick={() => onNextStep(order)} 
+              <Button
+                onClick={() => onNextStep(order)}
                 className="gap-2"
               >
                 <PlusCircle className="h-4 w-4" />
                 Next Step: {nextStatus}
               </Button>
             )}
-            
-            <Button 
-              variant="outline" 
+
+            <Button
+              variant="outline"
               onClick={() => onEdit(order)}
               className="gap-2"
             >
               <Edit className="h-4 w-4" />
               Edit Order
             </Button>
-            
-            <Button 
-              variant="outline" 
+
+            <Button
+              variant="outline"
               onClick={handlePrintInvoice}
               className="gap-2"
             >
               <Printer className="h-4 w-4" />
               Print Invoice
             </Button>
-            
+
             {order.status !== 'completed' && order.status !== 'cancelled' && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => onCancel(order)}
                 className="gap-2 text-red-600 hover:text-red-700"
               >

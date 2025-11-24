@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,12 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
-import { 
-  Clock, 
-  Calendar, 
-  Timer, 
-  FileText, 
-  User, 
+import {
+  Clock,
+  Calendar,
+  Timer,
+  FileText,
+  User,
   DollarSign,
   MapPin,
   Truck,
@@ -53,19 +53,19 @@ interface TimeOffRequest {
 export default function EmployeeQuickActions({ employeeId, employeeName }: EmployeeQuickActionsProps) {
   const { toast } = useToast();
   const { addNotification } = useNotifications();
-  
+
   // State for different actions
   const [isClockDialogOpen, setIsClockDialogOpen] = useState(false);
   const [isTimeOffDialogOpen, setIsTimeOffDialogOpen] = useState(false);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [isPayslipDialogOpen, setIsPayslipDialogOpen] = useState(false);
-  
+
   // Attendance state
   const [currentStatus, setCurrentStatus] = useState<'checked_in' | 'checked_out' | 'on_break'>('checked_out');
   const [checkInTime, setCheckInTime] = useState<string | null>(null);
   const [breakStartTime, setBreakStartTime] = useState<string | null>(null);
-  
+
   // Time off request state
   const [timeOffForm, setTimeOffForm] = useState({
     startDate: '',
@@ -73,14 +73,14 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
     reason: '',
     type: 'personal' as 'sick' | 'personal' | 'vacation' | 'emergency'
   });
-  
+
   // Report state
   const [reportForm, setReportForm] = useState({
     title: '',
     description: '',
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent'
   });
-  
+
   // Profile state
   const [profileForm, setProfileForm] = useState({
     phone: '',
@@ -92,7 +92,7 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
   // Clock In/Out functionality
   const handleClockAction = () => {
     const now = new Date().toISOString();
-    
+
     if (currentStatus === 'checked_out') {
       setCurrentStatus('checked_in');
       setCheckInTime(now);
@@ -126,7 +126,7 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
   // Break functionality
   const handleBreakAction = () => {
     const now = new Date().toISOString();
-    
+
     if (currentStatus === 'checked_in') {
       setCurrentStatus('on_break');
       setBreakStartTime(now);
@@ -201,12 +201,12 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
       actionUrl: '/employee-dashboard',
       actionText: 'View Reports'
     });
-    
+
     toast({
       title: "Report Submitted",
       description: "Your report has been sent to management.",
     });
-    
+
     setIsReportDialogOpen(false);
     setReportForm({ title: '', description: '', priority: 'medium' });
   };
@@ -218,12 +218,12 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
       title: 'Profile Updated!',
       message: "Your profile information has been updated successfully.",
     });
-    
+
     toast({
       title: "Profile Updated",
       description: "Your profile has been updated successfully.",
     });
-    
+
     setIsProfileDialogOpen(false);
   };
 
@@ -324,13 +324,16 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
               <Clock className="w-5 h-5" />
               {currentStatus === 'checked_out' ? 'Clock In' : 'Clock Out'}
             </DialogTitle>
+            <DialogDescription>
+              {currentStatus === 'checked_out' ? 'Start your work day' : 'End your work day and clock out'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="text-center p-4 bg-muted/50 rounded-lg">
               <p className="text-sm text-muted-foreground">Current Status</p>
               <p className="text-lg font-semibold capitalize">
-                {currentStatus === 'checked_out' ? 'Not Working' : 
-                 currentStatus === 'on_break' ? 'On Break' : 'Working'}
+                {currentStatus === 'checked_out' ? 'Not Working' :
+                  currentStatus === 'on_break' ? 'On Break' : 'Working'}
               </p>
               {checkInTime && (
                 <p className="text-sm text-muted-foreground mt-2">
@@ -338,7 +341,7 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
                 </p>
               )}
             </div>
-            
+
             <div className="flex gap-2">
               <Button onClick={handleClockAction} className="flex-1">
                 {currentStatus === 'checked_out' ? 'Clock In' : 'Clock Out'}
@@ -361,6 +364,9 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
               <Calendar className="w-5 h-5" />
               Request Time Off
             </DialogTitle>
+            <DialogDescription>
+              Submit a time off request for sick leave, vacation, or personal time.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -370,7 +376,7 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
                   id="startDate"
                   type="date"
                   value={timeOffForm.startDate}
-                  onChange={(e) => setTimeOffForm({...timeOffForm, startDate: e.target.value})}
+                  onChange={(e) => setTimeOffForm({ ...timeOffForm, startDate: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
@@ -379,14 +385,14 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
                   id="endDate"
                   type="date"
                   value={timeOffForm.endDate}
-                  onChange={(e) => setTimeOffForm({...timeOffForm, endDate: e.target.value})}
+                  onChange={(e) => setTimeOffForm({ ...timeOffForm, endDate: e.target.value })}
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="type">Leave Type</Label>
-              <Select value={timeOffForm.type} onValueChange={(value: any) => setTimeOffForm({...timeOffForm, type: value})}>
+              <Select value={timeOffForm.type} onValueChange={(value: any) => setTimeOffForm({ ...timeOffForm, type: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -398,17 +404,17 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="reason">Reason</Label>
               <Textarea
                 id="reason"
                 placeholder="Please provide a reason for your leave request..."
                 value={timeOffForm.reason}
-                onChange={(e) => setTimeOffForm({...timeOffForm, reason: e.target.value})}
+                onChange={(e) => setTimeOffForm({ ...timeOffForm, reason: e.target.value })}
               />
             </div>
-            
+
             <div className="flex gap-2">
               <Button onClick={handleTimeOffRequest} className="flex-1">
                 Submit Request
@@ -429,6 +435,9 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
               <FileText className="w-5 h-5" />
               Submit Report
             </DialogTitle>
+            <DialogDescription>
+              Submit a work report or issue to management.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -437,13 +446,13 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
                 id="reportTitle"
                 placeholder="Enter report title..."
                 value={reportForm.title}
-                onChange={(e) => setReportForm({...reportForm, title: e.target.value})}
+                onChange={(e) => setReportForm({ ...reportForm, title: e.target.value })}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="priority">Priority</Label>
-              <Select value={reportForm.priority} onValueChange={(value: any) => setReportForm({...reportForm, priority: value})}>
+              <Select value={reportForm.priority} onValueChange={(value: any) => setReportForm({ ...reportForm, priority: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -455,18 +464,18 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="reportDescription">Description</Label>
               <Textarea
                 id="reportDescription"
                 placeholder="Describe your report in detail..."
                 value={reportForm.description}
-                onChange={(e) => setReportForm({...reportForm, description: e.target.value})}
+                onChange={(e) => setReportForm({ ...reportForm, description: e.target.value })}
                 rows={4}
               />
             </div>
-            
+
             <div className="flex gap-2">
               <Button onClick={handleReportSubmit} className="flex-1">
                 Submit Report
@@ -487,6 +496,9 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
               <User className="w-5 h-5" />
               Update Profile
             </DialogTitle>
+            <DialogDescription>
+              Update your contact information and profile details.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -495,10 +507,10 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
                 id="phone"
                 placeholder="Enter your phone number..."
                 value={profileForm.phone}
-                onChange={(e) => setProfileForm({...profileForm, phone: e.target.value})}
+                onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
               <Input
@@ -506,31 +518,31 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
                 type="email"
                 placeholder="Enter your email address..."
                 value={profileForm.email}
-                onChange={(e) => setProfileForm({...profileForm, email: e.target.value})}
+                onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="address">Address</Label>
               <Textarea
                 id="address"
                 placeholder="Enter your address..."
                 value={profileForm.address}
-                onChange={(e) => setProfileForm({...profileForm, address: e.target.value})}
+                onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
                 rows={3}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="emergencyContact">Emergency Contact</Label>
               <Input
                 id="emergencyContact"
                 placeholder="Emergency contact name and phone..."
                 value={profileForm.emergencyContact}
-                onChange={(e) => setProfileForm({...profileForm, emergencyContact: e.target.value})}
+                onChange={(e) => setProfileForm({ ...profileForm, emergencyContact: e.target.value })}
               />
             </div>
-            
+
             <div className="flex gap-2">
               <Button onClick={handleProfileUpdate} className="flex-1">
                 Update Profile
@@ -551,6 +563,9 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
               <DollarSign className="w-5 h-5" />
               Pay Slip - September 2024
             </DialogTitle>
+            <DialogDescription>
+              View your monthly payslip details and download PDF.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
@@ -563,7 +578,7 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
                 <p className="font-semibold">{employeeId}</p>
               </div>
             </div>
-            
+
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span>Basic Salary</span>
@@ -598,7 +613,7 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
                 <span>₹43,020</span>
               </div>
             </div>
-            
+
             <div className="flex gap-2">
               <Button className="flex-1">
                 Download PDF

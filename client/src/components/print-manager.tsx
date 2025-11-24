@@ -2,18 +2,17 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { 
-  Printer, 
-  Settings, 
-  FileText, 
-  QrCode, 
-  Package, 
-  Receipt, 
+import {
+  Printer,
+  Settings,
+  FileText,
+  QrCode,
+  Package,
+  Receipt,
   Download,
   Eye,
   Trash2,
@@ -22,12 +21,12 @@ import {
   Copy
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  printDriver, 
-  BarcodePrintData, 
-  LabelPrintData, 
+import {
+  printDriver,
+  BarcodePrintData,
+  LabelPrintData,
   InvoicePrintData,
-  PrintTemplate 
+  PrintTemplate
 } from '@/lib/print-driver';
 import PrintSettingsComponent from './print-settings';
 
@@ -93,7 +92,7 @@ export default function PrintManager({ className }: PrintManagerProps) {
         layout: currentTemplate.layout,
         exportDate: new Date().toISOString()
       };
-      
+
       const blob = new Blob([JSON.stringify(settingsData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -103,7 +102,7 @@ export default function PrintManager({ className }: PrintManagerProps) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
+
       toast({
         title: "Settings Exported",
         description: `Settings for ${currentTemplate.name} have been exported`,
@@ -119,7 +118,7 @@ export default function PrintManager({ className }: PrintManagerProps) {
         settings: currentTemplate.settings,
         layout: currentTemplate.layout
       };
-      
+
       navigator.clipboard.writeText(JSON.stringify(settingsData, null, 2)).then(() => {
         toast({
           title: "Settings Copied",
@@ -144,7 +143,7 @@ export default function PrintManager({ className }: PrintManagerProps) {
       status: 'pending',
       createdAt: new Date().toISOString()
     };
-    
+
     setPrintJobs(prev => [...prev, job]);
     toast({
       title: "Print Job Added",
@@ -161,7 +160,7 @@ export default function PrintManager({ className }: PrintManagerProps) {
   };
 
   const updateJobStatus = (jobId: string, status: PrintJob['status']) => {
-    setPrintJobs(prev => prev.map(job => 
+    setPrintJobs(prev => prev.map(job =>
       job.id === jobId ? { ...job, status } : job
     ));
   };
@@ -207,7 +206,7 @@ export default function PrintManager({ className }: PrintManagerProps) {
 
   const printAllJobs = async () => {
     const pendingJobs = printJobs.filter(job => job.status === 'pending');
-    
+
     for (const job of pendingJobs) {
       await printJob(job);
     }
@@ -303,7 +302,7 @@ export default function PrintManager({ className }: PrintManagerProps) {
                   </div>
                 </div>
               </div>
-              <PrintSettingsComponent 
+              <PrintSettingsComponent
                 template={currentTemplate}
                 onSave={handleSettingsSave}
                 onReset={handleSettingsReset}
@@ -411,12 +410,12 @@ export default function PrintManager({ className }: PrintManagerProps) {
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
                     <Badge className={getStatusColor(job.status)}>
                       {job.status}
                     </Badge>
-                    
+
                     {job.status === 'pending' && (
                       <Button
                         variant="outline"
@@ -427,7 +426,7 @@ export default function PrintManager({ className }: PrintManagerProps) {
                         <Printer className="h-4 w-4" />
                       </Button>
                     )}
-                    
+
                     <Button
                       variant="ghost"
                       size="sm"

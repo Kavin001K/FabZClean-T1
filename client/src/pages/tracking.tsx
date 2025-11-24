@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
 import BarcodeScanner from "@/components/barcode-scanner";
 import BarcodeDisplay from "@/components/barcode-display";
@@ -63,10 +63,10 @@ interface Shipment {
 }
 
 const kpiData = [
-    { title: "Total Shipments", value: "42", change: "+15 today", changeType: "positive" },
-    { title: "In Transit", value: "28", change: "+5 from yesterday", changeType: "positive" },
-    { title: "Delivered", value: "1,289", change: "+2.5% this week", changeType: "positive" },
-    { title: "Delayed", value: "3", change: "-1 from yesterday", changeType: "negative" },
+  { title: "Total Shipments", value: "42", change: "+15 today", changeType: "positive" },
+  { title: "In Transit", value: "28", change: "+5 from yesterday", changeType: "positive" },
+  { title: "Delivered", value: "1,289", change: "+2.5% this week", changeType: "positive" },
+  { title: "Delayed", value: "3", change: "-1 from yesterday", changeType: "negative" },
 ];
 
 export default function Tracking() {
@@ -84,7 +84,17 @@ export default function Tracking() {
     queryKey: ["orders"],
     queryFn: async () => {
       const data = await ordersApi.getAll();
-      return data;
+      return data.map((order: any) => ({
+        id: order.id,
+        customerName: order.customerName,
+        phoneNumber: order.customerPhone || '',
+        address: typeof order.shippingAddress === 'string' ? order.shippingAddress : 'No address',
+        status: order.status,
+        items: Array.isArray(order.items) ? order.items.length : 0,
+        totalAmount: Number(order.totalAmount),
+        createdAt: order.createdAt ? new Date(order.createdAt).toISOString() : new Date().toISOString(),
+        estimatedDelivery: new Date().toISOString(), // Mock as not in schema
+      }));
     },
     retry: 3,
     staleTime: 2 * 60 * 1000, // 2 minutes
@@ -98,13 +108,13 @@ export default function Tracking() {
       return deliveries.map((delivery, index) => ({
         id: delivery.id,
         uti: `UTI-2025-${String(index + 1).padStart(3, '0')}`,
-        storeId: delivery.storeId || 'STORE-001',
+        storeId: 'STORE-001',
         staffName: delivery.driverName || 'N/A',
         packageCount: 1,
         orders: [delivery.orderId],
         status: delivery.status === 'pending' ? 'created' :
-                delivery.status === 'in_transit' ? 'in_transit' : 'delivered',
-        createdAt: delivery.createdAt.toISOString(),
+          delivery.status === 'in_transit' ? 'in_transit' : 'delivered',
+        createdAt: delivery.createdAt ? new Date(delivery.createdAt).toISOString() : new Date().toISOString(),
         estimatedDelivery: delivery.estimatedDelivery?.toISOString() || new Date().toISOString(),
         shipmentNumber: `SHP-${String(index + 1).padStart(4, '0')}`,
         carrier: 'Internal',
@@ -119,8 +129,8 @@ export default function Tracking() {
 
   const filteredOrders = orders?.filter(order => {
     const matchesSearch = order.id.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-                         order.customerName.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-                         order.phoneNumber.includes(debouncedSearchTerm);
+      order.customerName.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      order.phoneNumber.includes(debouncedSearchTerm);
     return matchesSearch;
   });
 
@@ -167,8 +177,8 @@ export default function Tracking() {
   };
 
   const handleOrderSelect = (orderId: string) => {
-    setSelectedOrders(prev => 
-      prev.includes(orderId) 
+    setSelectedOrders(prev =>
+      prev.includes(orderId)
         ? prev.filter(id => id !== orderId)
         : [...prev, orderId]
     );
@@ -182,7 +192,7 @@ export default function Tracking() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ encodedData: code })
       });
-      
+
       if (response.ok) {
         const { decodedData } = await response.json();
         if (decodedData.entityType === 'order') {
@@ -206,7 +216,7 @@ export default function Tracking() {
 
   const generateOrderBarcodes = async () => {
     if (selectedOrders.length === 0) return;
-    
+
     try {
       const barcodePromises = selectedOrders.map(async (orderId) => {
         const response = await fetch(`/api/barcodes/generate/order/${orderId}`, {
@@ -214,13 +224,13 @@ export default function Tracking() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: { generatedFor: 'shipment' } })
         });
-        
+
         if (response.ok) {
           return await response.json();
         }
         throw new Error(`Failed to generate barcode for order ${orderId}`);
       });
-      
+
       const barcodes = await Promise.all(barcodePromises);
       setGeneratedBarcodes(barcodes);
     } catch (error) {
@@ -291,6 +301,9 @@ export default function Tracking() {
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New Shipment</DialogTitle>
+                <DialogDescription>
+                  Select orders and create a new shipment for delivery.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-6">
                 <div className="text-sm text-muted-foreground">
@@ -309,7 +322,7 @@ export default function Tracking() {
                       {showBarcodeScanner ? 'Hide Scanner' : 'Show Scanner'}
                     </Button>
                   </div>
-                  
+
                   {showBarcodeScanner && (
                     <BarcodeScanner
                       onScan={handleBarcodeScan}
@@ -318,7 +331,7 @@ export default function Tracking() {
                     />
                   )}
                 </div>
-                
+
                 {/* QR Code Scanner Simulation */}
                 <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
                   <QrCode className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
@@ -339,8 +352,8 @@ export default function Tracking() {
                         return order ? (
                           <div key={orderId} className="flex items-center justify-between p-2 bg-muted rounded">
                             <span className="text-sm">{order.id} - {order.customerName}</span>
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               onClick={() => handleOrderSelect(orderId)}
                             >
@@ -422,7 +435,7 @@ export default function Tracking() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bento-card">
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
@@ -436,7 +449,7 @@ export default function Tracking() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bento-card">
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
@@ -450,7 +463,7 @@ export default function Tracking() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bento-card">
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
@@ -498,29 +511,29 @@ export default function Tracking() {
                 </TableRow>
               ) : (
                 shipments?.map((shipment) => (
-                <TableRow key={shipment.id}>
-                  <TableCell className="font-mono font-medium">{shipment.shipmentNumber || 'N/A'}</TableCell>
-                  <TableCell>{shipment.carrier || 'N/A'}</TableCell>
-                  <TableCell>{shipment.trackingNumber || 'N/A'}</TableCell>
-                  <TableCell>{Array.isArray(shipment.orderIds) ? shipment.orderIds.length : 0}</TableCell>
-                  <TableCell>
-                    <Badge className={getShipmentStatusColor(shipment.status || 'unknown')}>
-                      {getShipmentStatusText(shipment.status || 'unknown')}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{safeFormatDate(shipment.createdAt)}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <Printer className="w-4 h-4 mr-1" />
-                        Print
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => setSelectedShipment(shipment)}>
-                        Track
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                  <TableRow key={shipment.id}>
+                    <TableCell className="font-mono font-medium">{shipment.shipmentNumber || 'N/A'}</TableCell>
+                    <TableCell>{shipment.carrier || 'N/A'}</TableCell>
+                    <TableCell>{shipment.trackingNumber || 'N/A'}</TableCell>
+                    <TableCell>{Array.isArray(shipment.orderIds) ? shipment.orderIds.length : 0}</TableCell>
+                    <TableCell>
+                      <Badge className={getShipmentStatusColor(shipment.status || 'unknown')}>
+                        {getShipmentStatusText(shipment.status || 'unknown')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{safeFormatDate(shipment.createdAt)}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          <Printer className="w-4 h-4 mr-1" />
+                          Print
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setSelectedShipment(shipment)}>
+                          Track
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
             </TableBody>
@@ -572,43 +585,43 @@ export default function Tracking() {
             <TableBody>
               {ordersLoading ? (
                 <TableRow>
-                    <TableCell colSpan={9} className="text-center">Loading orders...</TableCell>
+                  <TableCell colSpan={9} className="text-center">Loading orders...</TableCell>
                 </TableRow>
               ) : (
                 filteredOrders?.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell>
-                    <input
-                      type="checkbox"
-                      checked={selectedOrders.includes(order.id)}
-                      onChange={() => handleOrderSelect(order.id)}
-                      className="rounded"
-                      aria-label={`Select order ${order.id} for ${order.customerName}`}
-                    />
-                  </TableCell>
-                  <TableCell className="font-mono font-medium">{order.id}</TableCell>
-                  <TableCell>{order.customerName}</TableCell>
-                  <TableCell>{order.phoneNumber}</TableCell>
-                  <TableCell className="max-w-xs truncate">{order.address}</TableCell>
-                  <TableCell>{order.items?.length ?? 0} items</TableCell>
-                  <TableCell className="font-medium">₹{order.totalAmount}</TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(order.status)}>
-                      {getStatusText(order.status)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <QrCode className="w-4 h-4 mr-1" />
-                        QR
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        View
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                  <TableRow key={order.id}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedOrders.includes(order.id)}
+                        onChange={() => handleOrderSelect(order.id)}
+                        className="rounded"
+                        aria-label={`Select order ${order.id} for ${order.customerName}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-mono font-medium">{order.id}</TableCell>
+                    <TableCell>{order.customerName}</TableCell>
+                    <TableCell>{order.phoneNumber}</TableCell>
+                    <TableCell className="max-w-xs truncate">{order.address}</TableCell>
+                    <TableCell>{order.items} items</TableCell>
+                    <TableCell className="font-medium">₹{order.totalAmount}</TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(order.status)}>
+                        {getStatusText(order.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          <QrCode className="w-4 h-4 mr-1" />
+                          QR
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          View
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
             </TableBody>
@@ -629,7 +642,7 @@ export default function Tracking() {
               <h2 className="text-2xl font-bold">TRANSPORT ORDER</h2>
               <p className="text-sm text-muted-foreground">Fab Clean Operations</p>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div>
                 <p className="text-sm font-medium">Store ID:</p>
@@ -684,6 +697,9 @@ export default function Tracking() {
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Track Shipment: {selectedShipment?.uti}</DialogTitle>
+            <DialogDescription>
+              View detailed tracking information and status updates.
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             {/* Shipment details and tracking visualization will go here */}
@@ -707,7 +723,7 @@ export default function Tracking() {
               <p className="text-sm text-muted-foreground">
                 Monitor your orders in real-time with live driver tracking and estimated delivery times.
               </p>
-              
+
               <div className="space-y-2">
                 <Button variant="outline" className="w-full justify-start">
                   <Truck className="h-4 w-4 mr-2" />
@@ -723,9 +739,9 @@ export default function Tracking() {
                 </Button>
               </div>
             </div>
-            
+
             <div className="h-64">
-              <LiveTrackingMap className="h-full" />
+              <LiveTrackingMap className="h-full" driver={null} />
             </div>
           </div>
         </CardContent>
