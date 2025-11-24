@@ -3,6 +3,7 @@ import { useWebSocket } from '@/hooks/use-websocket';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { getWebSocketUrl } from '@/api/axios';
+import { useRealtime as useSupabaseRealtime } from '@/hooks/use-realtime';
 
 interface RealtimeContextType {
   analyticsData: any;
@@ -15,16 +16,46 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [analyticsData, setAnalyticsData] = useState(null);
-  const [driverLocations, setDriverLocations] = useState([]);
 
   // Get WebSocket URL that automatically handles production (wss://) vs development (ws://)
   // On Vercel, this will use wss:// automatically when on HTTPS
   const wsUrl = useMemo(() => getWebSocketUrl(), []);
-  
+
+  // Skip backend WebSocket in development (Vite HMR conflict)
+  // Use Supabase Realtime only in development
+  const skipBackendWS = import.meta.env.DEV;
+
+  // ✅ Use Supabase Realtime for driver locations (works on Vercel Serverless)
+  const { data: supabaseDrivers } = useSupabaseRealtime({
+    tableName: 'drivers',
+    selectQuery: 'id, name, status, currentLatitude, currentLongitude, updatedAt, vehicleType, vehicleNumber',
+  });
+
+  // Map Supabase drivers to DriverLocation format
+  const driverLocations = useMemo(() => {
+    if (!Array.isArray(supabaseDrivers)) return [];
+
+    return supabaseDrivers.map((d: any) => ({
+      driverId: d.id,
+      driverName: d.name,
+      orderId: '', // Would need a join or separate query for this
+      latitude: d.currentLatitude || 0,
+      longitude: d.currentLongitude || 0,
+      heading: 0,
+      speed: 0,
+      status: d.status,
+      estimatedArrival: new Date().toISOString(), // Placeholder
+      lastUpdated: d.updatedAt || new Date().toISOString(),
+    }));
+  }, [supabaseDrivers]);
+
   const { subscribe } = useWebSocket({
     url: wsUrl,
-    maxReconnectAttempts: 5, // Enable reconnection in production but with limit
+    maxReconnectAttempts: skipBackendWS ? 0 : 5, // Disable reconnection in development
     onMessage: (message) => {
+      // Skip processing if in development mode
+      if (skipBackendWS) return;
+
       console.log('Realtime update:', message);
       const { type, data } = message;
 
@@ -33,10 +64,8 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return;
       }
 
-      if (type === 'driver_locations') {
-        setDriverLocations(data.drivers);
-        return;
-      }
+      // Note: driver_locations are now handled by Supabase Realtime above
+      // We keep this for backward compatibility if WS sends other data
 
       if (type === 'driver_assigned' || type === 'driver_status_update') {
         queryClient.invalidateQueries({ queryKey: ['live-tracking-drivers'] });
@@ -62,7 +91,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         queryClient.invalidateQueries({ queryKey: ['employee', data?.id] });
         toast({ title: 'Employees updated', description: 'The list of employees has been updated in real-time.' });
       }
-      
+
       if (type.startsWith('product_')) {
         queryClient.invalidateQueries({ queryKey: ['products'] });
         queryClient.invalidateQueries({ queryKey: ['product', data?.id] });
@@ -70,7 +99,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         queryClient.invalidateQueries({ queryKey: ['inventory-kpis'] }); // For inventory KPIs
         toast({ title: 'Products updated', description: 'The list of products has been updated in real-time.' });
       }
-      
+
       if (type.startsWith('service_')) {
         queryClient.invalidateQueries({ queryKey: ['services'] });
         queryClient.invalidateQueries({ queryKey: ['service', data?.id] });
@@ -149,22 +178,22 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     subscribe([
-        'order_created', 'order_updated', 'order_deleted',
-        'customer_created', 'customer_updated', 'customer_deleted',
-        'employee_created', 'employee_updated', 'employee_deleted',
-        'product_created', 'product_updated', 'product_deleted',
-        'service_created', 'service_updated', 'service_deleted',
-        'invoice_created', 'invoice_updated', 'invoice_deleted',
-        'expense_created', 'expense_updated', 'expense_deleted',
-        'budget_created', 'budget_updated', 'budget_deleted',
-        'taxRate_created', 'taxRate_updated', 'taxRate_deleted',
-        'account_created', 'account_updated', 'account_deleted',
-        'journalEntry_created', 'journalEntry_posted', 'journalEntry_voided',
-        'payment_created', 'payment_updated', 'payment_deleted',
-        'posTransaction_created', 'posTransaction_updated', 'posTransaction_deleted',
-        'setting_updated',
-        'analytics_update',
-        'driver_locations', 'driver_assigned', 'driver_status_update'
+      'order_created', 'order_updated', 'order_deleted',
+      'customer_created', 'customer_updated', 'customer_deleted',
+      'employee_created', 'employee_updated', 'employee_deleted',
+      'product_created', 'product_updated', 'product_deleted',
+      'service_created', 'service_updated', 'service_deleted',
+      'invoice_created', 'invoice_updated', 'invoice_deleted',
+      'expense_created', 'expense_updated', 'expense_deleted',
+      'budget_created', 'budget_updated', 'budget_deleted',
+      'taxRate_created', 'taxRate_updated', 'taxRate_deleted',
+      'account_created', 'account_updated', 'account_deleted',
+      'journalEntry_created', 'journalEntry_posted', 'journalEntry_voided',
+      'payment_created', 'payment_updated', 'payment_deleted',
+      'posTransaction_created', 'posTransaction_updated', 'posTransaction_deleted',
+      'setting_updated',
+      'analytics_update',
+      'driver_locations', 'driver_assigned', 'driver_status_update'
     ]);
   }, [subscribe]);
 

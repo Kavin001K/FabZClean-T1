@@ -2,11 +2,11 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY!;
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL!;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fabzclean-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'fabzclean-secret-key-change-in-production';
 const JWT_EXPIRY = '8h';
 
 export interface EmployeeJWTPayload {
@@ -35,12 +35,13 @@ export class AuthService {
      * Authenticate employee with username and password
      */
     static async login(username: string, password: string, ipAddress?: string): Promise<{ token: string; employee: AuthEmployee }> {
-        // Fetch employee by username
-        const { data: emp, error } = await supabase
+        // Fetch employee by username or email
+        const { data: employees, error } = await supabase
             .from('auth_employees')
             .select('*')
-            .eq('username', username)
-            .single();
+            .or(`username.eq."${username}",email.eq."${username}"`);
+
+        const emp = employees?.[0];
 
         if (error || !emp) {
             throw new Error('Invalid username or password');

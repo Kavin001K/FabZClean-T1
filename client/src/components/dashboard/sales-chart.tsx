@@ -109,27 +109,27 @@ export default React.memo(function SalesChart({
     let ci = { lower: 0, upper: 0 };
 
     if (hasEnoughData) {
-      const regressionData = revenues.map((revenue, index) => ({ x: index, y: revenue }));
+    const regressionData = revenues.map((revenue, index) => ({ x: index, y: revenue }));
       regression = linearRegression(regressionData);
 
-      // Calculate trend line values
+    // Calculate trend line values
       trendLine = chartData.map((_, index) =>
-        regression.slope * index + regression.intercept
-      );
+      regression.slope * index + regression.intercept
+    );
 
-      // Forecast next 7 periods
+    // Forecast next 7 periods
       forecast = forecastLinear(revenues, 7);
 
-      // Confidence interval
+    // Confidence interval
       ci = confidenceInterval(revenues, 0.95);
 
-      // Prepare forecast data points (continuing from last actual data point)
+    // Prepare forecast data points (continuing from last actual data point)
       forecastData = forecast.map((value, index) => ({
-        month: `F${index + 1}`,
-        revenue: null,
-        forecast: value,
-        isForecast: true,
-      }));
+      month: `F${index + 1}`,
+      revenue: null,
+      forecast: value,
+      isForecast: true,
+    }));
     } else {
       // Return null arrays if not enough data
       trendLine = chartData.map(() => null);
@@ -237,9 +237,9 @@ export default React.memo(function SalesChart({
             R²: {((statistics.regression?.r2 ?? 0) * 100).toFixed(1)}%
           </Badge>
           {statistics.hasEnoughData && statistics.forecast[0] && (
-            <Badge variant="secondary">
+          <Badge variant="secondary">
               Next Forecast: ₹{statistics.forecast[0].toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-            </Badge>
+          </Badge>
           )}
         </div>
 
@@ -325,29 +325,29 @@ export default React.memo(function SalesChart({
 
               {/* Trend Line - Only show if enough data */}
               {statistics.hasEnoughData && (
-                <Line
-                  type="monotone"
-                  dataKey="trendLine"
-                  name="Trend Line"
-                  stroke="#f59e0b"
-                  strokeWidth={2}
-                  dot={false}
-                  strokeDasharray="5 5"
-                />
+              <Line
+                type="monotone"
+                dataKey="trendLine"
+                name="Trend Line"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                dot={false}
+                strokeDasharray="5 5"
+              />
               )}
 
               {/* Forecast - Only show if enough data */}
               {statistics.hasEnoughData && (
-                <Line
-                  type="monotone"
-                  dataKey="forecast"
-                  name="Forecast"
-                  stroke="#8b5cf6"
-                  strokeWidth={2}
-                  strokeDasharray="8 4"
-                  dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 3 }}
-                  connectNulls
-                />
+              <Line
+                type="monotone"
+                dataKey="forecast"
+                name="Forecast"
+                stroke="#8b5cf6"
+                strokeWidth={2}
+                strokeDasharray="8 4"
+                dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 3 }}
+                connectNulls
+              />
               )}
             </LineChart>
           </ResponsiveContainer>
@@ -365,14 +365,14 @@ export default React.memo(function SalesChart({
           </div>
           {statistics.hasEnoughData && (
             <>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-0.5 bg-amber-500" style={{ width: '16px', height: '2px', borderTop: '2px dashed' }}></div>
-                <span>Trend Line</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-0.5 bg-purple-500" style={{ width: '16px', height: '2px', borderTop: '2px dashed' }}></div>
-                <span>Forecast</span>
-              </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-0.5 bg-amber-500" style={{ width: '16px', height: '2px', borderTop: '2px dashed' }}></div>
+            <span>Trend Line</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-0.5 bg-purple-500" style={{ width: '16px', height: '2px', borderTop: '2px dashed' }}></div>
+            <span>Forecast</span>
+          </div>
             </>
           )}
         </div>

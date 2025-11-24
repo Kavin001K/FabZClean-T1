@@ -139,10 +139,10 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
         <CardTitle className="flex items-center justify-between">
           <span>Service Popularity & Performance</span>
           {statistics.topService && (
-            <Badge variant="default" className="flex items-center gap-1">
-              <Award className="h-3 w-3" />
-              {statistics.topService.name}
-            </Badge>
+          <Badge variant="default" className="flex items-center gap-1">
+            <Award className="h-3 w-3" />
+            {statistics.topService.name}
+          </Badge>
           )}
         </CardTitle>
       </CardHeader>

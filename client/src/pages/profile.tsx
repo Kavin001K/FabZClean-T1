@@ -8,17 +8,36 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { User, Mail, Phone, MapPin, Lock, Shield, Calendar } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Lock, Shield, Calendar, LogOut } from 'lucide-react';
+import { useLocation } from 'wouter';
 
 export default function ProfilePage() {
-    const { employee } = useAuth();
+    const { employee, signOut } = useAuth();
     const { toast } = useToast();
+    const [, setLocation] = useLocation();
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({
         fullName: employee?.fullName || '',
         email: employee?.email || '',
         phone: employee?.phone || '',
     });
+
+    const handleLogout = async () => {
+        try {
+            await signOut();
+            toast({
+                title: 'Logged Out',
+                description: 'You have been successfully logged out.',
+            });
+            setLocation('/login');
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: 'Failed to logout. Please try again.',
+                variant: 'destructive',
+            });
+        }
+    };
 
     const handleSave = async () => {
         try {
@@ -93,6 +112,10 @@ export default function ProfilePage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
+                <Button variant="destructive" onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                </Button>
             </div>
 
             <div className="grid gap-6 md:grid-cols-3">
@@ -105,7 +128,7 @@ export default function ProfilePage() {
                     <CardContent className="space-y-6">
                         <div className="flex flex-col items-center space-y-4">
                             <Avatar className="h-24 w-24">
-                                <AvatarImage src={employee?.avatarUrl} />
+                                <AvatarImage src="" />
                                 <AvatarFallback className="text-2xl">
                                     {getInitials(employee?.fullName || employee?.username || 'U')}
                                 </AvatarFallback>

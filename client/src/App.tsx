@@ -29,6 +29,7 @@ import Logistics from "@/pages/logistics";
 import TransitOrders from "@/pages/transit-orders";
 import DebugPage from "@/pages/debug";
 import EmployeeDashboardPage from "@/pages/employee-dashboard";
+import UserManagementPage from "@/pages/user-management";
 import FranchiseDashboard from "@/pages/franchise-dashboard";
 import Settings from "@/pages/settings";
 import DatabaseStatus from "@/pages/database-status";
@@ -37,8 +38,6 @@ import Accounting from "@/pages/accounting";
 import { InvoiceGenerator } from "@/components/invoice-generator";
 import CustomerPortal from "@/pages/customer-portal";
 import WorkerPortal from "@/pages/worker-portal";
-import UserManagementPage from "@/pages/user-management";
-import ProfilePage from "@/pages/profile";
 
 function Router() {
   return (
@@ -178,6 +177,14 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/users">
+        <ProtectedRoute allowedRoles={['admin', 'franchise_manager', 'factory_manager']}>
+          <MainLayout>
+            <UserManagementPage />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
       <Route path="/franchise-dashboard">
         <ProtectedRoute allowedRoles={['franchise_manager']}>
           <MainLayout>
@@ -230,22 +237,6 @@ function Router() {
         <ProtectedRoute allowedRoles={['driver', 'employee']}>
           <MainLayout>
             <WorkerPortal />
-          </MainLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/users">
-        <ProtectedRoute allowedRoles={['admin', 'franchise_manager', 'factory_manager']}>
-          <MainLayout>
-            <UserManagementPage />
-          </MainLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/profile">
-        <ProtectedRoute>
-          <MainLayout>
-            <ProfilePage />
           </MainLayout>
         </ProtectedRoute>
       </Route>

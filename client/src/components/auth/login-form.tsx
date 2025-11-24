@@ -64,13 +64,13 @@ export const LoginForm: React.FC = () => {
               </Alert>
             )}
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">Username or Email</Label>
               <div className="relative">
                 <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="username"
                   type="text"
-                  placeholder="Enter your username"
+                  placeholder="Enter username or email"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="pl-10"

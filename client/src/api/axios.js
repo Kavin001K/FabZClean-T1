@@ -36,19 +36,16 @@ export function getWebSocketUrl() {
     const host = window.location.host;
 
     // In production (Vercel/Render), WebSocket usually runs on the same domain
-    // If on Vercel, we might need a separate WebSocket server URL if using serverless functions
-    // But if we are just fixing the mixed content error, we must ensure wss://
-
-    // If the host has no port (e.g. vercel.app), use the host directly
-    // If it has a port, use it
-
     return `${protocol}//${host}`;
   }
 
-  // In development, use localhost with ws protocol
-  // WebSocket runs on the same port as the HTTP server
-  const wsPort = import.meta.env.VITE_WS_PORT || '5001';
-  return `ws://localhost:${wsPort}`;
+  // In development, use the current window location so Vite proxy handles it
+  // This prevents conflicts between Vite HMR and backend WebSocket
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host; // This will be localhost:5000 (Vite dev server)
+
+  // Use the /ws path which is proxied to the backend WebSocket server
+  return `${protocol}//${host}`;
 }
 
 // Export API base URL

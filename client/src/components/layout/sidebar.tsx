@@ -185,6 +185,9 @@ export function Sidebar() {
             {employee?.role === 'admin' && 'Administrator'}
             {employee?.role === 'franchise_manager' && 'Franchise Manager'}
             {employee?.role === 'factory_manager' && 'Factory Manager'}
+            {employee?.role === 'employee' && 'Employee'}
+            {employee?.role === 'driver' && 'Driver'}
+            {!employee?.role && 'Unknown'}
           </span>
         </div>
         <Link

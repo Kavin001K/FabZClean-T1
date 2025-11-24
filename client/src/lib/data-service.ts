@@ -6,9 +6,9 @@ import type { Order, Customer, Service, Product, Delivery, Employee } from "../.
 
 // Get access token from localStorage (employee-based auth)
 function getAccessToken(): string | null {
-  return localStorage.getItem('employee_token') ||
-    localStorage.getItem('access_token') ||
-    localStorage.getItem('supabase.auth.token');
+  return localStorage.getItem('employee_token') || 
+         localStorage.getItem('access_token') || 
+         localStorage.getItem('supabase.auth.token');
 }
 
 export type InventoryItem = {
@@ -80,7 +80,7 @@ function normalizeHeaders(headers?: HeadersInit): HeadersMap {
   return { ...(headers as HeadersMap) };
 }
 
-export function withAuth(init: RequestInit = {}): RequestInit {
+function withAuth(init: RequestInit = {}): RequestInit {
   const headers = normalizeHeaders(init.headers);
   if (!headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
@@ -97,16 +97,11 @@ export function withAuth(init: RequestInit = {}): RequestInit {
 }
 
 async function authorizedFetch(endpoint: string, init: RequestInit = {}) {
-  const response = await fetch(`${API_BASE}${endpoint}`, withAuth(init));
-  if (!response.ok && response.status === 401) {
-    // Redirect to login when unauthorized
-    window.location.href = '/login';
-  }
-  return response;
+  return fetch(`${API_BASE}${endpoint}`, withAuth(init));
 }
 
 // Generic fetch function with error handling
-export async function fetchData<T>(endpoint: string, init: RequestInit = {}): Promise<T> {
+async function fetchData<T>(endpoint: string, init: RequestInit = {}): Promise<T> {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
@@ -206,11 +201,11 @@ export const ordersApi = {
         method: "DELETE",
         body: JSON.stringify({ orderIds }),
       });
-
+      
       if (!response.ok) {
         throw new Error("Failed to delete orders");
       }
-
+      
       return await response.json();
     } catch (error) {
       console.error("Failed to delete orders:", error);
@@ -294,12 +289,7 @@ export const customersApi = {
 export const employeesApi = {
   async getAll(): Promise<Employee[]> {
     try {
-      const response = await fetchData<{ success: boolean; employees: Employee[] } | Employee[]>('/employees');
-      // Handle both response formats: { success: true, employees: [...] } or just [...]
-      if (response && typeof response === 'object' && 'employees' in response) {
-        return response.employees;
-      }
-      return Array.isArray(response) ? response : [];
+      return await fetchData<Employee[]>('/employees');
     } catch (error) {
       console.error('Failed to fetch employees:', error);
       return [];
@@ -322,9 +312,7 @@ export const employeesApi = {
         body: JSON.stringify(employee),
       });
       if (!response.ok) throw new Error("Failed to create employee");
-      const data = await response.json();
-      // Handle backend response format: { success: true, employee: {...} }
-      return data.employee || data;
+      return await response.json();
     } catch (error) {
       console.error("Failed to create employee:", error);
       return null;
@@ -338,9 +326,7 @@ export const employeesApi = {
         body: JSON.stringify(employee),
       });
       if (!response.ok) throw new Error("Failed to update employee");
-      const data = await response.json();
-      // Handle backend response format: { success: true, employee: {...} }
-      return data.employee || data;
+      return await response.json();
     } catch (error) {
       console.error(`Failed to update employee ${id}:`, error);
       return null;
@@ -371,7 +357,7 @@ export const inventoryApi = {
         name: item.name,
         stock: item.stockQuantity,
         status: item.stockQuantity === 0 ? 'Out of Stock' as const :
-          item.stockQuantity <= (item.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+                item.stockQuantity <= (item.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
         category: item.category,
         sku: item.sku,
         price: parseFloat(item.price) || 0,
@@ -394,7 +380,7 @@ export const inventoryApi = {
         name: rawData.name,
         stock: rawData.stockQuantity,
         status: rawData.stockQuantity === 0 ? 'Out of Stock' as const :
-          rawData.stockQuantity <= (rawData.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+                rawData.stockQuantity <= (rawData.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
         category: rawData.category,
         sku: rawData.sku,
         price: parseFloat(rawData.price) || 0,
@@ -428,7 +414,7 @@ export const inventoryApi = {
         name: product.name,
         stock: product.stockQuantity,
         status: product.stockQuantity === 0 ? 'Out of Stock' as const :
-          product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+                product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
         category: product.category,
         sku: product.sku,
         price: parseFloat(product.price) || 0,
@@ -462,7 +448,7 @@ export const inventoryApi = {
         name: product.name,
         stock: product.stockQuantity,
         status: product.stockQuantity === 0 ? 'Out of Stock' as const :
-          product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+                product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
         category: product.category,
         sku: product.sku,
         price: parseFloat(product.price) || 0,
@@ -507,19 +493,19 @@ export const analyticsApi = {
   async getSalesData(): Promise<SalesData[]> {
     // ✅ Removed mock data - use RevenueChartRealtime component instead
     // This function is kept for backward compatibility
-    return [];
+      return [];
   },
 
   async getOrderStatusData(): Promise<OrderStatusData[]> {
     // ✅ Removed mock data - use useAnalyticsEngine hook instead
     // This function is kept for backward compatibility
-    return [];
+      return [];
   },
 
   async getServicePopularityData(): Promise<ServicePopularityData[]> {
     // ✅ Removed mock data - use useAnalyticsEngine hook instead
     // This function is kept for backward compatibility
-    return [];
+      return [];
   },
 
   async getDashboardMetrics(): Promise<{
@@ -583,8 +569,7 @@ export const formatNumber = (num: number): string => {
   return new Intl.NumberFormat('en-US').format(num);
 };
 
-export const formatPercentage = (num: number | undefined | null): string => {
-  if (num === undefined || num === null || isNaN(num)) return '0.0%';
+export const formatPercentage = (num: number): string => {
   return `${num.toFixed(1)}%`;
 };
 
@@ -596,7 +581,7 @@ export const getStatusColor = (status: string): string => {
     completed: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
     cancelled: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400",
   };
-
+  
   return statusColors[status.toLowerCase() as keyof typeof statusColors] || statusColors.pending;
 };
 
@@ -606,7 +591,7 @@ export const getPriorityColor = (priority: string): string => {
     high: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400",
     urgent: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400",
   };
-
+  
   return priorityColors[priority.toLowerCase() as keyof typeof priorityColors] || priorityColors.normal;
 };
 
@@ -784,7 +769,7 @@ export const logisticsApi = {
       // Mock routes data - in real app this would be a proper endpoint
       const deliveries = await this.getDeliveries();
       const drivers = await this.getDrivers();
-
+      
       // Convert deliveries to routes
       const routes: Route[] = deliveries.map((delivery, index) => ({
         id: `route-${delivery.id}`,
@@ -792,8 +777,8 @@ export const logisticsApi = {
         driverId: delivery.driverName ? drivers.find(d => d.name === delivery.driverName)?.id : undefined,
         driverName: delivery.driverName,
         vehicleId: delivery.vehicleId,
-        status: delivery.status === 'pending' ? 'unassigned' :
-          delivery.status === 'in_transit' ? 'in_progress' : 'completed',
+        status: delivery.status === 'pending' ? 'unassigned' : 
+                delivery.status === 'in_transit' ? 'in_progress' : 'completed',
         stops: [{
           id: `stop-${delivery.id}`,
           orderId: delivery.orderId || `order-${delivery.id}`, // Ensure orderId is never null
@@ -801,8 +786,8 @@ export const logisticsApi = {
           address: '123 Main St, City',
           coordinates: delivery.location as { lat: number; lng: number } || { lat: 12.9716, lng: 77.5946 },
           status: delivery.status === 'pending' ? 'pending' :
-            delivery.status === 'in_transit' ? 'in_progress' :
-              delivery.status === 'delivered' ? 'completed' : 'failed',
+                  delivery.status === 'in_transit' ? 'in_progress' :
+                  delivery.status === 'delivered' ? 'completed' : 'failed',
           estimatedArrival: delivery.estimatedDelivery ? new Date(delivery.estimatedDelivery) : undefined,
           actualArrival: delivery.actualDelivery ? new Date(delivery.actualDelivery) : undefined,
         }],
@@ -813,7 +798,7 @@ export const logisticsApi = {
         createdAt: delivery.createdAt ? new Date(delivery.createdAt) : new Date(),
         updatedAt: delivery.updatedAt ? new Date(delivery.updatedAt) : new Date(),
       }));
-
+      
       return routes;
     } catch (error) {
       console.error('Failed to fetch routes:', error);

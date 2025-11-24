@@ -62,7 +62,7 @@ export function useDashboard() {
   const salesData: SalesData[] = [];
   const salesLoading = false;
   const salesError = null;
-  
+
   const orderStatusLoading = analyticsLoading;
   const orderStatusError = analyticsError;
   
@@ -168,21 +168,21 @@ export function useDashboard() {
     const totalOrders = kpiMetrics.totalOrders || apiMetrics?.totalOrders || 0;
     const averageOrderValue = kpiMetrics.averageOrderValue || 0;
 
-    return {
+      return {
       totalRevenue,
       totalOrders,
       newCustomers: apiMetrics?.newCustomers || 0,
       inventoryItems: apiMetrics?.inventoryItems || 0,
-      averageOrderValue: Math.round(averageOrderValue),
+        averageOrderValue: Math.round(averageOrderValue),
       onTimeDelivery: kpiMetrics.successRate || 0, // Use success rate as proxy for on-time delivery
       customerSatisfaction: 0, // Will be calculated from feedback data when available
       dueDateStats: apiMetrics?.dueDateStats || {
-        today: 0,
-        tomorrow: 0,
-        overdue: 0,
-        upcoming: 0,
-      },
-    };
+          today: 0,
+          tomorrow: 0,
+          overdue: 0,
+          upcoming: 0,
+        },
+      };
   }, [dashboardMetrics, kpiMetrics]);
 
   // Processed data with fallbacks

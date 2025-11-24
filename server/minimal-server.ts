@@ -7,6 +7,7 @@ import { initializeDatabase } from "./db-utils";
 import { corsOptions, errorHandler } from "./middleware/auth";
 import { registerAllRoutes } from "./routes/index";
 import { db as storage } from "./db";
+import { realtimeServer } from "./websocket-server";
 
 const app = express();
 
@@ -37,12 +38,23 @@ app.get('/api/test', (req, res) => {
 (async () => {
   // Routes are registered via registerAllRoutes(app) below
 
-  // Create HTTP server first (needed for Vite HMR)
-  const server = createServer(app);
+  // Determine environment
+  const isProduction = process.env.NODE_ENV === "production";
+
+  // Create HTTP server
+  // In development: Use standard HTTP server (Vite handles WebSocket for HMR)
+  // In production: Use WebSocket-enabled server for real-time features
+  const server = isProduction
+    ? realtimeServer.createServer(app)
+    : createServer(app);
+
+  if (!isProduction) {
+    log("⚠️  Backend WebSocket disabled in development (using Supabase Realtime only)");
+  }
 
   // importantly only setup vite in development and BEFORE
   // registering routes so Vite middleware can handle module requests
-  const isProduction = process.env.NODE_ENV === "production";
+  // The `isProduction` constant is already defined above.
 
   if (!isProduction) {
     await setupVite(app, server);
@@ -52,47 +64,7 @@ app.get('/api/test', (req, res) => {
     log("✅ Serving static files in production mode");
   }
 
-  // Explicit health routes for database status and info
-  app.get('/api/health/database', async (req, res) => {
-    try {
-      const { db } = await import('./db');
-      await db.getProducts();
-      res.json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        type: process.env.USE_SUPABASE === 'true' ? 'Supabase' : 'SQLite',
-      });
-    } catch (error: any) {
-      res.status(500).json({ status: 'unhealthy', error: error.message });
-    }
-  });
-
-  app.get('/api/database/info', async (req, res) => {
-    try {
-      res.json({
-        type: process.env.USE_SUPABASE === 'true' ? 'Supabase' : 'SQLite',
-        version: '1.0.0',
-        tables: ['users', 'products', 'orders', 'customers', 'employees'],
-      });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Services endpoint
-  app.get('/api/services', async (req, res) => {
-    try {
-      const { db } = await import('./db');
-      const services = await db.getServices();
-      res.json({ data: services });
-    } catch (error: any) {
-      console.error('Error fetching services:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
   // Register all API routes AFTER Vite setup
-  log("🔄 Registering all API routes (RELOADED)...");
   registerAllRoutes(app);
   log("✅ All API routes registered");
 

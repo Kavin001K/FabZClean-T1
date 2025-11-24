@@ -45,6 +45,7 @@ export default defineConfig({
     drop: ['console', 'debugger'],
   },
   server: {
+    port: 5000, // Frontend runs on 5000
     fs: {
       strict: false,
     },
@@ -53,18 +54,19 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
     hmr: {
-      overlay: {
-        warnings: false,
-        errors: true,
-        // Filter out chrome extension errors
-        exclude: [/chrome-extension:/],
-      },
+      clientPort: 5000, // Force HMR to use the frontend port, not the backend
     },
     proxy: {
       '/api': {
-        target: process.env.NODE_ENV === 'production' ? 'http://localhost:5000' : 'http://localhost:5001',
+        target: 'http://localhost:5001', // Backend is on 5001
         changeOrigin: true,
         secure: false,
+      },
+      // WebSocket proxy for backend real-time connections
+      '/ws': {
+        target: 'ws://localhost:5001',
+        ws: true,
+        changeOrigin: true,
       },
     },
   },

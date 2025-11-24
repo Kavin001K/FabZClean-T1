@@ -227,7 +227,7 @@ function calculateKPIMetrics(orders: Order[]): KPIMetrics {
 
   orders.forEach((order) => {
     // Calculate total revenue from paid orders
-    const isPaid = 
+    const isPaid =
       order.paymentStatus?.toLowerCase() === 'paid' ||
       order.paymentStatus?.toLowerCase() === 'completed';
 
@@ -251,11 +251,11 @@ function calculateKPIMetrics(orders: Order[]): KPIMetrics {
   });
 
   const totalOrders = orders.length;
-  const successRate = totalOrders > 0 
-    ? Math.round((completedOrdersCount / totalOrders) * 100 * 10) / 10 
+  const successRate = totalOrders > 0
+    ? Math.round((completedOrdersCount / totalOrders) * 100 * 10) / 10
     : 0;
-  const averageOrderValue = paidOrdersCount > 0 
-    ? totalRevenue / paidOrdersCount 
+  const averageOrderValue = paidOrdersCount > 0
+    ? totalRevenue / paidOrdersCount
     : 0;
 
   return {
@@ -270,17 +270,17 @@ function calculateKPIMetrics(orders: Order[]): KPIMetrics {
 interface UseAnalyticsEngineReturn {
   // Algorithm A output
   statusDistribution: StatusDistributionItem[];
-  
+
   // Algorithm B output
   servicePerformance: ServicePerformanceItem[];
-  
+
   // Algorithm C output
   kpiMetrics: KPIMetrics;
-  
+
   // Raw data (for advanced use cases)
   orders: Order[];
   services: Service[];
-  
+
   // Loading and error states
   isLoading: boolean;
   error: Error | null;
@@ -294,7 +294,7 @@ interface UseAnalyticsEngineReturn {
  */
 export function useAnalyticsEngine(): UseAnalyticsEngineReturn {
   // ✅ All hooks called at top level (Rules of Hooks compliance)
-  
+
   // Fetch orders with realtime subscription
   const {
     data: orders,
@@ -302,7 +302,7 @@ export function useAnalyticsEngine(): UseAnalyticsEngineReturn {
     error: ordersError,
   } = useRealtime<Order>({
     tableName: 'orders',
-    selectQuery: 'id, status, paymentStatus, totalAmount, items, serviceId, service, createdAt, updatedAt',
+    selectQuery: 'id, status, paymentStatus, totalAmount, items, createdAt, updatedAt', // Fixed: removed serviceId/service columns
     orderBy: 'createdAt.desc',
   });
 
@@ -319,7 +319,7 @@ export function useAnalyticsEngine(): UseAnalyticsEngineReturn {
 
   // Combined loading state
   const isLoading = ordersLoading || servicesLoading;
-  
+
   // Combined error state
   const error = ordersError || servicesError || null;
 

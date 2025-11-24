@@ -48,7 +48,7 @@ export async function setupVite(app: Express, server: Server) {
     if (url.startsWith("/api")) {
       return next();
     }
-    
+
     // Skip asset requests (Vite middleware handles these)
     if (url.startsWith("/src/") || 
         url.startsWith("/node_modules/") || 

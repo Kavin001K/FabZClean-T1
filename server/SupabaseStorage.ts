@@ -224,7 +224,7 @@ export class SupabaseStorage {
         const { data: order, error } = await this.supabase
             .from('orders')
             .insert(insertData)
-            .select()
+            .select('id, status, paymentStatus, totalAmount, items, createdAt, updatedAt')
             .single();
 
         if (error) throw error;
@@ -234,7 +234,7 @@ export class SupabaseStorage {
     async getOrder(id: string): Promise<Order | undefined> {
         const { data: order, error } = await this.supabase
             .from('orders')
-            .select('*')
+            .select('id, status, paymentStatus, totalAmount, items, createdAt, updatedAt')
             .eq('id', id)
             .single();
 
@@ -247,7 +247,7 @@ export class SupabaseStorage {
             .from('orders')
             .update(data)
             .eq('id', id)
-            .select()
+            .select('id, status, paymentStatus, totalAmount, items, createdAt, updatedAt')
             .single();
 
         if (error) return undefined;
@@ -266,7 +266,7 @@ export class SupabaseStorage {
     async listOrders(): Promise<Order[]> {
         const { data, error } = await this.supabase
             .from('orders')
-            .select('*');
+            .select('id, status, paymentStatus, totalAmount, items, createdAt, updatedAt');
 
         if (error) throw error;
         return data.map(item => this.mapDates(item));
