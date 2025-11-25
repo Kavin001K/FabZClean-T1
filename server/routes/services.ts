@@ -7,7 +7,8 @@ const router = express.Router();
 router.get('/', async (req, res) => {
     try {
         const services = await db.getServices();
-        res.json({ data: services });
+        // Return array directly for frontend compatibility
+        res.json(services);
     } catch (error: any) {
         console.error('Error fetching services:', error);
         res.status(500).json({ error: error.message });

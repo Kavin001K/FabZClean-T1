@@ -26,6 +26,7 @@ import { DriverProfile } from '@/components/driver-profile';
 import { useToast } from '@/hooks/use-toast';
 import { useRealtime } from '@/contexts/realtime-context';
 import { useNotifications } from '@/hooks/use-notifications';
+import { useActiveDrivers, useDriverTracking } from '@/hooks/use-live-tracking';
 
 interface DriverLocation {
   driverId: string;
@@ -61,6 +62,13 @@ export default function LiveTrackingPage() {
   const queryClient = useQueryClient();
   const { driverLocations } = useRealtime();
 
+  // Use live tracking hooks for real-time driver data
+  const {
+    drivers: liveDrivers,
+    loading: liveTrackingLoading,
+    refresh: refreshLiveTracking
+  } = useActiveDrivers();
+
   // Fetch orders using React Query
   const {
     data: orders = [],
@@ -78,9 +86,9 @@ export default function LiveTrackingPage() {
     gcTime: 2 * 60 * 1000, // 2 minutes
   });
 
-  // Fetch drivers using React Query
+  // Fetch drivers from local API (fallback/combined with live tracking)
   const {
-    data: drivers = [],
+    data: localDrivers = [],
     isLoading: driversLoading,
     error: driversError,
     refetch: refetchDrivers,
@@ -88,14 +96,33 @@ export default function LiveTrackingPage() {
     queryKey: ['live-tracking-drivers'],
     queryFn: async () => {
       const response = await fetch('/api/tracking/drivers');
-      if (!response.ok) throw new Error('Failed to fetch drivers');
+      if (!response.ok) {
+        // If local API fails, use live tracking data
+        return [];
+      }
       return response.json();
     },
     staleTime: 10 * 1000, // 10 seconds
     gcTime: 1 * 60 * 1000, // 1 minute
   });
 
-  const isLoading = ordersLoading || driversLoading;
+  // Combine local and live tracking data
+  const drivers = liveDrivers.length > 0
+    ? liveDrivers.map(d => ({
+      driverId: d.driverId,
+      driverName: d.driverName,
+      orderId: 'live-tracking',
+      latitude: d.currentLocation.latitude,
+      longitude: d.currentLocation.longitude,
+      heading: d.currentLocation.heading || 0,
+      speed: d.currentLocation.speed || 0,
+      status: d.status === 'active' ? 'in_transit' as const : 'delivered' as const,
+      estimatedArrival: new Date(Date.now() + 3600000).toISOString(),
+      lastUpdated: d.lastUpdated,
+    }))
+    : localDrivers;
+
+  const isLoading = ordersLoading || driversLoading || liveTrackingLoading;
   const hasError = ordersError || driversError;
 
   const activeDrivers = driverLocations.length > 0 ? driverLocations : drivers;

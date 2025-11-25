@@ -35,9 +35,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatDate } from '@/lib/data-service';
+import { formatDate, formatCurrency } from '@/lib/data-service';
 import { cn } from '@/lib/utils';
-import type { Customer } from '../../../shared/schema';
+import type { Customer, Order } from '../../../../shared/schema';
 
 // Form validation schemas
 const customerFormSchema = z.object({
@@ -64,6 +64,7 @@ interface CustomerDialogsProps {
   onCloseCreateDialog: () => void;
   onEditCustomer: (data: CustomerFormData) => void;
   onCreateCustomer: (data: CustomerFormData) => void;
+  orders?: Order[];
 }
 
 // Mock recent orders data - in real app this would come from API
@@ -119,6 +120,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   onCloseCreateDialog,
   onEditCustomer,
   onCreateCustomer,
+  orders = [],
 }) => {
   const editForm = useForm<CustomerFormData>({
     resolver: zodResolver(customerFormSchema),
@@ -126,8 +128,8 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
       name: selectedCustomer?.name || '',
       email: selectedCustomer?.email || '',
       phone: selectedCustomer?.phone || '',
-      address: selectedCustomer?.address || '',
-      notes: selectedCustomer?.notes || '',
+      address: typeof selectedCustomer?.address === 'string' ? selectedCustomer.address : '',
+      notes: '',
     },
   });
 
@@ -172,6 +174,17 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   const totalOrders = selectedCustomer?.totalOrders || 0;
   const customerSince = selectedCustomer ? new Date(selectedCustomer.createdAt || new Date()) : new Date();
   const daysSinceJoined = Math.max(1, Math.floor((Date.now() - customerSince.getTime()) / (1000 * 60 * 60 * 24)));
+
+  // Filter orders for the selected customer
+  const customerOrders = React.useMemo(() => {
+    if (!selectedCustomer || !orders) return [];
+    // Match by customer name or phone since ID linking might be loose
+    return orders.filter(order =>
+      (order.customerName === selectedCustomer.name) ||
+      (order.customerPhone === selectedCustomer.phone)
+    ).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .slice(0, 5); // Show last 5 orders
+  }, [selectedCustomer, orders]);
 
   return (
     <>
@@ -221,7 +234,9 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Address</Label>
-                      <p className="text-sm">{selectedCustomer.address || 'Not provided'}</p>
+                      <p className="text-sm">
+                        {typeof selectedCustomer.address === 'string' ? selectedCustomer.address : 'Not provided'}
+                      </p>
                     </div>
                   </div>
 
@@ -316,29 +331,47 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {mockRecentOrders.map((order) => (
-                        <TableRow key={order.id}>
-                          <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(order.status)}>
-                              {order.status ? order.status.replace('_', ' ') : 'Unknown'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {order.services.map((service, index) => (
-                                <Badge key={index} variant="outline" className="text-xs">
-                                  {service}
+                      {customerOrders.length > 0 ? (
+                        customerOrders.map((order) => {
+                          // Parse items to get service names
+                          const serviceNames = Array.isArray(order.items)
+                            ? (order.items as any[]).map(item => item.productName || item.serviceName || 'Service').slice(0, 2)
+                            : ['Services'];
+
+                          return (
+                            <TableRow key={order.id}>
+                              <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                              <TableCell>
+                                <Badge className={getStatusColor(order.status)}>
+                                  {order.status ? order.status.replace('_', ' ') : 'Unknown'}
                                 </Badge>
-                              ))}
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-medium">{order.total}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {formatDate(order.createdAt)}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap gap-1">
+                                  {serviceNames.map((service, i) => (
+                                    <Badge key={i} variant="outline" className="text-xs">
+                                      {service}
+                                    </Badge>
+                                  ))}
+                                  {Array.isArray(order.items) && (order.items as any[]).length > 2 && (
+                                    <Badge variant="outline" className="text-xs">+{(order.items as any[]).length - 2}</Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-medium">{formatCurrency(parseFloat(order.totalAmount))}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {formatDate(order.createdAt ? new Date(order.createdAt).toISOString() : '')}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
+                            No orders found for this customer.
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </div>

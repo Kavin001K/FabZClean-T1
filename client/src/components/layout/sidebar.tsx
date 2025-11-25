@@ -56,18 +56,20 @@ const NAV_ITEMS: NavItem[] = [
     icon: Package,
     roles: ["admin", "factory_manager"],
   },
-  {
-    to: "/logistics",
-    label: "Logistics",
-    icon: Truck,
-    roles: ["admin", "factory_manager", "driver"],
-  },
-  {
-    to: "/live-tracking",
-    label: "Live Tracking",
-    icon: MapPin,
-    roles: ["admin", "factory_manager", "franchise_manager", "driver"],
-  },
+  // DISABLED - Uncomment to reactivate or set VITE_ENABLE_LOGISTICS=true in .env
+  // {
+  //   to: "/logistics",
+  //   label: "Logistics",
+  //   icon: Truck,
+  //   roles: ["admin", "factory_manager", "driver"],
+  // },
+  // DISABLED - Uncomment to reactivate or set VITE_ENABLE_LIVE_TRACKING=true in .env
+  // {
+  //   to: "/live-tracking",
+  //   label: "Live Tracking",
+  //   icon: MapPin,
+  //   roles: ["admin", "factory_manager", "franchise_manager", "driver"],
+  // },
   {
     to: "/documents",
     label: "Documents",

@@ -149,8 +149,8 @@ export default function Analytics() {
     }
 
     // Apply filters to orders
-    let filteredOrders = [...orders];
-    let filteredCustomers = [...customers];
+    let filteredOrders = Array.isArray(orders) ? [...orders] : [];
+    let filteredCustomers = Array.isArray(customers) ? [...customers] : [];
 
     // Date range filter
     if (dateRange !== 'all') {

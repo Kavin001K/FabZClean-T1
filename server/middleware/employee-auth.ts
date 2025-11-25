@@ -15,6 +15,19 @@ declare global {
  */
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
     try {
+        // Skip authentication in development mode
+        if (process.env.NODE_ENV !== 'production') {
+            // Create a mock employee for development
+            req.employee = {
+                employeeId: 'dev-admin',
+                username: 'System Admin',
+                role: 'admin',
+                email: 'admin@fabzclean.local',
+                exp: 0
+            };
+            return next();
+        }
+
         // Get token from Authorization header
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {

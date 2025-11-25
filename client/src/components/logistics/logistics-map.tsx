@@ -179,8 +179,8 @@ export const LogisticsMap: React.FC<LogisticsMapProps> = React.memo(({
           <CardTitle>Live Route Map</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="h-96">
-            <LoadingSkeleton.CustomerRowSkeleton />
+          <div className="h-96 p-4">
+            <LoadingSkeleton.KpiCardSkeleton />
           </div>
         </CardContent>
       </Card>

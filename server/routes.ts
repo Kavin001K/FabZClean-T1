@@ -49,7 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate due date statistics
       const currentDate = new Date();
       const tomorrow = new Date(currentDate.getTime() + (24 * 60 * 60 * 1000));
-      
+
       const ordersWithDueDates = allOrders.filter(order => {
         const pickupDate = order.shippingAddress?.pickupDate;
         return pickupDate && ['pending', 'processing', 'ready'].includes(order.status);
@@ -139,13 +139,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/due-date-orders", async (req, res) => {
     try {
       const { type, days } = req.query;
-      
+
       let orders;
       let title;
-      
+
       // Get all orders from the database
       const allOrders = await storage.listOrders();
-      
+
       // Add due date logic based on pickup date
       const ordersWithDueDates = allOrders.map(order => {
         const pickupDate = order.shippingAddress?.pickupDate;
@@ -153,7 +153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const pickup = new Date(pickupDate);
           const dueDate = new Date(pickup.getTime() + (2 * 24 * 60 * 60 * 1000)); // 2 days after pickup
           const estimatedDelivery = new Date(pickup.getTime() + (2 * 24 * 60 * 60 * 1000));
-          
+
           return {
             ...order,
             pickupDate: pickupDate,
@@ -171,7 +171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const today = new Date();
       const tomorrow = new Date(today.getTime() + (24 * 60 * 60 * 1000));
-      
+
       switch (type) {
         case 'today':
           orders = ordersWithDueDates.filter(order => {
@@ -208,8 +208,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orders = ordersWithDueDates.filter(order => {
             if (!order.dueDate) return false;
             const dueDate = new Date(order.dueDate);
-            return dueDate >= today && dueDate <= futureDate && 
-                   ['pending', 'processing', 'ready'].includes(order.status);
+            return dueDate >= today && dueDate <= futureDate &&
+              ['pending', 'processing', 'ready'].includes(order.status);
           });
           title = `Upcoming Orders (Next ${daysAhead} days)`;
           break;
@@ -218,17 +218,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add computed fields for better display
       const enrichedOrders = orders.map(order => {
         if (!order.dueDate) return order;
-        
+
         const dueDate = new Date(order.dueDate);
         const diffTime = dueDate.getTime() - today.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
+
         let urgency = 'normal';
         if (diffDays < 0) urgency = 'overdue';
         else if (diffDays === 0) urgency = 'today';
         else if (diffDays === 1) urgency = 'tomorrow';
         else if (diffDays <= 3) urgency = 'urgent';
-        
+
         return {
           ...order,
           daysUntilDue: diffDays,
@@ -268,7 +268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Due date orders API error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Internal server error',
         message: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -543,8 +543,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertOrderSchema.parse(req.body);
       const order = await storage.createOrder(validatedData);
 
-      // Award loyalty points (only if customerId exists)
+      // Update customer statistics if customerId exists
       if (order.customerId) {
+        try {
+          const customer = await storage.getCustomer(order.customerId);
+          if (customer) {
+            const currentOrders = customer.totalOrders || 0;
+            const currentSpent = parseFloat(customer.totalSpent?.toString() || "0");
+            const orderAmount = parseFloat(order.totalAmount || "0");
+
+            await storage.updateCustomer(order.customerId, {
+              totalOrders: currentOrders + 1,
+              totalSpent: (currentSpent + orderAmount).toString(),
+              lastOrder: new Date(),
+            });
+          }
+        } catch (customerUpdateError) {
+          console.error("Failed to update customer stats:", customerUpdateError);
+          // Don't fail the order creation if customer update fails
+        }
+
+        // Award loyalty points
         await loyaltyProgram.processOrderRewards(
           order.customerId,
           parseFloat(order.totalAmount || "0"),
@@ -686,9 +705,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const avgOrderValue =
         orders.length > 0
           ? orders.reduce(
-              (sum, order) => sum + parseFloat(order.totalAmount || "0"),
-              0,
-            ) / orders.length
+            (sum, order) => sum + parseFloat(order.totalAmount || "0"),
+            0,
+          ) / orders.length
           : 0;
 
       const repeatCustomers = customers.filter(
@@ -717,14 +736,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { phone } = req.query;
       let customers = await storage.listCustomers();
 
-      // Filter by phone number if provided (exact match)
+      // Filter by phone number if provided (flexible match)
       if (phone && typeof phone === 'string') {
         const normalizedSearchPhone = phone.replace(/\D/g, ''); // Remove non-digits
-        customers = customers.filter(customer => {
-          if (!customer.phone) return false;
-          const normalizedCustomerPhone = customer.phone.replace(/\D/g, '');
-          return normalizedCustomerPhone === normalizedSearchPhone;
-        });
+
+        if (normalizedSearchPhone.length > 0) {
+          customers = customers.filter(customer => {
+            if (!customer.phone) return false;
+            const normalizedCustomerPhone = customer.phone.replace(/\D/g, '');
+
+            // Check if one contains the other to handle country codes (e.g. 918825... vs 8825...)
+            // But ensure we have at least a reasonable overlap (e.g. 6 digits) to avoid broad matches
+            if (normalizedSearchPhone.length >= 6 && normalizedCustomerPhone.length >= 6) {
+              return normalizedCustomerPhone.includes(normalizedSearchPhone) ||
+                normalizedSearchPhone.includes(normalizedCustomerPhone);
+            }
+
+            // Fallback for short numbers (exact match)
+            return normalizedCustomerPhone === normalizedSearchPhone;
+          });
+        }
       }
 
       const transformedCustomers = customers.map((customer) => ({
@@ -763,19 +794,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/customers", async (req, res) => {
     try {
       const validatedData = insertCustomerSchema.parse(req.body);
+
+      // Check if customer already exists (Get or Create pattern)
+      const allCustomers = await storage.listCustomers();
+
+      // Check by email
+      if (validatedData.email) {
+        const existingByEmail = allCustomers.find(c =>
+          c.email?.toLowerCase() === validatedData.email?.toLowerCase()
+        );
+        if (existingByEmail) {
+          return res.status(200).json(existingByEmail);
+        }
+      }
+
+      // Check by phone
+      if (validatedData.phone) {
+        const normalizedInputPhone = validatedData.phone.replace(/\D/g, '');
+        if (normalizedInputPhone.length > 0) {
+          const existingByPhone = allCustomers.find(c => {
+            if (!c.phone) return false;
+            const normalizedDbPhone = c.phone.replace(/\D/g, '');
+            return normalizedDbPhone === normalizedInputPhone;
+          });
+          if (existingByPhone) {
+            return res.status(200).json(existingByPhone);
+          }
+        }
+      }
+
       const customer = await storage.createCustomer(validatedData);
 
       // Trigger real-time update
       await realtimeServer.triggerUpdate("customer", "created", customer);
 
       res.status(201).json(customer);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           message: "Invalid customer data",
           errors: error.errors,
         });
       }
+
+      // Handle unique constraint violations as fallback
+      if (error.code === 'SQLITE_CONSTRAINT_UNIQUE' || error.message?.includes('UNIQUE constraint failed')) {
+        return res.status(409).json({
+          message: "Customer with this phone number or email already exists",
+        });
+      }
+
       console.error("Create customer error:", error);
       res.status(500).json({ message: "Failed to create customer" });
     }
@@ -854,6 +922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/services", async (req, res) => {
     try {
       const services = await storage.listServices();
+      // Return array directly, not wrapped in { data: [] }
       res.json(services);
     } catch (error) {
       console.error("Fetch services error:", error);
@@ -1722,7 +1791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/orders/:id/assign-driver", async (req, res) => {
     try {
       const { driverId } = req.body;
-      
+
       // Get the order
       const order = await storage.getOrder(req.params.id);
       if (!order) {
@@ -1764,20 +1833,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orders = await storage.listOrders();
       const customers = await storage.listCustomers();
-      
+
       // Calculate financial metrics
-      const totalRevenue = orders.reduce((sum, order) => 
+      const totalRevenue = orders.reduce((sum, order) =>
         sum + parseFloat(order.totalAmount || "0"), 0
       );
-      
+
       const paidOrders = orders.filter(order => order.paymentStatus === 'paid');
       const pendingPayments = orders.filter(order => order.paymentStatus === 'pending');
-      
-      const totalPaid = paidOrders.reduce((sum, order) => 
+
+      const totalPaid = paidOrders.reduce((sum, order) =>
         sum + parseFloat(order.totalAmount || "0"), 0
       );
-      
-      const totalPending = pendingPayments.reduce((sum, order) => 
+
+      const totalPending = pendingPayments.reduce((sum, order) =>
         sum + parseFloat(order.totalAmount || "0"), 0
       );
 

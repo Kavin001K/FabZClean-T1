@@ -6,9 +6,9 @@ import type { Order, Customer, Service, Product, Delivery, Employee } from "../.
 
 // Get access token from localStorage (employee-based auth)
 function getAccessToken(): string | null {
-  return localStorage.getItem('employee_token') || 
-         localStorage.getItem('access_token') || 
-         localStorage.getItem('supabase.auth.token');
+  return localStorage.getItem('employee_token') ||
+    localStorage.getItem('access_token') ||
+    localStorage.getItem('supabase.auth.token');
 }
 
 export type InventoryItem = {
@@ -201,11 +201,11 @@ export const ordersApi = {
         method: "DELETE",
         body: JSON.stringify({ orderIds }),
       });
-      
+
       if (!response.ok) {
         throw new Error("Failed to delete orders");
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error("Failed to delete orders:", error);
@@ -240,11 +240,14 @@ export const customersApi = {
         method: "POST",
         body: JSON.stringify(customer),
       });
-      if (!response.ok) throw new Error("Failed to create customer");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to create customer");
+      }
       return await response.json();
     } catch (error) {
       console.error("Failed to create customer:", error);
-      return null;
+      throw error; // Propagate error to caller
     }
   },
 
@@ -289,7 +292,12 @@ export const customersApi = {
 export const employeesApi = {
   async getAll(): Promise<Employee[]> {
     try {
-      return await fetchData<Employee[]>('/employees');
+      const response = await fetchData<{ success: boolean; employees: Employee[] } | Employee[]>('/employees');
+      // Handle both wrapped and unwrapped responses
+      if (response && typeof response === 'object' && 'employees' in response) {
+        return response.employees || [];
+      }
+      return Array.isArray(response) ? response : [];
     } catch (error) {
       console.error('Failed to fetch employees:', error);
       return [];
@@ -298,7 +306,12 @@ export const employeesApi = {
 
   async getById(id: string): Promise<Employee | null> {
     try {
-      return await fetchData<Employee>(`/employees/${id}`);
+      const response = await fetchData<{ success: boolean; employee: Employee } | Employee>(`/employees/${id}`);
+      // Handle both wrapped and unwrapped responses
+      if (response && typeof response === 'object' && 'employee' in response) {
+        return response.employee || null;
+      }
+      return response as Employee;
     } catch (error) {
       console.error(`Failed to fetch employee ${id}:`, error);
       return null;
@@ -312,7 +325,12 @@ export const employeesApi = {
         body: JSON.stringify(employee),
       });
       if (!response.ok) throw new Error("Failed to create employee");
-      return await response.json();
+      const data = await response.json();
+      // Handle wrapped response
+      if (data && typeof data === 'object' && 'employee' in data) {
+        return data.employee;
+      }
+      return data;
     } catch (error) {
       console.error("Failed to create employee:", error);
       return null;
@@ -357,7 +375,7 @@ export const inventoryApi = {
         name: item.name,
         stock: item.stockQuantity,
         status: item.stockQuantity === 0 ? 'Out of Stock' as const :
-                item.stockQuantity <= (item.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+          item.stockQuantity <= (item.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
         category: item.category,
         sku: item.sku,
         price: parseFloat(item.price) || 0,
@@ -380,7 +398,7 @@ export const inventoryApi = {
         name: rawData.name,
         stock: rawData.stockQuantity,
         status: rawData.stockQuantity === 0 ? 'Out of Stock' as const :
-                rawData.stockQuantity <= (rawData.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+          rawData.stockQuantity <= (rawData.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
         category: rawData.category,
         sku: rawData.sku,
         price: parseFloat(rawData.price) || 0,
@@ -414,7 +432,7 @@ export const inventoryApi = {
         name: product.name,
         stock: product.stockQuantity,
         status: product.stockQuantity === 0 ? 'Out of Stock' as const :
-                product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+          product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
         category: product.category,
         sku: product.sku,
         price: parseFloat(product.price) || 0,
@@ -448,7 +466,7 @@ export const inventoryApi = {
         name: product.name,
         stock: product.stockQuantity,
         status: product.stockQuantity === 0 ? 'Out of Stock' as const :
-                product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
+          product.stockQuantity <= (product.reorderLevel || 25) ? 'Low Stock' as const : 'In Stock' as const,
         category: product.category,
         sku: product.sku,
         price: parseFloat(product.price) || 0,
@@ -493,19 +511,19 @@ export const analyticsApi = {
   async getSalesData(): Promise<SalesData[]> {
     // ✅ Removed mock data - use RevenueChartRealtime component instead
     // This function is kept for backward compatibility
-      return [];
+    return [];
   },
 
   async getOrderStatusData(): Promise<OrderStatusData[]> {
     // ✅ Removed mock data - use useAnalyticsEngine hook instead
     // This function is kept for backward compatibility
-      return [];
+    return [];
   },
 
   async getServicePopularityData(): Promise<ServicePopularityData[]> {
     // ✅ Removed mock data - use useAnalyticsEngine hook instead
     // This function is kept for backward compatibility
-      return [];
+    return [];
   },
 
   async getDashboardMetrics(): Promise<{
@@ -581,7 +599,7 @@ export const getStatusColor = (status: string): string => {
     completed: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
     cancelled: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400",
   };
-  
+
   return statusColors[status.toLowerCase() as keyof typeof statusColors] || statusColors.pending;
 };
 
@@ -591,7 +609,7 @@ export const getPriorityColor = (priority: string): string => {
     high: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400",
     urgent: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400",
   };
-  
+
   return priorityColors[priority.toLowerCase() as keyof typeof priorityColors] || priorityColors.normal;
 };
 
@@ -769,7 +787,7 @@ export const logisticsApi = {
       // Mock routes data - in real app this would be a proper endpoint
       const deliveries = await this.getDeliveries();
       const drivers = await this.getDrivers();
-      
+
       // Convert deliveries to routes
       const routes: Route[] = deliveries.map((delivery, index) => ({
         id: `route-${delivery.id}`,
@@ -777,8 +795,8 @@ export const logisticsApi = {
         driverId: delivery.driverName ? drivers.find(d => d.name === delivery.driverName)?.id : undefined,
         driverName: delivery.driverName,
         vehicleId: delivery.vehicleId,
-        status: delivery.status === 'pending' ? 'unassigned' : 
-                delivery.status === 'in_transit' ? 'in_progress' : 'completed',
+        status: delivery.status === 'pending' ? 'unassigned' :
+          delivery.status === 'in_transit' ? 'in_progress' : 'completed',
         stops: [{
           id: `stop-${delivery.id}`,
           orderId: delivery.orderId || `order-${delivery.id}`, // Ensure orderId is never null
@@ -786,8 +804,8 @@ export const logisticsApi = {
           address: '123 Main St, City',
           coordinates: delivery.location as { lat: number; lng: number } || { lat: 12.9716, lng: 77.5946 },
           status: delivery.status === 'pending' ? 'pending' :
-                  delivery.status === 'in_transit' ? 'in_progress' :
-                  delivery.status === 'delivered' ? 'completed' : 'failed',
+            delivery.status === 'in_transit' ? 'in_progress' :
+              delivery.status === 'delivered' ? 'completed' : 'failed',
           estimatedArrival: delivery.estimatedDelivery ? new Date(delivery.estimatedDelivery) : undefined,
           actualArrival: delivery.actualDelivery ? new Date(delivery.actualDelivery) : undefined,
         }],
@@ -798,7 +816,7 @@ export const logisticsApi = {
         createdAt: delivery.createdAt ? new Date(delivery.createdAt) : new Date(),
         updatedAt: delivery.updatedAt ? new Date(delivery.updatedAt) : new Date(),
       }));
-      
+
       return routes;
     } catch (error) {
       console.error('Failed to fetch routes:', error);

@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -26,6 +26,7 @@ import { RouteList } from '@/components/logistics/route-list';
 
 // Import hooks
 import { useLogisticsKPIs } from '@/hooks/use-logistics-kpis';
+import { useActiveDrivers } from '@/hooks/use-live-tracking';
 
 // Import data service and types
 import { logisticsApi } from '@/lib/data-service';
@@ -43,6 +44,14 @@ export default function Logistics() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Live tracking integration
+  const {
+    drivers: liveDrivers,
+    loading: liveTrackingLoading,
+    error: liveTrackingError,
+    refresh: refreshLiveTracking
+  } = useActiveDrivers();
+
   // Fetch logistics data with React Query and auto-refetch
   const {
     data: routes = [],
@@ -53,7 +62,7 @@ export default function Logistics() {
     queryKey: ['logistics-routes'],
     queryFn: logisticsApi.getRoutes,
     staleTime: 30 * 1000, // 30 seconds
-    cacheTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes (replaces cacheTime)
     retry: 3,
     retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
     refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds for live updates
@@ -61,16 +70,53 @@ export default function Logistics() {
   });
 
   const {
-    data: drivers = [],
+    data: localDrivers = [],
     isLoading: driversLoading,
     isError: driversError,
   } = useQuery({
     queryKey: ['drivers'],
-    queryFn: logisticsApi.getDrivers,
+    queryFn: async () => {
+      try {
+        return await logisticsApi.getDrivers();
+      } catch (error) {
+        console.warn('Local drivers API failed, using live tracking:', error);
+        return [];
+      }
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
-    retry: 3,
+    gcTime: 10 * 60 * 1000, // 10 minutes (replaces cacheTime)
+    retry: 1, // Reduce retries since we have fallback
   });
+
+  // Merge live tracking and local driver data
+  const drivers = React.useMemo(() => {
+    if (liveDrivers.length > 0) {
+      // Convert live tracking data to Driver format
+      return liveDrivers.map(d => ({
+        id: d.driverId,
+        name: d.driverName,
+        phone: d.vehicleNumber || 'N/A',
+        email: `${d.driverId}@fabzclean.local`,
+        status: d.status === 'active' ? ('available' as const) : ('offline' as const),
+        vehicleNumber: d.vehicleNumber || 'N/A',
+        licenseNumber: 'LIVE-TRACKING',
+        vehicleType: 'van' as const,
+        vehicleModel: 'Unknown',
+        rating: 5.0,
+        totalDeliveries: 0,
+        onTimeDeliveries: 0,
+        totalEarnings: 0,
+        lastActive: new Date(d.lastUpdated).toISOString(),
+        currentLocation: {
+          latitude: d.currentLocation.latitude,
+          longitude: d.currentLocation.longitude,
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(d.lastUpdated),
+      }));
+    }
+    return Array.isArray(localDrivers) ? localDrivers : [];
+  }, [liveDrivers, localDrivers]);
 
   // Fetch logistics KPIs
   const {
@@ -89,7 +135,7 @@ export default function Logistics() {
         // Invalidate queries to refetch data
         queryClient.invalidateQueries({ queryKey: ["logistics-routes"] });
         queryClient.invalidateQueries({ queryKey: ["logistics-kpis"] });
-        
+
         toast({
           title: "Driver Assigned Successfully",
           description: `Driver has been assigned to ${selectedRoute?.name || 'the route'}.`,
@@ -117,7 +163,7 @@ export default function Logistics() {
       // Invalidate queries to refetch data
       queryClient.invalidateQueries({ queryKey: ["logistics-routes"] });
       queryClient.invalidateQueries({ queryKey: ["logistics-kpis"] });
-      
+
       toast({
         title: "Status Updated",
         description: "Delivery status has been updated successfully.",
@@ -143,7 +189,7 @@ export default function Logistics() {
         // Invalidate queries to refetch data
         queryClient.invalidateQueries({ queryKey: ["logistics-routes"] });
         queryClient.invalidateQueries({ queryKey: ["logistics-kpis"] });
-        
+
         toast({
           title: "Route Created Successfully",
           description: `New route "${newRoute.name}" has been created.`,
@@ -183,8 +229,11 @@ export default function Logistics() {
     });
   }, [createRouteMutation, routes.length]);
 
-  const isLoading = routesLoading || driversLoading;
+  const isLoading = routesLoading || driversLoading || liveTrackingLoading;
   const hasError = routesError || driversError;
+
+  // Show live tracking status
+  const liveTrackingActive = liveDrivers.length > 0 && !liveTrackingError;
 
   // Error state with non-intrusive toast notification
   if (hasError && routes.length === 0) {
@@ -195,19 +244,19 @@ export default function Logistics() {
             <div className="text-center space-y-4">
               <div className="text-destructive text-lg font-semibold">
                 Unable to load logistics data
-          </div>
+              </div>
               <p className="text-sm text-muted-foreground">
                 {routesErrorDetails?.message || 'An unexpected error occurred'}
               </p>
-              <Button 
+              <Button
                 onClick={() => queryClient.invalidateQueries({ queryKey: ['logistics-routes'] })}
                 variant="outline"
               >
                 Refresh
               </Button>
             </div>
-            </CardContent>
-          </Card>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -222,8 +271,10 @@ export default function Logistics() {
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-sm text-muted-foreground">Live Tracking Active</span>
+            <div className={`w-2 h-2 rounded-full ${liveTrackingActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+            <span className="text-sm text-muted-foreground">
+              {liveTrackingActive ? `Live Tracking: ${liveDrivers.length} drivers` : 'Live Tracking Offline'}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -264,10 +315,10 @@ export default function Logistics() {
       </div>
 
       {/* KPI Cards */}
-      <LogisticsKPIs 
-        data={kpiData} 
-        isLoading={kpisLoading} 
-        isError={kpisError} 
+      <LogisticsKPIs
+        data={kpiData}
+        isLoading={kpisLoading}
+        isError={kpisError}
       />
 
       {/* Main Content - Two Panel Layout */}
@@ -280,7 +331,7 @@ export default function Logistics() {
             isLoading={isLoading}
             onRouteSelect={handleRouteSelect}
           />
-            </div>
+        </div>
 
         {/* Right Panel - Route List (40% width) */}
         <div className="lg:col-span-2">
@@ -296,7 +347,7 @@ export default function Logistics() {
             isAssigningDriver={assignDriverMutation.isPending}
             isUpdatingStatus={updateStatusMutation.isPending}
           />
-            </div>
+        </div>
       </div>
 
       {/* Real-time Status Indicator */}
@@ -305,9 +356,9 @@ export default function Logistics() {
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
           <span className="text-sm text-green-700 font-medium">
             Live updates every 30 seconds
-                            </span>
-                          </div>
-          </div>
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

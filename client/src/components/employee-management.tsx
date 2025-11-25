@@ -83,10 +83,16 @@ export default function EmployeeManagement() {
   });
 
   // Fetch employees
-  const { data: employees = [], isLoading } = useQuery({
+  const { data: employeesData, isLoading } = useQuery({
     queryKey: ['employees'],
     queryFn: () => employeesApi.getAll(),
   });
+
+  // Ensure employees is always an array
+  const employees = React.useMemo(() => {
+    if (!employeesData) return [];
+    return Array.isArray(employeesData) ? employeesData : [];
+  }, [employeesData]);
 
   // Mutations
   const createEmployeeMutation = useMutation({

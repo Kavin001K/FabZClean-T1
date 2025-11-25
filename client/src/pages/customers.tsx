@@ -796,6 +796,7 @@ export default function Customers() {
           onCloseCreateDialog={() => setIsCreateDialogOpen(false)}
           onEditCustomer={handleUpdateCustomer}
           onCreateCustomer={handleCreateCustomer}
+          orders={orders}
         />
       </div>
     </PageTransition>

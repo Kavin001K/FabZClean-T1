@@ -13,6 +13,8 @@ import authRouter from './auth'; // Employee-based authentication
 import employeesRouter from './employees'; // Employee management
 import dashboardRouter from './dashboard';
 import accountingRouter from './accounting';
+import healthRouter from './health';
+import databaseRouter from './database';
 
 /**
  * Register all route modules with the Express app
@@ -39,6 +41,10 @@ export function registerAllRoutes(app: Express): void {
   // Dashboard and Accounting routes
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/accounting', accountingRouter);
+
+  // Health and Database routes
+  app.use('/api/health', healthRouter);
+  app.use('/api/database', databaseRouter);
 
   // Legacy API routes (for backward compatibility)
   app.use('/api/orders', ordersRouter);

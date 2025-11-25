@@ -12,7 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
-import { ordersApi, customersApi } from "@/lib/data-service";
+import { ordersApi, customersApi, servicesApi } from '@/lib/data-service';
+import { useInvoicePrint } from '@/hooks/use-invoice-print';
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,6 +21,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 interface ServiceItem {
   service: Service;
   quantity: number;
+  // Allows per‑order price override without mutating the original service price
+  priceOverride: number;
   subtotal: number;
 }
 
@@ -70,18 +73,22 @@ export default function CreateOrder() {
   const { addNotification } = useNotifications();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { printInvoice } = useInvoicePrint();
 
-  // Fetch services
-  const { data: services, isLoading: servicesLoading, isError: servicesError } = useQuery<Service[]>({
+  // Fetch services - only active ones
+  const { data: servicesData, isLoading: servicesLoading, isError: servicesError } = useQuery<Service[]>({
     queryKey: ["services"],
     queryFn: async () => {
-      const response = await fetch("/api/services");
-      if (!response.ok) {
-        throw new Error("Failed to fetch services");
-      }
-      return response.json();
+      const allServices = await servicesApi.getAll();
+      // Filter to only show Active services (case-insensitive)
+      return allServices.filter(service =>
+        service.status?.toLowerCase() === 'active'
+      );
     },
   });
+
+  // Ensure services is always an array
+  const services = Array.isArray(servicesData) ? servicesData : [];
 
   // Customer search by phone
   const handleFetchCustomer = async () => {
@@ -103,7 +110,17 @@ export default function CreateOrder() {
         setCustomerName(customer.name || "");
         setCustomerEmail(customer.email || "");
         setCustomerPhone(customer.phone || phoneNumber);
-        setCustomerAddress(typeof customer.address === 'string' ? customer.address : JSON.stringify(customer.address) || "");
+
+        // Handle address which could be jsonb or string
+        let addressStr = "";
+        if (customer.address) {
+          if (typeof customer.address === 'string') {
+            addressStr = customer.address;
+          } else if (typeof customer.address === 'object') {
+            addressStr = JSON.stringify(customer.address);
+          }
+        }
+        setCustomerAddress(addressStr);
 
         toast({
           title: "Customer Found!",
@@ -129,7 +146,9 @@ export default function CreateOrder() {
   // Create new customer mutation
   const createCustomerMutation = useMutation({
     mutationFn: async (customerData: Partial<Customer>) => {
-      return await customersApi.create(customerData);
+      const result = await customersApi.create(customerData);
+      if (!result) throw new Error("Failed to create customer");
+      return result;
     },
     onSuccess: (newCustomer) => {
       if (newCustomer) {
@@ -137,7 +156,17 @@ export default function CreateOrder() {
         setCustomerName(newCustomer.name || "");
         setCustomerEmail(newCustomer.email || "");
         setCustomerPhone(newCustomer.phone || "");
-        setCustomerAddress(typeof newCustomer.address === 'string' ? newCustomer.address : JSON.stringify(newCustomer.address) || "");
+
+        // Handle address which could be jsonb or string
+        let addressStr = "";
+        if (newCustomer.address) {
+          if (typeof newCustomer.address === 'string') {
+            addressStr = newCustomer.address;
+          } else if (typeof newCustomer.address === 'object') {
+            addressStr = JSON.stringify(newCustomer.address);
+          }
+        }
+        setCustomerAddress(addressStr);
 
         queryClient.invalidateQueries({ queryKey: ["customers"] });
 
@@ -159,7 +188,7 @@ export default function CreateOrder() {
       console.error('Failed to create customer:', error);
       toast({
         title: "Error",
-        description: "Failed to create customer. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create customer. Please try again.",
         variant: "destructive",
       });
     },
@@ -195,13 +224,15 @@ export default function CreateOrder() {
       // Increase quantity
       const updated = [...selectedServices];
       updated[existingIndex].quantity += 1;
-      updated[existingIndex].subtotal = updated[existingIndex].quantity * parseFloat(serviceToAdd.price);
+      const price = updated[existingIndex].priceOverride;
+      updated[existingIndex].subtotal = updated[existingIndex].quantity * price;
       setSelectedServices(updated);
     } else {
-      // Add new service
+      // Add new service with its base price as the default override
       setSelectedServices([...selectedServices, {
         service: serviceToAdd,
         quantity: 1,
+        priceOverride: parseFloat(serviceToAdd.price),
         subtotal: parseFloat(serviceToAdd.price),
       }]);
     }
@@ -216,10 +247,11 @@ export default function CreateOrder() {
 
     const updated = selectedServices.map(item => {
       if (item.service.id === serviceId) {
+        const price = item.priceOverride;
         return {
           ...item,
           quantity,
-          subtotal: quantity * parseFloat(item.service.price),
+          subtotal: quantity * price,
         };
       }
       return item;
@@ -391,6 +423,7 @@ export default function CreateOrder() {
 
     const orderData: any = {
       orderNumber: `ORD-${Date.now()}`,
+      customerId: currentCustomerId,
       customerName,
       customerEmail: customerEmail || undefined,
       customerPhone,
@@ -401,7 +434,8 @@ export default function CreateOrder() {
         productId: item.service.id,
         productName: item.service.name,
         quantity: item.quantity,
-        price: item.service.price,
+        // Use the overridden price for this order only
+        price: item.priceOverride,
       })),
       shippingAddress: {
         instructions: specialInstructions,
@@ -624,22 +658,34 @@ export default function CreateOrder() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label>Add Service *</Label>
-                  <Select onValueChange={handleAddService} value="">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a service to add..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {services && services.length > 0 ? (
-                        services.map((service) => (
-                          <SelectItem key={service.id} value={service.id}>
-                            {service.name} - ₹{parseFloat(service.price).toFixed(2)}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="no-services" disabled>No services available</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
+                  {servicesLoading ? (
+                    <div className="flex items-center justify-center p-3 border rounded-md bg-muted/50">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <span className="text-sm text-muted-foreground">Loading services...</span>
+                    </div>
+                  ) : servicesError ? (
+                    <div className="flex items-center justify-center p-3 border rounded-md bg-destructive/10 text-destructive">
+                      <AlertCircle className="h-4 w-4 mr-2" />
+                      <span className="text-sm">Failed to load services. Please refresh the page.</span>
+                    </div>
+                  ) : (
+                    <Select onValueChange={handleAddService} value="">
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a service to add..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {services && services.length > 0 ? (
+                          services.map((service) => (
+                            <SelectItem key={service.id} value={service.id}>
+                              {service.name} - ₹{parseFloat(service.price).toFixed(2)}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-services" disabled>No services available</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
                 {selectedServices.length === 0 ? (
@@ -680,7 +726,22 @@ export default function CreateOrder() {
                                   className="w-20"
                                 />
                               </TableCell>
-                              <TableCell>₹{parseFloat(item.service.price).toFixed(2)}</TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={item.priceOverride}
+                                  onChange={(e) => {
+                                    const newPrice = parseFloat(e.target.value) || 0;
+                                    const updated = selectedServices.map(s =>
+                                      s.service.id === item.service.id ? { ...s, priceOverride: newPrice, subtotal: s.quantity * newPrice } : s
+                                    );
+                                    setSelectedServices(updated);
+                                  }}
+                                  className="w-24"
+                                />
+                              </TableCell>
                               <TableCell className="font-semibold">₹{item.subtotal.toFixed(2)}</TableCell>
                               <TableCell>
                                 <Button
@@ -1110,6 +1171,14 @@ export default function CreateOrder() {
                 setLocation('/orders');
               }}>
                 View Orders
+              </Button>
+              <Button
+                onClick={() => createdOrder && printInvoice(createdOrder)}
+                variant="default"
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                Print Invoice
               </Button>
             </div>
           </motion.div>

@@ -110,7 +110,7 @@ export default function Services() {
 
   // Fetch services data with React Query
   const {
-    data: services = [],
+    data: servicesData,
     isLoading: servicesLoading,
     isError: servicesError,
     error: servicesErrorDetails,
@@ -121,6 +121,18 @@ export default function Services() {
     retry: 3,
     retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
+
+  // Ensure services is always an array
+  const services: Service[] = useMemo(() => {
+    if (!servicesData) return [];
+    if (Array.isArray(servicesData)) return servicesData;
+    // If data is wrapped in an object, try to extract the array
+    if (typeof servicesData === 'object' && 'data' in servicesData) {
+      const wrappedData = (servicesData as any).data;
+      return Array.isArray(wrappedData) ? wrappedData : [];
+    }
+    return [];
+  }, [servicesData]);
 
   // Get unique categories from services
   const categories = useMemo(() => {
@@ -514,99 +526,99 @@ export default function Services() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search services by name, description, or category..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-                aria-label="Search services by name, description, or category"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-[180px]" aria-label="Filter by category">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat === 'all' ? 'All Categories' : cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search services by name, description, or category..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                  aria-label="Search services by name, description, or category"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="w-[180px]" aria-label="Filter by category">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat === 'all' ? 'All Categories' : cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="w-[140px]" aria-label="Filter by status">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="w-[140px]" aria-label="Filter by status">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-                <SelectTrigger className="w-[140px]" aria-label="Sort services">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">Name</SelectItem>
-                  <SelectItem value="price">Price</SelectItem>
-                  <SelectItem value="popular">Popular</SelectItem>
-                </SelectContent>
-              </Select>
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                  <SelectTrigger className="w-[140px]" aria-label="Sort services">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name">Name</SelectItem>
+                    <SelectItem value="price">Price</SelectItem>
+                    <SelectItem value="popular">Popular</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <div className="flex border rounded-md">
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('grid')}
-                  className="rounded-r-none"
-                >
-                  <Grid3x3 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('list')}
-                  className="rounded-l-none"
-                >
-                  <List className="h-4 w-4" />
-                </Button>
+                <div className="flex border rounded-md">
+                  <Button
+                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('grid')}
+                    className="rounded-r-none"
+                  >
+                    <Grid3x3 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('list')}
+                    className="rounded-l-none"
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
 
-          <AnimatePresence>
-            {(searchQuery || selectedCategory !== 'all' || selectedStatus !== 'all') && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
-                className="mt-4 flex items-center gap-2 text-sm text-muted-foreground"
-              >
-                <span>Showing {filteredServices.length} of {services.length} services</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedCategory('all');
-                    setSelectedStatus('all');
-                  }}
+            <AnimatePresence>
+              {(searchQuery || selectedCategory !== 'all' || selectedStatus !== 'all') && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="mt-4 flex items-center gap-2 text-sm text-muted-foreground"
                 >
-                  Clear filters
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </CardContent>
-      </Card>
+                  <span>Showing {filteredServices.length} of {services.length} services</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedCategory('all');
+                      setSelectedStatus('all');
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </CardContent>
+        </Card>
       </motion.div>
 
       {/* Service Cards Grid/List */}
@@ -673,85 +685,85 @@ export default function Services() {
                   layout
                 >
                   <Card className="group hover:shadow-lg transition-all duration-300 relative overflow-hidden h-full"
-              >
-                {isPopular && (
-                  <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-500 to-amber-400 text-white px-3 py-1 rounded-bl-lg text-xs font-semibold flex items-center gap-1">
-                    <Star className="h-3 w-3 fill-current" />
-                    Popular
-                  </div>
-                )}
-
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="p-3 rounded-lg bg-lime-100 text-lime-600 group-hover:bg-lime-500 group-hover:text-white transition-colors">
-                      <ServiceIcon className="h-6 w-6" />
-                    </div>
-                    <Badge
-                      variant={service.status === 'Active' ? 'default' : 'secondary'}
-                      className={service.status === 'Active' ? 'bg-green-500' : ''}
-                    >
-                      {service.status === 'Active' ? (
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                      ) : (
-                        <XCircle className="h-3 w-3 mr-1" />
-                      )}
-                      {service.status}
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-xl mt-3">{service.name}</CardTitle>
-                  <Badge variant="outline" className="w-fit">
-                    {service.category}
-                  </Badge>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground line-clamp-2 min-h-[40px]">
-                    {service.description || 'Professional service with quality guarantee'}
-                  </p>
-
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>{service.duration}</span>
-                  </div>
-
-                  <div className="pt-3 border-t">
-                    <div className="flex items-end justify-between mb-3">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Service Price</p>
-                        <p className="text-2xl font-bold text-lime-600">
-                          {formatCurrency(service.price)}
-                        </p>
+                  >
+                    {isPopular && (
+                      <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-500 to-amber-400 text-white px-3 py-1 rounded-bl-lg text-xs font-semibold flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-current" />
+                        Popular
                       </div>
-                    </div>
+                    )}
 
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditService(service);
-                        }}
-                        className="flex-1"
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        className="flex-1 group-hover:bg-lime-600"
-                        size="sm"
-                        onClick={() => handleAddToOrder(service)}
-                        disabled={service.status !== 'Active'}
-                      >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        Add to Order
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              </motion.div>
-            );
-          })}
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="p-3 rounded-lg bg-lime-100 text-lime-600 group-hover:bg-lime-500 group-hover:text-white transition-colors">
+                          <ServiceIcon className="h-6 w-6" />
+                        </div>
+                        <Badge
+                          variant={service.status === 'Active' ? 'default' : 'secondary'}
+                          className={service.status === 'Active' ? 'bg-green-500' : ''}
+                        >
+                          {service.status === 'Active' ? (
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                          ) : (
+                            <XCircle className="h-3 w-3 mr-1" />
+                          )}
+                          {service.status}
+                        </Badge>
+                      </div>
+                      <CardTitle className="text-xl mt-3">{service.name}</CardTitle>
+                      <Badge variant="outline" className="w-fit">
+                        {service.category}
+                      </Badge>
+                    </CardHeader>
+
+                    <CardContent className="space-y-4">
+                      <p className="text-sm text-muted-foreground line-clamp-2 min-h-[40px]">
+                        {service.description || 'Professional service with quality guarantee'}
+                      </p>
+
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>{service.duration}</span>
+                      </div>
+
+                      <div className="pt-3 border-t">
+                        <div className="flex items-end justify-between mb-3">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Service Price</p>
+                            <p className="text-2xl font-bold text-lime-600">
+                              {formatCurrency(service.price)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditService(service);
+                            }}
+                            className="flex-1"
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            className="flex-1 group-hover:bg-lime-600"
+                            size="sm"
+                            onClick={() => handleAddToOrder(service)}
+                            disabled={service.status !== 'Active'}
+                          >
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                            Add to Order
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </motion.div>
       ) : (
@@ -785,74 +797,74 @@ export default function Services() {
                   layout
                 >
                   <Card className="hover:shadow-md transition-shadow"
-              >
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-6">
-                    <div className="p-4 rounded-lg bg-lime-100 text-lime-600">
-                      <ServiceIcon className="h-8 w-8" />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-xl font-semibold">{service.name}</h3>
-                        {isPopular && (
-                          <Badge variant="secondary" className="bg-amber-100 text-amber-700">
-                            <Star className="h-3 w-3 mr-1 fill-current" />
-                            Popular
-                          </Badge>
-                        )}
-                        <Badge variant="outline">{service.category}</Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground line-clamp-1">
-                        {service.description || 'Professional service with quality guarantee'}
-                      </p>
-                      <div className="flex items-center gap-4 mt-2">
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Clock className="h-4 w-4" />
-                          {service.duration}
+                  >
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-6">
+                        <div className="p-4 rounded-lg bg-lime-100 text-lime-600">
+                          <ServiceIcon className="h-8 w-8" />
                         </div>
-                        <Badge
-                          variant={service.status === 'Active' ? 'default' : 'secondary'}
-                          className={service.status === 'Active' ? 'bg-green-500' : ''}
-                        >
-                          {service.status}
-                        </Badge>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="text-xl font-semibold">{service.name}</h3>
+                            {isPopular && (
+                              <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+                                <Star className="h-3 w-3 mr-1 fill-current" />
+                                Popular
+                              </Badge>
+                            )}
+                            <Badge variant="outline">{service.category}</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground line-clamp-1">
+                            {service.description || 'Professional service with quality guarantee'}
+                          </p>
+                          <div className="flex items-center gap-4 mt-2">
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              {service.duration}
+                            </div>
+                            <Badge
+                              variant={service.status === 'Active' ? 'default' : 'secondary'}
+                              className={service.status === 'Active' ? 'bg-green-500' : ''}
+                            >
+                              {service.status}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground mb-1">Service Price</p>
+                          <p className="text-3xl font-bold text-lime-600">
+                            {formatCurrency(service.price)}
+                          </p>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditService(service);
+                            }}
+                            className="whitespace-nowrap"
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            onClick={() => handleAddToOrder(service)}
+                            disabled={service.status !== 'Active'}
+                            className="whitespace-nowrap"
+                          >
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                            Add to Order
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground mb-1">Service Price</p>
-                      <p className="text-3xl font-bold text-lime-600">
-                        {formatCurrency(service.price)}
-                      </p>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditService(service);
-                        }}
-                        className="whitespace-nowrap"
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        onClick={() => handleAddToOrder(service)}
-                        disabled={service.status !== 'Active'}
-                        className="whitespace-nowrap"
-                      >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        Add to Order
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              </motion.div>
-            );
-          })}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </motion.div>
       )}
@@ -947,101 +959,101 @@ function EditServiceDialog({
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-service-name">Service Name</Label>
-              <Input
-                id="edit-service-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Deep Cleaning Service"
-                required
-                aria-required="true"
-                minLength={2}
-                maxLength={100}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-service-category">Category</Label>
-              <Input
-                id="edit-service-category"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="e.g., Cleaning"
-                required
-                aria-required="true"
-                minLength={2}
-                maxLength={50}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-service-description">Description</Label>
-              <Textarea
-                id="edit-service-description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Describe your service..."
-                rows={3}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-service-price">Price (₹)</Label>
+                <Label htmlFor="edit-service-name">Service Name</Label>
                 <Input
-                  id="edit-service-price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  placeholder="0.00"
+                  id="edit-service-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Deep Cleaning Service"
                   required
                   aria-required="true"
+                  minLength={2}
+                  maxLength={100}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-service-duration">Duration</Label>
+                <Label htmlFor="edit-service-category">Category</Label>
                 <Input
-                  id="edit-service-duration"
-                  value={formData.duration}
-                  onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                  placeholder="e.g., 2 hours"
+                  id="edit-service-category"
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  placeholder="e.g., Cleaning"
                   required
                   aria-required="true"
+                  minLength={2}
+                  maxLength={50}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-service-description">Description</Label>
+                <Textarea
+                  id="edit-service-description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Describe your service..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-service-price">Price (₹)</Label>
+                  <Input
+                    id="edit-service-price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    placeholder="0.00"
+                    required
+                    aria-required="true"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-service-duration">Duration</Label>
+                  <Input
+                    id="edit-service-duration"
+                    value={formData.duration}
+                    onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                    placeholder="e.g., 2 hours"
+                    required
+                    aria-required="true"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-service-status">Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(v) => setFormData({ ...formData, status: v as 'Active' | 'Inactive' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-service-status">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(v) => setFormData({ ...formData, status: v as 'Active' | 'Inactive' })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Updating...' : 'Update Service'}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Updating...' : 'Update Service'}
+              </Button>
+            </DialogFooter>
+          </form>
         </motion.div>
       </DialogContent>
     </Dialog>
@@ -1098,101 +1110,101 @@ function CreateServiceDialog({
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Service Name</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Deep Cleaning Service"
-                required
-                aria-required="true"
-                minLength={2}
-                maxLength={100}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Input
-                id="category"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="e.g., Cleaning"
-                required
-                aria-required="true"
-                minLength={2}
-                maxLength={50}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Describe your service..."
-                rows={3}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="price">Price (₹)</Label>
+                <Label htmlFor="name">Service Name</Label>
                 <Input
-                  id="price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  placeholder="0.00"
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Deep Cleaning Service"
                   required
                   aria-required="true"
+                  minLength={2}
+                  maxLength={100}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="duration">Duration</Label>
+                <Label htmlFor="category">Category</Label>
                 <Input
-                  id="duration"
-                  value={formData.duration}
-                  onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                  placeholder="e.g., 2 hours"
+                  id="category"
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  placeholder="e.g., Cleaning"
                   required
                   aria-required="true"
+                  minLength={2}
+                  maxLength={50}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Describe your service..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price (₹)</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    placeholder="0.00"
+                    required
+                    aria-required="true"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="duration">Duration</Label>
+                  <Input
+                    id="duration"
+                    value={formData.duration}
+                    onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                    placeholder="e.g., 2 hours"
+                    required
+                    aria-required="true"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(v) => setFormData({ ...formData, status: v as 'Active' | 'Inactive' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(v) => setFormData({ ...formData, status: v as 'Active' | 'Inactive' })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Creating...' : 'Create Service'}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Creating...' : 'Create Service'}
+              </Button>
+            </DialogFooter>
+          </form>
         </motion.div>
       </DialogContent>
     </Dialog>
@@ -1235,37 +1247,37 @@ function AddToOrderDialog({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-          <div>
-            <h3 className="font-semibold text-lg">{service.name}</h3>
-            <Badge variant="outline" className="mt-1">{service.category}</Badge>
-          </div>
-
-          {service.description && (
-            <p className="text-sm text-muted-foreground">{service.description}</p>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Duration</p>
-              <p className="font-medium">{service.duration}</p>
+            <div>
+              <h3 className="font-semibold text-lg">{service.name}</h3>
+              <Badge variant="outline" className="mt-1">{service.category}</Badge>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Price</p>
-              <p className="text-xl font-bold text-lime-600">
-                {formatCurrency(service.price)}
-              </p>
+
+            {service.description && (
+              <p className="text-sm text-muted-foreground">{service.description}</p>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Duration</p>
+                <p className="font-medium">{service.duration}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Price</p>
+                <p className="text-xl font-bold text-lime-600">
+                  {formatCurrency(service.price)}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleAddToOrder}>
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            Confirm & Add
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddToOrder}>
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Confirm & Add
+            </Button>
+          </DialogFooter>
         </motion.div>
       </DialogContent>
     </Dialog>

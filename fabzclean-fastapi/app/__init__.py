@@ -1,2 +1,0 @@
-# FabzClean FastAPI Application
-

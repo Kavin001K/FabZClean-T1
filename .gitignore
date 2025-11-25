@@ -65,3 +65,24 @@ $RECYCLE.BIN/
 *.backup
 * 2.*
 *2.*
+
+# Test files  
+test-*.html
+test-*.js
+**/tests/
+**/*test*.py
+**/*demo*.tsx
+**/*demo*.ts
+
+# Local development
+.local/
+.replit
+replit.nix
+
+# API collections (keep in docs if needed)
+*.postman_collection.json
+openapi.yaml
+
+# Old/legacy code
+src/app/
+fabzclean-fastapi/
