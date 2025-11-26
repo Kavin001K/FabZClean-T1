@@ -6,8 +6,8 @@ export async function initializeDatabase() {
     const dbType = process.env.USE_SUPABASE === 'true' ? 'supabase' : 'sqlite';
     console.log(`🔄 Initializing ${dbType} database...`);
 
-    // Test the database connection by trying to get users
-    await db.listUsers();
+    // Test the database connection by trying to get customers
+    await db.listCustomers();
 
     console.log(`✅ ${dbType} database initialized successfully`);
 
@@ -29,8 +29,8 @@ export async function getDatabaseHealth() {
     const startTime = Date.now();
     const dbType = process.env.USE_SUPABASE === 'true' ? 'supabase' : 'sqlite';
 
-    // Simple health check - try to query users table
-    await db.listUsers();
+    // Simple health check - try to query customers table
+    await db.listCustomers();
 
     const responseTime = Date.now() - startTime;
 
@@ -57,7 +57,7 @@ export async function pingDatabase() {
     const dbType = process.env.USE_SUPABASE === 'true' ? 'supabase' : 'sqlite';
 
     // Simple ping - try to query
-    await db.listUsers();
+    await db.listCustomers();
 
     const responseTime = Date.now() - startTime;
 
@@ -81,7 +81,7 @@ export async function pingDatabase() {
 export async function getDatabaseInfo() {
   try {
     const dbType = process.env.USE_SUPABASE === 'true' ? 'supabase' : 'sqlite';
-    const users = await db.listUsers();
+    // const users = await db.listUsers(); // Users table might not exist in Supabase
     const products = await db.listProducts();
     const orders = await db.listOrders();
     const customers = await db.listCustomers();
@@ -90,7 +90,7 @@ export async function getDatabaseInfo() {
       database: dbType,
       version: dbType === 'sqlite' ? "3.x" : "PostgreSQL",
       tables: {
-        users: users.length,
+        users: 0, // users.length,
         products: products.length,
         orders: orders.length,
         customers: customers.length,

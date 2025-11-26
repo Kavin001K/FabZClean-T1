@@ -11,6 +11,7 @@ import {
   calculateOrderPriority,
   calculateOrderScore,
 } from '../algorithms';
+import { whatsappService } from './whatsapp.service';
 
 export interface OrderFilters {
   status?: string;
@@ -231,6 +232,16 @@ export class OrderService {
       const enrichedOrder = enrichOrderWithAlgorithms(order);
 
       console.log(`✅ [OrderService] Order created: ${order.id}`);
+
+      console.log(`✅ [OrderService] Order created: ${order.id}`);
+
+      // Send WhatsApp confirmation
+      try {
+        await whatsappService.sendOrderConfirmation(order);
+      } catch (waError) {
+        console.error('⚠️ [OrderService] Failed to send WhatsApp confirmation:', waError);
+        // Don't fail the order creation
+      }
 
       return enrichedOrder;
     } catch (error) {
