@@ -1,4 +1,5 @@
 import React from 'react';
+// Customer Dialogs Component
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,7 +18,8 @@ import {
   DollarSign,
   ShoppingBag,
   Star,
-  Clock
+  Clock,
+  Trash2
 } from 'lucide-react';
 import {
   Dialog,
@@ -48,6 +50,14 @@ const customerFormSchema = z.object({
   phone: z.string().min(10, 'Phone number must be at least 10 digits').max(15, 'Phone number must be less than 15 digits'),
   address: z.string().optional(), // Simple string for now - matches text input in UI
   notes: z.string().optional(),
+  // New fields for enhanced customer management
+  companyName: z.string().optional(),
+  taxId: z.string().optional(),
+  dateOfBirth: z.string().optional(),
+  creditLimit: z.string().optional(),
+  creditBalance: z.string().optional(),
+  status: z.enum(['active', 'inactive']).optional(),
+  paymentTerms: z.string().optional(),
 });
 
 type CustomerFormData = z.infer<typeof customerFormSchema>;
@@ -64,6 +74,7 @@ interface CustomerDialogsProps {
   onCloseCreateDialog: () => void;
   onEditCustomer: (data: CustomerFormData) => void;
   onCreateCustomer: (data: CustomerFormData) => void;
+  onDeleteCustomer?: (customerId: string) => void;
   orders?: Order[];
 }
 
@@ -120,6 +131,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   onCloseCreateDialog,
   onEditCustomer,
   onCreateCustomer,
+  onDeleteCustomer,
   orders = [],
 }) => {
   const editForm = useForm<CustomerFormData>({
@@ -382,8 +394,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   Close
                 </Button>
               </DialogFooter>
-            </motion.div>
-          ) : null}
+            </motion.div>) : null}
         </DialogContent>
       </Dialog>
 
@@ -489,18 +500,140 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   )}
                 </div>
 
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={onCloseEditDialog}
-                    disabled={isUpdating}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={isUpdating}>
-                    {isUpdating ? 'Saving...' : 'Save Changes'}
-                  </Button>
+                {/* Business Information */}
+                <div className="space-y-4 border-t pt-4">
+                  <h4 className="font-semibold text-sm text-muted-foreground">Business Information (Optional)</h4>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-company">Company Name</Label>
+                      <Input
+                        id="edit-company"
+                        {...editForm.register('companyName')}
+                        placeholder="Company name"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-tax">Tax ID / GST</Label>
+                      <Input
+                        id="edit-tax"
+                        {...editForm.register('taxId')}
+                        placeholder="Tax identification number"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-dob">Date of Birth</Label>
+                      <Input
+                        id="edit-dob"
+                        type="date"
+                        {...editForm.register('dateOfBirth')}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-payment-terms">Payment Terms</Label>
+                      <select
+                        id="edit-payment-terms"
+                        {...editForm.register('paymentTerms')}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="">Select payment terms</option>
+                        <option value="cash">Cash Only</option>
+                        <option value="net15">Net 15 Days</option>
+                        <option value="net30">Net 30 Days</option>
+                        <option value="net60">Net 60 Days</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Credit Management */}
+                <div className="space-y-4 border-t pt-4">
+                  <h4 className="font-semibold text-sm text-muted-foreground">Credit Management</h4>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-credit-limit">Credit Limit (₹)</Label>
+                      <Input
+                        id="edit-credit-limit"
+                        type="number"
+                        {...editForm.register('creditLimit')}
+                        placeholder="0"
+                      />
+                      <p className="text-xs text-muted-foreground">Maximum credit allowed for this customer</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-credit-balance">Current Credit Balance (₹)</Label>
+                      <Input
+                        id="edit-credit-balance"
+                        type="number"
+                        {...editForm.register('creditBalance')}
+                        placeholder="0"
+                        readOnly
+                        className="bg-muted"
+                      />
+                      <p className="text-xs text-muted-foreground">Current outstanding credit amount</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Management */}
+                <div className="space-y-4 border-t pt-4">
+                  <h4 className="font-semibold text-sm text-muted-foreground">Account Status</h4>
+
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-status" className="text-base font-medium">
+                        Customer Status
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Inactive customers cannot place new orders
+                      </p>
+                    </div>
+                    <select
+                      id="edit-status"
+                      {...editForm.register('status')}
+                      className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium"
+                    >
+                      <option value="active">✅ Active</option>
+                      <option value="inactive">⛔ Inactive</option>
+                    </select>
+                  </div>
+                </div>
+
+                <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between w-full">
+                  {onDeleteCustomer && selectedCustomer && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => {
+                        onDeleteCustomer(selectedCustomer.id);
+                      }}
+                      disabled={isUpdating}
+                      title="Delete Customer"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <div className="flex gap-2 ml-auto">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={onCloseEditDialog}
+                      disabled={isUpdating}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={isUpdating}>
+                      {isUpdating ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </div>
                 </DialogFooter>
               </form>
             </motion.div>

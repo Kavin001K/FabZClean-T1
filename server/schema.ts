@@ -2,10 +2,23 @@ import { z } from 'zod';
 
 // Order validation schemas
 export const insertOrderSchema = z.object({
+  orderNumber: z.string().optional(),
+  customerId: z.string().optional(),
   customerName: z.string().min(1, 'Customer name is required'),
-  customerEmail: z.string().email('Valid email is required'),
+  customerEmail: z.string().email('Valid email is required').optional().or(z.literal('')),
   customerPhone: z.string().min(10, 'Phone number is required'),
-  serviceIds: z.array(z.string()).min(1, 'At least one service is required'),
+  status: z.string().optional(),
+  paymentStatus: z.string().optional(),
+  totalAmount: z.union([z.string(), z.number()]).optional(),
+  items: z.array(z.any()).optional(),
+  serviceIds: z.array(z.string()).optional(),
+  shippingAddress: z.any().optional(),
+  advancePaid: z.any().optional(),
+  paymentMethod: z.string().optional(),
+  discountType: z.string().optional(),
+  discountValue: z.any().optional(),
+  couponCode: z.string().optional(),
+  extraCharges: z.any().optional(),
   pickupDate: z.string().optional(),
   specialInstructions: z.string().optional(),
   total: z.number().positive('Total must be positive').optional()

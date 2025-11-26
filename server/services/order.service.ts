@@ -169,29 +169,37 @@ export class OrderService {
       console.log('📦 [OrderService] Creating order for customer:', orderData.customerId);
 
       // Pre-validate customer via external API if customerId is provided
+      // Skip validation if external API is not configured
       if (orderData.customerId) {
         try {
           const validation = await this.validateCustomer(orderData.customerId);
 
-          if (!validation.isValid) {
+          // If validation service is unavailable, log warning but continue
+          if (validation.reason === 'Validation service unavailable') {
+            console.warn(
+              `⚠️  [OrderService] External validation unavailable for customer ${orderData.customerId}, continuing with order creation`
+            );
+          } else if (!validation.isValid) {
             throw new Error(
               `Customer validation failed: ${validation.reason || 'Unknown reason'}`
             );
+          } else {
+            console.log(
+              `✅ [OrderService] Customer validated: ${orderData.customerId}`
+            );
           }
-
-          console.log(
-            `✅ [OrderService] Customer validated: ${orderData.customerId}`
-          );
         } catch (error) {
           if (error instanceof ExternalApiError) {
-            console.error(
-              '❌ [OrderService] External API error during validation:',
-              error.message
+            console.warn(
+              '⚠️  [OrderService] External API error during validation:',
+              error.message,
+              '- continuing with order creation'
             );
+            // Don't throw - allow order creation to proceed
+          } else {
+            // Re-throw other errors
             throw error;
           }
-          // Re-throw other errors
-          throw error;
         }
       }
 

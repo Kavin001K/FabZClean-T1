@@ -16,7 +16,8 @@ import {
   DollarSign,
   Clock,
   FileText,
-  UserPlus
+  UserPlus,
+  Edit
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -265,6 +266,9 @@ export default function Customers() {
           title: "Customer Deleted Successfully",
           description: "Customer has been deleted.",
         });
+        setIsEditDialogOpen(false);
+        setIsViewDialogOpen(false);
+        setSelectedCustomer(null);
       }
     },
     onError: (error) => {
@@ -772,6 +776,18 @@ export default function Customers() {
                               <Phone className="h-4 w-4" />
                               Call
                             </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 gap-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditCustomer(customer);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                              Edit
+                            </Button>
                           </div>
                         </CardContent>
                       </Card>
@@ -796,6 +812,7 @@ export default function Customers() {
           onCloseCreateDialog={() => setIsCreateDialogOpen(false)}
           onEditCustomer={handleUpdateCustomer}
           onCreateCustomer={handleCreateCustomer}
+          onDeleteCustomer={handleDeleteCustomer}
           orders={orders}
         />
       </div>

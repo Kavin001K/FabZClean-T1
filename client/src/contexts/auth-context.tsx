@@ -75,6 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Sign in with username and password
   const signIn = async (username: string, password: string): Promise<{ error: string | null }> => {
+    setLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
@@ -95,6 +96,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error: any) {
       return { error: error.message || 'Login failed' };
+    } finally {
+      setLoading(false);
     }
   };
 

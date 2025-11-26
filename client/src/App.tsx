@@ -38,6 +38,7 @@ import Accounting from "@/pages/accounting";
 import { InvoiceGenerator } from "@/components/invoice-generator";
 import CustomerPortal from "@/pages/customer-portal";
 import WorkerPortal from "@/pages/worker-portal";
+import BillView from "@/pages/bill-view";
 
 function Router() {
   return (
@@ -47,6 +48,7 @@ function Router() {
       <Route path="/unauthorized" component={UnauthorizedPage}
       />
       <Route path="/account-inactive" component={AccountInactivePage} />
+      <Route path="/bill/:orderNumber" component={BillView} />
 
       {/* Protected routes */}
       <Route path="/">

@@ -17,6 +17,8 @@ import { useInvoicePrint } from '@/hooks/use-invoice-print';
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CustomerAutocomplete } from "@/components/customer-autocomplete";
+import { OrderConfirmationDialog } from "@/components/orders/order-confirmation-dialog";
 
 interface ServiceItem {
   service: Service;
@@ -90,6 +92,14 @@ export default function CreateOrder() {
   // Ensure services is always an array
   const services = Array.isArray(servicesData) ? servicesData : [];
 
+  // Fetch all customers for autocomplete
+  const { data: customersData } = useQuery<Customer[]>({
+    queryKey: ["customers"],
+    queryFn: () => customersApi.getAll(),
+  });
+
+  const customers = Array.isArray(customersData) ? customersData : [];
+
   // Customer search by phone
   const handleFetchCustomer = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
@@ -141,6 +151,30 @@ export default function CreateOrder() {
     } finally {
       setSearchingCustomer(false);
     }
+  };
+
+  // Handle customer selection from autocomplete
+  const handleSelectCustomer = (customer: Customer) => {
+    setFoundCustomer(customer);
+    setCustomerName(customer.name || "");
+    setCustomerEmail(customer.email || "");
+    setCustomerPhone(customer.phone || "");
+
+    // Handle address which could be jsonb or string
+    let addressStr = "";
+    if (customer.address) {
+      if (typeof customer.address === 'string') {
+        addressStr = customer.address;
+      } else if (typeof customer.address === 'object') {
+        addressStr = JSON.stringify(customer.address);
+      }
+    }
+    setCustomerAddress(addressStr);
+
+    toast({
+      title: "Customer Selected!",
+      description: `Details loaded for ${customer.name}`,
+    });
   };
 
   // Create new customer mutation
@@ -521,37 +555,16 @@ export default function CreateOrder() {
                   <Search className="h-5 w-5 mr-2" />
                   Customer Search
                 </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Type to search by name, phone, or email - results appear as you type
+                </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <Label htmlFor="phoneSearch">Phone Number</Label>
-                    <Input
-                      id="phoneSearch"
-                      placeholder="Enter phone number to search customer"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleFetchCustomer()}
-                      type="tel"
-                      disabled={searchingCustomer}
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <Button
-                      onClick={handleFetchCustomer}
-                      disabled={searchingCustomer || !phoneNumber}
-                    >
-                      {searchingCustomer ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Search className="h-4 w-4 mr-2" />
-                          Fetch
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
+                <CustomerAutocomplete
+                  customers={customers}
+                  onSelect={handleSelectCustomer}
+                  placeholder="Search by name, phone, or email..."
+                />
 
                 <AnimatePresence>
                   {foundCustomer && (
@@ -566,7 +579,7 @@ export default function CreateOrder() {
                           <CheckCircle className="h-5 w-5 text-green-600" />
                           <div>
                             <p className="font-semibold text-green-800 dark:text-green-200">
-                              Customer Found!
+                              Customer Selected!
                             </p>
                             <p className="text-sm text-green-600 dark:text-green-400">
                               {foundCustomer.name} - {foundCustomer.phone}
@@ -1116,74 +1129,14 @@ export default function CreateOrder() {
       </Dialog>
 
       {/* Success Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", duration: 0.5 }}
-              >
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              </motion.div>
-              Order Created Successfully!
-            </DialogTitle>
-            <DialogDescription>
-              The order has been successfully processed and saved.
-            </DialogDescription>
-          </DialogHeader>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="py-4 space-y-4"
-          >
-            <p>Your new order has been created and saved to the database.</p>
-            {createdOrder && (
-              <div className="bg-muted p-4 rounded-lg space-y-2">
-                <p><strong>Order Number:</strong> {createdOrder.orderNumber}</p>
-                <p><strong>Customer:</strong> {createdOrder.customerName}</p>
-                <p><strong>Services:</strong> {selectedServices.map(s => `${s.service.name} (x${s.quantity})`).join(', ')}</p>
-                <p><strong>Subtotal:</strong> ₹{subtotal.toFixed(2)}</p>
-                {discountType !== 'none' && discountValue > 0 && (
-                  <p><strong>Discount:</strong> {discountType === 'percentage' ? `${discountValue}%` : `₹${discountValue.toFixed(2)}`}</p>
-                )}
-                {extraCharges > 0 && (
-                  <p><strong>{extraChargesLabel || 'Extra Charges'}:</strong> ₹{extraCharges.toFixed(2)}</p>
-                )}
-                <p><strong>Total Amount:</strong> ₹{parseFloat(createdOrder.totalAmount).toFixed(2)}</p>
-                {advancePayment && parseFloat(advancePayment) > 0 && (
-                  <>
-                    <p><strong>Advance Paid:</strong> ₹{parseFloat(advancePayment).toFixed(2)}</p>
-                    <p><strong>Balance Due:</strong> ₹{(parseFloat(createdOrder.totalAmount) - parseFloat(advancePayment)).toFixed(2)}</p>
-                  </>
-                )}
-                <p><strong>Status:</strong> <Badge variant="secondary">{createdOrder.status}</Badge></p>
-              </div>
-            )}
-            <div className="flex gap-2">
-              <Button onClick={() => setIsModalOpen(false)} variant="outline">
-                Close
-              </Button>
-              <Button onClick={() => {
-                setIsModalOpen(false);
-                setLocation('/orders');
-              }}>
-                View Orders
-              </Button>
-              <Button
-                onClick={() => createdOrder && printInvoice(createdOrder)}
-                variant="default"
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <DollarSign className="h-4 w-4 mr-2" />
-                Print Invoice
-              </Button>
-            </div>
-          </motion.div>
-        </DialogContent>
-      </Dialog>
+      <OrderConfirmationDialog
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        order={createdOrder}
+        onClose={() => {
+          setIsModalOpen(false);
+        }}
+      />
     </div>
   );
 }

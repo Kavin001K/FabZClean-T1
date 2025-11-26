@@ -218,7 +218,16 @@ export const ordersApi = {
 export const customersApi = {
   async getAll(): Promise<Customer[]> {
     try {
-      return await fetchData<Customer[]>('/customers');
+      const response = await fetchData<{ data: Customer[] } | Customer[]>('/customers');
+      // Handle paginated response structure
+      if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
+        return response.data;
+      }
+      // Handle direct array response
+      if (Array.isArray(response)) {
+        return response;
+      }
+      return [];
     } catch (error) {
       console.error('Failed to fetch customers:', error);
       return [];
