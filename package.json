@@ -10,6 +10,7 @@
     "dev": "npx tsx server/minimal-server.ts",
     "build": "npm run build:client",
     "build:client": "vite build --config vite.config.minimal.ts",
+    "postinstall": "npm run build:client",
     "start": "npx tsx server/minimal-server.ts",
     "start:client": "vite preview --port 5000",
     "check": "tsc",
