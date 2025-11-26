@@ -49,4 +49,37 @@ router.get('/check-user', async (req: Request, res: Response) => {
     }
 });
 
+router.get('/reset-password', async (req: Request, res: Response) => {
+    const { username, secret } = req.query;
+
+    if (secret !== 'debug123') {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    try {
+        // Generate hash using the server's bcrypt library
+        const passwordHash = await bcrypt.hash('admin123', 10);
+
+        const { data, error } = await supabase
+            .from('auth_employees')
+            .update({ password_hash: passwordHash, is_active: true })
+            .eq('username', username)
+            .select();
+
+        if (error) {
+            return res.json({ status: 'error', error: error.message });
+        }
+
+        return res.json({
+            status: 'success',
+            message: 'Password reset to admin123',
+            user: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 export const debugRouter = router;
+```
