@@ -26,6 +26,7 @@ export const products = pgTable("products", {
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderNumber: text("order_number").notNull().unique(),
+  customerId: text("customer_id"), // Added customerId
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
   customerPhone: text("customer_phone"),
@@ -35,6 +36,12 @@ export const orders = pgTable("orders", {
   items: jsonb("items").notNull(), // Array of order items
   shippingAddress: jsonb("shipping_address"),
   pickupDate: timestamp("pickup_date"), // Scheduled pickup date
+  advancePaid: decimal("advance_paid", { precision: 10, scale: 2 }).default("0"),
+  paymentMethod: text("payment_method").default("cash"),
+  discountType: text("discount_type"),
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }),
+  couponCode: text("coupon_code"),
+  extraCharges: decimal("extra_charges", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

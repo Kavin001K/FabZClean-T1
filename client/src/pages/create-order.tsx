@@ -127,7 +127,13 @@ export default function CreateOrder() {
           if (typeof customer.address === 'string') {
             addressStr = customer.address;
           } else if (typeof customer.address === 'object') {
-            addressStr = JSON.stringify(customer.address);
+            // Try to extract line1 if it exists, otherwise stringify
+            const addrObj = customer.address as any;
+            if (addrObj && typeof addrObj.line1 === 'string') {
+              addressStr = addrObj.line1;
+            } else {
+              addressStr = JSON.stringify(customer.address);
+            }
           }
         }
         setCustomerAddress(addressStr);
@@ -166,7 +172,13 @@ export default function CreateOrder() {
       if (typeof customer.address === 'string') {
         addressStr = customer.address;
       } else if (typeof customer.address === 'object') {
-        addressStr = JSON.stringify(customer.address);
+        // Try to extract line1 if it exists, otherwise stringify
+        const addrObj = customer.address as any;
+        if (addrObj && typeof addrObj.line1 === 'string') {
+          addressStr = addrObj.line1;
+        } else {
+          addressStr = JSON.stringify(customer.address);
+        }
       }
     }
     setCustomerAddress(addressStr);
@@ -197,7 +209,13 @@ export default function CreateOrder() {
           if (typeof newCustomer.address === 'string') {
             addressStr = newCustomer.address;
           } else if (typeof newCustomer.address === 'object') {
-            addressStr = JSON.stringify(newCustomer.address);
+            // Try to extract line1 if it exists, otherwise stringify
+            const addrObj = newCustomer.address as any;
+            if (addrObj && typeof addrObj.line1 === 'string') {
+              addressStr = addrObj.line1;
+            } else {
+              addressStr = JSON.stringify(newCustomer.address);
+            }
           }
         }
         setCustomerAddress(addressStr);
@@ -239,11 +257,22 @@ export default function CreateOrder() {
       return;
     }
 
+    // Validate email if provided
+    if (newCustomerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newCustomerEmail)) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
     createCustomerMutation.mutate({
       name: newCustomerName,
       phone: newCustomerPhone,
       email: newCustomerEmail || undefined,
-      address: newCustomerAddress || undefined,
+      // Send address as an object to satisfy jsonb requirement
+      address: newCustomerAddress ? { line1: newCustomerAddress } : undefined,
     });
   };
 
@@ -532,11 +561,22 @@ export default function CreateOrder() {
     // If no customer found, create a new one
     if (!currentCustomerId) {
       try {
+        // Validate email if provided
+        if (customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+          toast({
+            title: "Validation Error",
+            description: "Please enter a valid email address",
+            variant: "destructive",
+          });
+          return;
+        }
+
         const newCustomer = await customersApi.create({
           name: customerName,
           phone: customerPhone,
           email: customerEmail || undefined,
-          address: customerAddress || undefined,
+          // Send address as an object to satisfy jsonb requirement
+          address: customerAddress ? { line1: customerAddress } : undefined,
         });
 
         if (newCustomer) {
@@ -672,6 +712,18 @@ export default function CreateOrder() {
                 <CustomerAutocomplete
                   customers={customers}
                   onSelect={handleSelectCustomer}
+                  onCreateNew={(query) => {
+                    // Pre-fill based on query type (phone or name)
+                    const isPhone = /^\d+$/.test(query.replace(/[\s\-\(\)]/g, ''));
+                    if (isPhone) {
+                      setNewCustomerPhone(query);
+                      setNewCustomerName('');
+                    } else {
+                      setNewCustomerName(query);
+                      setNewCustomerPhone('');
+                    }
+                    setShowCustomerDialog(true);
+                  }}
                   placeholder="Search by name, phone, or email..."
                 />
 

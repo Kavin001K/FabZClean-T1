@@ -9,7 +9,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create and export Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+// Create and export Supabase client
+// Use a fallback URL if not provided to prevent crash, but warn user
+const validSupabaseUrl = supabaseUrl || 'https://placeholder.supabase.co';
+const validSupabaseKey = supabaseAnonKey || 'placeholder';
+
+export const isSupabaseConfigured = !validSupabaseUrl.includes('placeholder');
+
+export const supabase = createClient(validSupabaseUrl, validSupabaseKey, {
   realtime: {
     params: {
       eventsPerSecond: 10,

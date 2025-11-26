@@ -33,10 +33,10 @@ router.use(jwtRequired);
 // Get customers with pagination and search
 router.get('/', async (req, res) => {
   try {
-    const { 
-      cursor, 
-      limit = 20, 
-      search, 
+    const {
+      cursor,
+      limit = 20,
+      search,
       segment,
       sortBy = 'createdAt',
       sortOrder = 'desc'
@@ -47,7 +47,7 @@ router.get('/', async (req, res) => {
     // Apply search filter
     if (search && typeof search === 'string') {
       const searchTerm = search.toLowerCase();
-      customers = customers.filter(customer => 
+      customers = customers.filter(customer =>
         customer.name?.toLowerCase().includes(searchTerm) ||
         customer.email?.toLowerCase().includes(searchTerm) ||
         customer.phone?.toLowerCase().includes(searchTerm)
@@ -59,8 +59,8 @@ router.get('/', async (req, res) => {
       customers = customers.filter(customer => {
         if (!customer.segments) return false;
         try {
-          const segments = typeof customer.segments === 'string' 
-            ? JSON.parse(customer.segments) 
+          const segments = typeof customer.segments === 'string'
+            ? JSON.parse(customer.segments)
             : customer.segments;
           return Array.isArray(segments) && segments.includes(segment);
         } catch {
@@ -73,7 +73,7 @@ router.get('/', async (req, res) => {
     customers.sort((a, b) => {
       const aValue = a[sortBy as string];
       const bValue = b[sortBy as string];
-      
+
       if (sortOrder === 'asc') {
         return aValue > bValue ? 1 : -1;
       } else {
@@ -85,7 +85,7 @@ router.get('/', async (req, res) => {
     const limitNum = parseInt(limit as string) || 20;
     const startIndex = cursor ? customers.findIndex(c => c.id === cursor) + 1 : 0;
     const endIndex = startIndex + limitNum;
-    
+
     const paginatedCustomers = customers.slice(startIndex, endIndex);
     const hasMore = endIndex < customers.length;
     const nextCursor = hasMore ? paginatedCustomers[paginatedCustomers.length - 1]?.id : undefined;
@@ -112,7 +112,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const customer = await storage.getCustomer(req.params.id);
-    
+
     if (!customer) {
       return res.status(404).json(createErrorResponse('Customer not found', 404));
     }
@@ -131,28 +131,44 @@ router.post(
   requireRole(CUSTOMER_EDITOR_ROLES),
   validateInput(insertCustomerSchema),
   async (req, res) => {
-  try {
-    const customerData = req.body;
+    try {
+      const customerData = req.body;
 
-    // Check if customer already exists
-    const existingCustomer = await storage.listCustomers();
-    const emailExists = existingCustomer.some(c => c.email === customerData.email);
+      // Check if customer already exists
+      const existingCustomer = await storage.listCustomers();
+      const emailExists = existingCustomer.some(c => c.email === customerData.email);
 
-    if (emailExists) {
-      return res.status(400).json(createErrorResponse('Customer with this email already exists', 400));
+      if (emailExists) {
+        return res.status(400).json(createErrorResponse('Customer with this email already exists', 400));
+      }
+
+      // Check if phone already exists
+      if (customerData.phone) {
+        const phoneExists = existingCustomer.some(c => c.phone === customerData.phone);
+        if (phoneExists) {
+          return res.status(400).json(createErrorResponse('Customer with this phone number already exists', 400));
+        }
+      }
+
+      // Ensure address is properly formatted for storage
+      // If it's an object (from frontend), keep it as object for Supabase client which handles jsonb
+      // If it's a string, it might need parsing or keeping as string depending on storage implementation
+
+      console.log('Creating customer with data:', JSON.stringify(customerData, null, 2));
+
+      const customer = await storage.createCustomer(customerData);
+
+      // Notify real-time clients
+      realtimeServer.triggerUpdate('customers', 'created', customer);
+
+      const serializedCustomer = serializeCustomer(customer);
+      res.status(201).json(createSuccessResponse(serializedCustomer, 'Customer created successfully'));
+    } catch (error: any) {
+      console.error('Create customer error details:', error);
+      // Return the specific error message from the database/storage if available
+      const errorMessage = error.message || 'Failed to create customer';
+      res.status(500).json(createErrorResponse(errorMessage, 500));
     }
-
-    const customer = await storage.createCustomer(customerData);
-
-    // Notify real-time clients
-    realtimeServer.triggerUpdate('customers', 'created', customer);
-
-    const serializedCustomer = serializeCustomer(customer);
-    res.status(201).json(createSuccessResponse(serializedCustomer, 'Customer created successfully'));
-  } catch (error) {
-    console.error('Create customer error:', error);
-    res.status(500).json(createErrorResponse('Failed to create customer', 500));
-  }
   },
 );
 
@@ -254,8 +270,8 @@ router.get('/analytics/overview', async (req, res) => {
     customers.forEach(customer => {
       if (customer.segments) {
         try {
-          const customerSegments = typeof customer.segments === 'string' 
-            ? JSON.parse(customer.segments) 
+          const customerSegments = typeof customer.segments === 'string'
+            ? JSON.parse(customer.segments)
             : customer.segments;
           if (Array.isArray(customerSegments)) {
             customerSegments.forEach(segment => {
@@ -271,8 +287,8 @@ router.get('/analytics/overview', async (req, res) => {
     // Calculate loyalty points distribution
     const loyaltyStats = {
       totalPoints: customers.reduce((sum, customer) => sum + (parseInt(customer.loyaltyPoints || '0')), 0),
-      averagePoints: customers.length > 0 
-        ? customers.reduce((sum, customer) => sum + (parseInt(customer.loyaltyPoints || '0')), 0) / customers.length 
+      averagePoints: customers.length > 0
+        ? customers.reduce((sum, customer) => sum + (parseInt(customer.loyaltyPoints || '0')), 0) / customers.length
         : 0,
       customersWithPoints: customers.filter(c => parseInt(c.loyaltyPoints || '0') > 0).length
     };
@@ -314,33 +330,33 @@ router.patch(
   "/:id/segments",
   requireRole(CUSTOMER_ADMIN_ROLES),
   async (req, res) => {
-  try {
-    const customerId = req.params.id;
-    const { segments } = req.body;
+    try {
+      const customerId = req.params.id;
+      const { segments } = req.body;
 
-    if (!Array.isArray(segments)) {
-      return res.status(400).json(createErrorResponse('Segments must be an array', 400));
+      if (!Array.isArray(segments)) {
+        return res.status(400).json(createErrorResponse('Segments must be an array', 400));
+      }
+
+      const customer = await storage.getCustomer(customerId);
+      if (!customer) {
+        return res.status(404).json(createErrorResponse('Customer not found', 404));
+      }
+
+      const updatedCustomer = await storage.updateCustomer(customerId, { segments });
+
+      // Notify real-time clients
+      realtimeServer.triggerUpdate('customers', 'segments_updated', {
+        customerId,
+        segments
+      });
+
+      const serializedCustomer = serializeCustomer(updatedCustomer);
+      res.json(createSuccessResponse(serializedCustomer, 'Customer segments updated successfully'));
+    } catch (error) {
+      console.error('Update customer segments error:', error);
+      res.status(500).json(createErrorResponse('Failed to update customer segments', 500));
     }
-
-    const customer = await storage.getCustomer(customerId);
-    if (!customer) {
-      return res.status(404).json(createErrorResponse('Customer not found', 404));
-    }
-
-    const updatedCustomer = await storage.updateCustomer(customerId, { segments });
-
-    // Notify real-time clients
-    realtimeServer.triggerUpdate('customers', 'segments_updated', {
-      customerId,
-      segments
-    });
-
-    const serializedCustomer = serializeCustomer(updatedCustomer);
-    res.json(createSuccessResponse(serializedCustomer, 'Customer segments updated successfully'));
-  } catch (error) {
-    console.error('Update customer segments error:', error);
-    res.status(500).json(createErrorResponse('Failed to update customer segments', 500));
-  }
   },
 );
 
@@ -353,8 +369,8 @@ router.get('/segments/list', async (req, res) => {
     customers.forEach(customer => {
       if (customer.segments) {
         try {
-          const customerSegments = typeof customer.segments === 'string' 
-            ? JSON.parse(customer.segments) 
+          const customerSegments = typeof customer.segments === 'string'
+            ? JSON.parse(customer.segments)
             : customer.segments;
           if (Array.isArray(customerSegments)) {
             customerSegments.forEach(segment => allSegments.add(segment));

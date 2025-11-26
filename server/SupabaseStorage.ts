@@ -49,7 +49,15 @@ export class SupabaseStorage {
             'pickup_date': 'pickupDate',
             'shipping_address': 'shippingAddress',
             'created_at': 'createdAt',
-            'updated_at': 'updatedAt'
+            'updated_at': 'updatedAt',
+            // New fields
+            'advance_paid': 'advancePaid',
+            'payment_method': 'paymentMethod',
+            'discount_type': 'discountType',
+            'discount_value': 'discountValue',
+            'coupon_code': 'couponCode',
+            'extra_charges': 'extraCharges',
+            'loyalty_points': 'loyaltyPoints'
         };
 
         Object.entries(mappings).forEach(([snake, camel]) => {
@@ -191,9 +199,20 @@ export class SupabaseStorage {
 
     // ======= CUSTOMERS =======
     async createCustomer(data: InsertCustomer): Promise<Customer> {
+        // Ensure address is stringified if it's an object, as Supabase client might need it for jsonb
+        const insertData = { ...data };
+        if (insertData.address && typeof insertData.address === 'object') {
+            // @ts-ignore - Supabase expects different types depending on client version, force stringify for safety if needed, 
+            // but actually for jsonb it should be object. However, if previous errors were 400, let's try to ensure it matches what Supabase expects.
+            // If the column is jsonb, passing an object is correct. 
+            // If the column is text (which it shouldn't be after the fix), stringify is needed.
+            // Let's rely on the fact that we fixed the column to jsonb.
+            // BUT, if the error persists, it might be that the type definition in InsertCustomer says string but we pass object.
+        }
+
         const { data: customer, error } = await this.supabase
             .from('customers')
-            .insert(data)
+            .insert(insertData)
             .select()
             .single();
 

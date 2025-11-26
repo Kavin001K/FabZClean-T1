@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { SQLiteStorage, type Driver, type InsertDriver } from "./SQLiteStorage";
+import bcrypt from 'bcryptjs';
 
 export interface IStorage {
   // Driver methods
@@ -222,48 +223,209 @@ export class MemStorage implements IStorage {
 
       // Sample Services
       const sampleServices = [
+        // Dry Cleaning - Men
         {
-          name: "Dry Cleaning",
-          description: "Professional dry cleaning service for delicate fabrics",
-          price: "15.00",
+          name: "Shirt (Dry Clean)",
+          category: "Dry Cleaning",
+          description: "Professional dry cleaning for shirts",
+          price: "150.00",
+          duration: "2 Days",
+          status: "Active"
         },
         {
-          name: "Premium Laundry",
-          description: "High-quality laundry service with premium detergents",
-          price: "8.00",
+          name: "Trousers (Dry Clean)",
+          category: "Dry Cleaning",
+          description: "Professional dry cleaning for trousers",
+          price: "180.00",
+          duration: "2 Days",
+          status: "Active"
         },
         {
-          name: "Leather Care",
-          description:
-            "Specialized cleaning and conditioning for leather items",
-          price: "25.00",
+          name: "Suit - 2 Piece (Dry Clean)",
+          category: "Dry Cleaning",
+          description: "Dry cleaning for 2-piece suit (Jacket + Trousers)",
+          price: "450.00",
+          duration: "3 Days",
+          status: "Active"
         },
         {
-          name: "Stain Removal",
-          description: "Professional stain removal for tough stains",
-          price: "12.00",
+          name: "Suit - 3 Piece (Dry Clean)",
+          category: "Dry Cleaning",
+          description: "Dry cleaning for 3-piece suit (Jacket + Vest + Trousers)",
+          price: "550.00",
+          duration: "3 Days",
+          status: "Active"
         },
         {
-          name: "Express Service",
-          description: "Same-day cleaning service for urgent needs",
-          price: "20.00",
+          name: "Jacket/Blazer (Dry Clean)",
+          category: "Dry Cleaning",
+          description: "Professional dry cleaning for jackets or blazers",
+          price: "250.00",
+          duration: "3 Days",
+          status: "Active"
         },
         {
-          name: "Wedding Dress Cleaning",
-          description:
-            "Specialized cleaning for wedding dresses and formal wear",
-          price: "50.00",
+          name: "Coat/Overcoat (Dry Clean)",
+          category: "Dry Cleaning",
+          description: "Professional dry cleaning for heavy coats",
+          price: "350.00",
+          duration: "4 Days",
+          status: "Active"
+        },
+
+        // Dry Cleaning - Women
+        {
+          name: "Saree (Dry Clean)",
+          category: "Dry Cleaning",
+          description: "Delicate dry cleaning for sarees (Cotton/Silk)",
+          price: "250.00",
+          duration: "3 Days",
+          status: "Active"
         },
         {
-          name: "Rug Cleaning",
-          description: "Professional rug and carpet cleaning service",
+          name: "Saree with Blouse (Dry Clean)",
+          category: "Dry Cleaning",
+          description: "Dry cleaning for saree and matching blouse",
+          price: "300.00",
+          duration: "3 Days",
+          status: "Active"
+        },
+        {
+          name: "Blouse (Dry Clean)",
+          category: "Dry Cleaning",
+          description: "Professional dry cleaning for blouses",
+          price: "100.00",
+          duration: "2 Days",
+          status: "Active"
+        },
+        {
+          name: "Dress/Gown (Dry Clean)",
+          category: "Dry Cleaning",
+          description: "Dry cleaning for dresses or gowns",
+          price: "350.00",
+          duration: "3 Days",
+          status: "Active"
+        },
+        {
+          name: "Kurta/Top (Dry Clean)",
+          category: "Dry Cleaning",
+          description: "Dry cleaning for kurtas or tops",
+          price: "150.00",
+          duration: "2 Days",
+          status: "Active"
+        },
+
+        // Laundry (Wash & Fold/Iron)
+        {
+          name: "Wash & Fold (per kg)",
+          category: "Laundry",
+          description: "Machine wash and professional folding (min 3kg)",
+          price: "60.00",
+          duration: "24 Hours",
+          status: "Active"
+        },
+        {
+          name: "Wash & Iron (per kg)",
+          category: "Laundry",
+          description: "Machine wash and steam ironing (min 3kg)",
+          price: "90.00",
+          duration: "48 Hours",
+          status: "Active"
+        },
+        {
+          name: "Shirt (Wash & Iron)",
+          category: "Laundry",
+          description: "Premium wash and iron for shirts",
+          price: "80.00",
+          duration: "48 Hours",
+          status: "Active"
+        },
+        {
+          name: "Trousers (Wash & Iron)",
+          category: "Laundry",
+          description: "Premium wash and iron for trousers",
+          price: "90.00",
+          duration: "48 Hours",
+          status: "Active"
+        },
+
+        // Household Items
+        {
+          name: "Bed Sheet (Single)",
+          category: "Household",
+          description: "Cleaning for single bed sheets",
+          price: "120.00",
+          duration: "3 Days",
+          status: "Active"
+        },
+        {
+          name: "Bed Sheet (Double/King)",
+          category: "Household",
+          description: "Cleaning for double or king size bed sheets",
+          price: "180.00",
+          duration: "3 Days",
+          status: "Active"
+        },
+        {
+          name: "Pillow Cover",
+          category: "Household",
+          description: "Cleaning for pillow covers",
+          price: "40.00",
+          duration: "3 Days",
+          status: "Active"
+        },
+        {
+          name: "Blanket (Single)",
+          category: "Household",
+          description: "Deep cleaning for single blankets",
+          price: "300.00",
+          duration: "4 Days",
+          status: "Active"
+        },
+        {
+          name: "Blanket (Double)",
+          category: "Household",
+          description: "Deep cleaning for double blankets",
+          price: "450.00",
+          duration: "4 Days",
+          status: "Active"
+        },
+        {
+          name: "Curtains (per panel)",
+          category: "Household",
+          description: "Professional cleaning for curtains (unlined)",
+          price: "200.00",
+          duration: "4 Days",
+          status: "Active"
+        },
+
+        // Steam Ironing
+        {
+          name: "Steam Ironing (per piece)",
+          category: "Ironing",
+          description: "Professional steam ironing only",
           price: "30.00",
+          duration: "24 Hours",
+          status: "Active"
+        },
+
+        // Shoe Cleaning
+        {
+          name: "Sports Shoes",
+          category: "Shoe Cleaning",
+          description: "Deep cleaning for sports shoes/sneakers",
+          price: "350.00",
+          duration: "4 Days",
+          status: "Active"
         },
         {
-          name: "Alterations",
-          description: "Basic alterations and repairs",
-          price: "10.00",
-        },
+          name: "Leather Shoes",
+          category: "Shoe Cleaning",
+          description: "Cleaning and polishing for leather shoes",
+          price: "450.00",
+          duration: "4 Days",
+          status: "Active"
+        }
       ];
 
       // Insert services
@@ -274,19 +436,31 @@ export class MemStorage implements IStorage {
       // Sample Orders
       const sampleOrders = [
         {
+          orderNumber: "ORD-001",
           customerId: customerIds[0],
+          customerName: sampleCustomers[0].name,
+          customerEmail: sampleCustomers[0].email,
+          customerPhone: sampleCustomers[0].phone,
           status: "processing",
           totalAmount: "156.00",
           items: [{ productId: productIds[0], quantity: 2, price: "89.99" }],
         },
         {
+          orderNumber: "ORD-002",
           customerId: customerIds[1],
+          customerName: sampleCustomers[1].name,
+          customerEmail: sampleCustomers[1].email,
+          customerPhone: sampleCustomers[1].phone,
           status: "completed",
           totalAmount: "89.50",
           items: [{ productId: productIds[0], quantity: 1, price: "89.99" }],
         },
         {
+          orderNumber: "ORD-003",
           customerId: customerIds[2],
+          customerName: sampleCustomers[2].name,
+          customerEmail: sampleCustomers[2].email,
+          customerPhone: sampleCustomers[2].phone,
           status: "pending",
           totalAmount: "234.97",
           items: [
@@ -296,7 +470,11 @@ export class MemStorage implements IStorage {
           ],
         },
         {
+          orderNumber: "ORD-004",
           customerId: customerIds[4],
+          customerName: sampleCustomers[4].name,
+          customerEmail: sampleCustomers[4].email,
+          customerPhone: sampleCustomers[4].phone,
           status: "ready",
           totalAmount: "178.95",
           items: [
@@ -306,13 +484,21 @@ export class MemStorage implements IStorage {
           ],
         },
         {
+          orderNumber: "ORD-005",
           customerId: customerIds[5],
+          customerName: sampleCustomers[5].name,
+          customerEmail: sampleCustomers[5].email,
+          customerPhone: sampleCustomers[5].phone,
           status: "completed",
           totalAmount: "45.98",
           items: [{ productId: productIds[8], quantity: 2, price: "22.99" }],
         },
         {
+          orderNumber: "ORD-006",
           customerId: customerIds[6],
+          customerName: sampleCustomers[6].name,
+          customerEmail: sampleCustomers[6].email,
+          customerPhone: sampleCustomers[6].phone,
           status: "processing",
           totalAmount: "127.97",
           items: [
@@ -322,13 +508,21 @@ export class MemStorage implements IStorage {
           ],
         },
         {
+          orderNumber: "ORD-007",
           customerId: customerIds[3],
+          customerName: sampleCustomers[3].name,
+          customerEmail: sampleCustomers[3].email,
+          customerPhone: sampleCustomers[3].phone,
           status: "cancelled",
           totalAmount: "89.99",
           items: [{ productId: productIds[0], quantity: 1, price: "89.99" }],
         },
         {
+          orderNumber: "ORD-008",
           customerId: customerIds[7],
+          customerName: sampleCustomers[7].name,
+          customerEmail: sampleCustomers[7].email,
+          customerPhone: sampleCustomers[7].phone,
           status: "completed",
           totalAmount: "67.99",
           items: [{ productId: productIds[5], quantity: 1, price: "67.99" }],
@@ -342,25 +536,42 @@ export class MemStorage implements IStorage {
         orderIds.push(order.id);
       }
 
+
+      // ... (existing imports)
+
+      // ... inside seedSampleData method ...
+
       // Sample Employees
+      // Create valid hashes for passwords
+      const adminHash = bcrypt.hashSync('admin', 10);
+      const managerHash = bcrypt.hashSync('manager', 10);
+      const cashierHash = bcrypt.hashSync('cashier', 10);
+      const driverHash = bcrypt.hashSync('driver', 10);
+
       const sampleEmployees = [
+        {
+          name: "System Admin",
+          role: "admin",
+          email: "admin", // Allows login with username 'admin'
+          password: adminHash,
+        },
         {
           name: "John Manager",
           role: "Manager",
           email: "john.manager@fabzclean.com",
-          password: "hashedpassword1",
+          password: managerHash,
         },
         {
           name: "Jane Cashier",
           role: "Cashier",
           email: "jane.cashier@fabzclean.com",
-          password: "hashedpassword2",
+          password: cashierHash,
         },
         {
           name: "Bob Driver",
           role: "Driver",
           email: "bob.driver@fabzclean.com",
-          password: "hashedpassword3",
+          password: driverHash,
         },
       ];
 
@@ -556,6 +767,10 @@ export class MemStorage implements IStorage {
 
   async deleteEmployee(id: string) {
     return this.sqliteStorage.deleteEmployee(id);
+  }
+
+  async getEmployeeByEmail(email: string) {
+    return this.sqliteStorage.getEmployeeByEmail(email);
   }
 
   async getBarcodes() {

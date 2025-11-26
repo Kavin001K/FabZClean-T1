@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface UseRealtimeOptions {
@@ -30,11 +30,11 @@ interface UseRealtimeReturn<T> {
  */
 export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeReturn<T> {
   const { tableName, selectQuery = '*', filter, orderBy, limit } = options;
-  
+
   const [data, setData] = useState<T[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  
+
   // Use ref to track subscription channel
   const channelRef = useRef<RealtimeChannel | null>(null);
 
@@ -43,6 +43,15 @@ export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeRe
     let isMounted = true;
 
     async function fetchInitialData() {
+      // Skip if Supabase is not configured
+      if (!isSupabaseConfigured) {
+        if (isMounted) {
+          setIsLoading(false);
+          console.warn(`⚠️ Supabase not configured, skipping realtime fetch for ${tableName}`);
+        }
+        return;
+      }
+
       try {
         setIsLoading(true);
         setError(null);
@@ -100,7 +109,7 @@ export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeRe
 
         // ✅ Safety: Always ensure data is an array
         const safeData = Array.isArray(fetchedData) ? fetchedData : [];
-        
+
         if (isMounted) {
           setData(safeData);
           setIsLoading(false);
@@ -123,6 +132,9 @@ export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeRe
 
   // Set up realtime subscription
   useEffect(() => {
+    // Skip if Supabase is not configured
+    if (!isSupabaseConfigured) return;
+
     // Clean up previous subscription if it exists
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
@@ -156,7 +168,7 @@ export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeRe
                 // Updated item: Replace the item with matching ID
                 const updatedItem = payload.new as T;
                 const itemId = (updatedItem as any)?.id;
-                
+
                 if (!itemId) {
                   console.warn('Updated item missing ID, skipping merge');
                   return current;
@@ -172,7 +184,7 @@ export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeRe
                 // Deleted item: Remove from array
                 const deletedItem = payload.old as T;
                 const itemId = (deletedItem as any)?.id;
-                
+
                 if (!itemId) {
                   console.warn('Deleted item missing ID, skipping filter');
                   return current;

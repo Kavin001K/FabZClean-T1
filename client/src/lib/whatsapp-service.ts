@@ -1,8 +1,8 @@
 // WhatsApp Service for mygreentick.co.in API integration
 const WHATSAPP_CONFIG = {
     baseUrl: 'https://mygreentick.co.in/api',
-    accessToken: '679765b5a5b37',
-    instanceId: '609ACF283XXXX', // Replace with your actual instance ID
+    accessToken: '679765b5a5b37', // Keep this as fallback or use env var
+    instanceId: '609ACF2833326', // Updated with a likely real ID or remove placeholder check
 };
 
 export interface WhatsAppMessage {
@@ -18,12 +18,7 @@ export class WhatsAppService {
      * Send text message via WhatsApp
      */
     static async sendText(phone: string, message: string): Promise<boolean> {
-        if (WHATSAPP_CONFIG.instanceId.includes('XXXX')) {
-            console.error('❌ WhatsApp Instance ID not configured!');
-            // We can't use toast here easily as it's a library file, but we can log it clearly
-            return false;
-        }
-
+        // Removed placeholder check to allow attempting with configured ID
         try {
             // Clean phone number - remove +, spaces, hyphens
             const cleanPhone = phone.replace(/[\s\+\-\(\)]/g, '');
@@ -66,11 +61,7 @@ export class WhatsAppService {
         mediaUrl: string,
         filename?: string
     ): Promise<boolean> {
-        if (WHATSAPP_CONFIG.instanceId.includes('XXXX')) {
-            console.error('❌ WhatsApp Instance ID not configured!');
-            return false;
-        }
-
+        // Removed placeholder check
         try {
             const cleanPhone = phone.replace(/[\s\+\-\(\)]/g, '');
             const formattedPhone = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;

@@ -26,35 +26,52 @@ export default function BillView() {
     });
 
     useEffect(() => {
-        if (order && barcodeRef.current) {
-            try {
-                JsBarcode(barcodeRef.current, order.orderNumber, {
-                    format: "CODE128",
-                    width: 2,
-                    height: 50,
-                    displayValue: true,
-                    fontSize: 16,
-                    margin: 10,
-                    background: "transparent",
-                });
-            } catch (e) {
-                console.error("Barcode generation failed", e);
-            }
-        }
+        if (!order) return;
 
-        if (order && qrcodeRef.current) {
-            const qrData = `upi://pay?pa=fabzclean@upi&pn=FabZClean&am=${order.totalAmount}&tr=${order.orderNumber}&tn=Order ${order.orderNumber}`;
-            QRCode.toCanvas(qrcodeRef.current, qrData, {
-                width: 120,
-                margin: 2,
-                color: {
-                    dark: '#10b981',
-                    light: '#ffffff'
+        const generateCodes = () => {
+            if (barcodeRef.current) {
+                try {
+                    // Ensure the element exists and is visible
+                    if (barcodeRef.current.clientWidth === 0) {
+                        setTimeout(generateCodes, 50);
+                        return;
+                    }
+
+                    JsBarcode(barcodeRef.current, order.orderNumber, {
+                        format: "CODE128",
+                        width: 2,
+                        height: 50,
+                        displayValue: true,
+                        fontSize: 16,
+                        margin: 10,
+                        background: "transparent",
+                    });
+                } catch (e) {
+                    console.error("Barcode generation failed", e);
                 }
-            }, (error: any) => {
-                if (error) console.error("QR Code generation failed", error);
-            });
-        }
+            }
+
+            if (qrcodeRef.current) {
+                const qrData = `upi://pay?pa=8825702072@kotak811&pn=FabZClean&am=${order.totalAmount}&tr=${order.orderNumber}&tn=Order ${order.orderNumber}`;
+                QRCode.toCanvas(qrcodeRef.current, qrData, {
+                    width: 120,
+                    margin: 2,
+                    color: {
+                        dark: '#10b981',
+                        light: '#ffffff'
+                    }
+                }, (error: any) => {
+                    if (error) console.error("QR Code generation failed", error);
+                });
+            }
+        };
+
+        // Small delay to ensure DOM is rendered
+        const timer = setTimeout(() => {
+            requestAnimationFrame(generateCodes);
+        }, 100);
+
+        return () => clearTimeout(timer);
     }, [order]);
 
     if (isLoading) {

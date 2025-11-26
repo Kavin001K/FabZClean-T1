@@ -419,10 +419,10 @@ export class SQLiteStorage implements IStorage {
       .get(id) as any;
     return row
       ? {
-          ...row,
-          createdAt: new Date(row.createdAt),
-          updatedAt: new Date(row.updatedAt),
-        }
+        ...row,
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt),
+      }
       : undefined;
   }
 
@@ -432,10 +432,10 @@ export class SQLiteStorage implements IStorage {
       .get(username) as any;
     return row
       ? {
-          ...row,
-          createdAt: new Date(row.createdAt),
-          updatedAt: new Date(row.updatedAt),
-        }
+        ...row,
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt),
+      }
       : undefined;
   }
 
@@ -479,6 +479,19 @@ export class SQLiteStorage implements IStorage {
         typeof dataWithTimestamps.items === "string"
           ? dataWithTimestamps.items
           : JSON.stringify(dataWithTimestamps.items);
+    }
+    // Handle customers table JSON fields
+    if (table === "customers" && dataWithTimestamps.address) {
+      dataWithTimestamps.address =
+        typeof dataWithTimestamps.address === "string"
+          ? dataWithTimestamps.address
+          : JSON.stringify(dataWithTimestamps.address);
+    }
+    if (table === "customers" && dataWithTimestamps.segments) {
+      dataWithTimestamps.segments =
+        typeof dataWithTimestamps.segments === "string"
+          ? dataWithTimestamps.segments
+          : JSON.stringify(dataWithTimestamps.segments);
     }
 
     const keys = Object.keys(dataWithTimestamps);
@@ -1063,10 +1076,10 @@ export class SQLiteStorage implements IStorage {
 
     return row
       ? {
-          ...row,
-          createdAt: new Date(row.createdAt),
-          updatedAt: new Date(row.updatedAt),
-        }
+        ...row,
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt),
+      }
       : undefined;
   }
 
@@ -1077,10 +1090,10 @@ export class SQLiteStorage implements IStorage {
 
     return row
       ? {
-          ...row,
-          createdAt: new Date(row.createdAt),
-          updatedAt: new Date(row.updatedAt),
-        }
+        ...row,
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt),
+      }
       : undefined;
   }
 
@@ -1764,7 +1777,7 @@ export class SQLiteStorage implements IStorage {
 
   async updateDriverLocation(id: string, latitude: number, longitude: number): Promise<Driver | null> {
     const now = new Date().toISOString();
-    
+
     this.db
       .prepare(
         'UPDATE drivers SET currentLatitude = ?, currentLongitude = ?, lastActive = ?, updatedAt = ? WHERE id = ?'
@@ -1775,7 +1788,7 @@ export class SQLiteStorage implements IStorage {
   }
 
   // ======= AUTHENTICATION METHODS =======
-  
+
   async createAuthUser(data: {
     email: string;
     passwordHash: string;

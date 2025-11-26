@@ -7,6 +7,7 @@ import type { Customer } from '../../../shared/schema';
 interface CustomerAutocompleteProps {
     customers: Customer[];
     onSelect: (customer: Customer) => void;
+    onCreateNew?: (query: string) => void;
     placeholder?: string;
     className?: string;
 }
@@ -72,6 +73,7 @@ function calculateRelevance(customer: Customer, query: string): number {
 export function CustomerAutocomplete({
     customers,
     onSelect,
+    onCreateNew,
     placeholder = 'Search by name, phone, or email...',
     className = ''
 }: CustomerAutocompleteProps) {
@@ -85,7 +87,6 @@ export function CustomerAutocomplete({
     // Debug: Log customers when they change
     React.useEffect(() => {
         console.log('[Autocomplete] Total customers:', customers.length);
-        console.log('[Autocomplete] Sample customer:', customers[0]);
     }, [customers]);
 
     // Filter and sort customers based on search query
@@ -106,14 +107,8 @@ export function CustomerAutocomplete({
             .slice(0, 10) // Show top 10 matches
             .map(({ customer }) => customer);
 
-        console.log('[Autocomplete] Query:', searchQuery);
-        console.log('[Autocomplete] Matches found:', matches.length);
-        if (matches.length > 0) {
-            console.log('[Autocomplete] First match:', matches[0]);
-        }
-
         setFilteredCustomers(matches);
-        setIsOpen(matches.length > 0);
+        setIsOpen(true); // Always open if there is a query, to show "Create New" option
         setHighlightedIndex(0);
     }, [searchQuery, customers]);
 
@@ -133,11 +128,14 @@ export function CustomerAutocomplete({
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (!isOpen) return;
 
+        // If we have results, navigation includes them. If we have "Create New", it's the last item.
+        const totalItems = filteredCustomers.length + (onCreateNew ? 1 : 0);
+
         switch (e.key) {
             case 'ArrowDown':
                 e.preventDefault();
                 setHighlightedIndex(prev =>
-                    prev < filteredCustomers.length - 1 ? prev + 1 : prev
+                    prev < totalItems - 1 ? prev + 1 : prev
                 );
                 break;
             case 'ArrowUp':
@@ -146,8 +144,11 @@ export function CustomerAutocomplete({
                 break;
             case 'Enter':
                 e.preventDefault();
-                if (filteredCustomers[highlightedIndex]) {
+                if (highlightedIndex < filteredCustomers.length) {
                     handleSelect(filteredCustomers[highlightedIndex]);
+                } else if (onCreateNew) {
+                    onCreateNew(searchQuery);
+                    setIsOpen(false);
                 }
                 break;
             case 'Escape':
@@ -198,7 +199,7 @@ export function CustomerAutocomplete({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    onFocus={() => searchQuery && filteredCustomers.length > 0 && setIsOpen(true)}
+                    onFocus={() => searchQuery && setIsOpen(true)}
                     placeholder={placeholder}
                     className="pl-9 pr-9"
                 />
@@ -213,7 +214,7 @@ export function CustomerAutocomplete({
             </div>
 
             {/* Dropdown */}
-            {isOpen && filteredCustomers.length > 0 && (
+            {isOpen && searchQuery && (
                 <Card className="absolute z-[9999] w-full mt-1 max-h-80 overflow-y-auto shadow-xl border bg-popover text-popover-foreground">
                     <div className="p-2">
                         {filteredCustomers.map((customer, index) => (
@@ -254,20 +255,38 @@ export function CustomerAutocomplete({
                                 </div>
                             </button>
                         ))}
+
+                        {/* Create New Option */}
+                        {onCreateNew && (
+                            <button
+                                onClick={() => {
+                                    onCreateNew(searchQuery);
+                                    setIsOpen(false);
+                                }}
+                                onMouseEnter={() => setHighlightedIndex(filteredCustomers.length)}
+                                className={`w-full text-left px-3 py-3 rounded-md transition-colors border-t mt-1 ${highlightedIndex === filteredCustomers.length
+                                    ? 'bg-primary/10 border border-primary'
+                                    : 'hover:bg-muted'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-3 text-primary">
+                                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-bold flex-shrink-0">
+                                        +
+                                    </div>
+                                    <div>
+                                        <div className="font-medium text-sm">Create New Customer</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            Create a new record for "{searchQuery}"
+                                        </div>
+                                    </div>
+                                </div>
+                            </button>
+                        )}
                     </div>
 
                     {/* Keyboard hint */}
                     <div className="px-3 py-2 text-xs text-muted-foreground bg-muted border-t">
                         <span className="font-medium">Tip:</span> Use ↑↓ to navigate, Enter to select, Esc to close
-                    </div>
-                </Card>
-            )}
-
-            {/* No results */}
-            {isOpen && searchQuery && filteredCustomers.length === 0 && (
-                <Card className="absolute z-[9999] w-full mt-1 shadow-xl border bg-popover text-popover-foreground">
-                    <div className="p-4 text-center text-sm text-muted-foreground">
-                        No customers found matching "{searchQuery}"
                     </div>
                 </Card>
             )}

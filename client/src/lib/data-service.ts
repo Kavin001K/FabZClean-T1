@@ -295,6 +295,9 @@ export const customersApi = {
       return null;
     }
   },
+
+  // Alias for getById to fix linter error
+  get: async (id: string) => customersApi.getById(id),
 };
 
 // Employees API

@@ -34,9 +34,11 @@ export const updateOrderSchema = z.object({
 // Customer validation schemas
 export const insertCustomerSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  email: z.string().email('Valid email is required'),
+  email: z.string().email('Valid email is required').optional().or(z.literal('')),
   phone: z.string().min(10, 'Phone number is required'),
-  address: z.string().optional()
+  address: z.any().optional(), // Allow object for jsonb field
+  notes: z.string().optional(),
+  loyaltyPoints: z.string().optional()
 });
 
 export const updateCustomerSchema = z.object({

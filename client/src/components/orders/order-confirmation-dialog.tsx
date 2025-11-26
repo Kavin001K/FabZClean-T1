@@ -79,25 +79,38 @@ export function OrderConfirmationDialog({
     useEffect(() => {
         if (!open || !order) return;
 
-        // Generate Barcode with timeout to ensure DOM is ready
-        const timer = setTimeout(() => {
+        const generateCodes = () => {
             // Barcode - Use SVG for best quality
             if (order.orderNumber && barcodeRef.current) {
                 try {
+                    // Ensure the element exists and is visible
+                    if (barcodeRef.current.clientWidth === 0) {
+                        // If width is 0, it might not be rendered yet, retry shortly
+                        setTimeout(generateCodes, 50);
+                        return;
+                    }
+
                     JsBarcode(barcodeRef.current, order.orderNumber, {
                         format: "CODE128",
                         width: 2,
-                        height: 50,
+                        height: 60,
                         displayValue: true,
-                        fontSize: 14,
+                        fontSize: 16,
                         margin: 10,
                         background: "#ffffff",
                         lineColor: "#000000",
+                        textAlign: "center",
+                        textPosition: "bottom"
                     });
-                    console.log('✅ Barcode generated:', order.orderNumber);
+                    console.log('✅ Barcode generated for:', order.orderNumber);
                 } catch (e) {
                     console.error("❌ Barcode error:", e);
                 }
+            } else {
+                console.warn("⚠️ Skipping barcode: orderNumber or ref missing", {
+                    orderNumber: order.orderNumber,
+                    ref: !!barcodeRef.current
+                });
             }
 
             // Generate QR Code with payment info
@@ -107,9 +120,9 @@ export function OrderConfirmationDialog({
                     if (ctx) {
                         ctx.clearRect(0, 0, qrcodeRef.current.width, qrcodeRef.current.height);
                     }
-                    // ... (keep existing QR logic) ...
+
                     const amount = totalAmount.toFixed(2);
-                    const qrData = `upi://pay?pa=fabzclean@upi&pn=FabZClean&am=${amount}&tr=${order.orderNumber}&tn=Order ${order.orderNumber}`;
+                    const qrData = `upi://pay?pa=8825702072@kotak811&pn=FabZClean&am=${amount}&tr=${order.orderNumber}&tn=Order ${order.orderNumber}`;
 
                     QRCode.toCanvas(qrcodeRef.current, qrData, {
                         width: 140,
@@ -126,9 +139,15 @@ export function OrderConfirmationDialog({
                     console.error("❌ QR generation error:", e);
                 }
             }
-        }, 300); // Increased timeout to 300ms to be safe
+        };
+
+        // Use setTimeout to allow Dialog animation to complete
+        const timer = setTimeout(() => {
+            requestAnimationFrame(generateCodes);
+        }, 300); // 300ms delay for dialog animation
 
         return () => clearTimeout(timer);
+
     }, [open, order, totalAmount]);
 
     const handlePrintBill = () => {

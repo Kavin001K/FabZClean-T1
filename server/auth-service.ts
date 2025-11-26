@@ -1,10 +1,16 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
+import { storage } from './storage';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL!;
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Use placeholder if not set to avoid crash, but auth will fail if relying on Supabase
+const supabase = createClient(
+    supabaseUrl || 'https://placeholder.supabase.co',
+    supabaseKey || 'placeholder'
+);
 
 const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'fabzclean-secret-key-change-in-production';
 const JWT_EXPIRY = '30d'; // 30 days - long session for better UX
@@ -35,6 +41,55 @@ export class AuthService {
      * Authenticate employee with username and password
      */
     static async login(username: string, password: string, ipAddress?: string): Promise<{ token: string; employee: AuthEmployee }> {
+        console.log(`🔐 Attempting login for: ${username}`);
+
+        // 1. Try Local Storage (SQLite) first
+        try {
+            // Username is likely an email in the local seed data
+            // Cast to any because SQLite table structure differs from shared schema (has password/role)
+            const localEmployee = await storage.getEmployeeByEmail(username) as any;
+
+            if (localEmployee && localEmployee.password) {
+                console.log(`✅ Found user in local storage: ${localEmployee.email}`);
+
+                // Verify password
+                const isValidPassword = await bcrypt.compare(password, localEmployee.password);
+                if (!isValidPassword) {
+                    console.warn(`❌ Invalid password for user: ${username}`);
+                    throw new Error('Invalid username or password');
+                }
+
+                // Map local employee to AuthEmployee
+                // Note: Local employees might not have all fields like franchiseId/factoryId in the simple schema
+                const role = (localEmployee.role || 'admin').toLowerCase().replace(' ', '_') as any;
+
+                const authEmployee: AuthEmployee = {
+                    id: localEmployee.id,
+                    employeeId: localEmployee.id, // Use ID as employeeId for local
+                    username: localEmployee.email || username,
+                    role: role,
+                    fullName: localEmployee.name || `${localEmployee.firstName} ${localEmployee.lastName}`,
+                    email: localEmployee.email || undefined,
+                    isActive: true, // Assume active for local
+                };
+
+                // Generate JWT
+                const payload: EmployeeJWTPayload = {
+                    employeeId: authEmployee.employeeId,
+                    username: authEmployee.username,
+                    role: authEmployee.role,
+                };
+
+                const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+
+                return { token, employee: authEmployee };
+            }
+        } catch (err) {
+            console.warn(`⚠️ Local auth failed or user not found: ${err}`);
+            // Continue to Supabase auth if local fails
+        }
+
+        // 2. Fallback to Supabase Auth (Original Logic)
         // Fetch employee by username or email
         const { data: employees, error } = await supabase
             .from('auth_employees')
@@ -101,7 +156,18 @@ export class AuthService {
         try {
             const payload = jwt.verify(token, JWT_SECRET) as EmployeeJWTPayload;
 
-            // Verify employee still exists and is active
+            // 1. Check Local Storage first
+            try {
+                // If the ID looks like a UUID (local), check local storage
+                const localEmployee = await storage.getEmployee(payload.employeeId); // payload.employeeId is mapped to id for local
+                if (localEmployee) {
+                    return payload;
+                }
+            } catch (e) {
+                // Ignore local check error
+            }
+
+            // 2. Check Supabase
             const { data: emp, error } = await supabase
                 .from('auth_employees')
                 .select('is_active')
@@ -109,6 +175,9 @@ export class AuthService {
                 .single();
 
             if (error || !emp || !emp.is_active) {
+                // If not found in Supabase AND not found in local (checked above), then invalid
+                // But if we are running locally with placeholder Supabase, Supabase check will fail.
+                // So if we are here, it means it wasn't found locally either.
                 throw new Error('Invalid or inactive employee');
             }
 

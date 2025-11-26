@@ -85,9 +85,11 @@ export class OrderService {
       }
 
       // Create external data map for batch enrichment
-      const externalDataMap = new Map<string, any>();
+      // const externalDataMap = new Map<string, any>();
 
       // Fetch external data for each order (with graceful degradation)
+      // DISABLED: MyGreenTick is only for messaging, not order storage.
+      /*
       const externalDataPromises = orders.map(async (order) => {
         try {
           // Attempt to fetch additional data from external API
@@ -109,12 +111,14 @@ export class OrderService {
 
       // Wait for all external API calls to complete (or fail gracefully)
       await Promise.allSettled(externalDataPromises);
+      */
 
       // Enrich orders with external data and algorithms
-      const enrichedOrders = enrichOrdersWithAlgorithms(orders, externalDataMap);
+      // Passing empty map as we are skipping external enrichment
+      const enrichedOrders = enrichOrdersWithAlgorithms(orders, new Map());
 
       console.log(
-        `✅ [OrderService] Fetched ${enrichedOrders.length} orders, ${externalDataMap.size} enriched with external data`
+        `✅ [OrderService] Fetched ${enrichedOrders.length} orders`
       );
 
       return enrichedOrders;
@@ -140,6 +144,8 @@ export class OrderService {
 
       // Attempt to fetch external data (graceful degradation)
       let externalData: any = undefined;
+      // DISABLED: MyGreenTick is only for messaging, not order storage.
+      /*
       try {
         externalData = await externalApiClient.get(`/orders/${orderId}/details`);
       } catch (error) {
@@ -148,6 +154,7 @@ export class OrderService {
           error instanceof Error ? error.message : 'Unknown error'
         );
       }
+      */
 
       // Enrich with external data and algorithms
       const enrichedOrder = enrichOrderWithAlgorithms(order, externalData);

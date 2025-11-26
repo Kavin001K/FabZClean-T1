@@ -43,6 +43,7 @@ router.post('/logout', authMiddleware, auditMiddleware('logout'), async (req: Re
  */
 router.get('/me', authMiddleware, async (req: Request, res: Response) => {
   try {
+    console.log('📍 /api/auth/me endpoint hit, employee:', req.employee?.employeeId);
     const employee = await AuthService.getEmployee(req.employee!.employeeId);
 
     if (!employee) {
