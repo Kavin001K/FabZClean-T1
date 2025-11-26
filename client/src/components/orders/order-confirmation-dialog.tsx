@@ -320,12 +320,21 @@ export function OrderConfirmationDialog({
                     </div>
 
                     {/* Info Grid */}
-                    <div className="grid grid-cols-2 gap-4 w-full">
-                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-center">
-                            <p className="text-xs text-blue-600 font-semibold uppercase tracking-wider mb-1">Total Amount</p>
-                            <p className="text-2xl font-bold text-blue-900">{formatCurrency(totalAmount)}</p>
+                    <div className="grid grid-cols-1 gap-4 w-full">
+                        {/* REPLACEMENT START: Better Total Amount Display */}
+                        <div className="flex items-center justify-between border-t pt-4 mt-4">
+                            <span className="text-muted-foreground text-base">Total Amount:</span>
+                            <div className="text-right">
+                                <span className="block text-3xl font-bold text-primary">
+                                    {/* Formats as ₹1,250.00 */}
+                                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(order.totalAmount || 0)}
+                                </span>
+                                <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                                    {order.paymentStatus || 'Pending'}
+                                </span>
+                            </div>
                         </div>
-
+                        {/* REPLACEMENT END */}
                         <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex flex-col items-center justify-center relative overflow-hidden">
                             <div className="absolute top-0 right-0 bg-emerald-200 text-[10px] px-2 py-0.5 rounded-bl-lg text-emerald-800 font-bold">UPI</div>
                             <canvas ref={qrcodeRef} className="w-20 h-20"></canvas>
