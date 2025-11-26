@@ -28,12 +28,15 @@ export default function BillView() {
     useEffect(() => {
         if (!order) return;
 
+        console.log('📄 Bill View: Generating codes for', order.orderNumber);
+
         const generateCodes = () => {
             if (barcodeRef.current) {
                 try {
                     // Ensure the element exists and is visible
                     if (barcodeRef.current.clientWidth === 0) {
-                        setTimeout(generateCodes, 50);
+                        console.log('⏳ Barcode ref not ready, retrying...');
+                        setTimeout(generateCodes, 100);
                         return;
                     }
 
@@ -42,13 +45,16 @@ export default function BillView() {
                         width: 2,
                         height: 50,
                         displayValue: true,
-                        fontSize: 16,
-                        margin: 10,
+                        fontSize: 14,
+                        margin: 5,
                         background: "transparent",
                     });
+                    console.log('✅ Bill barcode generated');
                 } catch (e) {
-                    console.error("Barcode generation failed", e);
+                    console.error("❌ Bill barcode error:", e);
                 }
+            } else {
+                console.warn('⚠️ Barcode ref is null');
             }
 
             if (qrcodeRef.current) {
@@ -61,17 +67,23 @@ export default function BillView() {
                         light: '#ffffff'
                     }
                 }, (error: any) => {
-                    if (error) console.error("QR Code generation failed", error);
+                    if (error) console.error("❌ QR Code error:", error);
+                    else console.log('✅ QR code generated');
                 });
             }
         };
 
-        // Small delay to ensure DOM is rendered
-        const timer = setTimeout(() => {
-            requestAnimationFrame(generateCodes);
-        }, 100);
+        // Try immediate generation
+        if (barcodeRef.current) {
+            generateCodes();
+        } else {
+            // Fallback with delay
+            const timer = setTimeout(() => {
+                requestAnimationFrame(generateCodes);
+            }, 200);
 
-        return () => clearTimeout(timer);
+            return () => clearTimeout(timer);
+        }
     }, [order]);
 
     if (isLoading) {
@@ -134,8 +146,21 @@ export default function BillView() {
         @media print {
           body { margin: 0; padding: 0; }
           .print-hide { display: none !important; }
-          .invoice-container { box-shadow: none !important; border-radius: 0 !important; }
-          @page { margin: 0.5cm; }
+          .invoice-container { 
+            box-shadow: none !important; 
+            border-radius: 0 !important;
+            max-width: 100% !important;
+          }
+          @page { 
+            size: A4;
+            margin: 10mm;
+          }
+          .header-section {
+            padding: 20px !important;
+          }
+          .content-section {
+            padding: 20px !important;
+          }
         }
         
         @keyframes shimmer {
@@ -170,26 +195,31 @@ export default function BillView() {
 
                 {/* Invoice Container */}
                 <div className="max-w-4xl mx-auto bg-white shadow-2xl rounded-2xl overflow-hidden invoice-container">
-                    {/* Premium Header with Gradient */}
-                    <div className="relative bg-gradient-to-r from-emerald-600 via-emerald-500 to-blue-600 p-8 text-white overflow-hidden">
+                    {/* Premium Header with Logo */}
+                    <div className="relative bg-gradient-to-r from-emerald-600 via-emerald-500 to-blue-600 p-6 text-white overflow-hidden header-section">
                         <div className="absolute inset-0 shimmer opacity-20"></div>
-                        <div className="relative z-10">
-                            <div className="flex items-center justify-center mb-4">
-                                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border-2 border-white/30">
-                                    <Sparkles className="w-8 h-8 text-white" />
+                        <div className="relative z-10 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                {/* Logo Circle */}
+                                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
+                                    <div className="text-2xl font-bold bg-gradient-to-br from-emerald-600 to-blue-600 bg-clip-text text-transparent">
+                                        FC
+                                    </div>
+                                </div>
+                                <div>
+                                    <h1 className="text-3xl font-bold tracking-tight">FabZClean</h1>
+                                    <p className="text-emerald-50 text-sm">Premium Laundry Service</p>
                                 </div>
                             </div>
-                            <h1 className="text-4xl font-bold text-center mb-2 tracking-tight">FabZClean</h1>
-                            <p className="text-center text-emerald-50 text-lg">Premium Dry Clean & Laundry Service</p>
-                            <div className="mt-4 text-center text-sm text-emerald-100 space-y-1">
-                                <p>📍 123 Main Street, Business District, City 560001</p>
-                                <p>📞 +91 123 456 7890 | ✉️ hello@fabzclean.com</p>
+                            <div className="text-right text-sm text-emerald-50">
+                                <p>📍 123 Business Street</p>
+                                <p>📞 +91 123 456 7890</p>
                             </div>
                         </div>
                     </div>
 
                     {/* Invoice Details Section */}
-                    <div className="p-8 md:p-12">
+                    <div className="p-6 md:p-8 content-section">
                         {/* Header Info Grid */}
                         <div className="grid md:grid-cols-2 gap-8 mb-8 pb-8 border-b-2 border-gray-100">
                             <div className="space-y-4">
