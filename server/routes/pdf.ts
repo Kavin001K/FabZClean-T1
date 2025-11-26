@@ -20,7 +20,9 @@ if (!fs.existsSync(uploadsDir)) {
 import { createClient } from '@supabase/supabase-js';
 
 // Configure storage based on environment
-const useSupabase = !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_KEY;
+const useSupabase = !!process.env.SUPABASE_URL &&
+    !!process.env.SUPABASE_SERVICE_KEY &&
+    !process.env.SUPABASE_URL.includes('placeholder');
 
 // Multer configuration
 const storage = useSupabase
