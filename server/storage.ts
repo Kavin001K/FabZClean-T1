@@ -848,4 +848,8 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+import { SupabaseStorage } from "./SupabaseStorage";
+
+export const storage = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY
+  ? new SupabaseStorage()
+  : new MemStorage();

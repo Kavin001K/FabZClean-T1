@@ -54,6 +54,7 @@
     "@types/jspdf": "^1.3.3",
     "@types/leaflet": "^1.9.20",
     "@types/multer": "^2.0.0",
+    "axios": "^1.13.2",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.4.6",

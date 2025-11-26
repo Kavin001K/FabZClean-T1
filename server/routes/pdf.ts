@@ -17,17 +17,23 @@ if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Configure multer for PDF uploads
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadsDir);
-    },
-    filename: (req, file, cb) => {
-        // Generate unique filename
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'bill-' + uniqueSuffix + '.pdf');
-    }
-});
+import { createClient } from '@supabase/supabase-js';
+
+// Configure storage based on environment
+const useSupabase = !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_KEY;
+
+// Multer configuration
+const storage = useSupabase
+    ? multer.memoryStorage()
+    : multer.diskStorage({
+        destination: (req, file, cb) => {
+            cb(null, uploadsDir);
+        },
+        filename: (req, file, cb) => {
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+            cb(null, 'bill-' + uniqueSuffix + '.pdf');
+        }
+    });
 
 const upload = multer({
     storage: storage,
@@ -35,7 +41,6 @@ const upload = multer({
         fileSize: 10 * 1024 * 1024, // 10MB limit
     },
     fileFilter: (req, file, cb) => {
-        // Accept PDFs only
         if (file.mimetype === 'application/pdf' || file.originalname.endsWith('.pdf')) {
             cb(null, true);
         } else {
@@ -48,31 +53,59 @@ const upload = multer({
  * POST /api/upload-pdf
  * Upload a PDF file and return public URL
  */
-router.post('/upload-pdf', upload.single('pdf'), (req: Request, res: Response) => {
+router.post('/upload-pdf', upload.single('pdf'), async (req: Request, res: Response) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No PDF file uploaded' });
         }
 
-        // Generate public URL
-        const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
-        const publicUrl = `${baseUrl}/uploads/pdfs/${req.file.filename}`;
+        let publicUrl: string;
+        let filename: string;
 
-        console.log('✅ PDF uploaded:', publicUrl);
+        if (useSupabase) {
+            // Upload to Supabase Storage
+            const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
+            filename = `bill-${Date.now()}-${Math.round(Math.random() * 1E9)}.pdf`;
 
-        // Schedule deletion after 24 hours
-        setTimeout(() => {
-            const filePath = path.join(uploadsDir, req.file!.filename);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-                console.log('🗑️ Deleted temporary PDF:', req.file!.filename);
-            }
-        }, 24 * 60 * 60 * 1000); // 24 hours
+            const { data, error } = await supabase
+                .storage
+                .from('pdfs')
+                .upload(filename, req.file.buffer!, {
+                    contentType: 'application/pdf',
+                    upsert: true
+                });
+
+            if (error) throw error;
+
+            // Get public URL
+            const { data: { publicUrl: url } } = supabase
+                .storage
+                .from('pdfs')
+                .getPublicUrl(filename);
+
+            publicUrl = url;
+            console.log('✅ PDF uploaded to Supabase:', publicUrl);
+        } else {
+            // Local storage
+            filename = req.file.filename;
+            const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+            publicUrl = `${baseUrl}/uploads/pdfs/${filename}`;
+            console.log('✅ PDF uploaded locally:', publicUrl);
+
+            // Schedule deletion after 24 hours
+            setTimeout(() => {
+                const filePath = path.join(uploadsDir, filename);
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                    console.log('🗑️ Deleted temporary PDF:', filename);
+                }
+            }, 24 * 60 * 60 * 1000);
+        }
 
         res.json({
             success: true,
             url: publicUrl,
-            filename: req.file.filename,
+            filename: filename,
             size: req.file.size
         });
     } catch (error: any) {

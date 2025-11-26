@@ -110,31 +110,36 @@ export class WhatsAppService {
         billUrl: string,
         pdfUrl?: string
     ): Promise<boolean> {
-        const message = `Hello *${customerName}*! 👋
+        try {
+            // Call our backend proxy to avoid CORS and hide API keys
+            const response = await fetch('/api/whatsapp/send', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('employee_token')}`
+                },
+                body: JSON.stringify({
+                    order: {
+                        customerPhone: phone,
+                        orderNumber: orderNumber,
+                        customerName: customerName,
+                        totalAmount: totalAmount
+                    },
+                    pdfUrl: pdfUrl
+                })
+            });
 
-Your order has been created successfully! ✅
+            if (!response.ok) {
+                console.error('WhatsApp backend send failed:', await response.text());
+                return false;
+            }
 
-📋 *Order Number:* ${orderNumber}
-💰 *Total Amount:* ₹${totalAmount.toFixed(2)}
-
-${pdfUrl ? '📄 *Invoice attached as PDF*' : `📄 *View & Download Bill:*\n${billUrl}`}
-
-Thank you for choosing *FabZClean*! 🌟
-
-For any queries, feel free to contact us.`;
-
-        // If PDF URL is provided, send as media attachment
-        if (pdfUrl) {
-            return await this.sendMedia(
-                phone,
-                message,
-                pdfUrl,
-                `Invoice-${orderNumber}.pdf`
-            );
+            const data = await response.json();
+            return data.success;
+        } catch (error) {
+            console.error('WhatsApp send error:', error);
+            return false;
         }
-
-        // Otherwise send as text message
-        return await this.sendText(phone, message);
     }
 
     /**

@@ -242,13 +242,8 @@ export class OrderService {
 
       console.log(`✅ [OrderService] Order created: ${order.id}`);
 
-      // Send WhatsApp confirmation
-      try {
-        await whatsappService.sendOrderConfirmation(order);
-      } catch (waError) {
-        console.error('⚠️ [OrderService] Failed to send WhatsApp confirmation:', waError);
-        // Don't fail the order creation
-      }
+      // WhatsApp confirmation is now handled by the client after PDF generation
+      // to ensure the invoice is attached.
 
       return enrichedOrder;
     } catch (error) {

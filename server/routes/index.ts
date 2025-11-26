@@ -16,6 +16,7 @@ import accountingRouter from './accounting';
 import healthRouter from './health';
 import databaseRouter from './database';
 import pdfRouter from './pdf';
+import whatsappRouter from './whatsapp';
 
 /**
  * Register all route modules with the Express app
@@ -24,6 +25,7 @@ export function registerAllRoutes(app: Express): void {
   // Authentication routes (no version prefix)
   app.use('/api/auth', authRouter);
   app.use('/api/employees', employeesRouter);
+  app.use('/api/whatsapp', whatsappRouter);
 
   // API v1 routes
   app.use('/api/v1/orders', ordersRouter);
