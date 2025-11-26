@@ -850,7 +850,7 @@ export class MemStorage implements IStorage {
 
 import { SupabaseStorage } from "./SupabaseStorage";
 
-const isSupabaseConfigured = process.env.SUPABASE_URL &&
+export const isSupabaseConfigured = process.env.SUPABASE_URL &&
   process.env.SUPABASE_SERVICE_KEY &&
   !process.env.SUPABASE_URL.includes('placeholder');
 

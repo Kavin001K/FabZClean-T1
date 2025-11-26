@@ -5,11 +5,13 @@ import { existsSync } from "fs";
 
 // Determine database path with fallbacks
 const isProduction = process.env.NODE_ENV === "production";
-const useSupabase = process.env.USE_SUPABASE === "true";
+const isSupabaseConfigured = !!process.env.SUPABASE_URL &&
+  !!process.env.SUPABASE_SERVICE_KEY &&
+  !process.env.SUPABASE_URL.includes('placeholder');
 
 let dbInstance: any;
 
-if (useSupabase) {
+if (isSupabaseConfigured) {
   console.log("🗄️  Using Supabase storage");
   dbInstance = new SupabaseStorage();
 } else {

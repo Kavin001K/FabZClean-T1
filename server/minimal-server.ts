@@ -74,7 +74,7 @@ app.get('/api/test', (req, res) => {
   // Initialize database connection
   try {
     await initializeDatabase();
-    const dbType = process.env.USE_SUPABASE === 'true' ? 'Supabase' : 'SQLite';
+    const dbType = (process.env.SUPABASE_URL && !process.env.SUPABASE_URL.includes('placeholder')) ? 'Supabase' : 'SQLite';
     log(`✅ ${dbType} database initialized and connected`);
   } catch (error: any) {
     log("❌ Database initialization failed:", error);

@@ -83,13 +83,6 @@ export function OrderConfirmationDialog({
             // Barcode - Use SVG for best quality
             if (order.orderNumber && barcodeRef.current) {
                 try {
-                    // Ensure the element exists and is visible
-                    if (barcodeRef.current.clientWidth === 0) {
-                        // If width is 0, it might not be rendered yet, retry shortly
-                        setTimeout(generateCodes, 50);
-                        return;
-                    }
-
                     JsBarcode(barcodeRef.current, order.orderNumber, {
                         format: "CODE128",
                         width: 2,
@@ -106,11 +99,6 @@ export function OrderConfirmationDialog({
                 } catch (e) {
                     console.error("❌ Barcode error:", e);
                 }
-            } else {
-                console.warn("⚠️ Skipping barcode: orderNumber or ref missing", {
-                    orderNumber: order.orderNumber,
-                    ref: !!barcodeRef.current
-                });
             }
 
             // Generate QR Code with payment info

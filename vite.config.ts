@@ -27,11 +27,7 @@ export default defineConfig({
     minify: 'esbuild',
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
-      external: ['shelljs'],
       output: {
-        globals: {
-          shelljs: 'shell'
-        },
         manualChunks: {
           vendor: ['react', 'react-dom'],
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-popover', '@radix-ui/react-select']
