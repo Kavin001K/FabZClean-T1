@@ -76,95 +76,107 @@ export function OrderConfirmationDialog({
     const totalAmount = getTotalAmount();
 
     const autoSentRef = useRef<string | null>(null);
+    const barcodeRetryCount = useRef(0);
 
-    // Generate barcode and QR code - MOVED BEFORE auto-send to ensure it runs first
+    // Generate barcode and QR code with aggressive retry
     useEffect(() => {
-        if (!open || !order) return;
+        if (!open || !order) {
+            barcodeRetryCount.current = 0;
+            return;
+        }
 
         console.log('🔄 Starting code generation for order:', order.orderNumber);
 
-        const generateCodes = () => {
-            // Barcode - Use SVG for best quality
-            if (order.orderNumber && barcodeRef.current) {
-                try {
-                    console.log('📊 Generating barcode for:', order.orderNumber);
-                    console.log('📊 Barcode ref exists:', !!barcodeRef.current);
-
-                    JsBarcode(barcodeRef.current, order.orderNumber, {
-                        format: "CODE128",
-                        width: 3, // Increased width for better visibility
-                        height: 100, // Increased height
-                        displayValue: true,
-                        fontSize: 20,
-                        margin: 10,
-                        background: "#ffffff",
-                        lineColor: "#000000",
-                        textAlign: "center",
-                        textPosition: "bottom"
-                    });
-                    console.log('✅ Barcode generated successfully for:', order.orderNumber);
-                } catch (e) {
-                    console.error("❌ Barcode generation error:", e);
-                    console.error("Order number:", order.orderNumber);
-                }
-            } else {
-                console.warn('⚠️ Barcode generation skipped:', {
-                    hasOrderNumber: !!order.orderNumber,
-                    hasRef: !!barcodeRef.current
-                });
+        const generateBarcode = () => {
+            if (!order.orderNumber) {
+                console.error('❌ No order number!');
+                return false;
             }
 
-            // Generate QR Code with payment info
-            if (qrcodeRef.current && totalAmount > 0) {
-                try {
-                    const ctx = qrcodeRef.current.getContext('2d');
-                    if (ctx) {
-                        ctx.clearRect(0, 0, qrcodeRef.current.width, qrcodeRef.current.height);
-                    }
+            if (!barcodeRef.current) {
+                console.warn('⚠️ Barcode ref not ready, retry count:', barcodeRetryCount.current);
+                return false;
+            }
 
-                    const amount = totalAmount.toFixed(2);
-                    const qrData = `upi://pay?pa=8825702072@kotak811&pn=FabZClean&am=${amount}&tr=${order.orderNumber}&tn=Order ${order.orderNumber}`;
+            try {
+                console.log('📊 Generating barcode for:', order.orderNumber);
 
-                    QRCode.toCanvas(qrcodeRef.current, qrData, {
-                        width: 140,
-                        margin: 2,
-                        color: {
-                            dark: '#16a34a',
-                            light: '#ffffff'
-                        },
-                        errorCorrectionLevel: 'H'
-                    }, (error: any) => {
-                        if (error) console.error("❌ QR error:", error);
-                        else console.log('✅ QR code generated');
-                    });
-                } catch (e) {
-                    console.error("❌ QR generation error:", e);
-                }
+                // Clear any existing barcode
+                barcodeRef.current.innerHTML = '';
+
+                JsBarcode(barcodeRef.current, order.orderNumber, {
+                    format: "CODE128",
+                    width: 2,
+                    height: 60,
+                    displayValue: true,
+                    fontSize: 14,
+                    margin: 5,
+                    background: "#ffffff",
+                    lineColor: "#000000",
+                });
+
+                console.log('✅ Barcode generated successfully!');
+                barcodeRetryCount.current = 0;
+                return true;
+            } catch (e) {
+                console.error("❌ Barcode error:", e);
+                return false;
             }
         };
 
-        // Try immediate generation first
-        if (barcodeRef.current) {
-            generateCodes();
-        } else {
-            // Fallback: wait for DOM
-            const timer = setTimeout(() => {
-                requestAnimationFrame(generateCodes);
-            }, 500); // Increased delay
+        const generateQR = () => {
+            if (!qrcodeRef.current || totalAmount <= 0) return;
 
-            return () => clearTimeout(timer);
-        }
+            try {
+                const ctx = qrcodeRef.current.getContext('2d');
+                if (ctx) {
+                    ctx.clearRect(0, 0, qrcodeRef.current.width, qrcodeRef.current.height);
+                }
+
+                const amount = totalAmount.toFixed(2);
+                const qrData = `upi://pay?pa=8825702072@kotak811&pn=FabZClean&am=${amount}&tr=${order.orderNumber}&tn=Order ${order.orderNumber}`;
+
+                QRCode.toCanvas(qrcodeRef.current, qrData, {
+                    width: 140,
+                    margin: 2,
+                    color: {
+                        dark: '#16a34a',
+                        light: '#ffffff'
+                    },
+                    errorCorrectionLevel: 'H'
+                }, (error: any) => {
+                    if (error) console.error("❌ QR error:", error);
+                    else console.log('✅ QR code generated');
+                });
+            } catch (e) {
+                console.error("❌ QR generation error:", e);
+            }
+        };
+
+        // Aggressive retry mechanism
+        const attemptGeneration = () => {
+            const barcodeSuccess = generateBarcode();
+            generateQR();
+
+            if (!barcodeSuccess && barcodeRetryCount.current < 10) {
+                barcodeRetryCount.current++;
+                console.log(`🔄 Retrying barcode generation (${barcodeRetryCount.current}/10)...`);
+                setTimeout(attemptGeneration, 100);
+            }
+        };
+
+        // Start immediately
+        attemptGeneration();
 
     }, [open, order, totalAmount]);
 
-    // Auto-send WhatsApp when dialog opens - AFTER barcode generation
+    // Auto-send WhatsApp when dialog opens
     useEffect(() => {
         if (open && order && customerPhone && autoSentRef.current !== order.orderNumber) {
             autoSentRef.current = order.orderNumber;
-            // Delay to ensure barcode is generated first
             setTimeout(() => {
                 handleWhatsApp();
-            }, 2000); // Increased delay
+            }, 2000);
         }
     }, [open, order, customerPhone]);
 
@@ -372,8 +384,8 @@ export function OrderConfirmationDialog({
                                     </div>
                                 </div>
                                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${order.paymentStatus === 'paid'
-                                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                                        : 'bg-amber-100 text-amber-700 border border-amber-200'
+                                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                    : 'bg-amber-100 text-amber-700 border border-amber-200'
                                     }`}>
                                     {order.paymentStatus === 'paid' ? '✓ Paid' : '⏳ Pending'}
                                 </span>
