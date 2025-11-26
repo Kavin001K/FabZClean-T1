@@ -323,84 +323,82 @@ export function OrderConfirmationDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white via-emerald-50/30 to-blue-50/30 border-2 border-emerald-100/50 shadow-2xl">
-                <DialogHeader className="space-y-4">
-                    {/* Success Icon with Animation */}
+            <DialogContent className="sm:max-w-md bg-gradient-to-br from-white via-emerald-50/20 to-blue-50/20 border-2 border-emerald-100/50 shadow-xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader className="space-y-2">
+                    {/* Success Icon - Smaller */}
                     <div className="mx-auto relative">
-                        <div className="absolute inset-0 bg-emerald-400 rounded-full blur-xl opacity-30 animate-pulse"></div>
-                        <div className="relative bg-gradient-to-br from-emerald-500 to-green-600 p-4 rounded-full shadow-lg">
-                            <CheckCircle className="h-10 w-10 text-white" strokeWidth={2.5} />
+                        <div className="absolute inset-0 bg-emerald-400 rounded-full blur-lg opacity-20 animate-pulse"></div>
+                        <div className="relative bg-gradient-to-br from-emerald-500 to-green-600 p-2.5 rounded-full shadow-md">
+                            <CheckCircle className="h-7 w-7 text-white" strokeWidth={2.5} />
                         </div>
                     </div>
 
-                    {/* Title */}
-                    <div className="text-center space-y-2">
-                        <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
+                    {/* Title - Compact */}
+                    <div className="text-center space-y-1">
+                        <DialogTitle className="text-lg font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent">
                             Order Created Successfully!
                         </DialogTitle>
-                        <DialogDescription className="text-base text-gray-600">
+                        <DialogDescription className="text-sm text-gray-600">
                             Order <span className="font-mono font-semibold text-emerald-600">#{order.orderNumber}</span> has been saved
                         </DialogDescription>
                     </div>
                 </DialogHeader>
 
-                <div className="flex flex-col space-y-5 py-2">
-                    {/* Barcode Section - Redesigned */}
+                <div className="flex flex-col space-y-3 py-1">
+                    {/* Barcode Section - Compact */}
                     <div className="relative group">
-                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 to-blue-400/20 rounded-2xl blur-sm group-hover:blur-md transition-all"></div>
-                        <div className="relative bg-white p-6 rounded-2xl border-2 border-gray-100 shadow-sm">
-                            <div className="flex justify-center items-center min-h-[80px]">
-                                <svg ref={barcodeRef} className="w-full max-w-[280px]"></svg>
+                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/10 to-blue-400/10 rounded-xl blur-sm"></div>
+                        <div className="relative bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+                            <div className="flex justify-center items-center min-h-[60px]">
+                                <svg ref={barcodeRef} className="w-full max-w-[240px]"></svg>
                             </div>
-                            <p className="text-center text-xs text-gray-500 mt-2 font-medium">Scan for order tracking</p>
+                            <p className="text-center text-[10px] text-gray-500 mt-1">Scan for tracking</p>
                         </div>
                     </div>
 
-                    {/* Total Amount - Beautiful Card */}
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-green-600 p-[2px] shadow-lg">
-                        <div className="bg-white rounded-2xl p-6">
+                    {/* Total Amount - Compact Card */}
+                    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 p-[1.5px] shadow-md">
+                        <div className="bg-white rounded-xl p-3">
                             <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-100 to-green-100 flex items-center justify-center">
-                                        <span className="text-2xl">💰</span>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-100 to-green-100 flex items-center justify-center flex-shrink-0">
+                                        <span className="text-lg">💰</span>
                                     </div>
                                     <div>
-                                        <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total Amount</p>
-                                        <p className="text-3xl font-black bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">
+                                        <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Total Amount</p>
+                                        <p className="text-2xl font-black bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent leading-tight">
                                             {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(Number(order.totalAmount) || 0)}
                                         </p>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${order.paymentStatus === 'paid'
-                                            ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                                            : 'bg-amber-100 text-amber-700 border border-amber-200'
-                                        }`}>
-                                        {order.paymentStatus === 'paid' ? '✓ Paid' : '⏳ Pending'}
-                                    </span>
-                                </div>
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${order.paymentStatus === 'paid'
+                                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                        : 'bg-amber-100 text-amber-700 border border-amber-200'
+                                    }`}>
+                                    {order.paymentStatus === 'paid' ? '✓ Paid' : '⏳ Pending'}
+                                </span>
                             </div>
                         </div>
                     </div>
 
-                    {/* QR Code - Modern Card */}
-                    <div className="relative group">
-                        <div className="absolute inset-0 bg-gradient-to-r from-green-400/20 to-emerald-400/20 rounded-2xl blur-sm group-hover:blur-md transition-all"></div>
-                        <div className="relative bg-gradient-to-br from-emerald-50 to-green-50 border-2 border-emerald-200 rounded-2xl p-5 shadow-sm">
-                            <div className="flex items-center gap-4">
-                                <div className="bg-white p-3 rounded-xl shadow-md border border-emerald-100">
-                                    <canvas ref={qrcodeRef} className="w-24 h-24"></canvas>
+                    {/* QR Code - Compact */}
+                    <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-400/10 to-emerald-400/10 rounded-xl blur-sm"></div>
+                        <div className="relative bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-xl p-3 shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-white p-2 rounded-lg shadow-sm border border-emerald-100 flex-shrink-0">
+                                    <canvas ref={qrcodeRef} className="w-20 h-20"></canvas>
                                 </div>
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                                        <p className="text-sm font-bold text-emerald-800 uppercase tracking-wide">UPI Payment</p>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                                        <p className="text-xs font-bold text-emerald-800 uppercase tracking-wide">UPI Payment</p>
                                     </div>
-                                    <p className="text-xs text-emerald-700 font-medium mb-2">Scan with any UPI app:</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        <span className="text-[10px] bg-white px-2 py-1 rounded-md text-emerald-600 font-semibold border border-emerald-200">GPay</span>
-                                        <span className="text-[10px] bg-white px-2 py-1 rounded-md text-emerald-600 font-semibold border border-emerald-200">PhonePe</span>
-                                        <span className="text-[10px] bg-white px-2 py-1 rounded-md text-emerald-600 font-semibold border border-emerald-200">Paytm</span>
+                                    <p className="text-[10px] text-emerald-700 font-medium mb-1.5">Scan with any UPI app:</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <span className="text-[9px] bg-white px-1.5 py-0.5 rounded text-emerald-600 font-semibold border border-emerald-200">GPay</span>
+                                        <span className="text-[9px] bg-white px-1.5 py-0.5 rounded text-emerald-600 font-semibold border border-emerald-200">PhonePe</span>
+                                        <span className="text-[9px] bg-white px-1.5 py-0.5 rounded text-emerald-600 font-semibold border border-emerald-200">Paytm</span>
                                     </div>
                                 </div>
                             </div>
@@ -408,46 +406,50 @@ export function OrderConfirmationDialog({
                     </div>
                 </div>
 
-                <DialogFooter className="flex-col gap-3 sm:flex-col pt-2">
-                    <div className="grid grid-cols-2 gap-3 w-full">
+                <DialogFooter className="flex-col gap-2 sm:flex-col pt-1">
+                    <div className="grid grid-cols-2 gap-2 w-full">
                         <Button
                             onClick={handlePrintBill}
                             variant="outline"
-                            className="w-full border-2 border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all group"
+                            size="sm"
+                            className="w-full border border-gray-300 hover:border-emerald-400 hover:bg-emerald-50 transition-all"
                         >
-                            <FileText className="h-4 w-4 mr-2 text-gray-600 group-hover:text-emerald-600 transition-colors" />
-                            <span className="group-hover:text-emerald-700">Print Bill</span>
+                            <FileText className="h-3.5 w-3.5 mr-1.5" />
+                            <span className="text-xs">Print Bill</span>
                         </Button>
                         <Button
                             onClick={handlePrintTags}
                             variant="outline"
-                            className="w-full border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all group"
+                            size="sm"
+                            className="w-full border border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-all"
                         >
-                            <Tag className="h-4 w-4 mr-2 text-gray-600 group-hover:text-blue-600 transition-colors" />
-                            <span className="group-hover:text-blue-700">Print Tags</span>
+                            <Tag className="h-3.5 w-3.5 mr-1.5" />
+                            <span className="text-xs">Print Tags</span>
                         </Button>
                     </div>
                     <Button
                         onClick={handleWhatsApp}
                         disabled={sendingWhatsApp || !customerPhone}
-                        className="w-full bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
+                        size="sm"
+                        className="w-full bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50"
                     >
                         {sendingWhatsApp ? (
                             <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Sending...
+                                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                <span className="text-xs">Sending...</span>
                             </>
                         ) : (
                             <>
-                                <MessageCircle className="h-4 w-4 mr-2" />
-                                Send on WhatsApp
+                                <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+                                <span className="text-xs">Send on WhatsApp</span>
                             </>
                         )}
                     </Button>
                     <Button
                         onClick={onClose}
                         variant="ghost"
-                        className="w-full text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                        size="sm"
+                        className="w-full text-gray-600 hover:text-gray-900 hover:bg-gray-100 text-xs"
                     >
                         Close & Start New Order
                     </Button>
