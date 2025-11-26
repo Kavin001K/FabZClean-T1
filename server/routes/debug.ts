@@ -82,4 +82,3 @@ router.get('/reset-password', async (req: Request, res: Response) => {
 });
 
 export const debugRouter = router;
-```
