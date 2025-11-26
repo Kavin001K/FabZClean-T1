@@ -1,4 +1,3 @@
-import { SQLiteStorage } from "./SQLiteStorage";
 import { SupabaseStorage } from "./SupabaseStorage";
 import path from "path";
 import { existsSync } from "fs";
@@ -36,6 +35,8 @@ if (isSupabaseConfigured) {
 
   console.log(`🗄️  Database path: ${dbPath}`);
   // Use SQLite as the primary database
+  // Dynamically import SQLiteStorage to avoid loading better-sqlite3 in Vercel/Supabase environments
+  const { SQLiteStorage } = await import("./SQLiteStorage");
   dbInstance = new SQLiteStorage(dbPath);
 }
 
