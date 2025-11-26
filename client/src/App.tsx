@@ -18,14 +18,14 @@ import Orders from "@/pages/orders";
 import OrderDetail from "@/pages/order-detail";
 import Services from "@/pages/services";
 import CreateOrder from "@/pages/create-order";
-import Tracking from "@/pages/tracking";
-import LiveTracking from "@/pages/live-tracking";
+// import Tracking from "@/pages/tracking";
+// import LiveTracking from "@/pages/live-tracking";
 import Documents from "@/pages/documents";
 import Customers from "@/pages/customers";
 import Analytics from "@/pages/analytics";
 import { MainLayout } from "@/components/layout/main-layout";
 import Inventory from "@/pages/inventory";
-import Logistics from "@/pages/logistics";
+// import Logistics from "@/pages/logistics";
 import TransitOrders from "@/pages/transit-orders";
 import DebugPage from "@/pages/debug";
 import EmployeeDashboardPage from "@/pages/employee-dashboard";
@@ -123,7 +123,7 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      <Route path="/tracking">
+      {/* <Route path="/tracking">
         <ProtectedRoute>
           <MainLayout>
             <Tracking />
@@ -137,7 +137,7 @@ function Router() {
             <LiveTracking />
           </MainLayout>
         </ProtectedRoute>
-      </Route>
+      </Route> */}
 
       <Route path="/documents">
         <ProtectedRoute>
@@ -155,13 +155,13 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      <Route path="/logistics">
+      {/* <Route path="/logistics">
         <ProtectedRoute allowedRoles={['admin', 'employee', 'franchise_manager']}>
           <MainLayout>
             <Logistics />
           </MainLayout>
         </ProtectedRoute>
-      </Route>
+      </Route> */}
 
       <Route path="/transit-orders">
         <ProtectedRoute allowedRoles={['admin', 'employee', 'franchise_manager', 'factory_manager']}>

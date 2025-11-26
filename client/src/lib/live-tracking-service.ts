@@ -4,7 +4,7 @@
  */
 
 const TRACKING_API_KEY = import.meta.env.VITE_LIVE_TRACKING_API_KEY || 'fd8031fc53487803e037ce5c49ffa78d';
-const TRACKING_ENABLED = import.meta.env.VITE_LIVE_TRACKING_ENABLED === 'true';
+const TRACKING_ENABLED = false; // Explicitly disabled as per user request
 
 export interface TrackingLocation {
     latitude: number;

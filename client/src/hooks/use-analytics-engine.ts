@@ -302,7 +302,7 @@ export function useAnalyticsEngine(): UseAnalyticsEngineReturn {
     error: ordersError,
   } = useRealtime<Order>({
     tableName: 'orders',
-    selectQuery: 'id, status, paymentStatus, totalAmount, items, createdAt, updatedAt', // Fixed: removed serviceId/service columns
+    selectQuery: '*', // Select all columns to ensure service info is available
     orderBy: 'createdAt.desc',
   });
 
@@ -313,7 +313,7 @@ export function useAnalyticsEngine(): UseAnalyticsEngineReturn {
     error: servicesError,
   } = useRealtime<Service>({
     tableName: 'services',
-    selectQuery: 'id, name, category, price, status',
+    selectQuery: '*',
     orderBy: 'name.asc',
   });
 

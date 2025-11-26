@@ -56,6 +56,15 @@ export class SupabaseStorage {
             }
         });
 
+        // Enrich order with service name from items if available
+        if (newRecord.items && Array.isArray(newRecord.items) && newRecord.items.length > 0 && !newRecord.service) {
+            const services = newRecord.items.map((item: any) => item.service || item.serviceName || item.name).filter(Boolean);
+            if (services.length > 0) {
+                // Deduplicate services
+                newRecord.service = Array.from(new Set(services)).join(', ');
+            }
+        }
+
         return newRecord;
     }
 
@@ -224,7 +233,7 @@ export class SupabaseStorage {
         const { data: order, error } = await this.supabase
             .from('orders')
             .insert(insertData)
-            .select('id, status, paymentStatus, totalAmount, items, createdAt, updatedAt')
+            .select('*')
             .single();
 
         if (error) throw error;
@@ -234,7 +243,7 @@ export class SupabaseStorage {
     async getOrder(id: string): Promise<Order | undefined> {
         const { data: order, error } = await this.supabase
             .from('orders')
-            .select('id, status, paymentStatus, totalAmount, items, createdAt, updatedAt')
+            .select('*')
             .eq('id', id)
             .single();
 
@@ -247,7 +256,7 @@ export class SupabaseStorage {
             .from('orders')
             .update(data)
             .eq('id', id)
-            .select('id, status, paymentStatus, totalAmount, items, createdAt, updatedAt')
+            .select('*')
             .single();
 
         if (error) return undefined;
@@ -266,7 +275,7 @@ export class SupabaseStorage {
     async listOrders(): Promise<Order[]> {
         const { data, error } = await this.supabase
             .from('orders')
-            .select('id, status, paymentStatus, totalAmount, items, createdAt, updatedAt');
+            .select('*');
 
         if (error) throw error;
         return data.map(item => this.mapDates(item));

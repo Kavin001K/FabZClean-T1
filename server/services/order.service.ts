@@ -206,6 +206,27 @@ export class OrderService {
       // Create the order
       const order = await storage.createOrder(orderData);
 
+      // Update customer stats if customerId is present
+      if (order.customerId) {
+        try {
+          const customer = await storage.getCustomer(order.customerId);
+          if (customer) {
+            const currentTotalSpent = parseFloat(customer.totalSpent || '0');
+            const orderTotal = parseFloat(order.totalAmount || '0');
+
+            await storage.updateCustomer(order.customerId, {
+              totalOrders: (customer.totalOrders || 0) + 1,
+              totalSpent: (currentTotalSpent + orderTotal).toString(),
+              lastOrder: new Date()
+            });
+            console.log(`✅ [OrderService] Updated stats for customer: ${order.customerId}`);
+          }
+        } catch (error) {
+          console.error(`❌ [OrderService] Failed to update customer stats:`, error);
+          // Don't fail the order creation if stats update fails
+        }
+      }
+
       // Enrich with algorithm processing
       const enrichedOrder = enrichOrderWithAlgorithms(order);
 
