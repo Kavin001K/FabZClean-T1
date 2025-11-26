@@ -189,6 +189,22 @@ export const employeePerformance = pgTable("employee_performance", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const documents = pgTable("documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type", { enum: ["invoice", "receipt", "report", "label", "other"] }).notNull().default("invoice"),
+  title: text("title").notNull(),
+  filename: text("filename").notNull(),
+  filepath: text("filepath").notNull(), // Path in Supabase storage
+  fileUrl: text("file_url").notNull(), // Public URL
+  status: text("status", { enum: ["draft", "sent", "paid", "overdue", "cancelled"] }).default("draft"),
+  amount: decimal("amount", { precision: 10, scale: 2 }),
+  customerName: text("customer_name"),
+  orderNumber: text("order_number"),
+  metadata: jsonb("metadata"), // Additional data (invoice details, etc.)
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users);
 
@@ -215,6 +231,8 @@ export const insertEmployeeAttendanceSchema = createInsertSchema(employeeAttenda
 export const insertEmployeeTaskSchema = createInsertSchema(employeeTasks);
 
 export const insertEmployeePerformanceSchema = createInsertSchema(employeePerformance);
+
+export const insertDocumentSchema = createInsertSchema(documents);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;

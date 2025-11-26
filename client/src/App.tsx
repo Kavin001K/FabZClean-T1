@@ -39,6 +39,7 @@ import { InvoiceGenerator } from "@/components/invoice-generator";
 import CustomerPortal from "@/pages/customer-portal";
 import WorkerPortal from "@/pages/worker-portal";
 import BillView from "@/pages/bill-view";
+import TestInvoice from "@/pages/test-invoice";
 
 function Router() {
   return (
@@ -239,6 +240,14 @@ function Router() {
         <ProtectedRoute allowedRoles={['driver', 'employee']}>
           <MainLayout>
             <WorkerPortal />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/test-invoice">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <MainLayout>
+            <TestInvoice />
           </MainLayout>
         </ProtectedRoute>
       </Route>
