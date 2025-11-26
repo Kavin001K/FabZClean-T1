@@ -17,6 +17,7 @@ import healthRouter from './health';
 import databaseRouter from './database';
 import pdfRouter from './pdf';
 import whatsappRouter from './whatsapp';
+import { debugRouter } from './debug';
 
 /**
  * Register all route modules with the Express app
@@ -24,6 +25,7 @@ import whatsappRouter from './whatsapp';
 export function registerAllRoutes(app: Express): void {
   // Authentication routes (no version prefix)
   app.use('/api/auth', authRouter);
+  app.use('/api/debug', debugRouter);
   app.use('/api/employees', employeesRouter);
   app.use('/api/whatsapp', whatsappRouter);
 
