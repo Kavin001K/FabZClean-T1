@@ -77,41 +77,41 @@ export function OrderConfirmationDialog({
 
     const autoSentRef = useRef<string | null>(null);
 
-    // Auto-send WhatsApp when dialog opens
-    useEffect(() => {
-        if (open && order && autoSentRef.current !== order.orderNumber) {
-            autoSentRef.current = order.orderNumber;
-            // Small delay to ensure everything is ready
-            setTimeout(() => {
-                handleWhatsApp();
-            }, 1000);
-        }
-    }, [open, order]);
-
-    // Generate barcode and QR code
+    // Generate barcode and QR code - MOVED BEFORE auto-send to ensure it runs first
     useEffect(() => {
         if (!open || !order) return;
+
+        console.log('🔄 Starting code generation for order:', order.orderNumber);
 
         const generateCodes = () => {
             // Barcode - Use SVG for best quality
             if (order.orderNumber && barcodeRef.current) {
                 try {
+                    console.log('📊 Generating barcode for:', order.orderNumber);
+                    console.log('📊 Barcode ref exists:', !!barcodeRef.current);
+
                     JsBarcode(barcodeRef.current, order.orderNumber, {
                         format: "CODE128",
-                        width: 2.5, // Increased width for better scanning
-                        height: 80, // Increased height
+                        width: 3, // Increased width for better visibility
+                        height: 100, // Increased height
                         displayValue: true,
-                        fontSize: 18,
+                        fontSize: 20,
                         margin: 10,
                         background: "#ffffff",
                         lineColor: "#000000",
                         textAlign: "center",
                         textPosition: "bottom"
                     });
-                    console.log('✅ Barcode generated for:', order.orderNumber);
+                    console.log('✅ Barcode generated successfully for:', order.orderNumber);
                 } catch (e) {
-                    console.error("❌ Barcode error:", e);
+                    console.error("❌ Barcode generation error:", e);
+                    console.error("Order number:", order.orderNumber);
                 }
+            } else {
+                console.warn('⚠️ Barcode generation skipped:', {
+                    hasOrderNumber: !!order.orderNumber,
+                    hasRef: !!barcodeRef.current
+                });
             }
 
             // Generate QR Code with payment info
@@ -135,6 +135,7 @@ export function OrderConfirmationDialog({
                         errorCorrectionLevel: 'H'
                     }, (error: any) => {
                         if (error) console.error("❌ QR error:", error);
+                        else console.log('✅ QR code generated');
                     });
                 } catch (e) {
                     console.error("❌ QR generation error:", e);
@@ -142,14 +143,30 @@ export function OrderConfirmationDialog({
             }
         };
 
-        // Use setTimeout to allow Dialog animation to complete
-        const timer = setTimeout(() => {
-            requestAnimationFrame(generateCodes);
-        }, 300); // 300ms delay for dialog animation
+        // Try immediate generation first
+        if (barcodeRef.current) {
+            generateCodes();
+        } else {
+            // Fallback: wait for DOM
+            const timer = setTimeout(() => {
+                requestAnimationFrame(generateCodes);
+            }, 500); // Increased delay
 
-        return () => clearTimeout(timer);
+            return () => clearTimeout(timer);
+        }
 
     }, [open, order, totalAmount]);
+
+    // Auto-send WhatsApp when dialog opens - AFTER barcode generation
+    useEffect(() => {
+        if (open && order && customerPhone && autoSentRef.current !== order.orderNumber) {
+            autoSentRef.current = order.orderNumber;
+            // Delay to ensure barcode is generated first
+            setTimeout(() => {
+                handleWhatsApp();
+            }, 2000); // Increased delay
+        }
+    }, [open, order, customerPhone]);
 
     const handlePrintBill = () => {
         if (!order?.orderNumber) return;
