@@ -186,57 +186,78 @@ export function OrderConfirmationDialog({
             return;
         }
 
+        // Logic to handle "No Notes" cleanly
+        const notesSection = (order as any).notes
+            ? `<div class="notes"><strong>Note:</strong> ${(order as any).notes}</div>`
+            : ''; // Renders nothing if no notes
+
         let tagsHtml = '';
         order.items.forEach((item: any) => {
             const qty = parseInt(String(item.quantity || 1));
-            const itemName = item.productName || item.name || 'Item';
+            const itemName = item.productName || item.name || 'Garment';
 
             for (let i = 1; i <= qty; i++) {
                 tagsHtml += `
-          <div class="tag-page">
-            <div class="tag-container">
-              <div class="tag-header">
-                <div class="company-name">FabZClean</div>
-                <div class="tag-title">LAUNDRY TAG</div>
-              </div>
-              <div class="tag-body">
-                <div class="section"><div class="label">Customer:</div><div class="value customer-name">${order.customerName || 'Customer'}</div></div>
-                <div class="section"><div class="label">Phone:</div><div class="value">${customerPhone || ''}</div></div>
-                <div class="section item-section"><div class="label">Item:</div><div class="value item-name">${itemName}</div></div>
-                <div class="section"><div class="label">Piece:</div><div class="value piece-count">${i} of ${qty}</div></div>
-                <div class="section"><div class="label">Order ID:</div><div class="value order-number">${order.orderNumber}</div></div>
-              </div>
-            </div>
-          </div>
-        `;
+      <div class="tag-container">
+        <div class="header">FabZClean</div>
+        <div class="order-id">#${order.orderNumber || order.id}</div>
+        
+        <div class="details">
+          <div><strong>Cust:</strong> ${order.customerName}</div>
+          <div><strong>Item:</strong> ${itemName} (${i}/${qty})</div>
+          <div><strong>Date:</strong> ${new Date().toLocaleDateString()}</div>
+        </div>
+
+        ${notesSection}
+
+        <div class="footer">
+          Scan for status tracking
+        </div>
+      </div>
+    `;
             }
         });
 
         const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Tags - ${order.orderNumber}</title>
-          <style>
-            @page { size: 58mm auto; margin: 0; }
-            body { margin: 0; padding: 0; font-family: Arial, sans-serif; background: white; }
-            .tag-page { width: 58mm; min-height: 80mm; page-break-after: always; padding: 2mm; box-sizing: border-box; }
-            .tag-container { border: 2px solid #000; padding: 2mm; }
-            .tag-header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 2mm; margin-bottom: 2mm; }
-            .company-name { font-size: 12pt; font-weight: bold; }
-            .tag-title { font-size: 8pt; }
-            .section { margin: 1mm 0; display: flex; }
-            .label { font-size: 8pt; font-weight: bold; width: 15mm; flex-shrink: 0; }
-            .value { font-size: 9pt; flex: 1; word-wrap: break-word; }
-            .customer-name { font-size: 10pt; font-weight: bold; }
-            .item-section { background: #eee; padding: 1mm; border-left: 2px solid #000; }
-            .item-name { font-weight: bold; }
-            .order-number { font-family: monospace; }
-          </style>
-        </head>
-        <body>${tagsHtml}<script>window.onload=()=>window.print();</script></body>
-      </html>
-    `;
+  <!DOCTYPE html>
+  <html>
+    <head>
+      <title>Tags - ${order.orderNumber}</title>
+      <style>
+        /* THERMAL PRINTER OPTIMIZATION */
+        @page {
+          size: 80mm auto; /* Adjust to 58mm if using a smaller printer */
+          margin: 0;
+        }
+        body {
+          font-family: 'Courier New', monospace; /* Monospace is better for receipts */
+          width: 72mm; /* Slight margin for 80mm paper */
+          margin: 2mm auto;
+          padding-bottom: 5mm;
+        }
+        .tag-container {
+          border: 2px dashed #000;
+          padding: 10px;
+          text-align: center;
+          page-break-after: always; /* CRITICAL: Forces cut after each tag */
+        }
+        .header { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+        .order-id { font-size: 24px; font-weight: 900; margin: 10px 0; }
+        .details { text-align: left; font-size: 14px; margin-top: 10px; }
+        .notes {
+          margin-top: 10px;
+          padding: 5px;
+          border: 1px solid #000;
+          font-size: 12px;
+          text-align: left;
+          font-weight: bold;
+        }
+        .footer { font-size: 10px; margin-top: 10px; }
+      </style>
+    </head>
+    <body>${tagsHtml}<script>window.onload=()=>window.print();</script></body>
+  </html>
+`;
 
         const printWindow = window.open('', 'TagPrint', 'width=400,height=600');
         if (printWindow) {
@@ -327,7 +348,7 @@ export function OrderConfirmationDialog({
                             <div className="text-right">
                                 <span className="block text-3xl font-bold text-primary">
                                     {/* Formats as ₹1,250.00 */}
-                                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(order.totalAmount || 0)}
+                                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(Number(order.totalAmount) || 0)}
                                 </span>
                                 <span className="text-xs text-muted-foreground uppercase tracking-wide">
                                     {order.paymentStatus || 'Pending'}
