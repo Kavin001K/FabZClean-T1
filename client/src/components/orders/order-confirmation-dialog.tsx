@@ -75,6 +75,19 @@ export function OrderConfirmationDialog({
 
     const totalAmount = getTotalAmount();
 
+    const autoSentRef = useRef<string | null>(null);
+
+    // Auto-send WhatsApp when dialog opens
+    useEffect(() => {
+        if (open && order && autoSentRef.current !== order.orderNumber) {
+            autoSentRef.current = order.orderNumber;
+            // Small delay to ensure everything is ready
+            setTimeout(() => {
+                handleWhatsApp();
+            }, 1000);
+        }
+    }, [open, order]);
+
     // Generate barcode and QR code
     useEffect(() => {
         if (!open || !order) return;
@@ -85,10 +98,10 @@ export function OrderConfirmationDialog({
                 try {
                     JsBarcode(barcodeRef.current, order.orderNumber, {
                         format: "CODE128",
-                        width: 2,
-                        height: 60,
+                        width: 2.5, // Increased width for better scanning
+                        height: 80, // Increased height
                         displayValue: true,
-                        fontSize: 16,
+                        fontSize: 18,
                         margin: 10,
                         background: "#ffffff",
                         lineColor: "#000000",
