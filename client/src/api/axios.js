@@ -36,6 +36,10 @@ export function getWebSocketUrl() {
     const host = window.location.host;
 
     // In production (Vercel/Render), WebSocket usually runs on the same domain
+    // But Vercel Serverless does not support WebSockets.
+    if (window.location.hostname.includes('vercel.app')) {
+      return null;
+    }
     return `${protocol}//${host}`;
   }
 

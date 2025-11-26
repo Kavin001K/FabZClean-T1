@@ -9,7 +9,7 @@ interface WebSocketMessage {
 }
 
 interface UseWebSocketOptions {
-  url: string;
+  url: string | null;
   onMessage?: (message: WebSocketMessage) => void;
   onOpen?: () => void;
   onClose?: () => void;
@@ -49,6 +49,11 @@ export function useWebSocket({
   }, [onMessage, onOpen, onClose, onError]);
 
   const connect = useCallback(() => {
+    if (!url) {
+      // No URL provided (e.g. Vercel environment), skip connection
+      return;
+    }
+
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
@@ -124,12 +129,12 @@ export function useWebSocket({
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
     }
-    
+
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
-    
+
     setIsConnected(false);
     setConnectionStatus('disconnected');
   }, []);
