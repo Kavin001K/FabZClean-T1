@@ -50,9 +50,11 @@ function validateConfig(): void {
   }
 
   // Only require DATABASE_URL in production
+  // Only require DATABASE_URL in production if NOT using Supabase
   if (config.isProduction) {
-    if (!config.databaseUrl) {
-      missing.push('DATABASE_URL');
+    const isSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY;
+    if (!config.databaseUrl && !isSupabase) {
+      missing.push('DATABASE_URL (or SUPABASE_URL + SUPABASE_SERVICE_KEY)');
     }
   }
 

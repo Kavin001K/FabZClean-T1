@@ -30,25 +30,10 @@ export function getWebSocketUrl() {
     return wsUrl;
   }
 
-  if (import.meta.env.PROD) {
-    // In production, check if we're on HTTPS
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-
-    // In production (Vercel/Render), WebSocket usually runs on the same domain
-    // But Vercel Serverless does not support WebSockets.
-    if (window.location.hostname.includes('vercel.app')) {
-      return null;
-    }
-    return `${protocol}//${host}`;
-  }
-
-  // In development, use the current window location so Vite proxy handles it
-  // This prevents conflicts between Vite HMR and backend WebSocket
+  // Use standard WebSocket URL construction based on current protocol/host
+  // This works for local dev (ws://localhost:5000) and Render (wss://app-name.onrender.com)
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.host; // This will be localhost:5000 (Vite dev server)
-
-  // Use the /ws path which is proxied to the backend WebSocket server
+  const host = window.location.host;
   return `${protocol}//${host}`;
 }
 

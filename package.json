@@ -11,7 +11,7 @@
     "build": "npm run build:client",
     "build:client": "vite build --config vite.config.minimal.ts",
     "postinstall": "npm run build:client",
-    "start": "node start.js",
+    "start": "npx tsx server/minimal-server.ts",
     "start:client": "vite preview --port 5000",
     "check": "tsc",
     "db:push": "drizzle-kit push",
@@ -109,7 +109,8 @@
     "ws": "^8.18.0",
     "xlsx": "^0.18.5",
     "zod": "^3.24.2",
-    "zod-validation-error": "^3.4.0"
+    "zod-validation-error": "^3.4.0",
+    "tsx": "^4.20.6"
   },
   "devDependencies": {
     "@babel/core": "^7.28.5",
@@ -135,7 +136,6 @@
     "postcss": "^8.4.47",
     "sucrase": "^3.35.1",
     "tailwindcss": "^3.4.17",
-    "tsx": "^4.20.6",
     "typescript": "5.6.3",
     "vite": "^7.1.9"
   },

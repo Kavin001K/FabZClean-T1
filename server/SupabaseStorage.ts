@@ -17,7 +17,7 @@ import {
     type Employee,
     type InsertEmployee,
 } from "../shared/schema";
-import type { Driver, InsertDriver } from "./SQLiteStorage";
+import { Driver, InsertDriver } from "./SQLiteStorage";
 
 export class SupabaseStorage {
     private supabase: SupabaseClient;

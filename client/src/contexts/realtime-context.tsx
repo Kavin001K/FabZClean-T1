@@ -50,7 +50,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [supabaseDrivers]);
 
   const { subscribe } = useWebSocket({
-    url: wsUrl,
+    url: skipBackendWS ? null : wsUrl,
     maxReconnectAttempts: skipBackendWS ? 0 : 5, // Disable reconnection in development
     onMessage: (message) => {
       // Skip processing if in development mode

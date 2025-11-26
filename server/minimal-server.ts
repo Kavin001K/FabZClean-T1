@@ -39,7 +39,8 @@ app.get('/api/test', (req, res) => {
   // Routes are registered via registerAllRoutes(app) below
 
   // Determine environment
-  const isProduction = process.env.NODE_ENV === "production";
+  // Force production mode if running on Render (RENDER=true) or if NODE_ENV is production
+  const isProduction = process.env.NODE_ENV === "production" || !!process.env.RENDER;
 
   // Create HTTP server
   // In development: Use standard HTTP server (Vite handles WebSocket for HMR)
