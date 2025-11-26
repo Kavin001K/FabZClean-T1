@@ -33,10 +33,31 @@ export class SupabaseStorage {
         this.supabase = createClient(supabaseUrl || '', supabaseKey || '');
     }
 
-    // Helper to map Supabase dates to JS Dates
+    // Helper to map Supabase dates to JS Dates and handle snake_case to camelCase
     private mapDates(record: any): any {
         if (!record) return record;
         const newRecord = { ...record };
+
+        // Map snake_case to camelCase for critical fields
+        const mappings: Record<string, string> = {
+            'customer_phone': 'customerPhone',
+            'customer_name': 'customerName',
+            'customer_email': 'customerEmail',
+            'order_number': 'orderNumber',
+            'total_amount': 'totalAmount',
+            'payment_status': 'paymentStatus',
+            'pickup_date': 'pickupDate',
+            'shipping_address': 'shippingAddress',
+            'created_at': 'createdAt',
+            'updated_at': 'updatedAt'
+        };
+
+        Object.entries(mappings).forEach(([snake, camel]) => {
+            if (newRecord[snake] !== undefined && newRecord[camel] === undefined) {
+                newRecord[camel] = newRecord[snake];
+                // Optional: delete snake_case key to clean up? No, keep it just in case.
+            }
+        });
 
         // Common date fields
         ['createdAt', 'updatedAt', 'pickupDate', 'deliveryDate', 'deliveredAt', 'lastOrder', 'lastActive', 'completedAt', 'dispatchedAt', 'receivedAt', 'invoiceDate'].forEach(field => {

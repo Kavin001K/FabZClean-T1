@@ -7,7 +7,7 @@ const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_S
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'fabzclean-secret-key-change-in-production';
-const JWT_EXPIRY = '8h';
+const JWT_EXPIRY = '30d'; // 30 days - long session for better UX
 
 export interface EmployeeJWTPayload {
     employeeId: string;

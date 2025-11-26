@@ -15,6 +15,7 @@ import dashboardRouter from './dashboard';
 import accountingRouter from './accounting';
 import healthRouter from './health';
 import databaseRouter from './database';
+import pdfRouter from './pdf';
 
 /**
  * Register all route modules with the Express app
@@ -45,6 +46,9 @@ export function registerAllRoutes(app: Express): void {
   // Health and Database routes
   app.use('/api/health', healthRouter);
   app.use('/api/database', databaseRouter);
+
+  // PDF upload route
+  app.use('/api', pdfRouter);
 
   // Legacy API routes (for backward compatibility)
   app.use('/api/orders', ordersRouter);

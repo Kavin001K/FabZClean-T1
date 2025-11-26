@@ -207,8 +207,8 @@ function OrdersComponent() {
     // Apply sorting
     if (sortField) {
       filtered.sort((a, b) => {
-        const aValue = a[sortField];
-        const bValue = b[sortField];
+        const aValue = (a as any)[sortField];
+        const bValue = (b as any)[sortField];
 
         if (typeof aValue === 'string' && typeof bValue === 'string') {
           return sortDirection === 'asc'
@@ -348,8 +348,8 @@ function OrdersComponent() {
   }, [sortField]);
 
   const handleSelectOrder = useCallback((orderId: string) => {
-    setSelectedOrders(prev => 
-      prev.includes(orderId) 
+    setSelectedOrders(prev =>
+      prev.includes(orderId)
         ? prev.filter(id => id !== orderId)
         : [...prev, orderId]
     );
@@ -384,9 +384,9 @@ function OrdersComponent() {
   }, []);
 
   const handleCancelOrder = useCallback((order: Order) => {
-    updateOrderStatusMutation.mutate({ 
-      orderId: order.id, 
-      newStatus: 'cancelled' 
+    updateOrderStatusMutation.mutate({
+      orderId: order.id,
+      newStatus: 'cancelled'
     });
   }, [updateOrderStatusMutation]);
 
@@ -407,11 +407,11 @@ function OrdersComponent() {
     const statusFlow = ['pending', 'processing', 'completed'];
     const currentIndex = statusFlow.indexOf(order.status);
     const nextStatus = statusFlow[currentIndex + 1];
-    
+
     if (nextStatus) {
-      updateOrderStatusMutation.mutate({ 
-        orderId: order.id, 
-        newStatus: nextStatus 
+      updateOrderStatusMutation.mutate({
+        orderId: order.id,
+        newStatus: nextStatus
       });
     }
   }, [updateOrderStatusMutation]);
@@ -522,10 +522,10 @@ function OrdersComponent() {
       return;
     }
     exportOrdersToCSV(filteredOrders);
-      toast({
+    toast({
       title: "Export Started",
       description: `Exporting ${filteredOrders.length} orders to CSV...`,
-      });
+    });
   }, [filteredOrders, toast]);
 
   const handleExportPDF = useCallback(() => {
@@ -605,7 +605,7 @@ function OrdersComponent() {
   const handleStatusFilterChange = useCallback((status: string, checked: boolean) => {
     setFilters(prev => ({
       ...prev,
-      status: checked 
+      status: checked
         ? [...prev.status, status]
         : prev.status.filter(s => s !== status)
     }));
@@ -1495,196 +1495,196 @@ function OrdersComponent() {
                   ) : (
                     <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
                       <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead className="w-12">
-                            <Checkbox
-                              checked={paginatedOrders.length > 0 && selectedOrders.length === paginatedOrders.length}
-                              onCheckedChange={handleSelectAll}
-                              aria-label="Select all orders on this page"
-                            />
-                          </TableHead>
-                          <TableHead
-                            className="cursor-pointer hover:bg-muted/70 select-none"
-                            onClick={() => handleSort('orderNumber')}
-                          >
-                            <div className="flex items-center gap-2">
-                              Order #
-                              {sortField === 'orderNumber' ? (
-                                sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                              ) : (
-                                <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </div>
-                          </TableHead>
-                          <TableHead
-                            className="cursor-pointer hover:bg-muted/70 select-none"
-                            onClick={() => handleSort('customerName')}
-                          >
-                            <div className="flex items-center gap-2">
-                              Customer
-                              {sortField === 'customerName' ? (
-                                sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                              ) : (
-                                <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </div>
-                          </TableHead>
-                          <TableHead>Service</TableHead>
-                          <TableHead
-                            className="cursor-pointer hover:bg-muted/70 select-none"
-                            onClick={() => handleSort('status')}
-                          >
-                            <div className="flex items-center gap-2">
-                              Status
-                              {sortField === 'status' ? (
-                                sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                              ) : (
-                                <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </div>
-                          </TableHead>
-                          <TableHead>Payment</TableHead>
-                          <TableHead
-                            className="cursor-pointer hover:bg-muted/70 select-none text-right"
-                            onClick={() => handleSort('totalAmount')}
-                          >
-                            <div className="flex items-center justify-end gap-2">
-                              Amount
-                              {sortField === 'totalAmount' ? (
-                                sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                              ) : (
-                                <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </div>
-                          </TableHead>
-                          <TableHead
-                            className="cursor-pointer hover:bg-muted/70 select-none"
-                            onClick={() => handleSort('createdAt')}
-                          >
-                            <div className="flex items-center gap-2">
-                              Date
-                              {sortField === 'createdAt' ? (
-                                sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                              ) : (
-                                <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </div>
-                          </TableHead>
-                          <TableHead className="text-center">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        <AnimatePresence mode="popLayout">
-                          {paginatedOrders.map((order, index) => (
-                            <motion.tr
-                              key={order.id}
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -20 }}
-                              transition={{ duration: 0.15, delay: Math.min(index * 0.02, 0.3) }}
-                              className="hover:bg-muted/50 cursor-pointer transition-colors"
-                              onClick={() => handleViewOrder(order)}
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="w-12">
+                              <Checkbox
+                                checked={paginatedOrders.length > 0 && selectedOrders.length === paginatedOrders.length}
+                                onCheckedChange={handleSelectAll}
+                                aria-label="Select all orders on this page"
+                              />
+                            </TableHead>
+                            <TableHead
+                              className="cursor-pointer hover:bg-muted/70 select-none"
+                              onClick={() => handleSort('orderNumber')}
                             >
-                              <TableCell onClick={(e) => e.stopPropagation()}>
-                                <Checkbox
-                                  checked={selectedOrders.includes(order.id)}
-                                  onCheckedChange={() => handleSelectOrder(order.id)}
-                                  aria-label={`Select order ${order.orderNumber}`}
-                                />
-                              </TableCell>
-                              <TableCell className="font-mono font-medium">
-                                {order.orderNumber}
-                              </TableCell>
-                              <TableCell>
-                                <div>
-                                  <div className="font-medium">{order.customerName}</div>
-                                  <div className="text-sm text-muted-foreground">
-                                    {(order as any).customerPhone || 'N/A'}
+                              <div className="flex items-center gap-2">
+                                Order #
+                                {sortField === 'orderNumber' ? (
+                                  sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+                                ) : (
+                                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead
+                              className="cursor-pointer hover:bg-muted/70 select-none"
+                              onClick={() => handleSort('customerName')}
+                            >
+                              <div className="flex items-center gap-2">
+                                Customer
+                                {sortField === 'customerName' ? (
+                                  sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+                                ) : (
+                                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead>Service</TableHead>
+                            <TableHead
+                              className="cursor-pointer hover:bg-muted/70 select-none"
+                              onClick={() => handleSort('status')}
+                            >
+                              <div className="flex items-center gap-2">
+                                Status
+                                {sortField === 'status' ? (
+                                  sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+                                ) : (
+                                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead>Payment</TableHead>
+                            <TableHead
+                              className="cursor-pointer hover:bg-muted/70 select-none text-right"
+                              onClick={() => handleSort('totalAmount')}
+                            >
+                              <div className="flex items-center justify-end gap-2">
+                                Amount
+                                {sortField === 'totalAmount' ? (
+                                  sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+                                ) : (
+                                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead
+                              className="cursor-pointer hover:bg-muted/70 select-none"
+                              onClick={() => handleSort('createdAt')}
+                            >
+                              <div className="flex items-center gap-2">
+                                Date
+                                {sortField === 'createdAt' ? (
+                                  sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+                                ) : (
+                                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead className="text-center">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <AnimatePresence mode="popLayout">
+                            {paginatedOrders.map((order, index) => (
+                              <motion.tr
+                                key={order.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.15, delay: Math.min(index * 0.02, 0.3) }}
+                                className="hover:bg-muted/50 cursor-pointer transition-colors"
+                                onClick={() => handleViewOrder(order)}
+                              >
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <Checkbox
+                                    checked={selectedOrders.includes(order.id)}
+                                    onCheckedChange={() => handleSelectOrder(order.id)}
+                                    aria-label={`Select order ${order.orderNumber}`}
+                                  />
+                                </TableCell>
+                                <TableCell className="font-mono font-medium">
+                                  {order.orderNumber}
+                                </TableCell>
+                                <TableCell>
+                                  <div>
+                                    <div className="font-medium">{order.customerName}</div>
+                                    <div className="text-sm text-muted-foreground">
+                                      {(order as any).customerPhone || 'N/A'}
+                                    </div>
                                   </div>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <span className="text-sm">
-                                  {(order as any).service || 'Dry Cleaning'}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <Badge className={cn("border gap-1.5", getStatusColor(order.status))}>
-                                  {getStatusIcon(order.status)}
-                                  <span className="capitalize">{order.status}</span>
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge className={cn("border", getPaymentStatusColor((order as any).paymentStatus || 'pending'))}>
-                                  <span className="capitalize">
-                                    {(order as any).paymentStatus || 'Pending'}
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-sm">
+                                    {(order as any).service || 'Dry Cleaning'}
                                   </span>
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right font-semibold">
-                                {formatCurrency(parseFloat(order.totalAmount))}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {formatDate(order.createdAt || new Date())}
-                              </TableCell>
-                              <TableCell onClick={(e) => e.stopPropagation()}>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 w-8 p-0"
-                                      aria-label={`Actions for order ${order.orderNumber}`}
-                                    >
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => handleViewOrder(order)}>
-                                      <Eye className="mr-2 h-4 w-4" />
-                                      View Details
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleEditOrder(order)}>
-                                      <Edit className="mr-2 h-4 w-4" />
-                                      Edit Order
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handlePrintInvoice(order)}>
-                                      <Printer className="mr-2 h-4 w-4" />
-                                      Print Invoice
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    {order.status === 'pending' && (
-                                      <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'processing')}>
-                                        <Clock className="mr-2 h-4 w-4" />
-                                        Mark as Processing
-                                      </DropdownMenuItem>
-                                    )}
-                                    {order.status === 'processing' && (
-                                      <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>
-                                        <CheckCircle className="mr-2 h-4 w-4" />
-                                        Mark as Completed
-                                      </DropdownMenuItem>
-                                    )}
-                                    {order.status !== 'completed' && order.status !== 'cancelled' && (
-                                      <DropdownMenuItem
-                                        onClick={() => handleCancelOrder(order)}
-                                        className="text-red-600 focus:text-red-600"
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={cn("border gap-1.5", getStatusColor(order.status))}>
+                                    {getStatusIcon(order.status)}
+                                    <span className="capitalize">{order.status}</span>
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={cn("border", getPaymentStatusColor((order as any).paymentStatus || 'pending'))}>
+                                    <span className="capitalize">
+                                      {(order as any).paymentStatus || 'Pending'}
+                                    </span>
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right font-semibold">
+                                  {formatCurrency(parseFloat(order.totalAmount))}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {formatDate(order.createdAt || new Date())}
+                                </TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        aria-label={`Actions for order ${order.orderNumber}`}
                                       >
-                                        <X className="mr-2 h-4 w-4" />
-                                        Cancel Order
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onClick={() => handleViewOrder(order)}>
+                                        <Eye className="mr-2 h-4 w-4" />
+                                        View Details
                                       </DropdownMenuItem>
-                                    )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </motion.tr>
-                          ))}
-                        </AnimatePresence>
-                      </TableBody>
-                    </Table>
+                                      <DropdownMenuItem onClick={() => handleEditOrder(order)}>
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        Edit Order
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => handlePrintInvoice(order)}>
+                                        <Printer className="mr-2 h-4 w-4" />
+                                        Print Invoice
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      {order.status === 'pending' && (
+                                        <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'processing')}>
+                                          <Clock className="mr-2 h-4 w-4" />
+                                          Mark as Processing
+                                        </DropdownMenuItem>
+                                      )}
+                                      {order.status === 'processing' && (
+                                        <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>
+                                          <CheckCircle className="mr-2 h-4 w-4" />
+                                          Mark as Completed
+                                        </DropdownMenuItem>
+                                      )}
+                                      {order.status !== 'completed' && order.status !== 'cancelled' && (
+                                        <DropdownMenuItem
+                                          onClick={() => handleCancelOrder(order)}
+                                          className="text-red-600 focus:text-red-600"
+                                        >
+                                          <X className="mr-2 h-4 w-4" />
+                                          Cancel Order
+                                        </DropdownMenuItem>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              </motion.tr>
+                            ))}
+                          </AnimatePresence>
+                        </TableBody>
+                      </Table>
                     </div>
                   )}
                 </div>
@@ -1727,15 +1727,15 @@ function OrdersComponent() {
                       <div className="space-y-4 ml-8 border-l-2 border-primary/30 pl-6 relative">
                         {orders.map((order, orderIndex) => {
                           const statusIcon = order.status === 'completed' ? CheckCircle :
-                                            order.status === 'in_progress' ? Clock :
-                                            order.status === 'pending' ? AlertCircle :
-                                            XCircle;
+                            order.status === 'in_progress' ? Clock :
+                              order.status === 'pending' ? AlertCircle :
+                                XCircle;
                           const StatusIcon = statusIcon;
 
                           const statusColor = order.status === 'completed' ? 'text-green-500 bg-green-500/10 border-green-500/20' :
-                                             order.status === 'in_progress' ? 'text-blue-500 bg-blue-500/10 border-blue-500/20' :
-                                             order.status === 'pending' ? 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' :
-                                             'text-red-500 bg-red-500/10 border-red-500/20';
+                            order.status === 'in_progress' ? 'text-blue-500 bg-blue-500/10 border-blue-500/20' :
+                              order.status === 'pending' ? 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' :
+                                'text-red-500 bg-red-500/10 border-red-500/20';
 
                           return (
                             <motion.div
@@ -1776,9 +1776,9 @@ function OrdersComponent() {
                                             <Badge
                                               variant={
                                                 order.status === 'completed' ? 'default' :
-                                                order.status === 'in_progress' ? 'secondary' :
-                                                order.status === 'pending' ? 'outline' :
-                                                'destructive'
+                                                  order.status === 'in_progress' ? 'secondary' :
+                                                    order.status === 'pending' ? 'outline' :
+                                                      'destructive'
                                               }
                                               className="capitalize"
                                             >

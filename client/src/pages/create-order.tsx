@@ -327,8 +327,46 @@ export default function CreateOrder() {
     mutationFn: async (orderData: Partial<Order>) => {
       return await ordersApi.create(orderData);
     },
-    onSuccess: (newOrder) => {
-      if (newOrder) {
+    onSuccess: async (responseOrder) => {
+      if (responseOrder) {
+        // 🛡️ DEFENSIVE FIX: Normalize order data using form state as fallback
+        // This ensures the dialog works even if the backend returns snake_case or missing fields
+        const newOrder: any = { ...responseOrder };
+
+        // 1. Ensure Customer Phone (Critical for WhatsApp)
+        if (!newOrder.customerPhone) {
+          newOrder.customerPhone = newOrder.customer_phone || customerPhone;
+        }
+
+        // 2. Ensure Items (Critical for Tags/Bill)
+        if (!newOrder.items || !Array.isArray(newOrder.items) || newOrder.items.length === 0) {
+          console.warn('⚠️ Backend returned no items, using form state');
+          newOrder.items = selectedServices.map(item => ({
+            productId: item.service.id,
+            productName: item.service.name,
+            quantity: item.quantity,
+            price: item.priceOverride,
+            service: item.service.name // Ensure service name is present
+          }));
+        }
+
+        // 3. Ensure Total Amount
+        if (!newOrder.totalAmount || newOrder.totalAmount === '0' || newOrder.totalAmount === 0) {
+          newOrder.totalAmount = newOrder.total_amount || totalAmount.toString();
+        }
+
+        // 4. Ensure Order Number
+        if (!newOrder.orderNumber) {
+          newOrder.orderNumber = newOrder.order_number;
+        }
+
+        // 5. Ensure Customer Name
+        if (!newOrder.customerName) {
+          newOrder.customerName = newOrder.customer_name || customerName;
+        }
+
+        console.log('✅ Normalized Order for Dialog:', newOrder);
+
         setCreatedOrder(newOrder);
         setIsModalOpen(true);
         queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -346,6 +384,77 @@ export default function CreateOrder() {
           title: "Order Created Successfully!",
           description: `Order ${newOrder.orderNumber} has been created and saved.`,
         });
+
+        // Automatically send WhatsApp notification with PDF
+        // Customer phone is mandatory, use it from order data
+        if (newOrder.customerPhone) {
+          // Run in background
+          setTimeout(async () => {
+            try {
+              const { WhatsAppService } = await import('@/lib/whatsapp-service');
+
+              // Calculate total
+              let totalAmount = 0;
+              if (typeof newOrder.totalAmount === 'string') {
+                totalAmount = parseFloat(newOrder.totalAmount.replace(/[^0-9.]/g, '')) || 0;
+              } else {
+                totalAmount = Number(newOrder.totalAmount) || 0;
+              }
+
+              // Fallback to items calculation
+              if (totalAmount === 0 && Array.isArray(newOrder.items) && newOrder.items.length > 0) {
+                totalAmount = newOrder.items.reduce((sum: number, item: any) => {
+                  const price = parseFloat(String(item.price || 0));
+                  const qty = parseInt(String(item.quantity || 1));
+                  return sum + (price * qty);
+                }, 0);
+              }
+
+              const billUrl = `${window.location.origin}/bill/${newOrder.orderNumber}`;
+
+              // Generate PDF
+              let pdfUrl: string | undefined;
+              try {
+                toast({
+                  title: "📄 Preparing invoice...",
+                  description: "Generating PDF",
+                });
+
+                const { PDFService } = await import('@/lib/pdf-service');
+                pdfUrl = await PDFService.generateAndUploadBillPDF(newOrder.orderNumber);
+                console.log('✅ PDF generated:', pdfUrl);
+              } catch (pdfError) {
+                console.warn('⚠️ PDF failed, sending link only:', pdfError);
+              }
+
+              // Send WhatsApp using customer phone from order
+              const success = await WhatsAppService.sendOrderBill(
+                newOrder.customerPhone,
+                newOrder.orderNumber,
+                newOrder.customerName || 'Valued Customer',
+                totalAmount,
+                billUrl,
+                pdfUrl
+              );
+
+              if (success) {
+                toast({
+                  title: "📱 WhatsApp Sent!",
+                  description: pdfUrl
+                    ? `Invoice PDF sent to ${newOrder.customerPhone}`
+                    : `Bill link sent to ${newOrder.customerPhone}`,
+                });
+              } else {
+                console.warn('⚠️ Auto WhatsApp failed - customer can use manual button');
+              }
+            } catch (error) {
+              console.error('❌ Auto WhatsApp error:', error);
+              // Silent fail - manual button still available
+            }
+          }, 1000);
+        } else {
+          console.warn('⚠️ No customer phone in order - skipping auto WhatsApp');
+        }
 
         // Reset form
         resetForm();

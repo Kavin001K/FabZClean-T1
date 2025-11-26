@@ -1,42 +1,24 @@
--- Run this SQL in your Supabase SQL Editor to add missing columns to the orders table
+-- Run this SQL in your Supabase SQL Editor to ensure all order columns exist
+-- This fixes issues where data might not be saved because columns are missing
 
--- Add advancePaid column
-ALTER TABLE public.orders 
-ADD COLUMN IF NOT EXISTS "advancePaid" text DEFAULT '0';
+-- 1. Add missing business logic columns (camelCase to match frontend)
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS "advancePaid" text DEFAULT '0';
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS "paymentMethod" text DEFAULT 'cash';
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS "discountType" text;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS "discountValue" text;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS "couponCode" text;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS "extraCharges" text;
 
--- Add paymentMethod column
-ALTER TABLE public.orders 
-ADD COLUMN IF NOT EXISTS "paymentMethod" text;
+-- 2. Ensure critical columns exist (checking both cases just to be safe)
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS "customerPhone" text;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS "customerName" text;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS "totalAmount" text;
 
--- Add discountType column
-ALTER TABLE public.orders 
-ADD COLUMN IF NOT EXISTS "discountType" text;
+-- 3. Ensure JSON columns exist
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS "items" jsonb;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS "shippingAddress" jsonb;
 
--- Add discountValue column
-ALTER TABLE public.orders 
-ADD COLUMN IF NOT EXISTS "discountValue" text;
-
--- Add couponCode column
-ALTER TABLE public.orders 
-ADD COLUMN IF NOT EXISTS "couponCode" text;
-
--- Add extraCharges column
-ALTER TABLE public.orders 
-ADD COLUMN IF NOT EXISTS "extraCharges" text;
-
--- Add orderNumber column (if not exists)
-ALTER TABLE public.orders 
-ADD COLUMN IF NOT EXISTS "orderNumber" text UNIQUE;
-
--- Add shippingAddress column (stores JSON data)
-ALTER TABLE public.orders 
-ADD COLUMN IF NOT EXISTS "shippingAddress" jsonb;
-
--- Add items column (stores JSON array of order items)
-ALTER TABLE public.orders 
-ADD COLUMN IF NOT EXISTS "items" jsonb;
-
--- Verify columns were added
+-- 4. Verify the columns
 SELECT column_name, data_type 
 FROM information_schema.columns 
 WHERE table_name = 'orders' 
