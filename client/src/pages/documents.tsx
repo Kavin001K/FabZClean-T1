@@ -3,93 +3,64 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { 
-  FileText, 
-  Download, 
-  Eye, 
-  Plus, 
-  Calendar, 
+import {
+  FileText,
+  Download,
+  Eye,
+  Plus,
+  Calendar,
   DollarSign,
   BarChart3,
   Receipt,
   FileSpreadsheet,
   Archive,
   Search,
-  Filter
+  Filter,
+  Loader2,
+  ExternalLink
 } from 'lucide-react';
 import { InvoiceGenerator } from '@/components/invoice-generator';
 import { ReportGenerator } from '@/components/report-generator';
 import { Input } from '@/components/ui/input';
+import { useQuery } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
 
 interface Document {
   id: string;
   type: 'invoice' | 'report' | 'receipt' | 'label';
   title: string;
+  filename: string;
+  filepath: string;
+  fileUrl: string;
   status: 'draft' | 'sent' | 'paid' | 'overdue';
-  amount?: number;
+  amount?: string | null;
+  customerName?: string | null;
+  orderNumber?: string | null;
   createdAt: string;
-  customer?: string;
-  description: string;
+  metadata?: any;
 }
 
 export default function DocumentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTab, setSelectedTab] = useState('overview');
+  const { toast } = useToast();
 
-  // Mock documents data
-  const documents: Document[] = [
-    {
-      id: '1',
-      type: 'invoice',
-      title: 'Invoice #INV-001',
-      status: 'sent',
-      amount: 1500,
-      createdAt: '2024-01-15',
-      customer: 'John Doe',
-      description: 'Cleaning services for residential property'
+  // Fetch documents from API
+  const { data: documents = [], isLoading, error, refetch } = useQuery<Document[]>({
+    queryKey: ['documents'],
+    queryFn: async () => {
+      const response = await fetch('/api/documents');
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
+      return response.json();
     },
-    {
-      id: '2',
-      type: 'report',
-      title: 'Monthly Sales Report',
-      status: 'draft',
-      createdAt: '2024-01-14',
-      description: 'January 2024 performance analysis'
-    },
-    {
-      id: '3',
-      type: 'invoice',
-      title: 'Invoice #INV-002',
-      status: 'paid',
-      amount: 850,
-      createdAt: '2024-01-10',
-      customer: 'Jane Smith',
-      description: 'Office cleaning services'
-    },
-    {
-      id: '4',
-      type: 'receipt',
-      title: 'Receipt #RCP-001',
-      status: 'sent',
-      amount: 200,
-      createdAt: '2024-01-12',
-      customer: 'Bob Johnson',
-      description: 'One-time cleaning service'
-    },
-    {
-      id: '5',
-      type: 'report',
-      title: 'Customer Analytics Report',
-      status: 'draft',
-      createdAt: '2024-01-13',
-      description: 'Customer behavior and preferences analysis'
-    }
-  ];
+  });
 
   const filteredDocuments = documents.filter(doc =>
     doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    doc.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    doc.customer?.toLowerCase().includes(searchQuery.toLowerCase())
+    doc.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    doc.customerName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getStatusColor = (status: string) => {
@@ -126,10 +97,68 @@ export default function DocumentsPage() {
     totalDocuments: documents.length,
     totalInvoices: documents.filter(d => d.type === 'invoice').length,
     totalReports: documents.filter(d => d.type === 'report').length,
-    totalAmount: documents.reduce((sum, d) => sum + (d.amount || 0), 0),
+    totalAmount: documents.reduce((sum, d) => sum + (d.amount ? parseFloat(d.amount) : 0), 0),
     pendingInvoices: documents.filter(d => d.type === 'invoice' && d.status === 'sent').length,
     overdueInvoices: documents.filter(d => d.type === 'invoice' && d.status === 'overdue').length
   };
+
+  const handleViewDocument = (doc: Document) => {
+    if (doc.fileUrl) {
+      window.open(doc.fileUrl, '_blank');
+    } else {
+      toast({
+        title: "Error",
+        description: "Document URL not available",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadDocument = async (doc: Document) => {
+    try {
+      const response = await fetch(`/api/documents/${doc.id}/download`);
+      if (!response.ok) throw new Error('Download failed');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Success",
+        description: "Document downloaded successfully",
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to download document",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 space-y-4">
+        <p className="text-red-500">Failed to load documents</p>
+        <Button onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -170,7 +199,7 @@ export default function DocumentsPage() {
                 <div className="text-2xl font-bold">{stats.totalDocuments}</div>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-2">
@@ -180,7 +209,7 @@ export default function DocumentsPage() {
                 <div className="text-2xl font-bold">₹{stats.totalAmount.toLocaleString()}</div>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-2">
@@ -190,7 +219,7 @@ export default function DocumentsPage() {
                 <div className="text-2xl font-bold">{stats.pendingInvoices}</div>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-2">
@@ -239,30 +268,30 @@ export default function DocumentsPage() {
                             {doc.status}
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-600">{doc.description}</p>
+                        <p className="text-sm text-gray-600">{doc.filename}</p>
                         <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
                           <span className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            {doc.createdAt}
+                            {new Date(doc.createdAt).toLocaleDateString()}
                           </span>
-                          {doc.customer && (
-                            <span>Customer: {doc.customer}</span>
+                          {doc.customerName && (
+                            <span>Customer: {doc.customerName}</span>
                           )}
                           {doc.amount && (
                             <span className="flex items-center gap-1">
                               <DollarSign className="h-3 w-3" />
-                              ₹{doc.amount.toLocaleString()}
+                              ₹{parseFloat(doc.amount).toLocaleString()}
                             </span>
                           )}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={() => handleViewDocument(doc)}>
                         <Eye className="h-4 w-4 mr-1" />
                         View
                       </Button>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(doc)}>
                         <Download className="h-4 w-4 mr-1" />
                         Download
                       </Button>
@@ -294,10 +323,10 @@ export default function DocumentsPage() {
                             {invoice.status}
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-600">{invoice.description}</p>
+                        <p className="text-sm text-gray-600">{invoice.filename}</p>
                         <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
-                          <span>Customer: {invoice.customer}</span>
-                          <span>Amount: ₹{invoice.amount?.toLocaleString()}</span>
+                          <span>Customer: {invoice.customerName}</span>
+                          <span>Amount: ₹{invoice.amount ? parseFloat(invoice.amount).toLocaleString() : '0'}</span>
                           <span>Date: {invoice.createdAt}</span>
                         </div>
                       </div>
@@ -334,7 +363,7 @@ export default function DocumentsPage() {
                             {report.status}
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-600">{report.description}</p>
+                        <p className="text-sm text-gray-600">{report.filename}</p>
                         <div className="text-xs text-gray-500 mt-1">
                           Generated on: {report.createdAt}
                         </div>
@@ -358,11 +387,11 @@ export default function DocumentsPage() {
               <TabsTrigger value="invoice">Invoice Generator</TabsTrigger>
               <TabsTrigger value="report">Report Generator</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="invoice">
               <InvoiceGenerator />
             </TabsContent>
-            
+
             <TabsContent value="report">
               <ReportGenerator />
             </TabsContent>

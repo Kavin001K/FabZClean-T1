@@ -1,6 +1,15 @@
 import { z } from 'zod';
 
 // Order validation schemas
+const itemSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, 'Item name is required'),
+  quantity: z.number().min(1, 'Quantity must be at least 1'),
+  price: z.number().min(0, 'Price must be non-negative'),
+  serviceId: z.string().optional(),
+  notes: z.string().optional()
+});
+
 export const insertOrderSchema = z.object({
   orderNumber: z.string().optional(),
   customerId: z.string().optional(),
@@ -10,7 +19,7 @@ export const insertOrderSchema = z.object({
   status: z.string().optional(),
   paymentStatus: z.string().optional(),
   totalAmount: z.union([z.string(), z.number()]).optional(),
-  items: z.array(z.any()).optional(),
+  items: z.array(itemSchema).optional(),
   serviceIds: z.array(z.string()).optional(),
   shippingAddress: z.any().optional(),
   advancePaid: z.any().optional(),

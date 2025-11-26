@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { calculateGST, formatIndianCurrency, isInterStateTransaction, validateGSTIN } from '@/../../shared/gst-utils';
+import { calculateGST, formatIndianCurrency, isInterStateTransaction, validateGSTIN } from '@shared/gst-utils';
 
 interface InvoiceData {
   invoiceNumber: string;
@@ -362,32 +362,12 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
   );
 
   return (
-    <div className="bg-white p-8 mx-auto border-2 border-gray-300 shadow-lg print:shadow-none print:border-gray-400" style={{ maxWidth: '210mm', minHeight: '297mm' }}>
+    <div className="bg-white p-8 mx-auto" style={{ maxWidth: '210mm', minHeight: '297mm' }}>
       {renderHeader()}
       {renderCustomerInfo()}
       {renderItemsTable()}
       {renderTotals()}
       {renderFooter()}
-
-      {/* Print styles */}
-      <style jsx>{`
-        @media print {
-          body {
-            margin: 0;
-            padding: 0;
-          }
-          @page {
-            size: A4;
-            margin: 10mm;
-          }
-          .print\\:shadow-none {
-            box-shadow: none !important;
-          }
-          .print\\:border-gray-400 {
-            border-color: #9ca3af !important;
-          }
-        }
-      `}</style>
     </div>
   );
 };

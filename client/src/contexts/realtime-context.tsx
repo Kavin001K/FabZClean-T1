@@ -2,8 +2,9 @@ import React, { createContext, useContext, useEffect, useState, useMemo } from '
 import { useWebSocket } from '@/hooks/use-websocket';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { getWebSocketUrl } from '@/api/axios';
+import { getWebSocketUrl } from '@/lib/data-service';
 import { useRealtime as useSupabaseRealtime } from '@/hooks/use-realtime';
+import { useAuth } from './auth-context';
 
 interface RealtimeContextType {
   analyticsData: any;
@@ -15,6 +16,7 @@ const RealtimeContext = createContext<RealtimeContextType | undefined>(undefined
 export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { employee } = useAuth();
   const [analyticsData, setAnalyticsData] = useState(null);
 
   // Get WebSocket URL that automatically handles production (wss://) vs development (ws://)
@@ -52,6 +54,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const { subscribe } = useWebSocket({
     url: skipBackendWS ? null : wsUrl,
     maxReconnectAttempts: skipBackendWS ? 0 : 5, // Disable reconnection in development
+    enabled: !!employee, // Only connect if user is authenticated
     onMessage: (message) => {
       // Skip processing if in development mode
       if (skipBackendWS) return;

@@ -56,7 +56,18 @@ const getApiBase = () => {
   return '/api';
 };
 
-const API_BASE = getApiBase();
+export const getWebSocketUrl = () => {
+  if (import.meta.env.PROD) {
+    // In production, use wss:// and the current host
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    return `${protocol}//${host}/ws`;
+  }
+  // In development, use ws://localhost:5001
+  return 'ws://localhost:5001/ws';
+};
+
+export const API_BASE = getApiBase();
 
 type HeadersMap = Record<string, string>;
 
@@ -162,7 +173,9 @@ export const ordersApi = {
         body: JSON.stringify(order),
       });
       if (!response.ok) throw new Error("Failed to create order");
-      return await response.json();
+      const result = await response.json();
+      // Handle wrapped response from createSuccessResponse
+      return result.data || result;
     } catch (error) {
       console.error("Failed to create order:", error);
       return null;

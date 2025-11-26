@@ -30,13 +30,13 @@ class RealtimeServer {
   private clients: Map<string, ClientSubscription> = new Map();
   private updateInterval: NodeJS.Timeout | null = null;
   private server: Server | null = null;
-  
+
   // Message batching and deduplication
   private messageQueue: BatchedMessage[] = [];
   private batchInterval: NodeJS.Timeout | null = null;
   private messageIds: Set<string> = new Set();
   private connectionPool: Map<string, WebSocket[]> = new Map();
-  
+
   // Performance metrics
   private metrics = {
     totalConnections: 0,
@@ -72,18 +72,18 @@ class RealtimeServer {
           portalType: client.portalType
         });
         break;
-      
+
       case 'unsubscribe':
         client.subscriptions = [];
         this.sendToClient(clientId, {
           type: 'unsubscribed'
         });
         break;
-      
+
       case 'ping':
         this.sendToClient(clientId, { type: 'pong', timestamp: new Date().toISOString() });
         break;
-        
+
       case 'location_update':
         // Handle location updates from workers
         if (client.portalType === 'worker' && data.latitude && data.longitude) {
@@ -95,7 +95,7 @@ class RealtimeServer {
           });
         }
         break;
-        
+
       case 'status_update':
         // Handle status updates from workers
         if (client.portalType === 'worker' && data.status) {
@@ -123,7 +123,7 @@ class RealtimeServer {
 
   private addToBatch(type: string, data: any, priority: 'low' | 'medium' | 'high' = 'medium'): string {
     const messageId = this.generateMessageId();
-    
+
     // Check for duplicates
     if (this.messageIds.has(messageId)) {
       this.metrics.duplicateMessages++;
@@ -170,12 +170,12 @@ class RealtimeServer {
 
   private broadcastBatch(batch: MessageBatch): void {
     const message = JSON.stringify(batch);
-    
+
     this.clients.forEach((client, clientId) => {
       if (client.ws.readyState === WebSocket.OPEN) {
         // Filter messages relevant to this client's subscriptions
-        const relevantMessages = batch.messages.filter(msg => 
-          client.subscriptions.includes(msg.type) || 
+        const relevantMessages = batch.messages.filter(msg =>
+          client.subscriptions.includes(msg.type) ||
           client.subscriptions.includes('all')
         );
 
@@ -184,7 +184,7 @@ class RealtimeServer {
             ...batch,
             messages: relevantMessages
           };
-          
+
           client.ws.send(JSON.stringify(clientBatch));
         }
       }
@@ -198,11 +198,11 @@ class RealtimeServer {
 
   private broadcastToPortal(portalType: 'admin' | 'employee' | 'customer' | 'worker', type: string, data: any) {
     const message = JSON.stringify({ type, data, timestamp: new Date().toISOString() });
-    
+
     this.clients.forEach((client, clientId) => {
-      if (client.portalType === portalType && 
-          client.subscriptions.includes(type) && 
-          client.ws.readyState === WebSocket.OPEN) {
+      if (client.portalType === portalType &&
+        client.subscriptions.includes(type) &&
+        client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(message);
       }
     });
@@ -210,11 +210,11 @@ class RealtimeServer {
 
   private broadcastToUser(userId: string, type: string, data: any) {
     const message = JSON.stringify({ type, data, timestamp: new Date().toISOString() });
-    
+
     this.clients.forEach((client, clientId) => {
-      if (client.userId === userId && 
-          client.subscriptions.includes(type) && 
-          client.ws.readyState === WebSocket.OPEN) {
+      if (client.userId === userId &&
+        client.subscriptions.includes(type) &&
+        client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(message);
       }
     });
@@ -235,7 +235,7 @@ class RealtimeServer {
     try {
       const orders = await storage.getOrders();
       const customers = await storage.getCustomers();
-      
+
       // Calculate real-time KPIs
       const totalRevenue = orders.reduce((sum, order) => sum + parseFloat(order.totalAmount || '0'), 0);
       const avgOrderValue = orders.length > 0 ? totalRevenue / orders.length : 0;
@@ -379,12 +379,12 @@ class RealtimeServer {
   // Method to create server with Express app
   public createServer(app: Express): Server {
     const server = createServer(app);
-    this.wss = new WebSocketServer({ server });
+    this.wss = new WebSocketServer({ server, path: '/ws' });
     this.server = server;
-    
+
     this.setupWebSocketHandlers();
     this.startPeriodicUpdates();
-    
+
     return server;
   }
 
@@ -392,7 +392,7 @@ class RealtimeServer {
     this.wss.on('connection', (ws: WebSocket, req) => {
       const clientId = this.generateClientId();
       console.log(`Client ${clientId} connected`);
-      
+
       this.clients.set(clientId, {
         ws,
         subscriptions: [],

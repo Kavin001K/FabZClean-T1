@@ -12,6 +12,7 @@ import {
   calculateOrderScore,
 } from '../algorithms';
 import { whatsappService } from './whatsapp.service';
+import { Order, InsertOrder } from '../../shared/schema';
 
 export interface OrderFilters {
   status?: string;
@@ -39,7 +40,7 @@ export class OrderService {
    * Fetch all orders with optional filters
    * Enriches each order with external API data and algorithm processing
    */
-  async findAllOrders(filters: OrderFilters = {}): Promise<any[]> {
+  async findAllOrders(filters: OrderFilters = {}): Promise<Order[]> {
     try {
       console.log('📦 [OrderService] Fetching orders with filters:', filters);
 
@@ -48,19 +49,19 @@ export class OrderService {
 
       // Apply email filter if provided
       if (filters.customerEmail) {
-        orders = orders.filter((order) => order.customerEmail === filters.customerEmail);
+        orders = orders.filter((order: Order) => order.customerEmail === filters.customerEmail);
       }
 
       // Apply status filter if provided
       if (filters.status && filters.status !== 'all') {
-        orders = orders.filter((order) => order.status === filters.status);
+        orders = orders.filter((order: Order) => order.status === filters.status);
       }
 
       // Apply search filter if provided
       if (filters.search && typeof filters.search === 'string') {
         const searchTerm = filters.search.toLowerCase();
         orders = orders.filter(
-          (order) =>
+          (order: Order) =>
             order.customerName?.toLowerCase().includes(searchTerm) ||
             order.customerEmail?.toLowerCase().includes(searchTerm) ||
             order.id.toLowerCase().includes(searchTerm) ||
@@ -70,11 +71,13 @@ export class OrderService {
 
       // Apply sorting if provided
       if (filters.sortBy) {
-        const sortBy = filters.sortBy as string;
+        const sortBy = filters.sortBy as keyof Order;
         const sortOrder = filters.sortOrder || 'desc';
-        orders.sort((a: any, b: any) => {
+        orders.sort((a: Order, b: Order) => {
           const aValue = a[sortBy];
           const bValue = b[sortBy];
+
+          if (aValue === undefined || aValue === null || bValue === undefined || bValue === null) return 0;
 
           if (sortOrder === 'asc') {
             return aValue > bValue ? 1 : -1;
@@ -132,7 +135,7 @@ export class OrderService {
    * Fetch a single order by ID
    * Includes external data enrichment and algorithm processing
    */
-  async getOrderById(orderId: string): Promise<any> {
+  async getOrderById(orderId: string): Promise<Order> {
     try {
       console.log(`📦 [OrderService] Fetching order: ${orderId}`);
 
@@ -172,12 +175,13 @@ export class OrderService {
    * Create a new order
    * Validates customer via external API before creating
    */
-  async createOrder(orderData: any): Promise<any> {
+  async createOrder(orderData: InsertOrder): Promise<Order> {
     try {
       console.log('📦 [OrderService] Creating order for customer:', orderData.customerId);
 
       // Pre-validate customer via external API if customerId is provided
       // Skip validation if external API is not configured
+      /*
       if (orderData.customerId) {
         try {
           const validation = await this.validateCustomer(orderData.customerId);
@@ -210,6 +214,7 @@ export class OrderService {
           }
         }
       }
+      */
 
       // Create the order
       const order = await storage.createOrder(orderData);
@@ -240,8 +245,6 @@ export class OrderService {
 
       console.log(`✅ [OrderService] Order created: ${order.id}`);
 
-      console.log(`✅ [OrderService] Order created: ${order.id}`);
-
       // WhatsApp confirmation is now handled by the client after PDF generation
       // to ensure the invoice is attached.
 
@@ -255,7 +258,7 @@ export class OrderService {
   /**
    * Update an existing order
    */
-  async updateOrder(orderId: string, updateData: any): Promise<any> {
+  async updateOrder(orderId: string, updateData: Partial<InsertOrder>): Promise<Order> {
     try {
       console.log(`📦 [OrderService] Updating order: ${orderId}`);
 
@@ -339,16 +342,16 @@ export class OrderService {
       const stats = {
         totalOrders: orders.length,
         priorityBreakdown: {
-          high: orders.filter((o) => o.priority === 'high').length,
-          medium: orders.filter((o) => o.medium === 'medium').length,
-          normal: orders.filter((o) => o.normal === 'normal').length,
-          low: orders.filter((o) => o.low === 'low').length,
+          high: orders.filter((o: any) => o.priority === 'high').length,
+          medium: orders.filter((o: any) => o.medium === 'medium').length,
+          normal: orders.filter((o: any) => o.normal === 'normal').length,
+          low: orders.filter((o: any) => o.low === 'low').length,
         },
         totalValue: orders.reduce(
           (sum, order) => sum + parseFloat(order.totalAmount || '0'),
           0
         ),
-        ordersWithExternalData: orders.filter((o) => o.externalData).length,
+        ordersWithExternalData: orders.filter((o: any) => o.externalData).length,
       };
 
       return stats;

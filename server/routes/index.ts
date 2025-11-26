@@ -17,6 +17,7 @@ import healthRouter from './health';
 import databaseRouter from './database';
 import pdfRouter from './pdf';
 import whatsappRouter from './whatsapp';
+import documentsRouter from './documents';
 import { debugRouter } from './debug';
 
 /**
@@ -28,6 +29,7 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/debug', debugRouter);
   app.use('/api/employees', employeesRouter);
   app.use('/api/whatsapp', whatsappRouter);
+  app.use('/api/documents', documentsRouter);
 
   // API v1 routes
   app.use('/api/v1/orders', ordersRouter);

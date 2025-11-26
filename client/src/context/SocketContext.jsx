@@ -6,16 +6,16 @@
 
 import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { useWebSocket } from '@/hooks/use-websocket';
-import { getWebSocketUrl } from '@/api/axios';
+import { getWebSocketUrl } from '@/lib/data-service';
 
 const SocketContext = createContext({
   isConnected: false,
   connectionStatus: 'disconnected',
-  sendMessage: () => {},
-  subscribe: () => {},
-  unsubscribe: () => {},
-  reconnect: () => {},
-  disconnect: () => {},
+  sendMessage: () => { },
+  subscribe: () => { },
+  unsubscribe: () => { },
+  reconnect: () => { },
+  disconnect: () => { },
 });
 
 export const useSocket = () => {
@@ -34,7 +34,9 @@ export const SocketProvider = ({ children }) => {
   // In development, this uses ws://localhost
   const wsUrl = useMemo(() => {
     try {
-      return getWebSocketUrl();
+      const url = getWebSocketUrl();
+      console.log('SocketContext URL:', url);
+      return url;
     } catch (error) {
       console.error('Error getting WebSocket URL:', error);
       // Fallback to current host if getWebSocketUrl fails

@@ -124,16 +124,28 @@ export default function CreateOrder() {
         // Handle address which could be jsonb or string
         let addressStr = "";
         if (customer.address) {
-          if (typeof customer.address === 'string') {
-            addressStr = customer.address;
-          } else if (typeof customer.address === 'object') {
-            // Try to extract line1 if it exists, otherwise stringify
-            const addrObj = customer.address as any;
-            if (addrObj && typeof addrObj.line1 === 'string') {
-              addressStr = addrObj.line1;
+          try {
+            const rawAddr = customer.address;
+            // If it's a string, try to parse it first
+            const addrObj = typeof rawAddr === 'string' && rawAddr.startsWith('{')
+              ? JSON.parse(rawAddr)
+              : rawAddr;
+
+            if (typeof addrObj === 'object' && addrObj !== null) {
+              // It's an object (or parsed object), look for line1
+              if (addrObj.line1) {
+                addressStr = addrObj.line1;
+              } else {
+                // Fallback: stringify the whole object if no line1
+                addressStr = JSON.stringify(addrObj);
+              }
             } else {
-              addressStr = JSON.stringify(customer.address);
+              // It's a simple string
+              addressStr = String(addrObj);
             }
+          } catch (e) {
+            // If parsing fails, use as is
+            addressStr = String(customer.address);
           }
         }
         setCustomerAddress(addressStr);
@@ -169,16 +181,28 @@ export default function CreateOrder() {
     // Handle address which could be jsonb or string
     let addressStr = "";
     if (customer.address) {
-      if (typeof customer.address === 'string') {
-        addressStr = customer.address;
-      } else if (typeof customer.address === 'object') {
-        // Try to extract line1 if it exists, otherwise stringify
-        const addrObj = customer.address as any;
-        if (addrObj && typeof addrObj.line1 === 'string') {
-          addressStr = addrObj.line1;
+      try {
+        const rawAddr = customer.address;
+        // If it's a string, try to parse it first
+        const addrObj = typeof rawAddr === 'string' && rawAddr.startsWith('{')
+          ? JSON.parse(rawAddr)
+          : rawAddr;
+
+        if (typeof addrObj === 'object' && addrObj !== null) {
+          // It's an object (or parsed object), look for line1
+          if (addrObj.line1) {
+            addressStr = addrObj.line1;
+          } else {
+            // Fallback: stringify the whole object if no line1
+            addressStr = JSON.stringify(addrObj);
+          }
         } else {
-          addressStr = JSON.stringify(customer.address);
+          // It's a simple string
+          addressStr = String(addrObj);
         }
+      } catch (e) {
+        // If parsing fails, use as is
+        addressStr = String(customer.address);
       }
     }
     setCustomerAddress(addressStr);
@@ -206,16 +230,28 @@ export default function CreateOrder() {
         // Handle address which could be jsonb or string
         let addressStr = "";
         if (newCustomer.address) {
-          if (typeof newCustomer.address === 'string') {
-            addressStr = newCustomer.address;
-          } else if (typeof newCustomer.address === 'object') {
-            // Try to extract line1 if it exists, otherwise stringify
-            const addrObj = newCustomer.address as any;
-            if (addrObj && typeof addrObj.line1 === 'string') {
-              addressStr = addrObj.line1;
+          try {
+            const rawAddr = newCustomer.address;
+            // If it's a string, try to parse it first
+            const addrObj = typeof rawAddr === 'string' && rawAddr.startsWith('{')
+              ? JSON.parse(rawAddr)
+              : rawAddr;
+
+            if (typeof addrObj === 'object' && addrObj !== null) {
+              // It's an object (or parsed object), look for line1
+              if (addrObj.line1) {
+                addressStr = addrObj.line1;
+              } else {
+                // Fallback: stringify the whole object if no line1
+                addressStr = JSON.stringify(addrObj);
+              }
             } else {
-              addressStr = JSON.stringify(newCustomer.address);
+              // It's a simple string
+              addressStr = String(addrObj);
             }
+          } catch (e) {
+            // If parsing fails, use as is
+            addressStr = String(newCustomer.address);
           }
         }
         setCustomerAddress(addressStr);
@@ -614,8 +650,8 @@ export default function CreateOrder() {
       paymentStatus: "pending",
       totalAmount: totalAmount.toFixed(2),
       items: selectedServices.map(item => ({
-        productId: item.service.id,
-        productName: item.service.name,
+        serviceId: item.service.id,
+        name: item.service.name,
         quantity: item.quantity,
         // Use the overridden price for this order only
         price: item.priceOverride,

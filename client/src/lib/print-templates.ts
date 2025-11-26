@@ -524,3 +524,136 @@ export function printDashboardSummary(metrics: any) {
     ],
   });
 }
+
+export function generateTagHTML(order: any, items: any[]): string {
+  let tagsHtml = '';
+  items.forEach((item: any) => {
+    const qty = parseInt(String(item.quantity || 1));
+    const itemName = item.productName || item.name || 'Garment';
+
+    for (let i = 1; i <= qty; i++) {
+      tagsHtml += `
+        <div class="tag-wrapper">
+          <div class="brand">FabZClean</div>
+          <div class="meta">${new Date().toLocaleDateString('en-IN')}</div>
+          
+          <div class="customer">${order.customerName?.substring(0, 15) || 'Guest'}</div>
+          
+          <div class="item-box">
+            <div>${itemName}</div>
+            <span class="counter">${i}/${qty}</span>
+          </div>
+
+          ${order.notes ? `<div style="font-size:10px; font-weight:bold; margin-top:5px;">⚠️ ${order.notes}</div>` : ''}
+          
+          <div class="barcode-container">
+            <svg class="barcode"
+              jsbarcode-format="CODE128"
+              jsbarcode-value="${order.orderNumber}"
+              jsbarcode-textmargin="0"
+              jsbarcode-fontoptions="bold"
+              jsbarcode-height="30"
+              jsbarcode-width="1.5"
+              jsbarcode-displayValue="false"
+              jsbarcode-fontSize="10"
+            ></svg>
+          </div>
+          <div class="footer-id">#${order.orderNumber}</div>
+        </div>
+      `;
+    }
+  });
+
+  return `
+  <!DOCTYPE html>
+  <html>
+    <head>
+      <title>Tags #${order.orderNumber}</title>
+      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+      <style>
+        /* RESET & BASICS */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+          font-family: 'Courier New', monospace; 
+          background: white; 
+          width: 58mm; /* Force width for 58mm printers */
+        }
+        
+        /* PRINT SETTINGS */
+        @media print {
+          @page { margin: 0; size: 58mm auto; }
+          body { margin: 0; }
+        }
+
+        /* TAG STYLING */
+        .tag-wrapper {
+          width: 100%;
+          padding: 5px 2px 10px 2px;
+          border-bottom: 2px dashed black; /* Visual cut line */
+          page-break-after: always; /* CRITICAL: Forces printer to cut */
+          text-align: center;
+        }
+
+        .brand { font-size: 16px; font-weight: 900; text-transform: uppercase; margin-bottom: 5px; }
+        .meta { font-size: 10px; margin-bottom: 8px; border-bottom: 1px solid #000; padding-bottom: 4px; }
+        
+        /* ITEM HIGHLIGHT */
+        .item-box {
+          border: 2px solid black;
+          padding: 5px;
+          margin: 5px 0;
+          font-size: 14px;
+          font-weight: bold;
+          background: #fff;
+        }
+
+        .counter {
+          font-size: 24px;
+          font-weight: 900;
+          display: block;
+          margin-top: 2px;
+        }
+
+        .customer { 
+          font-size: 12px; 
+          font-weight: bold; 
+          overflow: hidden; 
+          text-overflow: ellipsis; 
+          white-space: nowrap; 
+          margin-bottom: 5px;
+        }
+
+        .barcode-container {
+          margin-top: 5px;
+          display: flex;
+          justify-content: center;
+        }
+        
+        .barcode {
+          width: 100%;
+          max-width: 180px;
+        }
+
+        .footer-id { font-size: 10px; font-family: sans-serif; margin-top: 2px; }
+      </style>
+    </head>
+    <body>
+      ${tagsHtml}
+      <script>
+        // Initialize barcodes
+        window.onload = () => { 
+          try {
+            JsBarcode(".barcode").init();
+          } catch (e) {
+            console.error("Barcode generation failed", e);
+          }
+          // Small delay to ensure rendering
+          setTimeout(() => {
+            window.print(); 
+          }, 500);
+        };
+      </script>
+    </body>
+  </html>
+`;
+}

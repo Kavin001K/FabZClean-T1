@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { API_BASE_URL } from '../api/axios';
+import { API_BASE as API_BASE_URL } from '../lib/data-service';
 
 interface Employee {
   id: string;

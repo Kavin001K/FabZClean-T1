@@ -7,20 +7,36 @@ router.post('/send', async (req: Request, res: Response) => {
     try {
         const { order, pdfUrl } = req.body;
 
-        if (!order || !pdfUrl) {
-            return res.status(400).json({ error: 'Missing order or pdfUrl' });
+        if (!order) {
+            return res.status(400).json({ error: 'Missing order data' });
         }
+
+        if (!pdfUrl) {
+            console.warn('⚠️ No PDF URL provided, sending text-only message');
+        }
+
+        console.log('📱 WhatsApp API called with:', {
+            phone: order.customerPhone,
+            orderNumber: order.orderNumber,
+            hasPDF: !!pdfUrl
+        });
 
         const success = await whatsappService.sendOrderConfirmation(order, pdfUrl);
 
         if (success) {
-            res.json({ success: true, message: 'WhatsApp message sent' });
+            res.json({ success: true, message: 'WhatsApp message sent successfully' });
         } else {
-            res.status(500).json({ error: 'Failed to send WhatsApp message' });
+            res.status(500).json({
+                error: 'Failed to send WhatsApp message',
+                details: 'Check server logs for more information'
+            });
         }
     } catch (error: any) {
-        console.error('WhatsApp route error:', error);
-        res.status(500).json({ error: error.message });
+        console.error('❌ WhatsApp route error:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: error.message
+        });
     }
 });
 

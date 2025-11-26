@@ -1,6 +1,8 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { createRoot } from 'react-dom/client';
+import React from 'react';
+import InvoiceTemplateIN from '../components/print/invoice-template-in';
 
 export interface PrintSettings {
   pageSize: 'A4' | 'A5' | 'Letter' | 'Legal';
@@ -583,9 +585,8 @@ export class PrintDriver {
     }
 
     try {
-      // Import the InvoiceTemplateIN component dynamically
-      const { default: InvoiceTemplateIN } = await import('../components/print/invoice-template-in');
-      const React = await import('react');
+      console.log('🚀 Starting invoice generation...');
+      console.log('📦 Invoice data:', data);
 
       // Convert InvoicePrintData to InvoiceData format expected by the template
       const invoiceData = {
@@ -623,6 +624,8 @@ export class PrintDriver {
         status: data.status
       };
 
+      console.log('✅ Invoice data prepared');
+
       // Create a temporary container for rendering
       const container = document.createElement('div');
       container.style.position = 'absolute';
@@ -632,15 +635,20 @@ export class PrintDriver {
       container.style.background = 'white';
       document.body.appendChild(container);
 
+      console.log('📄 Rendering React component...');
+
       // Render the React component
       const root = createRoot(container);
       await new Promise<void>((resolve) => {
         root.render(React.createElement(InvoiceTemplateIN, { data: invoiceData }));
         // Wait for rendering and any images to load
-        setTimeout(resolve, 1000);
+        setTimeout(resolve, 1500); // Increased timeout
       });
 
+      console.log('✅ React component rendered');
+
       // Convert to PDF using html2canvas
+      console.log('🎨 Starting html2canvas...');
       const canvas = await html2canvas(container, {
         scale: 2,
         useCORS: true,
@@ -650,6 +658,7 @@ export class PrintDriver {
         windowWidth: 794, // A4 width in pixels at 96 DPI
         windowHeight: 1123 // A4 height in pixels at 96 DPI
       });
+      console.log('✅ html2canvas completed');
 
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
@@ -680,18 +689,20 @@ export class PrintDriver {
       root.unmount();
       document.body.removeChild(container);
 
-      // Get PDF as blob for upload
+      // Get PDF as blob
       const pdfBlob = pdf.output('blob');
       const filename = `invoice-${data.invoiceNumber}-${Date.now()}.pdf`;
 
-      // Save to server
-      await this.savePDFToServer(pdfBlob, filename, {
+      console.log('💾 Saving PDF to server...');
+
+      // Save to server in background (don't wait for it)
+      this.savePDFToServer(pdfBlob, filename, {
         type: 'invoice',
         invoiceNumber: data.invoiceNumber,
         orderNumber: data.orderNumber,
         customerName: data.customerInfo.name,
         amount: data.total,
-        status: data.paymentStatus || 'pending',
+        status: data.paymentStatus || 'sent',
         metadata: {
           invoiceDate: data.invoiceDate,
           dueDate: data.dueDate,
@@ -700,15 +711,18 @@ export class PrintDriver {
           tax: data.tax,
           total: data.total
         }
+      }).catch(err => {
+        console.warn('⚠️ Server upload failed (PDF still downloaded):', err);
       });
 
-      // Also trigger download for user
+      // Trigger download for user
       pdf.save(filename);
 
-      console.log(`Invoice ${data.invoiceNumber} saved to server successfully`);
+      console.log(`✅ Invoice ${data.invoiceNumber} generated and downloaded successfully!`);
     } catch (error) {
-      console.error('Error generating invoice PDF:', error);
-      throw new Error('Failed to generate invoice PDF');
+      console.error('❌ Error generating invoice PDF:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      throw error; // Re-throw the actual error for better debugging
     }
   }
 

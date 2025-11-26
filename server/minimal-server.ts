@@ -43,15 +43,12 @@ app.get('/api/test', (req, res) => {
   const isProduction = process.env.NODE_ENV === "production" || !!process.env.RENDER;
 
   // Create HTTP server
-  // In development: Use standard HTTP server (Vite handles WebSocket for HMR)
-  // In production: Use WebSocket-enabled server for real-time features
-  const server = isProduction
-    ? realtimeServer.createServer(app)
-    : createServer(app);
+  // Always use WebSocket-enabled server for real-time features
+  const server = realtimeServer.createServer(app);
 
-  if (!isProduction) {
-    log("⚠️  Backend WebSocket disabled in development (using Supabase Realtime only)");
-  }
+  // if (!isProduction) {
+  //   log("⚠️  Backend WebSocket disabled in development (using Supabase Realtime only)");
+  // }
 
   // importantly only setup vite in development and BEFORE
   // registering routes so Vite middleware can handle module requests
