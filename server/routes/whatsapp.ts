@@ -5,10 +5,13 @@ const router = express.Router();
 
 router.post('/send', async (req: Request, res: Response) => {
     try {
+        console.log('📨 [WhatsApp Route] Received request body:', JSON.stringify(req.body, null, 2));
+
         const { order, pdfUrl } = req.body;
 
         if (!order) {
-            return res.status(400).json({ error: 'Missing order data' });
+            console.error('❌ [WhatsApp Route] Missing order object in request body');
+            return res.status(400).json({ error: 'Missing order data', receivedBody: req.body });
         }
 
         if (!pdfUrl) {

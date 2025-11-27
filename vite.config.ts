@@ -41,7 +41,6 @@ export default defineConfig({
     drop: ['console', 'debugger'],
   },
   server: {
-    port: 5000, // Frontend runs on 5000
     fs: {
       strict: false,
     },
@@ -50,20 +49,8 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
     hmr: {
-      clientPort: 5000, // Force HMR to use the frontend port, not the backend
+      // clientPort: 5000, // Removed to allow auto-detection (should match window.location.port)
     },
-    proxy: {
-      '/api': {
-        target: 'http://localhost:5001', // Backend is on 5001
-        changeOrigin: true,
-        secure: false,
-      },
-      // WebSocket proxy for backend real-time connections
-      '/ws': {
-        target: 'ws://localhost:5001',
-        ws: true,
-        changeOrigin: true,
-      },
-    },
+    // Proxy is not needed in middleware mode as Express handles API routes
   },
 });

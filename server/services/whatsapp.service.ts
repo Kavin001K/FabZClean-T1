@@ -44,70 +44,43 @@ export class WhatsAppService {
     }
 
     async sendOrderConfirmation(order: any, pdfUrl: string) {
-        // 1. Validate Configuration
-        if (!this.baseUrl || !this.apiKey || !this.instanceId) {
-            console.warn('⚠️ [WhatsApp] API not configured properly. Check .env');
+        // 1. Validate Config
+        if (!this.baseUrl || !this.apiKey) {
+            console.warn('⚠️ WhatsApp API not configured');
             return false;
         }
 
         try {
-            // 2. Prepare Data
-            const customerName = order.customerName || 'Customer';
-            const orderId = order.orderNumber || order.id || 'N/A';
-            const amount = order.totalAmount || 0;
-            const phone = order.customerPhone || order.phone || '';
+            console.log(`📱 Preparing WhatsApp for ${order.customerPhone}`);
 
-            if (!phone) {
-                console.warn('⚠️ [WhatsApp] No phone number provided.');
-                return false;
-            }
+            // 2. Fix the URL (CRITICAL STEP)
+            // If on Render, this environment variable will be set.
+            // If on Localhost, you MUST use ngrok for this to work.
+            const appUrl = process.env.PUBLIC_URL || 'http://localhost:5001';
 
-            // 3. Create the Message Caption
-            const message = `👋 Hello *${customerName}*!
-
-Order *${orderId}* Created! 
-💰 Amount: ₹${amount}
-📄 Bill: The PDF is attached to this message.
-
-Thank you for choosing *FabZClean*! ✨`;
-
-            // 4. Construct the API Request
-            const params = new URLSearchParams();
-            // Clean phone number
-            const cleanPhone = phone.replace(/[\s\+\-\(\)]/g, '');
-            const formattedPhone = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
-
-            // Ensure pdfUrl is a complete, public link
-            const publicBaseUrl = process.env.PUBLIC_URL || 'http://localhost:5001';
-            let finalMediaUrl = pdfUrl;
-
+            // If the pdfUrl is relative (e.g., "/uploads/..."), make it absolute
+            let finalPdfUrl = pdfUrl;
             if (pdfUrl && !pdfUrl.startsWith('http')) {
-                // If pdfUrl is relative (e.g., /uploads/...), prepend the domain
-                finalMediaUrl = `${publicBaseUrl}${pdfUrl.startsWith('/') ? '' : '/'}${pdfUrl}`;
+                finalPdfUrl = `${appUrl}${pdfUrl.startsWith('/') ? '' : '/'}${pdfUrl}`;
             }
 
-            console.log(`🔗 Generated Public PDF Link: ${finalMediaUrl}`);
-
-            params.append('number', formattedPhone);
-            params.append('type', 'media'); // Required for PDF
-            params.append('message', message);
-            params.append('media_url', finalMediaUrl); // MUST be a public URL
-            params.append('filename', `Bill-${orderId}.pdf`);
+            // 3. Prepare Parameters
+            const params = new URLSearchParams();
+            params.append('number', order.customerPhone);
+            params.append('type', 'media');
+            params.append('message', `Hello ${order.customerName}! Your order #${order.orderNumber} is confirmed. Amount: ₹${order.totalAmount}`);
+            params.append('media_url', finalPdfUrl); // <--- Must be a public URL!
+            params.append('filename', `Invoice-${order.orderNumber}.pdf`);
             params.append('instance_id', this.instanceId);
             params.append('access_token', this.apiKey);
 
-            console.log(`📱 [WhatsApp] Sending Bill PDF to ${formattedPhone}...`);
-
-            if (finalMediaUrl.includes('localhost') || finalMediaUrl.includes('127.0.0.1')) {
-                console.warn('⚠️ [WhatsApp] WARNING: pdfUrl contains "localhost". The WhatsApp API will likely FAIL to download this file.');
-                console.warn('👉 Use ngrok or a public URL for development: npm install -g ngrok && ngrok http 5001');
-            }
-
-            // 5. Send with Retry
-            return await this.sendWithRetry(params);
+            // 4. Send
+            const response = await axios.post(`${this.baseUrl}/send`, params);
+            console.log('✅ WhatsApp API Response:', response.data);
+            return true;
 
         } catch (error: any) {
-            console.error('❌ [WhatsApp] Error preparing message:', error.message);
+            console.error('❌ WhatsApp Failed:', error.message);
             return false;
         }
     }

@@ -78,49 +78,48 @@ export function OrderConfirmationDialog({
     const totalAmount = getTotalAmount();
 
     // Generate barcode and QR code with 300ms timeout
+    // Generate barcode and QR code with 300ms timeout
     useEffect(() => {
-        if (open && order) {
-            // Add delay to ensure DOM is ready and animation is complete
-            const timer = setTimeout(() => {
-                if (barcodeRef.current) {
-                    try {
-                        JsBarcode(barcodeRef.current, order.orderNumber, {
-                            format: "CODE128",
-                            width: 1.5,
-                            height: 40,
-                            displayValue: true,
-                            fontSize: 12,
-                            margin: 0,
-                            background: "transparent"
-                        });
-                    } catch (e) {
-                        console.error("Barcode generation failed:", e);
-                    }
+        if (!open || !order) return;
+
+        // WAIT 300ms for the dialog animation to finish
+        const timer = setTimeout(() => {
+            // Generate Barcode
+            if (barcodeRef.current && order.orderNumber) {
+                try {
+                    JsBarcode(barcodeRef.current, order.orderNumber, {
+                        format: "CODE128",
+                        width: 2,
+                        height: 60,
+                        displayValue: true,
+                        background: "transparent"
+                    });
+                } catch (e) {
+                    console.error("Barcode error:", e);
                 }
+            }
 
-                if (qrcodeRef.current) {
-                    try {
-                        // Generate UPI QR Code
-                        // Format: upi://pay?pa=UPI_ID&pn=NAME&am=AMOUNT&tr=REF_ID&tn=NOTE
-                        const upiId = "8825702072@okbizaxis";
-                        const upiUrl = `upi://pay?pa=${upiId}&pn=FabZClean&am=${totalAmount}&tr=${order.orderNumber}&tn=Order-${order.orderNumber}`;
+            // Generate UPI QR Code
+            if (qrcodeRef.current) {
+                try {
+                    const upiId = "8825702072@okbizaxis";
+                    const upiUrl = `upi://pay?pa=${upiId}&pn=FabZClean&am=${totalAmount}&tr=${order.orderNumber}&tn=Order-${order.orderNumber}`;
 
-                        QRCode.toCanvas(qrcodeRef.current, upiUrl, {
-                            width: 100,
-                            margin: 0,
-                            color: {
-                                dark: '#000000',
-                                light: '#ffffff'
-                            }
-                        });
-                    } catch (e) {
-                        console.error("QR Code generation failed:", e);
-                    }
+                    QRCode.toCanvas(qrcodeRef.current, upiUrl, {
+                        width: 100,
+                        margin: 0,
+                        color: {
+                            dark: '#000000',
+                            light: '#ffffff'
+                        }
+                    });
+                } catch (e) {
+                    console.error("QR Code generation failed:", e);
                 }
-            }, 300); // 300ms delay for animation
+            }
+        }, 300);
 
-            return () => clearTimeout(timer);
-        }
+        return () => clearTimeout(timer);
     }, [open, order, totalAmount]);
 
     // Auto-send WhatsApp when dialog opens
