@@ -1,89 +1,76 @@
-import axios from 'axios';
-import dotenv from 'dotenv';
+import twilio from 'twilio';
 
-dotenv.config();
+// Load config from .env
+const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const API_KEY = process.env.TWILIO_API_KEY;
+const API_SECRET = process.env.TWILIO_API_SECRET;
+const FROM_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || '+14155238886';
 
-export class WhatsAppService {
-    private baseUrl: string;
-    private apiKey: string;
-    private instanceId: string;
+export class WhatsappService {
+    private static client: any;
 
-    constructor() {
-        this.baseUrl = process.env.EXTERNAL_API_BASE_URL || '';
-        this.apiKey = process.env.EXTERNAL_API_KEY || '';
-        this.instanceId = process.env.WA_INSTANCE_ID || '';
-
-        if (!this.baseUrl) {
-            console.warn('⚠️ [WhatsApp] EXTERNAL_API_BASE_URL is not set in .env');
+    private static getClient() {
+        if (!this.client) {
+            if (!ACCOUNT_SID || !API_KEY || !API_SECRET) {
+                console.error('❌ Twilio credentials missing in .env');
+                return null;
+            }
+            // Authenticate with API Key & Secret, linked to Account SID
+            this.client = twilio(API_KEY, API_SECRET, { accountSid: ACCOUNT_SID });
         }
+        return this.client;
     }
 
-    private async sendWithRetry(params: URLSearchParams, attempt = 1, maxAttempts = 3): Promise<boolean> {
+    static formatNumber(phone: string): string {
+        let cleaned = phone.replace(/\D/g, '');
+        if (cleaned.length === 10) cleaned = '91' + cleaned;
+        return `whatsapp:+${cleaned}`;
+    }
+
+    static async sendMessage(to: string, message: string): Promise<boolean> {
+        const client = this.getClient();
+        if (!client) return false;
+
         try {
-            const response = await axios.post(`${this.baseUrl}/send`, params);
+            const formattedTo = this.formatNumber(to);
+            const formattedFrom = `whatsapp:${FROM_NUMBER}`;
+            console.log(`📨 Sending to ${formattedTo}...`);
 
-            if (response.data && response.data.status === 'error') {
-                console.error(`❌ [WhatsApp] API Provider Error (Attempt ${attempt}):`, response.data.message);
-                return false;
-            }
-
-            console.log('✅ [WhatsApp] Message sent successfully!');
+            const response = await client.messages.create({
+                body: message,
+                from: formattedFrom,
+                to: formattedTo
+            });
+            console.log(`✅ Sent! SID: ${response.sid}`);
             return true;
         } catch (error: any) {
-            console.error(`❌ [WhatsApp] Network Error (Attempt ${attempt}/${maxAttempts}):`, error.message);
-
-            if (attempt < maxAttempts) {
-                const delay = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
-                console.log(`⏳ Retrying in ${delay}ms...`);
-                await new Promise(resolve => setTimeout(resolve, delay));
-                return this.sendWithRetry(params, attempt + 1, maxAttempts);
-            }
-
+            console.error('❌ Twilio Error:', error.message);
             return false;
         }
     }
 
-    async sendOrderConfirmation(order: any, pdfUrl: string) {
-        // 1. Validate Config
-        if (!this.baseUrl || !this.apiKey) {
-            console.warn('⚠️ WhatsApp API not configured');
-            return false;
-        }
+    static async sendPdf(to: string, pdfUrl: string, filename: string, caption?: string): Promise<boolean> {
+        const client = this.getClient();
+        if (!client) return false;
 
         try {
-            console.log(`📱 Preparing WhatsApp for ${order.customerPhone}`);
+            const formattedTo = this.formatNumber(to);
+            const formattedFrom = `whatsapp:${FROM_NUMBER}`;
+            console.log(`📄 Sending PDF to ${formattedTo}...`);
 
-            // 2. Fix the URL (CRITICAL STEP)
-            // If on Render, this environment variable will be set.
-            // If on Localhost, you MUST use ngrok for this to work.
-            const appUrl = process.env.PUBLIC_URL || 'http://localhost:5001';
-
-            // If the pdfUrl is relative (e.g., "/uploads/..."), make it absolute
-            let finalPdfUrl = pdfUrl;
-            if (pdfUrl && !pdfUrl.startsWith('http')) {
-                finalPdfUrl = `${appUrl}${pdfUrl.startsWith('/') ? '' : '/'}${pdfUrl}`;
-            }
-
-            // 3. Prepare Parameters
-            const params = new URLSearchParams();
-            params.append('number', order.customerPhone);
-            params.append('type', 'media');
-            params.append('message', `Hello ${order.customerName}! Your order #${order.orderNumber} is confirmed. Amount: ₹${order.totalAmount}`);
-            params.append('media_url', finalPdfUrl); // <--- Must be a public URL!
-            params.append('filename', `Invoice-${order.orderNumber}.pdf`);
-            params.append('instance_id', this.instanceId);
-            params.append('access_token', this.apiKey);
-
-            // 4. Send
-            const response = await axios.post(`${this.baseUrl}/send`, params);
-            console.log('✅ WhatsApp API Response:', response.data);
+            const response = await client.messages.create({
+                body: caption || 'Invoice attached.',
+                from: formattedFrom,
+                to: formattedTo,
+                mediaUrl: [pdfUrl]
+            });
+            console.log(`✅ PDF Sent! SID: ${response.sid}`);
             return true;
-
         } catch (error: any) {
-            console.error('❌ WhatsApp Failed:', error.message);
+            console.error('❌ Twilio Media Error:', error.message);
             return false;
         }
     }
 }
 
-export const whatsappService = new WhatsAppService();
+export const whatsappService = new WhatsappService();
