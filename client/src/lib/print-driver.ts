@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { createRoot } from 'react-dom/client';
 import React from 'react';
+import * as QRCode from 'qrcode';
 import InvoiceTemplateIN from '../components/print/invoice-template-in';
 
 export interface PrintSettings {
@@ -174,6 +175,7 @@ export interface InvoicePrintData {
   notes?: string;
   terms?: string;
   status?: string;
+  qrCode?: string;
 }
 
 // Utility function to convert Order data to InvoicePrintData
@@ -591,6 +593,17 @@ export class PrintDriver {
       console.log('🚀 Starting invoice generation flow...');
       console.log('📦 Invoice data:', data);
 
+      // Generate QR Code for UPI Payment
+      let qrCodeDataUrl: string | undefined = undefined;
+      try {
+        // Use the UPI ID from existing code
+        const upiId = "8825702072@okbizaxis";
+        const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(data.companyInfo.name)}&am=${data.total}&cu=INR`;
+        qrCodeDataUrl = await QRCode.toDataURL(upiUrl);
+      } catch (e) {
+        console.error("Failed to generate QR code", e);
+      }
+
       // 1. Prepare Data
       const invoiceData = {
         invoiceNumber: data.invoiceNumber,
@@ -602,7 +615,7 @@ export class PrintDriver {
           phone: data.companyInfo.phone,
           email: data.companyInfo.email,
           taxId: data.companyInfo.taxId || 'GSTIN-NOT-PROVIDED',
-          logo: undefined
+          logo: '/assets/logo.webp'
         },
         customer: {
           name: data.customerInfo.name,
@@ -624,7 +637,8 @@ export class PrintDriver {
         total: data.total,
         paymentTerms: data.terms || 'Payment due within 30 days',
         notes: data.notes,
-        status: data.status
+        status: data.status,
+        qrCode: qrCodeDataUrl
       };
 
       console.log('✅ Data prepared');
@@ -679,7 +693,7 @@ export class PrintDriver {
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
 
-      while (heightLeft > 0) {
+      while (heightLeft > 5) { // Add 5mm tolerance to prevent blank pages from rounding errors
         position = heightLeft - imgHeight;
         pdf.addPage();
         pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);

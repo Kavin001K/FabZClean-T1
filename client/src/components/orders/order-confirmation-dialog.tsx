@@ -205,6 +205,22 @@ export function OrderConfirmationDialog({
             const { convertOrderToInvoiceData } = await import('@/lib/print-driver');
             const invoiceData = convertOrderToInvoiceData(order);
 
+            // Generate QR Code for PDF
+            try {
+                // Dynamic import for QRCode
+                const QRCodeModule = await import('qrcode');
+                // Handle both ES module and CommonJS
+                const toDataURL = QRCodeModule.toDataURL || (QRCodeModule.default && QRCodeModule.default.toDataURL);
+
+                if (toDataURL) {
+                    const upiId = "8825702072@okbizaxis";
+                    const upiUrl = `upi://pay?pa=${upiId}&pn=FabZClean&am=${totalAmount}&cu=INR`;
+                    invoiceData.qrCode = await toDataURL(upiUrl);
+                }
+            } catch (e) {
+                console.error("QR gen failed for PDF", e);
+            }
+
             // Generate PDF and get the uploaded document info
             const pdfBlob = await generatePDFBlob(invoiceData);
 

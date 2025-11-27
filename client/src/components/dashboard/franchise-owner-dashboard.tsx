@@ -63,6 +63,10 @@ export default React.memo(function FranchiseOwnerDashboard() {
     dueTodayOrders,
     customers,
     ordersTodayCount,
+    revenueToday,
+    ordersCompletedToday,
+    pendingOrdersCount,
+    newCustomersToday,
     isLoading,
     hasData,
     lastUpdated,
@@ -98,7 +102,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
         phone: quickActionForms.customer.phone,
         email: quickActionForms.customer.email || undefined,
         joinDate: new Date().toISOString(),
-        totalSpent: 0,
+        totalSpent: '0',
         loyaltyPoints: 0
       };
 
@@ -143,10 +147,10 @@ export default React.memo(function FranchiseOwnerDashboard() {
         customerEmail: undefined,
         serviceId: quickActionForms.order.service,
         quantity: quickActionForms.order.quantity,
-        pickupDate: quickActionForms.order.pickupDate,
-        status: 'pending',
-        paymentStatus: 'pending',
-        totalAmount: 0, // Will be calculated by server
+        pickupDate: new Date(quickActionForms.order.pickupDate),
+        status: 'pending' as const,
+        paymentStatus: 'pending' as const,
+        totalAmount: '0', // Will be calculated by server
         orderNumber: `ORD-${Date.now()}`
       };
 
@@ -186,14 +190,20 @@ export default React.memo(function FranchiseOwnerDashboard() {
 
     setIsSubmittingEmployee(true);
     try {
+      const [firstName, ...lastNameParts] = quickActionForms.employee.name.split(' ');
+      const lastName = lastNameParts.join(' ') || 'Unknown';
+
       const employeeData = {
-        name: quickActionForms.employee.name,
+        firstName,
+        lastName,
+        employeeId: `EMP-${Date.now()}`, // Generate ID
+        department: 'Operations', // Default department
         phone: quickActionForms.employee.phone,
         email: quickActionForms.employee.email,
         position: quickActionForms.employee.position,
         salary: parseFloat(quickActionForms.employee.salary).toString(),
-        joinDate: new Date().toISOString(),
-        status: 'active'
+        hireDate: new Date(),
+        status: 'active' as const
       };
 
       const newEmployee = await employeesApi.create(employeeData);
@@ -201,7 +211,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
       if (newEmployee) {
         toast({
           title: "Success!",
-          description: `Employee ${newEmployee.name} has been created successfully.`,
+          description: `Employee ${newEmployee.firstName} ${newEmployee.lastName} has been created successfully.`,
         });
 
         // Refresh dashboard data and employees list
@@ -304,7 +314,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
                   </Avatar>
                   <span className="text-sm">{customer.name || 'Unknown Customer'}</span>
                   <span className="text-xs text-muted-foreground">
-                    {formatCurrency(customer.totalSpent)}
+                    {formatCurrency(parseFloat(customer.totalSpent || '0'))}
                   </span>
                 </div>
               ))}
@@ -817,7 +827,6 @@ export default React.memo(function FranchiseOwnerDashboard() {
               >
                 <OrderStatusChart
                   data={orderStatusData}
-                  isLoading={isLoading}
                 />
               </motion.div>
 
@@ -829,7 +838,6 @@ export default React.memo(function FranchiseOwnerDashboard() {
               >
                 <ServicePopularityChart
                   data={servicePopularityData}
-                  isLoading={isLoading}
                 />
               </motion.div>
             </div>
@@ -895,7 +903,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
                           animate={{ scale: 1 }}
                           transition={{ type: "spring", stiffness: 200, delay: 0.7 }}
                         >
-                          {Math.floor(metrics.totalOrders / 30)}
+                          {ordersTodayCount}
                         </motion.div>
                         <div className="text-sm opacity-90">Orders Today</div>
                       </motion.div>
@@ -909,7 +917,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
                           animate={{ scale: 1 }}
                           transition={{ type: "spring", stiffness: 200, delay: 0.8 }}
                         >
-                          ₹{Math.floor(metrics.totalRevenue / 30).toLocaleString()}
+                          {formatCurrency(revenueToday)}
                         </motion.div>
                         <div className="text-sm opacity-90">Revenue Today</div>
                       </motion.div>
@@ -924,7 +932,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
                       >
                         <span className="text-sm text-muted-foreground">Orders Completed</span>
                         <span className="text-sm font-semibold text-success">
-                          {Math.floor(metrics.totalOrders * 0.85)}
+                          {ordersCompletedToday}
                         </span>
                       </motion.div>
                       <motion.div
@@ -935,7 +943,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
                       >
                         <span className="text-sm text-muted-foreground">Pending Orders</span>
                         <span className="text-sm font-semibold text-warning">
-                          {Math.floor(metrics.totalOrders * 0.15)}
+                          {pendingOrdersCount}
                         </span>
                       </motion.div>
                       <motion.div
@@ -946,7 +954,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
                       >
                         <span className="text-sm text-muted-foreground">New Customers</span>
                         <span className="text-sm font-semibold text-primary">
-                          {Math.floor(metrics.newCustomers / 30)}
+                          {newCustomersToday}
                         </span>
                       </motion.div>
                     </div>

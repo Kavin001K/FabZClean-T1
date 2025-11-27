@@ -3,22 +3,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Users, 
-  Clock, 
-  TrendingUp, 
-  AlertTriangle, 
-  CheckCircle, 
+import {
+  Users,
+  Clock,
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle,
   MapPin,
   Truck,
   DollarSign,
   BarChart3,
-  Calendar,
+  Calendar as CalendarIcon,
   User,
   Phone,
   Mail,
   Eye
 } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { formatCurrency, formatNumber } from "@/lib/data";
 import EmployeeManagement from "@/components/employee-management";
 import AttendanceTracker from "@/components/attendance-tracker";
@@ -176,14 +180,30 @@ export default function FranchiseDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-3 py-2 border rounded-md"
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "w-[240px] justify-start text-left font-normal",
+                  !selectedDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {selectedDate ? format(new Date(selectedDate), "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={selectedDate ? new Date(selectedDate) : undefined}
+                onSelect={(date) => setSelectedDate(date ? date.toISOString().split('T')[0] : '')}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
           <Button>
-            <Calendar className="w-4 h-4 mr-2" />
+            <CalendarIcon className="w-4 h-4 mr-2" />
             Export Report
           </Button>
         </div>
@@ -270,7 +290,7 @@ export default function FranchiseDashboard() {
                   </div>
                   <span className="font-bold text-green-600">{attendanceStats.present}</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-yellow-600" />
@@ -278,7 +298,7 @@ export default function FranchiseDashboard() {
                   </div>
                   <span className="font-bold text-yellow-600">{attendanceStats.late}</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-red-600" />
@@ -306,7 +326,7 @@ export default function FranchiseDashboard() {
               <CardContent>
                 <div className="space-y-3">
                   {attendanceData.map((employee) => (
-                    <div 
+                    <div
                       key={employee.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                     >
@@ -327,7 +347,7 @@ export default function FranchiseDashboard() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-4">
                         <div className="text-right">
                           {employee.checkIn && (
@@ -344,14 +364,14 @@ export default function FranchiseDashboard() {
                             {employee.totalHours}h worked
                           </p>
                         </div>
-                        
+
                         <div className="flex items-center gap-2">
                           {getStatusIcon(employee.status)}
                           <Badge className={getStatusColor(employee.status)}>
                             {employee.status ? employee.status.replace('_', ' ') : 'Unknown'}
                           </Badge>
                         </div>
-                        
+
                         <Button variant="outline" size="sm">
                           <Eye className="w-4 h-4" />
                         </Button>

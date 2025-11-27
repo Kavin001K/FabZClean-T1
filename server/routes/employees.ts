@@ -74,8 +74,13 @@ router.post(
                 return res.status(400).json({ error: 'Password must be at least 8 characters long' });
             }
 
-            if (!['admin', 'franchise_manager', 'factory_manager', 'employee', 'driver'].includes(role)) {
-                return res.status(400).json({ error: 'Invalid role' });
+            // Replace the hardcoded array with a robust check
+            const ALLOWED_ROLES = ['admin', 'franchise_manager', 'factory_manager', 'employee', 'driver'] as const;
+
+            if (!ALLOWED_ROLES.includes(role as any)) {
+                return res.status(400).json({
+                    error: `Invalid role. Must be one of: ${ALLOWED_ROLES.join(', ')}`
+                });
             }
 
             // Franchise managers can only create factory managers for their franchise

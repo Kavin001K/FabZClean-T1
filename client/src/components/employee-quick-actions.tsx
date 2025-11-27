@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
 import {
   Clock,
-  Calendar,
+  Calendar as CalendarIcon,
   Timer,
   FileText,
   User,
@@ -22,6 +22,10 @@ import {
   AlertCircle,
   Zap
 } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface EmployeeQuickActionsProps {
   employeeId: string;
@@ -244,12 +248,12 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
       label: currentStatus === 'checked_out' ? "Clock In" : currentStatus === 'on_break' ? "End Break" : "Clock Out",
       icon: Clock,
       action: () => setIsClockDialogOpen(true),
-      variant: currentStatus === 'checked_in' ? "destructive" : "default" as const,
+      variant: (currentStatus === 'checked_in' ? "destructive" : "default") as "destructive" | "default",
       badge: currentStatus !== 'checked_out' ? getCurrentTimeDisplay() : undefined
     },
     {
       label: "Request Time Off",
-      icon: Calendar,
+      icon: CalendarIcon,
       action: () => setIsTimeOffDialogOpen(true),
       variant: "outline" as const
     },
@@ -346,7 +350,7 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
               <Button onClick={handleClockAction} className="flex-1">
                 {currentStatus === 'checked_out' ? 'Clock In' : 'Clock Out'}
               </Button>
-              {currentStatus === 'checked_in' && (
+              {(currentStatus === 'checked_in' || currentStatus === 'on_break') && (
                 <Button variant="outline" onClick={handleBreakAction}>
                   {currentStatus === 'on_break' ? 'End Break' : 'Start Break'}
                 </Button>
@@ -361,7 +365,7 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
+              <CalendarIcon className="w-5 h-5" />
               Request Time Off
             </DialogTitle>
             <DialogDescription>
@@ -371,22 +375,54 @@ export default function EmployeeQuickActions({ employeeId, employeeName }: Emplo
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startDate">Start Date</Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={timeOffForm.startDate}
-                  onChange={(e) => setTimeOffForm({ ...timeOffForm, startDate: e.target.value })}
-                />
+                <Label>Start Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !timeOffForm.startDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {timeOffForm.startDate ? format(new Date(timeOffForm.startDate), "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={timeOffForm.startDate ? new Date(timeOffForm.startDate) : undefined}
+                      onSelect={(date) => setTimeOffForm({ ...timeOffForm, startDate: date ? date.toISOString().split('T')[0] : '' })}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="endDate">End Date</Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={timeOffForm.endDate}
-                  onChange={(e) => setTimeOffForm({ ...timeOffForm, endDate: e.target.value })}
-                />
+                <Label>End Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !timeOffForm.endDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {timeOffForm.endDate ? format(new Date(timeOffForm.endDate), "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={timeOffForm.endDate ? new Date(timeOffForm.endDate) : undefined}
+                      onSelect={(date) => setTimeOffForm({ ...timeOffForm, endDate: date ? date.toISOString().split('T')[0] : '' })}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 

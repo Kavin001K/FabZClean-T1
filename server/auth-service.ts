@@ -12,7 +12,13 @@ const supabase = createClient(
     supabaseKey || 'placeholder'
 );
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'fabzclean-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
+    throw new Error("FATAL: JWT_SECRET is not set in environment variables. Authentication is insecure.");
+}
+
+const FINAL_SECRET = JWT_SECRET || process.env.SESSION_SECRET || 'fabzclean-secret-key-change-in-production';
 const JWT_EXPIRY = '30d'; // 30 days - long session for better UX
 
 export interface EmployeeJWTPayload {
@@ -80,7 +86,7 @@ export class AuthService {
                     role: authEmployee.role,
                 };
 
-                const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+                const token = jwt.sign(payload, FINAL_SECRET, { expiresIn: JWT_EXPIRY });
 
                 return { token, employee: authEmployee };
             }
@@ -90,63 +96,81 @@ export class AuthService {
         }
 
         // 2. Fallback to Supabase Auth (Original Logic)
-        // Fetch employee by username or email
-        const { data: employees, error } = await supabase
-            .from('auth_employees')
-            .select('*')
-            .or(`username.eq."${username}",email.eq."${username}"`);
+        try {
+            // Fetch employee by username or email
+            const { data: employees, error } = await supabase
+                .from('auth_employees')
+                .select('*')
+                .or(`username.eq."${username}",email.eq."${username}"`);
 
-        const emp = employees?.[0];
+            const emp = employees?.[0];
 
-        if (error || !emp) {
-            throw new Error('Invalid username or password');
+            if (error || !emp) {
+                throw new Error('Invalid username or password');
+            }
+
+            // Check if account is active
+            if (!emp.is_active) {
+                throw new Error('Account is inactive');
+            }
+
+            // Verify password
+            const isValidPassword = await bcrypt.compare(password, emp.password_hash);
+            if (!isValidPassword) {
+                throw new Error('Invalid username or password');
+            }
+
+            // Update last login
+            await supabase
+                .from('auth_employees')
+                .update({ last_login: new Date().toISOString() })
+                .eq('id', emp.id);
+
+            // Log login action
+            await this.logAction(emp.employee_id, emp.username, 'login', null, null, {}, ipAddress);
+
+            // Generate JWT
+            const payload: EmployeeJWTPayload = {
+                employeeId: emp.employee_id,
+                username: emp.username,
+                role: emp.role,
+                franchiseId: emp.franchise_id,
+                factoryId: emp.factory_id,
+            };
+
+            const token = jwt.sign(payload, FINAL_SECRET, { expiresIn: JWT_EXPIRY });
+
+            const employee: AuthEmployee = {
+                id: emp.id,
+                employeeId: emp.employee_id,
+                username: emp.username,
+                role: emp.role,
+                franchiseId: emp.franchise_id,
+                factoryId: emp.factory_id,
+                fullName: emp.full_name,
+                email: emp.email,
+                phone: emp.phone,
+                isActive: emp.is_active,
+            };
+
+            return { token, employee };
+        } catch (err: any) {
+            // Log failed login attempts
+            try {
+                await this.logAction(
+                    'system',
+                    username,
+                    'login_failed',
+                    'auth',
+                    null,
+                    { error: err.message, ip: ipAddress },
+                    ipAddress
+                );
+            } catch (logError) {
+                // Ignore logging errors to prevent crash
+            }
+            throw err;
         }
-
-        // Check if account is active
-        if (!emp.is_active) {
-            throw new Error('Account is inactive');
-        }
-
-        // Verify password
-        const isValidPassword = await bcrypt.compare(password, emp.password_hash);
-        if (!isValidPassword) {
-            throw new Error('Invalid username or password');
-        }
-
-        // Update last login
-        await supabase
-            .from('auth_employees')
-            .update({ last_login: new Date().toISOString() })
-            .eq('id', emp.id);
-
-        // Log login action
-        await this.logAction(emp.employee_id, emp.username, 'login', null, null, {}, ipAddress);
-
-        // Generate JWT
-        const payload: EmployeeJWTPayload = {
-            employeeId: emp.employee_id,
-            username: emp.username,
-            role: emp.role,
-            franchiseId: emp.franchise_id,
-            factoryId: emp.factory_id,
-        };
-
-        const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY });
-
-        const employee: AuthEmployee = {
-            id: emp.id,
-            employeeId: emp.employee_id,
-            username: emp.username,
-            role: emp.role,
-            franchiseId: emp.franchise_id,
-            factoryId: emp.factory_id,
-            fullName: emp.full_name,
-            email: emp.email,
-            phone: emp.phone,
-            isActive: emp.is_active,
-        };
-
-        return { token, employee };
     }
 
     /**
@@ -154,7 +178,7 @@ export class AuthService {
      */
     static async verifyToken(token: string): Promise<EmployeeJWTPayload> {
         try {
-            const payload = jwt.verify(token, JWT_SECRET) as EmployeeJWTPayload;
+            const payload = jwt.verify(token, FINAL_SECRET) as EmployeeJWTPayload;
 
             // 1. Check Local Storage first
             try {

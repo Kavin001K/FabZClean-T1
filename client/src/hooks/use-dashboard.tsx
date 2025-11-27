@@ -3,10 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { analyticsApi, ordersApi, customersApi } from '@/lib/data-service';
 import { useAnalyticsEngine } from '@/hooks/use-analytics-engine';
-import { 
-  DashboardState, 
-  DashboardFilters, 
-  DateRange, 
+import {
+  DashboardState,
+  DashboardFilters,
+  DateRange,
   QuickActionForm,
   DashboardMetrics,
   SalesData,
@@ -24,12 +24,12 @@ const getDefaultDateRange = (): DateRange => ({
 export function useDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   // State management
   const [filters, setFilters] = useState<DashboardFilters>({
     dateRange: getDefaultDateRange(),
   });
-  
+
   const [quickActionForms, setQuickActionForms] = useState<QuickActionForm>({
     customer: { name: '', phone: '', email: '' },
     order: { customerName: '', customerPhone: '', service: '', quantity: 1, pickupDate: new Date().toISOString().split('T')[0] },
@@ -65,7 +65,7 @@ export function useDashboard() {
 
   const orderStatusLoading = analyticsLoading;
   const orderStatusError = analyticsError;
-  
+
   const serviceLoading = analyticsLoading;
   const serviceError = analyticsError;
 
@@ -115,7 +115,14 @@ export function useDashboard() {
       const pickup = new Date(order.pickupDate);
       pickup.setHours(0, 0, 0, 0);
       return pickup <= today; // Include overdue and due today
-    });
+    }).map(order => ({
+      ...order,
+      total: parseFloat(order.totalAmount || '0'),
+      customerPhone: order.customerPhone || undefined,
+      customerEmail: order.customerEmail || undefined,
+      pickupDate: order.pickupDate ? new Date(order.pickupDate).toISOString() : '',
+      createdAt: order.createdAt ? new Date(order.createdAt).toISOString() : '',
+    }));
   }, [recentOrders]);
 
   // Orders created today
@@ -145,8 +152,54 @@ export function useDashboard() {
     retry: 3,
   });
 
+  // Revenue today
+  const revenueToday = useMemo(() => {
+    if (!recentOrders) return 0;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return recentOrders.filter(order => {
+      if (!order.createdAt) return false;
+      const created = new Date(order.createdAt);
+      return created >= today && created < tomorrow;
+    }).reduce((sum, order) => sum + (parseFloat(order.totalAmount || '0')), 0);
+  }, [recentOrders]);
+
+  const ordersCompletedToday = useMemo(() => {
+    if (!recentOrders) return 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return recentOrders.filter(order => {
+      const dateStr = order.updatedAt || order.createdAt;
+      if (!dateStr) return false;
+      const date = new Date(dateStr);
+      return date >= today && ['completed', 'delivered'].includes(order.status);
+    }).length;
+  }, [recentOrders]);
+
+  const pendingOrdersCount = useMemo(() => {
+    if (!recentOrders) return 0;
+    return recentOrders.filter(order => ['pending', 'processing', 'ready', 'assigned', 'in_transit'].includes(order.status)).length;
+  }, [recentOrders]);
+
+  const newCustomersToday = useMemo(() => {
+    if (!customers) return 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return customers.filter(customer => {
+      if (!customer.createdAt) return false;
+      const created = new Date(customer.createdAt);
+      return created >= today;
+    }).length;
+  }, [customers]);
+
   // Computed state
-  const isLoading = useMemo(() => 
+  const isLoading = useMemo(() =>
     metricsLoading || salesLoading || orderStatusLoading || serviceLoading || ordersLoading || customersLoading,
     [metricsLoading, salesLoading, orderStatusLoading, serviceLoading, ordersLoading, customersLoading]
   );
@@ -162,27 +215,27 @@ export function useDashboard() {
   const enhancedMetrics = useMemo((): DashboardMetrics => {
     // Merge API metrics with analytics engine KPIs
     const apiMetrics = dashboardMetrics && typeof dashboardMetrics === 'object' ? dashboardMetrics : null;
-    
+
     // Use analytics engine KPIs (realtime) as primary source
     const totalRevenue = kpiMetrics.totalRevenue || apiMetrics?.totalRevenue || 0;
     const totalOrders = kpiMetrics.totalOrders || apiMetrics?.totalOrders || 0;
     const averageOrderValue = kpiMetrics.averageOrderValue || 0;
 
-      return {
+    return {
       totalRevenue,
       totalOrders,
       newCustomers: apiMetrics?.newCustomers || 0,
       inventoryItems: apiMetrics?.inventoryItems || 0,
-        averageOrderValue: Math.round(averageOrderValue),
+      averageOrderValue: Math.round(averageOrderValue),
       onTimeDelivery: kpiMetrics.successRate || 0, // Use success rate as proxy for on-time delivery
       customerSatisfaction: 0, // Will be calculated from feedback data when available
       dueDateStats: apiMetrics?.dueDateStats || {
-          today: 0,
-          tomorrow: 0,
-          overdue: 0,
-          upcoming: 0,
-        },
-      };
+        today: 0,
+        tomorrow: 0,
+        overdue: 0,
+        upcoming: 0,
+      },
+    };
   }, [dashboardMetrics, kpiMetrics]);
 
   // Processed data with fallbacks
@@ -223,7 +276,15 @@ export function useDashboard() {
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return dateB - dateA;
       })
-      .slice(0, 10);
+      .slice(0, 10)
+      .map(order => ({
+        ...order,
+        date: order.createdAt ? new Date(order.createdAt).toISOString() : '',
+        total: parseFloat(order.totalAmount || '0'),
+        customerPhone: order.customerPhone || undefined,
+        customerEmail: order.customerEmail || undefined,
+        createdAt: order.createdAt ? new Date(order.createdAt).toISOString() : '',
+      }));
   }, [recentOrders]);
 
   // Actions
@@ -283,7 +344,11 @@ export function useDashboard() {
     dueTodayOrders: dueTodayOrders || [],
     customers: customers || [],
     ordersTodayCount,
-    
+    revenueToday,
+    ordersCompletedToday,
+    pendingOrdersCount,
+    newCustomersToday,
+
     // Loading states
     isLoading,
     metricsLoading,
@@ -292,7 +357,7 @@ export function useDashboard() {
     serviceLoading,
     ordersLoading,
     customersLoading,
-    
+
     // Error states
     error,
     metricsError,
@@ -301,13 +366,13 @@ export function useDashboard() {
     serviceError,
     ordersError,
     customersError,
-    
+
     // Actions
     updateFilters,
     refreshData,
     updateQuickActionForm,
     resetQuickActionForm,
-    
+
     // Computed
     hasData: !isLoading && !error,
     lastUpdated: new Date(),

@@ -1,4 +1,9 @@
 import React, { useState, useEffect } from "react";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -204,13 +209,33 @@ export default React.memo(function EditOrderDialog({
 
             {/* Dates */}
             <div className="space-y-2">
-              <Label htmlFor="pickupDate">Pickup Date</Label>
-              <Input
-                id="pickupDate"
-                type="date"
-                value={(formData as any).pickupDate ? new Date((formData as any).pickupDate).toISOString().split('T')[0] : ''}
-                onChange={(e) => handleInputChange('pickupDate', e.target.value)}
-              />
+              <Label>Due Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !(formData as any).pickupDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {(formData as any).pickupDate ? (
+                      format(new Date((formData as any).pickupDate), "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={(formData as any).pickupDate ? new Date((formData as any).pickupDate) : undefined}
+                    onSelect={(date) => handleInputChange('pickupDate', date ? date.toISOString() : '')}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-2">

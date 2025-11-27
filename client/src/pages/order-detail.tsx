@@ -36,7 +36,7 @@ const getStatusColor = (status: Order['status']) => {
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
-  
+
   const {
     data: order,
     isLoading,
@@ -74,7 +74,7 @@ export default function OrderDetailPage() {
             <LoadingSkeleton className="h-4 w-32" />
           </div>
         </div>
-        
+
         <div className="grid gap-6">
           <Card>
             <CardHeader>
@@ -104,7 +104,7 @@ export default function OrderDetailPage() {
             </Button>
           </Link>
         </div>
-        
+
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
@@ -139,7 +139,7 @@ export default function OrderDetailPage() {
             <p className="text-muted-foreground">Order ID: {order.id}</p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">
             <Edit className="h-4 w-4 mr-2" />
@@ -259,7 +259,7 @@ export default function OrderDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {order.pickupDate && (
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Pickup Date</p>
+                    <p className="text-sm font-medium text-muted-foreground">Due Date</p>
                     <p className="text-lg font-semibold">{formatDate(order.pickupDate)}</p>
                   </div>
                 )}
@@ -273,8 +273,8 @@ export default function OrderDetailPage() {
                   <div className="md:col-span-2">
                     <p className="text-sm font-medium text-muted-foreground">Shipping Address</p>
                     <p className="text-lg font-semibold">
-                      {typeof order.shippingAddress === 'string' 
-                        ? order.shippingAddress 
+                      {typeof order.shippingAddress === 'string'
+                        ? order.shippingAddress
                         : JSON.stringify(order.shippingAddress)
                       }
                     </p>

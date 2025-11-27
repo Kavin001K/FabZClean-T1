@@ -7,7 +7,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "dev": "npx tsx server/minimal-server.ts",
+    "dev": "npx tsx watch server/minimal-server.ts",
     "build": "npm run build:client",
     "build:client": "vite build --config vite.config.minimal.ts",
     "postinstall": "npm run build:client",

@@ -153,7 +153,7 @@ export default React.memo(function OrderDetailsDialog({
               </div>
 
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Pickup Date</p>
+                <p className="text-sm font-medium text-muted-foreground">Due Date</p>
                 <p className="text-lg font-semibold">
                   {formatDate((order as any).pickupDate ? new Date((order as any).pickupDate).toString() : (order.createdAt ? order.createdAt.toString() : new Date().toString()))}
                 </p>

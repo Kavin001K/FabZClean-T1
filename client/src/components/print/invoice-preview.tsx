@@ -37,7 +37,7 @@ export default function InvoicePreview({
           </div>
         </div>
       </CardHeader>
-      
+
       <CardContent className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-start">
@@ -50,7 +50,7 @@ export default function InvoicePreview({
               <p className="text-muted-foreground">Website: {invoiceData.companyInfo.website}</p>
             )}
           </div>
-          
+
           <div className="text-right">
             <h2 className="text-2xl font-bold">INVOICE</h2>
             <p className="text-sm text-muted-foreground">Invoice #: {invoiceData.invoiceNumber}</p>
@@ -77,11 +77,11 @@ export default function InvoicePreview({
               <p className="text-muted-foreground">Email: {invoiceData.customerInfo.email}</p>
             </div>
           </div>
-          
+
           <div className="text-right">
             {invoiceData.paymentStatus && (
               <div className="mb-4">
-                <Badge 
+                <Badge
                   variant={invoiceData.paymentStatus.toLowerCase() === 'paid' ? 'default' : 'secondary'}
                   className="text-sm"
                 >
@@ -104,7 +104,7 @@ export default function InvoicePreview({
               <div className="text-right">Unit Price</div>
               <div className="text-right">Total</div>
             </div>
-            
+
             {invoiceData.items.map((item, index) => (
               <div key={index} className="p-4 grid grid-cols-4 gap-4 border-b last:border-b-0">
                 <div>
@@ -128,21 +128,21 @@ export default function InvoicePreview({
               <span>Subtotal:</span>
               <span>{formatCurrency(invoiceData.subtotal)}</span>
             </div>
-            
+
             {invoiceData.discount && invoiceData.discount > 0 && (
               <div className="flex justify-between text-green-600">
                 <span>Discount:</span>
                 <span>-{formatCurrency(invoiceData.discount)}</span>
               </div>
             )}
-            
+
             <div className="flex justify-between">
               <span>Tax:</span>
               <span>{formatCurrency(invoiceData.tax)}</span>
             </div>
-            
+
             <Separator />
-            
+
             <div className="flex justify-between text-lg font-bold">
               <span>Total:</span>
               <span>{formatCurrency(invoiceData.total)}</span>
@@ -165,6 +165,12 @@ export default function InvoicePreview({
                 <div>
                   <p className="text-sm text-muted-foreground">Payment Status</p>
                   <p className="font-medium">{invoiceData.paymentStatus}</p>
+                </div>
+              )}
+              {invoiceData.qrCode && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Payment QR</p>
+                  <img src={invoiceData.qrCode} alt="Payment QR" className="w-24 h-24 mt-1 border rounded" />
                 </div>
               )}
             </div>

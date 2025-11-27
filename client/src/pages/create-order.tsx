@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
-import { PlusCircle, User, Calendar, Truck, DollarSign, Search, CheckCircle, X, Loader2, AlertCircle } from "lucide-react";
+import { PlusCircle, User, Calendar as CalendarIcon, Truck, DollarSign, Search, CheckCircle, X, Loader2, AlertCircle } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -58,7 +62,7 @@ export default function CreateOrder() {
   const [extraChargesLabel, setExtraChargesLabel] = useState('');
 
   // Order details
-  const [pickupDate, setPickupDate] = useState('');
+  const [pickupDate, setPickupDate] = useState<Date>();
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [advancePayment, setAdvancePayment] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
@@ -550,7 +554,7 @@ export default function CreateOrder() {
     setCouponCode('');
     setExtraCharges(0);
     setExtraChargesLabel('');
-    setPickupDate('');
+    setPickupDate(undefined);
     setSpecialInstructions('');
     setAdvancePayment('');
     setPaymentMethod('cash');
@@ -658,7 +662,7 @@ export default function CreateOrder() {
       })),
       shippingAddress: {
         instructions: specialInstructions,
-        pickupDate: pickupDate || undefined,
+        pickupDate: pickupDate ? format(pickupDate, 'yyyy-MM-dd') : undefined,
       },
       advancePaid: advancePayment ? advancePayment : "0",
       paymentMethod: paymentMethod,
@@ -983,19 +987,35 @@ export default function CreateOrder() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <Calendar className="h-5 w-5 mr-2" />
+                  <CalendarIcon className="h-5 w-5 mr-2" />
                   Scheduling & Instructions
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="pickupDate">Pickup Date</Label>
-                  <Input
-                    id="pickupDate"
-                    type="date"
-                    value={pickupDate}
-                    onChange={(e) => setPickupDate(e.target.value)}
-                  />
+                  <Label>Due Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !pickupDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {pickupDate ? format(pickupDate, "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={pickupDate}
+                        onSelect={setPickupDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="specialInstructions">Special Instructions</Label>
