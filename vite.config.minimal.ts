@@ -27,9 +27,24 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
+          recharts: ['recharts'],
+          framer: ['framer-motion'],
+          radix: [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-select',
+            '@radix-ui/react-slot',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-toast',
+            '@radix-ui/react-tooltip'
+          ],
+          pdf: ['jspdf', 'html2canvas'],
+          utils: ['date-fns', 'lucide-react']
         }
       }
-    }
+    },
+    chunkSizeWarningLimit: 1000
   },
   esbuild: {
     target: 'es2020',
