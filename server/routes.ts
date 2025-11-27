@@ -20,8 +20,12 @@ import { pricingEngine } from "./pricing-engine";
 import { loyaltyProgram } from "./loyalty-program";
 import { driverTrackingService } from "./driver-tracking";
 import { settingsService } from "./services/settings-service";
+import whatsappRoutes from "./routes/whatsapp";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Register WhatsApp routes
+  app.use("/api/whatsapp", whatsappRoutes);
+
   // Dashboard metrics
   app.get("/api/dashboard/metrics", async (req, res) => {
     try {
