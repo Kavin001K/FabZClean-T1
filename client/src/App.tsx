@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { NotificationProvider } from "@/hooks/use-notifications";
 import { RealtimeProvider } from "@/contexts/realtime-context";
+import { SettingsProvider } from "@/contexts/settings-context";
 import { AuthProvider } from "@/contexts/auth-context";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import { ProtectedRoute } from "@/components/auth/protected-route";
@@ -279,21 +280,23 @@ function App() {
         {/* Nest additional error boundaries for critical sections */}
         <ErrorBoundary>
           <AuthProvider>
-            <RealtimeProvider>
-              <ThemeProvider defaultTheme="light" storageKey="fab-z-ui-theme">
-                <TooltipProvider>
-                  <NotificationProvider>
-                    <Toaster />
-                    <ErrorBoundary>
-                      <Router />
-                    </ErrorBoundary>
-                    <ErrorBoundary>
-                      <PerformanceAnalytics />
-                    </ErrorBoundary>
-                  </NotificationProvider>
-                </TooltipProvider>
-              </ThemeProvider>
-            </RealtimeProvider>
+            <SettingsProvider>
+              <RealtimeProvider>
+                <ThemeProvider defaultTheme="light" storageKey="fab-z-ui-theme">
+                  <TooltipProvider>
+                    <NotificationProvider>
+                      <Toaster />
+                      <ErrorBoundary>
+                        <Router />
+                      </ErrorBoundary>
+                      <ErrorBoundary>
+                        <PerformanceAnalytics />
+                      </ErrorBoundary>
+                    </NotificationProvider>
+                  </TooltipProvider>
+                </ThemeProvider>
+              </RealtimeProvider>
+            </SettingsProvider>
           </AuthProvider>
         </ErrorBoundary>
       </QueryClientProvider>

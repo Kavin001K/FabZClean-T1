@@ -51,96 +51,78 @@ interface FranchiseMetrics {
   averageOrderValue: number;
 }
 
+import { useQuery } from "@tanstack/react-query";
+import { employeesApi } from "@/lib/data-service";
+
+import { DashboardDueToday } from "@/components/dashboard/components/dashboard-due-today";
+import { DashboardRecentOrders } from "@/components/dashboard/components/dashboard-recent-orders";
+
 export default function FranchiseDashboard() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Demo franchise metrics
-  const franchiseMetrics: FranchiseMetrics = {
-    totalEmployees: 24,
-    presentToday: 20,
-    absentToday: 2,
-    lateToday: 2,
-    totalRevenue: 125000,
-    activeDeliveries: 8,
-    customerSatisfaction: 4.7,
-    averageOrderValue: 850
-  };
+  const { data: employees = [], isLoading: isLoadingEmployees } = useQuery({
+    queryKey: ['employees'],
+    queryFn: () => employeesApi.getAll()
+  });
 
-  // Demo attendance data
-  const attendanceData: EmployeeAttendance[] = [
-    {
-      id: '1',
-      employeeId: 'EMP-001',
-      employeeName: 'Sarah Johnson',
-      position: 'Dry Cleaning Specialist',
-      date: selectedDate,
-      checkIn: '09:00',
-      checkOut: '17:30',
-      totalHours: 8.5,
-      status: 'present',
-      location: 'Main Branch'
-    },
-    {
-      id: '2',
-      employeeId: 'EMP-002',
-      employeeName: 'Mike Chen',
-      position: 'Driver',
-      date: selectedDate,
-      checkIn: '08:45',
-      checkOut: '17:15',
-      totalHours: 8.5,
-      status: 'present',
-      location: 'Delivery Route'
-    },
-    {
-      id: '3',
-      employeeId: 'EMP-003',
-      employeeName: 'Lisa Wang',
-      position: 'Customer Service',
-      date: selectedDate,
-      checkIn: '09:15',
-      checkOut: null,
-      totalHours: 7.5,
-      status: 'late',
-      location: 'Main Branch'
-    },
-    {
-      id: '4',
-      employeeId: 'EMP-004',
-      employeeName: 'David Wilson',
-      position: 'Quality Inspector',
-      date: selectedDate,
-      checkIn: null,
-      checkOut: null,
-      totalHours: 0,
-      status: 'absent',
-      location: 'Main Branch'
-    },
-    {
-      id: '5',
-      employeeId: 'EMP-005',
-      employeeName: 'Maria Garcia',
-      position: 'Driver',
-      date: selectedDate,
-      checkIn: '08:30',
-      checkOut: '16:30',
-      totalHours: 8.0,
-      status: 'present',
-      location: 'Delivery Route'
-    },
-    {
-      id: '6',
-      employeeId: 'EMP-006',
-      employeeName: 'John Smith',
-      position: 'Machine Operator',
-      date: selectedDate,
-      checkIn: '09:05',
-      checkOut: null,
-      totalHours: 7.0,
-      status: 'late',
-      location: 'Processing Center'
+  // Fetch orders for the widgets
+  const { data: orders = [], isLoading: isLoadingOrders } = useQuery({
+    queryKey: ['franchise-orders'],
+    queryFn: async () => {
+      const response = await fetch('/api/orders');
+      if (!response.ok) throw new Error('Failed to fetch orders');
+      return response.json();
     }
-  ];
+  });
+
+  const dueTodayOrders = orders.filter((order: any) => {
+    if (!order.pickupDate && !order.deliveryDate) return false;
+    const date = new Date(order.pickupDate || order.deliveryDate);
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+  });
+
+  const recentOrders = [...orders].sort((a: any, b: any) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  ).slice(0, 5);
+
+  // Calculate real franchise metrics
+  const franchiseMetrics: FranchiseMetrics = React.useMemo(() => {
+    if (!orders || !employees) return {
+      totalEmployees: 0,
+      presentToday: 0,
+      absentToday: 0,
+      lateToday: 0,
+      totalRevenue: 0,
+      activeDeliveries: 0,
+      customerSatisfaction: 0,
+      averageOrderValue: 0
+    };
+
+    const totalRevenue = orders.reduce((sum: number, order: any) => sum + parseFloat(order.totalAmount || '0'), 0);
+    const averageOrderValue = orders.length > 0 ? totalRevenue / orders.length : 0;
+
+    // Active deliveries: orders in 'out_for_delivery' or 'in_transit' status
+    const activeDeliveries = orders.filter((o: any) =>
+      o.status === 'out_for_delivery' || o.status === 'in_transit'
+    ).length;
+
+    return {
+      totalEmployees: employees.length,
+      presentToday: 0, // Needs attendance API
+      absentToday: 0, // Needs attendance API
+      lateToday: 0, // Needs attendance API
+      totalRevenue,
+      activeDeliveries,
+      customerSatisfaction: 4.8, // Placeholder until feedback API
+      averageOrderValue
+    };
+  }, [orders, employees]);
+
+  // Placeholder attendance data for demonstration
+  const attendanceData: EmployeeAttendance[] = [];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -162,7 +144,7 @@ export default function FranchiseDashboard() {
     }
   };
 
-  const attendanceStats = {
+  const attendanceMetrics = {
     present: attendanceData.filter(emp => emp.status === 'present').length,
     late: attendanceData.filter(emp => emp.status === 'late').length,
     absent: attendanceData.filter(emp => emp.status === 'absent').length,
@@ -207,6 +189,18 @@ export default function FranchiseDashboard() {
             Export Report
           </Button>
         </div>
+      </div>
+
+      {/* Due Today & Recent Orders */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <DashboardDueToday
+          dueTodayOrders={dueTodayOrders}
+          isLoading={isLoadingOrders}
+        />
+        <DashboardRecentOrders
+          recentOrders={recentOrders}
+          isLoading={isLoadingOrders}
+        />
       </div>
 
       {/* Key Metrics */}
@@ -288,7 +282,7 @@ export default function FranchiseDashboard() {
                     <CheckCircle className="w-4 h-4 text-green-600" />
                     <span className="text-sm font-medium">Present</span>
                   </div>
-                  <span className="font-bold text-green-600">{attendanceStats.present}</span>
+                  <span className="font-bold text-green-600">{attendanceMetrics.present}</span>
                 </div>
 
                 <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
@@ -296,7 +290,7 @@ export default function FranchiseDashboard() {
                     <Clock className="w-4 h-4 text-yellow-600" />
                     <span className="text-sm font-medium">Late</span>
                   </div>
-                  <span className="font-bold text-yellow-600">{attendanceStats.late}</span>
+                  <span className="font-bold text-yellow-600">{attendanceMetrics.late}</span>
                 </div>
 
                 <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
@@ -304,14 +298,14 @@ export default function FranchiseDashboard() {
                     <AlertTriangle className="w-4 h-4 text-red-600" />
                     <span className="text-sm font-medium">Absent</span>
                   </div>
-                  <span className="font-bold text-red-600">{attendanceStats.absent}</span>
+                  <span className="font-bold text-red-600">{attendanceMetrics.absent}</span>
                 </div>
 
                 <div className="pt-4 border-t">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Attendance Rate</span>
                     <span className="font-bold">
-                      {Math.round((attendanceStats.present / franchiseMetrics.totalEmployees) * 100)}%
+                      {Math.round((attendanceMetrics.present / franchiseMetrics.totalEmployees) * 100)}%
                     </span>
                   </div>
                 </div>
@@ -391,27 +385,20 @@ export default function FranchiseDashboard() {
 
         {/* Tracker Tab */}
         <TabsContent value="tracker" className="space-y-6">
-          <AttendanceTracker employees={[
-            {
-              id: '1',
-              employeeId: 'EMP-001',
-              name: 'Sarah Johnson',
-              position: 'Dry Cleaning Specialist',
-              salaryType: 'monthly',
-              baseSalary: 45000,
-              workingHours: 8
-            },
-            {
-              id: '2',
-              employeeId: 'EMP-002',
-              name: 'Mike Chen',
-              position: 'Delivery Driver',
-              salaryType: 'hourly',
-              baseSalary: 0,
-              hourlyRate: 250,
-              workingHours: 8
-            }
-          ]} />
+          {isLoadingEmployees ? (
+            <div className="flex justify-center p-8">Loading employees...</div>
+          ) : (
+            <AttendanceTracker employees={(employees as any[]).map(emp => ({
+              id: emp.id,
+              employeeId: emp.employeeId,
+              name: emp.fullName || emp.username,
+              position: emp.position || 'Employee',
+              salaryType: emp.salaryType || 'monthly',
+              baseSalary: Number(emp.baseSalary) || 0,
+              hourlyRate: Number(emp.hourlyRate) || 0,
+              workingHours: Number(emp.workingHours) || 8
+            }))} />
+          )}
         </TabsContent>
 
         {/* Performance Tab */}
@@ -582,5 +569,6 @@ export default function FranchiseDashboard() {
         </TabsContent>
       </Tabs>
     </div>
+
   );
 }

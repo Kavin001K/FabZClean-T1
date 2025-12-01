@@ -376,7 +376,7 @@ export function generatePrintHTML(config: PrintConfig): string {
     for (const row of data) {
       html += '<tr>';
       for (const header of headers) {
-        const value = row[header] || '';
+        const value = row[header] ?? '';
         html += `<td>${value}</td>`;
       }
       html += '</tr>';
@@ -408,17 +408,49 @@ export function generatePrintHTML(config: PrintConfig): string {
   return html;
 }
 
+import { isElectron } from "./utils";
+
 export function printDocument(config: PrintConfig) {
   const html = generatePrintHTML(config);
-  const printWindow = window.open('', '_blank');
 
-  if (!printWindow) {
-    alert('Please allow popups to print this document.');
-    return;
+  if (isElectron()) {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(html);
+      doc.close();
+
+      iframe.contentWindow?.focus();
+      setTimeout(() => {
+        iframe.contentWindow?.print();
+        // Cleanup
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 5000); // Wait longer for user interaction
+      }, 500);
+    }
+  } else {
+    const printWindow = window.open('', '_blank');
+
+    if (!printWindow) {
+      alert('Please allow popups to print this document.');
+      return;
+    }
+
+    printWindow.document.write(html);
+    printWindow.document.close();
   }
-
-  printWindow.document.write(html);
-  printWindow.document.close();
 }
 
 // Specific print functions for different data types
@@ -647,10 +679,6 @@ export function generateTagHTML(order: any, items: any[]): string {
           } catch (e) {
             console.error("Barcode generation failed", e);
           }
-          // Small delay to ensure rendering
-          setTimeout(() => {
-            window.print(); 
-          }, 500);
         };
       </script>
     </body>

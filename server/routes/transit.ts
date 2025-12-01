@@ -1,15 +1,16 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db as storage } from '../db';
-import { 
-  adminLoginRequired, 
+import {
+  adminLoginRequired,
+  jwtRequired,
   validateInput,
-  rateLimit 
+  rateLimit
 } from '../middleware/auth';
-import { 
-  createPaginatedResponse, 
+import {
+  createPaginatedResponse,
   createErrorResponse,
-  createSuccessResponse 
+  createSuccessResponse
 } from '../services/serialization';
 import { realtimeServer } from '../websocket-server';
 
@@ -17,6 +18,17 @@ const router = Router();
 
 // Apply rate limiting
 router.use(rateLimit(60000, 100));
+
+// Get all transit orders (for employee dashboard)
+router.get('/', jwtRequired, async (req, res) => {
+  try {
+    const transitOrders = await storage.listTransitOrders();
+    res.json(transitOrders);
+  } catch (error) {
+    console.error('Get transit orders error:', error);
+    res.status(500).json(createErrorResponse('Failed to fetch transit orders', 500));
+  }
+});
 
 // Transit batch schema
 const transitBatchSchema = z.object({
@@ -29,9 +41,9 @@ const transitBatchSchema = z.object({
 // Get transit batches
 router.get('/batches', adminLoginRequired, async (req, res) => {
   try {
-    const { 
-      cursor, 
-      limit = 20, 
+    const {
+      cursor,
+      limit = 20,
       status,
       type,
       sortBy = 'createdAt',
@@ -54,7 +66,7 @@ router.get('/batches', adminLoginRequired, async (req, res) => {
     batches.sort((a, b) => {
       const aValue = a[sortBy as string];
       const bValue = b[sortBy as string];
-      
+
       if (sortOrder === 'asc') {
         return aValue > bValue ? 1 : -1;
       } else {
@@ -66,7 +78,7 @@ router.get('/batches', adminLoginRequired, async (req, res) => {
     const limitNum = parseInt(limit as string) || 20;
     const startIndex = cursor ? batches.findIndex(b => b.id === cursor) + 1 : 0;
     const endIndex = startIndex + limitNum;
-    
+
     const paginatedBatches = batches.slice(startIndex, endIndex);
     const hasMore = endIndex < batches.length;
     const nextCursor = hasMore ? paginatedBatches[paginatedBatches.length - 1]?.id : undefined;
@@ -90,7 +102,7 @@ router.get('/batches', adminLoginRequired, async (req, res) => {
 router.get('/batches/:id', adminLoginRequired, async (req, res) => {
   try {
     const batch = await storage.getTransitBatch(req.params.id);
-    
+
     if (!batch) {
       return res.status(404).json(createErrorResponse('Transit batch not found', 404));
     }
@@ -98,7 +110,7 @@ router.get('/batches/:id', adminLoginRequired, async (req, res) => {
     // Get associated orders
     const transitOrders = await storage.listTransitOrders();
     const batchTransitOrders = transitOrders.filter(to => to.transitBatchId === batch.id);
-    
+
     // Get order details
     const orders = await storage.listOrders();
     const batchOrders = batchTransitOrders.map(to => {
@@ -182,7 +194,7 @@ router.put('/batches/:id/initiate', adminLoginRequired, async (req, res) => {
     }
 
     // Update batch status
-    const updatedBatch = await storage.updateTransitBatch(batchId, { 
+    const updatedBatch = await storage.updateTransitBatch(batchId, {
       status: 'IN_TRANSIT',
       initiatedAt: new Date().toISOString()
     });
@@ -190,7 +202,7 @@ router.put('/batches/:id/initiate', adminLoginRequired, async (req, res) => {
     // Update transit orders status
     const transitOrders = await storage.listTransitOrders();
     const batchTransitOrders = transitOrders.filter(to => to.transitBatchId === batchId);
-    
+
     for (const transitOrder of batchTransitOrders) {
       await storage.updateTransitOrder(transitOrder.id, { status: 'IN_TRANSIT' });
     }
@@ -223,7 +235,7 @@ router.put('/batches/:id/complete', adminLoginRequired, async (req, res) => {
     }
 
     // Update batch status
-    const updatedBatch = await storage.updateTransitBatch(batchId, { 
+    const updatedBatch = await storage.updateTransitBatch(batchId, {
       status: 'COMPLETED',
       completedAt: new Date().toISOString()
     });
@@ -231,7 +243,7 @@ router.put('/batches/:id/complete', adminLoginRequired, async (req, res) => {
     // Update transit orders status
     const transitOrders = await storage.listTransitOrders();
     const batchTransitOrders = transitOrders.filter(to => to.transitBatchId === batchId);
-    
+
     for (const transitOrder of batchTransitOrders) {
       await storage.updateTransitOrder(transitOrder.id, { status: 'COMPLETED' });
     }
@@ -273,7 +285,7 @@ router.delete('/batches/:id', adminLoginRequired, async (req, res) => {
     // Delete associated transit orders
     const transitOrders = await storage.listTransitOrders();
     const batchTransitOrders = transitOrders.filter(to => to.transitBatchId === batchId);
-    
+
     for (const transitOrder of batchTransitOrders) {
       await storage.deleteTransitOrder(transitOrder.id);
     }
@@ -341,7 +353,7 @@ router.get('/available-orders', adminLoginRequired, async (req, res) => {
 
     const orders = await storage.listOrders();
     const transitOrders = await storage.listTransitOrders();
-    
+
     // Get orders already in transit
     const ordersInTransit = new Set(
       transitOrders
@@ -352,11 +364,11 @@ router.get('/available-orders', adminLoginRequired, async (req, res) => {
     // Filter orders based on type and status
     let availableOrders;
     if (type === 'STORE_TO_FACTORY') {
-      availableOrders = orders.filter(order => 
+      availableOrders = orders.filter(order =>
         order.status === 'At Store' && !ordersInTransit.has(order.id)
       );
     } else {
-      availableOrders = orders.filter(order => 
+      availableOrders = orders.filter(order =>
         order.status === 'Processing' && !ordersInTransit.has(order.id)
       );
     }

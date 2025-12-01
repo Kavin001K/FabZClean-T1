@@ -85,8 +85,9 @@ import { ordersApi, formatCurrency, formatDate } from '@/lib/data-service';
 import { exportOrdersToCSV } from '@/lib/export-utils';
 import { exportOrdersEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportOrdersToExcel } from '@/lib/excel-exports';
-import type { Order } from "../../shared/schema";
+import type { Order } from "../../../shared/schema";
 import { cn } from "@/lib/utils";
+import { isElectron } from "@/lib/utils";
 
 // Types
 interface OrderFilters {
@@ -192,8 +193,9 @@ function OrdersComponent() {
       // Date range filter
       if (filters.dateFrom || filters.dateTo) {
         const orderDate = new Date(order.createdAt || new Date());
-        if (filters.dateFrom && orderDate < filters.dateFrom) return false;
-        if (filters.dateTo && orderDate > filters.dateTo) return false;
+        const orderDateStr = orderDate.toISOString();
+        if (filters.dateFrom && new Date(orderDateStr) < filters.dateFrom) return false;
+        if (filters.dateTo && new Date(orderDateStr) > filters.dateTo) return false;
       }
 
       // Amount range filter
@@ -646,10 +648,9 @@ function OrdersComponent() {
     };
   }, [filteredOrders]);
 
-  const handlePrintView = useCallback(() => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+  // ... (inside component)
 
+  const handlePrintView = useCallback(() => {
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -830,13 +831,44 @@ function OrdersComponent() {
       </html>
     `;
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-    printWindow.focus();
+    if (isElectron()) {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
 
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
+      const doc = iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(htmlContent);
+        doc.close();
+
+        iframe.contentWindow?.focus();
+        setTimeout(() => {
+          iframe.contentWindow?.print();
+          setTimeout(() => {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          }, 5000);
+        }, 500);
+      }
+    } else {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) return;
+
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.focus();
+
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    }
   }, [filteredOrders, stats]);
 
   // Helper functions for status and payment status
@@ -1183,7 +1215,7 @@ function OrdersComponent() {
                                   className="w-full justify-start text-left font-normal"
                                 >
                                   <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {filters.dateFrom ? formatDate(filters.dateFrom) : 'Pick date'}
+                                  {filters.dateFrom ? formatDate(filters.dateFrom.toISOString()) : 'Pick date'}
                                 </Button>
                               </PopoverTrigger>
                               <PopoverContent className="w-auto p-0" align="start">
@@ -1205,7 +1237,7 @@ function OrdersComponent() {
                                   className="w-full justify-start text-left font-normal"
                                 >
                                   <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {filters.dateTo ? formatDate(filters.dateTo) : 'Pick date'}
+                                  {filters.dateTo ? formatDate(filters.dateTo.toISOString()) : 'Pick date'}
                                 </Button>
                               </PopoverTrigger>
                               <PopoverContent className="w-auto p-0" align="start">
@@ -1418,7 +1450,7 @@ function OrdersComponent() {
                     ))}
                     {filters.dateFrom && (
                       <Badge variant="secondary" className="gap-1">
-                        From: {formatDate(filters.dateFrom)}
+                        From: {formatDate(filters.dateFrom.toISOString())}
                         <X
                           className="h-3 w-3 cursor-pointer"
                           onClick={() => setFilters(prev => ({ ...prev, dateFrom: undefined }))}
@@ -1427,7 +1459,7 @@ function OrdersComponent() {
                     )}
                     {filters.dateTo && (
                       <Badge variant="secondary" className="gap-1">
-                        To: {formatDate(filters.dateTo)}
+                        To: {formatDate(filters.dateTo.toISOString())}
                         <X
                           className="h-3 w-3 cursor-pointer"
                           onClick={() => setFilters(prev => ({ ...prev, dateTo: undefined }))}
@@ -1571,6 +1603,19 @@ function OrdersComponent() {
                                 )}
                               </div>
                             </TableHead>
+                            <TableHead
+                              className="cursor-pointer hover:bg-muted/70 select-none"
+                              onClick={() => handleSort('pickupDate')}
+                            >
+                              <div className="flex items-center gap-2">
+                                Due Date
+                                {sortField === 'pickupDate' ? (
+                                  sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+                                ) : (
+                                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </div>
+                            </TableHead>
                             <TableHead className="text-center">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -1626,7 +1671,10 @@ function OrdersComponent() {
                                   {formatCurrency(parseFloat(order.totalAmount))}
                                 </TableCell>
                                 <TableCell className="text-sm text-muted-foreground">
-                                  {formatDate(order.createdAt || new Date())}
+                                  {formatDate((order.createdAt || new Date()).toString())}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  {(order as any).pickupDate ? formatDate(new Date((order as any).pickupDate).toString()) : 'N/A'}
                                 </TableCell>
                                 <TableCell onClick={(e) => e.stopPropagation()}>
                                   <DropdownMenu>

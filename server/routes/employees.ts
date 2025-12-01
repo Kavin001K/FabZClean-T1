@@ -13,14 +13,18 @@ router.use(authMiddleware);
  */
 router.get('/', async (req: Request, res: Response) => {
     try {
+        console.log('GET /api/employees - Requesting user:', JSON.stringify(req.employee));
+
         const employees = await AuthService.listEmployees(
             req.employee!.role,
             req.employee!.franchiseId,
             req.employee!.factoryId
         );
 
+        console.log(`GET /api/employees - Found ${employees.length} employees`);
         res.json({ success: true, employees });
     } catch (error: any) {
+        console.error('GET /api/employees - Error:', error);
         res.status(500).json({ error: error.message || 'Failed to list employees' });
     }
 });
@@ -63,7 +67,11 @@ router.post(
     auditMiddleware('create_employee', 'employee'),
     async (req: Request, res: Response) => {
         try {
-            const { username, password, role, franchiseId, factoryId, fullName, email, phone } = req.body;
+            const {
+                username, password, role, franchiseId, factoryId, fullName, email, phone,
+                position, department, hireDate, salaryType, baseSalary, hourlyRate,
+                workingHours, emergencyContact, qualifications, notes, address
+            } = req.body;
 
             // Validation
             if (!username || !password || !role) {
@@ -104,6 +112,17 @@ router.post(
                     fullName,
                     email,
                     phone,
+                    position,
+                    department,
+                    hireDate: hireDate ? new Date(hireDate) : undefined,
+                    salaryType,
+                    baseSalary: baseSalary ? parseFloat(baseSalary) : undefined,
+                    hourlyRate: hourlyRate ? parseFloat(hourlyRate) : undefined,
+                    workingHours: workingHours ? parseInt(workingHours) : undefined,
+                    emergencyContact,
+                    qualifications,
+                    notes,
+                    address
                 },
                 req.employee!.employeeId
             );
@@ -125,7 +144,11 @@ router.put(
     auditMiddleware('update_employee', 'employee'),
     async (req: Request, res: Response) => {
         try {
-            const { fullName, email, phone, franchiseId, factoryId, isActive } = req.body;
+            const {
+                fullName, email, phone, franchiseId, factoryId, isActive,
+                position, department, hireDate, salaryType, baseSalary, hourlyRate,
+                workingHours, emergencyContact, qualifications, notes, address
+            } = req.body;
 
             // Fetch employee to check permissions
             const targetEmployee = await AuthService.getEmployee(req.params.id);
@@ -142,7 +165,16 @@ router.put(
 
             const employee = await AuthService.updateEmployee(
                 req.params.id,
-                { fullName, email, phone, franchiseId, factoryId, isActive },
+                {
+                    fullName, email, phone, franchiseId, factoryId, isActive,
+                    position, department,
+                    hireDate: hireDate ? new Date(hireDate) : undefined,
+                    salaryType,
+                    baseSalary: baseSalary ? parseFloat(baseSalary) : undefined,
+                    hourlyRate: hourlyRate ? parseFloat(hourlyRate) : undefined,
+                    workingHours: workingHours ? parseInt(workingHours) : undefined,
+                    emergencyContact, qualifications, notes, address
+                },
                 req.employee!.employeeId
             );
 

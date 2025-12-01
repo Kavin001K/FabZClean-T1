@@ -21,10 +21,18 @@ import { loyaltyProgram } from "./loyalty-program";
 import { driverTrackingService } from "./driver-tracking";
 import { settingsService } from "./services/settings-service";
 import whatsappRoutes from "./routes/whatsapp";
+import settingsRoutes from "./routes/settings";
+import transitSuggestionsRoutes from "./routes/transit-suggestions";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register WhatsApp routes
   app.use("/api/whatsapp", whatsappRoutes);
+
+  // Register Settings routes
+  app.use("/api/settings", settingsRoutes);
+
+  // Register Transit Suggestions routes
+  app.use("/api/transit-suggestions", transitSuggestionsRoutes);
 
   // Dashboard metrics
   app.get("/api/dashboard/metrics", async (req, res) => {

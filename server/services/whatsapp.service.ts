@@ -7,9 +7,9 @@ const API_SECRET = process.env.TWILIO_API_SECRET;
 const FROM_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || '+14155238886';
 
 export class WhatsappService {
-    private static client: any;
+    private client: any;
 
-    private static getClient() {
+    private getClient() {
         if (!this.client) {
             if (!ACCOUNT_SID || !API_KEY || !API_SECRET) {
                 console.error('❌ Twilio credentials missing in .env');
@@ -21,13 +21,13 @@ export class WhatsappService {
         return this.client;
     }
 
-    static formatNumber(phone: string): string {
+    formatNumber(phone: string): string {
         let cleaned = phone.replace(/\D/g, '');
         if (cleaned.length === 10) cleaned = '91' + cleaned;
         return `whatsapp:+${cleaned}`;
     }
 
-    static async sendMessage(to: string, message: string): Promise<boolean> {
+    async sendMessage(to: string, message: string): Promise<boolean> {
         const client = this.getClient();
         if (!client) return false;
 
@@ -49,7 +49,7 @@ export class WhatsappService {
         }
     }
 
-    static async sendPdf(to: string, pdfUrl: string, filename: string, caption?: string): Promise<boolean> {
+    async sendPdf(to: string, pdfUrl: string, filename: string, caption?: string): Promise<boolean> {
         const client = this.getClient();
         if (!client) return false;
 
@@ -69,6 +69,26 @@ export class WhatsappService {
         } catch (error: any) {
             console.error('❌ Twilio Media Error:', error.message);
             return false;
+        }
+    }
+
+    async sendOrderConfirmation(order: any, pdfUrl?: string): Promise<boolean> {
+        const customerName = order.customerName || order.customer?.name || 'Customer';
+        const orderNumber = order.orderNumber || order.id;
+        const total = order.totalAmount || order.total;
+        const phone = order.customerPhone || order.customer?.phone || order.phone;
+
+        if (!phone) {
+            console.error('❌ No phone number provided for WhatsApp');
+            return false;
+        }
+
+        const message = `Hello ${customerName}, your order #${orderNumber} has been confirmed! Total: ₹${total}. Thank you for choosing FabZClean.`;
+
+        if (pdfUrl) {
+            return this.sendPdf(phone, pdfUrl, `Order_${orderNumber}.pdf`, message);
+        } else {
+            return this.sendMessage(phone, message);
         }
     }
 }

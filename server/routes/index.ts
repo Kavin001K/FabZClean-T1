@@ -18,6 +18,8 @@ import databaseRouter from './database';
 import pdfRouter from './pdf';
 import whatsappRouter from './whatsapp';
 import documentsRouter from './documents';
+import transitSuggestionsRouter from './transit-suggestions';
+import settingsRouter from './settings';
 import { debugRouter } from './debug';
 
 /**
@@ -48,6 +50,7 @@ export function registerAllRoutes(app: Express): void {
   // Dashboard and Accounting routes
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/accounting', accountingRouter);
+  app.use('/api/settings', settingsRouter);
 
   // Health and Database routes
   app.use('/api/health', healthRouter);
@@ -60,6 +63,7 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/orders', ordersRouter);
   app.use('/api/customers', customersRouter);
   app.use('/api/transit', transitRouter);
+  app.use('/api/transit-suggestions', transitSuggestionsRouter);
   app.use('/api/deliveries', deliveriesRouter);
   app.use('/api/drivers', driversRouter);
   app.use('/api/products', productsRouter);

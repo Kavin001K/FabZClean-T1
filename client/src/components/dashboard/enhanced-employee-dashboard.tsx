@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -66,11 +66,17 @@ import { useFuzzySearch, useHybridSearch } from '../../hooks/use-fuzzy-search';
 import { useClientPagination, useServerPagination } from '../../hooks/use-pagination';
 import { useClientCache, useCachedQuery } from '../../hooks/use-cache';
 
+import { useAuth } from '@/contexts/auth-context';
+
+import { DashboardDueToday } from "./components/dashboard-due-today";
+import { DashboardRecentOrders } from "./components/dashboard-recent-orders";
+
 // Enhanced Employee Dashboard Component
 export default function EnhancedEmployeeDashboard() {
   const { toast } = useToast();
   const { addNotification } = useNotifications();
   const queryClient = useQueryClient();
+  const { employee } = useAuth();
 
   // State management
   const [activeTab, setActiveTab] = useState('overview');
@@ -81,25 +87,35 @@ export default function EnhancedEmployeeDashboard() {
 
   // Employee data
   const employeeData = {
-    name: "Sarah Johnson",
-    position: "Dry Cleaning Specialist",
-    department: "Operations",
-    employeeId: "EMP-001",
-    hireDate: "2022-03-15",
-    salary: 45000,
-    hourlyRate: 22.50,
-    performanceRating: 4.2,
-    manager: "Michael Chen",
-    status: "active"
+    name: employee?.fullName || employee?.username || "Employee",
+    position: employee?.position || "Staff Member",
+    department: employee?.department || "General",
+    employeeId: employee?.employeeId || "EMP-000",
+    hireDate: employee?.hireDate ? new Date(employee.hireDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+    salary: employee?.baseSalary || 0,
+    hourlyRate: employee?.hourlyRate || 0,
+    performanceRating: 0.0, // This would come from performance API
+    manager: "Manager", // This would come from manager relation
+    status: employee?.isActive ? "active" : "inactive"
   };
 
   // Fetch orders with caching
   const { data: orders = [], isLoading: ordersLoading } = useCachedQuery(
     ['employee-orders'],
     async () => {
-      const response = await fetch('/api/orders');
+      const token = localStorage.getItem('employee_token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('/api/orders', { headers });
       if (!response.ok) throw new Error('Failed to fetch orders');
-      return response.json();
+      const data = await response.json();
+      // Handle paginated response or direct array
+      return Array.isArray(data) ? data : (data.data || []);
     },
     {
       cacheName: 'orders',
@@ -108,11 +124,94 @@ export default function EnhancedEmployeeDashboard() {
     }
   );
 
+  const dueTodayOrders = orders.filter((order: any) => {
+    if (!order.pickupDate && !order.deliveryDate) return false;
+    const date = new Date(order.pickupDate || order.deliveryDate);
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+  });
+
+  const recentOrders = [...orders].sort((a: any, b: any) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  ).slice(0, 5);
+
+  // Calculate real stats from orders
+  const todayStats = useMemo(() => {
+    if (!orders) return {
+      tasksCompleted: 0,
+      tasksInProgress: 0,
+      tasksPending: 0,
+      ordersProcessed: 0,
+      efficiency: 0,
+      hoursWorked: 0,
+      hoursRemaining: 8, // Standard shift
+      attendanceStatus: 'Present' // Assumed since they are logged in
+    };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const todaysOrders = orders.filter((order: any) => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= today;
+    });
+
+    const completed = todaysOrders.filter((o: any) => o.status === 'completed' || o.status === 'delivered').length;
+    const inProgress = todaysOrders.filter((o: any) => o.status === 'processing' || o.status === 'in_transit').length;
+    const pending = todaysOrders.filter((o: any) => o.status === 'pending' || o.status === 'confirmed').length;
+
+    // Simple efficiency calculation: (completed / total assigned today) * 100
+    const totalToday = todaysOrders.length;
+    const efficiency = totalToday > 0 ? Math.round((completed / totalToday) * 100) : 0;
+
+    return {
+      tasksCompleted: completed,
+      tasksInProgress: inProgress,
+      tasksPending: pending,
+      ordersProcessed: completed,
+      efficiency,
+      hoursWorked: 0, // Placeholder until we have attendance API
+      hoursRemaining: 8,
+      attendanceStatus: 'Present'
+    };
+  }, [orders]);
+
+  // Calculate monthly stats
+  const monthlyStats = useMemo(() => {
+    if (!orders) return {
+      salaryEarned: 0,
+      bonus: 0,
+      ordersProcessed: 0,
+      totalHours: 0,
+      performanceScore: 0
+    };
+
+    // This would ideally come from a payroll API
+    // For now, we can estimate based on completed orders if we had commission data
+    return {
+      salaryEarned: 0, // Placeholder
+      bonus: 0,
+      ordersProcessed: 0,
+      totalHours: 0,
+      performanceScore: 0
+    };
+  }, [orders]);
+
   // Fetch transit orders
   const { data: transitOrders = [], isLoading: transitLoading } = useCachedQuery(
     ['employee-transit-orders'],
     async () => {
-      const response = await fetch('/api/transit-orders');
+      const token = localStorage.getItem('employee_token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('/api/transit', { headers });
       if (!response.ok) throw new Error('Failed to fetch transit orders');
       return response.json();
     },
@@ -152,31 +251,6 @@ export default function EnhancedEmployeeDashboard() {
 
   // Cache management
   const { get: getCache, set: setCache, metrics: cacheMetrics } = useClientCache('employee-dashboard');
-
-  // Today's stats
-  const todayStats = {
-    tasksCompleted: 8,
-    tasksInProgress: 2,
-    tasksPending: 3,
-    efficiency: 92,
-    hoursWorked: 7.5,
-    hoursRemaining: 0.5,
-    attendanceStatus: "present",
-    ordersProcessed: orders.filter(o => o.status === 'completed').length,
-    ordersInProgress: orders.filter(o => ['processing', 'in_transit'].includes(o.status)).length,
-    ordersPending: orders.filter(o => ['pending', 'in_store'].includes(o.status)).length
-  };
-
-  const monthlyStats = {
-    totalHours: 160,
-    overtimeHours: 8,
-    tasksCompleted: 156,
-    performanceScore: 4.2,
-    salaryEarned: 3750,
-    bonus: 150,
-    ordersProcessed: orders.filter(o => o.status === 'completed').length,
-    efficiency: 94
-  };
 
   // Current tasks
   const currentTasks = [
@@ -332,6 +406,18 @@ export default function EnhancedEmployeeDashboard() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
+          {/* Due Today & Recent Orders */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <DashboardDueToday
+              dueTodayOrders={dueTodayOrders}
+              isLoading={ordersLoading}
+            />
+            <DashboardRecentOrders
+              recentOrders={recentOrders}
+              isLoading={ordersLoading}
+            />
+          </div>
+
           {/* Quick Stats Grid */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
@@ -342,7 +428,7 @@ export default function EnhancedEmployeeDashboard() {
               <CardContent>
                 <div className="text-2xl font-bold">{todayStats.ordersProcessed}</div>
                 <p className="text-xs text-muted-foreground">
-                  {Math.round((todayStats.ordersProcessed / (todayStats.ordersProcessed + todayStats.ordersPending)) * 100)}% completion rate
+                  {todayStats.tasksPending > 0 ? Math.round((todayStats.ordersProcessed / (todayStats.ordersProcessed + todayStats.tasksPending)) * 100) : 100}% completion rate
                 </p>
               </CardContent>
             </Card>
@@ -381,7 +467,7 @@ export default function EnhancedEmployeeDashboard() {
               <CardContent>
                 <div className="text-2xl font-bold">{todayStats.efficiency}%</div>
                 <p className="text-xs text-muted-foreground">
-                  +5% from last week
+                  Based on today's tasks
                 </p>
               </CardContent>
             </Card>
@@ -400,24 +486,24 @@ export default function EnhancedEmployeeDashboard() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Orders Processed</span>
-                    <span className="text-sm font-bold">{monthlyStats.ordersProcessed}</span>
+                    <span className="text-sm font-bold">{monthlyStats.ordersProcessed || 0}</span>
                   </div>
-                  <Progress value={(monthlyStats.ordersProcessed / 120) * 100} className="h-2" />
+                  <Progress value={((monthlyStats.ordersProcessed || 0) / 120) * 100} className="h-2" />
 
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Total Hours</span>
-                    <span className="text-sm font-bold">{monthlyStats.totalHours}h</span>
+                    <span className="text-sm font-bold">{monthlyStats.totalHours || 0}h</span>
                   </div>
-                  <Progress value={(monthlyStats.totalHours / 176) * 100} className="h-2" />
+                  <Progress value={((monthlyStats.totalHours || 0) / 176) * 100} className="h-2" />
 
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Performance Rating</span>
                     <span className="text-sm font-bold flex items-center space-x-1">
                       <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                      <span>{monthlyStats.performanceScore}/5.0</span>
+                      <span>{monthlyStats.performanceScore || 0}/5.0</span>
                     </span>
                   </div>
-                  <Progress value={(monthlyStats.performanceScore / 5) * 100} className="h-2" />
+                  <Progress value={((monthlyStats.performanceScore || 0) / 5) * 100} className="h-2" />
                 </div>
               </CardContent>
             </Card>
@@ -571,6 +657,7 @@ export default function EnhancedEmployeeDashboard() {
                       <TableHead>Service</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Created</TableHead>
+                      <TableHead>Due Date</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -588,6 +675,9 @@ export default function EnhancedEmployeeDashboard() {
                           </Badge>
                         </TableCell>
                         <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          {order.pickupDate ? new Date(order.pickupDate).toLocaleDateString() : 'N/A'}
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
                             <Button

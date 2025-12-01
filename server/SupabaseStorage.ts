@@ -520,6 +520,17 @@ export class SupabaseStorage {
         return this.mapDates(employee);
     }
 
+    async getEmployeeByEmail(email: string): Promise<Employee | undefined> {
+        const { data: employee, error } = await this.supabase
+            .from('employees')
+            .select('*')
+            .eq('email', email)
+            .single();
+
+        if (error) return undefined;
+        return this.mapDates(employee);
+    }
+
     async updateEmployee(id: string, data: Partial<InsertEmployee>): Promise<Employee | undefined> {
         const { data: employee, error } = await this.supabase
             .from('employees')
@@ -710,6 +721,138 @@ export class SupabaseStorage {
             newCustomers: newCustomersToday,
             inventoryItems: products.length
         };
+    }
+
+    // ======= SETTINGS =======
+    async getAllSettings(): Promise<any[]> {
+        const { data, error } = await this.supabase
+            .from('settings')
+            .select('*')
+            .order('category', { ascending: true })
+            .order('key', { ascending: true });
+
+        if (error) throw error;
+        return data.map(row => ({
+            ...row,
+            value: JSON.parse(row.value),
+            updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
+        }));
+    }
+
+    async getSettingsByCategory(category: string): Promise<any[]> {
+        const { data, error } = await this.supabase
+            .from('settings')
+            .select('*')
+            .eq('category', category)
+            .order('key', { ascending: true });
+
+        if (error) throw error;
+        return data.map(row => ({
+            ...row,
+            value: JSON.parse(row.value),
+            updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
+        }));
+    }
+
+    async getSetting(key: string): Promise<any | null> {
+        const { data, error } = await this.supabase
+            .from('settings')
+            .select('*')
+            .eq('key', key)
+            .single();
+
+        if (error) return null;
+        return {
+            ...data,
+            value: JSON.parse(data.value),
+            updatedAt: data.updatedAt ? new Date(data.updatedAt) : null
+        };
+    }
+
+    async updateSetting(key: string, value: any, category: string, updatedBy: string): Promise<any> {
+        const now = new Date().toISOString();
+        const valueStr = JSON.stringify(value);
+
+        // Check if exists
+        const existing = await this.getSetting(key);
+
+        let result;
+        if (existing) {
+            const { data, error } = await this.supabase
+                .from('settings')
+                .update({ value: valueStr, category, updatedBy, updatedAt: now })
+                .eq('key', key)
+                .select()
+                .single();
+
+            if (error) throw error;
+            result = data;
+        } else {
+            const { data, error } = await this.supabase
+                .from('settings')
+                .insert({ key, value: valueStr, category, updatedBy, updatedAt: now })
+                .select()
+                .single();
+
+            if (error) throw error;
+            result = data;
+        }
+
+        return {
+            ...result,
+            value: JSON.parse(result.value),
+            updatedAt: result.updatedAt ? new Date(result.updatedAt) : null
+        };
+    }
+
+    async updateSettings(settings: any[], updatedBy: string): Promise<any[]> {
+        const results = [];
+        for (const setting of settings) {
+            results.push(await this.updateSetting(setting.key, setting.value, setting.category, updatedBy));
+        }
+        return results;
+    }
+
+    async deleteAllSettings(): Promise<void> {
+        const { error } = await this.supabase
+            .from('settings')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+        if (error) throw error;
+    }
+
+    // ======= TRANSIT ORDERS =======
+    async listTransitOrders(): Promise<any[]> {
+        const { data, error } = await this.supabase
+            .from('transit_orders')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data.map(item => this.mapDates(item));
+    }
+
+    async getTransitOrdersByStatus(status: string): Promise<any[]> {
+        const { data, error } = await this.supabase
+            .from('transit_orders')
+            .select('*')
+            .eq('status', status)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data.map(item => this.mapDates(item));
+    }
+
+    async getTransitOrdersByType(type: string): Promise<any[]> {
+        const { data, error } = await this.supabase
+            .from('transit_orders')
+            .select('*')
+            .eq('type', type)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data.map(item => this.mapDates(item));
     }
 
     close() {

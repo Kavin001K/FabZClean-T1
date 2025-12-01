@@ -17,6 +17,7 @@ import {
   XCircle,
   PlusCircle,
   Printer,
+  Navigation,
 } from "lucide-react";
 import { formatCurrency, formatDate, getNextStatus } from "@/lib/data-service";
 import type { Order } from "../../../../shared/schema";
@@ -154,9 +155,23 @@ export default React.memo(function OrderDetailsDialog({
 
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Due Date</p>
-                <p className="text-lg font-semibold">
-                  {formatDate((order as any).pickupDate ? new Date((order as any).pickupDate).toString() : (order.createdAt ? order.createdAt.toString() : new Date().toString()))}
-                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-lg font-semibold">
+                    {formatDate((order as any).pickupDate ? new Date((order as any).pickupDate).toString() : (order.createdAt ? order.createdAt.toString() : new Date().toString()))}
+                  </p>
+                  {(order as any).pickupDate && (
+                    <Badge variant="outline" className={cn(
+                      "text-xs",
+                      new Date((order as any).pickupDate) < new Date() && order.status !== 'completed' && order.status !== 'delivered' ? "bg-red-100 text-red-800 border-red-200" :
+                        new Date((order as any).pickupDate).toDateString() === new Date().toDateString() && order.status !== 'completed' && order.status !== 'delivered' ? "bg-orange-100 text-orange-800 border-orange-200" :
+                          "bg-gray-100 text-gray-800 border-gray-200"
+                    )}>
+                      {new Date((order as any).pickupDate) < new Date() && order.status !== 'completed' && order.status !== 'delivered' ? "Overdue" :
+                        new Date((order as any).pickupDate).toDateString() === new Date().toDateString() && order.status !== 'completed' && order.status !== 'delivered' ? "Due Today" :
+                          "Scheduled"}
+                    </Badge>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -209,6 +224,31 @@ export default React.memo(function OrderDetailsDialog({
               <p className="text-sm font-medium text-muted-foreground">Notes</p>
               <div className="p-3 bg-muted/50 rounded-lg">
                 <p className="text-sm">{(order as any).notes}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Transit Information */}
+          {['processing', 'shipped', 'out_for_delivery', 'in_transit'].includes(order.status) && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Transit Status</p>
+              <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg dark:bg-blue-900/20 dark:border-blue-900/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 text-blue-600 rounded-full dark:bg-blue-900 dark:text-blue-400">
+                      <Navigation className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-blue-900 dark:text-blue-100">In Transit</p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        Order is currently being processed or is on its way.
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => window.open(`/tracking/${order.id}`, '_blank')}>
+                    Track Order
+                  </Button>
+                </div>
               </div>
             </div>
           )}

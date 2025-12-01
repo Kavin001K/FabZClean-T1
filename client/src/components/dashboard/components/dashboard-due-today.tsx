@@ -24,7 +24,7 @@ import { Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { TEST_IDS, getTestId } from '@/lib/test-ids';
 import { formatCurrency } from '@/lib/data-service';
 import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
-import { Link } from 'wouter';
+import { useLocation } from 'wouter';
 
 interface DashboardDueTodayProps {
   /** Due today orders data */
@@ -65,32 +65,17 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
   dueTodayOrders,
   isLoading,
 }) => {
+  const [, setLocation] = useLocation();
+
   if (isLoading) {
-    return (
-      <Card 
-        data-testid={getTestId(TEST_IDS.DASHBOARD.WIDGET, 'due-today-loading')}
-      >
-        <CardHeader>
-          <CardTitle>Due Today</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="flex items-center space-x-4">
-                <LoadingSkeleton.CardSkeleton />
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
+    // ... (keep loading state)
   }
 
   // Ensure dueTodayOrders is an array before calling slice
   const displayOrders = Array.isArray(dueTodayOrders) ? dueTodayOrders.slice(0, 5) : [];
 
   return (
-    <Card 
+    <Card
       data-testid={getTestId(TEST_IDS.DASHBOARD.WIDGET, 'due-today')}
     >
       <CardHeader className="flex flex-row items-center justify-between">
@@ -98,15 +83,18 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
           <Clock className="h-5 w-5" />
           Due Today
         </CardTitle>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/orders?filter=due-today" data-testid={getTestId(TEST_IDS.BUTTON.VIEW, 'due-today-orders')}>
-            View All
-          </Link>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setLocation('/orders?filter=due-today')}
+          data-testid={getTestId(TEST_IDS.BUTTON.VIEW, 'due-today-orders')}
+        >
+          View All
         </Button>
       </CardHeader>
       <CardContent>
         {displayOrders.length === 0 ? (
-          <div 
+          <div
             className="text-center py-8 text-muted-foreground"
             data-testid={getTestId(TEST_IDS.DATA.EMPTY, 'due-today-orders')}
           >
@@ -123,7 +111,7 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
               const urgencyText = getUrgencyText(hoursLeft);
 
               return (
-                <div 
+                <div
                   key={order.id || index}
                   className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
                   data-testid={getTestId(TEST_IDS.DATA.ITEM, `due-order-${order.id || index}`)}
@@ -133,8 +121,8 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
                       <span className="font-medium text-sm truncate">
                         {order.customerName || order.customer?.name || 'Unknown Customer'}
                       </span>
-                      <Badge 
-                        variant="secondary" 
+                      <Badge
+                        variant="secondary"
                         className={`text-xs ${urgencyColor}`}
                       >
                         <span className="flex items-center gap-1">
@@ -148,7 +136,7 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
                     </div>
                     {hoursLeft <= 6 && (
                       <div className="text-xs text-muted-foreground mt-1">
-                        {hoursLeft <= 0 
+                        {hoursLeft <= 0
                           ? `Overdue by ${Math.abs(hoursLeft)} hours`
                           : `Due in ${hoursLeft} hours`
                         }

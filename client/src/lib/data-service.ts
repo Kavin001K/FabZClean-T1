@@ -316,17 +316,13 @@ export const customersApi = {
 // Employees API
 export const employeesApi = {
   async getAll(): Promise<Employee[]> {
-    try {
-      const response = await fetchData<{ success: boolean; employees: Employee[] } | Employee[]>('/employees');
-      // Handle both wrapped and unwrapped responses
-      if (response && typeof response === 'object' && 'employees' in response) {
-        return response.employees || [];
-      }
-      return Array.isArray(response) ? response : [];
-    } catch (error) {
-      console.error('Failed to fetch employees:', error);
-      return [];
+    // Let errors propagate to the caller (useQuery)
+    const response = await fetchData<{ success: boolean; employees: Employee[] } | Employee[]>('/employees');
+    // Handle both wrapped and unwrapped responses
+    if (response && typeof response === 'object' && 'employees' in response) {
+      return response.employees || [];
     }
+    return Array.isArray(response) ? response : [];
   },
 
   async getById(id: string): Promise<Employee | null> {
@@ -349,7 +345,10 @@ export const employeesApi = {
         method: "POST",
         body: JSON.stringify(employee),
       });
-      if (!response.ok) throw new Error("Failed to create employee");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to create employee");
+      }
       const data = await response.json();
       // Handle wrapped response
       if (data && typeof data === 'object' && 'employee' in data) {
@@ -358,7 +357,7 @@ export const employeesApi = {
       return data;
     } catch (error) {
       console.error("Failed to create employee:", error);
-      return null;
+      throw error;
     }
   },
 
@@ -368,11 +367,14 @@ export const employeesApi = {
         method: "PUT",
         body: JSON.stringify(employee),
       });
-      if (!response.ok) throw new Error("Failed to update employee");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to update employee");
+      }
       return await response.json();
     } catch (error) {
       console.error(`Failed to update employee ${id}:`, error);
-      return null;
+      throw error;
     }
   },
 

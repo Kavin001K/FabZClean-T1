@@ -26,15 +26,28 @@ export const LoginForm: React.FC = () => {
     setLoading(true);
 
     try {
-      const { error } = await signIn(username, password);
+      const { error, employee } = await signIn(username, password);
 
       if (error) {
         setError(error);
       } else {
-        // Redirect to the intended page or dashboard
-        setLocation(redirectTo);
+        // Redirect based on role
+        if (employee) {
+          if (employee.role === 'admin') {
+            setLocation('/');
+          } else if (employee.role === 'franchise_manager') {
+            setLocation('/franchise-dashboard');
+          } else if (employee.role === 'employee' || employee.role === 'driver' || employee.role === 'factory_manager') {
+            setLocation('/employee-dashboard');
+          } else {
+            setLocation('/');
+          }
+        } else {
+          setLocation('/');
+        }
       }
     } catch (err) {
+      console.error(err);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);

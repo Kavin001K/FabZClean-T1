@@ -59,7 +59,45 @@ export const defaultPrintSettings: PrintSettings = {
  * Print using browser's native print dialog
  * Better for quick prints and when PDF generation is not needed
  */
+import { isElectron } from '@/lib/utils';
+
+/**
+ * Print using browser's native print dialog
+ * Better for quick prints and when PDF generation is not needed
+ */
 export function browserPrint(html: string, title: string = 'Print Document') {
+  if (isElectron()) {
+    // Electron-optimized printing using hidden iframe
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(html);
+      doc.close();
+
+      // Wait for content to load then print
+      iframe.onload = () => {
+        setTimeout(() => {
+          iframe.contentWindow?.print();
+          // Remove iframe after printing (with a delay to allow print dialog to open)
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
+        }, 500);
+      };
+    }
+    return;
+  }
+
+  // Standard browser printing
   const printWindow = window.open('', '_blank');
 
   if (!printWindow) {
@@ -416,7 +454,7 @@ export function printProfitLossStatement(data: any): void {
 
   const totalIncome = (data.serviceRevenue || 0) + (data.productSales || 0) + (data.otherIncome || 0);
   const totalExpenses = (data.operatingExpenses || 0) + (data.salaries || 0) +
-                        (data.rentUtilities || 0) + (data.marketing || 0) + (data.otherExpenses || 0);
+    (data.rentUtilities || 0) + (data.marketing || 0) + (data.otherExpenses || 0);
   const netProfit = totalIncome - totalExpenses;
   const profitMargin = totalIncome > 0 ? ((netProfit / totalIncome) * 100).toFixed(2) : 0;
 
@@ -453,7 +491,7 @@ export function printBalanceSheet(data: any): void {
   ];
 
   const totalAssets = (data.cash || 0) + (data.accountsReceivable || 0) +
-                      (data.inventory || 0) + (data.fixedAssets || 0);
+    (data.inventory || 0) + (data.fixedAssets || 0);
   const totalLiabilities = (data.accountsPayable || 0) + (data.loans || 0) + (data.otherLiabilities || 0);
   const equity = totalAssets - totalLiabilities;
 

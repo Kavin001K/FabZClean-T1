@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import React from 'react';
 import * as QRCode from 'qrcode';
 import InvoiceTemplateIN from '../components/print/invoice-template-in';
+import { isElectron } from './utils';
 
 export interface PrintSettings {
   pageSize: 'A4' | 'A5' | 'Letter' | 'Legal';
@@ -549,12 +550,12 @@ export class PrintDriver {
 
     // Add title
     doc.setFontSize(template.settings.fontSize + 4);
-    doc.setFont(undefined, 'bold');
+    doc.setFont(template.settings.fontFamily, 'bold');
     doc.text(data.title, template.settings.margin.left, template.settings.margin.top + 20);
 
     if (data.subtitle) {
       doc.setFontSize(template.settings.fontSize);
-      doc.setFont(undefined, 'normal');
+      doc.setFont(template.settings.fontFamily, 'normal');
       doc.text(data.subtitle, template.settings.margin.left, template.settings.margin.top + 30);
     }
 
@@ -667,7 +668,7 @@ export class PrintDriver {
       const canvas = await html2canvas(container, {
         scale: 2,
         useCORS: true,
-        allowTaint: true, // Allow taint to prevent security errors with images
+        allowTaint: false, // Changed to false to prevent security errors
         backgroundColor: '#ffffff',
         logging: false,
         windowWidth: 794,
@@ -677,7 +678,23 @@ export class PrintDriver {
 
       // 4. Generate PDF (jsPDF)
       console.log('📄 Generating PDF...');
-      const imgData = canvas.toDataURL('image/png');
+
+      // Use JPEG for better compatibility if PNG fails, but try PNG first
+      let imgData;
+      let imgFormat: 'PNG' | 'JPEG' = 'PNG';
+
+      try {
+        imgData = canvas.toDataURL('image/png');
+        // Basic validation of data URL
+        if (!imgData || imgData.length < 100) {
+          throw new Error('Invalid PNG data');
+        }
+      } catch (e) {
+        console.warn('PNG generation failed, falling back to JPEG', e);
+        imgData = canvas.toDataURL('image/jpeg', 0.95);
+        imgFormat = 'JPEG';
+      }
+
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -690,13 +707,13 @@ export class PrintDriver {
       let heightLeft = imgHeight;
       let position = 0;
 
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
 
       while (heightLeft > 5) { // Add 5mm tolerance to prevent blank pages from rounding errors
         position = heightLeft - imgHeight;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
 
@@ -727,10 +744,37 @@ export class PrintDriver {
         // We do NOT throw here anymore. We let the user download the file.
       }
 
-      // 6. Download to User
-      console.log('⬇️ Downloading file...');
-      pdf.save(filename);
-      console.log('✅ Download initiated');
+      // 6. Download to User or Print (Electron)
+      console.log('⬇️ Processing output...');
+
+      if (isElectron()) {
+        console.log('🖥️ Electron detected, initiating direct print...');
+        pdf.autoPrint();
+        const blobUrl = pdf.output('bloburl') as unknown as string;
+
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.border = 'none';
+        iframe.src = blobUrl;
+        document.body.appendChild(iframe);
+
+        // Allow time for PDF to load in iframe
+        setTimeout(() => {
+          if (iframe.contentWindow) {
+            iframe.contentWindow.print();
+          }
+          // Cleanup after a delay
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+            URL.revokeObjectURL(blobUrl);
+          }, 60000); // 1 minute cleanup
+        }, 1000);
+      } else {
+        pdf.save(filename);
+        console.log('✅ Download initiated');
+      }
 
     } catch (error) {
       console.error('❌ Critical error in printInvoice:', error);
@@ -886,13 +930,13 @@ export class PrintDriver {
     // Add logo placeholder
     if (template.layout.logo) {
       doc.setFontSize(16);
-      doc.setFont(undefined, 'bold');
+      doc.setFont(template.settings.fontFamily, 'bold');
       doc.text('FabZClean', margin.left, margin.top + 10);
     }
 
     // Add document type
     doc.setFontSize(12);
-    doc.setFont(undefined, 'normal');
+    doc.setFont(template.settings.fontFamily, 'normal');
     doc.text(`Document: ${data.invoiceNumber || data.title || 'Barcode'}`,
       doc.internal.pageSize.width - margin.right - 50, margin.top + 10);
   }
@@ -911,12 +955,12 @@ export class PrintDriver {
 
     // Company name (larger, bold)
     doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
+    doc.setFont(template.settings.fontFamily, 'bold');
     doc.text(companyInfo.name, margin.left, margin.top + 15);
 
     // Company details (smaller, normal)
     doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
+    doc.setFont(template.settings.fontFamily, 'normal');
 
     const details = [
       companyInfo.address,
@@ -970,10 +1014,10 @@ export class PrintDriver {
     const { margin } = template.settings;
 
     doc.setFontSize(template.settings.fontSize);
-    doc.setFont(undefined, 'bold');
+    doc.setFont(template.settings.fontFamily, 'bold');
     doc.text(`${data.entityType.toUpperCase()} DETAILS`, margin.left, margin.top + 80);
 
-    doc.setFont(undefined, 'normal');
+    doc.setFont(template.settings.fontFamily, 'normal');
     doc.text(`ID: ${data.entityId}`, margin.left, margin.top + 90);
     doc.text(`Code: ${data.code}`, margin.left, margin.top + 100);
     doc.text(`Type: ${data.type.toUpperCase()}`, margin.left, margin.top + 110);
@@ -989,10 +1033,10 @@ export class PrintDriver {
     const { margin } = template.settings;
 
     doc.setFontSize(template.settings.fontSize);
-    doc.setFont(undefined, 'bold');
+    doc.setFont(template.settings.fontFamily, 'bold');
     doc.text('DETAILS', margin.left, margin.top + 80);
 
-    doc.setFont(undefined, 'normal');
+    doc.setFont(template.settings.fontFamily, 'normal');
     data.details.forEach((detail, index) => {
       doc.text(`${detail.label}: ${detail.value}`, margin.left, margin.top + 90 + (index * 10));
     });
@@ -1011,7 +1055,7 @@ export class PrintDriver {
 
     // Invoice number and date (right aligned)
     doc.setFontSize(template.settings.fontSize + 2);
-    doc.setFont(undefined, 'bold');
+    doc.setFont(template.settings.fontFamily, 'bold');
     doc.text(`INVOICE`, rightMargin - doc.getTextWidth('INVOICE'), margin.top + 20);
 
     doc.setFontSize(template.settings.fontSize);
@@ -1027,9 +1071,9 @@ export class PrintDriver {
     }
 
     // Customer info section
-    doc.setFont(undefined, 'bold');
+    doc.setFont(template.settings.fontFamily, 'bold');
     doc.text('Bill To:', margin.left, margin.top + 80);
-    doc.setFont(undefined, 'normal');
+    doc.setFont(template.settings.fontFamily, 'normal');
 
     const customerY = margin.top + 90;
     doc.text(data.customerInfo.name, margin.left, customerY);
@@ -1039,7 +1083,7 @@ export class PrintDriver {
 
     // Payment status
     if (data.paymentStatus) {
-      doc.setFont(undefined, 'bold');
+      doc.setFont(template.settings.fontFamily, 'bold');
       const statusColor = data.paymentStatus.toLowerCase() === 'paid' ? '#27AE60' : '#E74C3C';
       doc.setTextColor(statusColor);
       doc.text(`Status: ${data.paymentStatus.toUpperCase()}`, rightMargin - doc.getTextWidth(`Status: ${data.paymentStatus.toUpperCase()}`), customerY + 20);
@@ -1066,7 +1110,7 @@ export class PrintDriver {
 
     // Table headers
     doc.setFontSize(template.settings.fontSize);
-    doc.setFont(undefined, 'bold');
+    doc.setFont(template.settings.fontFamily, 'bold');
     doc.text('Item/Description', margin.left + 2, startY);
     doc.text('Qty', margin.left + itemWidth + 2, startY);
     doc.text('Unit Price', margin.left + itemWidth + qtyWidth + 2, startY);
@@ -1077,7 +1121,7 @@ export class PrintDriver {
     doc.line(margin.left, startY + 2, rightMargin, startY + 2);
 
     // Table rows
-    doc.setFont(undefined, 'normal');
+    doc.setFont(template.settings.fontFamily, 'normal');
     let currentY = startY + 15;
 
     data.items.forEach((item, index) => {
@@ -1130,7 +1174,7 @@ export class PrintDriver {
 
     // Subtotal
     doc.setFontSize(template.settings.fontSize);
-    doc.setFont(undefined, 'normal');
+    doc.setFont(template.settings.fontFamily, 'normal');
     doc.text('Subtotal:', totalsX, startY + 10);
     doc.text(`₹${(parseFloat(String(data.subtotal)) || 0).toFixed(2)}`, totalsX + 50, startY + 10);
 
@@ -1145,7 +1189,7 @@ export class PrintDriver {
     doc.text(`₹${(parseFloat(String(data.tax)) || 0).toFixed(2)}`, totalsX + 50, startY + (data.discount ? 30 : 20));
 
     // Total
-    doc.setFont(undefined, 'bold');
+    doc.setFont(template.settings.fontFamily, 'bold');
     doc.setFontSize(template.settings.fontSize + 1);
     const totalY = startY + (data.discount ? 45 : 35);
     doc.text('Total:', totalsX, totalY);
@@ -1153,7 +1197,7 @@ export class PrintDriver {
 
     // Payment information
     if (data.paymentMethod || data.paymentStatus) {
-      doc.setFont(undefined, 'normal');
+      doc.setFont(template.settings.fontFamily, 'normal');
       doc.setFontSize(template.settings.fontSize - 1);
 
       const paymentY = totalY + 25;
@@ -1177,7 +1221,7 @@ export class PrintDriver {
     const { margin } = template.settings;
 
     doc.setFontSize(template.settings.fontSize);
-    doc.setFont(undefined, 'bold');
+    doc.setFont(template.settings.fontFamily, 'bold');
     doc.text(`Receipt #: ${data.invoiceNumber}`, margin.left, margin.top + 50);
     doc.text(`Date: ${new Date().toLocaleDateString()}`, margin.left, margin.top + 60);
     doc.text(`Time: ${new Date().toLocaleTimeString()}`, margin.left, margin.top + 70);
@@ -1187,7 +1231,7 @@ export class PrintDriver {
     const { margin } = template.settings;
 
     doc.setFontSize(template.settings.fontSize);
-    doc.setFont(undefined, 'normal');
+    doc.setFont(template.settings.fontFamily, 'normal');
 
     data.items.forEach((item, index) => {
       const y = margin.top + 90 + (index * 15);
@@ -1202,14 +1246,14 @@ export class PrintDriver {
     const startY = margin.top + 90 + (data.items.length * 15) + 20;
 
     doc.setFontSize(template.settings.fontSize);
-    doc.setFont(undefined, 'normal');
+    doc.setFont(template.settings.fontFamily, 'normal');
     doc.text(`Subtotal: ₹${(parseFloat(String(data.subtotal)) || 0).toFixed(2)}`, margin.left, startY);
     doc.text(`Tax: ₹${(parseFloat(String(data.tax)) || 0).toFixed(2)}`, margin.left, startY + 10);
-    doc.setFont(undefined, 'bold');
+    doc.setFont(template.settings.fontFamily, 'bold');
     doc.text(`Total: ₹${(parseFloat(String(data.total)) || 0).toFixed(2)}`, margin.left, startY + 20);
 
     if (data.paymentMethod) {
-      doc.setFont(undefined, 'normal');
+      doc.setFont(template.settings.fontFamily, 'normal');
       doc.text(`Payment: ${data.paymentMethod}`, margin.left, startY + 30);
     }
   }
@@ -1218,7 +1262,7 @@ export class PrintDriver {
     const { margin } = template.settings;
 
     doc.setFontSize(template.settings.fontSize);
-    doc.setFont(undefined, 'normal');
+    doc.setFont(template.settings.fontFamily, 'normal');
     doc.text('Signature:', margin.left, doc.internal.pageSize.height - margin.bottom - 30);
     doc.text('_________________________', margin.left, doc.internal.pageSize.height - margin.bottom - 20);
     doc.text('Date:', margin.left + 100, doc.internal.pageSize.height - margin.bottom - 30);
@@ -1229,7 +1273,7 @@ export class PrintDriver {
     const { margin } = template.settings;
 
     doc.setFontSize(8);
-    doc.setFont(undefined, 'normal');
+    doc.setFont(template.settings.fontFamily, 'normal');
     doc.text(`Printed on: ${new Date().toLocaleString()}`, margin.left, doc.internal.pageSize.height - margin.bottom + 10);
     doc.text('Thank you for your business!', margin.left, doc.internal.pageSize.height - margin.bottom + 20);
   }
@@ -1270,6 +1314,7 @@ export class PrintDriver {
   // Enhanced Invoice Generation
   async printProfessionalInvoice(data: InvoiceData): Promise<void> {
     const template = this.getTemplate('invoice');
+    if (!template) throw new Error('Invoice template not found');
     const pdf = new jsPDF({
       orientation: template.settings.orientation,
       unit: 'mm',
@@ -1488,6 +1533,7 @@ export class PrintDriver {
   // Enhanced Report Generation
   async printProfessionalReport(data: ReportData): Promise<void> {
     const template = this.getTemplate('report');
+    if (!template) throw new Error('Report template not found');
     const pdf = new jsPDF({
       orientation: template.settings.orientation,
       unit: 'mm',

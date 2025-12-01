@@ -17,7 +17,7 @@ export interface SettingsContextType {
   error: Error | null;
   getSetting: (key: string, defaultValue?: any) => any;
   updateSetting: (key: string, value: any, category: string) => Promise<void>;
-  updateSettings: (settings: Array<{key: string, value: any, category: string}>) => Promise<void>;
+  updateSettings: (settings: Array<{ key: string, value: any, category: string }>) => Promise<void>;
   resetSettings: () => Promise<void>;
   exportSettings: () => void;
   importSettings: (file: File) => Promise<void>;
@@ -35,7 +35,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const { data: settingsData, isLoading, error, refetch } = useQuery<Setting[]>({
     queryKey: ['settings'],
     queryFn: async () => {
-      const response = await fetch('/api/settings');
+      const token = localStorage.getItem('employee_token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const response = await fetch('/api/settings', { headers });
       if (!response.ok) throw new Error('Failed to fetch settings');
       return response.json();
     },
@@ -91,7 +98,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   // Bulk update settings mutation
   const updateSettingsMutation = useMutation({
-    mutationFn: async (settings: Array<{key: string, value: any, category: string}>) => {
+    mutationFn: async (settings: Array<{ key: string, value: any, category: string }>) => {
       const response = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -180,7 +187,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, [updateSettingMutation]);
 
   // Bulk update settings function
-  const updateSettings = useCallback(async (settings: Array<{key: string, value: any, category: string}>) => {
+  const updateSettings = useCallback(async (settings: Array<{ key: string, value: any, category: string }>) => {
     await updateSettingsMutation.mutateAsync(settings);
   }, [updateSettingsMutation]);
 

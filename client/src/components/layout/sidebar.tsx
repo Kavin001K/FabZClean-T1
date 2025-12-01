@@ -30,7 +30,19 @@ const NAV_ITEMS: NavItem[] = [
     to: "/",
     label: "Dashboard",
     icon: Home,
-    roles: ["admin", "employee", "franchise_manager", "factory_manager", "driver"],
+    roles: ["admin"],
+  },
+  {
+    to: "/franchise-dashboard",
+    label: "Dashboard",
+    icon: Home,
+    roles: ["franchise_manager"],
+  },
+  {
+    to: "/employee-dashboard",
+    label: "Dashboard",
+    icon: Home,
+    roles: ["employee", "driver", "factory_manager"],
   },
   {
     to: "/orders",
@@ -89,22 +101,10 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "franchise_manager", "factory_manager"],
   },
   {
-    to: "/employee-dashboard",
-    label: "Employee Dashboard",
-    icon: User,
-    roles: ["admin", "employee", "factory_manager"],
-  },
-  {
     to: "/users",
     label: "User Management",
     icon: Shield,
     roles: ["admin", "franchise_manager", "factory_manager"],
-  },
-  {
-    to: "/franchise-dashboard",
-    label: "Franchise Dashboard",
-    icon: Users2,
-    roles: ["admin", "franchise_manager"],
   },
   {
     to: "/database-status",

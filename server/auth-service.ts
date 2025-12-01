@@ -19,6 +19,10 @@ if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
     console.warn("⚠️ JWT_SECRET is not set. Using fallback for now, but this is insecure for production.");
 }
 
+if (!process.env.SUPABASE_SERVICE_KEY) {
+    console.warn("⚠️ SUPABASE_SERVICE_KEY is not set. Using ANON key. RLS policies may block backend operations.");
+}
+
 const FINAL_SECRET = JWT_SECRET || process.env.SESSION_SECRET || 'fabzclean-secret-key-change-in-production';
 const JWT_EXPIRY = '30d'; // 30 days - long session for better UX
 
@@ -41,6 +45,18 @@ export interface AuthEmployee {
     email?: string;
     phone?: string;
     isActive: boolean;
+    // HR Fields
+    position?: string;
+    department?: string;
+    hireDate?: Date;
+    salaryType?: 'hourly' | 'monthly';
+    baseSalary?: number;
+    hourlyRate?: number;
+    workingHours?: number;
+    emergencyContact?: string;
+    qualifications?: string;
+    notes?: string;
+    address?: string;
 }
 
 export class AuthService {
@@ -225,6 +241,18 @@ export class AuthService {
             fullName?: string;
             email?: string;
             phone?: string;
+            // HR Fields
+            position?: string;
+            department?: string;
+            hireDate?: Date;
+            salaryType?: 'hourly' | 'monthly';
+            baseSalary?: number;
+            hourlyRate?: number;
+            workingHours?: number;
+            emergencyContact?: string;
+            qualifications?: string;
+            notes?: string;
+            address?: string;
         },
         createdByEmployeeId: string
     ): Promise<AuthEmployee> {
@@ -250,12 +278,25 @@ export class AuthService {
                 full_name: data.fullName || null,
                 email: data.email || null,
                 phone: data.phone || null,
-                created_by: creator?.id || null,
+                // created_by: creator?.id || null, // Removed to fix schema cache error
+                // HR Fields
+                position: data.position || null,
+                department: data.department || null,
+                hire_date: data.hireDate ? data.hireDate.toISOString() : null,
+                salary_type: data.salaryType || null,
+                base_salary: data.baseSalary || null,
+                hourly_rate: data.hourlyRate || null,
+                working_hours: data.workingHours || 8,
+                emergency_contact: data.emergencyContact || null,
+                qualifications: data.qualifications || null,
+                notes: data.notes || null,
+                address: data.address || null,
             })
-            .select()
+            .select('id, employee_id, username, role, franchise_id, factory_id, full_name, email, phone, is_active, position, department, hire_date, salary_type, base_salary, hourly_rate, working_hours, emergency_contact, qualifications, notes, address')
             .single();
 
         if (error || !emp) {
+            console.error("❌ Create Employee DB Error:", error);
             throw new Error(`Failed to create employee: ${error?.message}`);
         }
 
@@ -276,6 +317,17 @@ export class AuthService {
             email: emp.email,
             phone: emp.phone,
             isActive: emp.is_active,
+            position: emp.position,
+            department: emp.department,
+            hireDate: emp.hire_date ? new Date(emp.hire_date) : undefined,
+            salaryType: emp.salary_type,
+            baseSalary: emp.base_salary,
+            hourlyRate: emp.hourly_rate,
+            workingHours: emp.working_hours,
+            emergencyContact: emp.emergency_contact,
+            qualifications: emp.qualifications,
+            notes: emp.notes,
+            address: emp.address,
         };
     }
 
@@ -291,6 +343,18 @@ export class AuthService {
             franchiseId: string;
             factoryId: string;
             isActive: boolean;
+            // HR Fields
+            position: string;
+            department: string;
+            hireDate: Date;
+            salaryType: 'hourly' | 'monthly';
+            baseSalary: number;
+            hourlyRate: number;
+            workingHours: number;
+            emergencyContact: string;
+            qualifications: string;
+            notes: string;
+            address: string;
         }>,
         updatedBy: string
     ): Promise<AuthEmployee> {
@@ -301,7 +365,20 @@ export class AuthService {
         if (data.phone !== undefined) updateData.phone = data.phone;
         if (data.franchiseId !== undefined) updateData.franchise_id = data.franchiseId;
         if (data.factoryId !== undefined) updateData.factory_id = data.factoryId;
+        if (data.factoryId !== undefined) updateData.factory_id = data.factoryId;
         if (data.isActive !== undefined) updateData.is_active = data.isActive;
+        // HR Fields
+        if (data.position !== undefined) updateData.position = data.position;
+        if (data.department !== undefined) updateData.department = data.department;
+        if (data.hireDate !== undefined) updateData.hire_date = data.hireDate.toISOString();
+        if (data.salaryType !== undefined) updateData.salary_type = data.salaryType;
+        if (data.baseSalary !== undefined) updateData.base_salary = data.baseSalary;
+        if (data.hourlyRate !== undefined) updateData.hourly_rate = data.hourlyRate;
+        if (data.workingHours !== undefined) updateData.working_hours = data.workingHours;
+        if (data.emergencyContact !== undefined) updateData.emergency_contact = data.emergencyContact;
+        if (data.qualifications !== undefined) updateData.qualifications = data.qualifications;
+        if (data.notes !== undefined) updateData.notes = data.notes;
+        if (data.address !== undefined) updateData.address = data.address;
 
         if (Object.keys(updateData).length === 0) {
             throw new Error('No fields to update');
@@ -332,7 +409,56 @@ export class AuthService {
             email: emp.email,
             phone: emp.phone,
             isActive: emp.is_active,
+            position: emp.position,
+            department: emp.department,
+            hireDate: emp.hire_date ? new Date(emp.hire_date) : undefined,
+            salaryType: emp.salary_type,
+            baseSalary: emp.base_salary,
+            hourlyRate: emp.hourly_rate,
+            workingHours: emp.working_hours,
+            emergencyContact: emp.emergency_contact,
+            qualifications: emp.qualifications,
+            notes: emp.notes,
+            address: emp.address,
         };
+    }
+
+    /**
+     * Change password (for users changing their own password)
+     */
+    static async changePassword(employeeId: string, currentPassword: string, newPassword: string): Promise<void> {
+        // 1. Get employee to verify current password
+        const { data: emp, error } = await supabase
+            .from('auth_employees')
+            .select('*')
+            .eq('employee_id', employeeId)
+            .single();
+
+        if (error || !emp) {
+            throw new Error('Employee not found');
+        }
+
+        // 2. Verify current password
+        const isValidPassword = await bcrypt.compare(currentPassword, emp.password_hash);
+        if (!isValidPassword) {
+            throw new Error('Invalid current password');
+        }
+
+        // 3. Hash new password
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+
+        // 4. Update password
+        const { error: updateError } = await supabase
+            .from('auth_employees')
+            .update({ password_hash: passwordHash })
+            .eq('employee_id', employeeId);
+
+        if (updateError) {
+            throw new Error('Failed to update password');
+        }
+
+        // Log password change
+        await this.logAction(employeeId, emp.username, 'change_password', 'employee', employeeId, {});
     }
 
     /**
@@ -379,6 +505,17 @@ export class AuthService {
             email: emp.email,
             phone: emp.phone,
             isActive: emp.is_active,
+            position: emp.position,
+            department: emp.department,
+            hireDate: emp.hire_date ? new Date(emp.hire_date) : undefined,
+            salaryType: emp.salary_type,
+            baseSalary: emp.base_salary,
+            hourlyRate: emp.hourly_rate,
+            workingHours: emp.working_hours,
+            emergencyContact: emp.emergency_contact,
+            qualifications: emp.qualifications,
+            notes: emp.notes,
+            address: emp.address,
         };
     }
 
@@ -416,6 +553,17 @@ export class AuthService {
             email: emp.email,
             phone: emp.phone,
             isActive: emp.is_active,
+            position: emp.position,
+            department: emp.department,
+            hireDate: emp.hire_date ? new Date(emp.hire_date) : undefined,
+            salaryType: emp.salary_type,
+            baseSalary: emp.base_salary,
+            hourlyRate: emp.hourly_rate,
+            workingHours: emp.working_hours,
+            emergencyContact: emp.emergency_contact,
+            qualifications: emp.qualifications,
+            notes: emp.notes,
+            address: emp.address,
         }));
     }
 

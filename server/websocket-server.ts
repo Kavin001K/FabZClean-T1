@@ -26,7 +26,7 @@ interface MessageBatch {
 }
 
 class RealtimeServer {
-  private wss: WebSocketServer;
+  private wss!: WebSocketServer;
   private clients: Map<string, ClientSubscription> = new Map();
   private updateInterval: NodeJS.Timeout | null = null;
   private server: Server | null = null;
@@ -379,8 +379,18 @@ class RealtimeServer {
   // Method to create server with Express app
   public createServer(app: Express): Server {
     const server = createServer(app);
-    this.wss = new WebSocketServer({ server, path: '/ws' });
+    this.wss = new WebSocketServer({ noServer: true });
     this.server = server;
+
+    server.on('upgrade', (request, socket, head) => {
+      const pathname = request.url;
+      if (pathname === '/ws') {
+        this.wss.handleUpgrade(request, socket, head, (ws) => {
+          this.wss.emit('connection', ws, request);
+        });
+      }
+      // Allow other listeners (like Vite) to handle other paths
+    });
 
     this.setupWebSocketHandlers();
     this.startPeriodicUpdates();

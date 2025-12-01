@@ -5,19 +5,31 @@ interface Employee {
   id: string;
   employeeId: string;
   username: string;
-  role: 'admin' | 'franchise_manager' | 'factory_manager';
+  role: 'admin' | 'franchise_manager' | 'factory_manager' | 'employee' | 'driver';
   franchiseId?: string;
   factoryId?: string;
   fullName?: string;
   email?: string;
   phone?: string;
   isActive: boolean;
+  // HR Fields
+  position?: string;
+  department?: string;
+  hireDate?: string; // ISO string
+  salaryType?: 'hourly' | 'monthly';
+  baseSalary?: number;
+  hourlyRate?: number;
+  workingHours?: number;
+  emergencyContact?: string;
+  qualifications?: string;
+  notes?: string;
+  address?: string;
 }
 
 interface AuthContextType {
   employee: Employee | null;
   loading: boolean;
-  signIn: (username: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (username: string, password: string) => Promise<{ error: string | null; employee?: Employee }>;
   signOut: () => Promise<void>;
   hasRole: (roles: string | string[]) => boolean;
   isAdmin: boolean;
@@ -74,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // Sign in with username and password
-  const signIn = async (username: string, password: string): Promise<{ error: string | null }> => {
+  const signIn = async (username: string, password: string): Promise<{ error: string | null; employee?: Employee }> => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -90,7 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (response.ok && data.success) {
         localStorage.setItem('employee_token', data.token);
         setEmployee(data.employee);
-        return { error: null };
+        return { error: null, employee: data.employee };
       } else {
         return { error: data.error || 'Login failed' };
       }

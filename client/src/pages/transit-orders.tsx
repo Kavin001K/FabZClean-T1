@@ -138,12 +138,12 @@ interface TransitBatch {
 // Audio feedback
 const playSuccessSound = () => {
   const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZUQ0PVK3n77BdGAg+ltjyvW0gBSyBzvLZiTYIGWi77eeeTRAMUKnk8LdlHAU4kNfyzHksBSR3x/DdkEAKFF606+uoVRQKRp/g8r5sIQUxh9Hz04IzBh5uwO/jmVENEFSu5++wXRgIPpbX8r1tIAUsgc7y2Yk2CBlou+3nnk0QDFCp5PC3ZRwFOJDX8sx5LAUkd8fw3ZBACxVetOvrqVUUCkae4fK+bCAFMIfR89OCMwYdbsDv45lRDRBUrufvsF0YCD6W1/K9bSAFLIHO8tmJNggZaLvt555NEAxQqeTwt2UcBTiQ1/LMeSwFJHfH8N2QQAsVXrTr66lVFApGnuHyvmwgBTCH0fPTgjMGHW7A7+OZUQwQVK7n77BdGAg+ltfyvW0gBSyBzvLZiTYIGWi77eeeTRAMUKnk8LdlHAU4kNfyzHksBSR3x/DdkEALFV606+upVRQKRp7h8r5sIAUwh9Hz04IzBh1uwO/jmVEMEFSu5++wXRgIPpbX8r1tIAUsgc7y2Yk2CBlou+3nnk0QDFCp5PC3ZRwFOJDX8sx5LAUkd8fw3ZBACxVetOvrqVUUCkae4fK+bCAFMIfR89OCMwYdbsDv45lRDRBUrufvsF0YCD6W1/K9bSAFLIHO8tmJNggZaLvt555NEAxQqeTwt2UcBTiQ1/LMeSwFJHfH8N2QQAsVXrTr66lVFApGnuHyvmwgBTCH0fPTgjMGHW7A7+OZUQwQVK7n77BdGAg+ltfyvW0gBSyBzvLZiTYIGWi77eeeTRAMUKnk8LdlHAU4kNfyzHksBSR3x/DdkEALFV606+upVRQKRp7h8r5sIAUwh9Hz04IzBh1uwO/jmVEMEFSu5++wXRgIPpbX8r1tIAUsgc7y2Yk2CBlouv3nnk0QDFCp5PC3ZRwFOJDX8sx5LAUkd8fw3ZBACxVetOvrqVUUCkae4fK+bCAFMIfR89OCMwYdbsDv45lRDRBUrufvsF0YCD6W1/K9bSAFLIHO8tmJNggZaLvt555NEAxQqeTwt2UcBTiQ1/LMeSwFJHfH8N2QQAsVXrTr66lVFApGnuHyvmwgBTCH0fPTgjMGHW7A7+OZUQwQVK7n77BdGAg+ltfyvW0gBSyBzvLZiTYIGWi77eeeTRAMUKnk8LdlHAU4kNfyzHksBSR3x/DdkEALFV606+upVRQKRp7h8r5sIAUwh9Hz04IzBh1uwO/jmVEMEFSu5++wXRgI');
-  audio.play().catch(() => {});
+  audio.play().catch(() => { });
 };
 
 const playErrorSound = () => {
   const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm01IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZUQ0PVK3n77BdGAg+ltjyvW0gBSyBzvLZiTYIGWi77eeeTRAMUKnk8LdlHAU4kNfyzHksBSR3x/DdkEAKFF606+uoVRQKRp/g8r5sIQUxh9Hz04IzBh5uwO/jmVENEFSu5++wXRgI');
-  audio.play().catch(() => {});
+  audio.play().catch(() => { });
 };
 
 // Transit Status History Component
@@ -191,9 +191,8 @@ const TransitStatusHistory: React.FC<{ transitOrderId: string }> = ({ transitOrd
         {statusHistory.map((entry, index) => (
           <div key={entry.id} className="ml-6 pb-6 relative">
             <div
-              className={`absolute -left-[29px] mt-1.5 h-4 w-4 rounded-full border-2 ${
-                index === 0 ? 'bg-primary border-primary' : 'bg-background border-muted'
-              }`}
+              className={`absolute -left-[29px] mt-1.5 h-4 w-4 rounded-full border-2 ${index === 0 ? 'bg-primary border-primary' : 'bg-background border-muted'
+                }`}
             />
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <div className="flex items-start justify-between">
@@ -204,8 +203,8 @@ const TransitStatusHistory: React.FC<{ transitOrderId: string }> = ({ transitOrd
                       entry.status === 'completed'
                         ? 'bg-green-100 text-green-800'
                         : entry.status === 'in_transit'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-blue-100 text-blue-800'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-blue-100 text-blue-800'
                     }
                   >
                     {entry.status.replace(/_/g, ' ').toUpperCase()}
@@ -391,7 +390,7 @@ const generateTransitPDF = (
 
   doc.setFontSize(7);
   doc.text(`Phone: ${origin.phone}`, margin + 3, currentY + 22);
-  doc.text(`Code: ${batchType === 'store_to_factory' ? origin.storeCode : origin.factoryCode}`, margin + 3, currentY + 26);
+  doc.text(`Code: ${batchType === 'store_to_factory' ? (origin as StoreDetails).storeCode : (origin as FactoryDetails).factoryCode}`, margin + 3, currentY + 26);
 
   // Destination Box
   const destX = margin + (pageWidth - 2 * margin - 5) / 2 + 5;
@@ -415,7 +414,7 @@ const generateTransitPDF = (
 
   doc.setFontSize(7);
   doc.text(`Phone: ${destination.phone}`, destX + 3, currentY + 22);
-  doc.text(`Code: ${batchType === 'store_to_factory' ? destination.factoryCode : destination.storeCode}`, destX + 3, currentY + 26);
+  doc.text(`Code: ${batchType === 'store_to_factory' ? (destination as FactoryDetails).factoryCode : (destination as StoreDetails).storeCode}`, destX + 3, currentY + 26);
 
   currentY += 32;
 
@@ -651,20 +650,11 @@ export default function TransitOrdersPage() {
   const { data: recentOrders = [], isLoading: isLoadingRecentOrders } = useQuery({
     queryKey: ['recent-orders', batchType],
     queryFn: async () => {
-      const response = await fetch('/api/orders/recent');
+      const response = await fetch(`/api/transit-suggestions/suggestions?type=${batchType}`);
       if (!response.ok) {
         throw new Error('Failed to fetch recent orders');
       }
-      const allOrders = await response.json();
-
-      // Filter orders based on batch type and appropriate statuses
-      const validStatuses = batchType === 'store_to_factory'
-        ? ['in_store', 'ready_for_transit', 'pending']
-        : ['processing', 'completed', 'ready_for_delivery'];
-
-      return allOrders
-        .filter((order: any) => validStatuses.includes(order.status))
-        .slice(0, 10); // Show last 10 recent orders
+      return response.json();
     },
     enabled: isScanning, // Only fetch when scanning is active
   });
@@ -673,13 +663,15 @@ export default function TransitOrdersPage() {
   const { data: transitHistory = [], isLoading } = useQuery<TransitBatch[]>({
     queryKey: ['transit-batches'],
     queryFn: async () => {
-      const response = await fetch('/api/transit-orders');
+      const response = await fetch('/api/transit/batches');
       if (!response.ok) {
         throw new Error('Failed to fetch transit orders');
       }
       const data = await response.json();
       // Map database format to component format
-      return data.map((order: any) => ({
+      // Handle paginated response structure
+      const batches = data.data || [];
+      return batches.map((order: any) => ({
         id: order.id,
         transitId: order.transitId,
         type: order.type,
@@ -1183,11 +1175,10 @@ export default function TransitOrdersPage() {
                         key={order.orderNumber}
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className={`p-2 rounded-md border-2 transition-all cursor-pointer ${
-                          currentBatch.some(b => b.orderNumber === order.orderNumber)
-                            ? 'border-green-500 bg-green-50 opacity-50 cursor-not-allowed'
-                            : 'border-border bg-background hover:border-primary hover:shadow-sm'
-                        }`}
+                        className={`p-2 rounded-md border-2 transition-all cursor-pointer ${currentBatch.some(b => b.orderNumber === order.orderNumber)
+                          ? 'border-green-500 bg-green-50 opacity-50 cursor-not-allowed'
+                          : 'border-border bg-background hover:border-primary hover:shadow-sm'
+                          }`}
                         onClick={() => handleQuickAddOrder(order)}
                       >
                         <div className="flex flex-col gap-1">

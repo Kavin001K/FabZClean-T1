@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,11 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
-import { 
-  Settings as SettingsIcon, 
-  User, 
-  Bell, 
-  Shield, 
+import { useAuth } from "@/contexts/auth-context";
+import { employeesApi, API_BASE } from "@/lib/data-service";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Settings as SettingsIcon,
+  User,
+  Bell,
+  Shield,
   Palette,
   Database,
   Globe,
@@ -41,6 +44,8 @@ import {
 export default function Settings() {
   const { toast } = useToast();
   const { addNotification } = useNotifications();
+  const { employee, signIn } = useAuth(); // We might need to refresh token/user data
+  const queryClient = useQueryClient();
 
   // Settings state
   const [settings, setSettings] = useState({
@@ -53,7 +58,7 @@ export default function Settings() {
     currency: 'INR',
     language: 'en',
     dateFormat: 'DD/MM/YYYY',
-    
+
     // Notification Settings
     emailNotifications: true,
     smsNotifications: false,
@@ -63,20 +68,20 @@ export default function Settings() {
     attendanceNotifications: true,
     deliveryNotifications: true,
     maintenanceNotifications: true,
-    
+
     // Security Settings
     twoFactorAuth: false,
     sessionTimeout: 30,
     passwordExpiry: 90,
     loginAttempts: 5,
     auditLog: true,
-    
+
     // Appearance Settings
     theme: 'system',
     primaryColor: '#3b82f6',
     sidebarCollapsed: false,
     compactMode: false,
-    
+
     // Business Settings
     operatingHours: {
       start: '08:00',
@@ -90,7 +95,7 @@ export default function Settings() {
       minimumOrderAmount: 100,
       autoAcceptOrders: false
     },
-    
+
     // Data Settings
     backupFrequency: 'weekly',
     dataRetention: 365,
@@ -100,15 +105,31 @@ export default function Settings() {
 
   // Profile state
   const [profile, setProfile] = useState({
-    name: 'Franchise Owner',
-    email: 'owner@fabzclean.com',
-    phone: '+91 98765 43210',
-    address: '123 Owner Street, Bangalore, KA 560001',
-    position: 'Franchise Owner',
-    department: 'Management',
-    hireDate: '2024-01-01',
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    position: '',
+    department: '',
+    hireDate: '',
     avatar: ''
   });
+
+  // Load profile from auth context
+  useEffect(() => {
+    if (employee) {
+      setProfile({
+        name: employee.fullName || '',
+        email: employee.email || '',
+        phone: employee.phone || '',
+        address: employee.address || '',
+        position: employee.position || '',
+        department: employee.department || '',
+        hireDate: employee.hireDate ? new Date(employee.hireDate).toISOString().split('T')[0] : '',
+        avatar: ''
+      });
+    }
+  }, [employee]);
 
   // Password change state
   const [passwordForm, setPasswordForm] = useState({
@@ -139,18 +160,95 @@ export default function Settings() {
     }));
   };
 
+  // Profile Update Mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (!employee?.id) throw new Error("No employee ID");
+      // Use employeesApi to update
+      // Note: We are using employee.employeeId because the API route expects the ID used in the URL to be the one we want to update.
+      // But wait, employeesApi.update takes 'id'. The route /employees/:id uses req.params.id.
+      // AuthService.updateEmployee uses employee_id (e.g. EMP-001) or uuid?
+      // Let's check server/routes/employees.ts. It calls AuthService.getEmployee(req.params.id).
+      // AuthService.getEmployee expects employee_id (string like EMP-001).
+      // So we should pass employee.employeeId.
+      return await employeesApi.update(employee.employeeId, data);
+    },
+    onSuccess: () => {
+      addNotification({
+        type: 'success',
+        title: 'Profile Updated!',
+        message: 'Your profile information has been updated successfully.',
+      });
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully.",
+      });
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['employee', employee?.employeeId] });
+      // Ideally we should also update the auth context, but that requires a fetch or manual update
+      // For now, a page reload or re-fetch in AuthProvider would handle it.
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update profile.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleProfileUpdate = () => {
-    addNotification({
-      type: 'success',
-      title: 'Profile Updated!',
-      message: 'Your profile information has been updated successfully.',
-    });
-    
-    toast({
-      title: "Profile Updated",
-      description: "Your profile has been updated successfully.",
+    updateProfileMutation.mutate({
+      fullName: profile.name,
+      email: profile.email,
+      phone: profile.phone,
+      address: profile.address,
+      // Users typically can't update their own position/department/hireDate via this form unless they are admins,
+      // but the UI shows them as inputs. We'll send them if they are editable.
+      // If the backend restricts it, it will be ignored or error.
+      // However, for a "Profile" page, usually only personal info is editable.
+      // Let's send what we have.
     });
   };
+
+  // Password Change Mutation
+  const changePasswordMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await fetch(`${API_BASE}/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('employee_token')}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to change password');
+      }
+      return await response.json();
+    },
+    onSuccess: () => {
+      addNotification({
+        type: 'success',
+        title: 'Password Changed!',
+        message: 'Your password has been changed successfully.',
+      });
+      toast({
+        title: "Password Changed",
+        description: "Your password has been updated successfully.",
+      });
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Password Change Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
 
   const handlePasswordChange = () => {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -171,18 +269,10 @@ export default function Settings() {
       return;
     }
 
-    addNotification({
-      type: 'success',
-      title: 'Password Changed!',
-      message: 'Your password has been changed successfully.',
+    changePasswordMutation.mutate({
+      currentPassword: passwordForm.currentPassword,
+      newPassword: passwordForm.newPassword
     });
-    
-    toast({
-      title: "Password Changed",
-      description: "Your password has been updated successfully.",
-    });
-
-    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
   };
 
   const handleSettingsSave = () => {
@@ -191,7 +281,7 @@ export default function Settings() {
       title: 'Settings Saved!',
       message: 'All settings have been saved successfully.',
     });
-    
+
     toast({
       title: "Settings Saved",
       description: "Your settings have been updated successfully.",
@@ -296,7 +386,7 @@ export default function Settings() {
                     <Input
                       id="profile-name"
                       value={profile.name}
-                      onChange={(e) => setProfile({...profile, name: e.target.value})}
+                      onChange={(e) => setProfile({ ...profile, name: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -305,7 +395,7 @@ export default function Settings() {
                       id="profile-email"
                       type="email"
                       value={profile.email}
-                      onChange={(e) => setProfile({...profile, email: e.target.value})}
+                      onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                     />
                   </div>
                 </div>
@@ -316,7 +406,7 @@ export default function Settings() {
                     <Input
                       id="profile-phone"
                       value={profile.phone}
-                      onChange={(e) => setProfile({...profile, phone: e.target.value})}
+                      onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -324,7 +414,7 @@ export default function Settings() {
                     <Input
                       id="profile-position"
                       value={profile.position}
-                      onChange={(e) => setProfile({...profile, position: e.target.value})}
+                      onChange={(e) => setProfile({ ...profile, position: e.target.value })}
                     />
                   </div>
                 </div>
@@ -334,7 +424,7 @@ export default function Settings() {
                   <Textarea
                     id="profile-address"
                     value={profile.address}
-                    onChange={(e) => setProfile({...profile, address: e.target.value})}
+                    onChange={(e) => setProfile({ ...profile, address: e.target.value })}
                   />
                 </div>
 
@@ -361,14 +451,14 @@ export default function Settings() {
                       id="current-password"
                       type={showPasswords.current ? "text" : "password"}
                       value={passwordForm.currentPassword}
-                      onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                     />
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       className="absolute right-0 top-0 h-full px-3"
-                      onClick={() => setShowPasswords({...showPasswords, current: !showPasswords.current})}
+                      onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
                     >
                       {showPasswords.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </Button>
@@ -382,14 +472,14 @@ export default function Settings() {
                       id="new-password"
                       type={showPasswords.new ? "text" : "password"}
                       value={passwordForm.newPassword}
-                      onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                     />
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       className="absolute right-0 top-0 h-full px-3"
-                      onClick={() => setShowPasswords({...showPasswords, new: !showPasswords.new})}
+                      onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
                     >
                       {showPasswords.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </Button>
@@ -403,14 +493,14 @@ export default function Settings() {
                       id="confirm-password"
                       type={showPasswords.confirm ? "text" : "password"}
                       value={passwordForm.confirmPassword}
-                      onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                     />
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       className="absolute right-0 top-0 h-full px-3"
-                      onClick={() => setShowPasswords({...showPasswords, confirm: !showPasswords.confirm})}
+                      onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
                     >
                       {showPasswords.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </Button>

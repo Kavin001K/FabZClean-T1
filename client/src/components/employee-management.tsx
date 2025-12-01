@@ -83,7 +83,7 @@ export default function EmployeeManagement() {
   });
 
   // Fetch employees
-  const { data: employeesData, isLoading } = useQuery({
+  const { data: employeesData, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['employees'],
     queryFn: () => employeesApi.getAll(),
   });
@@ -104,7 +104,7 @@ export default function EmployeeManagement() {
       resetForm();
     },
     onError: (error) => {
-      toast({ title: "Error", description: "Failed to create employee", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to create employee", variant: "destructive" });
     }
   });
 
@@ -116,7 +116,7 @@ export default function EmployeeManagement() {
       toast({ title: "Success", description: "Employee updated successfully" });
     },
     onError: (error) => {
-      toast({ title: "Error", description: "Failed to update employee", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to update employee", variant: "destructive" });
     }
   });
 
@@ -148,8 +148,13 @@ export default function EmployeeManagement() {
   };
 
   const handleCreateEmployee = () => {
-    if (!employeeForm.fullName || !employeeForm.email || !employeeForm.phone || !employeeForm.position) {
-      toast({ title: "Validation Error", description: "Please fill in all required fields.", variant: "destructive" });
+    if (!employeeForm.fullName || !employeeForm.email || !employeeForm.phone || !employeeForm.position || !employeeForm.department || !employeeForm.hireDate) {
+      toast({ title: "Validation Error", description: "Please fill in all required fields (Name, Email, Phone, Position, Department, Hire Date).", variant: "destructive" });
+      return;
+    }
+
+    if (employeeForm.salaryType === 'monthly' && !employeeForm.baseSalary) {
+      toast({ title: "Validation Error", description: "Base Salary is required for monthly employees.", variant: "destructive" });
       return;
     }
 
@@ -168,7 +173,7 @@ export default function EmployeeManagement() {
       department: employeeForm.department,
       hireDate: new Date(employeeForm.hireDate),
       salaryType: employeeForm.salaryType,
-      baseSalary: employeeForm.salaryType === 'monthly' ? parseFloat(employeeForm.baseSalary) : 0,
+      salary: employeeForm.salaryType === 'monthly' ? parseFloat(employeeForm.baseSalary) : 0, // Map to 'salary' column
       hourlyRate: employeeForm.salaryType === 'hourly' ? parseFloat(employeeForm.hourlyRate) : undefined,
       workingHours: parseInt(employeeForm.workingHours),
       status: 'active',
@@ -191,7 +196,7 @@ export default function EmployeeManagement() {
       department: employee.department,
       hireDate: employee.hireDate ? new Date(employee.hireDate).toISOString().split('T')[0] : '',
       salaryType: employee.salaryType,
-      baseSalary: employee.baseSalary?.toString() || '',
+      baseSalary: (employee as any).salary?.toString() || employee.baseSalary?.toString() || '', // Handle both salary and baseSalary
       hourlyRate: employee.hourlyRate?.toString() || '',
       workingHours: employee.workingHours?.toString() || '8',
       emergencyContact: employee.emergencyContact,
@@ -218,7 +223,7 @@ export default function EmployeeManagement() {
         department: employeeForm.department,
         hireDate: new Date(employeeForm.hireDate),
         salaryType: employeeForm.salaryType,
-        baseSalary: employeeForm.salaryType === 'monthly' ? parseFloat(employeeForm.baseSalary) : 0,
+        salary: employeeForm.salaryType === 'monthly' ? parseFloat(employeeForm.baseSalary) : 0, // Map to 'salary' column
         hourlyRate: employeeForm.salaryType === 'hourly' ? parseFloat(employeeForm.hourlyRate) : undefined,
         workingHours: parseInt(employeeForm.workingHours),
         emergencyContact: employeeForm.emergencyContact,
@@ -518,50 +523,62 @@ export default function EmployeeManagement() {
         <CardContent>
           {isLoading ? (
             <div className="text-center py-4">Loading users...</div>
+          ) : isError ? (
+            <div className="text-center py-8 text-red-500">
+              <p className="mb-2">Failed to load users.</p>
+              <p className="text-sm text-muted-foreground mb-4">{(error as Error)?.message}</p>
+              <Button variant="outline" onClick={() => refetch()}>Retry</Button>
+            </div>
           ) : (
             <div className="space-y-4">
-              {employees.map((employee: any) => (
-                <div key={employee.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-                      <span className="text-lg font-medium text-primary-foreground">
-                        {employee.fullName ? employee.fullName.split(' ').map((n: string) => n[0]).join('') : 'U'}
-                      </span>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">{employee.fullName}</h3>
-                        <Badge variant="outline" className="ml-2">
-                          <Shield className="w-3 h-3 mr-1" />
-                          {employee.role}
-                        </Badge>
-                        <Badge className={getStatusColor(employee.status)}>
-                          {employee.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {employee.position} • {employee.department} • {employee.employeeId}
-                      </p>
-                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Mail className="w-3 h-3" />
-                          {employee.email}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Phone className="w-3 h-3" />
-                          {employee.phone}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleEditEmployee(employee)}>
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                  </div>
+              {employees.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No users found.
                 </div>
-              ))}
+              ) : (
+                employees.map((employee: any) => (
+                  <div key={employee.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
+                        <span className="text-lg font-medium text-primary-foreground">
+                          {employee.fullName ? employee.fullName.split(' ').map((n: string) => n[0]).join('') : 'U'}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold">{employee.fullName}</h3>
+                          <Badge variant="outline" className="ml-2">
+                            <Shield className="w-3 h-3 mr-1" />
+                            {employee.role}
+                          </Badge>
+                          <Badge className={getStatusColor(employee.status)}>
+                            {employee.status}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {employee.position} • {employee.department} • {employee.employeeId}
+                        </p>
+                        <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Mail className="w-3 h-3" />
+                            {employee.email}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Phone className="w-3 h-3" />
+                            {employee.phone}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleEditEmployee(employee)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </CardContent>
@@ -576,29 +593,168 @@ export default function EmployeeManagement() {
               Update user information and role.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <Tabs defaultValue="personal" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="personal">Personal Info</TabsTrigger>
+              <TabsTrigger value="work">Work Details</TabsTrigger>
+              <TabsTrigger value="compensation">Compensation</TabsTrigger>
+            </TabsList>
+
+            {/* Personal Information Tab */}
+            <TabsContent value="personal" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">Full Name *</Label>
+                  <Input
+                    id="edit-name"
+                    placeholder="Enter full name"
+                    value={employeeForm.fullName}
+                    onChange={(e) => setEmployeeForm({ ...employeeForm, fullName: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email Address *</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    placeholder="Enter email address"
+                    value={employeeForm.email}
+                    onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-phone">Phone Number *</Label>
+                  <Input
+                    id="edit-phone"
+                    placeholder="Enter phone number"
+                    value={employeeForm.phone}
+                    onChange={(e) => setEmployeeForm({ ...employeeForm, phone: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-emergencyContact">Emergency Contact</Label>
+                  <Input
+                    id="edit-emergencyContact"
+                    placeholder="Name and phone number"
+                    value={employeeForm.emergencyContact}
+                    onChange={(e) => setEmployeeForm({ ...employeeForm, emergencyContact: e.target.value })}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label>Full Name</Label>
-                <Input
-                  value={employeeForm.fullName}
-                  onChange={(e) => setEmployeeForm({ ...employeeForm, fullName: e.target.value })}
+                <Label htmlFor="edit-address">Address</Label>
+                <Textarea
+                  id="edit-address"
+                  placeholder="Enter full address"
+                  value={employeeForm.address}
+                  onChange={(e) => setEmployeeForm({ ...employeeForm, address: e.target.value })}
                 />
               </div>
+            </TabsContent>
+
+            {/* Work Details Tab */}
+            <TabsContent value="work" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-role">System Role *</Label>
+                  <Select value={employeeForm.role} onValueChange={(value) => setEmployeeForm({ ...employeeForm, role: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableRoles().map((role) => (
+                        <SelectItem key={role} value={role}>{role.replace('_', ' ').toUpperCase()}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-department">Department</Label>
+                  <Select value={employeeForm.department} onValueChange={(value) => setEmployeeForm({ ...employeeForm, department: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-position">Position *</Label>
+                  <Select value={employeeForm.position} onValueChange={(value) => setEmployeeForm({ ...employeeForm, position: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select position" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {positions.map((position) => (
+                        <SelectItem key={position} value={position}>{position}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-hireDate">Hire Date *</Label>
+                  <Input
+                    id="edit-hireDate"
+                    type="date"
+                    value={employeeForm.hireDate}
+                    onChange={(e) => setEmployeeForm({ ...employeeForm, hireDate: e.target.value })}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Compensation Tab */}
+            <TabsContent value="compensation" className="space-y-4">
               <div className="space-y-2">
-                <Label>Role</Label>
-                <Select value={employeeForm.role} onValueChange={(value) => setEmployeeForm({ ...employeeForm, role: value })}>
+                <Label htmlFor="edit-salaryType">Salary Type *</Label>
+                <Select value={employeeForm.salaryType} onValueChange={(value: 'hourly' | 'monthly') => setEmployeeForm({ ...employeeForm, salaryType: value })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {getAvailableRoles().map((role) => (
-                      <SelectItem key={role} value={role}>{role.replace('_', ' ').toUpperCase()}</SelectItem>
-                    ))}
+                    <SelectItem value="monthly">Monthly Salary</SelectItem>
+                    <SelectItem value="hourly">Hourly Rate</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            </div>
+
+              {employeeForm.salaryType === 'monthly' ? (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-baseSalary">Monthly Salary (₹) *</Label>
+                  <Input
+                    id="edit-baseSalary"
+                    type="number"
+                    placeholder="Enter monthly salary"
+                    value={employeeForm.baseSalary}
+                    onChange={(e) => setEmployeeForm({ ...employeeForm, baseSalary: e.target.value })}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-hourlyRate">Hourly Rate (₹) *</Label>
+                  <Input
+                    id="edit-hourlyRate"
+                    type="number"
+                    placeholder="Enter hourly rate"
+                    value={employeeForm.hourlyRate}
+                    onChange={(e) => setEmployeeForm({ ...employeeForm, hourlyRate: e.target.value })}
+                  />
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          <div className="pt-4">
             <Button onClick={handleUpdateEmployee} className="w-full" disabled={updateEmployeeMutation.isPending}>
               {updateEmployeeMutation.isPending ? "Updating..." : "Update User"}
             </Button>

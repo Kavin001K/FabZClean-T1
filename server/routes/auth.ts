@@ -72,13 +72,8 @@ router.post('/change-password', authMiddleware, auditMiddleware('change_password
       return res.status(400).json({ error: 'Password must be at least 8 characters long' });
     }
 
-    // For now, only admin can change passwords
-    // You can extend this to allow employees to change their own passwords
-    if (req.employee!.role !== 'admin') {
-      return res.status(403).json({ error: 'Only admin can change passwords' });
-    }
-
-    await AuthService.resetPassword(req.employee!.employeeId, newPassword, req.employee!.employeeId);
+    // Allow any authenticated user to change their own password
+    await AuthService.changePassword(req.employee!.employeeId, currentPassword, newPassword);
 
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (error: any) {

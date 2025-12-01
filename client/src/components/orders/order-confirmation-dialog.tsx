@@ -172,15 +172,48 @@ export function OrderConfirmationDialog({
 
         const htmlContent = generateTagHTML(order, order.items);
 
-        const printWindow = window.open('', 'TagPrint', 'width=400,height=600');
-        if (printWindow) {
-            printWindow.document.write(htmlContent);
-            printWindow.document.close();
+        // Create a hidden iframe
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentWindow?.document;
+        if (doc) {
+            doc.open();
+            doc.write(htmlContent);
+            doc.close();
+
+            // Wait for content to load (especially images/barcodes) then print
+            iframe.onload = () => {
+                setTimeout(() => {
+                    try {
+                        iframe.contentWindow?.focus();
+                        iframe.contentWindow?.print();
+                    } catch (error) {
+                        console.error('Print failed:', error);
+                        toast({
+                            title: "Print Error",
+                            description: "Failed to print tags.",
+                            variant: "destructive",
+                        });
+                    } finally {
+                        // Cleanup after a delay to ensure print dialog has opened
+                        setTimeout(() => {
+                            if (document.body.contains(iframe)) {
+                                document.body.removeChild(iframe);
+                            }
+                        }, 1000);
+                    }
+                }, 500);
+            };
         } else {
-            console.error('Failed to open print window. Popup blocked?');
+            console.error('Failed to create print iframe');
             toast({
                 title: "Print Error",
-                description: "Pop-up blocked. Please allow pop-ups for this site.",
+                description: "Failed to initialize printer.",
                 variant: "destructive",
             });
         }
@@ -296,17 +329,33 @@ export function OrderConfirmationDialog({
         const canvas = await html2canvas(container, {
             scale: 2,
             useCORS: true,
-            allowTaint: false,
+            allowTaint: false, // Changed to false to prevent security errors
             backgroundColor: '#ffffff',
             logging: false,
         });
 
         // Create PDF
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const imgData = canvas.toDataURL('image/png');
+
+        // Use JPEG for better compatibility if PNG fails, but try PNG first
+        let imgData;
+        let imgFormat: 'PNG' | 'JPEG' = 'PNG';
+
+        try {
+            imgData = canvas.toDataURL('image/png');
+            // Basic validation of data URL
+            if (!imgData || imgData.length < 100) {
+                throw new Error('Invalid PNG data');
+            }
+        } catch (e) {
+            console.warn('PNG generation failed, falling back to JPEG', e);
+            imgData = canvas.toDataURL('image/jpeg', 0.95);
+            imgFormat = 'JPEG';
+        }
+
         const imgWidth = 210;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+        pdf.addImage(imgData, imgFormat, 0, 0, imgWidth, imgHeight);
 
         // Cleanup
         root.unmount();
