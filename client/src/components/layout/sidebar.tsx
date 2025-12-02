@@ -14,6 +14,7 @@ import {
   FileText,
   Calculator,
   Shield,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -37,6 +38,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Dashboard",
     icon: Home,
     roles: ["franchise_manager"],
+  },
+  {
+    to: "/franchise-management",
+    label: "Franchises",
+    icon: Building2,
+    roles: ["admin"],
   },
   {
     to: "/employee-dashboard",

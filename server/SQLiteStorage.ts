@@ -82,21 +82,44 @@ export class SQLiteStorage implements IStorage {
     console.log(`🗄️  Initializing SQLite database at: ${dbPath}`);
     this.db = new Database(dbPath);
     this.createTables();
+    this.migrateTables();
   }
 
   private createTables() {
     this.db.exec(`
+      CREATE TABLE IF NOT EXISTS franchises (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        franchiseId TEXT UNIQUE NOT NULL,
+        ownerName TEXT NOT NULL,
+        email TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        address TEXT NOT NULL,
+        legalEntityName TEXT,
+        taxId TEXT,
+        status TEXT DEFAULT 'active',
+        documents TEXT,
+        agreementStartDate TEXT,
+        agreementEndDate TEXT,
+        royaltyPercentage REAL DEFAULT 0,
+        createdAt TEXT,
+        updatedAt TEXT
+      );
+
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         username TEXT UNIQUE,
         password TEXT,
         email TEXT,
+        franchiseId TEXT,
         createdAt TEXT,
-        updatedAt TEXT
+        updatedAt TEXT,
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
 
       CREATE TABLE IF NOT EXISTS products (
         id TEXT PRIMARY KEY,
+        franchiseId TEXT,
         name TEXT,
         sku TEXT,
         category TEXT,
@@ -106,11 +129,13 @@ export class SQLiteStorage implements IStorage {
         reorderLevel INTEGER,
         supplier TEXT,
         createdAt TEXT,
-        updatedAt TEXT
+        updatedAt TEXT,
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
 
       CREATE TABLE IF NOT EXISTS customers (
         id TEXT PRIMARY KEY,
+        franchiseId TEXT,
         name TEXT,
         email TEXT,
         phone TEXT,
@@ -119,11 +144,13 @@ export class SQLiteStorage implements IStorage {
         totalSpent TEXT,
         lastOrder TEXT,
         createdAt TEXT,
-        updatedAt TEXT
+        updatedAt TEXT,
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
 
       CREATE TABLE IF NOT EXISTS orders (
         id TEXT PRIMARY KEY,
+        franchiseId TEXT,
         customerId TEXT,
         status TEXT,
         totalAmount TEXT,
@@ -144,18 +171,25 @@ export class SQLiteStorage implements IStorage {
         isInterState INTEGER DEFAULT 0,
         invoiceNumber TEXT,
         invoiceDate TEXT,
+        advancePaid TEXT,
+        paymentMethod TEXT,
+        discountType TEXT,
+        discountValue TEXT,
+        couponCode TEXT,
+        extraCharges TEXT,
         createdAt TEXT,
         updatedAt TEXT,
-        FOREIGN KEY (customerId) REFERENCES customers(id)
+        FOREIGN KEY (customerId) REFERENCES customers(id),
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
+
 
       CREATE TABLE IF NOT EXISTS deliveries (
         id TEXT PRIMARY KEY,
         orderId TEXT,
-        status TEXT,
-        deliveredAt TEXT,
         driverName TEXT,
         vehicleId TEXT,
+        status TEXT,
         estimatedDelivery TEXT,
         actualDelivery TEXT,
         location TEXT,
@@ -167,6 +201,7 @@ export class SQLiteStorage implements IStorage {
 
       CREATE TABLE IF NOT EXISTS posTransactions (
         id TEXT PRIMARY KEY,
+        franchiseId TEXT,
         orderId TEXT,
         amount TEXT,
         paymentMethod TEXT,
@@ -175,11 +210,13 @@ export class SQLiteStorage implements IStorage {
         cashierId TEXT,
         createdAt TEXT,
         updatedAt TEXT,
-        FOREIGN KEY (orderId) REFERENCES orders(id)
+        FOREIGN KEY (orderId) REFERENCES orders(id),
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
 
       CREATE TABLE IF NOT EXISTS services (
         id TEXT PRIMARY KEY,
+        franchiseId TEXT,
         name TEXT,
         description TEXT,
         price TEXT,
@@ -187,22 +224,26 @@ export class SQLiteStorage implements IStorage {
         duration TEXT,
         status TEXT,
         createdAt TEXT,
-        updatedAt TEXT
+        updatedAt TEXT,
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
 
       CREATE TABLE IF NOT EXISTS shipments (
         id TEXT PRIMARY KEY,
+        franchiseId TEXT,
         orderId TEXT,
         trackingNumber TEXT,
         carrier TEXT,
         status TEXT,
         createdAt TEXT,
         updatedAt TEXT,
-        FOREIGN KEY (orderId) REFERENCES orders(id)
+        FOREIGN KEY (orderId) REFERENCES orders(id),
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
 
       CREATE TABLE IF NOT EXISTS barcodes (
         id TEXT PRIMARY KEY,
+        franchiseId TEXT,
         code TEXT UNIQUE,
         productId TEXT,
         type TEXT,
@@ -213,17 +254,109 @@ export class SQLiteStorage implements IStorage {
         isActive INTEGER DEFAULT 1,
         createdAt TEXT,
         updatedAt TEXT,
-        FOREIGN KEY (productId) REFERENCES products(id)
+        FOREIGN KEY (productId) REFERENCES products(id),
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
 
       CREATE TABLE IF NOT EXISTS employees (
         id TEXT PRIMARY KEY,
+        franchiseId TEXT,
         name TEXT,
         role TEXT,
-        email TEXT UNIQUE,
+        email TEXT,
         password TEXT,
+        employeeId TEXT,
+        firstName TEXT,
+        lastName TEXT,
+        phone TEXT,
+        position TEXT,
+        department TEXT,
+        hireDate TEXT,
+        salary TEXT,
+        hourlyRate TEXT,
+        status TEXT,
+        managerId TEXT,
+        address TEXT,
+        emergencyContact TEXT,
+        skills TEXT,
+        performanceRating TEXT,
+        lastReviewDate TEXT,
         createdAt TEXT,
-        updatedAt TEXT
+        updatedAt TEXT,
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS employee_attendance (
+        id TEXT PRIMARY KEY,
+        franchiseId TEXT,
+        employeeId TEXT NOT NULL,
+        date TEXT NOT NULL,
+        clockIn TEXT,
+        clockOut TEXT,
+        breakStart TEXT,
+        breakEnd TEXT,
+        totalHours REAL,
+        status TEXT DEFAULT 'present',
+        notes TEXT,
+        locationCheckIn TEXT,
+        createdAt TEXT,
+        updatedAt TEXT,
+        FOREIGN KEY (employeeId) REFERENCES employees(id),
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS employee_tasks (
+        id TEXT PRIMARY KEY,
+        franchiseId TEXT,
+        employeeId TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        priority TEXT DEFAULT 'medium',
+        status TEXT DEFAULT 'pending',
+        estimatedHours REAL,
+        actualHours REAL,
+        dueDate TEXT,
+        completedDate TEXT,
+        assignedBy TEXT,
+        metrics TEXT,
+        createdAt TEXT,
+        updatedAt TEXT,
+        FOREIGN KEY (employeeId) REFERENCES employees(id),
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS employee_performance (
+        id TEXT PRIMARY KEY,
+        franchiseId TEXT,
+        employeeId TEXT NOT NULL,
+        reviewPeriod TEXT NOT NULL,
+        rating REAL NOT NULL,
+        goals TEXT,
+        feedback TEXT,
+        reviewedBy TEXT,
+        reviewDate TEXT NOT NULL,
+        createdAt TEXT,
+        updatedAt TEXT,
+        FOREIGN KEY (employeeId) REFERENCES employees(id),
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS documents (
+        id TEXT PRIMARY KEY,
+        franchiseId TEXT,
+        type TEXT DEFAULT 'invoice',
+        title TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        filepath TEXT NOT NULL,
+        fileUrl TEXT NOT NULL,
+        status TEXT DEFAULT 'draft',
+        amount TEXT,
+        customerName TEXT,
+        orderNumber TEXT,
+        metadata TEXT,
+        createdAt TEXT,
+        updatedAt TEXT,
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
 
       CREATE TABLE IF NOT EXISTS settings (
@@ -360,6 +493,14 @@ export class SQLiteStorage implements IStorage {
       CREATE INDEX IF NOT EXISTS idx_drivers_status ON drivers(status);
       CREATE INDEX IF NOT EXISTS idx_drivers_vehicleNumber ON drivers(vehicleNumber);
       CREATE INDEX IF NOT EXISTS idx_drivers_licenseNumber ON drivers(licenseNumber);
+      
+      -- Indexes for franchise isolation
+      CREATE INDEX IF NOT EXISTS idx_orders_franchise ON orders(franchiseId);
+      CREATE INDEX IF NOT EXISTS idx_products_franchise ON products(franchiseId);
+      CREATE INDEX IF NOT EXISTS idx_customers_franchise ON customers(franchiseId);
+      CREATE INDEX IF NOT EXISTS idx_employees_franchise ON employees(franchiseId);
+      CREATE INDEX IF NOT EXISTS idx_employee_attendance_franchise ON employee_attendance(franchiseId);
+      CREATE INDEX IF NOT EXISTS idx_employee_tasks_franchise ON employee_tasks(franchiseId);
 
       -- Authentication tables
       CREATE TABLE IF NOT EXISTS auth_users (
@@ -391,6 +532,37 @@ export class SQLiteStorage implements IStorage {
     `);
   }
 
+  private migrateTables() {
+    try {
+      // Check if orders table exists
+      const tableExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'").get();
+      if (!tableExists) return;
+
+      // Get current columns
+      const columns = this.db.prepare("PRAGMA table_info(orders)").all() as any[];
+      const columnNames = columns.map(c => c.name);
+
+      // Columns to add if missing
+      const newColumns = [
+        { name: 'advancePaid', type: 'TEXT' },
+        { name: 'paymentMethod', type: 'TEXT' },
+        { name: 'discountType', type: 'TEXT' },
+        { name: 'discountValue', type: 'TEXT' },
+        { name: 'couponCode', type: 'TEXT' },
+        { name: 'extraCharges', type: 'TEXT' }
+      ];
+
+      for (const col of newColumns) {
+        if (!columnNames.includes(col.name)) {
+          console.log(`🔄 Migrating orders table: Adding column ${col.name}`);
+          this.db.exec(`ALTER TABLE orders ADD COLUMN ${col.name} ${col.type}`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Migration failed:', error);
+    }
+  }
+
   // ======= USERS =======
   async createUser(data: InsertUser): Promise<User> {
     const id = randomUUID();
@@ -408,6 +580,8 @@ export class SQLiteStorage implements IStorage {
     return {
       id,
       ...data,
+      email: data.email ?? null,
+      franchiseId: data.franchiseId ?? null,
       createdAt: new Date(now),
       updatedAt: new Date(now),
     };
@@ -450,48 +624,64 @@ export class SQLiteStorage implements IStorage {
     const dataWithTimestamps = { ...data, id, createdAt: now, updatedAt: now };
 
     // Handle JSON fields for certain tables
-    if (table === "orders" && dataWithTimestamps.items) {
-      dataWithTimestamps.items =
-        typeof dataWithTimestamps.items === "string"
-          ? dataWithTimestamps.items
-          : JSON.stringify(dataWithTimestamps.items);
+    const anyData = dataWithTimestamps as any;
+    if (table === "orders" && anyData.items) {
+      anyData.items =
+        typeof anyData.items === "string"
+          ? anyData.items
+          : JSON.stringify(anyData.items);
     }
-    if (table === "orders" && dataWithTimestamps.shippingAddress) {
-      dataWithTimestamps.shippingAddress =
-        typeof dataWithTimestamps.shippingAddress === "string"
-          ? dataWithTimestamps.shippingAddress
-          : JSON.stringify(dataWithTimestamps.shippingAddress);
+    if (table === "orders" && anyData.shippingAddress) {
+      anyData.shippingAddress =
+        typeof anyData.shippingAddress === "string"
+          ? anyData.shippingAddress
+          : JSON.stringify(anyData.shippingAddress);
     }
-    if (table === "deliveries" && dataWithTimestamps.location) {
-      dataWithTimestamps.location =
-        typeof dataWithTimestamps.location === "string"
-          ? dataWithTimestamps.location
-          : JSON.stringify(dataWithTimestamps.location);
+    if (table === "deliveries" && anyData.location) {
+      anyData.location =
+        typeof anyData.location === "string"
+          ? anyData.location
+          : JSON.stringify(anyData.location);
     }
-    if (table === "deliveries" && dataWithTimestamps.route) {
-      dataWithTimestamps.route =
-        typeof dataWithTimestamps.route === "string"
-          ? dataWithTimestamps.route
-          : JSON.stringify(dataWithTimestamps.route);
+    if (table === "deliveries" && anyData.route) {
+      anyData.route =
+        typeof anyData.route === "string"
+          ? anyData.route
+          : JSON.stringify(anyData.route);
     }
-    if (table === "posTransactions" && dataWithTimestamps.items) {
-      dataWithTimestamps.items =
-        typeof dataWithTimestamps.items === "string"
-          ? dataWithTimestamps.items
-          : JSON.stringify(dataWithTimestamps.items);
+    if (table === "posTransactions" && anyData.items) {
+      anyData.items =
+        typeof anyData.items === "string"
+          ? anyData.items
+          : JSON.stringify(anyData.items);
     }
     // Handle customers table JSON fields
-    if (table === "customers" && dataWithTimestamps.address) {
-      dataWithTimestamps.address =
-        typeof dataWithTimestamps.address === "string"
-          ? dataWithTimestamps.address
-          : JSON.stringify(dataWithTimestamps.address);
+    if (table === "customers" && anyData.address) {
+      anyData.address =
+        typeof anyData.address === "string"
+          ? anyData.address
+          : JSON.stringify(anyData.address);
     }
-    if (table === "customers" && dataWithTimestamps.segments) {
-      dataWithTimestamps.segments =
-        typeof dataWithTimestamps.segments === "string"
-          ? dataWithTimestamps.segments
-          : JSON.stringify(dataWithTimestamps.segments);
+    if (table === "customers" && anyData.segments) {
+      anyData.segments =
+        typeof anyData.segments === "string"
+          ? anyData.segments
+          : JSON.stringify(anyData.segments);
+    }
+    // Handle franchises table JSON fields
+    if (table === "franchises") {
+      if (anyData.address) {
+        anyData.address =
+          typeof anyData.address === "string"
+            ? anyData.address
+            : JSON.stringify(anyData.address);
+      }
+      if (anyData.documents) {
+        anyData.documents =
+          typeof anyData.documents === "string"
+            ? anyData.documents
+            : JSON.stringify(anyData.documents);
+      }
     }
 
     const keys = Object.keys(dataWithTimestamps);
@@ -568,6 +758,34 @@ export class SQLiteStorage implements IStorage {
         console.warn("Failed to parse transaction items:", e);
       }
     }
+    if (
+      table === "customers" &&
+      row.segments &&
+      typeof row.segments === "string"
+    ) {
+      try {
+        row.segments = JSON.parse(row.segments);
+      } catch (e) {
+        console.warn("Failed to parse customer segments:", e);
+      }
+    }
+    // Parse franchises JSON fields
+    if (table === "franchises") {
+      if (row.address && typeof row.address === "string") {
+        try {
+          row.address = JSON.parse(row.address);
+        } catch (e) {
+          console.warn("Failed to parse franchise address:", e);
+        }
+      }
+      if (row.documents && typeof row.documents === "string") {
+        try {
+          row.documents = JSON.parse(row.documents);
+        } catch (e) {
+          console.warn("Failed to parse franchise documents:", e);
+        }
+      }
+    }
 
     return row as T;
   }
@@ -582,7 +800,7 @@ export class SQLiteStorage implements IStorage {
     if (!keys.length) return;
 
     // Handle JSON fields
-    const processedData = { ...data };
+    const processedData = { ...data } as any;
     if (table === "orders" && processedData.items) {
       processedData.items =
         typeof processedData.items === "string"
@@ -612,6 +830,21 @@ export class SQLiteStorage implements IStorage {
         typeof processedData.items === "string"
           ? processedData.items
           : JSON.stringify(processedData.items);
+    }
+    // Handle franchises table JSON fields
+    if (table === "franchises") {
+      if (processedData.address) {
+        processedData.address =
+          typeof processedData.address === "string"
+            ? processedData.address
+            : JSON.stringify(processedData.address);
+      }
+      if (processedData.documents) {
+        processedData.documents =
+          typeof processedData.documents === "string"
+            ? processedData.documents
+            : JSON.stringify(processedData.documents);
+      }
     }
 
     const setStmt =
@@ -1158,13 +1391,13 @@ export class SQLiteStorage implements IStorage {
     );
 
     const onTimeDeliveries = completedDeliveries.filter((delivery) => {
-      if (!delivery.deliveredAt || !delivery.createdAt) return false;
+      if (!delivery.actualDelivery || !delivery.createdAt) return false;
 
       // Assume 24 hours is the standard delivery time
       const expectedDelivery = new Date(delivery.createdAt);
       expectedDelivery.setHours(expectedDelivery.getHours() + 24);
 
-      return new Date(delivery.deliveredAt) <= expectedDelivery;
+      return new Date(delivery.actualDelivery) <= expectedDelivery;
     });
 
     const onTimeDelivery =
@@ -1905,6 +2138,155 @@ export class SQLiteStorage implements IStorage {
   async cleanupExpiredSessions(): Promise<void> {
     const now = new Date().toISOString();
     this.db.prepare('DELETE FROM auth_sessions WHERE expires_at < ?').run(now);
+  }
+
+  // ======= FRANCHISES =======
+  async createFranchise(data: any): Promise<any> {
+    const id = this.insertRecord("franchises", data);
+    return this.getRecord("franchises", id);
+  }
+
+  async listFranchises(): Promise<any[]> {
+    return this.listAllRecords("franchises");
+  }
+
+  async getFranchise(id: string): Promise<any | undefined> {
+    return this.getRecord("franchises", id);
+  }
+
+  async updateFranchise(id: string, data: any): Promise<any | undefined> {
+    this.updateRecord("franchises", id, data);
+    return this.getFranchise(id);
+  }
+
+  // ======= TASKS =======
+  async createTask(data: any): Promise<any> {
+    const id = this.insertRecord("employee_tasks", data);
+    return this.getRecord("employee_tasks", id);
+  }
+
+  async listTasks(franchiseId?: string): Promise<any[]> {
+    let tasks = this.listAllRecords<any>("employee_tasks");
+    if (franchiseId) {
+      tasks = tasks.filter(t => t.franchiseId === franchiseId);
+    }
+    return tasks;
+  }
+
+  async updateTask(id: string, data: any): Promise<any | undefined> {
+    this.updateRecord("employee_tasks", id, data);
+    return this.getRecord("employee_tasks", id);
+  }
+
+  // ======= ATTENDANCE =======
+  async createAttendance(data: any): Promise<any> {
+    const id = this.insertRecord("employee_attendance", data);
+    return this.getRecord("employee_attendance", id);
+  }
+
+  async listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]> {
+    let attendance = this.listAllRecords<any>("employee_attendance");
+
+    if (franchiseId) {
+      attendance = attendance.filter(a => a.franchiseId === franchiseId);
+    }
+
+    if (employeeId) {
+      attendance = attendance.filter(a => a.employeeId === employeeId);
+    }
+
+    if (date) {
+      const dateStr = date.toISOString().split('T')[0];
+      attendance = attendance.filter(a => {
+        const aDate = new Date(a.date).toISOString().split('T')[0];
+        return aDate === dateStr;
+      });
+    }
+
+    return attendance;
+  }
+
+  // Document methods
+  async createDocument(data: any) {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+
+    const stmt = this.db.prepare(`
+      INSERT INTO documents (
+        id, franchiseId, type, title, filename, filepath, fileUrl, 
+        status, amount, customerName, orderNumber, metadata, createdAt, updatedAt
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      )
+    `);
+
+    stmt.run(
+      id,
+      data.franchiseId,
+      data.type,
+      data.title,
+      data.filename,
+      data.filepath,
+      data.fileUrl,
+      data.status,
+      data.amount,
+      data.customerName,
+      data.orderNumber,
+      JSON.stringify(data.metadata || {}),
+      now,
+      now
+    );
+
+    return this.getDocument(id);
+  }
+
+  async listDocuments(filters: any = {}) {
+    let query = "SELECT * FROM documents WHERE 1=1";
+    const params: any[] = [];
+
+    if (filters.type) {
+      query += " AND type = ?";
+      params.push(filters.type);
+    }
+
+    if (filters.status) {
+      query += " AND status = ?";
+      params.push(filters.status);
+    }
+
+    query += " ORDER BY createdAt DESC";
+
+    if (filters.limit) {
+      query += " LIMIT ?";
+      params.push(filters.limit);
+    }
+
+    const stmt = this.db.prepare(query);
+    const docs = stmt.all(...params);
+
+    return docs.map((doc: any) => ({
+      ...doc,
+      metadata: doc.metadata ? JSON.parse(doc.metadata) : {}
+    }));
+  }
+
+  async getDocument(id: string) {
+    const stmt = this.db.prepare("SELECT * FROM documents WHERE id = ?");
+    const doc = stmt.get(id) as any;
+
+    if (doc) {
+      return {
+        ...doc,
+        metadata: doc.metadata ? JSON.parse(doc.metadata) : {}
+      };
+    }
+    return null;
+  }
+
+  async deleteDocument(id: string) {
+    const stmt = this.db.prepare("DELETE FROM documents WHERE id = ?");
+    const result = stmt.run(id);
+    return result.changes > 0;
   }
 
   // Close database connection

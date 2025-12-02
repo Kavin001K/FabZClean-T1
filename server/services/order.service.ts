@@ -11,7 +11,7 @@ import {
   calculateOrderPriority,
   calculateOrderScore,
 } from '../algorithms';
-import { whatsappService } from './whatsapp.service';
+
 import { Order, InsertOrder } from '../../shared/schema';
 
 export interface OrderFilters {

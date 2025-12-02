@@ -81,23 +81,44 @@ export async function pingDatabase() {
 export async function getDatabaseInfo() {
   try {
     const dbType = process.env.USE_SUPABASE === 'true' ? 'supabase' : 'sqlite';
-    // const users = await db.listUsers(); // Users table might not exist in Supabase
-    const products = await db.listProducts();
-    const orders = await db.listOrders();
-    const customers = await db.listCustomers();
 
-    return {
-      database: dbType,
-      version: dbType === 'sqlite' ? "3.x" : "PostgreSQL",
-      tables: {
-        users: 0, // users.length,
-        products: products.length,
-        orders: orders.length,
-        customers: customers.length,
-      },
-      status: "connected",
-      timestamp: new Date().toISOString(),
+    let config = {
+      host: 'Local Filesystem',
+      port: 0,
+      database: 'local.sqlite',
+      user: 'N/A',
+      ssl: 'No',
+      restApiUrl: undefined as string | undefined,
+      stackProjectId: undefined as string | undefined,
+      stackPublishableKey: undefined as string | undefined,
+      stackSecretKey: undefined as string | undefined,
+      jwksUrl: undefined as string | undefined
     };
+
+    if (dbType === 'supabase') {
+      const sbUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+
+      if (sbUrl) {
+        try {
+          const url = new URL(sbUrl);
+          config.host = url.hostname;
+          config.port = 443;
+          config.database = 'postgres';
+          config.user = 'supabase_user';
+          config.ssl = 'Required';
+          config.restApiUrl = `${sbUrl}/rest/v1`;
+          config.stackProjectId = url.hostname.split('.')[0];
+          config.jwksUrl = `${sbUrl}/auth/v1/jwks`;
+        } catch (e) {
+          console.warn('Invalid Supabase URL:', sbUrl);
+        }
+      } else {
+        config.host = 'Supabase (Not Configured)';
+        config.database = 'postgres';
+      }
+    }
+
+    return config;
   } catch (error) {
     throw new Error(`Failed to get database info: ${(error as Error).message}`);
   }

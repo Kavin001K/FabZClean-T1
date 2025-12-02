@@ -1,0 +1,34 @@
+
+> fabzclean@1.0.0 build
+> npm run build:client
+
+
+> fabzclean@1.0.0 build:client
+> vite build --config vite.config.minimal.ts
+
+vite v7.2.4 building client environment for production...
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+transforming...
+✓ 4366 modules transformed.
+✗ Build failed in 5.65s
+error during build:
+client/src/pages/franchise-management.tsx (36:9): "insertFranchiseSchema" is not exported by "shared/schema.js", imported by "client/src/pages/franchise-management.tsx".
+file: /Users/kavin/Documents/GitHub/FabZClean-T1/client/src/pages/franchise-management.tsx:36:9
+
+34: import { useToast } from "@/hooks/use-toast";
+35: import { Plus, Building2, FileText, Info, Loader2 } from "lucide-react";
+36: import { insertFranchiseSchema } from "@shared/schema";
+             ^
+37: 
+38: // Extend schema for file upload handling in form
+
+    at getRollupError (file:///Users/kavin/Documents/GitHub/FabZClean-T1/node_modules/rollup/dist/es/shared/parseAst.js:401:41)
+    at error (file:///Users/kavin/Documents/GitHub/FabZClean-T1/node_modules/rollup/dist/es/shared/parseAst.js:397:42)
+    at Module.error (file:///Users/kavin/Documents/GitHub/FabZClean-T1/node_modules/rollup/dist/es/shared/node-entry.js:16938:16)
+    at Module.traceVariable (file:///Users/kavin/Documents/GitHub/FabZClean-T1/node_modules/rollup/dist/es/shared/node-entry.js:17390:29)
+    at ModuleScope.findVariable (file:///Users/kavin/Documents/GitHub/FabZClean-T1/node_modules/rollup/dist/es/shared/node-entry.js:15060:39)
+    at MemberExpression.bind (file:///Users/kavin/Documents/GitHub/FabZClean-T1/node_modules/rollup/dist/es/shared/node-entry.js:7349:49)
+    at CallExpression.bind (file:///Users/kavin/Documents/GitHub/FabZClean-T1/node_modules/rollup/dist/es/shared/node-entry.js:2804:23)
+    at CallExpression.bind (file:///Users/kavin/Documents/GitHub/FabZClean-T1/node_modules/rollup/dist/es/shared/node-entry.js:12108:15)
+    at VariableDeclarator.bind (file:///Users/kavin/Documents/GitHub/FabZClean-T1/node_modules/rollup/dist/es/shared/node-entry.js:2804:23)
+    at VariableDeclaration.bind (file:///Users/kavin/Documents/GitHub/FabZClean-T1/node_modules/rollup/dist/es/shared/node-entry.js:2800:28)

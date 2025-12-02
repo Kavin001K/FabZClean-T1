@@ -112,19 +112,17 @@ export class WhatsAppService {
     ): Promise<boolean> {
         try {
             // Call our backend proxy to avoid CORS and hide API keys
-            const response = await fetch('/api/whatsapp/send', {
+            const response = await fetch('/api/whatsapp/send-bill', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('employee_token')}`
                 },
                 body: JSON.stringify({
-                    order: {
-                        customerPhone: phone,
-                        orderNumber: orderNumber,
-                        customerName: customerName,
-                        totalAmount: totalAmount
-                    },
+                    customerName: customerName,
+                    customerPhone: phone,
+                    orderId: orderNumber,
+                    amount: totalAmount,
                     pdfUrl: pdfUrl
                 })
             });

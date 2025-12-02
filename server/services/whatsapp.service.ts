@@ -1,96 +1,87 @@
-import twilio from 'twilio';
+import axios from 'axios';
 
-// Load config from .env
-const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const API_KEY = process.env.TWILIO_API_KEY;
-const API_SECRET = process.env.TWILIO_API_SECRET;
-const FROM_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || '+14155238886';
+// Load from .env
+const MSG91_AUTH_KEY = process.env.MSG91_AUTH_KEY || '480091AbJuma92Ie692de24aP1'; // Fallback to your key
+const MSG91_INTEGRATED_NUMBER = process.env.MSG91_INTEGRATED_NUMBER || '15558125705';
 
-export class WhatsappService {
-    private client: any;
-
-    private getClient() {
-        if (!this.client) {
-            if (!ACCOUNT_SID || !API_KEY || !API_SECRET) {
-                console.error('❌ Twilio credentials missing in .env');
-                return null;
-            }
-            // Authenticate with API Key & Secret, linked to Account SID
-            this.client = twilio(API_KEY, API_SECRET, { accountSid: ACCOUNT_SID });
-        }
-        return this.client;
-    }
-
-    formatNumber(phone: string): string {
-        let cleaned = phone.replace(/\D/g, '');
-        if (cleaned.length === 10) cleaned = '91' + cleaned;
-        return `whatsapp:+${cleaned}`;
-    }
-
-    async sendMessage(to: string, message: string): Promise<boolean> {
-        const client = this.getClient();
-        if (!client) return false;
-
-        try {
-            const formattedTo = this.formatNumber(to);
-            const formattedFrom = `whatsapp:${FROM_NUMBER}`;
-            console.log(`📨 Sending to ${formattedTo}...`);
-
-            const response = await client.messages.create({
-                body: message,
-                from: formattedFrom,
-                to: formattedTo
-            });
-            console.log(`✅ Sent! SID: ${response.sid}`);
-            return true;
-        } catch (error: any) {
-            console.error('❌ Twilio Error:', error.message);
-            return false;
-        }
-    }
-
-    async sendPdf(to: string, pdfUrl: string, filename: string, caption?: string): Promise<boolean> {
-        const client = this.getClient();
-        if (!client) return false;
-
-        try {
-            const formattedTo = this.formatNumber(to);
-            const formattedFrom = `whatsapp:${FROM_NUMBER}`;
-            console.log(`📄 Sending PDF to ${formattedTo}...`);
-
-            const response = await client.messages.create({
-                body: caption || 'Invoice attached.',
-                from: formattedFrom,
-                to: formattedTo,
-                mediaUrl: [pdfUrl]
-            });
-            console.log(`✅ PDF Sent! SID: ${response.sid}`);
-            return true;
-        } catch (error: any) {
-            console.error('❌ Twilio Media Error:', error.message);
-            return false;
-        }
-    }
-
-    async sendOrderConfirmation(order: any, pdfUrl?: string): Promise<boolean> {
-        const customerName = order.customerName || order.customer?.name || 'Customer';
-        const orderNumber = order.orderNumber || order.id;
-        const total = order.totalAmount || order.total;
-        const phone = order.customerPhone || order.customer?.phone || order.phone;
-
-        if (!phone) {
-            console.error('❌ No phone number provided for WhatsApp');
-            return false;
-        }
-
-        const message = `Hello ${customerName}, your order #${orderNumber} has been confirmed! Total: ₹${total}. Thank you for choosing FabZClean.`;
-
-        if (pdfUrl) {
-            return this.sendPdf(phone, pdfUrl, `Order_${orderNumber}.pdf`, message);
-        } else {
-            return this.sendMessage(phone, message);
-        }
-    }
+// Define the parameters we need to send a bill
+interface SendBillParams {
+    customerName: string;
+    customerPhone: string;
+    orderId: string;
+    amount: string;       // For body_3
+    paymentLink: string;  // For body_4
+    pdfUrl: string;       // The hosted URL of the PDF
 }
 
-export const whatsappService = new WhatsappService();
+export const sendWhatsAppBill = async (params: SendBillParams) => {
+    try {
+        const url = 'https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/';
+
+        const data = {
+            integrated_number: MSG91_INTEGRATED_NUMBER,
+            content_type: "template",
+            payload: {
+                messaging_product: "whatsapp",
+                type: "template",
+                template: {
+                    name: "bill", // The specific template name you provided
+                    language: {
+                        code: "en",
+                        policy: "deterministic"
+                    },
+                    namespace: "1520cd50_8420_404b_b634_4808f5f33034", // Your specific namespace
+                    to_and_components: [
+                        {
+                            to: [
+                                // MSG91 expects number with country code, e.g., "919876543210"
+                                params.customerPhone.replace(/\+/g, '')
+                            ],
+                            components: {
+                                header_1: {
+                                    type: "document",
+                                    filename: `Invoice_${params.orderId}.pdf`,
+                                    value: params.pdfUrl // URL to the hosted PDF
+                                },
+                                body_1: {
+                                    type: "text",
+                                    value: params.customerName // {{1}}
+                                },
+                                body_2: {
+                                    type: "text",
+                                    value: params.orderId // {{2}}
+                                },
+                                body_3: {
+                                    type: "text",
+                                    value: params.amount // {{3}}
+                                },
+                                body_4: {
+                                    type: "text",
+                                    value: params.paymentLink // {{4}}
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+
+        const config = {
+            headers: {
+                'Content-Type': 'application/json',
+                'authkey': MSG91_AUTH_KEY
+            }
+        };
+
+        console.log('Sending WhatsApp Bill Payload:', JSON.stringify(data, null, 2));
+
+        const response = await axios.post(url, data, config);
+        console.log('WhatsApp Response:', response.data);
+
+        return response.data;
+
+    } catch (error: any) {
+        console.error('WhatsApp Service Error:', error.response?.data || error.message);
+        throw new Error('Failed to send WhatsApp message');
+    }
+};

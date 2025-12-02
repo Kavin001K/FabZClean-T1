@@ -3,16 +3,40 @@ import { pgTable, text, varchar, integer, decimal, timestamp, boolean, jsonb, uu
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const franchises = pgTable("franchises", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  franchiseId: text("franchise_id").notNull().unique(), // Custom ID e.g. FR-001
+  ownerName: text("owner_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  address: jsonb("address").notNull(),
+  legalEntityName: text("legal_entity_name"),
+  taxId: text("tax_id"),
+  status: text("status", { enum: ["active", "inactive", "pending"] }).default("active"),
+  documents: jsonb("documents"), // Array of document URLs/metadata
+  agreementStartDate: timestamp("agreement_start_date"),
+  agreementEndDate: timestamp("agreement_end_date"),
+  royaltyPercentage: decimal("royalty_percentage", { precision: 5, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  email: text("email"),
+  franchiseId: varchar("franchise_id").references(() => franchises.id), // Link to franchise
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  franchiseId: varchar("franchise_id").references(() => franchises.id), // Inventory per franchise
   name: text("name").notNull(),
-  sku: text("sku").notNull().unique(),
+  sku: text("sku").notNull(), // Removed unique constraint globally, should be unique per franchise ideally
   category: text("category").notNull(),
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
@@ -25,7 +49,8 @@ export const products = pgTable("products", {
 
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  orderNumber: text("order_number").notNull().unique(),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
+  orderNumber: text("order_number").notNull(), // Removed unique constraint globally
   customerId: text("customer_id"), // Added customerId
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
@@ -62,7 +87,8 @@ export const deliveries = pgTable("deliveries", {
 
 export const orderTransactions = pgTable("order_transactions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  transactionNumber: varchar("transaction_number", { length: 255 }).notNull().unique(),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
+  transactionNumber: varchar("transaction_number", { length: 255 }).notNull(),
   items: jsonb("items").notNull(), // Array of transaction items
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   paymentMethod: text("payment_method", { enum: ["cash", "credit", "debit", "mobile"] }).notNull(), // cash, credit, debit, mobile
@@ -73,8 +99,9 @@ export const orderTransactions = pgTable("order_transactions", {
 
 export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
   name: text("name").notNull(),
-  email: text("email").unique(),
+  email: text("email"), // Removed unique constraint globally
   phone: text("phone"),
   address: jsonb("address"),
   totalOrders: integer("total_orders").default(0),
@@ -86,6 +113,7 @@ export const customers = pgTable("customers", {
 
 export const services = pgTable("services", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
   name: text("name").notNull(),
   category: text("category").notNull(),
   description: text("description"),
@@ -98,7 +126,8 @@ export const services = pgTable("services", {
 
 export const shipments = pgTable("shipments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  shipmentNumber: text("shipment_number").notNull().unique(),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
+  shipmentNumber: text("shipment_number").notNull(),
   orderIds: jsonb("order_ids").notNull(), // Array of order IDs
   carrier: text("carrier").notNull(),
   trackingNumber: text("tracking_number"),
@@ -111,6 +140,7 @@ export const shipments = pgTable("shipments", {
 
 export const barcodes = pgTable("barcodes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
   code: text("code").notNull().unique(), // The actual barcode/QR code value
   type: text("type", { enum: ["qr", "barcode", "ean13", "code128"] }).notNull(), // Type of code
   entityType: text("entity_type", { enum: ["order", "shipment", "product"] }).notNull(), // What entity this code represents
@@ -124,10 +154,11 @@ export const barcodes = pgTable("barcodes", {
 
 export const employees = pgTable("employees", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  employeeId: text("employee_id").notNull().unique(),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
+  employeeId: text("employee_id").notNull(), // Removed unique constraint globally
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
-  email: text("email").unique(),
+  email: text("email"), // Removed unique constraint globally
   phone: text("phone"),
   position: text("position").notNull(),
   department: text("department").notNull(),
@@ -147,6 +178,7 @@ export const employees = pgTable("employees", {
 
 export const employeeAttendance = pgTable("employee_attendance", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
   employeeId: varchar("employee_id").references(() => employees.id).notNull(),
   date: timestamp("date").notNull(),
   clockIn: timestamp("clock_in"),
@@ -156,28 +188,32 @@ export const employeeAttendance = pgTable("employee_attendance", {
   totalHours: decimal("total_hours", { precision: 4, scale: 2 }),
   status: text("status", { enum: ["present", "absent", "late", "half_day"] }).notNull().default("present"),
   notes: text("notes"),
+  locationCheckIn: jsonb("location_check_in"), // Added location
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const employeeTasks = pgTable("employee_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
   employeeId: varchar("employee_id").references(() => employees.id).notNull(),
   title: text("title").notNull(),
   description: text("description"),
   priority: text("priority", { enum: ["low", "medium", "high", "urgent"] }).notNull().default("medium"),
-  status: text("status", { enum: ["pending", "in_progress", "completed", "cancelled"] }).notNull().default("pending"),
+  status: text("status", { enum: ["pending", "in_progress", "completed", "cancelled", "verified"] }).notNull().default("pending"),
   estimatedHours: decimal("estimated_hours", { precision: 4, scale: 2 }),
   actualHours: decimal("actual_hours", { precision: 4, scale: 2 }),
   dueDate: timestamp("due_date"),
   completedDate: timestamp("completed_date"),
   assignedBy: varchar("assigned_by").references(() => employees.id),
+  metrics: jsonb("metrics"), // Added metrics
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const employeePerformance = pgTable("employee_performance", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
   employeeId: varchar("employee_id").references(() => employees.id).notNull(),
   reviewPeriod: text("review_period").notNull(), // e.g., "2024-Q1"
   rating: decimal("rating", { precision: 3, scale: 2 }).notNull(), // 1.00 to 5.00
@@ -191,7 +227,8 @@ export const employeePerformance = pgTable("employee_performance", {
 
 export const documents = pgTable("documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  type: text("type", { enum: ["invoice", "receipt", "report", "label", "other"] }).notNull().default("invoice"),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
+  type: text("type", { enum: ["invoice", "receipt", "report", "label", "other", "legal"] }).notNull().default("invoice"),
   title: text("title").notNull(),
   filename: text("filename").notNull(),
   filepath: text("filepath").notNull(), // Path in Supabase storage
@@ -206,6 +243,7 @@ export const documents = pgTable("documents", {
 });
 
 // Insert schemas
+export const insertFranchiseSchema = createInsertSchema(franchises);
 export const insertUserSchema = createInsertSchema(users);
 
 export const insertProductSchema = createInsertSchema(products);
@@ -235,6 +273,9 @@ export const insertEmployeePerformanceSchema = createInsertSchema(employeePerfor
 export const insertDocumentSchema = createInsertSchema(documents);
 
 // Types
+export type InsertFranchise = z.infer<typeof insertFranchiseSchema>;
+export type Franchise = typeof franchises.$inferSelect;
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
@@ -273,3 +314,6 @@ export type EmployeeTask = typeof employeeTasks.$inferSelect;
 
 export type InsertEmployeePerformance = z.infer<typeof insertEmployeePerformanceSchema>;
 export type EmployeePerformance = typeof employeePerformance.$inferSelect;
+
+export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+export type Document = typeof documents.$inferSelect;

@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, FileText, Download, Eye } from 'lucide-react';
 import { printDriver, InvoiceData } from '@/lib/print-driver';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
 import InvoiceTemplateIN from '@/components/print/invoice-template-in';
 
 interface InvoiceItem {
@@ -17,8 +18,8 @@ interface InvoiceItem {
   quantity: number;
   unitPrice: number;
   total: number;
-  taxRate: number;
-  hsn: string;
+  taxRate?: number;
+  hsn?: string;
 }
 
 export const InvoiceGenerator: React.FC = () => {
@@ -59,6 +60,8 @@ export const InvoiceGenerator: React.FC = () => {
     qrCode: 'payment-qr-code'
   });
 
+  const [enableGST, setEnableGST] = useState(false);
+
   const [newItem, setNewItem] = useState<InvoiceItem>({
     description: '',
     quantity: 1,
@@ -72,9 +75,9 @@ export const InvoiceGenerator: React.FC = () => {
 
   const calculateTotals = (items: InvoiceItem[]) => {
     const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-    const taxAmount = items.reduce((sum, item) => sum + (item.total * item.taxRate / 100), 0);
+    const taxAmount = items.reduce((sum, item) => sum + (item.total * (item.taxRate || 0) / 100), 0);
     const total = subtotal + taxAmount;
-    
+
     return { subtotal, taxAmount, total };
   };
 
@@ -127,13 +130,13 @@ export const InvoiceGenerator: React.FC = () => {
   const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
     const updatedItems = [...invoiceData.items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
-    
+
     if (field === 'quantity' || field === 'unitPrice') {
       updatedItems[index] = updateItemTotal(updatedItems[index]);
     }
-    
+
     const totals = calculateTotals(updatedItems);
-    
+
     setInvoiceData({
       ...invoiceData,
       items: updatedItems,
@@ -159,7 +162,21 @@ export const InvoiceGenerator: React.FC = () => {
 
   const generateIndianInvoice = async () => {
     try {
-      await printDriver.printComponent(<InvoiceTemplateIN data={invoiceData} />, 'indian-invoice.pdf');
+      const dataWithGST = { ...invoiceData, enableGST };
+      await printDriver.printComponent(
+        <InvoiceTemplateIN data={dataWithGST} />,
+        'indian-invoice.pdf',
+        {
+          type: 'invoice',
+          invoiceNumber: dataWithGST.invoiceNumber,
+          customerName: dataWithGST.customer.name,
+          amount: dataWithGST.total,
+          status: 'generated',
+          metadata: {
+            invoiceDate: dataWithGST.invoiceDate
+          }
+        }
+      );
       toast({
         title: "Success",
         description: "Indian Invoice generated successfully!"
@@ -182,6 +199,91 @@ export const InvoiceGenerator: React.FC = () => {
     });
   };
 
+  // Add this function inside the component or as a helper
+  const sendWhatsAppBill = async () => {
+    try {
+      // 1. Convert current invoice data to print data format
+      // We need to map InvoiceData to InvoicePrintData
+      // This is a simplified mapping, you might need to adjust based on your types
+      const printData = {
+        invoiceNumber: invoiceData.invoiceNumber,
+        invoiceDate: invoiceData.invoiceDate,
+        dueDate: invoiceData.dueDate,
+        orderNumber: invoiceData.invoiceNumber, // Using invoice number as order number for now
+        customerInfo: {
+          name: invoiceData.customer.name,
+          address: invoiceData.customer.address,
+          phone: invoiceData.customer.phone,
+          email: invoiceData.customer.email
+        },
+        companyInfo: {
+          name: invoiceData.company.name,
+          address: invoiceData.company.address,
+          phone: invoiceData.company.phone,
+          email: invoiceData.company.email,
+          taxId: invoiceData.company.taxId
+        },
+        items: invoiceData.items.map(item => ({
+          name: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.total,
+          taxRate: item.taxRate
+        })),
+        subtotal: invoiceData.subtotal,
+        tax: invoiceData.taxAmount,
+        total: invoiceData.total,
+        paymentStatus: 'Pending',
+        notes: invoiceData.notes
+      };
+
+      // 2. Generate and Upload PDF
+      // We use printInvoice which now returns the saved document info
+      const savedDocResponse = await printDriver.printInvoice(printData);
+
+      if (!savedDocResponse || !savedDocResponse.document || !savedDocResponse.document.fileUrl) {
+        throw new Error("Failed to upload PDF to server. Cannot send WhatsApp.");
+      }
+
+      const pdfUrl = savedDocResponse.document.fileUrl;
+      console.log("PDF Uploaded to:", pdfUrl);
+
+      // 3. Send WhatsApp
+      const response = await fetch('/api/whatsapp/send-bill', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customerName: invoiceData.customer.name,
+          customerPhone: invoiceData.customer.phone,
+          orderId: invoiceData.invoiceNumber,
+          amount: `₹${invoiceData.total.toFixed(2)}`,
+          pdfUrl: pdfUrl
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "WhatsApp bill sent successfully!",
+        });
+      } else {
+        throw new Error(result.error || "Failed to send WhatsApp");
+      }
+
+    } catch (error: any) {
+      console.error("WhatsApp Send Error:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send WhatsApp bill",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -190,6 +292,15 @@ export const InvoiceGenerator: React.FC = () => {
             <FileText className="h-5 w-5" />
             Invoice Generator
           </CardTitle>
+
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="gst-mode">Enable GST</Label>
+            <Switch
+              id="gst-mode"
+              checked={enableGST}
+              onCheckedChange={setEnableGST}
+            />
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Invoice Header */}
@@ -203,7 +314,7 @@ export const InvoiceGenerator: React.FC = () => {
                   onChange={(e) => setInvoiceData({ ...invoiceData, invoiceNumber: e.target.value })}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="invoiceDate">Invoice Date</Label>
                 <Input
@@ -213,7 +324,7 @@ export const InvoiceGenerator: React.FC = () => {
                   onChange={(e) => setInvoiceData({ ...invoiceData, invoiceDate: e.target.value })}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="dueDate">Due Date</Label>
                 <Input
@@ -243,7 +354,7 @@ export const InvoiceGenerator: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div>
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea
@@ -274,7 +385,7 @@ export const InvoiceGenerator: React.FC = () => {
                   placeholder="Enter customer name"
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="customerEmail">Email</Label>
                 <Input
@@ -288,7 +399,7 @@ export const InvoiceGenerator: React.FC = () => {
                   placeholder="customer@example.com"
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="customerPhone">Phone</Label>
                 <Input
@@ -301,7 +412,7 @@ export const InvoiceGenerator: React.FC = () => {
                   placeholder="+91 9876543210"
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="customerTaxId">GSTIN (Optional)</Label>
                 <Input
@@ -314,7 +425,7 @@ export const InvoiceGenerator: React.FC = () => {
                   placeholder="27ABCDE1234F1Z5"
                 />
               </div>
-              
+
               <div className="md:col-span-2">
                 <Label htmlFor="customerAddress">Address</Label>
                 <Textarea
@@ -336,7 +447,7 @@ export const InvoiceGenerator: React.FC = () => {
           {/* Items */}
           <div>
             <h3 className="text-lg font-semibold mb-4">Invoice Items</h3>
-            
+
             <div className="space-y-4">
               {invoiceData.items.map((item, index) => (
                 <Card key={index} className="p-4">
@@ -355,7 +466,7 @@ export const InvoiceGenerator: React.FC = () => {
                         onChange={(e) => updateItem(index, 'hsn', e.target.value)}
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Quantity</Label>
                       <Input
@@ -365,7 +476,7 @@ export const InvoiceGenerator: React.FC = () => {
                         onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Unit Price</Label>
                       <Input
@@ -376,7 +487,7 @@ export const InvoiceGenerator: React.FC = () => {
                         onChange={(e) => updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Tax Rate (%)</Label>
                       <Input
@@ -387,7 +498,7 @@ export const InvoiceGenerator: React.FC = () => {
                         onChange={(e) => updateItem(index, 'taxRate', parseFloat(e.target.value) || 0)}
                       />
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                       <div className="text-right">
                         <Label>Total</Label>
@@ -429,7 +540,7 @@ export const InvoiceGenerator: React.FC = () => {
                     placeholder="e.g. 9601"
                   />
                 </div>
-                
+
                 <div>
                   <Label>Quantity</Label>
                   <Input
@@ -439,7 +550,7 @@ export const InvoiceGenerator: React.FC = () => {
                     onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value) || 1 })}
                   />
                 </div>
-                
+
                 <div>
                   <Label>Unit Price</Label>
                   <Input
@@ -450,7 +561,7 @@ export const InvoiceGenerator: React.FC = () => {
                     onChange={(e) => setNewItem({ ...newItem, unitPrice: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
-                
+
                 <div className="flex items-end">
                   <Button onClick={addItem} className="w-full">
                     <Plus className="h-4 w-4 mr-2" />
@@ -464,20 +575,23 @@ export const InvoiceGenerator: React.FC = () => {
           <Separator />
 
           {/* Totals */}
-          <div className="flex justify-end">
-            <div className="w-64 space-y-2">
-              <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span>₹{invoiceData.subtotal.toFixed(2)}</span>
+          <div className="flex justify-end mt-8">
+            <div className="w-72 bg-muted/30 p-6 rounded-xl border border-border/50 space-y-3">
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Subtotal</span>
+                <span className="font-medium text-foreground">₹{invoiceData.subtotal.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Tax:</span>
-                <span>₹{invoiceData.taxAmount.toFixed(2)}</span>
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Tax (18% GST)</span>
+                <span className="font-medium text-foreground">₹{invoiceData.taxAmount.toFixed(2)}</span>
               </div>
-              <Separator />
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total:</span>
-                <span>₹{invoiceData.total.toFixed(2)}</span>
+              <Separator className="my-2" />
+              <div className="flex justify-between items-center">
+                <span className="text-base font-semibold">Total Amount</span>
+                <span className="text-xl font-bold text-primary">₹{invoiceData.total.toFixed(2)}</span>
+              </div>
+              <div className="text-xs text-muted-foreground text-right pt-1">
+                Inclusive of all taxes
               </div>
             </div>
           </div>
@@ -495,6 +609,41 @@ export const InvoiceGenerator: React.FC = () => {
             <Button onClick={generateIndianInvoice}>
               <Download className="h-4 w-4 mr-2" />
               Generate Indian Invoice
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                try {
+                  toast({ title: "Sending...", description: "Generating and sending WhatsApp bill..." });
+
+                  // 1. Generate PDF Blob (using existing logic but capturing output)
+                  // Note: We need to modify printDriver to return the blob or URL, 
+                  // or we can use a slightly modified flow here.
+                  // For now, let's assume we can trigger the printDriver to save to server 
+                  // and then we get the URL from the server response.
+
+                  // Since printDriver.printInvoice saves to server, we can try to hook into that 
+                  // or we can implement a direct call here if we had the blob.
+                  // Given the current structure, let's use a new method we'll add to printDriver
+                  // or just rely on the fact that printInvoice saves it.
+
+                  // However, printInvoice is void. We need the URL.
+                  // Let's modify printDriver to return the saved document info.
+
+                  // TEMPORARY: We will use the generateIndianInvoice flow which uses printComponent.
+                  // We need to capture the blob from that.
+
+                  // Let's use a direct approach for now:
+                  // We'll call a new function in this component that orchestrates this.
+                  await sendWhatsAppBill();
+                } catch (e) {
+                  console.error(e);
+                  toast({ title: "Error", description: "Failed to send WhatsApp", variant: "destructive" });
+                }
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-4 w-4"><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" /><path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0 .5-.5l.14-.35A.5.5 0 0 0 10.5 8c0-.5-.5-.5-.5-.5s-.5.5-.5.5a.5.5 0 0 1-.5.5J9 10z" /></svg>
+              Send via WhatsApp
             </Button>
           </div>
         </CardContent>

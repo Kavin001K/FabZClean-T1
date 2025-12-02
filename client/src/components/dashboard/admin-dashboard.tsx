@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Users,
@@ -8,44 +8,35 @@ import {
     Activity,
     TrendingUp,
     ArrowUpRight,
-    ArrowDownRight
+    ArrowDownRight,
+    Building2
 } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
 import { DashboardDueToday } from "./components/dashboard-due-today";
 import { DashboardRecentOrders } from "./components/dashboard-recent-orders";
 import { useQuery } from "@tanstack/react-query";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 export default function AdminDashboard() {
-    // Mock data for Admin Dashboard - in a real app this would come from an API
-    // that aggregates data across all franchises
-    const { data: stats } = useQuery({
-        queryKey: ['admin-stats'],
+    const [selectedFranchiseId, setSelectedFranchiseId] = useState<string>("all");
+
+    // Fetch Franchises
+    const { data: franchises = [] } = useQuery({
+        queryKey: ['franchises'],
         queryFn: async () => {
-            // Simulate API call
-            return {
-                totalRevenue: 450000,
-                revenueGrowth: 12.5,
-                totalOrders: 1250,
-                ordersGrowth: 8.2,
-                activeCustomers: 3200,
-                customersGrowth: 5.4,
-                activeFranchises: 12,
-                franchiseGrowth: 0
-            };
-        },
-        initialData: {
-            totalRevenue: 450000,
-            revenueGrowth: 12.5,
-            totalOrders: 1250,
-            ordersGrowth: 8.2,
-            activeCustomers: 3200,
-            customersGrowth: 5.4,
-            activeFranchises: 12,
-            franchiseGrowth: 0
+            const res = await fetch('/api/franchises');
+            if (!res.ok) return [];
+            return res.json();
         }
     });
 
-    // Fetch orders for the widgets
+    // Fetch orders
     const { data: orders = [], isLoading: isLoadingOrders } = useQuery({
         queryKey: ['admin-orders'],
         queryFn: async () => {
@@ -55,7 +46,31 @@ export default function AdminDashboard() {
         }
     });
 
-    const dueTodayOrders = orders.filter((order: any) => {
+    // Filter orders based on selected franchise
+    const filteredOrders = useMemo(() => {
+        if (selectedFranchiseId === "all") return orders;
+        return orders.filter((order: any) => order.franchiseId === selectedFranchiseId);
+    }, [orders, selectedFranchiseId]);
+
+    // Calculate stats based on filtered orders
+    const stats = useMemo(() => {
+        const totalRevenue = filteredOrders.reduce((sum: number, order: any) => sum + parseFloat(order.totalAmount || 0), 0);
+        const totalOrders = filteredOrders.length;
+        const activeCustomers = new Set(filteredOrders.map((o: any) => o.customerId)).size;
+
+        return {
+            totalRevenue,
+            revenueGrowth: 12.5, // Mock growth for now
+            totalOrders,
+            ordersGrowth: 8.2,
+            activeCustomers,
+            customersGrowth: 5.4,
+            activeFranchises: selectedFranchiseId === "all" ? franchises.length : 1,
+            franchiseGrowth: 0
+        };
+    }, [filteredOrders, franchises.length, selectedFranchiseId]);
+
+    const dueTodayOrders = filteredOrders.filter((order: any) => {
         if (!order.pickupDate && !order.deliveryDate) return false;
         const date = new Date(order.pickupDate || order.deliveryDate);
         const today = new Date();
@@ -64,18 +79,33 @@ export default function AdminDashboard() {
             date.getFullYear() === today.getFullYear();
     });
 
-    const recentOrders = [...orders].sort((a: any, b: any) =>
+    const recentOrders = [...filteredOrders].sort((a: any, b: any) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     ).slice(0, 5);
 
     return (
         <div className="p-8 space-y-8">
             {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-                <p className="text-muted-foreground">
-                    Global overview of FabZClean operations
-                </p>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+                    <p className="text-muted-foreground">
+                        Global overview of FabZClean operations
+                    </p>
+                </div>
+                <div className="w-[200px]">
+                    <Select value={selectedFranchiseId} onValueChange={setSelectedFranchiseId}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Filter by Franchise" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Franchises</SelectItem>
+                            {franchises.map((f: any) => (
+                                <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             {/* Key Metrics */}
@@ -146,12 +176,14 @@ export default function AdminDashboard() {
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Active Franchises</CardTitle>
-                        <Activity className="h-4 w-4 text-muted-foreground" />
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{stats.activeFranchises}</div>
                         <p className="text-xs text-muted-foreground flex items-center mt-1">
-                            <span className="text-muted-foreground">Stable</span>
+                            <span className="text-muted-foreground">
+                                {selectedFranchiseId === 'all' ? 'Across all regions' : 'Selected Franchise'}
+                            </span>
                         </p>
                     </CardContent>
                 </Card>

@@ -25,6 +25,7 @@ interface OrderConfirmationDialogProps {
     onOpenChange: (open: boolean) => void;
     order: Order | null;
     onClose: () => void;
+    enableGST?: boolean;
 }
 
 export function OrderConfirmationDialog({
@@ -32,6 +33,7 @@ export function OrderConfirmationDialog({
     onOpenChange,
     order,
     onClose,
+    enableGST = true,
 }: OrderConfirmationDialogProps) {
     const barcodeRef = useRef<SVGSVGElement>(null);
     const qrcodeRef = useRef<HTMLCanvasElement>(null);
@@ -102,17 +104,27 @@ export function OrderConfirmationDialog({
             // Generate UPI QR Code
             if (qrcodeRef.current) {
                 try {
-                    const upiId = "8825702072@okbizaxis";
-                    const upiUrl = `upi://pay?pa=${upiId}&pn=FabZClean&am=${totalAmount}&tr=${order.orderNumber}&tn=Order-${order.orderNumber}`;
+                    const advancePaid = order.advancePaid ? parseFloat(String(order.advancePaid)) : 0;
+                    const balanceDue = Math.max(0, totalAmount - advancePaid);
 
-                    QRCode.toCanvas(qrcodeRef.current, upiUrl, {
-                        width: 100,
-                        margin: 0,
-                        color: {
-                            dark: '#000000',
-                            light: '#ffffff'
-                        }
-                    });
+                    // Only generate QR if there is a balance due
+                    if (balanceDue > 0) {
+                        const upiId = "8825702072@okbizaxis";
+                        const upiUrl = `upi://pay?pa=${upiId}&pn=FabZClean&am=${balanceDue.toFixed(2)}&tr=${order.orderNumber}&tn=Order-${order.orderNumber}`;
+
+                        QRCode.toCanvas(qrcodeRef.current, upiUrl, {
+                            width: 100,
+                            margin: 0,
+                            color: {
+                                dark: '#000000',
+                                light: '#ffffff'
+                            }
+                        });
+                    } else {
+                        // Clear canvas if no balance due
+                        const ctx = qrcodeRef.current.getContext('2d');
+                        if (ctx) ctx.clearRect(0, 0, qrcodeRef.current.width, qrcodeRef.current.height);
+                    }
                 } catch (e) {
                     console.error("QR Code generation failed:", e);
                 }
@@ -139,6 +151,9 @@ export function OrderConfirmationDialog({
 
             // Convert order to invoice data format
             const invoiceData = convertOrderToInvoiceData(order);
+            // Set enableGST based on prop
+            (invoiceData as any).enableGST = enableGST;
+
             console.log('Invoice data converted:', invoiceData);
 
             // Use the print driver to print the invoice
@@ -274,7 +289,7 @@ export function OrderConfirmationDialog({
                 order.orderNumber,
                 order.customerName || 'Valued Customer',
                 totalAmount,
-                `${window.location.origin}/bill/${order.orderNumber}`,
+                `${window.location.origin}/bill/${order.orderNumber}?enableGST=${enableGST}`,
                 uploadedDoc.fileUrl // Use the uploaded PDF URL
             );
 

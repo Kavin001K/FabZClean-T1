@@ -4,7 +4,7 @@ interface InvoiceData {
   invoiceNumber: string;
   invoiceDate: string;
   dueDate: string;
-  // We keep the interface for type safety, even though we override company details below
+  enableGST?: boolean; // Added toggle
   company: {
     name: string;
     address: string;
@@ -89,20 +89,21 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
     subtotal,
     total,
     qrCode,
+    enableGST = false, // Default to false
   } = data;
 
   // HARDCODED COMPANY DETAILS FROM MYFABCLEAN.IN
   const companyDetails = {
     name: "Fab Clean",
-    address: "#16, Venkatramana Round Road,\nMahalingapuram, Pollachi - 642002",
-    phone: "93630 59595",
-    email: "info@myfabclean.in",
-    taxId: data.company.taxId,
-    logo: "/assets/logo.webp" // Hardcoded logo path
+    // Added "Opp to HDFC Bank" as requested
+    address: "#16, Venkatramana Round Road,\nOpp to HDFC Bank,\nMahalingapuram, Pollachi - 642002",
+    phone: "+91 93630 59595",
+    email: "support@myfabclean.com",
+    taxId: "33AITPD3522F1ZK",
+    logo: "/assets/logo.webp"
   };
 
-  // Determine if this is an inter-state transaction
-  const isInterState = customer.taxId && companyDetails.taxId
+  const isInterState = enableGST && customer?.taxId && companyDetails.taxId
     ? validateGSTIN(companyDetails.taxId) && validateGSTIN(customer.taxId)
       ? isInterStateTransaction(companyDetails.taxId, customer.taxId)
       : false
@@ -177,7 +178,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
   return (
     <div style={{
       backgroundColor: 'white',
-      padding: '0', // Removed padding to allow header to stretch
+      padding: '0',
       width: '210mm',
       minHeight: '297mm',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
@@ -185,35 +186,61 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
       lineHeight: '1.5',
       color: colors.text,
       margin: '0 auto',
-      position: 'relative'
+      position: 'relative',
+      overflow: 'hidden' // Ensure watermark doesn't spill
     }}>
       {/* Top Brand Bar */}
       <div style={{ height: '8px', backgroundColor: colors.primary, width: '100%' }}></div>
 
-      <div style={{ padding: '40px' }}>
-        {/* Header */}
+      {/* Watermark */}
+      <div style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%) rotate(-45deg)',
+        fontSize: '120px',
+        fontWeight: '900',
+        color: colors.primary,
+        opacity: '0.05',
+        pointerEvents: 'none',
+        whiteSpace: 'nowrap',
+        zIndex: 0
+      }}>
+        FAB CLEAN
+      </div>
+
+      <div style={{ padding: '40px', position: 'relative', zIndex: 1 }}>
+        {/* Header - Left: Info, Center: Logo, Right: Invoice No */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '40px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            {/* Logo */}
-            <img
-              src={companyDetails.logo}
-              alt="Fab Clean Logo"
-              style={{ width: '80px', height: 'auto', objectFit: 'contain' }}
-            />
-            <div>
-              <h1 style={{ fontSize: '28px', fontWeight: '800', margin: '0', color: colors.secondary, letterSpacing: '-0.5px' }}>
-                {companyDetails.name}
-              </h1>
-              <div style={{ fontSize: '12px', color: colors.gray, marginTop: '4px' }}>
-                <p style={{ margin: '2px 0', whiteSpace: 'pre-line' }}>{companyDetails.address}</p>
-                <p style={{ margin: '2px 0' }}>{companyDetails.phone} | {companyDetails.email}</p>
-              </div>
+
+          {/* Left: Company Info */}
+          <div style={{ flex: 1 }}>
+            <h1 style={{ fontSize: '28px', fontWeight: '800', margin: '0', color: colors.secondary, letterSpacing: '-0.5px' }}>
+              {companyDetails.name}
+            </h1>
+            <div style={{ fontSize: '12px', color: colors.gray, marginTop: '8px' }}>
+              <p style={{ margin: '2px 0', whiteSpace: 'pre-line', fontWeight: '500' }}>{companyDetails.address}</p>
+              <p style={{ margin: '4px 0 2px 0' }}>Ph: {companyDetails.phone}</p>
+              <p style={{ margin: '2px 0' }}>Email: {companyDetails.email}</p>
             </div>
           </div>
 
-          <div style={{ textAlign: 'right' }}>
+          {/* Center: Logo */}
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+            <img
+              src={companyDetails.logo}
+              alt="Fab Clean Logo"
+              style={{ width: '180px', height: 'auto', objectFit: 'contain' }}
+            />
+          </div>
+
+          {/* Right: Invoice Details */}
+          <div style={{ flex: 1, textAlign: 'right' }}>
             <h2 style={{ fontSize: '42px', fontWeight: '900', margin: '0', color: colors.primary, lineHeight: '1', letterSpacing: '-1px' }}>INVOICE</h2>
             <p style={{ fontSize: '14px', color: colors.secondary, margin: '8px 0 0 0', fontWeight: '600' }}>#{invoiceNumber}</p>
+            {enableGST && companyDetails.taxId && (
+              <p style={{ fontSize: '11px', color: colors.gray, margin: '4px 0 0 0' }}>GSTIN: {companyDetails.taxId}</p>
+            )}
           </div>
         </div>
 
@@ -224,13 +251,14 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
             <h3 style={{ fontSize: '11px', fontWeight: 'bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Bill To</h3>
             <div style={{ fontSize: '15px' }}>
               <p style={{ fontWeight: 'bold', margin: '0 0 4px 0', fontSize: '18px', color: colors.secondary }}>{customer.name}</p>
-              <p style={{ margin: '0 0 4px 0', whiteSpace: 'pre-line', color: '#374151' }}>{customer.address}</p>
+              {/* Added full address display logic */}
+              <p style={{ margin: '0 0 4px 0', whiteSpace: 'pre-line', color: '#374151', minHeight: '40px' }}>{customer.address || "Address not provided"}</p>
               <p style={{ margin: '0 0 4px 0', color: '#374151' }}>{customer.phone}</p>
-              {customer.taxId && <p style={{ fontWeight: '600', margin: '8px 0 0 0', fontSize: '13px' }}>GSTIN: {customer.taxId}</p>}
+              {enableGST && customer.taxId && <p style={{ fontWeight: '600', margin: '8px 0 0 0', fontSize: '13px' }}>GSTIN: {customer.taxId}</p>}
             </div>
           </div>
 
-          {/* Dates & Details */}
+          {/* Dates */}
           <div style={{ backgroundColor: colors.light, padding: '20px', borderRadius: '12px', border: `1px solid ${colors.primary}30` }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', fontSize: '14px' }}>
               <div style={{ color: colors.secondary }}>Invoice Date</div>
@@ -238,13 +266,6 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
 
               <div style={{ color: colors.secondary }}>Due Date</div>
               <div style={{ fontWeight: '700', textAlign: 'right' }}>{new Date(dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-
-              {companyDetails.taxId && (
-                <>
-                  <div style={{ color: colors.secondary }}>Our GSTIN</div>
-                  <div style={{ fontWeight: '700', textAlign: 'right' }}>{companyDetails.taxId}</div>
-                </>
-              )}
             </div>
           </div>
         </div>
@@ -258,8 +279,9 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                 <th style={{ padding: '14px', textAlign: 'center', width: '80px', fontWeight: '600' }}>Qty</th>
                 <th style={{ padding: '14px', textAlign: 'right', width: '100px', fontWeight: '600' }}>Price</th>
                 <th style={{ padding: '14px', textAlign: 'right', width: '100px', fontWeight: '600' }}>Total</th>
-                <th style={{ padding: '14px', textAlign: 'center', width: '60px', fontWeight: '600' }}>GST</th>
-                <th style={{ padding: '14px 20px', textAlign: 'right', width: '120px', fontWeight: '600' }}>Net</th>
+                {enableGST && <th style={{ padding: '14px', textAlign: 'center', width: '60px', fontWeight: '600' }}>GST</th>}
+                {/* Renamed Net to Amount for clarity, or kept Net */}
+                <th style={{ padding: '14px 20px', textAlign: 'right', width: '120px', fontWeight: '600' }}>Net Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -267,14 +289,14 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                 <tr key={index} style={{ borderBottom: index === itemsWithGST.length - 1 ? 'none' : '1px solid #e5e7eb', backgroundColor: index % 2 === 0 ? 'white' : '#f9fafb' }}>
                   <td style={{ padding: '16px 20px' }}>
                     <div style={{ fontWeight: '600', color: colors.text, fontSize: '14px' }}>{item.description}</div>
-                    {item.hsn && <div style={{ fontSize: '11px', color: colors.gray, marginTop: '2px' }}>HSN: {item.hsn}</div>}
+                    {enableGST && item.hsn && <div style={{ fontSize: '11px', color: colors.gray, marginTop: '2px' }}>HSN: {item.hsn}</div>}
                   </td>
                   <td style={{ padding: '16px', textAlign: 'center', color: colors.secondary, fontWeight: '500' }}>{item.quantity}</td>
                   <td style={{ padding: '16px', textAlign: 'right', fontFamily: 'monospace' }}>{item.unitPrice.toFixed(2)}</td>
                   <td style={{ padding: '16px', textAlign: 'right', fontFamily: 'monospace' }}>{item.total.toFixed(2)}</td>
-                  <td style={{ padding: '16px', textAlign: 'center', fontSize: '11px', color: colors.gray }}>{item.gstBreakdown.gstRate}%</td>
+                  {enableGST && <td style={{ padding: '16px', textAlign: 'center', fontSize: '11px', color: colors.gray }}>{item.gstBreakdown.gstRate}%</td>}
                   <td style={{ padding: '16px 20px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '700', color: colors.secondary }}>
-                    {item.gstBreakdown.totalAmount.toFixed(2)}
+                    {enableGST ? item.gstBreakdown.totalAmount.toFixed(2) : item.total.toFixed(2)}
                   </td>
                 </tr>
               ))}
@@ -314,33 +336,38 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                 <span style={{ fontFamily: 'monospace', fontWeight: '500', color: colors.text }}>{formatIndianCurrency(subtotal)}</span>
               </div>
 
-              {isInterState ? (
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', color: colors.gray }}>
-                  <span>IGST</span>
-                  <span style={{ fontFamily: 'monospace', color: colors.text }}>{formatIndianCurrency(totalIGST)}</span>
-                </div>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: colors.gray }}>
-                    <span>CGST</span>
-                    <span style={{ fontFamily: 'monospace', color: colors.text }}>{formatIndianCurrency(totalCGST)}</span>
-                  </div>
+              {enableGST && (
+                isInterState ? (
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', color: colors.gray }}>
-                    <span>SGST</span>
-                    <span style={{ fontFamily: 'monospace', color: colors.text }}>{formatIndianCurrency(totalSGST)}</span>
+                    <span>IGST</span>
+                    <span style={{ fontFamily: 'monospace', color: colors.text }}>{formatIndianCurrency(totalIGST)}</span>
                   </div>
-                </>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', color: colors.gray }}>
+                      <span>CGST</span>
+                      <span style={{ fontFamily: 'monospace', color: colors.text }}>{formatIndianCurrency(totalCGST)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', color: colors.gray }}>
+                      <span>SGST</span>
+                      <span style={{ fontFamily: 'monospace', color: colors.text }}>{formatIndianCurrency(totalSGST)}</span>
+                    </div>
+                  </>
+                )
               )}
 
               <div style={{ height: '2px', backgroundColor: colors.primary, margin: '15px 0' }}></div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '16px', fontWeight: '800', color: colors.secondary }}>TOTAL</span>
-                <span style={{ fontSize: '24px', fontWeight: '900', fontFamily: 'monospace', color: colors.primary }}>{formatIndianCurrency(total)}</span>
+                {/* Adjust total based on GST inclusion */}
+                <span style={{ fontSize: '24px', fontWeight: '900', fontFamily: 'monospace', color: colors.primary }}>
+                  {formatIndianCurrency(enableGST ? total : subtotal)}
+                </span>
               </div>
 
               <div style={{ marginTop: '10px', fontSize: '11px', fontStyle: 'italic', color: colors.gray, textAlign: 'right' }}>
-                {convertToWords(total)} Only
+                {convertToWords(enableGST ? total : subtotal)} Only
               </div>
             </div>
           </div>
@@ -355,14 +382,18 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
         width: '100%',
         backgroundColor: colors.secondary,
         color: 'white',
-        padding: '12px 40px',
-        fontSize: '10px',
+        padding: '15px 40px',
+        fontSize: '12px', // Increased size slightly
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <div>Thank you for choosing {companyDetails.name}!</div>
-        <div>Printed on: {new Date().toLocaleString('en-IN')}</div>
+        <div style={{ fontSize: '16px', fontWeight: '900', letterSpacing: '0.5px' }}>
+          Thank you for Choosing Fab Clean!
+        </div>
+        <div style={{ fontSize: '11px', opacity: 0.9 }}>
+          This is a computer generated bill no signature needed
+        </div>
       </div>
     </div>
   );

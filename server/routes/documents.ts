@@ -2,8 +2,6 @@ import { Router } from 'express';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
 import { db } from '../db';
-import { documents } from '../../shared/schema';
-import { eq } from 'drizzle-orm';
 
 const router = Router();
 
@@ -36,10 +34,29 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         }
 
         const { type, metadata: metadataStr } = req.body;
-        const metadata = metadataStr ? JSON.parse(metadataStr) : {};
+        let metadata = {};
+        try {
+            metadata = metadataStr ? JSON.parse(metadataStr) : {};
+        } catch (e) {
+            console.warn('Failed to parse metadata JSON:', e);
+        }
 
         const filename = req.file.originalname;
-        const filepath = `documents/${Date.now()}-${filename}`;
+        const filepath = `documents/${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`; // Sanitize filename
+
+        // Ensure bucket exists
+        const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
+        if (bucketError) {
+            console.error('Error listing buckets:', bucketError);
+        } else if (!buckets.find(b => b.name === 'pdfs')) {
+            const { error: createBucketError } = await supabase.storage.createBucket('pdfs', {
+                public: true
+            });
+            if (createBucketError) {
+                console.error('Error creating bucket:', createBucketError);
+                return res.status(500).json({ error: 'Failed to configure storage bucket' });
+            }
+        }
 
         // Upload to Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -51,7 +68,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
         if (uploadError) {
             console.error('Supabase upload error:', uploadError);
-            return res.status(500).json({ error: 'Failed to upload file to storage' });
+            return res.status(500).json({ error: 'Failed to upload file to storage', details: uploadError.message });
         }
 
         // Get public URL
@@ -62,24 +79,32 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         const fileUrl = urlData.publicUrl;
 
         // Save document record to database
-        const [document] = await db.insert(documents).values({
-            type: type || 'invoice',
-            title: metadata.invoiceNumber ? `Invoice ${metadata.invoiceNumber}` : filename,
-            filename,
-            filepath,
-            fileUrl,
-            status: metadata.status || 'sent',
-            amount: metadata.amount ? String(metadata.amount) : null,
-            customerName: metadata.customerName || null,
-            orderNumber: metadata.orderNumber || null,
-            metadata: metadata.metadata || {},
-        }).returning();
+        try {
+            const document = await db.createDocument({
+                franchiseId: (req as any).user?.franchiseId, // Assuming user is attached to req
+                type: type || 'invoice',
+                title: (metadata as any).invoiceNumber ? `Invoice ${(metadata as any).invoiceNumber}` : filename,
+                filename,
+                filepath,
+                fileUrl,
+                status: (metadata as any).status || 'sent',
+                amount: (metadata as any).amount ? String((metadata as any).amount) : null,
+                customerName: (metadata as any).customerName || null,
+                orderNumber: (metadata as any).orderNumber || null,
+                metadata: (metadata as any).metadata || {},
+            });
 
-        res.json({
-            success: true,
-            document,
-            message: 'Document uploaded successfully',
-        });
+            res.json({
+                success: true,
+                document,
+                message: 'Document uploaded successfully',
+            });
+        } catch (dbError) {
+            console.error('Database insert error:', dbError);
+            // Try to clean up the uploaded file if DB insert fails
+            await supabase.storage.from('pdfs').remove([filepath]);
+            return res.status(500).json({ error: 'Failed to save document record', details: dbError instanceof Error ? dbError.message : String(dbError) });
+        }
     } catch (error) {
         console.error('Document upload error:', error);
         res.status(500).json({
@@ -93,35 +118,35 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 router.get('/', async (req, res) => {
     try {
         const { type, status, limit = '50' } = req.query;
+        console.log(`Fetching documents with params: type=${type}, status=${status}, limit=${limit}`);
 
-        let query = db.select().from(documents);
+        const parsedLimit = parseInt(limit as string);
+        const validLimit = isNaN(parsedLimit) ? 50 : parsedLimit;
 
-        if (type) {
-            query = query.where(eq(documents.type, type as string));
-        }
+        const allDocuments = await db.listDocuments({
+            type: type as string,
+            status: status as string,
+            limit: validLimit
+        });
 
-        if (status) {
-            query = query.where(eq(documents.status, status as string));
-        }
-
-        const allDocuments = await query
-            .orderBy(documents.createdAt)
-            .limit(parseInt(limit as string));
-
+        console.log(`Successfully fetched ${allDocuments.length} documents`);
         res.json(allDocuments);
     } catch (error) {
         console.error('Error fetching documents:', error);
-        res.status(500).json({ error: 'Failed to fetch documents' });
+        if (error instanceof Error) {
+            console.error('Stack:', error.stack);
+        }
+        res.status(500).json({
+            error: 'Failed to fetch documents',
+            details: error instanceof Error ? error.message : JSON.stringify(error)
+        });
     }
 });
 
 // Get document by ID
 router.get('/:id', async (req, res) => {
     try {
-        const [document] = await db
-            .select()
-            .from(documents)
-            .where(eq(documents.id, req.params.id));
+        const document = await db.getDocument(req.params.id);
 
         if (!document) {
             return res.status(404).json({ error: 'Document not found' });
@@ -137,10 +162,7 @@ router.get('/:id', async (req, res) => {
 // Download document
 router.get('/:id/download', async (req, res) => {
     try {
-        const [document] = await db
-            .select()
-            .from(documents)
-            .where(eq(documents.id, req.params.id));
+        const document = await db.getDocument(req.params.id);
 
         if (!document) {
             return res.status(404).json({ error: 'Document not found' });
@@ -170,10 +192,7 @@ router.get('/:id/download', async (req, res) => {
 // Delete document
 router.delete('/:id', async (req, res) => {
     try {
-        const [document] = await db
-            .select()
-            .from(documents)
-            .where(eq(documents.id, req.params.id));
+        const document = await db.getDocument(req.params.id);
 
         if (!document) {
             return res.status(404).json({ error: 'Document not found' });
@@ -189,7 +208,7 @@ router.delete('/:id', async (req, res) => {
         }
 
         // Delete from database
-        await db.delete(documents).where(eq(documents.id, req.params.id));
+        await db.deleteDocument(req.params.id);
 
         res.json({ success: true, message: 'Document deleted successfully' });
     } catch (error) {

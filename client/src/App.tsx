@@ -32,6 +32,7 @@ import DebugPage from "@/pages/debug";
 import EmployeeDashboardPage from "@/pages/employee-dashboard";
 import UserManagementPage from "@/pages/user-management";
 import FranchiseDashboard from "@/pages/franchise-dashboard";
+import FranchiseManagement from "@/pages/franchise-management";
 import Settings from "@/pages/settings";
 import DatabaseStatus from "@/pages/database-status";
 import PerformanceAnalytics from "@/components/analytics";
@@ -193,6 +194,14 @@ function Router() {
         <ProtectedRoute allowedRoles={['franchise_manager']}>
           <MainLayout>
             <FranchiseDashboard />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/franchise-management">
+        <ProtectedRoute allowedRoles={['admin']}>
+          <MainLayout>
+            <FranchiseManagement />
           </MainLayout>
         </ProtectedRoute>
       </Route>

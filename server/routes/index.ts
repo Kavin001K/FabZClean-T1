@@ -20,6 +20,7 @@ import whatsappRouter from './whatsapp';
 import documentsRouter from './documents';
 import transitSuggestionsRouter from './transit-suggestions';
 import settingsRouter from './settings';
+import franchiseRouter from './franchise';
 import { debugRouter } from './debug';
 
 /**
@@ -32,6 +33,7 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/employees', employeesRouter);
   app.use('/api/whatsapp', whatsappRouter);
   app.use('/api/documents', documentsRouter);
+  app.use('/api/franchises', franchiseRouter);
 
   // API v1 routes
   app.use('/api/v1/orders', ordersRouter);

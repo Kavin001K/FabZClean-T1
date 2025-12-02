@@ -200,11 +200,12 @@ export class PDFService {
      * Generate PDF and upload for WhatsApp sharing
      */
     static async generateAndUploadBillPDF(
-        orderNumber: string
+        orderNumber: string,
+        enableGST: boolean = true
     ): Promise<string> {
         try {
             // Generate PDF from bill URL
-            const billUrl = `${window.location.origin}/bill/${orderNumber}`;
+            const billUrl = `${window.location.origin}/bill/${orderNumber}?enableGST=${enableGST}`;
             console.log('📄 Generating PDF from:', billUrl);
 
             const pdfBlob = await this.generatePDFFromURL(billUrl);

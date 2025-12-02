@@ -11,6 +11,21 @@ export interface IStorage {
   deleteDriver(id: string): Promise<boolean>;
   getDriversByStatus(status: string): Promise<Driver[]>;
   updateDriverLocation(id: string, latitude: number, longitude: number): Promise<Driver | null>;
+
+  // Franchise methods
+  createFranchise(data: any): Promise<any>;
+  listFranchises(): Promise<any[]>;
+  getFranchise(id: string): Promise<any | undefined>;
+  updateFranchise(id: string, data: any): Promise<any | undefined>;
+
+  // Task methods
+  createTask(data: any): Promise<any>;
+  listTasks(franchiseId?: string): Promise<any[]>;
+  updateTask(id: string, data: any): Promise<any | undefined>;
+
+  // Attendance methods
+  createAttendance(data: any): Promise<any>;
+  listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]>;
 }
 
 export class MemStorage implements IStorage {

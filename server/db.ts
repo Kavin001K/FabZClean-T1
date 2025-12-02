@@ -5,7 +5,8 @@ import { existsSync } from "fs";
 
 // Determine database path with fallbacks
 const isProduction = process.env.NODE_ENV === "production";
-const isSupabaseConfigured = !!process.env.SUPABASE_URL &&
+const isSupabaseConfigured = process.env.USE_SUPABASE === 'true' &&
+  !!process.env.SUPABASE_URL &&
   !!process.env.SUPABASE_SERVICE_KEY &&
   !process.env.SUPABASE_URL.includes('placeholder');
 

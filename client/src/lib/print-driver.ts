@@ -54,6 +54,7 @@ export interface InvoiceData {
   invoiceNumber: string;
   invoiceDate: string;
   dueDate: string;
+  enableGST?: boolean;
   company: {
     name: string;
     address: string;
@@ -75,6 +76,7 @@ export interface InvoiceData {
     unitPrice: number;
     total: number;
     taxRate?: number;
+    hsn?: string;
   }>;
   subtotal: number;
   taxAmount: number;
@@ -185,10 +187,10 @@ export function convertOrderToInvoiceData(order: any): InvoicePrintData {
   const companyInfo = {
     name: "FabZClean",
     address: "123 Business Street, City, State 12345\nIndia",
-    phone: "+1 (555) 123-4567",
-    email: "info@fabzclean.com",
-    website: "www.fabzclean.com",
-    taxId: "29ABCDE1234F1Z5" // Example GSTIN format
+    phone: "+91 93630 59595",
+    email: "support@myfabclean.com",
+    website: "www.myfabclean.com",
+    taxId: "33AITPD3522F1ZK" // Updated GSTIN
   };
 
   // Parse customer address
@@ -243,6 +245,43 @@ export function convertOrderToInvoiceData(order: any): InvoicePrintData {
       total: totalAmount / 1.18,
       taxRate: 0.18
     }];
+  }
+
+  // Add Extra Charges
+  if (order.extraCharges && parseFloat(String(order.extraCharges)) > 0) {
+    const charge = parseFloat(String(order.extraCharges));
+    items.push({
+      name: 'Extra Charges',
+      description: 'Additional fees',
+      quantity: 1,
+      unitPrice: charge,
+      total: charge,
+      taxRate: 0.18
+    });
+  }
+
+  // Add Discount
+  if (order.discountValue && parseFloat(String(order.discountValue)) > 0) {
+    const discountVal = parseFloat(String(order.discountValue));
+    const currentSubtotal = items.reduce((sum, item) => sum + item.total, 0);
+
+    let discountAmount = 0;
+    if (order.discountType === 'percentage') {
+      discountAmount = (currentSubtotal * discountVal) / 100;
+    } else {
+      discountAmount = discountVal;
+    }
+
+    if (discountAmount > 0) {
+      items.push({
+        name: 'Discount',
+        description: order.discountType === 'percentage' ? `${discountVal}% off` : 'Fixed discount',
+        quantity: 1,
+        unitPrice: -discountAmount,
+        total: -discountAmount,
+        taxRate: 0.18
+      });
+    }
   }
 
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
@@ -581,7 +620,7 @@ export class PrintDriver {
     doc.save(`${data.title ? data.title.toLowerCase().replace(/\s+/g, '-') : 'document'}-label.pdf`);
   }
 
-  public async printInvoice(data: InvoicePrintData, templateId: string = 'invoice'): Promise<void> {
+  public async printInvoice(data: InvoicePrintData, templateId: string = 'invoice'): Promise<any> {
     const template = this.getTemplate(templateId);
     if (!template) {
       throw new Error(`Template ${templateId} not found`);
@@ -723,8 +762,9 @@ export class PrintDriver {
 
       // 5. Save to Server (CRITICAL STEP)
       console.log('💾 Saving to server...');
+      let savedDoc = null;
       try {
-        const savedDoc = await this.savePDFToServer(pdfBlob, filename, {
+        savedDoc = await this.savePDFToServer(pdfBlob, filename, {
           type: 'invoice',
           invoiceNumber: data.invoiceNumber,
           orderNumber: data.orderNumber,
@@ -775,6 +815,8 @@ export class PrintDriver {
         pdf.save(filename);
         console.log('✅ Download initiated');
       }
+
+      return savedDoc; // Return the saved document info
 
     } catch (error) {
       console.error('❌ Critical error in printInvoice:', error);
@@ -865,7 +907,7 @@ export class PrintDriver {
     doc.save(`receipt-${data.invoiceNumber}.pdf`);
   }
 
-  public async printFromElement(element: HTMLElement, filename: string = 'document.pdf'): Promise<void> {
+  public async printFromElement(element: HTMLElement, filename: string = 'document.pdf', metadata?: any): Promise<any> {
     try {
       const canvas = await html2canvas(element, {
         scale: 2,
@@ -898,6 +940,17 @@ export class PrintDriver {
         heightLeft -= pageHeight;
       }
 
+      // Save to server if metadata provided
+      if (metadata) {
+        try {
+          const pdfBlob = pdf.output('blob');
+          await this.savePDFToServer(pdfBlob, filename, metadata);
+        } catch (error) {
+          console.error('Failed to save document to server:', error);
+          // Continue to download even if upload fails
+        }
+      }
+
       pdf.autoPrint();
       pdf.save(filename);
     } catch (error) {
@@ -906,7 +959,7 @@ export class PrintDriver {
     }
   }
 
-  public async printComponent(component: React.ReactElement, filename: string = 'document.pdf'): Promise<void> {
+  public async printComponent(component: React.ReactElement, filename: string = 'document.pdf', metadata?: any): Promise<void> {
     const container = document.createElement('div');
     container.style.position = 'absolute';
     container.style.left = '-9999px';
@@ -918,7 +971,7 @@ export class PrintDriver {
       setTimeout(resolve, 500); // Wait for rendering
     });
 
-    await this.printFromElement(container, filename);
+    await this.printFromElement(container, filename, metadata);
 
     root.unmount();
     document.body.removeChild(container);
@@ -1525,6 +1578,23 @@ export class PrintDriver {
       pdf.setFont(template.settings.fontFamily, 'italic');
       pdf.text(`Generated on ${new Date().toLocaleString()}`, margin.left, yPosition);
       pdf.text('Thank you for your business!', pageWidth - margin.right - 50, yPosition);
+    }
+
+    // Save to server
+    try {
+      const pdfBlob = pdf.output('blob');
+      await this.savePDFToServer(pdfBlob, `Invoice_${data.invoiceNumber}.pdf`, {
+        type: 'invoice',
+        invoiceNumber: data.invoiceNumber,
+        customerName: data.customer.name,
+        amount: data.total,
+        status: 'generated',
+        metadata: {
+          invoiceDate: data.invoiceDate
+        }
+      });
+    } catch (e) {
+      console.error("Failed to save to server", e);
     }
 
     pdf.save(`Invoice_${data.invoiceNumber}.pdf`);

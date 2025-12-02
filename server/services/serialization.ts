@@ -20,12 +20,12 @@ export class SerializationService {
    */
   private static toCamelCaseObject(obj: Record<string, any>): Record<string, any> {
     const result: Record<string, any> = {};
-    
+
     for (const [key, value] of Object.entries(obj)) {
       const camelKey = this.toCamelCase(key);
       result[camelKey] = value;
     }
-    
+
     return result;
   }
 
@@ -44,7 +44,7 @@ export class SerializationService {
     } = options;
 
     // Create a copy to avoid mutating the original
-    let serialized = { ...record };
+    let serialized: Record<string, any> = { ...record };
 
     // Remove excluded fields
     excludeFields.forEach(field => {
@@ -54,10 +54,18 @@ export class SerializationService {
     // Handle timestamp fields
     if (includeTimestamps) {
       if (serialized.createdAt && typeof serialized.createdAt === 'string') {
-        serialized.createdAt = new Date(serialized.createdAt).toISOString();
+        try {
+          serialized.createdAt = new Date(serialized.createdAt).toISOString();
+        } catch (e) {
+          // Keep original value if invalid
+        }
       }
       if (serialized.updatedAt && typeof serialized.updatedAt === 'string') {
-        serialized.updatedAt = new Date(serialized.updatedAt).toISOString();
+        try {
+          serialized.updatedAt = new Date(serialized.updatedAt).toISOString();
+        } catch (e) {
+          // Keep original value if invalid
+        }
       }
     } else {
       delete serialized.createdAt;
@@ -144,7 +152,7 @@ export class SerializationService {
     details?: any
   ) {
     const message = typeof error === 'string' ? error : error.message;
-    
+
     return {
       error: true,
       message,
@@ -182,8 +190,8 @@ export class SerializationService {
 
     // Handle service data
     if (includeServices && order.serviceId) {
-      serialized.serviceIds = Array.isArray(order.serviceId) 
-        ? order.serviceId 
+      serialized.serviceIds = Array.isArray(order.serviceId)
+        ? order.serviceId
         : order.serviceId.split(',').filter(Boolean);
     }
 
@@ -221,15 +229,15 @@ export class SerializationService {
 
     // Convert totalSpent to number if it's a string
     if (serialized.totalSpent !== undefined) {
-      serialized.totalSpent = typeof serialized.totalSpent === 'string' 
-        ? parseFloat(serialized.totalSpent) 
+      serialized.totalSpent = typeof serialized.totalSpent === 'string'
+        ? parseFloat(serialized.totalSpent)
         : serialized.totalSpent;
     }
 
     // Convert totalOrders to number if it's a string
     if (serialized.totalOrders !== undefined) {
-      serialized.totalOrders = typeof serialized.totalOrders === 'string' 
-        ? parseInt(serialized.totalOrders) 
+      serialized.totalOrders = typeof serialized.totalOrders === 'string'
+        ? parseInt(serialized.totalOrders)
         : serialized.totalOrders;
     }
 
@@ -304,19 +312,19 @@ export class SerializationService {
 }
 
 // Export commonly used serialization functions with proper binding
-export const serializeOrder = (order: any, includeCustomer = true, includeServices = true) => 
+export const serializeOrder = (order: any, includeCustomer = true, includeServices = true) =>
   SerializationService.serializeOrder(order, includeCustomer, includeServices);
-export const serializeCustomer = (customer: any, includeLoyalty = true) => 
+export const serializeCustomer = (customer: any, includeLoyalty = true) =>
   SerializationService.serializeCustomer(customer, includeLoyalty);
-export const serializeProduct = (product: any) => 
+export const serializeProduct = (product: any) =>
   SerializationService.serializeProduct(product);
-export const serializeDelivery = (delivery: any, includeDriver = true, includeRoute = false) => 
+export const serializeDelivery = (delivery: any, includeDriver = true, includeRoute = false) =>
   SerializationService.serializeDelivery(delivery, includeDriver, includeRoute);
-export const createPaginatedResponse = (data: any[], options: any, serializationOptions?: any) => 
+export const createPaginatedResponse = (data: any[], options: any, serializationOptions?: any) =>
   SerializationService.createPaginatedResponse(data, options, serializationOptions);
-export const createSearchResponse = (data: any[], query: string, options: any, serializationOptions?: any) => 
+export const createSearchResponse = (data: any[], query: string, options: any, serializationOptions?: any) =>
   SerializationService.createSearchResponse(data, query, options, serializationOptions);
-export const createErrorResponse = (message: string, statusCode: number = 500, error?: any) => 
+export const createErrorResponse = (message: string, statusCode: number = 500, error?: any) =>
   SerializationService.createErrorResponse(message, statusCode, error);
-export const createSuccessResponse = (data: any, message?: string, meta?: any) => 
+export const createSuccessResponse = (data: any, message?: string, meta?: any) =>
   SerializationService.createSuccessResponse(data, message, meta);

@@ -419,8 +419,24 @@ function OrdersComponent() {
   }, [updateOrderStatusMutation]);
 
   const handleUpdateStatus = useCallback((orderId: string, newStatus: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (newStatus === 'completed' && order && order.paymentStatus !== 'paid') {
+      toast({
+        title: "Cannot Complete Order",
+        description: "Order must be marked as Paid before it can be completed.",
+        variant: "destructive",
+      });
+      return;
+    }
     updateOrderStatusMutation.mutate({ orderId, newStatus });
-  }, [updateOrderStatusMutation]);
+  }, [updateOrderStatusMutation, orders, toast]);
+
+  const handleMarkAsPaid = useCallback((orderId: string) => {
+    updateOrderMutation.mutate({
+      orderId,
+      updates: { paymentStatus: 'paid' }
+    });
+  }, [updateOrderMutation]);
 
   const handleBulkStatusUpdate = useCallback(async (newStatus: string) => {
     if (selectedOrders.length === 0) {
@@ -560,7 +576,7 @@ function OrdersComponent() {
       status: filters.status,
       paymentStatus: filters.paymentStatus,
       dateRange: filters.dateFrom || filters.dateTo
-        ? `${filters.dateFrom ? formatDate(filters.dateFrom) : 'Any'} - ${filters.dateTo ? formatDate(filters.dateTo) : 'Any'}`
+        ? `${filters.dateFrom ? formatDate(filters.dateFrom.toISOString()) : 'Any'} - ${filters.dateTo ? formatDate(filters.dateTo.toISOString()) : 'Any'}`
         : undefined,
       amountRange: filters.amountMin || filters.amountMax
         ? `${filters.amountMin || 'Any'} - ${filters.amountMax || 'Any'}`
@@ -1299,6 +1315,7 @@ function OrdersComponent() {
                   <AnimatePresence>
                     {selectedOrders.length > 0 && (
                       <motion.div
+                        key="bulk-actions"
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
@@ -1710,6 +1727,12 @@ function OrdersComponent() {
                                           Mark as Processing
                                         </DropdownMenuItem>
                                       )}
+                                      {order.paymentStatus !== 'paid' && (
+                                        <DropdownMenuItem onClick={() => handleMarkAsPaid(order.id)}>
+                                          <DollarSign className="mr-2 h-4 w-4" />
+                                          Mark as Paid
+                                        </DropdownMenuItem>
+                                      )}
                                       {order.status === 'processing' && (
                                         <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>
                                           <CheckCircle className="mr-2 h-4 w-4" />
@@ -1775,13 +1798,13 @@ function OrdersComponent() {
                       <div className="space-y-4 ml-8 border-l-2 border-primary/30 pl-6 relative">
                         {orders.map((order, orderIndex) => {
                           const statusIcon = order.status === 'completed' ? CheckCircle :
-                            order.status === 'in_progress' ? Clock :
+                            order.status === 'processing' ? Clock :
                               order.status === 'pending' ? AlertCircle :
                                 XCircle;
                           const StatusIcon = statusIcon;
 
                           const statusColor = order.status === 'completed' ? 'text-green-500 bg-green-500/10 border-green-500/20' :
-                            order.status === 'in_progress' ? 'text-blue-500 bg-blue-500/10 border-blue-500/20' :
+                            order.status === 'processing' ? 'text-blue-500 bg-blue-500/10 border-blue-500/20' :
                               order.status === 'pending' ? 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' :
                                 'text-red-500 bg-red-500/10 border-red-500/20';
 
@@ -1824,7 +1847,7 @@ function OrdersComponent() {
                                             <Badge
                                               variant={
                                                 order.status === 'completed' ? 'default' :
-                                                  order.status === 'in_progress' ? 'secondary' :
+                                                  order.status === 'processing' ? 'secondary' :
                                                     order.status === 'pending' ? 'outline' :
                                                       'destructive'
                                               }
@@ -1835,7 +1858,7 @@ function OrdersComponent() {
                                           </div>
                                           <p className="text-sm text-muted-foreground flex items-center gap-1">
                                             <Clock className="h-3 w-3" />
-                                            {new Date(order.createdAt).toLocaleTimeString('en-US', {
+                                            {new Date(order.createdAt || new Date()).toLocaleTimeString('en-US', {
                                               hour: '2-digit',
                                               minute: '2-digit'
                                             })}
@@ -1925,6 +1948,11 @@ function OrdersComponent() {
                                             <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'in_progress')}>
                                               Mark as In Progress
                                             </DropdownMenuItem>
+                                            {order.paymentStatus !== 'paid' && (
+                                              <DropdownMenuItem onClick={() => handleMarkAsPaid(order.id)}>
+                                                Mark as Paid
+                                              </DropdownMenuItem>
+                                            )}
                                             <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>
                                               Mark as Completed
                                             </DropdownMenuItem>

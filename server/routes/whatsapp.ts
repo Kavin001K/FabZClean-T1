@@ -1,45 +1,39 @@
-import express, { Request, Response } from 'express';
-import { whatsappService } from '../services/whatsapp.service';
+import { Router } from 'express';
+import { sendWhatsAppBill } from '../services/whatsapp.service';
 
-const router = express.Router();
+const router = Router();
 
-router.post('/send', async (req: Request, res: Response) => {
+router.post('/send-bill', async (req, res) => {
     try {
-        console.log('📨 [WhatsApp Route] Received request body:', JSON.stringify(req.body, null, 2));
+        const {
+            customerName,
+            customerPhone,
+            orderId,
+            amount,
+            pdfUrl
+        } = req.body;
 
-        const { order, pdfUrl } = req.body;
-
-        if (!order) {
-            console.error('❌ [WhatsApp Route] Missing order object in request body');
-            return res.status(400).json({ error: 'Missing order data', receivedBody: req.body });
+        // Validate inputs
+        if (!customerName || !customerPhone || !pdfUrl) {
+            return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        if (!pdfUrl) {
-            console.warn('⚠️ No PDF URL provided, sending text-only message');
-        }
+        // Generate a payment link (Mock logic - replace with actual if you have one)
+        const paymentLink = `https://fabclean.com/pay/${orderId}`;
 
-        console.log('📱 WhatsApp API called with:', {
-            phone: order.customerPhone,
-            orderNumber: order.orderNumber,
-            hasPDF: !!pdfUrl
+        await sendWhatsAppBill({
+            customerName,
+            customerPhone,
+            orderId,
+            amount: amount || "0.00",
+            paymentLink,
+            pdfUrl
         });
 
-        const success = await whatsappService.sendOrderConfirmation(order, pdfUrl);
-
-        if (success) {
-            res.json({ success: true, message: 'WhatsApp message sent successfully' });
-        } else {
-            res.status(500).json({
-                error: 'Failed to send WhatsApp message',
-                details: 'Check server logs for more information'
-            });
-        }
-    } catch (error: any) {
-        console.error('❌ WhatsApp route error:', error);
-        res.status(500).json({
-            error: 'Internal server error',
-            message: error.message
-        });
+        res.json({ success: true, message: 'WhatsApp bill sent successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to send WhatsApp message' });
     }
 });
 

@@ -15,6 +15,10 @@ export default function BillView() {
     const barcodeRef = useRef<SVGSVGElement>(null);
     const qrcodeRef = useRef<HTMLCanvasElement>(null);
 
+    // Parse query params for GST toggle
+    const searchParams = new URLSearchParams(window.location.search);
+    const enableGST = searchParams.get('enableGST') !== 'false'; // Default to true
+
     const { data: order, isLoading, error } = useQuery({
         queryKey: ["order", orderNumber],
         queryFn: async () => {
@@ -24,6 +28,16 @@ export default function BillView() {
         },
         enabled: !!orderNumber
     });
+
+    const subtotal = order ? (Array.isArray(order.items)
+        ? order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
+        : Number(order.totalAmount)) : 0;
+
+    const discount = order?.discountValue ? Number(order.discountValue) : 0;
+    const extraCharges = order?.extraCharges ? Number(order.extraCharges) : 0;
+    const advancePaid = order?.advancePaid ? Number(order.advancePaid) : 0;
+    const totalAmount = order ? Number(order.totalAmount) : 0;
+    const balanceDue = Math.max(0, totalAmount - advancePaid);
 
     useEffect(() => {
         if (!order) return;
@@ -58,18 +72,24 @@ export default function BillView() {
             }
 
             if (qrcodeRef.current) {
-                const qrData = `upi://pay?pa=8825702072@kotak811&pn=FabZClean&am=${order.totalAmount}&tr=${order.orderNumber}&tn=Order ${order.orderNumber}`;
-                QRCode.toCanvas(qrcodeRef.current, qrData, {
-                    width: 120,
-                    margin: 2,
-                    color: {
-                        dark: '#10b981',
-                        light: '#ffffff'
-                    }
-                }, (error: any) => {
-                    if (error) console.error("❌ QR Code error:", error);
-                    else console.log('✅ QR code generated');
-                });
+                // Only generate QR if there is a balance due
+                if (balanceDue > 0) {
+                    const qrData = `upi://pay?pa=8825702072@okbizaxis&pn=FabZClean&am=${balanceDue.toFixed(2)}&tr=${order.orderNumber}&tn=Order-${order.orderNumber}`;
+                    QRCode.toCanvas(qrcodeRef.current, qrData, {
+                        width: 120,
+                        margin: 2,
+                        color: {
+                            dark: '#10b981',
+                            light: '#ffffff'
+                        }
+                    }, (error: any) => {
+                        if (error) console.error("❌ QR Code error:", error);
+                        else console.log('✅ QR code generated');
+                    });
+                } else {
+                    const ctx = qrcodeRef.current.getContext('2d');
+                    if (ctx) ctx.clearRect(0, 0, qrcodeRef.current.width, qrcodeRef.current.height);
+                }
             }
         };
 
@@ -84,7 +104,7 @@ export default function BillView() {
 
             return () => clearTimeout(timer);
         }
-    }, [order]);
+    }, [order, balanceDue]);
 
     if (isLoading) {
         return (
@@ -131,13 +151,7 @@ export default function BillView() {
         }
     };
 
-    const subtotal = Array.isArray(order.items)
-        ? order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
-        : Number(order.totalAmount);
 
-    const discount = order.discountValue ? Number(order.discountValue) : 0;
-    const extraCharges = order.extraCharges ? Number(order.extraCharges) : 0;
-    const advancePaid = order.advancePaid ? Number(order.advancePaid) : 0;
 
     return (
         <>
@@ -225,7 +239,7 @@ export default function BillView() {
                             <div className="space-y-4">
                                 <div>
                                     <h2 className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent mb-4">
-                                        INVOICE
+                                        {enableGST ? 'TAX INVOICE' : 'INVOICE'}
                                     </h2>
                                     <div className="space-y-2 text-sm">
                                         <div className="flex items-center gap-3">
@@ -363,19 +377,23 @@ export default function BillView() {
                         </div>
 
                         {/* Footer */}
-                        <div className="mt-8 pt-8 border-t border-gray-200 text-center">
-                            <p className="text-sm text-gray-600 mb-2">
-                                Thank you for choosing FabZClean! 🌟
-                            </p>
-                            <p className="text-xs text-gray-500">
-                                For any queries, contact us at support@fabzclean.com or call +91 123 456 7890
-                            </p>
-                            <div className="mt-4 flex items-center justify-center gap-6 text-xs text-gray-400">
-                                <span>📧 Email Support</span>
-                                <span>•</span>
-                                <span>🔒 Secure Payment</span>
-                                <span>•</span>
-                                <span>♻️ Eco-Friendly</span>
+                        <div className="invoice-footer mt-12 pt-6 border-t border-gray-100 bg-gray-50 -mx-6 -mb-6 md:-mx-8 md:-mb-8 px-6 pb-6 md:px-8 md:pb-8">
+                            <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm">
+                                <div className="text-center md:text-left">
+                                    <p className="font-bold text-emerald-800">Thank you for choosing FabZClean!</p>
+                                    <p className="text-xs text-gray-500 mt-1">We appreciate your business.</p>
+                                </div>
+                                <div className="text-center md:text-right">
+                                    <p className="font-semibold text-gray-700">Need Help?</p>
+                                    <p className="text-xs text-gray-500 mt-1">support@fabzclean.com • +91 123 456 7890</p>
+                                </div>
+                            </div>
+                            <div className="mt-6 pt-4 border-t border-gray-200 flex flex-wrap justify-center gap-x-6 gap-y-2 text-[10px] text-gray-400 font-medium tracking-wider uppercase">
+                                <span>Premium Laundry</span>
+                                <span className="hidden md:inline">•</span>
+                                <span>Eco-Friendly Processing</span>
+                                <span className="hidden md:inline">•</span>
+                                <span>Express Delivery</span>
                             </div>
                         </div>
                     </div>

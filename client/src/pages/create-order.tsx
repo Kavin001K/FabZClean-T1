@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Switch } from "@/components/ui/switch";
 import { PlusCircle, User, Calendar as CalendarIcon, Truck, DollarSign, Search, CheckCircle, X, Loader2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
@@ -66,6 +67,8 @@ export default function CreateOrder() {
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [advancePayment, setAdvancePayment] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentStatus, setPaymentStatus] = useState('pending');
+  const [enableGST, setEnableGST] = useState(false);
 
   // Calculation state
   const [subtotal, setSubtotal] = useState(0);
@@ -387,9 +390,14 @@ export default function CreateOrder() {
     // Add extra charges
     calculatedTotal += extraCharges;
 
+    // Apply GST if enabled (18%)
+    if (enableGST) {
+      calculatedTotal += calculatedTotal * 0.18;
+    }
+
     // Ensure total is not negative
     setTotalAmount(Math.max(0, calculatedTotal));
-  }, [subtotal, discountType, discountValue, extraCharges]);
+  }, [subtotal, discountType, discountValue, extraCharges, enableGST]);
 
   // Create order mutation
   const createOrderMutation = useMutation({
@@ -490,7 +498,7 @@ export default function CreateOrder() {
                 });
 
                 const { PDFService } = await import('@/lib/pdf-service');
-                pdfUrl = await PDFService.generateAndUploadBillPDF(newOrder.orderNumber);
+                pdfUrl = await PDFService.generateAndUploadBillPDF(newOrder.orderNumber, enableGST);
                 console.log('✅ PDF generated:', pdfUrl);
               } catch (pdfError) {
                 console.warn('⚠️ PDF failed, sending link only:', pdfError);
@@ -558,6 +566,8 @@ export default function CreateOrder() {
     setSpecialInstructions('');
     setAdvancePayment('');
     setPaymentMethod('cash');
+    setPaymentStatus('pending');
+    setEnableGST(true);
   };
 
   // Validate phone number
@@ -651,7 +661,7 @@ export default function CreateOrder() {
       customerEmail: customerEmail || undefined,
       customerPhone,
       status: "pending",
-      paymentStatus: "pending",
+      paymentStatus: paymentStatus,
       totalAmount: totalAmount.toFixed(2),
       items: selectedServices.map(item => ({
         serviceId: item.service.id,
@@ -770,6 +780,7 @@ export default function CreateOrder() {
                 <AnimatePresence>
                   {foundCustomer && (
                     <motion.div
+                      key="customer-found"
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
@@ -1045,6 +1056,20 @@ export default function CreateOrder() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="flex items-center justify-between space-x-2 border p-3 rounded-md bg-muted/20">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="gst-mode" className="text-base">Enable GST (18%)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Apply 18% Goods & Services Tax to the order total
+                    </p>
+                  </div>
+                  <Switch
+                    id="gst-mode"
+                    checked={enableGST}
+                    onCheckedChange={setEnableGST}
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="discountType">Discount Type</Label>
@@ -1192,6 +1217,7 @@ export default function CreateOrder() {
                   <AnimatePresence>
                     {discountType !== 'none' && discountValue > 0 && (
                       <motion.div
+                        key="discount-summary"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
@@ -1206,6 +1232,7 @@ export default function CreateOrder() {
 
                     {extraCharges > 0 && (
                       <motion.div
+                        key="extra-charges-summary"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
@@ -1213,6 +1240,19 @@ export default function CreateOrder() {
                       >
                         <span>{extraChargesLabel || 'Extra Charges'}</span>
                         <span>+₹{extraCharges.toFixed(2)}</span>
+                      </motion.div>
+                    )}
+
+                    {enableGST && (
+                      <motion.div
+                        key="gst-summary"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="flex justify-between text-sm text-amber-600"
+                      >
+                        <span>GST (18%)</span>
+                        <span>+₹{((subtotal - (discountType === 'percentage' ? (subtotal * discountValue) / 100 : discountType === 'fixed' ? discountValue : 0) + extraCharges) * 0.18).toFixed(2)}</span>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -1225,6 +1265,7 @@ export default function CreateOrder() {
                   <AnimatePresence>
                     {advancePayment && parseFloat(advancePayment) > 0 && (
                       <motion.div
+                        key="advance-payment-summary"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
@@ -1350,6 +1391,7 @@ export default function CreateOrder() {
         open={isModalOpen}
         onOpenChange={setIsModalOpen}
         order={createdOrder}
+        enableGST={enableGST}
         onClose={() => {
           setIsModalOpen(false);
         }}

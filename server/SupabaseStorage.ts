@@ -855,6 +855,61 @@ export class SupabaseStorage {
         return data.map(item => this.mapDates(item));
     }
 
+    // ======= DOCUMENTS =======
+    async createDocument(data: any): Promise<any> {
+        const { data: document, error } = await this.supabase
+            .from('documents')
+            .insert(data)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return this.mapDates(document);
+    }
+
+    async listDocuments(filters: any = {}): Promise<any[]> {
+        let query = this.supabase
+            .from('documents')
+            .select('*');
+
+        if (filters.type) {
+            query = query.eq('type', filters.type);
+        }
+
+        if (filters.status) {
+            query = query.eq('status', filters.status);
+        }
+
+        if (filters.limit) {
+            query = query.limit(filters.limit);
+        }
+
+        const { data, error } = await query.order('createdAt', { ascending: false });
+
+        if (error) throw error;
+        return data.map(item => this.mapDates(item));
+    }
+
+    async getDocument(id: string): Promise<any | undefined> {
+        const { data: document, error } = await this.supabase
+            .from('documents')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) return undefined;
+        return this.mapDates(document);
+    }
+
+    async deleteDocument(id: string): Promise<boolean> {
+        const { error } = await this.supabase
+            .from('documents')
+            .delete()
+            .eq('id', id);
+
+        return !error;
+    }
+
     close() {
         // Supabase client doesn't need explicit closing
     }
