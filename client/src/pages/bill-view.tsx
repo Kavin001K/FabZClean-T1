@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ordersApi } from "@/lib/data-service";
 import { Loader2, Printer, Share2, Download, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import InvoiceTemplateIN from '@/components/print/invoice-template-in';
 import { formatCurrency, formatDate } from "@/lib/data-service";
 // @ts-ignore
 import QRCode from 'qrcode';
@@ -14,10 +15,9 @@ export default function BillView() {
     const orderNumber = params?.orderNumber;
     const barcodeRef = useRef<SVGSVGElement>(null);
     const qrcodeRef = useRef<HTMLCanvasElement>(null);
+    const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
 
-    // Parse query params for GST toggle
-    const searchParams = new URLSearchParams(window.location.search);
-    const enableGST = searchParams.get('enableGST') !== 'false'; // Default to true
+
 
     const { data: order, isLoading, error } = useQuery({
         queryKey: ["order", orderNumber],
@@ -28,6 +28,15 @@ export default function BillView() {
         },
         enabled: !!orderNumber
     });
+
+    // Parse query params for GST toggle
+    const searchParams = new URLSearchParams(window.location.search);
+    const hasGSTParam = searchParams.has('enableGST');
+    const paramGST = searchParams.get('enableGST') === 'true';
+
+    // Determine if we should show GST view
+    // Priority: 1. Query Param, 2. Order's gstEnabled flag, 3. Default false
+    const enableGST = order ? (hasGSTParam ? paramGST : (order.gstEnabled || false)) : false;
 
     const subtotal = order ? (Array.isArray(order.items)
         ? order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
@@ -71,10 +80,23 @@ export default function BillView() {
                 console.warn('⚠️ Barcode ref is null');
             }
 
-            if (qrcodeRef.current) {
-                // Only generate QR if there is a balance due
-                if (balanceDue > 0) {
-                    const qrData = `upi://pay?pa=8825702072@okbizaxis&pn=FabZClean&am=${balanceDue.toFixed(2)}&tr=${order.orderNumber}&tn=Order-${order.orderNumber}`;
+            if (balanceDue > 0) {
+                const qrData = `upi://pay?pa=8825702072@okbizaxis&pn=FabZClean&am=${balanceDue.toFixed(2)}&tr=${order.orderNumber}&tn=Order-${order.orderNumber}`;
+
+                // Generate Data URL for Invoice Template
+                QRCode.toDataURL(qrData, {
+                    width: 120,
+                    margin: 2,
+                    color: {
+                        dark: '#000000',
+                        light: '#ffffff'
+                    }
+                }, (err: any, url: string) => {
+                    if (!err) setQrCodeUrl(url);
+                });
+
+                // Generate Canvas for standard view
+                if (qrcodeRef.current) {
                     QRCode.toCanvas(qrcodeRef.current, qrData, {
                         width: 120,
                         margin: 2,
@@ -86,7 +108,10 @@ export default function BillView() {
                         if (error) console.error("❌ QR Code error:", error);
                         else console.log('✅ QR code generated');
                     });
-                } else {
+                }
+            } else {
+                setQrCodeUrl('');
+                if (qrcodeRef.current) {
                     const ctx = qrcodeRef.current.getContext('2d');
                     if (ctx) ctx.clearRect(0, 0, qrcodeRef.current.width, qrcodeRef.current.height);
                 }
@@ -105,6 +130,46 @@ export default function BillView() {
             return () => clearTimeout(timer);
         }
     }, [order, balanceDue]);
+
+    if (enableGST && order) {
+        const shippingAddress = order.shippingAddress as any;
+        const invoiceData = {
+            invoiceNumber: order.orderNumber,
+            invoiceDate: order.createdAt ? new Date(order.createdAt).toISOString() : new Date().toISOString(),
+            dueDate: order.pickupDate ? new Date(order.pickupDate).toISOString() : (order.createdAt ? new Date(order.createdAt).toISOString() : new Date().toISOString()),
+            enableGST: true,
+            company: {
+                name: "Fab Clean",
+                address: "#16, Venkatramana Round Road,\nOpp to HDFC Bank,\nMahalingapuram, Pollachi - 642002",
+                phone: "+91 93630 59595",
+                email: "support@myfabclean.com",
+                taxId: "33AITPD3522F1ZK",
+                logo: "/assets/logo.webp"
+            },
+            customer: {
+                name: order.customerName,
+                address: shippingAddress?.instructions || "",
+                phone: order.customerPhone || "",
+                email: order.customerEmail || "",
+                taxId: order.gstNumber || undefined
+            },
+            items: Array.isArray(order.items) ? order.items.map((item: any) => ({
+                description: item.productName || item.name,
+                quantity: item.quantity,
+                unitPrice: item.price,
+                total: item.price * item.quantity,
+                taxRate: 18,
+                hsn: "9601"
+            })) : [],
+            subtotal: subtotal,
+            taxAmount: order.gstAmount ? parseFloat(order.gstAmount) : 0,
+            total: parseFloat(order.totalAmount),
+            paymentTerms: "Due on receipt",
+            qrCode: qrCodeUrl || undefined
+        };
+
+        return <InvoiceTemplateIN data={invoiceData} />;
+    }
 
     if (isLoading) {
         return (

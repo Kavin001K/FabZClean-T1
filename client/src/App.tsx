@@ -42,6 +42,7 @@ import CustomerPortal from "@/pages/customer-portal";
 import WorkerPortal from "@/pages/worker-portal";
 import BillView from "@/pages/bill-view";
 import TestInvoice from "@/pages/test-invoice";
+import AuditLogsPage from "@/pages/admin/audit-logs";
 
 function Router() {
   return (
@@ -258,6 +259,14 @@ function Router() {
         <ProtectedRoute allowedRoles={['admin']}>
           <MainLayout>
             <TestInvoice />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/audit-logs">
+        <ProtectedRoute allowedRoles={['admin', 'franchise_manager']}>
+          <MainLayout>
+            <AuditLogsPage />
           </MainLayout>
         </ProtectedRoute>
       </Route>

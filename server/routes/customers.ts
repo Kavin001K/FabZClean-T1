@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db as storage } from "../db";
-import { insertCustomerSchema } from "../schema";
+import { insertCustomerSchema, type Customer, type Order } from "../../shared/schema";
 import {
   jwtRequired,
   validateInput,
@@ -47,7 +47,7 @@ router.get('/', async (req, res) => {
     // Apply search filter
     if (search && typeof search === 'string') {
       const searchTerm = search.toLowerCase();
-      customers = customers.filter(customer =>
+      customers = customers.filter((customer: Customer) =>
         customer.name?.toLowerCase().includes(searchTerm) ||
         customer.email?.toLowerCase().includes(searchTerm) ||
         customer.phone?.toLowerCase().includes(searchTerm)
@@ -56,12 +56,13 @@ router.get('/', async (req, res) => {
 
     // Apply segment filter
     if (segment && segment !== 'all') {
-      customers = customers.filter(customer => {
-        if (!customer.segments) return false;
+      customers = customers.filter((customer: Customer) => {
+        const segmentsData = (customer as any).segments;
+        if (!segmentsData) return false;
         try {
-          const segments = typeof customer.segments === 'string'
-            ? JSON.parse(customer.segments)
-            : customer.segments;
+          const segments = typeof segmentsData === 'string'
+            ? JSON.parse(segmentsData)
+            : segmentsData;
           return Array.isArray(segments) && segments.includes(segment);
         } catch {
           return false;
@@ -70,7 +71,8 @@ router.get('/', async (req, res) => {
     }
 
     // Apply sorting
-    customers.sort((a, b) => {
+    // Apply sorting
+    customers.sort((a: any, b: any) => {
       const aValue = a[sortBy as string];
       const bValue = b[sortBy as string];
 
@@ -83,7 +85,7 @@ router.get('/', async (req, res) => {
 
     // Apply pagination
     const limitNum = parseInt(limit as string) || 20;
-    const startIndex = cursor ? customers.findIndex(c => c.id === cursor) + 1 : 0;
+    const startIndex = cursor ? customers.findIndex((c: Customer) => c.id === cursor) + 1 : 0;
     const endIndex = startIndex + limitNum;
 
     const paginatedCustomers = customers.slice(startIndex, endIndex);
@@ -91,7 +93,7 @@ router.get('/', async (req, res) => {
     const nextCursor = hasMore ? paginatedCustomers[paginatedCustomers.length - 1]?.id : undefined;
 
     // Serialize customers
-    const serializedCustomers = paginatedCustomers.map(customer => serializeCustomer(customer));
+    const serializedCustomers = paginatedCustomers.map((customer: Customer) => serializeCustomer(customer));
 
     // Return paginated response
     const response = createPaginatedResponse(serializedCustomers, {
@@ -136,7 +138,7 @@ router.post(
 
       // Check if customer already exists
       const existingCustomer = await storage.listCustomers();
-      const emailExists = existingCustomer.some(c => c.email === customerData.email);
+      const emailExists = existingCustomer.some((c: Customer) => c.email === customerData.email);
 
       if (emailExists) {
         return res.status(400).json(createErrorResponse('Customer with this email already exists', 400));
@@ -144,7 +146,7 @@ router.post(
 
       // Check if phone already exists
       if (customerData.phone) {
-        const phoneExists = existingCustomer.some(c => c.phone === customerData.phone);
+        const phoneExists = existingCustomer.some((c: Customer) => c.phone === customerData.phone);
         if (phoneExists) {
           return res.status(400).json(createErrorResponse('Customer with this phone number already exists', 400));
         }
@@ -159,7 +161,7 @@ router.post(
       const customer = await storage.createCustomer(customerData);
 
       // Notify real-time clients
-      realtimeServer.triggerUpdate('customers', 'created', customer);
+      realtimeServer.triggerUpdate('customer', 'created', customer);
 
       const serializedCustomer = serializeCustomer(customer);
       res.status(201).json(createSuccessResponse(serializedCustomer, 'Customer created successfully'));
@@ -186,7 +188,7 @@ router.put('/:id', requireRole(CUSTOMER_EDITOR_ROLES), async (req, res) => {
     const updatedCustomer = await storage.updateCustomer(customerId, updateData);
 
     // Notify real-time clients
-    realtimeServer.triggerUpdate('customers', 'updated', updatedCustomer);
+    realtimeServer.triggerUpdate('customer', 'updated', updatedCustomer);
 
     const serializedCustomer = serializeCustomer(updatedCustomer);
     res.json(createSuccessResponse(serializedCustomer, 'Customer updated successfully'));
@@ -213,7 +215,7 @@ router.delete('/:id', requireRole(CUSTOMER_ADMIN_ROLES), async (req, res) => {
     }
 
     // Notify real-time clients
-    realtimeServer.triggerUpdate('customers', 'deleted', { customerId });
+    realtimeServer.triggerUpdate('customer', 'deleted', { customerId });
 
     res.json(createSuccessResponse(null, 'Customer deleted successfully'));
   } catch (error) {
@@ -229,22 +231,26 @@ router.get('/:id/orders', async (req, res) => {
     const { limit = 20, status } = req.query;
 
     const orders = await storage.listOrders();
-    let customerOrders = orders.filter(order => order.customerId === customerId);
+    let customerOrders = orders.filter((order: Order) => order.customerId === customerId);
 
     // Apply status filter
     if (status && status !== 'all') {
-      customerOrders = customerOrders.filter(order => order.status === status);
+      customerOrders = customerOrders.filter((order: Order) => order.status === status);
     }
 
     // Sort by creation date (newest first)
-    customerOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    customerOrders.sort((a: Order, b: Order) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
 
     // Apply limit
     const limitNum = parseInt(limit as string) || 20;
     customerOrders = customerOrders.slice(0, limitNum);
 
     // Serialize orders
-    const serializedOrders = customerOrders.map(order => ({
+    const serializedOrders = customerOrders.map((order: Order) => ({
       id: order.id,
       totalAmount: order.totalAmount,
       status: order.status,
@@ -266,15 +272,17 @@ router.get('/analytics/overview', async (req, res) => {
     const orders = await storage.listOrders();
 
     // Calculate customer segments
+    // Calculate customer segments
     const segments: Record<string, number> = {};
-    customers.forEach(customer => {
-      if (customer.segments) {
+    customers.forEach((customer: Customer) => {
+      const segmentsData = (customer as any).segments;
+      if (segmentsData) {
         try {
-          const customerSegments = typeof customer.segments === 'string'
-            ? JSON.parse(customer.segments)
-            : customer.segments;
+          const customerSegments = typeof segmentsData === 'string'
+            ? JSON.parse(segmentsData)
+            : segmentsData;
           if (Array.isArray(customerSegments)) {
-            customerSegments.forEach(segment => {
+            customerSegments.forEach((segment: string) => {
               segments[segment] = (segments[segment] || 0) + 1;
             });
           }
@@ -286,17 +294,17 @@ router.get('/analytics/overview', async (req, res) => {
 
     // Calculate loyalty points distribution
     const loyaltyStats = {
-      totalPoints: customers.reduce((sum, customer) => sum + (parseInt(customer.loyaltyPoints || '0')), 0),
+      totalPoints: customers.reduce((sum: number, customer: Customer) => sum + (parseInt((customer as any).loyaltyPoints || '0')), 0),
       averagePoints: customers.length > 0
-        ? customers.reduce((sum, customer) => sum + (parseInt(customer.loyaltyPoints || '0')), 0) / customers.length
+        ? customers.reduce((sum: number, customer: Customer) => sum + (parseInt((customer as any).loyaltyPoints || '0')), 0) / customers.length
         : 0,
-      customersWithPoints: customers.filter(c => parseInt(c.loyaltyPoints || '0') > 0).length
+      customersWithPoints: customers.filter((c: Customer) => parseInt((c as any).loyaltyPoints || '0') > 0).length
     };
 
     // Calculate customer lifetime value
-    const customerLTV = customers.map(customer => {
-      const customerOrders = orders.filter(order => order.customerId === customer.id);
-      const totalSpent = customerOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount || '0'), 0);
+    const customerLTV = customers.map((customer: Customer) => {
+      const customerOrders = orders.filter((order: Order) => order.customerId === customer.id);
+      const totalSpent = customerOrders.reduce((sum: number, order: Order) => sum + parseFloat(order.totalAmount || '0'), 0);
       return {
         customerId: customer.id,
         customerName: customer.name,
@@ -307,14 +315,15 @@ router.get('/analytics/overview', async (req, res) => {
 
     const analytics = {
       totalCustomers: customers.length,
-      newCustomersToday: customers.filter(customer => {
+      newCustomersToday: customers.filter((customer: Customer) => {
         const today = new Date().toISOString().split('T')[0];
-        return customer.createdAt.startsWith(today);
+        const customerDate = customer.createdAt ? new Date(customer.createdAt).toISOString().split('T')[0] : '';
+        return customerDate === today;
       }).length,
       segments,
       loyaltyStats,
       topCustomers: customerLTV
-        .sort((a, b) => b.totalSpent - a.totalSpent)
+        .sort((a: any, b: any) => b.totalSpent - a.totalSpent)
         .slice(0, 10)
     };
 
@@ -346,9 +355,9 @@ router.patch(
       const updatedCustomer = await storage.updateCustomer(customerId, { segments });
 
       // Notify real-time clients
-      realtimeServer.triggerUpdate('customers', 'segments_updated', {
-        customerId,
-        segments
+      realtimeServer.broadcast({
+        type: 'customer_segments_updated',
+        data: { customerId, segments }
       });
 
       const serializedCustomer = serializeCustomer(updatedCustomer);
@@ -366,14 +375,15 @@ router.get('/segments/list', async (req, res) => {
     const customers = await storage.listCustomers();
     const allSegments = new Set<string>();
 
-    customers.forEach(customer => {
-      if (customer.segments) {
+    customers.forEach((customer: Customer) => {
+      const segmentsData = (customer as any).segments;
+      if (segmentsData) {
         try {
-          const customerSegments = typeof customer.segments === 'string'
-            ? JSON.parse(customer.segments)
-            : customer.segments;
+          const customerSegments = typeof segmentsData === 'string'
+            ? JSON.parse(segmentsData)
+            : segmentsData;
           if (Array.isArray(customerSegments)) {
-            customerSegments.forEach(segment => allSegments.add(segment));
+            customerSegments.forEach((segment: string) => allSegments.add(segment));
           }
         } catch {
           // Ignore invalid segments
@@ -388,5 +398,6 @@ router.get('/segments/list', async (req, res) => {
     res.status(500).json(createErrorResponse('Failed to fetch customer segments', 500));
   }
 });
+
 
 export default router;

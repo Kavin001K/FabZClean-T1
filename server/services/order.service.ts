@@ -230,7 +230,7 @@ export class OrderService {
             await storage.updateCustomer(order.customerId, {
               totalOrders: (customer.totalOrders || 0) + 1,
               totalSpent: (currentTotalSpent + orderTotal).toString(),
-              lastOrder: new Date()
+              lastOrder: new Date().toISOString()
             });
             console.log(`✅ [OrderService] Updated stats for customer: ${order.customerId}`);
           }
@@ -251,6 +251,9 @@ export class OrderService {
       return enrichedOrder;
     } catch (error) {
       console.error('❌ [OrderService] Error creating order:', error);
+      if (error instanceof Error) {
+        console.error('Error stack:', error.stack);
+      }
       throw error;
     }
   }

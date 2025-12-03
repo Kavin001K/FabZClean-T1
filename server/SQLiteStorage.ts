@@ -177,6 +177,12 @@ export class SQLiteStorage implements IStorage {
         discountValue TEXT,
         couponCode TEXT,
         extraCharges TEXT,
+
+        gstEnabled INTEGER DEFAULT 0,
+        gstRate TEXT DEFAULT '18.00',
+        gstAmount TEXT DEFAULT '0.00',
+        panNumber TEXT,
+        specialInstructions TEXT,
         createdAt TEXT,
         updatedAt TEXT,
         FOREIGN KEY (customerId) REFERENCES customers(id),
@@ -549,7 +555,13 @@ export class SQLiteStorage implements IStorage {
         { name: 'discountType', type: 'TEXT' },
         { name: 'discountValue', type: 'TEXT' },
         { name: 'couponCode', type: 'TEXT' },
-        { name: 'extraCharges', type: 'TEXT' }
+        { name: 'extraCharges', type: 'TEXT' },
+        { name: 'gstEnabled', type: 'INTEGER DEFAULT 0' },
+        { name: 'gstRate', type: 'TEXT DEFAULT "18.00"' },
+        { name: 'gstAmount', type: 'TEXT DEFAULT "0.00"' },
+        { name: 'panNumber', type: 'TEXT' },
+        { name: 'gstNumber', type: 'TEXT' },
+        { name: 'specialInstructions', type: 'TEXT' }
       ];
 
       for (const col of newColumns) {
@@ -685,7 +697,11 @@ export class SQLiteStorage implements IStorage {
     }
 
     const keys = Object.keys(dataWithTimestamps);
-    const values = Object.values(dataWithTimestamps);
+    const values = Object.values(dataWithTimestamps).map(value => {
+      if (value instanceof Date) return value.toISOString();
+      if (typeof value === 'boolean') return value ? 1 : 0;
+      return value;
+    });
     const placeholders = keys.map(() => "?").join(",");
 
     this.db
@@ -1934,7 +1950,8 @@ export class SQLiteStorage implements IStorage {
         driver.updatedAt,
       );
 
-    return this.getDriver(id)!;
+    const newDriver = await this.getDriver(id);
+    return newDriver!;
   }
 
   async getDriver(id: string): Promise<Driver | null> {

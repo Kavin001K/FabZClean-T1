@@ -47,6 +47,22 @@ export const products = pgTable("products", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export interface ShippingAddress {
+  street: string;
+  city: string;
+  state?: string;
+  zip: string;
+  country?: string;
+}
+
+export interface OrderItem {
+  serviceId: string;
+  serviceName: string;
+  quantity: number;
+  price: string;
+  subtotal: string;
+}
+
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   franchiseId: varchar("franchise_id").references(() => franchises.id),
@@ -58,8 +74,8 @@ export const orders = pgTable("orders", {
   status: text("status", { enum: ["pending", "processing", "completed", "cancelled", "assigned", "in_transit", "shipped", "out_for_delivery", "delivered", "in_store", "ready_for_transit", "ready_for_delivery"] }).notNull(), // pending, processing, completed, cancelled, assigned, in_transit, shipped, out_for_delivery, delivered, in_store, ready_for_transit, ready_for_delivery
   paymentStatus: text("payment_status", { enum: ["pending", "paid", "failed"] }).notNull().default("pending"), // pending, paid, failed
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
-  items: jsonb("items").notNull(), // Array of order items
-  shippingAddress: jsonb("shipping_address"),
+  items: jsonb("items").$type<OrderItem[]>().notNull(), // Array of order items
+  shippingAddress: jsonb("shipping_address").$type<ShippingAddress>(),
   pickupDate: timestamp("pickup_date"), // Scheduled pickup date
   advancePaid: decimal("advance_paid", { precision: 10, scale: 2 }).default("0"),
   paymentMethod: text("payment_method").default("cash"),
@@ -67,6 +83,12 @@ export const orders = pgTable("orders", {
   discountValue: decimal("discount_value", { precision: 10, scale: 2 }),
   couponCode: text("coupon_code"),
   extraCharges: decimal("extra_charges", { precision: 10, scale: 2 }),
+  gstEnabled: boolean("gst_enabled").default(false),
+  gstRate: decimal("gst_rate", { precision: 5, scale: 2 }).default("18.00"),
+  gstAmount: decimal("gst_amount", { precision: 10, scale: 2 }).default("0.00"),
+  panNumber: text("pan_number"),
+  gstNumber: text("gst_number"),
+  specialInstructions: text("special_instructions"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

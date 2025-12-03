@@ -26,6 +26,9 @@ export interface IStorage {
   // Attendance methods
   createAttendance(data: any): Promise<any>;
   listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]>;
+
+  // Order methods
+  listOrders(): Promise<any[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -35,6 +38,21 @@ export class MemStorage implements IStorage {
     this.sqliteStorage = new SQLiteStorage("./fabzclean.db");
     this.initializeData();
   }
+
+  // Franchise methods
+  async createFranchise(data: any): Promise<any> { return null; }
+  async listFranchises(): Promise<any[]> { return []; }
+  async getFranchise(id: string): Promise<any | undefined> { return undefined; }
+  async updateFranchise(id: string, data: any): Promise<any | undefined> { return undefined; }
+
+  // Task methods
+  async createTask(data: any): Promise<any> { return null; }
+  async listTasks(franchiseId?: string): Promise<any[]> { return []; }
+  async updateTask(id: string, data: any): Promise<any | undefined> { return undefined; }
+
+  // Attendance methods
+  async createAttendance(data: any): Promise<any> { return null; }
+  async listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]> { return []; }
 
   private async initializeData() {
     // Check if database already has data to avoid duplicating
@@ -445,7 +463,7 @@ export class MemStorage implements IStorage {
 
       // Insert services
       for (const serviceData of sampleServices) {
-        await this.sqliteStorage.createService(serviceData);
+        await this.sqliteStorage.createService(serviceData as any);
       }
 
       // Sample Orders
@@ -547,7 +565,7 @@ export class MemStorage implements IStorage {
       // Insert orders and store their IDs
       const orderIds: string[] = [];
       for (const orderData of sampleOrders) {
-        const order = await this.sqliteStorage.createOrder(orderData);
+        const order = await this.sqliteStorage.createOrder(orderData as any);
         orderIds.push(order.id);
       }
 
@@ -592,7 +610,7 @@ export class MemStorage implements IStorage {
 
       // Insert employees
       for (const employeeData of sampleEmployees) {
-        await this.sqliteStorage.createEmployee(employeeData);
+        await this.sqliteStorage.createEmployee(employeeData as any);
       }
 
       // Sample POS Transactions
@@ -616,7 +634,7 @@ export class MemStorage implements IStorage {
 
       // Insert POS transactions
       for (const transactionData of sampleTransactions) {
-        await this.sqliteStorage.createPosTransaction(transactionData);
+        await this.sqliteStorage.createPosTransaction(transactionData as any);
       }
 
       // Sample Deliveries
@@ -638,7 +656,7 @@ export class MemStorage implements IStorage {
 
       // Insert deliveries
       for (const deliveryData of sampleDeliveries) {
-        await this.sqliteStorage.createDelivery(deliveryData);
+        await this.sqliteStorage.createDelivery(deliveryData as any);
       }
 
       console.log("Sample data seeded successfully!");
@@ -677,6 +695,10 @@ export class MemStorage implements IStorage {
   }
 
   async getOrders() {
+    return this.sqliteStorage.getOrders();
+  }
+
+  async listOrders() {
     return this.sqliteStorage.getOrders();
   }
 

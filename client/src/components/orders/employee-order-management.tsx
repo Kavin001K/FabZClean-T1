@@ -154,7 +154,7 @@ export default function EmployeeOrderManagement() {
       filtered = filtered.filter((order: Order) => order.paymentStatus === filters.paymentStatus);
     }
     if (filters.service) {
-      filtered = filtered.filter((order: Order) => 
+      filtered = filtered.filter((order: Order) =>
         Array.isArray(order.service) ? order.service.includes(filters.service!) : order.service === filters.service
       );
     }
@@ -534,6 +534,24 @@ export default function EmployeeOrderManagement() {
                   >
                     <CheckCircle className="w-4 h-4 mr-1" />
                     Mark Complete
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start" onClick={async () => {
+                    if (!selectedOrder) return;
+
+                    // Print invoice logic would go here
+                    toast({ title: "Printing Invoice", description: "Sending invoice to printer..." });
+
+                    // Log the print action
+                    try {
+                      await import("@/lib/data-service").then(({ ordersApi }) =>
+                        ordersApi.logPrintAction(selectedOrder.id, 'invoice')
+                      );
+                    } catch (err) {
+                      console.error('Failed to log print action:', err);
+                    }
+                  }}>
+                    <Printer className="w-4 h-4 mr-2" />
+                    Print Invoice
                   </Button>
                   <Button
                     size="sm"

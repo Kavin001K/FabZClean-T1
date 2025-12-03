@@ -39,7 +39,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -84,6 +84,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initializeAuth();
   }, []);
+
+  // Auto-logout on inactivity
+  useEffect(() => {
+    let inactivityTimer: NodeJS.Timeout;
+    const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes
+
+    const resetTimer = () => {
+      if (employee) {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = setTimeout(() => {
+          console.log('User inactive for 30 minutes, logging out...');
+          signOut();
+        }, INACTIVITY_LIMIT);
+      }
+    };
+
+    // Events to track activity
+    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+
+    if (employee) {
+      // Set initial timer
+      resetTimer();
+
+      // Add event listeners
+      activityEvents.forEach(event => {
+        window.addEventListener(event, resetTimer);
+      });
+    }
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [employee]);
 
   // Sign in with username and password
   const signIn = async (username: string, password: string): Promise<{ error: string | null; employee?: Employee }> => {
@@ -157,7 +193,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
+}
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

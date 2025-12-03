@@ -224,6 +224,17 @@ export const ordersApi = {
       console.error("Failed to delete orders:", error);
       return { successful: 0, failed: orderIds.length, total: orderIds.length };
     }
+  },
+
+  async logPrintAction(id: string, type: 'bill' | 'invoice' | 'label' = 'bill'): Promise<void> {
+    try {
+      await authorizedFetch(`/orders/${id}/log-print`, {
+        method: "POST",
+        body: JSON.stringify({ type }),
+      });
+    } catch (error) {
+      console.error(`Failed to log print action for order ${id}:`, error);
+    }
   }
 };
 

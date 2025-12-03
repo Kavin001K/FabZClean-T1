@@ -13,7 +13,7 @@ interface RealtimeContextType {
 
 const RealtimeContext = createContext<RealtimeContextType | undefined>(undefined);
 
-export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { employee } = useAuth();
@@ -205,7 +205,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       {children}
     </RealtimeContext.Provider>
   );
-};
+}
 
 export const useRealtime = () => {
   const context = useContext(RealtimeContext);

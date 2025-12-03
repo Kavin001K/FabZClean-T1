@@ -24,7 +24,7 @@ if (!process.env.SUPABASE_SERVICE_KEY) {
 }
 
 const FINAL_SECRET = JWT_SECRET || process.env.SESSION_SECRET || 'fabzclean-secret-key-change-in-production';
-const JWT_EXPIRY = '30d'; // 30 days - long session for better UX
+const JWT_EXPIRY = '24h'; // 24 hours - standard session length
 
 export interface EmployeeJWTPayload {
     employeeId: string;

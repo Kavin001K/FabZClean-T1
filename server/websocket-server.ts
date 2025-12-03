@@ -324,7 +324,13 @@ class RealtimeServer {
 
       // Broadcast general analytics for cross-portal updates
       this.broadcastToSubscribers('analytics_update', adminAnalytics, 'low');
-    } catch (error) {
+    } catch (error: any) {
+      // Suppress connection errors to avoid log spam
+      if (error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT' || error.message?.includes('fetch failed')) {
+        // Log only once or just a short message
+        // console.warn('Analytics update skipped: Database connection failed');
+        return;
+      }
       console.error('Error calculating analytics update:', error);
     }
   }

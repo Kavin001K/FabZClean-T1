@@ -69,6 +69,8 @@ export default function CreateOrder() {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [enableGST, setEnableGST] = useState(false);
+  const [gstNumber, setGstNumber] = useState('');
+  const [panNumber, setPanNumber] = useState('');
 
   // Calculation state
   const [subtotal, setSubtotal] = useState(0);
@@ -568,6 +570,8 @@ export default function CreateOrder() {
     setPaymentMethod('cash');
     setPaymentStatus('pending');
     setEnableGST(true);
+    setGstNumber('');
+    setPanNumber('');
   };
 
   // Validate phone number
@@ -680,6 +684,13 @@ export default function CreateOrder() {
       discountValue: discountValue > 0 ? discountValue.toFixed(2) : undefined,
       couponCode: couponCode || undefined,
       extraCharges: extraCharges > 0 ? extraCharges.toFixed(2) : undefined,
+      gstEnabled: enableGST,
+      gstRate: enableGST ? "18.00" : "0.00",
+      gstAmount: enableGST ? (
+        (subtotal - (discountType === 'percentage' ? (subtotal * discountValue) / 100 : discountType === 'fixed' ? discountValue : 0) + extraCharges) * 0.18
+      ).toFixed(2) : "0.00",
+      gstNumber: enableGST ? gstNumber : undefined,
+      panNumber: enableGST ? panNumber : undefined,
     };
 
     createOrderMutation.mutate(orderData);
@@ -1069,6 +1080,38 @@ export default function CreateOrder() {
                     onCheckedChange={setEnableGST}
                   />
                 </div>
+
+                <AnimatePresence>
+                  {enableGST && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="space-y-4 pt-2"
+                    >
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="gstNumber">GST Number</Label>
+                          <Input
+                            id="gstNumber"
+                            placeholder="Enter GSTIN"
+                            value={gstNumber}
+                            onChange={(e) => setGstNumber(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="panNumber">PAN Number</Label>
+                          <Input
+                            id="panNumber"
+                            placeholder="Enter PAN"
+                            value={panNumber}
+                            onChange={(e) => setPanNumber(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">

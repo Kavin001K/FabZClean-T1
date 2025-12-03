@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -124,19 +125,6 @@ export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPayme
     setIsProcessing(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const paymentData = {
-        orderId: order.id,
-        paymentType,
-        amount: parseFloat(amount),
-        method: selectedMethod,
-        transactionId,
-        notes,
-        timestamp: new Date().toISOString()
-      };
-
       // Update payment status
       let newPaymentStatus: string;
       if (paymentType === 'full' || (paymentType === 'delivery' && parseFloat(amount) >= remainingAmount)) {
@@ -147,11 +135,19 @@ export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPayme
         newPaymentStatus = 'partial';
       }
 
+      const updatedAdvancePaid = paymentType === 'advance' ?
+        (advancePaid + parseFloat(amount)).toString() :
+        order.advancePaid;
+
+      // Call API
+      await apiRequest("PUT", `/api/orders/${order.id}`, {
+        paymentStatus: newPaymentStatus,
+        advancePaid: updatedAdvancePaid
+      });
+
       const updatedOrder = {
         ...order,
-        advancePaid: paymentType === 'advance' ?
-          (advancePaid + parseFloat(amount)).toString() :
-          order.advancePaid,
+        advancePaid: updatedAdvancePaid,
         paymentStatus: newPaymentStatus
       };
 

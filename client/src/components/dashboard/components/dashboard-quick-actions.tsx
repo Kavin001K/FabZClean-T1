@@ -69,7 +69,18 @@ interface DashboardQuickActionsProps {
   isSubmittingEmployee: boolean;
 }
 
-const QUICK_ACTIONS = [
+interface QuickActionItem {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  color: string;
+  bgColor: string;
+  isNavigationOnly?: boolean;
+  navigateTo?: string;
+}
+
+const QUICK_ACTIONS: QuickActionItem[] = [
   {
     id: 'customer',
     title: 'Add Customer',
@@ -104,7 +115,7 @@ const QUICK_ACTIONS = [
     isNavigationOnly: true,
     navigateTo: '/logistics',
   },
-] as const;
+];
 
 export const DashboardQuickActions: React.FC<DashboardQuickActionsProps> = React.memo(({
   onQuickAction,
@@ -166,7 +177,7 @@ export const DashboardQuickActions: React.FC<DashboardQuickActionsProps> = React
   };
 
   return (
-    <Card 
+    <Card
       data-testid={getTestId(TEST_IDS.DASHBOARD.WIDGET, 'quick-actions')}
     >
       <CardHeader>
@@ -211,114 +222,114 @@ export const DashboardQuickActions: React.FC<DashboardQuickActionsProps> = React
                       <DialogHeader>
                         <DialogTitle>{action.title}</DialogTitle>
                       </DialogHeader>
-                    
-                    <form onSubmit={(e) => handleFormSubmit(action.id, e)} className="space-y-4">
-                      {action.id === 'customer' && (
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="customer-name">Name</Label>
-                            <Input
-                              id="customer-name"
-                              value={formData.name || ''}
-                              onChange={(e) => handleFormChange(action.id, 'name', e.target.value)}
-                              placeholder="Enter customer name"
-                              data-testid={getTestId(TEST_IDS.FORM.INPUT, 'customer-name')}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="customer-phone">Phone</Label>
-                            <Input
-                              id="customer-phone"
-                              value={formData.phone || ''}
-                              onChange={(e) => handleFormChange(action.id, 'phone', e.target.value)}
-                              placeholder="Enter phone number"
-                              data-testid={getTestId(TEST_IDS.FORM.INPUT, 'customer-phone')}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="customer-email">Email</Label>
-                            <Input
-                              id="customer-email"
-                              type="email"
-                              value={formData.email || ''}
-                              onChange={(e) => handleFormChange(action.id, 'email', e.target.value)}
-                              placeholder="Enter email address"
-                              data-testid={getTestId(TEST_IDS.FORM.INPUT, 'customer-email')}
-                            />
-                          </div>
-                        </>
-                      )}
-                      
-                      {action.id === 'order' && (
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="order-customer">Customer</Label>
-                            <Input
-                              id="order-customer"
-                              value={formData.customerName || ''}
-                              onChange={(e) => handleFormChange(action.id, 'customerName', e.target.value)}
-                              placeholder="Enter customer name"
-                              data-testid={getTestId(TEST_IDS.FORM.INPUT, 'order-customer')}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="order-service">Service</Label>
-                            <Input
-                              id="order-service"
-                              value={formData.service || ''}
-                              onChange={(e) => handleFormChange(action.id, 'service', e.target.value)}
-                              placeholder="Enter service type"
-                              data-testid={getTestId(TEST_IDS.FORM.INPUT, 'order-service')}
-                            />
-                          </div>
-                        </>
-                      )}
-                      
-                      {action.id === 'employee' && (
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="employee-name">Name</Label>
-                            <Input
-                              id="employee-name"
-                              value={formData.name || ''}
-                              onChange={(e) => handleFormChange(action.id, 'name', e.target.value)}
-                              placeholder="Enter employee name"
-                              data-testid={getTestId(TEST_IDS.FORM.INPUT, 'employee-name')}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="employee-position">Position</Label>
-                            <Input
-                              id="employee-position"
-                              value={formData.position || ''}
-                              onChange={(e) => handleFormChange(action.id, 'position', e.target.value)}
-                              placeholder="Enter position"
-                              data-testid={getTestId(TEST_IDS.FORM.INPUT, 'employee-position')}
-                            />
-                          </div>
-                        </>
-                      )}
-                      
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => onCloseDialog(action.id)}
-                          data-testid={getTestId(TEST_IDS.BUTTON.CANCEL, action.id)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={isSubmitting}
-                          data-testid={getTestId(TEST_IDS.BUTTON.SUBMIT, action.id)}
-                        >
-                          {isSubmitting ? 'Creating...' : 'Create'}
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+
+                      <form onSubmit={(e) => handleFormSubmit(action.id, e)} className="space-y-4">
+                        {action.id === 'customer' && (
+                          <>
+                            <div className="space-y-2">
+                              <Label htmlFor="customer-name">Name</Label>
+                              <Input
+                                id="customer-name"
+                                value={formData.name || ''}
+                                onChange={(e) => handleFormChange(action.id, 'name', e.target.value)}
+                                placeholder="Enter customer name"
+                                data-testid={getTestId(TEST_IDS.FORM.INPUT, 'customer-name')}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="customer-phone">Phone</Label>
+                              <Input
+                                id="customer-phone"
+                                value={formData.phone || ''}
+                                onChange={(e) => handleFormChange(action.id, 'phone', e.target.value)}
+                                placeholder="Enter phone number"
+                                data-testid={getTestId(TEST_IDS.FORM.INPUT, 'customer-phone')}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="customer-email">Email</Label>
+                              <Input
+                                id="customer-email"
+                                type="email"
+                                value={formData.email || ''}
+                                onChange={(e) => handleFormChange(action.id, 'email', e.target.value)}
+                                placeholder="Enter email address"
+                                data-testid={getTestId(TEST_IDS.FORM.INPUT, 'customer-email')}
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {action.id === 'order' && (
+                          <>
+                            <div className="space-y-2">
+                              <Label htmlFor="order-customer">Customer</Label>
+                              <Input
+                                id="order-customer"
+                                value={formData.customerName || ''}
+                                onChange={(e) => handleFormChange(action.id, 'customerName', e.target.value)}
+                                placeholder="Enter customer name"
+                                data-testid={getTestId(TEST_IDS.FORM.INPUT, 'order-customer')}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="order-service">Service</Label>
+                              <Input
+                                id="order-service"
+                                value={formData.service || ''}
+                                onChange={(e) => handleFormChange(action.id, 'service', e.target.value)}
+                                placeholder="Enter service type"
+                                data-testid={getTestId(TEST_IDS.FORM.INPUT, 'order-service')}
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {action.id === 'employee' && (
+                          <>
+                            <div className="space-y-2">
+                              <Label htmlFor="employee-name">Name</Label>
+                              <Input
+                                id="employee-name"
+                                value={formData.name || ''}
+                                onChange={(e) => handleFormChange(action.id, 'name', e.target.value)}
+                                placeholder="Enter employee name"
+                                data-testid={getTestId(TEST_IDS.FORM.INPUT, 'employee-name')}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="employee-position">Position</Label>
+                              <Input
+                                id="employee-position"
+                                value={formData.position || ''}
+                                onChange={(e) => handleFormChange(action.id, 'position', e.target.value)}
+                                placeholder="Enter position"
+                                data-testid={getTestId(TEST_IDS.FORM.INPUT, 'employee-position')}
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => onCloseDialog(action.id)}
+                            data-testid={getTestId(TEST_IDS.BUTTON.CANCEL, action.id)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={isSubmitting}
+                            data-testid={getTestId(TEST_IDS.BUTTON.SUBMIT, action.id)}
+                          >
+                            {isSubmitting ? 'Creating...' : 'Create'}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
                 )}
               </div>
             );

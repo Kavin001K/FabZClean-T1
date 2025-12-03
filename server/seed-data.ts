@@ -223,23 +223,38 @@ export async function seedDatabase() {
     }
 
     // Seed Employees
-    const employeeData: InsertEmployee[] = [
+    const employeeData: any[] = [
       {
-        name: "Sarah Manager",
+        firstName: "Sarah",
+        lastName: "Manager",
+        employeeId: "EMP-001",
         email: "sarah.manager@fabzclean.com",
-        role: "Manager",
+        position: "Manager",
+        department: "Management",
+        hireDate: new Date(),
+        salary: "50000.00",
         password: "$2a$10$abcdefghijklmnopqrstuvwxyz123456", // Hashed password
       },
       {
-        name: "Mike Cashier",
+        firstName: "Mike",
+        lastName: "Cashier",
+        employeeId: "EMP-002",
         email: "mike.cashier@fabzclean.com",
-        role: "Cashier",
+        position: "Cashier",
+        department: "Sales",
+        hireDate: new Date(),
+        salary: "30000.00",
         password: "$2a$10$abcdefghijklmnopqrstuvwxyz123456",
       },
       {
-        name: "Lisa Driver",
+        firstName: "Lisa",
+        lastName: "Driver",
+        employeeId: "EMP-003",
         email: "lisa.driver@fabzclean.com",
-        role: "Driver",
+        position: "Driver",
+        department: "Logistics",
+        hireDate: new Date(),
+        salary: "35000.00",
         password: "$2a$10$abcdefghijklmnopqrstuvwxyz123456",
       },
     ];
@@ -248,7 +263,7 @@ export async function seedDatabase() {
     for (const employee of employeeData) {
       const created = await db.createEmployee(employee);
       employees.push(created);
-      console.log(`  ✓ Created employee: ${created.name}`);
+      console.log(`  ✓ Created employee: ${created.firstName} ${created.lastName}`);
     }
 
     // Seed Sample Orders
@@ -259,9 +274,9 @@ export async function seedDatabase() {
         customerEmail: customers[0].email,
         customerPhone: customers[0].phone,
         status: "pending",
-        paymentStatus: "unpaid",
+        paymentStatus: "pending",
         totalAmount: "25.98",
-        items: JSON.stringify([
+        items: [
           {
             serviceId: services[0].id,
             serviceName: services[0].name,
@@ -276,7 +291,7 @@ export async function seedDatabase() {
             price: services[1].price,
             subtotal: "19.96",
           },
-        ]),
+        ],
         orderNumber: `ORD-${Date.now()}-001`,
         shippingAddress: customers[0].address,
         pickupDate: new Date(Date.now() + 86400000 * 2).toISOString(), // 2 days from now
@@ -289,7 +304,7 @@ export async function seedDatabase() {
         status: "processing",
         paymentStatus: "paid",
         totalAmount: "45.97",
-        items: JSON.stringify([
+        items: [
           {
             serviceId: services[2].id,
             serviceName: services[2].name,
@@ -304,7 +319,7 @@ export async function seedDatabase() {
             price: services[3].price,
             subtotal: "25.98",
           },
-        ]),
+        ],
         orderNumber: `ORD-${Date.now()}-002`,
         shippingAddress: customers[1].address,
         pickupDate: new Date(Date.now() + 86400000 * 3).toISOString(), // 3 days from now
@@ -317,7 +332,7 @@ export async function seedDatabase() {
         status: "completed",
         paymentStatus: "paid",
         totalAmount: "89.99",
-        items: JSON.stringify([
+        items: [
           {
             serviceId: services[7].id,
             serviceName: services[7].name,
@@ -325,7 +340,7 @@ export async function seedDatabase() {
             price: services[7].price,
             subtotal: "89.99",
           },
-        ]),
+        ],
         orderNumber: `ORD-${Date.now()}-003`,
         shippingAddress: customers[2].address,
         pickupDate: new Date(Date.now() - 86400000).toISOString(), // Yesterday

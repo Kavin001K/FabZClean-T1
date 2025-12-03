@@ -35,7 +35,7 @@ import { DashboardFooter } from "./components/dashboard-footer";
 export default React.memo(function FranchiseOwnerDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   // Use the enhanced dashboard hook
   const {
     filters,
@@ -135,8 +135,8 @@ export default React.memo(function FranchiseOwnerDashboard() {
     isEmployeeDialogOpen,
     onCloseDialog: handleCloseDialog,
     quickActionForms,
-    updateQuickActionForm,
-    resetQuickActionForm,
+    updateQuickActionForm: updateQuickActionForm as (formType: string, updates: any) => void,
+    resetQuickActionForm: resetQuickActionForm as (formType: string) => void,
     isSubmittingCustomer,
     isSubmittingOrder,
     isSubmittingEmployee,
@@ -160,9 +160,9 @@ export default React.memo(function FranchiseOwnerDashboard() {
   }), [recentOrders, isLoading]);
 
   const dashboardDueTodayProps = useMemo(() => ({
-    dueTodayOrders,
+    orders: recentOrders, // Using recentOrders as a proxy for all orders since we don't have all orders here
     isLoading,
-  }), [dueTodayOrders, isLoading]);
+  }), [recentOrders, isLoading]);
 
   const dashboardFooterProps = useMemo(() => ({
     lastUpdated,
@@ -171,7 +171,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
 
   if (isLoading) {
     return (
-      <div 
+      <div
         className="flex items-center justify-center min-h-screen"
         data-testid={getTestId(TEST_IDS.DASHBOARD.CONTAINER, 'loading')}
       >
@@ -185,7 +185,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
 
   return (
     <PageTransition>
-      <div 
+      <div
         className="space-y-6 p-6"
         data-testid={getTestId(TEST_IDS.DASHBOARD.CONTAINER)}
       >

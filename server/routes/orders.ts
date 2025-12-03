@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db as storage } from "../db";
-import { insertOrderSchema } from "../schema";
+import { insertOrderSchema, type Order, type Product } from "../../shared/schema";
 import {
   jwtRequired,
   validateInput,
@@ -18,6 +18,7 @@ import { realtimeServer } from "../websocket-server";
 import { loyaltyProgram } from "../loyalty-program";
 import { barcodeService } from "../barcode-service";
 import { OrderService } from "../services/order.service";
+import { AuthService } from "../auth-service";
 import type { UserRole } from "../../shared/supabase";
 
 const router = Router();
@@ -44,11 +45,11 @@ router.use(jwtRequired);
 // Get orders with pagination and search
 router.get('/', async (req, res) => {
   try {
-    const { 
-      email, 
-      cursor, 
-      limit = 20, 
-      search, 
+    const {
+      email,
+      cursor,
+      limit = 20,
+      search,
       status,
       sortBy = 'createdAt',
       sortOrder = 'desc'
@@ -69,7 +70,7 @@ router.get('/', async (req, res) => {
     const limitNum = parseInt(limit as string) || 20;
     const startIndex = cursor ? orders.findIndex(o => o.id === cursor) + 1 : 0;
     const endIndex = startIndex + limitNum;
-    
+
     const paginatedOrders = orders.slice(startIndex, endIndex);
     const hasMore = endIndex < orders.length;
     const nextCursor = hasMore ? paginatedOrders[paginatedOrders.length - 1]?.id : undefined;
@@ -89,6 +90,57 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('Get orders error:', error);
     res.status(500).json(createErrorResponse('Failed to fetch orders', 500));
+  }
+});
+
+// Get recent orders (for suggestions)
+router.get('/recent', async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+    const limitNum = parseInt(limit as string) || 10;
+
+    const orders = await storage.listOrders();
+    const products = await storage.listProducts();
+
+    // Get recent orders sorted by creation date
+    const recentOrders = orders
+      .sort((a: Order, b: Order) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      })
+      .slice(0, limitNum);
+
+    // Transform orders for suggestions
+    const transformedOrders = recentOrders.map((order: Order) => {
+      const serviceNames = order.service ? order.service.split(',').filter(Boolean) : [];
+      const serviceIds = (order as any).serviceId ? (order as any).serviceId.split(',').filter(Boolean) : [];
+
+      return {
+        id: order.id,
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        services: serviceNames,
+        serviceIds: serviceIds,
+        total: parseFloat(order.totalAmount || '0'),
+        status: order.status,
+        createdAt: order.createdAt,
+        // Add product information if available
+        products: serviceIds.map((id: string) => {
+          const product = products.find((p: Product) => p.id === id);
+          return product ? {
+            id: product.id,
+            name: product.name,
+            price: parseFloat(product.price || '0')
+          } : null;
+        }).filter(Boolean)
+      };
+    });
+
+    res.json(createSuccessResponse(transformedOrders));
+  } catch (error) {
+    console.error('Fetch recent orders error:', error);
+    res.status(500).json(createErrorResponse('Failed to fetch recent orders', 500));
   }
 });
 
@@ -116,48 +168,70 @@ router.post(
   requireRole(ORDER_CREATE_ROLES),
   validateInput(insertOrderSchema),
   async (req, res) => {
-  try {
-    const orderData = req.body;
-
-    // Use OrderService to create order (includes external validation and enrichment)
-    const order = await orderService.createOrder(orderData);
-
-    // Award loyalty points (only if customerId exists)
-    if (order.customerId) {
-      await loyaltyProgram.processOrderRewards(
-        order.customerId,
-        parseFloat(order.totalAmount || "0")
-      );
-    }
-
-    // Generate QR code
     try {
-      await barcodeService.generateOrderBarcode(order.id);
-    } catch (barcodeError) {
-      console.warn('Failed to generate barcode:', barcodeError);
-      // Don't fail the order creation if barcode generation fails
-    }
+      const orderData = req.body;
 
-    // Notify real-time clients
-    realtimeServer.triggerUpdate('orders', 'created', order);
+      // Use OrderService to create order (includes external validation and enrichment)
+      const order = await orderService.createOrder(orderData);
 
-    const serializedOrder = serializeOrder(order);
-    res.status(201).json(createSuccessResponse(serializedOrder, 'Order created successfully'));
-  } catch (error) {
-    console.error('Create order error:', error);
-    
-    // Handle specific validation errors
-    if (error instanceof Error) {
-      if (error.message.includes('validation')) {
-        return res.status(400).json(createErrorResponse(error.message, 400));
+      // Log order creation
+      if (req.employee) {
+        await AuthService.logAction(
+          req.employee.employeeId,
+          req.employee.username,
+          'create_order',
+          'order',
+          order.id,
+          {
+            orderNumber: order.orderNumber,
+            totalAmount: order.totalAmount,
+            customerName: order.customerName
+          },
+          req.ip || req.connection.remoteAddress,
+          req.get('user-agent')
+        );
       }
-      if (error.message.includes('Customer validation failed')) {
-        return res.status(400).json(createErrorResponse(error.message, 400));
+
+      // Award loyalty points (only if customerId exists)
+      if (order.customerId) {
+        try {
+          await loyaltyProgram.processOrderRewards(
+            order.customerId,
+            parseFloat(order.totalAmount || "0")
+          );
+        } catch (loyaltyError) {
+          console.warn('Failed to process loyalty rewards:', loyaltyError);
+        }
       }
+
+      // Generate QR code
+      try {
+        await barcodeService.generateOrderBarcode(order.id);
+      } catch (barcodeError) {
+        console.warn('Failed to generate barcode:', barcodeError);
+        // Don't fail the order creation if barcode generation fails
+      }
+
+      // Notify real-time clients
+      realtimeServer.triggerUpdate('order', 'created', order);
+
+      const serializedOrder = serializeOrder(order);
+      res.status(201).json(createSuccessResponse(serializedOrder, 'Order created successfully'));
+    } catch (error) {
+      console.error('Create order error:', error);
+
+      // Handle specific validation errors
+      if (error instanceof Error) {
+        if (error.message.includes('validation')) {
+          return res.status(400).json(createErrorResponse(error.message, 400));
+        }
+        if (error.message.includes('Customer validation failed')) {
+          return res.status(400).json(createErrorResponse(error.message, 400));
+        }
+      }
+
+      res.status(500).json(createErrorResponse(`Failed to create order: ${error instanceof Error ? error.message : String(error)}`, 500));
     }
-    
-    res.status(500).json(createErrorResponse('Failed to create order', 500));
-  }
   },
 );
 
@@ -174,8 +248,61 @@ router.put('/:id', requireRole(ORDER_UPDATE_ROLES), async (req, res) => {
 
     const updatedOrder = await storage.updateOrder(orderId, updateData);
 
+    // Log updates
+    if (req.employee) {
+      const changes: any = {};
+
+      // Check for price change
+      if (updateData.totalAmount && updateData.totalAmount !== order.totalAmount) {
+        changes.price_changed = {
+          from: order.totalAmount,
+          to: updateData.totalAmount
+        };
+      }
+
+      // Check for payment status change
+      if (updateData.paymentStatus && updateData.paymentStatus !== order.paymentStatus) {
+        changes.payment_status_changed = {
+          from: order.paymentStatus,
+          to: updateData.paymentStatus
+        };
+
+        // If marked as paid, log specifically
+        if (updateData.paymentStatus === 'paid') {
+          await AuthService.logAction(
+            req.employee.employeeId,
+            req.employee.username,
+            'payment_received',
+            'order',
+            orderId,
+            {
+              amount: updatedOrder?.totalAmount,
+              method: updatedOrder?.paymentMethod
+            },
+            req.ip || req.connection.remoteAddress,
+            req.get('user-agent')
+          );
+        }
+      }
+
+      // Log general update if there are other changes or just to track activity
+      await AuthService.logAction(
+        req.employee.employeeId,
+        req.employee.username,
+        'update_order',
+        'order',
+        orderId,
+        {
+          changes,
+          updateData
+        },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
+
     // Notify real-time clients
-    realtimeServer.triggerUpdate('orders', 'updated', updatedOrder);
+    realtimeServer.triggerUpdate('order', 'updated', updatedOrder);
 
     const serializedOrder = serializeOrder(updatedOrder);
     res.json(createSuccessResponse(serializedOrder, 'Order updated successfully'));
@@ -190,36 +317,81 @@ router.patch(
   "/:id/status",
   requireRole(ORDER_UPDATE_ROLES),
   async (req, res) => {
-  try {
-    const orderId = req.params.id;
-    const { status } = req.body;
+    try {
+      const orderId = req.params.id;
+      const { status } = req.body;
 
-    if (!status) {
-      return res.status(400).json(createErrorResponse('Status is required', 400));
+      if (!status) {
+        return res.status(400).json(createErrorResponse('Status is required', 400));
+      }
+
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json(createErrorResponse('Order not found', 404));
+      }
+
+      const updatedOrder = await storage.updateOrder(orderId, { status });
+
+      // Log status change
+      if (req.employee) {
+        await AuthService.logAction(
+          req.employee.employeeId,
+          req.employee.username,
+          'update_order_status',
+          'order',
+          orderId,
+          {
+            from: order.status,
+            to: status
+          },
+          req.ip || req.connection.remoteAddress,
+          req.get('user-agent')
+        );
+      }
+
+      // Notify real-time clients
+      realtimeServer.triggerUpdate('order', 'status_changed' as any, {
+        orderId: orderId,
+        status: status,
+        previousStatus: order.status
+      });
+
+      const serializedOrder = serializeOrder(updatedOrder);
+      res.json(createSuccessResponse(serializedOrder, 'Order status updated successfully'));
+    } catch (error) {
+      console.error('Update order status error:', error);
+      res.status(500).json(createErrorResponse('Failed to update order status', 500));
     }
-
-    const order = await storage.getOrder(orderId);
-    if (!order) {
-      return res.status(404).json(createErrorResponse('Order not found', 404));
-    }
-
-    const updatedOrder = await storage.updateOrder(orderId, { status });
-
-    // Notify real-time clients
-    realtimeServer.triggerUpdate('orders', 'status_changed', {
-      orderId: orderId,
-      status: status,
-      previousStatus: order.status
-    });
-
-    const serializedOrder = serializeOrder(updatedOrder);
-    res.json(createSuccessResponse(serializedOrder, 'Order status updated successfully'));
-  } catch (error) {
-    console.error('Update order status error:', error);
-    res.status(500).json(createErrorResponse('Failed to update order status', 500));
-  }
   },
 );
+
+// Log print action (Bill/Invoice)
+router.post('/:id/log-print', async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { type = 'bill' } = req.body; // bill, invoice, label, etc.
+
+    if (req.employee) {
+      await AuthService.logAction(
+        req.employee.employeeId,
+        req.employee.username,
+        'print_document',
+        'order',
+        orderId,
+        {
+          documentType: type
+        },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
+
+    res.json(createSuccessResponse(null, 'Print action logged'));
+  } catch (error) {
+    console.error('Log print error:', error);
+    res.status(500).json(createErrorResponse('Failed to log print action', 500));
+  }
+});
 
 // Delete order
 router.delete('/:id', requireRole(ADMIN_ONLY), async (req, res) => {
@@ -237,8 +409,24 @@ router.delete('/:id', requireRole(ADMIN_ONLY), async (req, res) => {
       return res.status(500).json(createErrorResponse('Failed to delete order', 500));
     }
 
+    // Log deletion
+    if (req.employee) {
+      await AuthService.logAction(
+        req.employee.employeeId,
+        req.employee.username,
+        'delete_order',
+        'order',
+        orderId,
+        {
+          orderNumber: order.orderNumber
+        },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
+
     // Notify real-time clients
-    realtimeServer.triggerUpdate('orders', 'deleted', { orderId });
+    realtimeServer.triggerUpdate('order', 'deleted', { orderId });
 
     res.json(createSuccessResponse(null, 'Order deleted successfully'));
   } catch (error) {
@@ -247,82 +435,38 @@ router.delete('/:id', requireRole(ADMIN_ONLY), async (req, res) => {
   }
 });
 
-// Get recent orders (for suggestions)
-router.get('/recent', async (req, res) => {
-  try {
-    const { limit = 10 } = req.query;
-    const limitNum = parseInt(limit as string) || 10;
 
-    const orders = await storage.listOrders();
-    const products = await storage.listProducts();
-
-    // Get recent orders sorted by creation date
-    const recentOrders = orders
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, limitNum);
-
-    // Transform orders for suggestions
-    const transformedOrders = recentOrders.map(order => {
-      const serviceNames = order.service ? order.service.split(',').filter(Boolean) : [];
-      const serviceIds = order.serviceId ? order.serviceId.split(',').filter(Boolean) : [];
-
-      return {
-        id: order.id,
-        customerName: order.customerName,
-        customerEmail: order.customerEmail,
-        services: serviceNames,
-        serviceIds: serviceIds,
-        total: parseFloat(order.totalAmount || '0'),
-        status: order.status,
-        createdAt: order.createdAt,
-        // Add product information if available
-        products: serviceIds.map(id => {
-          const product = products.find(p => p.id === id);
-          return product ? {
-            id: product.id,
-            name: product.name,
-            price: parseFloat(product.price || '0')
-          } : null;
-        }).filter(Boolean)
-      };
-    });
-
-    res.json(createSuccessResponse(transformedOrders));
-  } catch (error) {
-    console.error('Fetch recent orders error:', error);
-    res.status(500).json(createErrorResponse('Failed to fetch recent orders', 500));
-  }
-});
 
 // Get order analytics
 router.get(
   "/analytics/overview",
   requireRole(ORDER_ANALYTICS_ROLES),
   async (req, res) => {
-  try {
-    const orders = await storage.listOrders();
+    try {
+      const orders = await storage.listOrders();
 
-    const analytics = {
-      totalOrders: orders.length,
-      totalRevenue: orders.reduce((sum, order) => sum + parseFloat(order.totalAmount || '0'), 0),
-      statusBreakdown: orders.reduce((acc, order) => {
-        acc[order.status] = (acc[order.status] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
-      averageOrderValue: orders.length > 0 
-        ? orders.reduce((sum, order) => sum + parseFloat(order.totalAmount || '0'), 0) / orders.length 
-        : 0,
-      ordersToday: orders.filter(order => {
-        const today = new Date().toISOString().split('T')[0];
-        return order.createdAt.startsWith(today);
-      }).length
-    };
+      const analytics = {
+        totalOrders: orders.length,
+        totalRevenue: orders.reduce((sum: number, order: Order) => sum + parseFloat(order.totalAmount || '0'), 0),
+        statusBreakdown: orders.reduce((acc: Record<string, number>, order: Order) => {
+          acc[order.status] = (acc[order.status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+        averageOrderValue: orders.length > 0
+          ? orders.reduce((sum: number, order: Order) => sum + parseFloat(order.totalAmount || '0'), 0) / orders.length
+          : 0,
+        ordersToday: orders.filter((order: Order) => {
+          const today = new Date().toISOString().split('T')[0];
+          const orderDate = order.createdAt ? new Date(order.createdAt).toISOString().split('T')[0] : '';
+          return orderDate === today;
+        }).length
+      };
 
-    res.json(createSuccessResponse(analytics));
-  } catch (error) {
-    console.error('Get order analytics error:', error);
-    res.status(500).json(createErrorResponse('Failed to fetch order analytics', 500));
-  }
+      res.json(createSuccessResponse(analytics));
+    } catch (error) {
+      console.error('Get order analytics error:', error);
+      res.status(500).json(createErrorResponse('Failed to fetch order analytics', 500));
+    }
   },
 );
 

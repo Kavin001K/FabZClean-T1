@@ -119,6 +119,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: Server,
     roles: ["admin", "factory_manager"],
   },
+  {
+    to: "/admin/audit-logs",
+    label: "Audit Logs",
+    icon: Shield,
+    roles: ["admin", "franchise_manager"],
+  },
 ];
 
 const NavLink = ({

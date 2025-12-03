@@ -83,9 +83,17 @@ export default React.memo(function OrderDetailsDialog({
     }
   });
 
-  const handlePrintInvoice = () => {
+  const handlePrintInvoice = async () => {
     if (order) {
       printInvoice(order);
+      // Log the print action
+      try {
+        await import("@/lib/data-service").then(({ ordersApi }) =>
+          ordersApi.logPrintAction(order.id, 'invoice')
+        );
+      } catch (err) {
+        console.error('Failed to log print action:', err);
+      }
     }
   };
 

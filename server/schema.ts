@@ -30,6 +30,11 @@ export const insertOrderSchema = z.object({
   extraCharges: z.any().optional(),
   pickupDate: z.string().optional(),
   specialInstructions: z.string().optional(),
+  gstEnabled: z.boolean().optional(),
+  gstRate: z.union([z.string(), z.number()]).optional(),
+  gstAmount: z.union([z.string(), z.number()]).optional(),
+  panNumber: z.string().optional(),
+  gstNumber: z.string().optional(),
   total: z.number().positive('Total must be positive').optional()
 });
 
