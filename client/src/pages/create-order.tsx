@@ -669,15 +669,20 @@ export default function CreateOrder() {
       totalAmount: totalAmount.toFixed(2),
       items: selectedServices.map(item => ({
         serviceId: item.service.id,
-        name: item.service.name,
+        serviceName: item.service.name,
         quantity: item.quantity,
         // Use the overridden price for this order only
-        price: item.priceOverride,
+        price: item.priceOverride.toString(),
+        subtotal: (item.quantity * item.priceOverride).toString()
       })),
-      shippingAddress: {
-        instructions: specialInstructions,
-        pickupDate: pickupDate ? format(pickupDate, 'yyyy-MM-dd') : undefined,
-      },
+      pickupDate: pickupDate ? new Date(pickupDate).toISOString() : undefined,
+      specialInstructions: specialInstructions,
+      shippingAddress: customerAddress ? {
+        street: customerAddress,
+        city: "Bangalore", // Default or extract
+        zip: "560000", // Default
+        country: "India"
+      } : undefined,
       advancePaid: advancePayment ? advancePayment : "0",
       paymentMethod: paymentMethod,
       discountType: discountType === 'none' ? undefined : discountType,

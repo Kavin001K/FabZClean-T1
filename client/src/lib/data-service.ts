@@ -791,6 +791,27 @@ export type RouteStop = {
   notes?: string;
 };
 
+// Franchises API
+export const franchisesApi = {
+  async getAll(): Promise<any[]> {
+    try {
+      return await fetchData<any[]>('/franchises');
+    } catch (error) {
+      console.error('Failed to fetch franchises:', error);
+      return [];
+    }
+  },
+
+  async getById(id: string): Promise<any | null> {
+    try {
+      return await fetchData<any>(`/franchises/${id}`);
+    } catch (error) {
+      console.error(`Failed to fetch franchise ${id}:`, error);
+      return null;
+    }
+  }
+};
+
 // Logistics API
 export const logisticsApi = {
   async getDeliveries(): Promise<Delivery[]> {

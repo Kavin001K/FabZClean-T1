@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { SQLiteStorage, type Driver, type InsertDriver } from "./SQLiteStorage";
+import { type InsertAuditLog, type AuditLog } from "../shared/schema";
 import bcrypt from 'bcryptjs';
 
 export interface IStorage {
@@ -28,7 +29,15 @@ export interface IStorage {
   listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]>;
 
   // Order methods
+  // Order methods
   listOrders(): Promise<any[]>;
+  getActiveOrders(): Promise<any[]>;
+  getAnalyticsSummary(): Promise<any>;
+  searchGlobal(query: string): Promise<any>;
+
+  // Audit Log methods
+  createAuditLog(data: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogs(params: any): Promise<{ data: AuditLog[]; count: number }>;
 }
 
 export class MemStorage implements IStorage {
@@ -700,6 +709,26 @@ export class MemStorage implements IStorage {
 
   async listOrders() {
     return this.sqliteStorage.getOrders();
+  }
+
+  async getActiveOrders() {
+    return this.sqliteStorage.getActiveOrders();
+  }
+
+  async getAnalyticsSummary() {
+    return this.sqliteStorage.getAnalyticsSummary();
+  }
+
+  async searchGlobal(query: string) {
+    return this.sqliteStorage.searchGlobal(query);
+  }
+
+  async createAuditLog(data: InsertAuditLog) {
+    return this.sqliteStorage.createAuditLog(data);
+  }
+
+  async getAuditLogs(params: any) {
+    return this.sqliteStorage.getAuditLogs(params);
   }
 
   async getOrder(id: string) {

@@ -264,6 +264,19 @@ export const documents = pgTable("documents", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
+  employeeId: varchar("employee_id").references(() => employees.id),
+  action: text("action").notNull(), // login, create_order, etc.
+  entityType: text("entity_type"), // order, employee, product
+  entityId: text("entity_id"),
+  details: jsonb("details"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertFranchiseSchema = createInsertSchema(franchises);
 export const insertUserSchema = createInsertSchema(users);
@@ -339,3 +352,7 @@ export type EmployeePerformance = typeof employeePerformance.$inferSelect;
 
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs);
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;

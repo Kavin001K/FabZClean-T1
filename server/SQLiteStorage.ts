@@ -23,6 +23,8 @@ import {
   type InsertBarcode,
   type Employee,
   type InsertEmployee,
+  type AuditLog,
+  type InsertAuditLog,
 } from "../shared/schema";
 
 // Driver types (not in shared schema yet)
@@ -81,6 +83,7 @@ export class SQLiteStorage implements IStorage {
 
     console.log(`🗄️  Initializing SQLite database at: ${dbPath}`);
     this.db = new Database(dbPath);
+    this.db.pragma('foreign_keys = ON');
     this.createTables();
     this.migrateTables();
   }
@@ -101,9 +104,24 @@ export class SQLiteStorage implements IStorage {
         documents TEXT,
         agreementStartDate TEXT,
         agreementEndDate TEXT,
-        royaltyPercentage REAL DEFAULT 0,
-        createdAt TEXT,
-        updatedAt TEXT
+        royaltyPercentage TEXT DEFAULT '0',
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id TEXT PRIMARY KEY,
+        franchiseId TEXT,
+        employeeId TEXT,
+        action TEXT NOT NULL,
+        entityType TEXT,
+        entityId TEXT,
+        details TEXT,
+        ipAddress TEXT,
+        userAgent TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id),
+        FOREIGN KEY (employeeId) REFERENCES employees(id)
       );
 
       CREATE TABLE IF NOT EXISTS users (
@@ -542,34 +560,52 @@ export class SQLiteStorage implements IStorage {
     try {
       // Check if orders table exists
       const tableExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'").get();
-      if (!tableExists) return;
 
-      // Get current columns
-      const columns = this.db.prepare("PRAGMA table_info(orders)").all() as any[];
-      const columnNames = columns.map(c => c.name);
+      if (tableExists) {
+        // Get current columns for orders
+        const columns = this.db.prepare("PRAGMA table_info(orders)").all() as any[];
+        const columnNames = columns.map(c => c.name);
 
-      // Columns to add if missing
-      const newColumns = [
-        { name: 'advancePaid', type: 'TEXT' },
-        { name: 'paymentMethod', type: 'TEXT' },
-        { name: 'discountType', type: 'TEXT' },
-        { name: 'discountValue', type: 'TEXT' },
-        { name: 'couponCode', type: 'TEXT' },
-        { name: 'extraCharges', type: 'TEXT' },
-        { name: 'gstEnabled', type: 'INTEGER DEFAULT 0' },
-        { name: 'gstRate', type: 'TEXT DEFAULT "18.00"' },
-        { name: 'gstAmount', type: 'TEXT DEFAULT "0.00"' },
-        { name: 'panNumber', type: 'TEXT' },
-        { name: 'gstNumber', type: 'TEXT' },
-        { name: 'specialInstructions', type: 'TEXT' }
-      ];
+        // Columns to add if missing
+        const newColumns = [
+          { name: 'advancePaid', type: 'TEXT' },
+          { name: 'paymentMethod', type: 'TEXT' },
+          { name: 'discountType', type: 'TEXT' },
+          { name: 'discountValue', type: 'TEXT' },
+          { name: 'couponCode', type: 'TEXT' },
+          { name: 'extraCharges', type: 'TEXT' },
+          { name: 'gstEnabled', type: 'INTEGER DEFAULT 0' },
+          { name: 'gstRate', type: 'TEXT DEFAULT "18.00"' },
+          { name: 'gstAmount', type: 'TEXT DEFAULT "0.00"' },
+          { name: 'panNumber', type: 'TEXT' },
+          { name: 'gstNumber', type: 'TEXT' },
+          { name: 'specialInstructions', type: 'TEXT' }
+        ];
 
-      for (const col of newColumns) {
-        if (!columnNames.includes(col.name)) {
-          console.log(`🔄 Migrating orders table: Adding column ${col.name}`);
-          this.db.exec(`ALTER TABLE orders ADD COLUMN ${col.name} ${col.type}`);
+        for (const col of newColumns) {
+          if (!columnNames.includes(col.name)) {
+            console.log(`🔄 Migrating orders table: Adding column ${col.name}`);
+            this.db.exec(`ALTER TABLE orders ADD COLUMN ${col.name} ${col.type}`);
+          }
         }
       }
+
+      // Check settings table migration
+      const settingsTableExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='settings'").get();
+      if (settingsTableExists) {
+        const columns = this.db.prepare("PRAGMA table_info(settings)").all() as any[];
+        const columnNames = columns.map(c => c.name);
+
+        if (!columnNames.includes('category')) {
+          console.log('🔄 Migrating settings table: Adding column category');
+          this.db.exec("ALTER TABLE settings ADD COLUMN category TEXT DEFAULT 'general'");
+        }
+        if (!columnNames.includes('updatedBy')) {
+          console.log('🔄 Migrating settings table: Adding column updatedBy');
+          this.db.exec("ALTER TABLE settings ADD COLUMN updatedBy TEXT");
+        }
+      }
+
     } catch (error) {
       console.error('❌ Migration failed:', error);
     }
@@ -879,70 +915,75 @@ export class SQLiteStorage implements IStorage {
   }
 
   private listAllRecords<T>(table: string): T[] {
-    const rows = this.db.prepare(`SELECT * FROM ${table}`).all() as any[];
+    try {
+      const rows = this.db.prepare(`SELECT * FROM ${table}`).all() as any[];
 
-    rows.forEach((row) => {
-      Object.keys(row).forEach((key) => {
-        if (key.includes("At") && typeof row[key] === "string") {
-          row[key] = new Date(row[key]);
+      rows.forEach((row) => {
+        Object.keys(row).forEach((key) => {
+          if (key.includes("At") && typeof row[key] === "string") {
+            row[key] = new Date(row[key]);
+          }
+        });
+
+        // Parse JSON fields
+        if (table === "orders" && row.items && typeof row.items === "string") {
+          try {
+            row.items = JSON.parse(row.items);
+          } catch (e) {
+            console.warn("Failed to parse order items:", e);
+          }
+        }
+        if (
+          table === "orders" &&
+          row.shippingAddress &&
+          typeof row.shippingAddress === "string"
+        ) {
+          try {
+            row.shippingAddress = JSON.parse(row.shippingAddress);
+          } catch (e) {
+            console.warn("Failed to parse shipping address:", e);
+          }
+        }
+        if (
+          table === "deliveries" &&
+          row.location &&
+          typeof row.location === "string"
+        ) {
+          try {
+            row.location = JSON.parse(row.location);
+          } catch (e) {
+            console.warn("Failed to parse delivery location:", e);
+          }
+        }
+        if (
+          table === "deliveries" &&
+          row.route &&
+          typeof row.route === "string"
+        ) {
+          try {
+            row.route = JSON.parse(row.route);
+          } catch (e) {
+            console.warn("Failed to parse delivery route:", e);
+          }
+        }
+        if (
+          table === "posTransactions" &&
+          row.items &&
+          typeof row.items === "string"
+        ) {
+          try {
+            row.items = JSON.parse(row.items);
+          } catch (e) {
+            console.warn("Failed to parse transaction items:", e);
+          }
         }
       });
 
-      // Parse JSON fields
-      if (table === "orders" && row.items && typeof row.items === "string") {
-        try {
-          row.items = JSON.parse(row.items);
-        } catch (e) {
-          console.warn("Failed to parse order items:", e);
-        }
-      }
-      if (
-        table === "orders" &&
-        row.shippingAddress &&
-        typeof row.shippingAddress === "string"
-      ) {
-        try {
-          row.shippingAddress = JSON.parse(row.shippingAddress);
-        } catch (e) {
-          console.warn("Failed to parse shipping address:", e);
-        }
-      }
-      if (
-        table === "deliveries" &&
-        row.location &&
-        typeof row.location === "string"
-      ) {
-        try {
-          row.location = JSON.parse(row.location);
-        } catch (e) {
-          console.warn("Failed to parse delivery location:", e);
-        }
-      }
-      if (
-        table === "deliveries" &&
-        row.route &&
-        typeof row.route === "string"
-      ) {
-        try {
-          row.route = JSON.parse(row.route);
-        } catch (e) {
-          console.warn("Failed to parse delivery route:", e);
-        }
-      }
-      if (
-        table === "posTransactions" &&
-        row.items &&
-        typeof row.items === "string"
-      ) {
-        try {
-          row.items = JSON.parse(row.items);
-        } catch (e) {
-          console.warn("Failed to parse transaction items:", e);
-        }
-      }
-    });
-
-    return rows as T[];
+      return rows as T[];
+    } catch (error) {
+      console.error(`Error listing records from table ${table}:`, error);
+      return [];
+    }
   }
 
   // ======= PRODUCTS =======
@@ -1051,6 +1092,168 @@ export class SQLiteStorage implements IStorage {
   // Alias for compatibility with existing routes
   async getOrders(): Promise<Order[]> {
     return this.listOrders();
+  }
+
+  async getActiveOrders(): Promise<Order[]> {
+    const rows = this.db.prepare(`
+      SELECT * FROM orders 
+      WHERE status IN ('in_progress', 'shipped', 'out_for_delivery', 'in_transit', 'assigned')
+    `).all() as any[];
+
+    return rows.map(row => {
+      // Parse JSON fields
+      if (row.items && typeof row.items === "string") {
+        try { row.items = JSON.parse(row.items); } catch (e) { }
+      }
+      if (row.shippingAddress && typeof row.shippingAddress === "string") {
+        try { row.shippingAddress = JSON.parse(row.shippingAddress); } catch (e) { }
+      }
+      // Parse dates
+      Object.keys(row).forEach((key) => {
+        if (key.includes("At") && typeof row[key] === "string") {
+          row[key] = new Date(row[key]);
+        }
+      });
+      return row;
+    });
+  }
+
+  async getAnalyticsSummary(): Promise<any> {
+    const totalRevenue = this.db.prepare('SELECT SUM(CAST(totalAmount AS REAL)) as total FROM orders').get() as any;
+    const totalOrders = this.db.prepare('SELECT COUNT(*) as count FROM orders').get() as any;
+    const totalCustomers = this.db.prepare('SELECT COUNT(*) as count FROM customers').get() as any;
+    const completedOrders = this.db.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'completed'").get() as any;
+
+    // Status counts
+    const statusCounts = this.db.prepare('SELECT status, COUNT(*) as count FROM orders GROUP BY status').all() as any[];
+    const statusMap = statusCounts.reduce((acc: any, curr: any) => {
+      acc[curr.status] = curr.count;
+      return acc;
+    }, {});
+
+    // Recent activity (last 5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const recentOrders = this.db.prepare('SELECT * FROM orders WHERE createdAt > ? ORDER BY createdAt DESC LIMIT 10').all(fiveMinutesAgo) as any[];
+    const recentCustomers = this.db.prepare('SELECT * FROM customers WHERE createdAt > ? ORDER BY createdAt DESC LIMIT 10').all(fiveMinutesAgo) as any[];
+
+    return {
+      kpis: {
+        totalRevenue: totalRevenue?.total || 0,
+        totalOrders: totalOrders?.count || 0,
+        totalCustomers: totalCustomers?.count || 0,
+        completionRate: totalOrders?.count > 0 ? (completedOrders?.count / totalOrders.count) * 100 : 0,
+        avgOrderValue: totalOrders?.count > 0 ? (totalRevenue?.total / totalOrders.count) : 0,
+      },
+      recentActivity: {
+        newOrders: recentOrders.length,
+        newCustomers: recentCustomers.length,
+        orders: recentOrders.map(o => ({ ...o, createdAt: new Date(o.createdAt) })),
+        customers: recentCustomers.map(c => ({ ...c, createdAt: new Date(c.createdAt) }))
+      },
+      statusCounts: statusMap
+    };
+  }
+
+  async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    const auditLog = {
+      ...data,
+      id,
+      createdAt: now,
+      details: data.details ? JSON.stringify(data.details) : null
+    };
+
+    this.db.prepare(`
+      INSERT INTO audit_logs (id, franchiseId, employeeId, action, entityType, entityId, details, ipAddress, userAgent, createdAt)
+      VALUES (@id, @franchiseId, @employeeId, @action, @entityType, @entityId, @details, @ipAddress, @userAgent, @createdAt)
+    `).run(auditLog);
+
+    return {
+      ...auditLog,
+      createdAt: new Date(now),
+      details: data.details
+    } as AuditLog;
+  }
+
+  async getAuditLogs(params: any): Promise<{ data: AuditLog[]; count: number }> {
+    let query = 'SELECT * FROM audit_logs WHERE 1=1';
+    const queryParams: any[] = [];
+
+    if (params.employeeId) {
+      query += ' AND employeeId = ?';
+      queryParams.push(params.employeeId);
+    }
+    if (params.action) {
+      query += ' AND action = ?';
+      queryParams.push(params.action);
+    }
+    if (params.entityType) {
+      query += ' AND entityType = ?';
+      queryParams.push(params.entityType);
+    }
+    if (params.startDate) {
+      query += ' AND createdAt >= ?';
+      queryParams.push(params.startDate);
+    }
+    if (params.endDate) {
+      query += ' AND createdAt <= ?';
+      queryParams.push(params.endDate);
+    }
+
+    const countQuery = `SELECT COUNT(*) as count FROM (${query})`;
+    const total = this.db.prepare(countQuery).get(queryParams) as any;
+
+    // Sorting
+    const sortBy = params.sortBy || 'createdAt';
+    const sortOrder = params.sortOrder === 'asc' ? 'ASC' : 'DESC';
+    query += ` ORDER BY ${sortBy} ${sortOrder}`;
+
+    // Pagination
+    const limit = params.limit || 20;
+    const offset = params.offset || 0;
+    query += ' LIMIT ? OFFSET ?';
+    queryParams.push(limit, offset);
+
+    const rows = this.db.prepare(query).all(queryParams) as any[];
+
+    const data = rows.map(row => ({
+      ...row,
+      createdAt: new Date(row.createdAt),
+      details: row.details ? JSON.parse(row.details) : null
+    }));
+
+    return {
+      data,
+      count: total.count
+    };
+  }
+
+  async searchGlobal(query: string): Promise<any> {
+    const searchQuery = `%${query}%`;
+
+    const orders = this.db.prepare(`
+      SELECT id, orderNumber as title, 'order' as type, status as subtitle 
+      FROM orders 
+      WHERE orderNumber LIKE ? OR customerName LIKE ?
+      LIMIT 5
+    `).all(searchQuery, searchQuery);
+
+    const customers = this.db.prepare(`
+      SELECT id, name as title, 'customer' as type, phone as subtitle 
+      FROM customers 
+      WHERE name LIKE ? OR phone LIKE ? OR email LIKE ?
+      LIMIT 5
+    `).all(searchQuery, searchQuery, searchQuery);
+
+    const products = this.db.prepare(`
+      SELECT id, name as title, 'product' as type, sku as subtitle 
+      FROM products 
+      WHERE name LIKE ? OR sku LIKE ?
+      LIMIT 5
+    `).all(searchQuery, searchQuery);
+
+    return [...orders, ...customers, ...products];
   }
 
   // ======= DELIVERIES =======
@@ -1454,11 +1657,20 @@ export class SQLiteStorage implements IStorage {
       .prepare("SELECT * FROM settings ORDER BY category, key")
       .all() as any[];
 
-    return rows.map((row) => ({
-      ...row,
-      value: JSON.parse(row.value),
-      updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
-    }));
+    return rows.map((row) => {
+      let value = row.value;
+      try {
+        value = JSON.parse(row.value);
+      } catch (e) {
+        console.warn(`Failed to parse setting value for key ${row.key}:`, e);
+        // Fallback to raw string if parsing fails
+      }
+      return {
+        ...row,
+        value,
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+      };
+    });
   }
 
   async getSettingsByCategory(category: string): Promise<any[]> {
@@ -1466,11 +1678,19 @@ export class SQLiteStorage implements IStorage {
       .prepare("SELECT * FROM settings WHERE category = ? ORDER BY key")
       .all(category) as any[];
 
-    return rows.map((row) => ({
-      ...row,
-      value: JSON.parse(row.value),
-      updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
-    }));
+    return rows.map((row) => {
+      let value = row.value;
+      try {
+        value = JSON.parse(row.value);
+      } catch (e) {
+        console.warn(`Failed to parse setting value for key ${row.key}:`, e);
+      }
+      return {
+        ...row,
+        value,
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+      };
+    });
   }
 
   async getSetting(key: string): Promise<any | null> {
@@ -1480,9 +1700,16 @@ export class SQLiteStorage implements IStorage {
 
     if (!row) return null;
 
+    let value = row.value;
+    try {
+      value = JSON.parse(row.value);
+    } catch (e) {
+      console.warn(`Failed to parse setting value for key ${row.key}:`, e);
+    }
+
     return {
       ...row,
-      value: JSON.parse(row.value),
+      value,
       updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
     };
   }

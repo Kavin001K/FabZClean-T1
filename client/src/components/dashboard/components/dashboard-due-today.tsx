@@ -17,6 +17,7 @@
  */
 
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,10 +32,12 @@ import { format, isSameDay, addDays, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 interface DashboardDueTodayProps {
-  /** All active orders data */
-  orders: any[];
-  /** Loading state */
-  isLoading: boolean;
+  /** Optional initial orders data (legacy) */
+  orders?: any[];
+  /** Optional loading state */
+  isLoading?: boolean;
+  /** Optional franchise ID for filtering */
+  franchiseId?: string;
 }
 
 const getUrgencyColor = (hoursLeft: number) => {
@@ -66,42 +69,45 @@ const calculateHoursLeft = (dueDate: string) => {
 };
 
 export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
-  orders = [],
-  isLoading,
+  orders: initialOrders = [],
+  isLoading: initialLoading,
+  franchiseId = 'all'
 }) => {
   const [, setLocation] = useLocation();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  if (isLoading) {
-    return (
-      <Card data-testid={getTestId(TEST_IDS.DASHBOARD.WIDGET, 'due-today')}>
-        <CardHeader>
-          <Skeleton className="h-6 w-32" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-24 w-full mb-2" />
-          <Skeleton className="h-24 w-full mb-2" />
-          <Skeleton className="h-24 w-full" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Filter orders for the selected date
-  const dueOrders = orders.filter(order => {
-    const dateToUse = order.pickupDate || order.dueDate;
-    if (!dateToUse) return false;
-    return isSameDay(new Date(dateToUse), selectedDate);
+  // Fetch due orders for the selected date
+  const { data: apiData, isLoading: isQueryLoading } = useQuery({
+    queryKey: ['due-orders-specific', selectedDate.toISOString().split('T')[0], franchiseId],
+    queryFn: async () => {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const params = new URLSearchParams({
+        type: 'specific',
+        date: dateStr,
+        franchiseId
+      });
+      const res = await fetch(`/api/due-date-orders?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('employee_token')}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to fetch due orders');
+      return res.json();
+    }
   });
 
+  const isLoading = initialLoading || isQueryLoading;
+  const dueOrders = apiData?.orders || [];
+
   // Sort by urgency (closest due time first)
-  dueOrders.sort((a, b) => {
+  // Note: API might return them, but sorting client side ensures correct order if we mix sources
+  const sortedOrders = [...dueOrders].sort((a: any, b: any) => {
     const dateA = new Date(a.pickupDate || a.dueDate).getTime();
     const dateB = new Date(b.pickupDate || b.dueDate).getTime();
     return dateA - dateB;
   });
 
-  const displayOrders = dueOrders.slice(0, 5);
+  const displayOrders = sortedOrders.slice(0, 5);
   const isToday = isSameDay(selectedDate, new Date());
 
   return (
@@ -164,7 +170,13 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
       </CardHeader>
 
       <CardContent className="flex-1 overflow-auto">
-        {displayOrders.length === 0 ? (
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </div>
+        ) : displayOrders.length === 0 ? (
           <div
             className="flex flex-col items-center justify-center h-full py-8 text-muted-foreground"
             data-testid={getTestId(TEST_IDS.DATA.EMPTY, 'due-today-orders')}
@@ -175,8 +187,8 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
           </div>
         ) : (
           <div className="space-y-3">
-            {displayOrders.map((order, index) => {
-              const hoursLeft = calculateHoursLeft(order.pickupDate || order.dueDate);
+            {displayOrders.map((order: any, index: number) => {
+              const hoursLeft = calculateHoursLeft(order.dueDate || order.pickupDate);
               const urgencyColor = getUrgencyColor(hoursLeft);
               const urgencyIcon = getUrgencyIcon(hoursLeft);
               const urgencyText = getUrgencyText(hoursLeft);

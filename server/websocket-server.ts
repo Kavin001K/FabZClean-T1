@@ -191,7 +191,7 @@ class RealtimeServer {
     });
   }
 
-  private broadcastToSubscribers(type: string, data: any, priority: 'low' | 'medium' | 'high' = 'medium') {
+  public broadcastToSubscribers(type: string, data: any, priority: 'low' | 'medium' | 'high' = 'medium') {
     // Add to batch instead of immediate broadcast
     this.addToBatch(type, data, priority);
   }
@@ -233,87 +233,32 @@ class RealtimeServer {
 
   private async broadcastAnalyticsUpdate() {
     try {
-      const orders = await storage.getOrders();
-      const customers = await storage.getCustomers();
-
-      // Calculate real-time KPIs
-      const totalRevenue = orders.reduce((sum, order) => sum + parseFloat(order.totalAmount || '0'), 0);
-      const avgOrderValue = orders.length > 0 ? totalRevenue / orders.length : 0;
-      const completionRate = orders.length > 0 ? (orders.filter(o => o.status === 'completed').length / orders.length) * 100 : 0;
-      const customerRetention = customers.length > 0 ? customers.filter(c => (c.totalOrders || 0) > 1).length / customers.length * 100 : 0;
-
-      // Recent activity (last 5 minutes)
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-      const recentOrders = orders.filter(order => new Date(order.createdAt || new Date()) > fiveMinutesAgo);
-      const recentCustomers = customers.filter(customer => new Date(customer.createdAt || new Date()) > fiveMinutesAgo);
+      const analytics = await storage.getAnalyticsSummary();
 
       // Admin Portal Analytics
       const adminAnalytics = {
-        kpis: {
-          totalRevenue,
-          avgOrderValue,
-          completionRate,
-          customerRetention,
-          totalOrders: orders.length,
-          totalCustomers: customers.length
-        },
-        recentActivity: {
-          newOrders: recentOrders.length,
-          newCustomers: recentCustomers.length,
-          orders: recentOrders.map(order => ({
-            id: order.id,
-            customerName: order.customerName,
-            totalAmount: order.totalAmount,
-            status: order.status,
-            createdAt: order.createdAt
-          })),
-          customers: recentCustomers.map(customer => ({
-            id: customer.id,
-            name: customer.name,
-            email: customer.email,
-            createdAt: customer.createdAt
-          }))
-        }
+        kpis: analytics.kpis,
+        recentActivity: analytics.recentActivity
       };
 
       // Employee Portal Analytics
       const employeeAnalytics = {
-        orders: {
-          pending: orders.filter(o => o.status === 'pending').length,
-          processing: orders.filter(o => o.status === 'processing').length,
-          completed: orders.filter(o => o.status === 'completed').length,
-          total: orders.length
-        },
-        recentActivity: recentOrders.map(order => ({
-          id: order.id,
-          customerName: order.customerName,
-          status: order.status,
-          createdAt: order.createdAt
-        }))
+        pendingOrders: analytics.statusCounts?.['pending'] || 0,
+        processingOrders: analytics.statusCounts?.['processing'] || 0,
+        readyOrders: analytics.statusCounts?.['ready'] || 0,
+        completedOrders: analytics.statusCounts?.['completed'] || 0
       };
 
       // Customer Portal Analytics
       const customerAnalytics = {
-        metrics: {
-          totalOrders: orders.length,
-          totalCustomers: customers.length,
-          avgOrderValue,
-          completionRate
-        }
+        activeOrders: (analytics.statusCounts?.['processing'] || 0) + (analytics.statusCounts?.['in_progress'] || 0)
       };
 
       // Worker Portal Analytics
       const workerAnalytics = {
-        deliveries: {
-          assigned: orders.filter(o => o.status === 'assigned').length,
-          inTransit: orders.filter(o => o.status === 'in_transit').length,
-          completed: orders.filter(o => o.status === 'completed').length
-        },
-        performance: {
-          totalDeliveries: orders.length,
-          completionRate,
-          avgDeliveryTime: 45 // Mock value
-        }
+        assignedOrders: analytics.statusCounts?.['assigned'] || 0,
+        inTransitOrders: analytics.statusCounts?.['in_transit'] || 0,
+        outForDelivery: analytics.statusCounts?.['out_for_delivery'] || 0
       };
 
       // Broadcast portal-specific analytics

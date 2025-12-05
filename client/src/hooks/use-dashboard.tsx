@@ -93,24 +93,24 @@ export function useDashboard() {
   }, [rawServicePopularityData]);
 
   const {
-    data: recentOrders,
+    data: allOrders,
     isLoading: ordersLoading,
     error: ordersError,
   } = useQuery({
-    queryKey: ['dashboard/recent-orders'],
+    queryKey: ['dashboard/all-orders'],
     queryFn: () => ordersApi.getAll(),
     staleTime: 2 * 60 * 1000, // 2 minutes
     retry: 3,
   });
 
-  // Due today orders - filter from recent orders
+  // Due today orders - filter from all orders
   const dueTodayOrders = useMemo(() => {
-    if (!recentOrders) return [];
+    if (!allOrders) return [];
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    return recentOrders.filter(order => {
+    return allOrders.filter(order => {
       if (!order.pickupDate) return false;
       const pickup = new Date(order.pickupDate);
       pickup.setHours(0, 0, 0, 0);
@@ -123,23 +123,23 @@ export function useDashboard() {
       pickupDate: order.pickupDate ? new Date(order.pickupDate).toISOString() : '',
       createdAt: order.createdAt ? new Date(order.createdAt).toISOString() : '',
     }));
-  }, [recentOrders]);
+  }, [allOrders]);
 
   // Orders created today
   const ordersTodayCount = useMemo(() => {
-    if (!recentOrders) return 0;
+    if (!allOrders) return 0;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    return recentOrders.filter(order => {
+    return allOrders.filter(order => {
       if (!order.createdAt) return false;
       const created = new Date(order.createdAt);
       return created >= today && created < tomorrow;
     }).length;
-  }, [recentOrders]);
+  }, [allOrders]);
 
   const {
     data: customers,
@@ -154,37 +154,37 @@ export function useDashboard() {
 
   // Revenue today
   const revenueToday = useMemo(() => {
-    if (!recentOrders) return 0;
+    if (!allOrders) return 0;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    return recentOrders.filter(order => {
+    return allOrders.filter(order => {
       if (!order.createdAt) return false;
       const created = new Date(order.createdAt);
       return created >= today && created < tomorrow;
     }).reduce((sum, order) => sum + (parseFloat(order.totalAmount || '0')), 0);
-  }, [recentOrders]);
+  }, [allOrders]);
 
   const ordersCompletedToday = useMemo(() => {
-    if (!recentOrders) return 0;
+    if (!allOrders) return 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    return recentOrders.filter(order => {
+    return allOrders.filter(order => {
       const dateStr = order.updatedAt || order.createdAt;
       if (!dateStr) return false;
       const date = new Date(dateStr);
       return date >= today && ['completed', 'delivered'].includes(order.status);
     }).length;
-  }, [recentOrders]);
+  }, [allOrders]);
 
   const pendingOrdersCount = useMemo(() => {
-    if (!recentOrders) return 0;
-    return recentOrders.filter(order => ['pending', 'processing', 'ready', 'assigned', 'in_transit'].includes(order.status)).length;
-  }, [recentOrders]);
+    if (!allOrders) return 0;
+    return allOrders.filter(order => ['pending', 'processing', 'ready', 'assigned', 'in_transit'].includes(order.status)).length;
+  }, [allOrders]);
 
   const newCustomersToday = useMemo(() => {
     if (!customers) return 0;
@@ -269,8 +269,8 @@ export function useDashboard() {
   }, [servicePopularityData]);
 
   const processedRecentOrders = useMemo(() => {
-    if (!recentOrders || !Array.isArray(recentOrders)) return [];
-    return recentOrders
+    if (!allOrders || !Array.isArray(allOrders)) return [];
+    return allOrders
       .sort((a, b) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -285,7 +285,7 @@ export function useDashboard() {
         customerEmail: order.customerEmail || undefined,
         createdAt: order.createdAt ? new Date(order.createdAt).toISOString() : '',
       }));
-  }, [recentOrders]);
+  }, [allOrders]);
 
   // Actions
   const updateFilters = useCallback((newFilters: Partial<DashboardFilters>) => {
@@ -348,6 +348,7 @@ export function useDashboard() {
     ordersCompletedToday,
     pendingOrdersCount,
     newCustomersToday,
+    allOrders: allOrders || [],
 
     // Loading states
     isLoading,

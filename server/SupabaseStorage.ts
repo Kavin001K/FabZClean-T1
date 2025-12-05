@@ -16,6 +16,8 @@ import {
     type InsertBarcode,
     type Employee,
     type InsertEmployee,
+    type AuditLog,
+    type InsertAuditLog,
 } from "../shared/schema";
 import { Driver, InsertDriver } from "./SQLiteStorage";
 
@@ -57,7 +59,15 @@ export class SupabaseStorage {
             'discount_value': 'discountValue',
             'coupon_code': 'couponCode',
             'extra_charges': 'extraCharges',
-            'loyalty_points': 'loyaltyPoints'
+
+            'loyalty_points': 'loyaltyPoints',
+            // Audit Log fields
+            'employee_id': 'employeeId',
+            'entity_type': 'entityType',
+            'entity_id': 'entityId',
+            'ip_address': 'ipAddress',
+            'user_agent': 'userAgent',
+            'franchise_id': 'franchiseId'
         };
 
         Object.entries(mappings).forEach(([snake, camel]) => {
@@ -323,6 +333,131 @@ export class SupabaseStorage {
 
     async getOrders(): Promise<Order[]> {
         return this.listOrders();
+    }
+
+    async getActiveOrders(): Promise<Order[]> {
+        const { data, error } = await this.supabase
+            .from('orders')
+            .select('*')
+            .in('status', ['in_progress', 'shipped', 'out_for_delivery', 'in_transit', 'assigned']);
+
+        if (error) throw error;
+        return data.map(item => this.mapDates(item));
+    }
+
+    async getAnalyticsSummary(): Promise<any> {
+        // This is a simplified version. For production, consider using RPC or Edge Functions.
+        const { count: totalOrders } = await this.supabase.from('orders').select('*', { count: 'exact', head: true });
+        const { count: totalCustomers } = await this.supabase.from('customers').select('*', { count: 'exact', head: true });
+        const { count: completedOrders } = await this.supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'completed');
+
+        // Revenue aggregation (client-side for now as Supabase JS doesn't support SUM easily without RPC)
+        // Ideally: create a view or function in Supabase
+        const { data: orders } = await this.supabase.from('orders').select('totalAmount');
+        const totalRevenue = orders?.reduce((sum, o) => sum + parseFloat(o.totalAmount || '0'), 0) || 0;
+
+        // Recent activity
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const { data: recentOrders } = await this.supabase.from('orders').select('*').gt('createdAt', fiveMinutesAgo).order('createdAt', { ascending: false }).limit(10);
+        const { data: recentCustomers } = await this.supabase.from('customers').select('*').gt('createdAt', fiveMinutesAgo).order('createdAt', { ascending: false }).limit(10);
+
+        // Status counts (aggregation in memory for now)
+        const { data: allStatuses } = await this.supabase.from('orders').select('status');
+        const statusMap = allStatuses?.reduce((acc: any, curr: any) => {
+            acc[curr.status] = (acc[curr.status] || 0) + 1;
+            return acc;
+        }, {}) || {};
+
+        return {
+            kpis: {
+                totalRevenue,
+                totalOrders: totalOrders || 0,
+                totalCustomers: totalCustomers || 0,
+                completionRate: (totalOrders || 0) > 0 ? ((completedOrders || 0) / (totalOrders || 1)) * 100 : 0,
+                avgOrderValue: (totalOrders || 0) > 0 ? (totalRevenue / (totalOrders || 1)) : 0,
+            },
+            recentActivity: {
+                newOrders: recentOrders?.length || 0,
+                newCustomers: recentCustomers?.length || 0,
+                orders: recentOrders?.map(item => this.mapDates(item)) || [],
+                customers: recentCustomers?.map(item => this.mapDates(item)) || []
+            },
+            statusCounts: statusMap
+        };
+    }
+
+    async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
+        const { data: auditLog, error } = await this.supabase
+            .from('audit_logs')
+            .insert(data)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return this.mapDates(auditLog);
+    }
+
+    async getAuditLogs(params: any): Promise<{ data: AuditLog[]; count: number }> {
+        const {
+            page = 1,
+            limit = 20,
+            employeeId,
+            action,
+            startDate,
+            endDate,
+            entityType,
+            sortBy = 'created_at',
+            sortOrder = 'desc'
+        } = params;
+
+        const offset = (page - 1) * limit;
+
+        let query = this.supabase
+            .from('audit_logs')
+            .select('*', { count: 'exact' });
+
+        if (employeeId) query = query.eq('employee_id', employeeId);
+        if (action) query = query.eq('action', action);
+        if (entityType) query = query.eq('entity_type', entityType);
+        if (startDate) query = query.gte('created_at', startDate);
+        if (endDate) query = query.lte('created_at', endDate);
+
+        const { data, error, count } = await query
+            .order(sortBy, { ascending: sortOrder === 'asc' })
+            .range(offset, offset + limit - 1);
+
+        if (error) throw error;
+
+        return {
+            data: data.map(item => this.mapDates(item)),
+            count: count || 0
+        };
+    }
+
+    async searchGlobal(query: string): Promise<any> {
+        const { data: orders } = await this.supabase
+            .from('orders')
+            .select('id, orderNumber, status')
+            .or(`orderNumber.ilike.%${query}%,customerName.ilike.%${query}%`)
+            .limit(5);
+
+        const { data: customers } = await this.supabase
+            .from('customers')
+            .select('id, name, phone')
+            .or(`name.ilike.%${query}%,phone.ilike.%${query}%,email.ilike.%${query}%`)
+            .limit(5);
+
+        const { data: products } = await this.supabase
+            .from('products')
+            .select('id, name, sku')
+            .or(`name.ilike.%${query}%,sku.ilike.%${query}%`)
+            .limit(5);
+
+        const formattedOrders = orders?.map(o => ({ id: o.id, title: o.orderNumber, type: 'order', subtitle: o.status })) || [];
+        const formattedCustomers = customers?.map(c => ({ id: c.id, title: c.name, type: 'customer', subtitle: c.phone })) || [];
+        const formattedProducts = products?.map(p => ({ id: p.id, title: p.name, type: 'product', subtitle: p.sku })) || [];
+
+        return [...formattedOrders, ...formattedCustomers, ...formattedProducts];
     }
 
     // ======= DELIVERIES =======
@@ -820,6 +955,116 @@ export class SupabaseStorage {
             .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
 
         if (error) throw error;
+    }
+
+    // ======= FRANCHISES =======
+    async createFranchise(data: any): Promise<any> {
+        const { data: franchise, error } = await this.supabase
+            .from('franchises')
+            .insert(data)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return this.mapDates(franchise);
+    }
+
+    async getFranchise(id: string): Promise<any | undefined> {
+        const { data: franchise, error } = await this.supabase
+            .from('franchises')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) return undefined;
+        return this.mapDates(franchise);
+    }
+
+    async updateFranchise(id: string, data: any): Promise<any | undefined> {
+        const { data: franchise, error } = await this.supabase
+            .from('franchises')
+            .update(data)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) return undefined;
+        return this.mapDates(franchise);
+    }
+
+    async deleteFranchise(id: string): Promise<boolean> {
+        const { error } = await this.supabase
+            .from('franchises')
+            .delete()
+            .eq('id', id);
+
+        return !error;
+    }
+
+    async listFranchises(): Promise<any[]> {
+        const { data, error } = await this.supabase
+            .from('franchises')
+            .select('*');
+
+        if (error) throw error;
+        return data.map(item => this.mapDates(item));
+    }
+
+    // ======= EMPLOYEE TASKS & ATTENDANCE =======
+    async createTask(data: any): Promise<any> {
+        const { data: task, error } = await this.supabase
+            .from('employee_tasks')
+            .insert(data)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return this.mapDates(task);
+    }
+
+    async listTasks(franchiseId: string): Promise<any[]> {
+        const { data, error } = await this.supabase
+            .from('employee_tasks')
+            .select('*')
+            .eq('franchiseId', franchiseId);
+
+        if (error) throw error;
+        return data.map(item => this.mapDates(item));
+    }
+
+    async createAttendance(data: any): Promise<any> {
+        const { data: attendance, error } = await this.supabase
+            .from('employee_attendance')
+            .insert(data)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return this.mapDates(attendance);
+    }
+
+    async listAttendance(franchiseId: string, employeeId?: string, date?: Date): Promise<any[]> {
+        let query = this.supabase
+            .from('employee_attendance')
+            .select('*')
+            .eq('franchiseId', franchiseId);
+
+        if (employeeId) {
+            query = query.eq('employeeId', employeeId);
+        }
+
+        if (date) {
+            // Assuming date is stored as YYYY-MM-DD or timestamp
+            // If timestamp, we might need range. For now, exact match on date string if schema uses date type
+            // or if it uses text YYYY-MM-DD
+            const dateStr = date.toISOString().split('T')[0];
+            query = query.eq('date', dateStr);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+        return data.map(item => this.mapDates(item));
     }
 
     // ======= TRANSIT ORDERS =======

@@ -22,11 +22,76 @@ import transitSuggestionsRouter from './transit-suggestions';
 import settingsRouter from './settings';
 import franchiseRouter from './franchise';
 import { debugRouter } from './debug';
+import { db as storage } from '../db';
+import { Order, Product } from '../../shared/schema';
 
 /**
  * Register all route modules with the Express app
  */
 export function registerAllRoutes(app: Express): void {
+  // Due Date Orders endpoint (Direct mount to match frontend)
+  app.get("/api/due-date-orders", async (req, res) => {
+    try {
+      const { type, date, franchiseId } = req.query;
+      const orders = await storage.listOrders();
+
+      let filteredOrders = orders;
+
+      // Filter by franchise if provided and not 'all'
+      if (franchiseId && franchiseId !== 'all') {
+        filteredOrders = filteredOrders.filter((order: any) => order.franchiseId === franchiseId);
+      }
+
+      // Filter by date
+      if (type === 'specific' && date) {
+        const targetDate = new Date(date as string).toISOString().split('T')[0];
+        filteredOrders = filteredOrders.filter((order: any) => {
+          let dueDate = null;
+          let pickupDate = null;
+          if (order.dueDate) try { dueDate = new Date(order.dueDate).toISOString().split('T')[0]; } catch (e) { }
+          if (order.pickupDate) try { pickupDate = new Date(order.pickupDate).toISOString().split('T')[0]; } catch (e) { }
+          return dueDate === targetDate || pickupDate === targetDate;
+        });
+      } else if (type === 'today') {
+        const today = new Date().toISOString().split('T')[0];
+        filteredOrders = filteredOrders.filter((order: any) => {
+          let dueDate = null;
+          let pickupDate = null;
+          if (order.dueDate) try { dueDate = new Date(order.dueDate).toISOString().split('T')[0]; } catch (e) { }
+          if (order.pickupDate) try { pickupDate = new Date(order.pickupDate).toISOString().split('T')[0]; } catch (e) { }
+          return dueDate === today || pickupDate === today;
+        });
+      }
+
+      // Transform orders
+      const products = await storage.listProducts();
+      const productMap = new Map(
+        products.map((product: Product) => [product.id, product.name]),
+      );
+
+      const transformedOrders = filteredOrders.map((order: Order) => {
+        const items = (order.items as any[]) || [];
+        const serviceNames = Array.from(new Set(items.map(item => {
+          return productMap.get(item.productId) || "Unknown Service";
+        })));
+        const serviceName = serviceNames.length > 0 ? serviceNames.join(", ") : "Unknown Service";
+
+        return {
+          ...order,
+          date: order.createdAt,
+          total: parseFloat(order.totalAmount || "0"),
+          service: serviceName,
+          priority: "Normal",
+        };
+      });
+
+      res.json({ orders: transformedOrders });
+    } catch (error) {
+      console.error("Fetch due date orders error:", error);
+      res.status(500).json({ message: "Failed to fetch due date orders" });
+    }
+  });
+
   // Authentication routes (no version prefix)
   app.use('/api/auth', authRouter);
   app.use('/api/debug', debugRouter);

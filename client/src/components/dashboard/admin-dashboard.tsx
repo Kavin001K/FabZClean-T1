@@ -12,6 +12,7 @@ import {
     Building2
 } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
+import { ordersApi, franchisesApi } from "@/lib/data-service";
 import { DashboardDueToday } from "./components/dashboard-due-today";
 import { DashboardRecentOrders } from "./components/dashboard-recent-orders";
 import { useQuery } from "@tanstack/react-query";
@@ -29,21 +30,13 @@ export default function AdminDashboard() {
     // Fetch Franchises
     const { data: franchises = [] } = useQuery({
         queryKey: ['franchises'],
-        queryFn: async () => {
-            const res = await fetch('/api/franchises');
-            if (!res.ok) return [];
-            return res.json();
-        }
+        queryFn: () => franchisesApi.getAll()
     });
 
     // Fetch orders
     const { data: orders = [], isLoading: isLoadingOrders } = useQuery({
         queryKey: ['admin-orders'],
-        queryFn: async () => {
-            const response = await fetch('/api/orders');
-            if (!response.ok) throw new Error('Failed to fetch orders');
-            return response.json();
-        }
+        queryFn: () => ordersApi.getAll()
     });
 
     // Filter orders based on selected franchise
@@ -192,8 +185,7 @@ export default function AdminDashboard() {
             {/* Due Today & Recent Orders */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <DashboardDueToday
-                    orders={filteredOrders}
-                    isLoading={isLoadingOrders}
+                    franchiseId={selectedFranchiseId}
                 />
                 <DashboardRecentOrders
                     recentOrders={recentOrders}

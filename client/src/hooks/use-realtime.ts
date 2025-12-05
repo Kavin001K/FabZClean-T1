@@ -8,6 +8,7 @@ interface UseRealtimeOptions {
   filter?: string;
   orderBy?: string;
   limit?: number;
+  enabled?: boolean;
 }
 
 interface UseRealtimeReturn<T> {
@@ -29,7 +30,7 @@ interface UseRealtimeReturn<T> {
  * @returns { data, isLoading, error }
  */
 export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeReturn<T> {
-  const { tableName, selectQuery = '*', filter, orderBy, limit } = options;
+  const { tableName, selectQuery = '*', filter, orderBy, limit, enabled = true } = options;
 
   const [data, setData] = useState<T[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,11 +44,16 @@ export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeRe
     let isMounted = true;
 
     async function fetchInitialData() {
-      // Skip if Supabase is not configured
-      if (!isSupabaseConfigured) {
+      // Skip if disabled or Supabase is not configured
+      if (!enabled || !isSupabaseConfigured) {
         if (isMounted) {
           setIsLoading(false);
-          console.warn(`⚠️ Supabase not configured, skipping realtime fetch for ${tableName}`);
+          if (!enabled) {
+            // Just reset data if disabled
+            setData([]);
+          } else {
+            console.warn(`⚠️ Supabase not configured, skipping realtime fetch for ${tableName}`);
+          }
         }
         return;
       }
@@ -128,12 +134,12 @@ export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeRe
     return () => {
       isMounted = false;
     };
-  }, [tableName, selectQuery, filter, orderBy, limit]);
+  }, [tableName, selectQuery, filter, orderBy, limit, enabled]);
 
   // Set up realtime subscription
   useEffect(() => {
-    // Skip if Supabase is not configured
-    if (!isSupabaseConfigured) return;
+    // Skip if disabled or Supabase is not configured
+    if (!enabled || !isSupabaseConfigured) return;
 
     // Clean up previous subscription if it exists
     if (channelRef.current) {
@@ -220,7 +226,7 @@ export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeRe
         console.log(`🔌 Unsubscribed from ${tableName} realtime changes`);
       }
     };
-  }, [tableName]);
+  }, [tableName, enabled]);
 
   // ✅ Safety: Always return an array, never null or undefined
   return {

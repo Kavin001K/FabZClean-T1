@@ -29,37 +29,17 @@ router.get('/', jwtRequired, requireRole(AUDIT_VIEW_ROLES), async (req, res) => 
         const limitNum = parseInt(limit as string) || 20;
         const offset = (pageNum - 1) * limitNum;
 
-        // Build query
-        let query = storage.supabase
-            .from('audit_logs')
-            .select('*', { count: 'exact' });
-
-        // Apply filters
-        if (employeeId) {
-            query = query.eq('employee_id', employeeId);
-        }
-        if (action) {
-            query = query.eq('action', action);
-        }
-        if (entityType) {
-            query = query.eq('entity_type', entityType);
-        }
-        if (startDate) {
-            query = query.gte('created_at', startDate);
-        }
-        if (endDate) {
-            query = query.lte('created_at', endDate);
-        }
-
-        // Apply pagination and sorting
-        const { data, error, count } = await query
-            .order('created_at', { ascending: false })
-            .range(offset, offset + limitNum - 1);
-
-        if (error) throw error;
-
-        // Transform data if needed (e.g., parse JSON details if it comes as string)
-        // Supabase client usually handles JSON automatically
+        const { data, count } = await storage.getAuditLogs({
+            page: pageNum,
+            limit: limitNum,
+            employeeId,
+            action,
+            startDate,
+            endDate,
+            entityType,
+            sortBy: req.query.sortBy as string,
+            sortOrder: req.query.sortOrder as string
+        });
 
         const response = createPaginatedResponse(data || [], {
             total: count || 0,

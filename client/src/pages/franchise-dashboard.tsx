@@ -193,10 +193,7 @@ export default function FranchiseDashboard() {
 
       {/* Due Today & Recent Orders */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DashboardDueToday
-          orders={orders}
-          isLoading={isLoadingOrders}
-        />
+        <DashboardDueToday />
         <DashboardRecentOrders
           recentOrders={recentOrders}
           isLoading={isLoadingOrders}

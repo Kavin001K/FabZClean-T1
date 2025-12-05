@@ -105,7 +105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const overdueOrders = ordersWithDueDates.filter((order: any) => {
         const dueDate = new Date(order.dueDate);
-        return dueDate < currentDate && ['pending', 'processing'].includes(order.status);
+        return dueDate < today && ['pending', 'processing'].includes(order.status);
       }).length;
 
       const transformedMetrics = {
@@ -165,18 +165,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Due date orders endpoint
   app.get("/api/due-date-orders", async (req, res) => {
     try {
-      const { type, days } = req.query;
+      const { type, days, date, franchiseId } = req.query;
 
       let orders;
       let title;
 
       // Get all orders from the database
-      const allOrders = await storage.listOrders();
+      let allOrders = await storage.listOrders();
+
+      // Filter by franchise if provided
+      if (franchiseId && franchiseId !== 'all') {
+        allOrders = allOrders.filter((o: Order) => o.franchiseId === franchiseId);
+      }
 
       // Add due date logic based on pickup date
       const ordersWithDueDates = allOrders.map((order: Order) => {
-        const shippingAddress = order.shippingAddress as any;
-        const pickupDate = shippingAddress?.pickupDate;
+        const pickupDate = order.pickupDate;
         if (pickupDate) {
           const pickup = new Date(pickupDate);
           const dueDate = new Date(pickup.getTime() + (2 * 24 * 60 * 60 * 1000)); // 2 days after pickup
@@ -228,6 +232,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return dueDate < today && ['pending', 'processing'].includes(order.status);
           });
           title = "Overdue Orders";
+          break;
+        case 'specific':
+          if (!date) {
+            orders = [];
+            title = "Specific Date Orders";
+            break;
+          }
+          const specificDate = new Date(date as string);
+          const specificDateStr = specificDate.toISOString().split('T')[0];
+
+          orders = ordersWithDueDates.filter((order: any) => {
+            if (!order.dueDate) return false;
+            // Compare purely the date string YYYY-MM-DD
+            return order.dueDate === specificDateStr;
+          });
+          title = `Orders Due on ${specificDate.toLocaleDateString()}`;
           break;
         case 'upcoming':
         default:
@@ -468,11 +488,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transformedOrders = orders.map((order: Order) => {
         // Handle items if they exist in the order
         const items = (order.items as any[]) || [];
-        const firstItem = items[0];
-        const productId = firstItem?.productId;
-        const serviceName = productId
-          ? productMap.get(productId) || "Unknown Service"
-          : "Unknown Service";
+        const serviceNames = Array.from(new Set(items.map(item => {
+          return productMap.get(item.productId) || "Unknown Service";
+        })));
+        const serviceName = serviceNames.length > 0 ? serviceNames.join(", ") : "Unknown Service";
 
         return {
           ...order,
@@ -608,6 +627,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(order);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("Create order validation error:", JSON.stringify(error.errors, null, 2));
         return res.status(400).json({
           message: "Invalid order data",
           errors: error.errors,
@@ -986,12 +1006,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Services endpoints - Complete CRUD
   app.get("/api/services", async (req, res) => {
     try {
+      console.log("GET /api/services hit");
       const services = await storage.listServices();
       // Return array directly, not wrapped in { data: [] }
       res.json(services);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Fetch services error:", error);
-      res.status(500).json({ message: "Failed to fetch services" });
+      res.status(500).json({ message: "Failed to fetch services", error: error.message, stack: error.stack });
     }
   });
 
@@ -1002,9 +1023,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Service not found" });
       }
       res.json(service);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Fetch service error:", error);
-      res.status(500).json({ message: "Failed to fetch service" });
+      res.status(500).json({ message: "Failed to fetch service", error: error.message });
     }
   });
 
@@ -1017,7 +1038,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       realtimeServer.broadcast({ type: "service_created", data: service });
 
       res.status(201).json(service);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           message: "Invalid service data",
@@ -1025,7 +1046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       console.error("Create service error:", error);
-      res.status(500).json({ message: "Failed to create service" });
+      res.status(500).json({ message: "Failed to create service", error: error.message });
     }
   });
 
@@ -1042,7 +1063,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       realtimeServer.broadcast({ type: "service_updated", data: service });
 
       res.json(service);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           message: "Invalid service data",
@@ -1050,7 +1071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       console.error("Update service error:", error);
-      res.status(500).json({ message: "Failed to update service" });
+      res.status(500).json({ message: "Failed to update service", error: error.message });
     }
   });
 
@@ -1058,9 +1079,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       await storage.deleteService(req.params.id);
       res.json({ message: "Service deleted successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Delete service error:", error);
-      res.status(500).json({ message: "Failed to delete service" });
+      res.status(500).json({ message: "Failed to delete service", error: error.message });
     }
   });
 
@@ -1082,96 +1103,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const searchTerm = query.toLowerCase().trim();
 
-      // Search with fixed method names
-      const orders = await storage.listOrders(); // Changed from getOrders
-      const customers = await storage.listCustomers(); // Changed from getCustomers
-      const products = await storage.listProducts(); // Changed from getProducts
-      const services = await storage.listServices(); // Changed from getServices
+      // Optimized search using database-level filtering
+      const results = await storage.searchGlobal(searchTerm);
 
-      const matchingOrders = orders
-        .filter(
-          (order: Order) =>
-            order.customerName?.toLowerCase().includes(searchTerm) ||
-            order.orderNumber?.toLowerCase().includes(searchTerm) ||
-            order.status?.toLowerCase().includes(searchTerm),
-        )
-        .slice(0, limit);
+      const orders = results.filter((r: any) => r.type === 'order').map((r: any) => ({
+        id: r.id,
+        type: 'order',
+        title: r.title,
+        subtitle: r.subtitle,
+        description: `Order #${r.title}`,
+        url: `/orders/${r.id}`
+      }));
 
-      const matchingCustomers = customers
-        .filter(
-          (customer: Customer) =>
-            customer.name?.toLowerCase().includes(searchTerm) ||
-            customer.email?.toLowerCase().includes(searchTerm) ||
-            customer.phone?.toLowerCase().includes(searchTerm),
-        )
-        .slice(0, limit);
+      const customers = results.filter((r: any) => r.type === 'customer').map((r: any) => ({
+        id: r.id,
+        type: 'customer',
+        title: r.title,
+        subtitle: r.subtitle,
+        description: r.subtitle,
+        url: `/customers/${r.id}`
+      }));
 
-      const matchingProducts = products
-        .filter(
-          (product: Product) =>
-            product.name?.toLowerCase().includes(searchTerm) ||
-            product.category?.toLowerCase().includes(searchTerm) ||
-            product.description?.toLowerCase().includes(searchTerm),
-        )
-        .slice(0, limit);
-
-      const matchingServices = services
-        .filter(
-          (service: any) =>
-            service.name?.toLowerCase().includes(searchTerm) ||
-            service.description?.toLowerCase().includes(searchTerm),
-        )
-        .slice(0, limit);
-
-      const totalResults =
-        matchingOrders.length +
-        matchingCustomers.length +
-        matchingProducts.length +
-        matchingServices.length;
+      const products = results.filter((r: any) => r.type === 'product').map((r: any) => ({
+        id: r.id,
+        type: 'product',
+        title: r.title,
+        subtitle: r.subtitle,
+        description: `SKU: ${r.subtitle}`,
+        url: `/inventory?product=${r.id}`
+      }));
 
       res.json({
-        orders: matchingOrders.map((order: Order) => ({
-          id: order.id,
-          type: "order",
-          title: `Order #${order.orderNumber || order.id}`,
-          subtitle: order.customerName,
-          description: `${order.status} - ₹${order.totalAmount}`,
-          url: `/orders/${order.id}`,
-          createdAt: order.createdAt,
-        })),
-        customers: matchingCustomers.map((customer: Customer) => ({
-          id: customer.id,
-          type: "customer",
-          title: customer.name,
-          subtitle: customer.email,
-          description: `₹${customer.totalSpent} total spent`,
-          url: `/customers/${customer.id}`,
-          createdAt: customer.createdAt,
-        })),
-        products: matchingProducts.map((product: Product) => ({
-          id: product.id,
-          type: "product",
-          title: product.name,
-          subtitle: product.category,
-          description: `${product.stockQuantity} in stock`,
-          url: `/inventory/${product.id}`,
-          createdAt: product.createdAt,
-        })),
-        services: matchingServices.map((service: any) => ({
-          id: service.id,
-          type: "service",
-          title: service.name,
-          subtitle: service.category,
-          description: `₹${service.price}`,
-          url: `/services/${service.id}`,
-          createdAt: service.createdAt,
-        })),
-        totalResults,
-        query: searchTerm,
+        orders,
+        customers,
+        products,
+        services: [],
+        totalResults: results.length,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Search error:", error);
-      res.status(500).json({ message: "Search failed" });
+      res.status(500).json({ message: "Search failed", error: error.message });
     }
   });
 
@@ -1181,11 +1152,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all settings
   app.get("/api/settings", async (req, res) => {
     try {
+      console.log("GET /api/settings hit");
       const settings = await settingsService.getAllSettings();
       res.json(settings);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching settings:", error);
-      res.status(500).json({ message: "Failed to fetch settings" });
+      res.status(500).json({ message: "Failed to fetch settings", error: error.message, stack: error.stack });
     }
   });
 

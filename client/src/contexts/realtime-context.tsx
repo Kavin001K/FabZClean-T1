@@ -23,9 +23,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   // On Vercel, this will use wss:// automatically when on HTTPS
   const wsUrl = useMemo(() => getWebSocketUrl(), []);
 
-  // Skip backend WebSocket in development (Vite HMR conflict)
-  // Use Supabase Realtime only in development
-  const skipBackendWS = import.meta.env.DEV;
+  // Enable backend WebSocket in development as well to ensure realtime updates work
+  // This serves as a fallback if Supabase Realtime is not configured or failing
+  const skipBackendWS = false;
 
   // ✅ Use Supabase Realtime for driver locations (works on Vercel Serverless)
   const { data: supabaseDrivers } = useSupabaseRealtime({

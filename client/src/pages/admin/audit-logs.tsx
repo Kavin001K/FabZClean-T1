@@ -38,22 +38,22 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Search, Filter, RefreshCw, FileText, Printer, ShieldAlert, User, Clock } from "lucide-react";
+import { Calendar as CalendarIcon, Search, Filter, RefreshCw, FileText, Printer, ShieldAlert, User, Clock, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Skeleton, { TableSkeleton } from "@/components/ui/loading-skeleton";
 
 interface AuditLog {
     id: string;
-    employee_id: string;
-    employee_username: string;
+    employeeId: string;
+    employeeName?: string; // Optional, might not be available
     action: string;
-    entity_type: string;
-    entity_id: string;
+    entityType: string;
+    entityId: string;
     details: any;
-    ip_address: string;
-    user_agent: string;
-    created_at: string;
+    ipAddress: string;
+    userAgent: string;
+    createdAt: string;
 }
 
 export default function AuditLogsPage() {
@@ -64,13 +64,18 @@ export default function AuditLogsPage() {
     const [date, setDate] = useState<Date | undefined>(undefined);
     const [searchQuery, setSearchQuery] = useState('');
 
+    const [sortBy, setSortBy] = useState<string>('createdAt');
+    const [sortOrder, setSortOrder] = useState<string>('desc');
+
     // Fetch logs
     const { data, isLoading, error, refetch } = useQuery({
-        queryKey: ['audit-logs', page, limit, actionFilter, date],
+        queryKey: ['audit-logs', page, limit, actionFilter, date, sortBy, sortOrder],
         queryFn: async () => {
             const params = new URLSearchParams({
                 page: page.toString(),
                 limit: limit.toString(),
+                sortBy,
+                sortOrder,
             });
 
             if (actionFilter && actionFilter !== 'all') {
@@ -103,6 +108,22 @@ export default function AuditLogsPage() {
         }
     });
 
+    const handleSort = (column: string) => {
+        if (sortBy === column) {
+            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortBy(column);
+            setSortOrder('asc');
+        }
+    };
+
+    const SortIcon = ({ column }: { column: string }) => {
+        if (sortBy !== column) return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground opacity-50" />;
+        return sortOrder === 'asc' ?
+            <ArrowUp className="ml-2 h-4 w-4 text-foreground" /> :
+            <ArrowDown className="ml-2 h-4 w-4 text-foreground" />;
+    };
+
     const getActionColor = (action: string) => {
         if (action.includes('create')) return 'bg-green-100 text-green-800 border-green-200';
         if (action.includes('delete')) return 'bg-red-100 text-red-800 border-red-200';
@@ -130,94 +151,12 @@ export default function AuditLogsPage() {
 
     return (
         <div className="p-6 space-y-6 bg-background min-h-screen">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Audit Logs</h1>
-                    <p className="text-muted-foreground">
-                        Track and monitor all system activities and user actions.
-                    </p>
-                </div>
-                <Button variant="outline" onClick={() => refetch()}>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Refresh
-                </Button>
-            </div>
+            {/* ... (keep header) ... */}
 
             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <ShieldAlert className="h-5 w-5" />
-                        System Activity
-                    </CardTitle>
-                    <CardDescription>
-                        View detailed logs of who did what and when.
-                    </CardDescription>
-                </CardHeader>
+                {/* ... (keep CardHeader) ... */}
                 <CardContent>
-                    {/* Filters */}
-                    <div className="flex flex-wrap gap-4 mb-6">
-                        <div className="flex-1 min-w-[200px]">
-                            <div className="relative">
-                                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search by employee or entity ID..."
-                                    className="pl-8"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        <Select value={actionFilter} onValueChange={setActionFilter}>
-                            <SelectTrigger className="w-[180px]">
-                                <SelectValue placeholder="Filter by Action" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Actions</SelectItem>
-                                <SelectItem value="login">Login</SelectItem>
-                                <SelectItem value="create_order">Create Order</SelectItem>
-                                <SelectItem value="update_order">Update Order</SelectItem>
-                                <SelectItem value="delete_order">Delete Order</SelectItem>
-                                <SelectItem value="print_document">Print Document</SelectItem>
-                                <SelectItem value="payment_received">Payment Received</SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                        "w-[240px] justify-start text-left font-normal",
-                                        !date && "text-muted-foreground"
-                                    )}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {date ? format(date, "PPP") : <span>Pick a date</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                    mode="single"
-                                    selected={date}
-                                    onSelect={setDate}
-                                    initialFocus
-                                />
-                            </PopoverContent>
-                        </Popover>
-
-                        {(date || actionFilter !== 'all') && (
-                            <Button
-                                variant="ghost"
-                                onClick={() => {
-                                    setDate(undefined);
-                                    setActionFilter('all');
-                                }}
-                            >
-                                Clear Filters
-                            </Button>
-                        )}
-                    </div>
+                    {/* ... (keep Filters) ... */}
 
                     {/* Table */}
                     {isLoading ? (
@@ -233,10 +172,42 @@ export default function AuditLogsPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Time</TableHead>
-                                        <TableHead>Employee</TableHead>
-                                        <TableHead>Action</TableHead>
-                                        <TableHead>Entity</TableHead>
+                                        <TableHead
+                                            className="cursor-pointer hover:bg-muted/50"
+                                            onClick={() => handleSort('createdAt')}
+                                        >
+                                            <div className="flex items-center">
+                                                Time
+                                                <SortIcon column="createdAt" />
+                                            </div>
+                                        </TableHead>
+                                        <TableHead
+                                            className="cursor-pointer hover:bg-muted/50"
+                                            onClick={() => handleSort('employeeId')}
+                                        >
+                                            <div className="flex items-center">
+                                                Employee ID
+                                                <SortIcon column="employeeId" />
+                                            </div>
+                                        </TableHead>
+                                        <TableHead
+                                            className="cursor-pointer hover:bg-muted/50"
+                                            onClick={() => handleSort('action')}
+                                        >
+                                            <div className="flex items-center">
+                                                Action
+                                                <SortIcon column="action" />
+                                            </div>
+                                        </TableHead>
+                                        <TableHead
+                                            className="cursor-pointer hover:bg-muted/50"
+                                            onClick={() => handleSort('entityType')}
+                                        >
+                                            <div className="flex items-center">
+                                                Entity
+                                                <SortIcon column="entityType" />
+                                            </div>
+                                        </TableHead>
                                         <TableHead>IP Address</TableHead>
                                         <TableHead className="w-[50px]"></TableHead>
                                     </TableRow>
@@ -253,10 +224,10 @@ export default function AuditLogsPage() {
                                             <React.Fragment key={log.id}>
                                                 <TableRow className="group">
                                                     <TableCell className="whitespace-nowrap">
-                                                        {format(new Date(log.created_at), "MMM d, HH:mm:ss")}
+                                                        {format(new Date(log.createdAt), "MMM d, HH:mm:ss")}
                                                     </TableCell>
-                                                    <TableCell className="font-medium">
-                                                        {log.employee_username}
+                                                    <TableCell className="font-medium font-mono text-xs">
+                                                        {log.employeeId}
                                                     </TableCell>
                                                     <TableCell>
                                                         <Badge variant="outline" className={cn("flex w-fit items-center gap-1", getActionColor(log.action))}>
@@ -266,14 +237,14 @@ export default function AuditLogsPage() {
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="flex flex-col">
-                                                            <span className="capitalize text-sm font-medium">{log.entity_type}</span>
+                                                            <span className="capitalize text-sm font-medium">{log.entityType}</span>
                                                             <span className="text-xs text-muted-foreground font-mono truncate max-w-[100px]">
-                                                                {log.entity_id}
+                                                                {log.entityId}
                                                             </span>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-muted-foreground text-sm">
-                                                        {log.ip_address}
+                                                        {log.ipAddress}
                                                     </TableCell>
                                                     <TableCell>
                                                         <Accordion type="single" collapsible>
@@ -286,7 +257,7 @@ export default function AuditLogsPage() {
                                                                         <h4 className="text-sm font-semibold mb-2">Action Details</h4>
                                                                         {formatDetails(log.details)}
                                                                         <div className="mt-2 text-xs text-muted-foreground">
-                                                                            User Agent: {log.user_agent}
+                                                                            User Agent: {log.userAgent}
                                                                         </div>
                                                                     </div>
                                                                 </AccordionContent>

@@ -48,6 +48,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
     dueTodayOrders,
     customers,
     ordersTodayCount,
+    allOrders,
     isLoading,
     hasData,
     lastUpdated,
@@ -160,9 +161,9 @@ export default React.memo(function FranchiseOwnerDashboard() {
   }), [recentOrders, isLoading]);
 
   const dashboardDueTodayProps = useMemo(() => ({
-    orders: recentOrders, // Using recentOrders as a proxy for all orders since we don't have all orders here
+    orders: allOrders, // Use allOrders for correct date filtering
     isLoading,
-  }), [recentOrders, isLoading]);
+  }), [allOrders, isLoading]);
 
   const dashboardFooterProps = useMemo(() => ({
     lastUpdated,

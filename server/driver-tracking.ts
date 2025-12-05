@@ -40,7 +40,7 @@ class DriverTrackingService {
   private startSimulation() {
     this.isSimulating = true;
     console.log('Starting driver tracking simulation...');
-    
+
     // Update driver locations every 3 seconds
     this.simulationInterval = setInterval(() => {
       this.updateDriverLocations();
@@ -58,10 +58,11 @@ class DriverTrackingService {
 
   private async updateDriverLocations() {
     try {
-      const orders = await storage.listOrders();
-      const activeOrders = orders.filter(order =>
-        order.status === 'in_progress' || order.status === 'shipped'
-      );
+      const activeOrders = await storage.getActiveOrders();
+      // No need to filter manually anymore
+      // const activeOrders = orders.filter(order =>
+      //   order.status === 'in_progress' || order.status === 'shipped'
+      // );
 
       // Simulate drivers for active orders
       for (const order of activeOrders) {
@@ -101,7 +102,7 @@ class DriverTrackingService {
     // Simulate driver starting from a warehouse location
     const warehouseLocation = this.getWarehouseLocation();
     const customerLocation = this.getCustomerLocation(order);
-    
+
     return {
       driverId: `driver_${order.id}`,
       driverName: `Driver ${Math.floor(Math.random() * 1000)}`,
@@ -119,10 +120,10 @@ class DriverTrackingService {
   private updateDriverLocation(driver: DriverLocation): DriverLocation {
     const customerLocation = this.getCustomerLocation({ id: driver.orderId });
     const currentLocation = { latitude: driver.latitude, longitude: driver.longitude };
-    
+
     // Calculate distance to customer
     const distanceToCustomer = this.calculateDistance(currentLocation, customerLocation);
-    
+
     if (distanceToCustomer < 0.1) { // Within 100m
       driver.status = 'arrived';
       driver.speed = 0;
@@ -139,80 +140,80 @@ class DriverTrackingService {
     return driver;
   }
 
-  private moveTowardsTarget(current: { latitude: number; longitude: number }, 
-                           target: { latitude: number; longitude: number }, 
-                           speedKmh: number): { latitude: number; longitude: number } {
+  private moveTowardsTarget(current: { latitude: number; longitude: number },
+    target: { latitude: number; longitude: number },
+    speedKmh: number): { latitude: number; longitude: number } {
     const speedMs = speedKmh / 3.6; // Convert km/h to m/s
     const updateInterval = 3; // seconds
     const distanceMoved = speedMs * updateInterval; // meters
-    
+
     const distanceToTarget = this.calculateDistance(current, target);
-    
+
     if (distanceMoved >= distanceToTarget) {
       return target; // Reached destination
     }
-    
+
     // Calculate bearing
     const bearing = this.calculateBearing(current, target);
-    
+
     // Move in the direction of the target
     const earthRadius = 6371000; // meters
     const angularDistance = distanceMoved / earthRadius;
-    
+
     const lat1 = current.latitude * Math.PI / 180;
     const lon1 = current.longitude * Math.PI / 180;
     const bearingRad = bearing * Math.PI / 180;
-    
+
     const lat2 = Math.asin(
       Math.sin(lat1) * Math.cos(angularDistance) +
       Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearingRad)
     );
-    
+
     const lon2 = lon1 + Math.atan2(
       Math.sin(bearingRad) * Math.sin(angularDistance) * Math.cos(lat1),
       Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2)
     );
-    
+
     return {
       latitude: lat2 * 180 / Math.PI,
       longitude: lon2 * 180 / Math.PI
     };
   }
 
-  private calculateDistance(point1: { latitude: number; longitude: number }, 
-                           point2: { latitude: number; longitude: number }): number {
+  private calculateDistance(point1: { latitude: number; longitude: number },
+    point2: { latitude: number; longitude: number }): number {
     const R = 6371000; // Earth's radius in meters
     const dLat = (point2.latitude - point1.latitude) * Math.PI / 180;
     const dLon = (point2.longitude - point1.longitude) * Math.PI / 180;
-    
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(point1.latitude * Math.PI / 180) * Math.cos(point2.latitude * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(point1.latitude * Math.PI / 180) * Math.cos(point2.latitude * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c; // Distance in meters
   }
 
-  private calculateBearing(point1: { latitude: number; longitude: number }, 
-                          point2: { latitude: number; longitude: number }): number {
+  private calculateBearing(point1: { latitude: number; longitude: number },
+    point2: { latitude: number; longitude: number }): number {
     const lat1 = point1.latitude * Math.PI / 180;
     const lat2 = point2.latitude * Math.PI / 180;
     const dLon = (point2.longitude - point1.longitude) * Math.PI / 180;
-    
+
     const y = Math.sin(dLon) * Math.cos(lat2);
     const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-    
+
     let bearing = Math.atan2(y, x) * 180 / Math.PI;
     return (bearing + 360) % 360;
   }
 
-  private calculateHeading(point1: { latitude: number; longitude: number }, 
-                          point2: { latitude: number; longitude: number }): number {
+  private calculateHeading(point1: { latitude: number; longitude: number },
+    point2: { latitude: number; longitude: number }): number {
     return this.calculateBearing(point1, point2);
   }
 
-  private calculateEstimatedArrival(start: { latitude: number; longitude: number }, 
-                                   end: { latitude: number; longitude: number }): Date {
+  private calculateEstimatedArrival(start: { latitude: number; longitude: number },
+    end: { latitude: number; longitude: number }): Date {
     const distance = this.calculateDistance(start, end);
     const averageSpeed = 30; // km/h
     const timeHours = distance / 1000 / averageSpeed; // Convert to hours
@@ -229,7 +230,7 @@ class DriverTrackingService {
       { latitude: 28.7041, longitude: 77.1025 },  // Delhi
       { latitude: 13.0827, longitude: 80.2707 }  // Chennai
     ];
-    
+
     return warehouses[Math.floor(Math.random() * warehouses.length)];
   }
 
@@ -238,11 +239,11 @@ class DriverTrackingService {
     // In a real app, this would come from the customer's address
     const baseLatitude = 12.9716; // Bangalore center
     const baseLongitude = 77.5946;
-    
+
     // Add some random variation within Bangalore area
     const latVariation = (Math.random() - 0.5) * 0.1; // ±0.05 degrees
     const lonVariation = (Math.random() - 0.5) * 0.1;
-    
+
     return {
       latitude: baseLatitude + latVariation,
       longitude: baseLongitude + lonVariation
@@ -253,10 +254,10 @@ class DriverTrackingService {
     if (!this.driverRoutes.has(driverId)) {
       this.driverRoutes.set(driverId, []);
     }
-    
+
     const route = this.driverRoutes.get(driverId)!;
     route.push(point);
-    
+
     // Keep only last 50 points to prevent memory issues
     if (route.length > 50) {
       route.shift();
@@ -265,7 +266,7 @@ class DriverTrackingService {
 
   private broadcastLocationUpdates() {
     const activeDrivers = Array.from(this.activeDrivers.values());
-    
+
     if (activeDrivers.length > 0) {
       realtimeServer.broadcastToSubscribers('driver_locations', {
         drivers: activeDrivers,
