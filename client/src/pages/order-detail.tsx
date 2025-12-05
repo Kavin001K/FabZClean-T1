@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { ordersApi } from '@/lib/data-service';
 import { formatCurrency, formatDate, getNextStatus } from '@/lib/data-service';
-import type { Order } from '../../../shared/schema';
+import type { Order } from "@shared/schema";
 import { cn } from '@/lib/utils';
 import LoadingSkeleton from '@/components/ui/loading-skeleton';
 

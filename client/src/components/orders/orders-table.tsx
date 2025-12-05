@@ -35,7 +35,7 @@ import {
   FileText,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/data-service";
-import type { Order } from "../../../shared/schema";
+import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
 export interface OrdersTableProps {
@@ -155,7 +155,7 @@ export default React.memo(function OrdersTable({
   onRetry,
   className,
 }: OrdersTableProps) {
-  const isAllSelected = useMemo(() => 
+  const isAllSelected = useMemo(() =>
     orders.length > 0 && selectedOrders.length === orders.length,
     [orders.length, selectedOrders.length]
   );
@@ -237,7 +237,7 @@ export default React.memo(function OrdersTable({
                 aria-label="Select all orders"
               />
             </TableHead>
-            <TableHead 
+            <TableHead
               className="cursor-pointer hover:bg-muted/50 select-none"
               onClick={() => onSort('id')}
             >
@@ -246,7 +246,7 @@ export default React.memo(function OrdersTable({
                 <SortIcon field="id" />
               </div>
             </TableHead>
-            <TableHead 
+            <TableHead
               className="cursor-pointer hover:bg-muted/50 select-none"
               onClick={() => onSort('customerName')}
             >
@@ -257,7 +257,7 @@ export default React.memo(function OrdersTable({
             </TableHead>
             <TableHead>Service</TableHead>
             <TableHead>Priority</TableHead>
-            <TableHead 
+            <TableHead
               className="cursor-pointer hover:bg-muted/50 select-none"
               onClick={() => onSort('status')}
             >
@@ -266,7 +266,7 @@ export default React.memo(function OrdersTable({
                 <SortIcon field="status" />
               </div>
             </TableHead>
-            <TableHead 
+            <TableHead
               className="cursor-pointer hover:bg-muted/50 select-none"
               onClick={() => onSort('createdAt')}
             >
@@ -275,7 +275,7 @@ export default React.memo(function OrdersTable({
                 <SortIcon field="createdAt" />
               </div>
             </TableHead>
-            <TableHead 
+            <TableHead
               className="text-right cursor-pointer hover:bg-muted/50 select-none"
               onClick={() => onSort('totalAmount')}
             >
@@ -294,8 +294,8 @@ export default React.memo(function OrdersTable({
             <EmptyState onCreateOrder={() => window.location.href = '/create-order'} onRetry={onRetry} />
           ) : (
             orders.map((order) => (
-              <TableRow 
-                key={order.id} 
+              <TableRow
+                key={order.id}
                 className="cursor-pointer hover:bg-muted/50 transition-colors"
                 onClick={() => handleRowClick(order)}
               >
@@ -311,9 +311,9 @@ export default React.memo(function OrdersTable({
                 </TableCell>
                 <TableCell>
                   <div>
-                    <div className="font-medium">{order.customerName}</div>
+                    <div className="font-medium">{order.customerName || (order as any).customers?.name || "N/A"}</div>
                     <div className="text-sm text-muted-foreground">
-                      {order.orderNumber}
+                      {order.orderNumber || order.id.substring(0, 8).toUpperCase()}
                     </div>
                   </div>
                 </TableCell>
@@ -341,7 +341,16 @@ export default React.memo(function OrdersTable({
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-medium">
-                  {formatCurrency(parseFloat(order.totalAmount))}
+                  {formatCurrency((() => {
+                    const total = parseFloat(order.totalAmount || "0");
+                    if (total > 0) return total;
+                    if (Array.isArray((order as any).items)) {
+                      return (order as any).items.reduce((sum: number, item: any) => {
+                        return sum + (parseFloat(item.price || item.unitPrice || 0) * parseFloat(item.quantity || 1));
+                      }, 0);
+                    }
+                    return 0;
+                  })())}
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <DropdownMenu>
@@ -380,7 +389,7 @@ export default React.memo(function OrdersTable({
                         </DropdownMenuItem>
                       )}
                       {order.status !== 'completed' && order.status !== 'cancelled' && (
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={() => onCancelOrder(order)}
                           className="text-red-600 focus:text-red-600"
                         >

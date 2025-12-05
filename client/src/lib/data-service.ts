@@ -148,7 +148,7 @@ async function fetchData<T>(endpoint: string, init: RequestInit = {}): Promise<T
 export const ordersApi = {
   async getAll(): Promise<Order[]> {
     try {
-      const response = await fetchData<{ data: Order[]; pagination?: any } | Order[]>("/orders");
+      const response = await fetchData<{ data: Order[]; pagination?: any } | Order[]>("/orders?limit=1000");
       // Handle paginated response
       if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
         return response.data;

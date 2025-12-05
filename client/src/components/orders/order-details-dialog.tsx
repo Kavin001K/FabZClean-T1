@@ -20,7 +20,7 @@ import {
   Navigation,
 } from "lucide-react";
 import { formatCurrency, formatDate, getNextStatus } from "@/lib/data-service";
-import type { Order } from "../../../../shared/schema";
+import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { useInvoicePrint } from "@/hooks/use-invoice-print";
 
@@ -126,8 +126,8 @@ export default React.memo(function OrderDetailsDialog({
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Customer Information</p>
                 <div className="mt-2 space-y-1">
-                  <p className="text-lg font-semibold">{order.customerName}</p>
-                  <p className="text-sm text-muted-foreground">Order #{order.orderNumber}</p>
+                  <p className="text-lg font-semibold">{order.customerName || (order as any).customers?.name || "N/A"}</p>
+                  <p className="text-sm text-muted-foreground">Order #{order.orderNumber || order.id.substring(0, 8).toUpperCase()}</p>
                 </div>
               </div>
 
@@ -173,7 +173,16 @@ export default React.memo(function OrderDetailsDialog({
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
                 <p className="text-2xl font-bold text-primary">
-                  {formatCurrency(parseFloat(order.totalAmount))}
+                  {formatCurrency((() => {
+                    const total = parseFloat(order.totalAmount || "0");
+                    if (total > 0) return total;
+                    if (Array.isArray((order as any).items)) {
+                      return (order as any).items.reduce((sum: number, item: any) => {
+                        return sum + (parseFloat(item.price || item.unitPrice || 0) * parseFloat(item.quantity || 1));
+                      }, 0);
+                    }
+                    return 0;
+                  })())}
                 </p>
               </div>
             </div>
@@ -244,7 +253,7 @@ export default React.memo(function OrderDetailsDialog({
                 <div>
                   <p className="text-sm text-muted-foreground">Balance Due</p>
                   <p className="font-medium text-orange-600">
-                    {formatCurrency(parseFloat(order.totalAmount) - ((order as any).advancePaid || 0))}
+                    {formatCurrency(parseFloat(order.totalAmount || "0") - ((order as any).advancePaid || 0))}
                   </p>
                 </div>
               )}

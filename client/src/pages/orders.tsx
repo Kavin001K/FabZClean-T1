@@ -1660,9 +1660,9 @@ function OrdersComponent() {
                                 </TableCell>
                                 <TableCell>
                                   <div>
-                                    <div className="font-medium">{order.customerName}</div>
+                                    <div className="font-medium">{order.customerName || (order as any).customers?.name || "N/A"}</div>
                                     <div className="text-sm text-muted-foreground">
-                                      {(order as any).customerPhone || 'N/A'}
+                                      {order.orderNumber || order.id.substring(0, 8).toUpperCase()}
                                     </div>
                                   </div>
                                 </TableCell>
@@ -1685,7 +1685,17 @@ function OrdersComponent() {
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="text-right font-semibold">
-                                  {formatCurrency(parseFloat(order.totalAmount))}
+                                  {formatCurrency((() => {
+                                    const total = parseFloat(order.totalAmount || "0");
+                                    if (total > 0) return total;
+                                    // Fallback calculation
+                                    if (Array.isArray((order as any).items)) {
+                                      return (order as any).items.reduce((sum: number, item: any) => {
+                                        return sum + (parseFloat(item.price || item.unitPrice || 0) * parseFloat(item.quantity || 1));
+                                      }, 0);
+                                    }
+                                    return 0;
+                                  })())}
                                 </TableCell>
                                 <TableCell className="text-sm text-muted-foreground">
                                   {formatDate((order.createdAt || new Date()).toString())}

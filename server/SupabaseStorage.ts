@@ -38,6 +38,7 @@ export class SupabaseStorage {
     // Helper to map Supabase dates to JS Dates and handle snake_case to camelCase
     private mapDates(record: any): any {
         if (!record) return record;
+
         const newRecord = { ...record };
 
         // Map snake_case to camelCase for critical fields
@@ -80,6 +81,19 @@ export class SupabaseStorage {
             }
         });
 
+        // Map joined customer data if available (from Supabase join)
+        // Supabase might return it as 'customers' (plural) or 'customer' depending on query
+        const customerData = newRecord.customers || newRecord.customer;
+        if (customerData) {
+            // Handle both single object and array (though it should be single for Many-to-One)
+            const cust = Array.isArray(customerData) ? customerData[0] : customerData;
+            if (cust) {
+                if (!newRecord.customerName) newRecord.customerName = cust.name;
+                if (!newRecord.customerEmail) newRecord.customerEmail = cust.email;
+                if (!newRecord.customerPhone) newRecord.customerPhone = cust.phone;
+            }
+        }
+
         // Common date fields
         ['createdAt', 'updatedAt', 'pickupDate', 'deliveryDate', 'deliveredAt', 'lastOrder', 'lastActive', 'completedAt', 'dispatchedAt', 'receivedAt', 'invoiceDate'].forEach(field => {
             if (newRecord[field]) {
@@ -97,6 +111,18 @@ export class SupabaseStorage {
                 }
             }
         });
+
+        // Calculate totalAmount if missing or zero
+        if ((!newRecord.totalAmount || newRecord.totalAmount == 0) && newRecord.items && Array.isArray(newRecord.items)) {
+            const calculated = newRecord.items.reduce((sum: number, item: any) => {
+                const price = parseFloat(item.price || item.unitPrice || 0);
+                const qty = parseFloat(item.quantity || 1);
+                return sum + (price * qty);
+            }, 0);
+            if (calculated > 0) {
+                newRecord.totalAmount = calculated.toFixed(2);
+            }
+        }
 
         // Enrich order with service name from items if available
         if (newRecord.items && Array.isArray(newRecord.items) && newRecord.items.length > 0 && !newRecord.service) {
@@ -329,7 +355,7 @@ export class SupabaseStorage {
     async getOrder(id: string): Promise<Order | undefined> {
         const { data: order, error } = await this.supabase
             .from('orders')
-            .select('*')
+            .select('*, customers(name, email, phone)')
             .eq('id', id)
             .single();
 
@@ -399,7 +425,7 @@ export class SupabaseStorage {
     async listOrders(): Promise<Order[]> {
         const { data, error } = await this.supabase
             .from('orders')
-            .select('*');
+            .select('*, customers(name, email, phone)');
 
         if (error) throw error;
         return data.map(item => this.mapDates(item));
