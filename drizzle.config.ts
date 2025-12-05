@@ -8,5 +8,6 @@ export default defineConfig({
   schema: "./shared/schema.ts",
   dialect: "postgresql", // Changed to match schema definition (pg-core)
   dbCredentials: {
+    url: process.env.DATABASE_URL || "postgres://user:password@localhost:5432/fabzclean",
   },
 });
