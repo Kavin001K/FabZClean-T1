@@ -52,7 +52,40 @@ export default React.memo(function EditOrderDialog({
 
   const handleSave = () => {
     if (order && formData) {
-      onSave(order.id, formData);
+      const updates: any = { ...formData };
+
+      // Calculate unit price for the item
+      const quantity = parseInt(String(updates.quantity || 1));
+      const totalAmount = parseFloat(String(updates.totalAmount || 0));
+      const unitPrice = quantity > 0 ? totalAmount / quantity : 0;
+
+      // Construct items array if service is present
+      // This ensures that editing the "Service" field actually updates the order items
+      if (updates.service) {
+        updates.items = [{
+          serviceName: updates.service,
+          quantity: quantity,
+          price: unitPrice.toString(),
+          subtotal: totalAmount.toString(),
+          description: updates.notes || ''
+        }];
+      }
+
+      // Remove fields that don't exist in the orders table to prevent DB errors
+      delete updates.service;
+      delete updates.quantity;
+      delete updates.priority; // Priority is not currently in the DB schema
+
+      // Ensure numeric fields are strings/numbers as expected by DB
+      if (updates.totalAmount !== undefined && updates.totalAmount !== null) {
+        updates.totalAmount = updates.totalAmount.toString();
+      }
+      if (updates.advancePaid !== undefined && updates.advancePaid !== null) {
+        updates.advancePaid = updates.advancePaid.toString();
+      }
+
+      console.log('Saving order updates:', updates);
+      onSave(order.id, updates);
     }
   };
 

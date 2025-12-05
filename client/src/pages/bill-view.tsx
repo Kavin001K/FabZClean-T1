@@ -5,6 +5,7 @@ import { ordersApi } from "@/lib/data-service";
 import { Loader2, Printer, Share2, Download, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import InvoiceTemplateIN from '@/components/print/invoice-template-in';
+import SimpleInvoiceTemplate from '@/components/print/simple-invoice-template';
 import { formatCurrency, formatDate } from "@/lib/data-service";
 // @ts-ignore
 import QRCode from 'qrcode';
@@ -131,44 +132,111 @@ export default function BillView() {
         }
     }, [order, balanceDue]);
 
-    if (enableGST && order) {
+    if (order) {
         const shippingAddress = order.shippingAddress as any;
-        const invoiceData = {
-            invoiceNumber: order.orderNumber,
-            invoiceDate: order.createdAt ? new Date(order.createdAt).toISOString() : new Date().toISOString(),
-            dueDate: order.pickupDate ? new Date(order.pickupDate).toISOString() : (order.createdAt ? new Date(order.createdAt).toISOString() : new Date().toISOString()),
-            enableGST: true,
-            company: {
-                name: "Fab Clean",
-                address: "#16, Venkatramana Round Road,\nOpp to HDFC Bank,\nMahalingapuram, Pollachi - 642002",
-                phone: "+91 93630 59595",
-                email: "support@myfabclean.com",
-                taxId: "33AITPD3522F1ZK",
-                logo: "/assets/logo.webp"
-            },
-            customer: {
-                name: order.customerName,
-                address: shippingAddress?.instructions || "",
-                phone: order.customerPhone || "",
-                email: order.customerEmail || "",
-                taxId: order.gstNumber || undefined
-            },
-            items: Array.isArray(order.items) ? order.items.map((item: any) => ({
-                description: item.productName || item.name,
-                quantity: item.quantity,
-                unitPrice: item.price,
-                total: item.price * item.quantity,
-                taxRate: 18,
-                hsn: "9601"
-            })) : [],
-            subtotal: subtotal,
-            taxAmount: order.gstAmount ? parseFloat(order.gstAmount) : 0,
-            total: parseFloat(order.totalAmount),
-            paymentTerms: "Due on receipt",
-            qrCode: qrCodeUrl || undefined
-        };
 
-        return <InvoiceTemplateIN data={invoiceData} />;
+        // Robust address parsing
+        let formattedAddress = "";
+        try {
+            if (typeof shippingAddress === 'object' && shippingAddress !== null) {
+                if (Object.keys(shippingAddress).length > 0) {
+                    formattedAddress = [
+                        shippingAddress.street || shippingAddress.line1 || shippingAddress.address || shippingAddress.instructions,
+                        shippingAddress.city,
+                        shippingAddress.state,
+                        shippingAddress.zip || shippingAddress.pincode,
+                        shippingAddress.country
+                    ].filter(Boolean).join(", ");
+                }
+            } else if (typeof shippingAddress === 'string') {
+                if (shippingAddress !== "[object Object]") {
+                    formattedAddress = shippingAddress;
+                }
+            }
+        } catch (e) {
+            console.error("Error parsing address:", e);
+        }
+
+        if (!formattedAddress || formattedAddress === "[object Object]") {
+            formattedAddress = "";
+        }
+
+        // GST Invoice
+        if (enableGST) {
+            const calculatedTax = order.gstAmount ? parseFloat(order.gstAmount) : (subtotal * 0.18);
+            const calculatedTotal = subtotal + calculatedTax + extraCharges - discount;
+
+            const invoiceData = {
+                invoiceNumber: order.orderNumber,
+                invoiceDate: order.createdAt ? new Date(order.createdAt).toISOString() : new Date().toISOString(),
+                dueDate: order.pickupDate ? new Date(order.pickupDate).toISOString() : (order.createdAt ? new Date(order.createdAt).toISOString() : new Date().toISOString()),
+                enableGST: true,
+                company: {
+                    name: "Fab Clean",
+                    address: "#16, Venkatramana Round Road,\nOpp to HDFC Bank,\nMahalingapuram, Pollachi - 642002",
+                    phone: "+91 93630 59595",
+                    email: "support@myfabclean.com",
+                    taxId: "33AITPD3522F1ZK",
+                    logo: "/assets/logo.webp"
+                },
+                customer: {
+                    name: order.customerName,
+                    address: formattedAddress,
+                    phone: order.customerPhone || "",
+                    email: order.customerEmail || "",
+                    taxId: order.gstNumber || undefined
+                },
+                items: Array.isArray(order.items) ? order.items.map((item: any) => ({
+                    description: item.productName || item.name,
+                    quantity: item.quantity,
+                    unitPrice: item.price,
+                    total: item.price * item.quantity,
+                    taxRate: 18,
+                    hsn: "9601"
+                })) : [],
+                subtotal: subtotal,
+                taxAmount: calculatedTax,
+                total: calculatedTotal,
+                paymentTerms: "Due on receipt",
+                qrCode: qrCodeUrl || undefined
+            };
+
+            return <InvoiceTemplateIN data={invoiceData} />;
+        }
+
+        // Simple Invoice (Non-GST)
+        else {
+            const invoiceData = {
+                invoiceNumber: order.orderNumber,
+                invoiceDate: order.createdAt ? new Date(order.createdAt).toISOString() : new Date().toISOString(),
+                dueDate: order.pickupDate ? new Date(order.pickupDate).toISOString() : (order.createdAt ? new Date(order.createdAt).toISOString() : new Date().toISOString()),
+                company: {
+                    name: "Fab Clean",
+                    address: "#16, Venkatramana Round Road,\nOpp to HDFC Bank,\nMahalingapuram, Pollachi - 642002",
+                    phone: "+91 93630 59595",
+                    email: "support@myfabclean.com",
+                    logo: "/assets/logo.webp"
+                },
+                customer: {
+                    name: order.customerName,
+                    address: formattedAddress,
+                    phone: order.customerPhone || "",
+                    email: order.customerEmail || ""
+                },
+                items: Array.isArray(order.items) ? order.items.map((item: any) => ({
+                    description: item.productName || item.name,
+                    quantity: item.quantity,
+                    unitPrice: item.price,
+                    total: item.price * item.quantity
+                })) : [],
+                subtotal: subtotal,
+                total: totalAmount, // Use stored total for simple bill
+                paymentTerms: "Due on receipt",
+                qrCode: qrCodeUrl || undefined
+            };
+
+            return <SimpleInvoiceTemplate data={invoiceData} />;
+        }
     }
 
     if (isLoading) {

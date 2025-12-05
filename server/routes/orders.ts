@@ -30,7 +30,12 @@ const ORDER_CREATE_ROLES: UserRole[] = [
   "factory_manager",
   "franchise_manager",
 ];
-const ORDER_UPDATE_ROLES: UserRole[] = ["admin", "factory_manager"];
+const ORDER_UPDATE_ROLES: UserRole[] = [
+  "admin",
+  "factory_manager",
+  "franchise_manager",
+  "employee",
+];
 const ORDER_ANALYTICS_ROLES: UserRole[] = [
   "admin",
   "factory_manager",
@@ -45,45 +50,32 @@ router.use(jwtRequired);
 // Get orders with pagination and search
 router.get('/', async (req, res) => {
   try {
-    const {
-      email,
-      cursor,
-      limit = 20,
-      search,
-      status,
-      sortBy = 'createdAt',
-      sortOrder = 'desc'
-    } = req.query;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const search = req.query.search as string;
+    const status = req.query.status as string;
+    const customerEmail = req.query.customerEmail as string;
 
-    // Use OrderService to fetch and enrich orders
     const filters = {
-      status: status as string | undefined,
-      search: search as string | undefined,
-      customerEmail: email as string | undefined,
-      sortBy: sortBy as string | undefined,
-      sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+      limit,
+      search,
+      status: status === 'all' ? undefined : status,
+      customerEmail
     };
 
     const orders = await orderService.findAllOrders(filters);
 
-    // Apply pagination
-    const limitNum = parseInt(limit as string) || 20;
-    const startIndex = cursor ? orders.findIndex(o => o.id === cursor) + 1 : 0;
-    const endIndex = startIndex + limitNum;
-
+    // Calculate pagination
+    const total = orders.length; // This is an approximation as findAllOrders returns all matches
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
     const paginatedOrders = orders.slice(startIndex, endIndex);
-    const hasMore = endIndex < orders.length;
-    const nextCursor = hasMore ? paginatedOrders[paginatedOrders.length - 1]?.id : undefined;
 
-    // Serialize orders
     const serializedOrders = paginatedOrders.map(order => serializeOrder(order));
 
-    // Return paginated response
     const response = createPaginatedResponse(serializedOrders, {
-      cursor: nextCursor,
-      hasMore,
       total: orders.length,
-      limit: limitNum
+      limit: limit
     });
 
     res.json(response);
@@ -240,6 +232,7 @@ router.put('/:id', requireRole(ORDER_UPDATE_ROLES), async (req, res) => {
   try {
     const orderId = req.params.id;
     const updateData = req.body;
+    console.log(`[UPDATE ORDER] ID: ${orderId}`, JSON.stringify(updateData, null, 2));
 
     const order = await storage.getOrder(orderId);
     if (!order) {

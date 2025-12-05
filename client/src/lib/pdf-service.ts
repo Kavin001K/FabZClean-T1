@@ -46,7 +46,7 @@ export class PDFService {
 
                         // Capture the content as canvas
                         const canvas = await html2canvas(content, {
-                            scale: 2,
+                            scale: 1.5, // Reduced from 2 to 1.5 for smaller file size
                             useCORS: true,
                             logging: false,
                             backgroundColor: '#ffffff',
@@ -67,7 +67,7 @@ export class PDFService {
                         let position = 0;
 
                         // Add image to PDF
-                        const imgData = canvas.toDataURL('image/jpeg', options.quality || 0.95);
+                        const imgData = canvas.toDataURL('image/jpeg', options.quality || 0.8);
                         pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
                         heightLeft -= pageHeight;
 

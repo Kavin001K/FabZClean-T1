@@ -43,23 +43,65 @@ export function registerAllRoutes(app: Express): void {
       }
 
       // Filter by date
+      // Filter by date
       if (type === 'specific' && date) {
-        const targetDate = new Date(date as string).toISOString().split('T')[0];
+        const targetDate = date as string; // Expecting yyyy-MM-dd from query
+
         filteredOrders = filteredOrders.filter((order: any) => {
-          let dueDate = null;
-          let pickupDate = null;
-          if (order.dueDate) try { dueDate = new Date(order.dueDate).toISOString().split('T')[0]; } catch (e) { }
-          if (order.pickupDate) try { pickupDate = new Date(order.pickupDate).toISOString().split('T')[0]; } catch (e) { }
-          return dueDate === targetDate || pickupDate === targetDate;
+          let dueDateStr = null;
+          let pickupDateStr = null;
+
+          // Helper to convert UTC to IST (UTC+5:30) YYYY-MM-DD
+          const toISTDateString = (dateVal: any) => {
+            if (!dateVal) return null;
+            try {
+              const d = new Date(dateVal);
+              // Add 5 hours 30 minutes to get IST time represented in UTC
+              const istTime = d.getTime() + (5.5 * 60 * 60 * 1000);
+              const result = new Date(istTime).toISOString().split('T')[0];
+              // console.log(`[DEBUG] Converting ${dateVal} -> ${result}`);
+              return result;
+            } catch (e) {
+              return null;
+            }
+          };
+
+          if (order.dueDate) dueDateStr = toISTDateString(order.dueDate);
+          if (order.pickupDate) pickupDateStr = toISTDateString(order.pickupDate);
+
+          const match = dueDateStr === targetDate || pickupDateStr === targetDate;
+          const isCompleted = ['completed', 'delivered', 'cancelled'].includes(order.status?.toLowerCase());
+
+          return match && !isCompleted;
         });
       } else if (type === 'today') {
-        const today = new Date().toISOString().split('T')[0];
+        // For 'today', we also want IST today
+        const now = new Date();
+        const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+        const today = istNow.toISOString().split('T')[0];
+
         filteredOrders = filteredOrders.filter((order: any) => {
-          let dueDate = null;
-          let pickupDate = null;
-          if (order.dueDate) try { dueDate = new Date(order.dueDate).toISOString().split('T')[0]; } catch (e) { }
-          if (order.pickupDate) try { pickupDate = new Date(order.pickupDate).toISOString().split('T')[0]; } catch (e) { }
-          return dueDate === today || pickupDate === today;
+          let dueDateStr = null;
+          let pickupDateStr = null;
+
+          const toISTDateString = (dateVal: any) => {
+            if (!dateVal) return null;
+            try {
+              const d = new Date(dateVal);
+              const istTime = d.getTime() + (5.5 * 60 * 60 * 1000);
+              return new Date(istTime).toISOString().split('T')[0];
+            } catch (e) {
+              return null;
+            }
+          };
+
+          if (order.dueDate) dueDateStr = toISTDateString(order.dueDate);
+          if (order.pickupDate) pickupDateStr = toISTDateString(order.pickupDate);
+
+          const match = dueDateStr === today || pickupDateStr === today;
+          const isCompleted = ['completed', 'delivered', 'cancelled'].includes(order.status?.toLowerCase());
+
+          return match && !isCompleted;
         });
       }
 

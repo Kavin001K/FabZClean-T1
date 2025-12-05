@@ -71,9 +71,12 @@ export class SupabaseStorage {
         };
 
         Object.entries(mappings).forEach(([snake, camel]) => {
-            if (newRecord[snake] !== undefined && newRecord[camel] === undefined) {
-                newRecord[camel] = newRecord[snake];
-                // Optional: delete snake_case key to clean up? No, keep it just in case.
+            // If snake_case exists, and camelCase is missing OR null, map it.
+            // This handles cases where both columns exist in DB but one is empty.
+            if (newRecord[snake] !== undefined) {
+                if (newRecord[camel] === undefined || newRecord[camel] === null) {
+                    newRecord[camel] = newRecord[snake];
+                }
             }
         });
 
@@ -278,7 +281,40 @@ export class SupabaseStorage {
     // ======= ORDERS =======
     async createOrder(data: InsertOrder): Promise<Order> {
         // Ensure JSON fields are stringified if needed (Supabase client handles objects for JSONB columns automatically, but let's be safe)
-        const insertData = { ...data };
+        const insertData: any = { ...data };
+
+        // Map camelCase to snake_case for insertion
+        const mappings: Record<string, string> = {
+            'customerPhone': 'customer_phone',
+            'customerName': 'customer_name',
+            'customerEmail': 'customer_email',
+            'orderNumber': 'order_number',
+            'totalAmount': 'total_amount',
+            'paymentStatus': 'payment_status',
+            'pickupDate': 'pickup_date',
+            'shippingAddress': 'shipping_address',
+            'advancePaid': 'advance_paid',
+            'paymentMethod': 'payment_method',
+            'discountType': 'discount_type',
+            'discountValue': 'discount_value',
+            'couponCode': 'coupon_code',
+            'extraCharges': 'extra_charges',
+            'gstEnabled': 'gst_enabled',
+            'gstRate': 'gst_rate',
+            'gstAmount': 'gst_amount',
+            'gstNumber': 'gst_number',
+            'panNumber': 'pan_number',
+            'specialInstructions': 'special_instructions',
+            'customerId': 'customer_id',
+            'franchiseId': 'franchise_id'
+        };
+
+        Object.entries(mappings).forEach(([camel, snake]) => {
+            if (insertData[camel] !== undefined) {
+                insertData[snake] = insertData[camel];
+                delete insertData[camel];
+            }
+        });
 
         const { data: order, error } = await this.supabase
             .from('orders')
@@ -302,9 +338,47 @@ export class SupabaseStorage {
     }
 
     async updateOrder(id: string, data: Partial<InsertOrder>): Promise<Order | undefined> {
+        console.log(`[SupabaseStorage] Updating order ${id} with:`, JSON.stringify(data));
+        const updateData: any = { ...data };
+
+        // Map camelCase to snake_case for update
+        const mappings: Record<string, string> = {
+            'customerPhone': 'customer_phone',
+            'customerName': 'customer_name',
+            'customerEmail': 'customer_email',
+            'orderNumber': 'order_number',
+            'totalAmount': 'total_amount',
+            'paymentStatus': 'payment_status',
+            'pickupDate': 'pickup_date',
+            'shippingAddress': 'shipping_address',
+            'advancePaid': 'advance_paid',
+            'paymentMethod': 'payment_method',
+            'discountType': 'discount_type',
+            'discountValue': 'discount_value',
+            'couponCode': 'coupon_code',
+            'extraCharges': 'extra_charges',
+            'gstEnabled': 'gst_enabled',
+            'gstRate': 'gst_rate',
+            'gstAmount': 'gst_amount',
+            'gstNumber': 'gst_number',
+            'panNumber': 'pan_number',
+            'specialInstructions': 'special_instructions',
+            'customerId': 'customer_id',
+            'franchiseId': 'franchise_id'
+        };
+
+        Object.entries(mappings).forEach(([camel, snake]) => {
+            if (updateData[camel] !== undefined) {
+                updateData[snake] = updateData[camel];
+                delete updateData[camel];
+            }
+        });
+
+        console.log(`[SupabaseStorage] Mapped update data for ${id}:`, JSON.stringify(updateData));
+
         const { data: order, error } = await this.supabase
             .from('orders')
-            .update(data)
+            .update(updateData)
             .eq('id', id)
             .select('*')
             .single();

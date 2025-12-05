@@ -283,7 +283,9 @@ export const insertUserSchema = createInsertSchema(users);
 
 export const insertProductSchema = createInsertSchema(products);
 
-export const insertOrderSchema = createInsertSchema(orders);
+export const insertOrderSchema = createInsertSchema(orders, {
+  pickupDate: z.coerce.date().optional().nullable(),
+});
 
 export const insertDeliverySchema = createInsertSchema(deliveries);
 

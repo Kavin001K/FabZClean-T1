@@ -42,6 +42,8 @@ router.get('/:id', async (req: Request, res: Response) => {
         }
 
         // Check if user has permission to view this employee
+        console.log(`[GET /api/employees/:id] Requester: ${req.employee?.username} (${req.employee?.role}), Target: ${employee.username} (Franchise: ${employee.franchiseId})`);
+
         if (req.employee!.role !== 'admin') {
             if (req.employee!.role === 'franchise_manager' && employee.franchiseId !== req.employee!.franchiseId) {
                 return res.status(403).json({ error: 'You can only view employees in your franchise' });

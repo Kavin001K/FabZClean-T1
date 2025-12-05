@@ -1,16 +1,17 @@
 import React, { useEffect } from 'react';
 import { useParams, Link } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Edit, Printer, X, CheckCircle, Clock, AlertCircle, XCircle } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Edit, Printer, X, CheckCircle, Clock, AlertCircle, XCircle, CreditCard, Truck, Package } from 'lucide-react';
 import { useInvoicePrint } from '@/hooks/use-invoice-print';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
 import { ordersApi } from '@/lib/data-service';
 import { formatCurrency, formatDate, getNextStatus } from '@/lib/data-service';
-import type { Order } from '../../shared/schema';
+import type { Order } from '../../../shared/schema';
 import { cn } from '@/lib/utils';
 import LoadingSkeleton from '@/components/ui/loading-skeleton';
 
@@ -36,6 +37,7 @@ const getStatusColor = (status: Order['status']) => {
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
 
   const {
     data: order,
@@ -62,6 +64,34 @@ export default function OrderDetailPage() {
     if (order) {
       printInvoice(order);
     }
+  };
+
+  const { toast } = useToast();
+
+  const updateOrderMutation = useMutation({
+    mutationFn: (data: Partial<Order>) => ordersApi.update(id!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order', id] });
+      toast({
+        title: "Order Updated",
+        description: "The order has been successfully updated.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Update Failed",
+        description: "Failed to update the order. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleStatusChange = (newStatus: Order['status']) => {
+    updateOrderMutation.mutate({ status: newStatus });
+  };
+
+  const handlePaymentStatusChange = (newStatus: 'paid' | 'pending' | 'failed') => {
+    updateOrderMutation.mutate({ paymentStatus: newStatus });
   };
 
   if (isLoading) {
@@ -141,6 +171,57 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {order.paymentStatus !== 'paid' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-green-50 text-green-700 hover:bg-green-100 border-green-200"
+              onClick={() => handlePaymentStatusChange('paid')}
+              disabled={updateOrderMutation.isPending}
+            >
+              <CreditCard className="h-4 w-4 mr-2" />
+              Mark as Paid
+            </Button>
+          )}
+
+          {order.status === 'pending' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleStatusChange('processing')}
+              disabled={updateOrderMutation.isPending}
+            >
+              <Clock className="h-4 w-4 mr-2" />
+              Mark Processing
+            </Button>
+          )}
+
+          {order.status === 'processing' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
+              onClick={() => handleStatusChange('ready_for_delivery')}
+              disabled={updateOrderMutation.isPending}
+            >
+              <Package className="h-4 w-4 mr-2" />
+              Ready for Delivery
+            </Button>
+          )}
+
+          {order.status === 'ready_for_delivery' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-green-50 text-green-700 hover:bg-green-100 border-green-200"
+              onClick={() => handleStatusChange('completed')}
+              disabled={updateOrderMutation.isPending}
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Mark Completed
+            </Button>
+          )}
+
           <Button variant="outline" size="sm">
             <Edit className="h-4 w-4 mr-2" />
             Edit Order
@@ -207,6 +288,15 @@ export default function OrderDetailPage() {
                 <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
                 <p className="text-lg font-semibold">{formatCurrency(order.totalAmount)}</p>
               </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Payment Status</p>
+                <Badge className={cn(
+                  "mt-1",
+                  order.paymentStatus === 'paid' ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                )}>
+                  {order.paymentStatus === 'paid' ? 'Paid' : 'Pending'}
+                </Badge>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -219,10 +309,10 @@ export default function OrderDetailPage() {
           <CardContent>
             {order.items && Array.isArray(order.items) && order.items.length > 0 ? (
               <div className="space-y-4">
-                {order.items.map((item: { name: string; description?: string; quantity: number; price: number }, index: number) => (
+                {order.items.map((item: any, index: number) => (
                   <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex-1">
-                      <h4 className="font-semibold">{item.name || `Item ${index + 1}`}</h4>
+                      <h4 className="font-semibold">{item.name || item.serviceName || `Item ${index + 1}`}</h4>
                       <p className="text-sm text-muted-foreground">
                         Quantity: {item.quantity || 1}
                       </p>
@@ -250,32 +340,33 @@ export default function OrderDetailPage() {
         </Card>
 
         {/* Delivery Information */}
-        {(order.pickupDate || order.deliveryDate || order.shippingAddress) && (
+        {/* Delivery Information */}
+        {((order as any).pickupDate || (order as any).deliveryDate || (order as any).shippingAddress) && (
           <Card>
             <CardHeader>
               <CardTitle>Delivery Information</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {order.pickupDate && (
+                {(order as any).pickupDate && (
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Due Date</p>
-                    <p className="text-lg font-semibold">{formatDate(order.pickupDate)}</p>
+                    <p className="text-lg font-semibold">{formatDate((order as any).pickupDate)}</p>
                   </div>
                 )}
-                {order.deliveryDate && (
+                {(order as any).deliveryDate && (
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Delivery Date</p>
-                    <p className="text-lg font-semibold">{formatDate(order.deliveryDate)}</p>
+                    <p className="text-lg font-semibold">{formatDate((order as any).deliveryDate)}</p>
                   </div>
                 )}
-                {order.shippingAddress && (
+                {(order as any).shippingAddress && (
                   <div className="md:col-span-2">
                     <p className="text-sm font-medium text-muted-foreground">Shipping Address</p>
                     <p className="text-lg font-semibold">
-                      {typeof order.shippingAddress === 'string'
-                        ? order.shippingAddress
-                        : JSON.stringify(order.shippingAddress)
+                      {typeof (order as any).shippingAddress === 'string'
+                        ? (order as any).shippingAddress
+                        : JSON.stringify((order as any).shippingAddress)
                       }
                     </p>
                   </div>
@@ -286,13 +377,13 @@ export default function OrderDetailPage() {
         )}
 
         {/* Order Notes */}
-        {order.notes && (
+        {(order as any).notes && (
           <Card>
             <CardHeader>
               <CardTitle>Order Notes</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm">{order.notes}</p>
+              <p className="text-sm">{(order as any).notes}</p>
             </CardContent>
           </Card>
         )}

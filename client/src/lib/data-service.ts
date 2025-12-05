@@ -148,9 +148,16 @@ async function fetchData<T>(endpoint: string, init: RequestInit = {}): Promise<T
 export const ordersApi = {
   async getAll(): Promise<Order[]> {
     try {
-      const response = await fetchData<{ data: Order[]; pagination?: any }>("/orders");
+      const response = await fetchData<{ data: Order[]; pagination?: any } | Order[]>("/orders");
       // Handle paginated response
-      return response.data || response;
+      if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
+        return response.data;
+      }
+      // Handle direct array response
+      if (Array.isArray(response)) {
+        return response;
+      }
+      return [];
     } catch (error) {
       console.error('Failed to fetch orders:', error);
       return [];
@@ -159,7 +166,12 @@ export const ordersApi = {
 
   async getById(id: string): Promise<Order | null> {
     try {
-      return await fetchData<Order>(`/orders/${id}`);
+      const response = await fetchData<{ data: Order } | Order>(`/orders/${id}`);
+      // Handle wrapped response
+      if (response && typeof response === 'object' && 'data' in response) {
+        return response.data;
+      }
+      return response as Order;
     } catch (error) {
       console.error(`Failed to fetch order ${id}:`, error);
       return null;
@@ -172,7 +184,11 @@ export const ordersApi = {
         method: "POST",
         body: JSON.stringify(order),
       });
-      if (!response.ok) throw new Error("Failed to create order");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Order creation failed:", errorData);
+        throw new Error(errorData.message || (errorData.error && typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error)) || "Failed to create order");
+      }
       const result = await response.json();
       // Handle wrapped response from createSuccessResponse
       return result.data || result;
@@ -189,7 +205,9 @@ export const ordersApi = {
         body: JSON.stringify(order),
       });
       if (!response.ok) throw new Error("Failed to update order");
-      return await response.json();
+      const result = await response.json();
+      // Handle wrapped response
+      return result.data || result;
     } catch (error) {
       console.error(`Failed to update order ${id}:`, error);
       return null;
@@ -597,19 +615,21 @@ export const analyticsApi = {
 };
 
 // Helper functions for displaying data
-export const formatCurrency = (amount: number): string => {
+export const formatCurrency = (amount: number | string): string => {
+  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(numAmount)) return '₹0';
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(numAmount);
 };
 
-export const formatDate = (dateString: string): string => {
+export const formatDate = (dateString: string | Date | null | undefined): string => {
   if (!dateString) return 'N/A';
   try {
-    const date = new Date(dateString);
+    const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
     if (isNaN(date.getTime())) return 'N/A';
     return date.toLocaleDateString('en-IN', {
       year: 'numeric',

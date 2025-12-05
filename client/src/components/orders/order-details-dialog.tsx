@@ -132,18 +132,6 @@ export default React.memo(function OrderDetailsDialog({
               </div>
 
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Service Details</p>
-                <div className="mt-2 space-y-1">
-                  <p className="text-lg font-semibold">
-                    {(order as any).service || 'Dry Cleaning'}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Quantity: {(order as any).quantity || 1}
-                  </p>
-                </div>
-              </div>
-
-              <div>
                 <p className="text-sm font-medium text-muted-foreground">Priority</p>
                 <div className="mt-2">
                   <Badge className={getPriorityColor((order as any).priority || 'Normal')}>
@@ -189,6 +177,43 @@ export default React.memo(function OrderDetailsDialog({
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* Order Items */}
+          <div>
+            <p className="text-sm font-medium text-muted-foreground mb-2">Order Items</p>
+            {(order as any).items && Array.isArray((order as any).items) && (order as any).items.length > 0 ? (
+              <div className="border rounded-lg divide-y">
+                {(order as any).items.map((item: any, index: number) => (
+                  <div key={index} className="p-3 flex justify-between items-center bg-muted/20">
+                    <div>
+                      <p className="font-medium">{item.name || item.serviceName || `Item ${index + 1}`}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.description && <span className="mr-2">{item.description}</span>}
+                        Qty: {item.quantity || 1}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">{formatCurrency(item.price || item.unitPrice || 0)}</p>
+                      {(item.quantity || 1) > 1 && (
+                        <p className="text-xs text-muted-foreground">
+                          Total: {formatCurrency((parseFloat(item.price || item.unitPrice || 0)) * (item.quantity || 1))}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-3 bg-muted/20 rounded-lg">
+                <p className="font-medium">
+                  {(order as any).service || 'Dry Cleaning'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Quantity: {(order as any).quantity || 1}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Payment Information */}
