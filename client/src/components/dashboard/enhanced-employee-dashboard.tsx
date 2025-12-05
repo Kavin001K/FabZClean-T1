@@ -252,41 +252,74 @@ export default function EnhancedEmployeeDashboard() {
   // Cache management
   const { get: getCache, set: setCache, metrics: cacheMetrics } = useClientCache('employee-dashboard');
 
-  // Current tasks
-  const currentTasks = [
-    {
-      id: 1,
-      title: "Process 15 dry cleaning orders",
-      priority: "high",
-      estimatedHours: 2.5,
-      actualHours: 1.8,
-      status: "in_progress",
-      dueDate: "Today 5:00 PM",
-      orderIds: ["ORD-001", "ORD-002", "ORD-003"]
-    },
-    {
-      id: 2,
-      title: "Quality check finished garments",
-      priority: "medium",
-      estimatedHours: 1.25,
-      actualHours: 0,
-      status: "pending",
-      dueDate: "Today 6:00 PM",
-      orderIds: ["ORD-004", "ORD-005"]
-    },
-    {
-      id: 3,
-      title: "Inventory count - Cleaning supplies",
-      priority: "low",
-      estimatedHours: 1,
-      actualHours: 0,
-      status: "pending",
-      dueDate: "Tomorrow 10:00 AM",
-      orderIds: []
-    }
-  ];
+  // Fetch tasks
+  const { data: tasks = [], isLoading: tasksLoading, refetch: refetchTasks } = useCachedQuery(
+    ['employee-tasks'],
+    async () => {
+      const token = localStorage.getItem('employee_token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
-  // Performance data
+      const response = await fetch('/api/tasks', { headers });
+      if (!response.ok) throw new Error('Failed to fetch tasks');
+      return response.json();
+    },
+    {
+      cacheName: 'employee-tasks',
+      ttl: 2 * 60 * 1000 // 2 minutes
+    }
+  );
+
+  const completeTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      const token = localStorage.getItem('employee_token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status: 'completed' })
+      });
+
+      if (!response.ok) throw new Error('Failed to complete task');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employee-tasks'] });
+      addNotification({
+        type: 'success',
+        title: 'Task Completed!',
+        message: 'Great work! Task has been marked as completed.',
+      });
+      toast({
+        title: "Task Completed",
+        description: "Task has been marked as completed successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to complete task.",
+      });
+    }
+  });
+
+  // Handle task completion
+  const handleTaskComplete = (taskId: string) => {
+    completeTaskMutation.mutate(taskId);
+  };
+
+  // Performance data - Mock data for now
   const recentPerformance = [
     { month: "Jan", rating: 4.1, tasks: 142, orders: 89 },
     { month: "Feb", rating: 4.3, tasks: 158, orders: 95 },
@@ -330,18 +363,6 @@ export default function EnhancedEmployeeDashboard() {
     setShowOrderDetails(true);
   };
 
-  // Handle task completion
-  const handleTaskComplete = (taskId: number) => {
-    addNotification({
-      type: 'success',
-      title: 'Task Completed!',
-      message: 'Great work! Task has been marked as completed.',
-    });
-    toast({
-      title: "Task Completed",
-      description: "Task has been marked as completed successfully.",
-    });
-  };
 
   return (
     <div className="min-h-screen bg-background p-6 space-y-6">
@@ -544,7 +565,7 @@ export default function EnhancedEmployeeDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {currentTasks.map((task) => (
+                {tasks.slice(0, 3).map((task: any) => (
                   <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
@@ -554,16 +575,13 @@ export default function EnhancedEmployeeDashboard() {
                         </Badge>
                       </div>
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <span>Est: {task.estimatedHours}h</span>
-                        <span>Actual: {task.actualHours}h</span>
-                        <span>Due: {task.dueDate}</span>
-                        {task.orderIds.length > 0 && (
-                          <span>{task.orderIds.length} orders</span>
-                        )}
+                        <span>Est: {task.estimatedHours || 0}h</span>
+                        <span>Actual: {task.actualHours || 0}h</span>
+                        <span>Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A'}</span>
                       </div>
-                      {task.status === "in_progress" && (
+                      {(task.status === "in_progress" || task.status === "pending") && task.estimatedHours > 0 && (
                         <div className="mt-2">
-                          <Progress value={(task.actualHours / task.estimatedHours) * 100} className="h-1" />
+                          <Progress value={((task.actualHours || 0) / task.estimatedHours) * 100} className="h-1" />
                         </div>
                       )}
                     </div>
@@ -571,7 +589,7 @@ export default function EnhancedEmployeeDashboard() {
                       <Badge className={getStatusColor(task.status)}>
                         {task.status ? task.status.replace('_', ' ') : 'Unknown'}
                       </Badge>
-                      {task.status === "in_progress" && (
+                      {(task.status === "in_progress" || task.status === "pending") && (
                         <Button size="sm" onClick={() => handleTaskComplete(task.id)}>
                           <CheckCircle className="w-4 h-4 mr-1" />
                           Complete
@@ -826,7 +844,7 @@ export default function EnhancedEmployeeDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {currentTasks.map((task) => (
+                {tasks.map((task: any) => (
                   <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
@@ -836,13 +854,13 @@ export default function EnhancedEmployeeDashboard() {
                         </Badge>
                       </div>
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <span>Est: {task.estimatedHours}h</span>
-                        <span>Actual: {task.actualHours}h</span>
-                        <span>Due: {task.dueDate}</span>
+                        <span>Est: {task.estimatedHours || 0}h</span>
+                        <span>Actual: {task.actualHours || 0}h</span>
+                        <span>Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A'}</span>
                       </div>
-                      {task.status === "in_progress" && (
+                      {(task.status === "in_progress" || task.status === "pending") && task.estimatedHours > 0 && (
                         <div className="mt-2">
-                          <Progress value={(task.actualHours / task.estimatedHours) * 100} className="h-1" />
+                          <Progress value={((task.actualHours || 0) / task.estimatedHours) * 100} className="h-1" />
                         </div>
                       )}
                     </div>
@@ -850,7 +868,7 @@ export default function EnhancedEmployeeDashboard() {
                       <Badge className={getStatusColor(task.status)}>
                         {task.status ? task.status.replace('_', ' ') : 'Unknown'}
                       </Badge>
-                      {task.status === "in_progress" && (
+                      {(task.status === "in_progress" || task.status === "pending") && (
                         <Button size="sm" onClick={() => handleTaskComplete(task.id)}>
                           <CheckCircle className="w-4 h-4 mr-1" />
                           Complete

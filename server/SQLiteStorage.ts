@@ -1085,7 +1085,26 @@ export class SQLiteStorage implements IStorage {
     }
   }
 
-  async listOrders(): Promise<Order[]> {
+  async listOrders(franchiseId?: string): Promise<Order[]> {
+    if (franchiseId) {
+      const rows = this.db.prepare("SELECT * FROM orders WHERE franchiseId = ?").all(franchiseId) as any[];
+      return rows.map(row => {
+        // Parse JSON fields
+        if (row.items && typeof row.items === "string") {
+          try { row.items = JSON.parse(row.items); } catch (e) { }
+        }
+        if (row.shippingAddress && typeof row.shippingAddress === "string") {
+          try { row.shippingAddress = JSON.parse(row.shippingAddress); } catch (e) { }
+        }
+        // Parse timestamps
+        Object.keys(row).forEach((key) => {
+          if (key.includes("At") && typeof row[key] === "string") {
+            row[key] = new Date(row[key]);
+          }
+        });
+        return row;
+      });
+    }
     return this.listAllRecords<Order>("orders");
   }
 
@@ -2409,10 +2428,13 @@ export class SQLiteStorage implements IStorage {
     return this.getRecord("employee_tasks", id);
   }
 
-  async listTasks(franchiseId?: string): Promise<any[]> {
+  async listTasks(franchiseId?: string, employeeId?: string): Promise<any[]> {
     let tasks = this.listAllRecords<any>("employee_tasks");
     if (franchiseId) {
       tasks = tasks.filter(t => t.franchiseId === franchiseId);
+    }
+    if (employeeId) {
+      tasks = tasks.filter(t => t.employeeId === employeeId);
     }
     return tasks;
   }

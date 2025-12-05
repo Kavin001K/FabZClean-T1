@@ -18,7 +18,7 @@ export interface DueTodayOrder {
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
-  status: 'pending' | 'processing' | 'completed' | 'cancelled' | 'delivered';
+  status: string; // Relaxed type
   paymentStatus: 'pending' | 'paid' | 'partial' | 'failed';
   total: number;
   service?: string;
@@ -35,24 +35,28 @@ interface DueTodayOrdersProps {
   showDateSelector?: boolean;
 }
 
-const getStatusIcon = (status: DueTodayOrder['status']) => {
+const getStatusIcon = (status: string) => {
   switch (status) {
     case 'pending': return <Clock className="h-3 w-3" />;
     case 'processing': return <AlertCircle className="h-3 w-3" />;
     case 'completed':
     case 'delivered': return <CheckCircle className="h-3 w-3" />;
     case 'cancelled': return <XCircle className="h-3 w-3" />;
+    case 'assigned': return <Clock className="h-3 w-3" />;
+    case 'in_transit': return <Clock className="h-3 w-3" />;
     default: return <Clock className="h-3 w-3" />;
   }
 };
 
-const getStatusColor = (status: DueTodayOrder['status']) => {
+const getStatusColor = (status: string) => {
   switch (status) {
     case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800';
     case 'processing': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
     case 'completed':
     case 'delivered': return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
     case 'cancelled': return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
+    case 'assigned': return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800';
+    case 'in_transit': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
     default: return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
   }
 };

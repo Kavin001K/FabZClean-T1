@@ -56,11 +56,23 @@ router.get('/', async (req, res) => {
     const status = req.query.status as string;
     const customerEmail = req.query.customerEmail as string;
 
+    // Enforce franchise isolation
+    const user = (req as any).user;
+    let franchiseId = undefined;
+
+    if (user && user.role !== 'admin') {
+      franchiseId = user.franchiseId;
+    } else if (user && user.role === 'admin' && req.query.franchiseId) {
+      // Allow admin to filter by specific franchise if needed
+      franchiseId = req.query.franchiseId as string;
+    }
+
     const filters = {
       limit,
       search,
       status: status === 'all' ? undefined : status,
-      customerEmail
+      customerEmail,
+      franchiseId
     };
 
     const orders = await orderService.findAllOrders(filters);
@@ -162,6 +174,14 @@ router.post(
   async (req, res) => {
     try {
       const orderData = req.body;
+
+      // Enforce franchise isolation
+      const user = (req as any).user;
+      if (user && user.role !== 'admin') {
+        orderData.franchiseId = user.franchiseId;
+      } else if (user && user.role === 'admin' && !orderData.franchiseId) {
+        // Admins should ideally provide a franchiseId, but if missing, standard defaults apply
+      }
 
       // Use OrderService to create order (includes external validation and enrichment)
       const order = await orderService.createOrder(orderData);
@@ -436,7 +456,13 @@ router.get(
   requireRole(ORDER_ANALYTICS_ROLES),
   async (req, res) => {
     try {
-      const orders = await storage.listOrders();
+      const user = (req as any).user;
+      let franchiseId = undefined;
+      if (user && user.role !== 'admin') {
+        franchiseId = user.franchiseId;
+      }
+
+      const orders = await storage.listOrders(franchiseId);
 
       const analytics = {
         totalOrders: orders.length,

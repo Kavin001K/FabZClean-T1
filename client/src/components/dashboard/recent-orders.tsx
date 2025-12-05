@@ -16,7 +16,7 @@ export interface Order {
   customerPhone?: string;
   customerEmail?: string;
   date: string;
-  status: 'pending' | 'processing' | 'completed' | 'cancelled' | 'delivered';
+  status: string; // Relaxed to string to support all statuses like 'assigned', 'in_transit'
   paymentStatus: 'pending' | 'paid' | 'partial' | 'failed';
   total: number;
   service?: string;
@@ -31,24 +31,28 @@ interface RecentOrdersProps {
   className?: string;
 }
 
-const getStatusIcon = (status: Order['status']) => {
+const getStatusIcon = (status: string) => {
   switch (status) {
     case 'pending': return <Clock className="h-3 w-3" />;
     case 'processing': return <AlertCircle className="h-3 w-3" />;
-    case 'completed': 
+    case 'completed':
     case 'delivered': return <CheckCircle className="h-3 w-3" />;
     case 'cancelled': return <XCircle className="h-3 w-3" />;
+    case 'assigned': return <Clock className="h-3 w-3" />;
+    case 'in_transit': return <Clock className="h-3 w-3" />;
     default: return <Clock className="h-3 w-3" />;
   }
 };
 
-const getStatusColor = (status: Order['status']) => {
+const getStatusColor = (status: string) => {
   switch (status) {
     case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     case 'processing': return 'bg-blue-100 text-blue-800 border-blue-200';
-    case 'completed': 
+    case 'completed':
     case 'delivered': return 'bg-green-100 text-green-800 border-green-200';
     case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
+    case 'assigned': return 'bg-purple-100 text-purple-800 border-purple-200';
+    case 'in_transit': return 'bg-blue-100 text-blue-800 border-blue-200';
     default: return 'bg-gray-100 text-gray-800 border-gray-200';
   }
 };
@@ -63,12 +67,12 @@ const getPaymentStatusColor = (status: Order['paymentStatus']) => {
   }
 };
 
-export default React.memo(function RecentOrders({ 
-  orders = [], 
+export default React.memo(function RecentOrders({
+  orders = [],
   isLoading = false,
   limit = 5,
   showViewAll = true,
-  className 
+  className
 }: RecentOrdersProps) {
   // Ensure orders is an array before calling slice
   const displayOrders = Array.isArray(orders) ? orders.slice(0, limit) : [];
@@ -120,14 +124,14 @@ export default React.memo(function RecentOrders({
       <CardContent>
         <div className="space-y-3">
           {displayOrders.map((order, index) => (
-            <div 
-              key={order.id || index} 
+            <div
+              key={order.id || index}
               className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
             >
               <div className="flex items-center space-x-4">
                 <Avatar className="h-10 w-10">
                   <AvatarFallback className="text-xs">
-                    {order.customerName ? 
+                    {order.customerName ?
                       order.customerName.split(' ').map(n => n[0]).join('').toUpperCase() :
                       'N/A'
                     }
@@ -138,8 +142,8 @@ export default React.memo(function RecentOrders({
                     <p className="text-sm font-medium leading-none truncate">
                       {order.customerName || 'Unknown Customer'}
                     </p>
-                    <Badge 
-                      variant="outline" 
+                    <Badge
+                      variant="outline"
                       className={cn("text-xs border", getStatusColor(order.status))}
                     >
                       <span className="flex items-center space-x-1">
@@ -161,8 +165,8 @@ export default React.memo(function RecentOrders({
                       {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Unknown Date'}
                     </p>
                   </div>
-                  <Badge 
-                    variant="outline" 
+                  <Badge
+                    variant="outline"
                     className={cn("text-xs border w-fit", getPaymentStatusColor(order.paymentStatus))}
                   >
                     Payment: {order.paymentStatus || 'Unknown'}

@@ -52,7 +52,7 @@ interface FranchiseMetrics {
 }
 
 import { useQuery } from "@tanstack/react-query";
-import { employeesApi } from "@/lib/data-service";
+import { employeesApi, ordersApi } from "@/lib/data-service";
 
 import { DashboardDueToday } from "@/components/dashboard/components/dashboard-due-today";
 import { DashboardRecentOrders } from "@/components/dashboard/components/dashboard-recent-orders";
@@ -68,11 +68,7 @@ export default function FranchiseDashboard() {
   // Fetch orders for the widgets
   const { data: orders = [], isLoading: isLoadingOrders } = useQuery({
     queryKey: ['franchise-orders'],
-    queryFn: async () => {
-      const response = await fetch('/api/orders');
-      if (!response.ok) throw new Error('Failed to fetch orders');
-      return response.json();
-    }
+    queryFn: () => ordersApi.getAll()
   });
 
   const dueTodayOrders = orders.filter((order: any) => {

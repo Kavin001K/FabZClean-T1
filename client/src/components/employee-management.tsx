@@ -60,6 +60,7 @@ export default function EmployeeManagement() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("personal");
 
   // Form state
   const [employeeForm, setEmployeeForm] = useState({
@@ -79,7 +80,19 @@ export default function EmployeeManagement() {
     notes: '',
     password: '',
     confirmPassword: '',
-    role: 'employee'
+    role: 'employee',
+    franchiseId: ''
+  });
+
+  // Fetch franchises (Admin only)
+  const { data: franchises } = useQuery({
+    queryKey: ['franchises'],
+    queryFn: async () => {
+      const res = await fetch("/api/franchises");
+      if (!res.ok) throw new Error("Failed to fetch franchises");
+      return res.json();
+    },
+    enabled: currentUser?.role === 'admin'
   });
 
   // Fetch employees
@@ -127,12 +140,16 @@ export default function EmployeeManagement() {
   ];
 
   // Determine available roles based on current user
+  // Determine available roles based on current user
   const getAvailableRoles = () => {
     if (!currentUser) return [];
     if (currentUser.role === 'admin') {
       return ['admin', 'franchise_manager', 'factory_manager', 'employee', 'driver'];
     }
-    if (['franchise_manager', 'factory_manager'].includes(currentUser.role)) {
+    if (currentUser.role === 'franchise_manager') {
+      return ['factory_manager', 'employee', 'driver'];
+    }
+    if (currentUser.role === 'factory_manager') {
       return ['employee', 'driver'];
     }
     return [];
@@ -143,22 +160,49 @@ export default function EmployeeManagement() {
       fullName: '', email: '', phone: '', address: '', position: '', department: '',
       hireDate: '', salaryType: 'monthly', baseSalary: '', hourlyRate: '',
       workingHours: '8', emergencyContact: '', qualifications: '', notes: '',
-      password: '', confirmPassword: '', role: 'employee'
+      password: '', confirmPassword: '', role: 'employee', franchiseId: ''
     });
+    setIsCreateDialogOpen(false);
+    setIsEditDialogOpen(false);
   };
 
   const handleCreateEmployee = () => {
-    if (!employeeForm.fullName || !employeeForm.email || !employeeForm.phone || !employeeForm.position || !employeeForm.department || !employeeForm.hireDate) {
-      toast({ title: "Validation Error", description: "Please fill in all required fields (Name, Email, Phone, Position, Department, Hire Date).", variant: "destructive" });
+    // Personal Info validation
+    if (!employeeForm.fullName || !employeeForm.email || !employeeForm.phone) {
+      setActiveTab("personal");
+      toast({ title: "Validation Error", description: "Please fill in all required fields in Personal Info.", variant: "destructive" });
       return;
     }
 
+    // Work Details validation
+    if (!employeeForm.position || !employeeForm.department || !employeeForm.hireDate) {
+      setActiveTab("work");
+      toast({ title: "Validation Error", description: "Please fill in all required fields in Work Details.", variant: "destructive" });
+      return;
+    }
+
+    // Compensation validation
     if (employeeForm.salaryType === 'monthly' && !employeeForm.baseSalary) {
+      setActiveTab("compensation");
       toast({ title: "Validation Error", description: "Base Salary is required for monthly employees.", variant: "destructive" });
       return;
     }
 
+    if (employeeForm.salaryType === 'hourly' && !employeeForm.hourlyRate) {
+      setActiveTab("compensation");
+      toast({ title: "Validation Error", description: "Hourly Rate is required for hourly employees.", variant: "destructive" });
+      return;
+    }
+
+    // Security validation
+    if (!employeeForm.password || !employeeForm.confirmPassword) {
+      setActiveTab("security");
+      toast({ title: "Validation Error", description: "Password is required.", variant: "destructive" });
+      return;
+    }
+
     if (employeeForm.password !== employeeForm.confirmPassword) {
+      setActiveTab("security");
       toast({ title: "Password Mismatch", description: "Passwords do not match.", variant: "destructive" });
       return;
     }
@@ -181,7 +225,8 @@ export default function EmployeeManagement() {
       qualifications: employeeForm.qualifications,
       notes: employeeForm.notes,
       role: employeeForm.role,
-      password: employeeForm.password
+      password: employeeForm.password,
+      franchiseId: employeeForm.franchiseId || null
     } as any);
   };
 
@@ -204,7 +249,8 @@ export default function EmployeeManagement() {
       notes: employee.notes,
       password: '',
       confirmPassword: '',
-      role: employee.role
+      role: employee.role,
+      franchiseId: (employee as any).franchiseId || ''
     });
     setIsEditDialogOpen(true);
   };
@@ -229,7 +275,8 @@ export default function EmployeeManagement() {
         emergencyContact: employeeForm.emergencyContact,
         qualifications: employeeForm.qualifications,
         notes: employeeForm.notes,
-        role: employeeForm.role
+        role: employeeForm.role,
+        franchiseId: employeeForm.franchiseId || null
       }
     });
   };
@@ -293,7 +340,10 @@ export default function EmployeeManagement() {
             <Download className="w-4 h-4 mr-2" />
             Export Data
           </Button>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+            setIsCreateDialogOpen(open);
+            if (open) setActiveTab("personal");
+          }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="w-4 h-4 mr-2" />
@@ -311,7 +361,7 @@ export default function EmployeeManagement() {
                 </DialogDescription>
               </DialogHeader>
 
-              <Tabs defaultValue="personal" className="space-y-4">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
                 <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="personal">Personal Info</TabsTrigger>
                   <TabsTrigger value="work">Work Details</TabsTrigger>
@@ -378,6 +428,29 @@ export default function EmployeeManagement() {
                 {/* Work Details Tab */}
                 <TabsContent value="work" className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
+                    {/* Franchise Selection (Admin Only) */}
+                    {currentUser?.role === 'admin' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="franchise">Franchise (Optional for Admin/Global)</Label>
+                        <Select
+                          value={employeeForm.franchiseId || "none"}
+                          onValueChange={(value) => setEmployeeForm({ ...employeeForm, franchiseId: value === "none" ? "" : value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Franchise" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None (Global/HQ)</SelectItem>
+                            {franchises?.filter((f: any) => f.id).map((franchise: any) => (
+                              <SelectItem key={franchise.id} value={franchise.id}>
+                                {franchise.name} ({franchise.franchiseId})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                       <Label htmlFor="role">System Role *</Label>
                       <Select value={employeeForm.role} onValueChange={(value) => setEmployeeForm({ ...employeeForm, role: value })}>

@@ -278,7 +278,14 @@ export const auditLogs = pgTable("audit_logs", {
 });
 
 // Insert schemas
-export const insertFranchiseSchema = createInsertSchema(franchises);
+export const insertFranchiseSchema = createInsertSchema(franchises, {
+  agreementStartDate: z.coerce.date().optional().nullable(),
+  agreementEndDate: z.coerce.date().optional().nullable(),
+  royaltyPercentage: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().default("0"),
+  documents: z.any().optional(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+});
 export const insertUserSchema = createInsertSchema(users);
 
 export const insertProductSchema = createInsertSchema(products);

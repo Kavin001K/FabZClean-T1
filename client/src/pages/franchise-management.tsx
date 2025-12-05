@@ -39,6 +39,9 @@ import { insertFranchiseSchema } from "@shared/schema";
 // Extend schema for file upload handling in form
 const franchiseFormSchema = insertFranchiseSchema.extend({
     documents: z.any().optional(), // FileList or array of files
+    agreementStartDate: z.coerce.date().optional().nullable(),
+    agreementEndDate: z.coerce.date().optional().nullable(),
+    royaltyPercentage: z.coerce.string().optional().default("0"), // Handle string/number mismatch
 });
 
 type FranchiseFormValues = z.infer<typeof franchiseFormSchema>;
@@ -73,6 +76,8 @@ export default function FranchiseManagement() {
             taxId: "",
             status: "active",
             royaltyPercentage: "0",
+            agreementStartDate: null,
+            agreementEndDate: null,
         },
     });
 
@@ -180,9 +185,9 @@ export default function FranchiseManagement() {
             taxId: franchise.taxId || "",
             status: franchise.status as any,
             royaltyPercentage: franchise.royaltyPercentage?.toString() || "0",
-            agreementStartDate: franchise.agreementStartDate ? new Date(franchise.agreementStartDate) : undefined,
-            agreementEndDate: franchise.agreementEndDate ? new Date(franchise.agreementEndDate) : undefined,
-        });
+            agreementStartDate: franchise.agreementStartDate ? new Date(franchise.agreementStartDate).toISOString().split('T')[0] : "",
+            agreementEndDate: franchise.agreementEndDate ? new Date(franchise.agreementEndDate).toISOString().split('T')[0] : "",
+        } as any);
         setIsDialogOpen(true);
     };
 
@@ -203,6 +208,8 @@ export default function FranchiseManagement() {
             taxId: "",
             status: "active",
             royaltyPercentage: "0",
+            agreementStartDate: null,
+            agreementEndDate: null,
         });
         setIsDialogOpen(true);
     };
@@ -319,11 +326,11 @@ export default function FranchiseManagement() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="agreementStartDate">Agreement Start Date</Label>
-                                        <Input id="agreementStartDate" type="date" {...form.register("agreementStartDate", { valueAsDate: true })} />
+                                        <Input id="agreementStartDate" type="date" {...form.register("agreementStartDate")} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="agreementEndDate">Agreement End Date</Label>
-                                        <Input id="agreementEndDate" type="date" {...form.register("agreementEndDate", { valueAsDate: true })} />
+                                        <Input id="agreementEndDate" type="date" {...form.register("agreementEndDate")} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="royaltyPercentage">Royalty Percentage (%)</Label>

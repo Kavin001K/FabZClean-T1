@@ -18,7 +18,8 @@ import {
   Filter,
   Clock,
   Sparkles,
-  Download
+  Download,
+  Briefcase
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageTransition, FadeIn, StaggerChildren, StaggerItem } from "@/components/ui/page-transition";
@@ -26,6 +27,7 @@ import SalesChart from "@/components/dashboard/sales-chart";
 import RevenueChartRealtime from "@/components/dashboard/revenue-chart-realtime";
 import RecentOrders from "@/components/dashboard/recent-orders";
 import DueTodayOrders from "@/components/dashboard/due-today-orders";
+import TasksOverview from "@/components/dashboard/tasks-overview";
 import KpiCard from "@/components/dashboard/kpi-card";
 import OrderStatusChart from "@/components/dashboard/order-status-chart";
 import ServicePopularityChart from "@/components/dashboard/service-popularity-chart";
@@ -38,8 +40,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { analyticsApi, ordersApi, customersApi, employeesApi, formatCurrency } from '@/lib/data-service';
 import { exportDashboardReport } from '@/lib/enhanced-pdf-export';
@@ -80,11 +84,29 @@ export default React.memo(function FranchiseOwnerDashboard() {
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false);
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
 
   // Form submission states
   const [isSubmittingCustomer, setIsSubmittingCustomer] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [isSubmittingEmployee, setIsSubmittingEmployee] = useState(false);
+  const [isSubmittingTask, setIsSubmittingTask] = useState(false);
+
+  const [taskForm, setTaskForm] = useState({
+    title: '',
+    description: '',
+    assignedTo: '',
+    priority: 'medium',
+    dueDate: new Date().toISOString().split('T')[0],
+    estimatedHours: '1'
+  });
+
+  // Fetch employees list for task assignment
+  const { data: employeesList = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: () => employeesApi.getAll(),
+    staleTime: 5 * 60 * 1000
+  });
 
   // Date range handler
   const handleDateRangeChange = useCallback((dateRange: DateRange) => {
@@ -234,6 +256,65 @@ export default React.memo(function FranchiseOwnerDashboard() {
       setIsSubmittingEmployee(false);
     }
   }, [quickActionForms.employee, toast, queryClient, resetQuickActionForm, isSubmittingEmployee]);
+
+  const handleSaveTask = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmittingTask) return;
+
+    setIsSubmittingTask(true);
+    try {
+      // Get token properly
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          title: taskForm.title,
+          description: taskForm.description,
+          employeeId: taskForm.assignedTo, // Map UI 'assignedTo' to Schema 'employeeId'
+          priority: taskForm.priority,
+          dueDate: taskForm.dueDate,
+          estimatedHours: parseFloat(taskForm.estimatedHours || '0'),
+          status: 'pending'
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to create task');
+      }
+
+      toast({
+        title: "Success!",
+        description: "Task assigned successfully.",
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+
+      // Reset
+      setTaskForm({
+        title: '',
+        description: '',
+        assignedTo: '',
+        priority: 'medium',
+        dueDate: new Date().toISOString().split('T')[0],
+        estimatedHours: '1'
+      });
+      setIsTaskDialogOpen(false);
+    } catch (error: any) {
+      console.error('Failed to assign task:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to assign task. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingTask(false);
+    }
+  }, [taskForm, toast, isSubmittingTask]);
 
   // Memoized KPI cards with proper data
   const kpiCards = useMemo(() => [
@@ -723,6 +804,139 @@ export default React.memo(function FranchiseOwnerDashboard() {
                       </Dialog>
                     </StaggerItem>
 
+                    {/* Assign Task Quick Action */}
+                    <StaggerItem>
+                      <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+                        <DialogTrigger asChild>
+                          <motion.div
+                            whileHover={{ scale: 1.03, y: -5 }}
+                            whileTap={{ scale: 0.98 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                          >
+                            <Card className="cursor-pointer hover:shadow-xl hover-glow transition-all duration-300 border-2 hover:border-purple-500/50 glass">
+                              <CardContent className="p-6 flex items-center gap-4">
+                                <motion.div
+                                  animate={{ rotate: [0, -10, 10, 0] }}
+                                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                                  className="bg-purple-500/10 p-3 rounded-xl"
+                                >
+                                  <Briefcase className="h-8 w-8 text-purple-600" />
+                                </motion.div>
+                                <div>
+                                  <h3 className="font-semibold text-lg">Assign Task</h3>
+                                  <p className="text-sm text-muted-foreground">Assign work to employees</p>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Assign New Task</DialogTitle>
+                            <DialogDescription>
+                              Create a new task and assign it to an employee.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <form onSubmit={handleSaveTask} className="py-4 space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="taskTitle">Task Title *</Label>
+                              <Input
+                                id="taskTitle"
+                                placeholder="e.g. Clean Pressing Machine"
+                                value={taskForm.title}
+                                onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="taskDesc">Description</Label>
+                              <Textarea
+                                id="taskDesc"
+                                placeholder="Detailed instructions..."
+                                value={taskForm.description}
+                                onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="assignTo">Assign To *</Label>
+                              <Select
+                                value={taskForm.assignedTo}
+                                onValueChange={(val) => setTaskForm({ ...taskForm, assignedTo: val })}
+                                required
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select Employee" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Array.isArray(employeesList) && employeesList.map((emp: any) => (
+                                    <SelectItem key={emp.id || emp.employeeId} value={emp.employeeId}>
+                                      {emp.fullName || emp.name || emp.username} ({emp.position})
+                                    </SelectItem>
+                                  ))}
+                                  {(!Array.isArray(employeesList) || employeesList.length === 0) && (
+                                    <SelectItem value="loading" disabled>Loading employees...</SelectItem>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="priority">Priority</Label>
+                                <Select
+                                  value={taskForm.priority}
+                                  onValueChange={(val) => setTaskForm({ ...taskForm, priority: val })}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="low">Low</SelectItem>
+                                    <SelectItem value="medium">Medium</SelectItem>
+                                    <SelectItem value="high">High</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="estHours">Est. Hours</Label>
+                                <Input
+                                  id="estHours"
+                                  type="number"
+                                  min="0.5"
+                                  step="0.5"
+                                  value={taskForm.estimatedHours}
+                                  onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: e.target.value })}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="dueDate">Due Date</Label>
+                              <Input
+                                id="dueDate"
+                                type="date"
+                                value={taskForm.dueDate}
+                                onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
+                                required
+                              />
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                              <Button type="submit" className="flex-1" disabled={isSubmittingTask}>
+                                {isSubmittingTask ? 'Assigning...' : 'Assign Task'}
+                              </Button>
+                              <Button type="button" variant="outline" onClick={() => setIsTaskDialogOpen(false)}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    </StaggerItem>
+
+
                     {/* Advanced Order Creation */}
                     <StaggerItem>
                       <Link to="/create-order">
@@ -871,6 +1085,18 @@ export default React.memo(function FranchiseOwnerDashboard() {
             </div>
           </FadeIn>
 
+          {/* Tasks and Team Overview */}
+          <FadeIn delay={0.55}>
+            <div className="grid gap-6 grid-cols-1 mt-6">
+              <motion.div
+                whileHover={{ scale: 1.01 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                <TasksOverview />
+              </motion.div>
+            </div>
+          </FadeIn>
+
           {/* Additional Stats */}
           <FadeIn delay={0.6}>
             <div className="grid gap-6 grid-cols-1">
@@ -963,8 +1189,8 @@ export default React.memo(function FranchiseOwnerDashboard() {
               </motion.div>
             </div>
           </FadeIn>
-        </div>
-      </div>
-    </PageTransition>
+        </div >
+      </div >
+    </PageTransition >
   );
 });

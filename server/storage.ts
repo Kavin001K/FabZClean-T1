@@ -21,7 +21,7 @@ export interface IStorage {
 
   // Task methods
   createTask(data: any): Promise<any>;
-  listTasks(franchiseId?: string): Promise<any[]>;
+  listTasks(franchiseId?: string, employeeId?: string): Promise<any[]>;
   updateTask(id: string, data: any): Promise<any | undefined>;
 
   // Attendance methods
@@ -56,7 +56,7 @@ export class MemStorage implements IStorage {
 
   // Task methods
   async createTask(data: any): Promise<any> { return null; }
-  async listTasks(franchiseId?: string): Promise<any[]> { return []; }
+  async listTasks(franchiseId?: string, employeeId?: string): Promise<any[]> { return []; }
   async updateTask(id: string, data: any): Promise<any | undefined> { return undefined; }
 
   // Attendance methods

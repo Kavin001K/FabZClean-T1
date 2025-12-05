@@ -93,14 +93,17 @@ router.post(
                 });
             }
 
-            // Franchise managers can only create factory managers for their franchise
+            // Franchise managers can only create employees for their franchise
             if (req.employee!.role === 'franchise_manager') {
-                if (role !== 'factory_manager') {
-                    return res.status(403).json({ error: 'Franchise managers can only create factory managers' });
+                const ALLOWED_FRANCHISE_ROLES = ['factory_manager', 'employee', 'driver'];
+                if (!ALLOWED_FRANCHISE_ROLES.includes(role)) {
+                    return res.status(403).json({ error: 'Franchise managers can only create factory managers, employees, and drivers' });
                 }
+                // Strictly enforce franchise ID
                 if (franchiseId && franchiseId !== req.employee!.franchiseId) {
                     return res.status(403).json({ error: 'You can only create employees for your franchise' });
                 }
+                // If not provided, it will be auto-filled below, but logic is fine
             }
 
             // Create employee

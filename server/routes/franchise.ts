@@ -49,8 +49,25 @@ router.post("/", upload.array("documents"), async (req, res) => {
 
         // Generate Franchise ID if not provided
         if (!franchiseData.franchiseId) {
-            const count = (await storage.listFranchises()).length;
-            franchiseData.franchiseId = `FR-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
+            const franchises = await storage.listFranchises();
+            const currentYear = new Date().getFullYear();
+            const prefix = `FR-${currentYear}-`;
+
+            // Find max sequence number for current year
+            let maxSequence = 0;
+            for (const f of franchises) {
+                if (f.franchiseId && f.franchiseId.startsWith(prefix)) {
+                    const parts = f.franchiseId.split('-');
+                    if (parts.length === 3) {
+                        const seq = parseInt(parts[2], 10);
+                        if (!isNaN(seq) && seq > maxSequence) {
+                            maxSequence = seq;
+                        }
+                    }
+                }
+            }
+
+            franchiseData.franchiseId = `${prefix}${String(maxSequence + 1).padStart(3, '0')}`;
         }
 
         const validatedData = insertFranchiseSchema.parse({

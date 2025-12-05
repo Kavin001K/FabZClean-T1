@@ -1,7 +1,12 @@
 import { Router } from "express";
 import { db as storage } from "../db";
+import { jwtRequired } from "../middleware/auth";
+import { Order } from "../../shared/schema";
 
 const router = Router();
+
+// Apply authentication
+router.use(jwtRequired);
 
 // Helper function to safely format numbers
 const safeToFixed = (value: number | string | undefined | null, decimals: number = 2): string => {
@@ -13,29 +18,35 @@ const safeToFixed = (value: number | string | undefined | null, decimals: number
 // ======= ACCOUNTING API ENDPOINTS =======
 router.get("/dashboard", async (req, res) => {
     try {
-        const orders = await storage.listOrders();
+        const user = (req as any).user;
+        let franchiseId = undefined;
+        if (user && user.role !== 'admin') {
+            franchiseId = user.franchiseId;
+        }
+
+        const orders = await storage.listOrders(franchiseId);
         const customers = await storage.listCustomers();
 
-        const totalRevenue = orders.reduce((sum, order) => {
+        const totalRevenue = orders.reduce((sum: number, order: Order) => {
             const amount = parseFloat(order.totalAmount || "0");
             return sum + (isNaN(amount) ? 0 : amount);
         }, 0);
 
-        const paidOrders = orders.filter(order => order.paymentStatus === 'paid');
-        const pendingPayments = orders.filter(order => order.paymentStatus === 'pending');
+        const paidOrders = orders.filter((order: Order) => order.paymentStatus === 'paid');
+        const pendingPayments = orders.filter((order: Order) => order.paymentStatus === 'pending');
 
-        const totalPaid = paidOrders.reduce((sum, order) => {
+        const totalPaid = paidOrders.reduce((sum: number, order: Order) => {
             const amount = parseFloat(order.totalAmount || "0");
             return sum + (isNaN(amount) ? 0 : amount);
         }, 0);
 
-        const totalPending = pendingPayments.reduce((sum, order) => {
+        const totalPending = pendingPayments.reduce((sum: number, order: Order) => {
             const amount = parseFloat(order.totalAmount || "0");
             return sum + (isNaN(amount) ? 0 : amount);
         }, 0);
 
         const monthlyRevenue = orders
-            .filter(order => {
+            .filter((order: Order) => {
                 try {
                     if (!order.createdAt) return false;
                     const orderDate = new Date(order.createdAt);
@@ -46,7 +57,7 @@ router.get("/dashboard", async (req, res) => {
                     return false;
                 }
             })
-            .reduce((sum, order) => {
+            .reduce((sum: number, order: Order) => {
                 const amount = parseFloat(order.totalAmount || "0");
                 return sum + (isNaN(amount) ? 0 : amount);
             }, 0);
@@ -119,9 +130,16 @@ router.get("/trial-balance", async (req, res) => {
 router.get("/balance-sheet", async (req, res) => {
     try {
         const { asOfDate } = req.query;
-        const orders = await storage.listOrders();
 
-        const totalRevenue = orders.reduce((sum, order) => {
+        const user = (req as any).user;
+        let franchiseId = undefined;
+        if (user && user.role !== 'admin') {
+            franchiseId = user.franchiseId;
+        }
+
+        const orders = await storage.listOrders(franchiseId);
+
+        const totalRevenue = orders.reduce((sum: number, order: Order) => {
             const amount = parseFloat(order.totalAmount || "0");
             return sum + (isNaN(amount) ? 0 : amount);
         }, 0);
@@ -268,12 +286,19 @@ router.get("/balance-sheet", async (req, res) => {
 router.get("/income-statement", async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
-        const orders = await storage.listOrders();
+
+        const user = (req as any).user;
+        let franchiseId = undefined;
+        if (user && user.role !== 'admin') {
+            franchiseId = user.franchiseId;
+        }
+
+        const orders = await storage.listOrders(franchiseId);
 
         let filteredOrders = orders;
 
         if (startDate && endDate) {
-            filteredOrders = orders.filter(order => {
+            filteredOrders = orders.filter((order: Order) => {
                 try {
                     if (!order.createdAt) return false;
                     const orderDate = new Date(order.createdAt);
@@ -289,7 +314,7 @@ router.get("/income-statement", async (req, res) => {
             });
         }
 
-        const revenue = filteredOrders.reduce((sum, order) => {
+        const revenue = filteredOrders.reduce((sum: number, order: Order) => {
             const amount = parseFloat(order.totalAmount || "0");
             return sum + (isNaN(amount) ? 0 : amount);
         }, 0);

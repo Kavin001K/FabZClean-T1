@@ -17,10 +17,13 @@ import healthRouter from './health';
 import databaseRouter from './database';
 import pdfRouter from './pdf';
 import whatsappRouter from './whatsapp';
+import tasksRouter from './tasks';
 import documentsRouter from './documents';
 import transitSuggestionsRouter from './transit-suggestions';
 import settingsRouter from './settings';
 import franchiseRouter from './franchise';
+import auditLogsRouter from './audit-logs';
+import { jwtRequired } from '../middleware/auth';
 import { debugRouter } from './debug';
 import { db as storage } from '../db';
 import { Order, Product } from '../../shared/schema';
@@ -30,14 +33,26 @@ import { Order, Product } from '../../shared/schema';
  */
 export function registerAllRoutes(app: Express): void {
   // Due Date Orders endpoint (Direct mount to match frontend)
-  app.get("/api/due-date-orders", async (req, res) => {
+  app.get("/api/due-date-orders", jwtRequired, async (req, res) => {
     try {
-      const { type, date, franchiseId } = req.query;
-      const orders = await storage.listOrders();
+      const { type, date } = req.query;
+
+      // Enforce franchise isolation
+      const user = (req as any).user;
+      let franchiseId = undefined;
+
+      if (user && user.role !== 'admin') {
+        franchiseId = user.franchiseId;
+      } else if (user && user.role === 'admin' && req.query.franchiseId) {
+        franchiseId = req.query.franchiseId as string;
+      }
+
+      // Pass franchiseId to listOrders to filter at source (efficient)
+      const orders = await storage.listOrders(franchiseId);
 
       let filteredOrders = orders;
 
-      // Filter by franchise if provided and not 'all'
+      // Filter by franchise if provided and not 'all' (redundant if storage.listOrders handles it, but keeps logic structure)
       if (franchiseId && franchiseId !== 'all') {
         filteredOrders = filteredOrders.filter((order: any) => order.franchiseId === franchiseId);
       }
@@ -141,10 +156,15 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/whatsapp', whatsappRouter);
   app.use('/api/documents', documentsRouter);
   app.use('/api/franchises', franchiseRouter);
+  app.use('/api/tasks', tasksRouter);
 
   // API v1 routes
   app.use('/api/v1/orders', ordersRouter);
   app.use('/api/v1/customers', customersRouter);
+
+  // Use audit logs router (new)
+  app.use('/api/audit-logs', auditLogsRouter);
+
   app.use('/api/v1/transit', transitRouter);
   app.use('/api/v1/deliveries', deliveriesRouter);
   app.use('/api/v1/drivers', driversRouter);

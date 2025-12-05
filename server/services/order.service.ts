@@ -22,6 +22,7 @@ export interface OrderFilters {
   sortOrder?: 'asc' | 'desc';
   limit?: number;
   cursor?: string;
+  franchiseId?: string;
 }
 
 export interface CustomerValidationResult {
@@ -45,7 +46,7 @@ export class OrderService {
       console.log('📦 [OrderService] Fetching orders with filters:', filters);
 
       // Fetch orders from database
-      let orders = await storage.listOrders();
+      let orders = await storage.listOrders(filters.franchiseId);
 
       // Apply email filter if provided
       if (filters.customerEmail) {

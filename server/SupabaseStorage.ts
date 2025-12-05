@@ -422,10 +422,16 @@ export class SupabaseStorage {
         return !error;
     }
 
-    async listOrders(): Promise<Order[]> {
-        const { data, error } = await this.supabase
+    async listOrders(franchiseId?: string): Promise<Order[]> {
+        let query = this.supabase
             .from('orders')
             .select('*, customers(name, email, phone)');
+
+        if (franchiseId) {
+            query = query.eq('franchise_id', franchiseId);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
         return data.map(item => this.mapDates(item));
@@ -1110,62 +1116,7 @@ export class SupabaseStorage {
         return data.map(item => this.mapDates(item));
     }
 
-    // ======= EMPLOYEE TASKS & ATTENDANCE =======
-    async createTask(data: any): Promise<any> {
-        const { data: task, error } = await this.supabase
-            .from('employee_tasks')
-            .insert(data)
-            .select()
-            .single();
 
-        if (error) throw error;
-        return this.mapDates(task);
-    }
-
-    async listTasks(franchiseId: string): Promise<any[]> {
-        const { data, error } = await this.supabase
-            .from('employee_tasks')
-            .select('*')
-            .eq('franchiseId', franchiseId);
-
-        if (error) throw error;
-        return data.map(item => this.mapDates(item));
-    }
-
-    async createAttendance(data: any): Promise<any> {
-        const { data: attendance, error } = await this.supabase
-            .from('employee_attendance')
-            .insert(data)
-            .select()
-            .single();
-
-        if (error) throw error;
-        return this.mapDates(attendance);
-    }
-
-    async listAttendance(franchiseId: string, employeeId?: string, date?: Date): Promise<any[]> {
-        let query = this.supabase
-            .from('employee_attendance')
-            .select('*')
-            .eq('franchiseId', franchiseId);
-
-        if (employeeId) {
-            query = query.eq('employeeId', employeeId);
-        }
-
-        if (date) {
-            // Assuming date is stored as YYYY-MM-DD or timestamp
-            // If timestamp, we might need range. For now, exact match on date string if schema uses date type
-            // or if it uses text YYYY-MM-DD
-            const dateStr = date.toISOString().split('T')[0];
-            query = query.eq('date', dateStr);
-        }
-
-        const { data, error } = await query;
-
-        if (error) throw error;
-        return data.map(item => this.mapDates(item));
-    }
 
     // ======= TRANSIT ORDERS =======
     async listTransitOrders(): Promise<any[]> {
@@ -1229,7 +1180,7 @@ export class SupabaseStorage {
             query = query.limit(filters.limit);
         }
 
-        const { data, error } = await query.order('createdAt', { ascending: false });
+        const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) throw error;
         return data.map(item => this.mapDates(item));
@@ -1253,6 +1204,88 @@ export class SupabaseStorage {
             .eq('id', id);
 
         return !error;
+    }
+
+    // ======= TASKS =======
+    async createTask(data: any): Promise<any> {
+        const { data: task, error } = await this.supabase
+            .from('employee_tasks')
+            .insert(data)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return this.mapDates(task);
+    }
+
+    async listTasks(franchiseId?: string, employeeId?: string): Promise<any[]> {
+        let query = this.supabase
+            .from('employee_tasks')
+            .select('*');
+
+        if (franchiseId) {
+            query = query.eq('franchise_id', franchiseId);
+        }
+
+        if (employeeId) {
+            query = query.eq('employee_id', employeeId);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+        return data.map(item => this.mapDates(item));
+    }
+
+    async updateTask(id: string, data: any): Promise<any | undefined> {
+        const { data: task, error } = await this.supabase
+            .from('employee_tasks')
+            .update(data)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) return undefined;
+        return this.mapDates(task);
+    }
+
+    // ======= ATTENDANCE =======
+    async createAttendance(data: any): Promise<any> {
+        const { data: attendance, error } = await this.supabase
+            .from('employee_attendance')
+            .insert(data)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return this.mapDates(attendance);
+    }
+
+    async listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]> {
+        let query = this.supabase
+            .from('employee_attendance')
+            .select('*');
+
+        if (franchiseId) {
+            query = query.eq('franchise_id', franchiseId);
+        }
+
+        if (employeeId) {
+            query = query.eq('employee_id', employeeId);
+        }
+
+        if (date) {
+            // Supabase date filtering: check if date part matches
+            // Assuming date column is timestamp, we might need range or date_trunc
+            // Simplest for now: client side filter or simple GTE/LTE
+            const dateStr = date.toISOString().split('T')[0];
+            query = query.gte('date', `${dateStr}T00:00:00`).lte('date', `${dateStr}T23:59:59`);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+        return data.map(item => this.mapDates(item));
     }
 
     close() {
