@@ -37,7 +37,7 @@ router.get('/', jwtRequired, requireRole(AUDIT_VIEW_ROLES), async (req, res) => 
             startDate,
             endDate,
             entityType,
-            sortBy: req.query.sortBy as string,
+            sortBy: req.query.sortBy === 'createdAt' ? 'created_at' : req.query.sortBy as string,
             sortOrder: req.query.sortOrder as string
         });
 

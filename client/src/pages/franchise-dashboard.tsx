@@ -17,8 +17,27 @@ import {
   User,
   Phone,
   Mail,
-  Eye
+  Eye,
+  Briefcase
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -51,7 +70,7 @@ interface FranchiseMetrics {
   averageOrderValue: number;
 }
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { employeesApi, ordersApi } from "@/lib/data-service";
 
 import { DashboardDueToday } from "@/components/dashboard/components/dashboard-due-today";
@@ -59,6 +78,68 @@ import { DashboardRecentOrders } from "@/components/dashboard/components/dashboa
 
 export default function FranchiseDashboard() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const queryClient = useQueryClient();
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [taskForm, setTaskForm] = useState({
+    title: '',
+    description: '',
+    assignedTo: '',
+    priority: 'medium',
+    dueDate: '',
+    estimatedHours: ''
+  });
+
+  const handleSaveTask = async () => {
+    try {
+      if (!taskForm.title || !taskForm.assignedTo) {
+        alert("Please fill in required fields");
+        return;
+      }
+
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert("You must be logged in to assign tasks");
+        return;
+      }
+
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: taskForm.title,
+          description: taskForm.description,
+          employeeId: taskForm.assignedTo,
+          priority: taskForm.priority,
+          dueDate: taskForm.dueDate ? new Date(taskForm.dueDate).toISOString() : null,
+          estimatedHours: (taskForm.estimatedHours || '0').toString(),
+          status: 'pending'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create task");
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      setIsTaskDialogOpen(false);
+      setTaskForm({
+        title: '',
+        description: '',
+        assignedTo: '',
+        priority: 'medium',
+        dueDate: '',
+        estimatedHours: ''
+      });
+      // Optional: Show success toast
+    } catch (error: any) {
+      console.error("Error creating task:", error);
+      alert(error.message || "Failed to create task");
+    }
+  };
 
   const { data: employees = [], isLoading: isLoadingEmployees } = useQuery({
     queryKey: ['employees'],
@@ -158,6 +239,10 @@ export default function FranchiseDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <Button onClick={() => setIsTaskDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+            <Briefcase className="w-4 h-4 mr-2" />
+            Assign Task
+          </Button>
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -561,6 +646,98 @@ export default function FranchiseDashboard() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Assign New Task</DialogTitle>
+            <DialogDescription>
+              Create a new task and assign it to an employee.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="title">Task Title</Label>
+              <Input
+                id="title"
+                value={taskForm.title}
+                onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
+                placeholder="e.g. Clean main lobby"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="description">Description (Optional)</Label>
+              <Textarea
+                id="description"
+                value={taskForm.description}
+                onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
+                placeholder="Details about the task..."
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="employee">Assign To</Label>
+              <Select
+                value={taskForm.assignedTo}
+                onValueChange={(value) => setTaskForm({ ...taskForm, assignedTo: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((emp: any) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.fullName || emp.username || emp.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="priority">Priority</Label>
+                <Select
+                  value={taskForm.priority}
+                  onValueChange={(value) => setTaskForm({ ...taskForm, priority: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="hours">Est. Hours</Label>
+                <Input
+                  id="hours"
+                  type="number"
+                  step="0.5"
+                  value={taskForm.estimatedHours}
+                  onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: e.target.value })}
+                  placeholder="e.g. 2.5"
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="dueDate">Due Date</Label>
+              <Input
+                id="dueDate"
+                type="date"
+                value={taskForm.dueDate}
+                onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveTask}>Assign Task</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
 
   );

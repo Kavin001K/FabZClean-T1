@@ -71,6 +71,31 @@ import { useAuth } from '@/contexts/auth-context';
 import { DashboardDueToday } from "./components/dashboard-due-today";
 import { DashboardRecentOrders } from "./components/dashboard-recent-orders";
 
+interface DashboardOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail?: string;
+  status: string;
+  service?: string | string[];
+  createdAt: string;
+  pickupDate?: string | null;
+  deliveryDate?: string | null;
+  totalItems?: number;
+  totalAmount?: string | number;
+}
+
+interface DashboardTask {
+  id: string;
+  title: string;
+  description?: string;
+  priority: string;
+  status: string;
+  estimatedHours: number;
+  actualHours?: number;
+  dueDate?: string | null;
+}
+
 // Enhanced Employee Dashboard Component
 export default function EnhancedEmployeeDashboard() {
   const { toast } = useToast();
@@ -82,7 +107,7 @@ export default function EnhancedEmployeeDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<Record<string, any>>({});
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState<DashboardOrder | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
 
   // Employee data
@@ -124,16 +149,18 @@ export default function EnhancedEmployeeDashboard() {
     }
   );
 
-  const dueTodayOrders = orders.filter((order: any) => {
+  const dueTodayOrders = orders.filter((order: DashboardOrder) => {
     if (!order.pickupDate && !order.deliveryDate) return false;
-    const date = new Date(order.pickupDate || order.deliveryDate);
+    const dateStr = order.pickupDate || order.deliveryDate;
+    if (!dateStr) return false;
+    const date = new Date(dateStr);
     const today = new Date();
     return date.getDate() === today.getDate() &&
       date.getMonth() === today.getMonth() &&
       date.getFullYear() === today.getFullYear();
   });
 
-  const recentOrders = [...orders].sort((a: any, b: any) =>
+  const recentOrders = [...orders].sort((a: DashboardOrder, b: DashboardOrder) =>
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   ).slice(0, 5);
 
@@ -153,14 +180,14 @@ export default function EnhancedEmployeeDashboard() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const todaysOrders = orders.filter((order: any) => {
+    const todaysOrders = orders.filter((order: DashboardOrder) => {
       const orderDate = new Date(order.createdAt);
       return orderDate >= today;
     });
 
-    const completed = todaysOrders.filter((o: any) => o.status === 'completed' || o.status === 'delivered').length;
-    const inProgress = todaysOrders.filter((o: any) => o.status === 'processing' || o.status === 'in_transit').length;
-    const pending = todaysOrders.filter((o: any) => o.status === 'pending' || o.status === 'confirmed').length;
+    const completed = todaysOrders.filter((o: DashboardOrder) => o.status === 'completed' || o.status === 'delivered').length;
+    const inProgress = todaysOrders.filter((o: DashboardOrder) => o.status === 'processing' || o.status === 'in_transit').length;
+    const pending = todaysOrders.filter((o: DashboardOrder) => o.status === 'pending' || o.status === 'confirmed').length;
 
     // Simple efficiency calculation: (completed / total assigned today) * 100
     const totalToday = todaysOrders.length;
@@ -358,7 +385,7 @@ export default function EnhancedEmployeeDashboard() {
   };
 
   // Handle order selection
-  const handleOrderSelect = (order: any) => {
+  const handleOrderSelect = (order: DashboardOrder) => {
     setSelectedOrder(order);
     setShowOrderDetails(true);
   };
@@ -565,7 +592,7 @@ export default function EnhancedEmployeeDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {tasks.slice(0, 3).map((task: any) => (
+                {tasks.slice(0, 3).map((task: DashboardTask) => (
                   <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
@@ -844,7 +871,7 @@ export default function EnhancedEmployeeDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {tasks.map((task: any) => (
+                {tasks.map((task: DashboardTask) => (
                   <div key={task.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
@@ -955,7 +982,7 @@ export default function EnhancedEmployeeDashboard() {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Total Amount</label>
-                  <p className="font-medium">{formatCurrency(selectedOrder.totalAmount)}</p>
+                  <p className="font-medium">{formatCurrency(Number(selectedOrder.totalAmount || 0))}</p>
                 </div>
               </div>
               <div>

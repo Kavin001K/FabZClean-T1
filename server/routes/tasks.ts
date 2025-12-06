@@ -29,15 +29,24 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     }
 });
 
+import { AuthService } from '../auth-service';
+
 // Create a new task
 router.post('/', authMiddleware, async (req: Request, res: Response) => {
     try {
         const user = (req as any).employee;
+
+        // Lookup full user details to get UUID for foreign key check
+        const fullUser = await AuthService.getEmployee(user.employeeId);
+        if (!fullUser) {
+            return res.status(401).json({ error: 'User not found' });
+        }
+
         const taskData = insertEmployeeTaskSchema.parse({
             ...req.body,
-            franchiseId: user.franchiseId, // Enforce franchiseId
-            assignedBy: user.employeeId,
-            status: 'pending' // Default status
+            franchiseId: user.franchiseId || fullUser.franchiseId,
+            assignedBy: fullUser.id, // Must be UUID
+            status: 'pending'
         });
 
         const task = await storage.createTask(taskData);
