@@ -25,8 +25,8 @@ export class SupabaseStorage {
     private supabase: SupabaseClient;
 
     constructor() {
-        const supabaseUrl = process.env.SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+        const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
         if (!supabaseUrl || !supabaseKey) {
             console.warn("⚠️ Supabase credentials not found. SupabaseStorage will fail if used.");
@@ -35,45 +35,90 @@ export class SupabaseStorage {
         this.supabase = createClient(supabaseUrl || '', supabaseKey || '');
     }
 
-    // Helper to map Supabase dates to JS Dates and handle snake_case to camelCase
+    // Map DB snake_case to App camelCase
     private mapDates(record: any): any {
         if (!record) return record;
 
         const newRecord = { ...record };
-
-        // Map snake_case to camelCase for critical fields
         const mappings: Record<string, string> = {
-            'customer_phone': 'customerPhone',
+            'franchise_id': 'franchiseId',
+            'owner_name': 'ownerName',
+            'legal_entity_name': 'legalEntityName',
+            'tax_id': 'taxId',
+            'agreement_start_date': 'agreementStartDate',
+            'agreement_end_date': 'agreementEndDate',
+            'royalty_percentage': 'royaltyPercentage',
+            'stock_quantity': 'stockQuantity',
+            'reorder_level': 'reorderLevel',
+            'customer_id': 'customerId',
             'customer_name': 'customerName',
             'customer_email': 'customerEmail',
+            'customer_phone': 'customerPhone',
+            'total_orders': 'totalOrders',
+            'total_spent': 'totalSpent',
+            'last_order': 'lastOrder',
             'order_number': 'orderNumber',
-            'total_amount': 'totalAmount',
             'payment_status': 'paymentStatus',
-            'pickup_date': 'pickupDate',
+            'total_amount': 'totalAmount',
             'shipping_address': 'shippingAddress',
-            'created_at': 'createdAt',
-            'updated_at': 'updatedAt',
-            // New fields
+            'pickup_date': 'pickupDate',
             'advance_paid': 'advancePaid',
             'payment_method': 'paymentMethod',
             'discount_type': 'discountType',
             'discount_value': 'discountValue',
             'coupon_code': 'couponCode',
             'extra_charges': 'extraCharges',
-
-            'loyalty_points': 'loyaltyPoints',
-            // Audit Log fields
-            'employee_id': 'employeeId',
+            'gst_enabled': 'gstEnabled',
+            'gst_rate': 'gstRate',
+            'gst_amount': 'gstAmount',
+            'pan_number': 'panNumber',
+            'gst_number': 'gstNumber',
+            'special_instructions': 'specialInstructions',
+            'order_id': 'orderId',
+            'driver_name': 'driverName',
+            'vehicle_id': 'vehicleId',
+            'estimated_delivery': 'estimatedDelivery',
+            'actual_delivery': 'actualDelivery',
+            'transaction_number': 'transactionNumber',
+            'cashier_id': 'cashierId',
+            'shipment_number': 'shipmentNumber',
+            'order_ids': 'orderIds',
+            'tracking_number': 'trackingNumber',
             'entity_type': 'entityType',
             'entity_id': 'entityId',
+            'image_path': 'imagePath',
+            'is_active': 'isActive',
+            'employee_id': 'employeeId',
+            'first_name': 'firstName',
+            'last_name': 'lastName',
+            'hire_date': 'hireDate',
+            'hourly_rate': 'hourlyRate',
+            'manager_id': 'managerId',
+            'emergency_contact': 'emergencyContact',
+            'performance_rating': 'performanceRating',
+            'last_review_date': 'lastReviewDate',
+            'clock_in': 'clockIn',
+            'clock_out': 'clockOut',
+            'break_start': 'breakStart',
+            'break_end': 'breakEnd',
+            'total_hours': 'totalHours',
+            'location_check_in': 'locationCheckIn',
+            'estimated_hours': 'estimatedHours',
+            'actual_hours': 'actualHours',
+            'due_date': 'dueDate',
+            'completed_date': 'completedDate',
+            'assigned_by': 'assignedBy',
+            'review_period': 'reviewPeriod',
+            'reviewed_by': 'reviewedBy',
+            'review_date': 'reviewDate',
+            'file_url': 'fileUrl',
             'ip_address': 'ipAddress',
             'user_agent': 'userAgent',
-            'franchise_id': 'franchiseId'
+            'created_at': 'createdAt',
+            'updated_at': 'updatedAt'
         };
 
         Object.entries(mappings).forEach(([snake, camel]) => {
-            // If snake_case exists, and camelCase is missing OR null, map it.
-            // This handles cases where both columns exist in DB but one is empty.
             if (newRecord[snake] !== undefined) {
                 if (newRecord[camel] === undefined || newRecord[camel] === null) {
                     newRecord[camel] = newRecord[snake];
@@ -81,11 +126,9 @@ export class SupabaseStorage {
             }
         });
 
-        // Map joined customer data if available (from Supabase join)
-        // Supabase might return it as 'customers' (plural) or 'customer' depending on query
+        // Joined customer data
         const customerData = newRecord.customers || newRecord.customer;
         if (customerData) {
-            // Handle both single object and array (though it should be single for Many-to-One)
             const cust = Array.isArray(customerData) ? customerData[0] : customerData;
             if (cust) {
                 if (!newRecord.customerName) newRecord.customerName = cust.name;
@@ -93,54 +136,111 @@ export class SupabaseStorage {
                 if (!newRecord.customerPhone) newRecord.customerPhone = cust.phone;
             }
         }
-
-        // Common date fields
-        ['createdAt', 'updatedAt', 'pickupDate', 'deliveryDate', 'deliveredAt', 'lastOrder', 'lastActive', 'completedAt', 'dispatchedAt', 'receivedAt', 'invoiceDate'].forEach(field => {
-            if (newRecord[field]) {
-                newRecord[field] = new Date(newRecord[field]);
-            }
-        });
-
-        // Handle JSON fields
-        ['items', 'shippingAddress', 'location', 'route', 'storeDetails', 'factoryDetails'].forEach(field => {
-            if (newRecord[field] && typeof newRecord[field] === 'string') {
-                try {
-                    newRecord[field] = JSON.parse(newRecord[field]);
-                } catch (e) {
-                    // Ignore parse errors, might be already object or invalid
-                }
-            }
-        });
-
-        // Calculate totalAmount if missing or zero
-        if ((!newRecord.totalAmount || newRecord.totalAmount == 0) && newRecord.items && Array.isArray(newRecord.items)) {
-            const calculated = newRecord.items.reduce((sum: number, item: any) => {
-                const price = parseFloat(item.price || item.unitPrice || 0);
-                const qty = parseFloat(item.quantity || 1);
-                return sum + (price * qty);
-            }, 0);
-            if (calculated > 0) {
-                newRecord.totalAmount = calculated.toFixed(2);
-            }
-        }
-
-        // Enrich order with service name from items if available
-        if (newRecord.items && Array.isArray(newRecord.items) && newRecord.items.length > 0 && !newRecord.service) {
-            const services = newRecord.items.map((item: any) => item.service || item.serviceName || item.name).filter(Boolean);
-            if (services.length > 0) {
-                // Deduplicate services
-                newRecord.service = Array.from(new Set(services)).join(', ');
-            }
-        }
-
         return newRecord;
+    }
+
+
+
+    // Map App camelCase to DB snake_case for inserts/updates
+    private toSnakeCase(data: any): any {
+        if (!data) return data;
+        const newData: any = {};
+        const mappings: Record<string, string> = {
+            'franchiseId': 'franchise_id',
+            'ownerName': 'owner_name',
+            'legalEntityName': 'legal_entity_name',
+            'taxId': 'tax_id',
+            'agreementStartDate': 'agreement_start_date',
+            'agreementEndDate': 'agreement_end_date',
+            'royaltyPercentage': 'royalty_percentage',
+            'stockQuantity': 'stock_quantity',
+            'reorderLevel': 'reorder_level',
+            'customerId': 'customer_id',
+            'customerName': 'customer_name',
+            'customerEmail': 'customer_email',
+            'customerPhone': 'customer_phone',
+            'totalOrders': 'total_orders',
+            'totalSpent': 'total_spent',
+            'lastOrder': 'last_order',
+            'orderNumber': 'order_number',
+            'paymentStatus': 'payment_status',
+            'totalAmount': 'total_amount',
+            'shippingAddress': 'shipping_address',
+            'pickupDate': 'pickup_date',
+            'advancePaid': 'advance_paid',
+            'paymentMethod': 'payment_method',
+            'discountType': 'discount_type',
+            'discountValue': 'discount_value',
+            'couponCode': 'coupon_code',
+            'extraCharges': 'extra_charges',
+            'gstEnabled': 'gst_enabled',
+            'gstRate': 'gst_rate',
+            'gstAmount': 'gst_amount',
+            'panNumber': 'pan_number',
+            'gstNumber': 'gst_number',
+            'specialInstructions': 'special_instructions',
+            'orderId': 'order_id',
+            'driverName': 'driver_name',
+            'vehicleId': 'vehicle_id',
+            'estimatedDelivery': 'estimated_delivery',
+            'actualDelivery': 'actual_delivery',
+            'transactionNumber': 'transaction_number',
+            'cashierId': 'cashier_id',
+            'shipmentNumber': 'shipment_number',
+            'orderIds': 'order_ids',
+            'trackingNumber': 'tracking_number',
+            'entityType': 'entity_type',
+            'entityId': 'entity_id',
+            'imagePath': 'image_path',
+            'isActive': 'is_active',
+            'employeeId': 'employee_id',
+            'firstName': 'first_name',
+            'lastName': 'last_name',
+            'hireDate': 'hire_date',
+            'hourlyRate': 'hourly_rate',
+            'managerId': 'manager_id',
+            'emergencyContact': 'emergency_contact',
+            'performanceRating': 'performance_rating',
+            'lastReviewDate': 'last_review_date',
+            'clockIn': 'clock_in',
+            'clockOut': 'clock_out',
+            'breakStart': 'break_start',
+            'breakEnd': 'break_end',
+            'totalHours': 'total_hours',
+            'locationCheckIn': 'location_check_in',
+            'estimatedHours': 'estimated_hours',
+            'actualHours': 'actual_hours',
+            'dueDate': 'due_date',
+            'completedDate': 'completed_date',
+            'assignedBy': 'assigned_by',
+            'reviewPeriod': 'review_period',
+            'reviewedBy': 'reviewed_by',
+            'reviewDate': 'review_date',
+            'fileUrl': 'file_url',
+            'ipAddress': 'ip_address',
+            'userAgent': 'user_agent',
+            'createdAt': 'created_at',
+            'updatedAt': 'updated_at'
+        };
+
+        // If key exists in mappings, use snake_case. If not, preserve original (e.g. 'status', 'email', 'name')
+        Object.keys(data).forEach(key => {
+            if (mappings[key]) {
+                newData[mappings[key]] = data[key];
+            } else {
+                newData[key] = data[key];
+            }
+        });
+
+        // Ensure JSON fields are handled if needed, usually Supabase client handles object -> JSONB auto
+        return newData;
     }
 
     // ======= USERS =======
     async createUser(data: InsertUser): Promise<User> {
         const { data: user, error } = await this.supabase
             .from('users')
-            .insert(data)
+            .insert(this.toSnakeCase(data))
             .select()
             .single();
 
@@ -154,7 +254,6 @@ export class SupabaseStorage {
             .select('*')
             .eq('id', id)
             .single();
-
         if (error) return undefined;
         return this.mapDates(user);
     }
@@ -165,16 +264,12 @@ export class SupabaseStorage {
             .select('*')
             .eq('username', username)
             .single();
-
         if (error) return undefined;
         return this.mapDates(user);
     }
 
     async listUsers(): Promise<User[]> {
-        const { data, error } = await this.supabase
-            .from('users')
-            .select('*');
-
+        const { data, error } = await this.supabase.from('users').select('*');
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
@@ -183,10 +278,9 @@ export class SupabaseStorage {
     async createProduct(data: InsertProduct): Promise<Product> {
         const { data: product, error } = await this.supabase
             .from('products')
-            .insert(data)
+            .insert(this.toSnakeCase(data))
             .select()
             .single();
-
         if (error) throw error;
         return this.mapDates(product);
     }
@@ -197,7 +291,6 @@ export class SupabaseStorage {
             .select('*')
             .eq('id', id)
             .single();
-
         if (error) return undefined;
         return this.mapDates(product);
     }
@@ -205,67 +298,39 @@ export class SupabaseStorage {
     async updateProduct(id: string, data: Partial<InsertProduct>): Promise<Product | undefined> {
         const { data: product, error } = await this.supabase
             .from('products')
-            .update(data)
+            .update(this.toSnakeCase(data))
             .eq('id', id)
             .select()
             .single();
-
         if (error) return undefined;
         return this.mapDates(product);
     }
 
     async deleteProduct(id: string): Promise<boolean> {
-        const { error } = await this.supabase
-            .from('products')
-            .delete()
-            .eq('id', id);
-
+        const { error } = await this.supabase.from('products').delete().eq('id', id);
         return !error;
     }
 
     async listProducts(): Promise<Product[]> {
-        const { data, error } = await this.supabase
-            .from('products')
-            .select('*');
-
+        const { data, error } = await this.supabase.from('products').select('*');
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
-
-    async getProducts(): Promise<Product[]> {
-        return this.listProducts();
-    }
+    async getProducts(): Promise<Product[]> { return this.listProducts(); }
 
     // ======= CUSTOMERS =======
     async createCustomer(data: InsertCustomer): Promise<Customer> {
-        // Ensure address is stringified if it's an object, as Supabase client might need it for jsonb
-        const insertData = { ...data };
-        if (insertData.address && typeof insertData.address === 'object') {
-            // @ts-ignore - Supabase expects different types depending on client version, force stringify for safety if needed, 
-            // but actually for jsonb it should be object. However, if previous errors were 400, let's try to ensure it matches what Supabase expects.
-            // If the column is jsonb, passing an object is correct. 
-            // If the column is text (which it shouldn't be after the fix), stringify is needed.
-            // Let's rely on the fact that we fixed the column to jsonb.
-            // BUT, if the error persists, it might be that the type definition in InsertCustomer says string but we pass object.
-        }
-
         const { data: customer, error } = await this.supabase
             .from('customers')
-            .insert(insertData)
+            .insert(this.toSnakeCase(data))
             .select()
             .single();
-
         if (error) throw error;
         return this.mapDates(customer);
     }
 
     async getCustomer(id: string): Promise<Customer | undefined> {
-        const { data: customer, error } = await this.supabase
-            .from('customers')
-            .select('*')
-            .eq('id', id)
-            .single();
-
+        const { data: customer, error } = await this.supabase.from('customers').select('*').eq('id', id).single();
         if (error) return undefined;
         return this.mapDates(customer);
     }
@@ -273,81 +338,33 @@ export class SupabaseStorage {
     async updateCustomer(id: string, data: Partial<InsertCustomer>): Promise<Customer | undefined> {
         const { data: customer, error } = await this.supabase
             .from('customers')
-            .update(data)
+            .update(this.toSnakeCase(data))
             .eq('id', id)
             .select()
             .single();
-
         if (error) return undefined;
         return this.mapDates(customer);
     }
 
     async deleteCustomer(id: string): Promise<boolean> {
-        const { error } = await this.supabase
-            .from('customers')
-            .delete()
-            .eq('id', id);
-
+        const { error } = await this.supabase.from('customers').delete().eq('id', id);
         return !error;
     }
 
     async listCustomers(): Promise<Customer[]> {
-        const { data, error } = await this.supabase
-            .from('customers')
-            .select('*');
-
+        const { data, error } = await this.supabase.from('customers').select('*');
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
-
-    async getCustomers(): Promise<Customer[]> {
-        return this.listCustomers();
-    }
+    async getCustomers(): Promise<Customer[]> { return this.listCustomers(); }
 
     // ======= ORDERS =======
     async createOrder(data: InsertOrder): Promise<Order> {
-        // Ensure JSON fields are stringified if needed (Supabase client handles objects for JSONB columns automatically, but let's be safe)
-        const insertData: any = { ...data };
-
-        // Map camelCase to snake_case for insertion
-        const mappings: Record<string, string> = {
-            'customerPhone': 'customer_phone',
-            'customerName': 'customer_name',
-            'customerEmail': 'customer_email',
-            'orderNumber': 'order_number',
-            'totalAmount': 'total_amount',
-            'paymentStatus': 'payment_status',
-            'pickupDate': 'pickup_date',
-            'shippingAddress': 'shipping_address',
-            'advancePaid': 'advance_paid',
-            'paymentMethod': 'payment_method',
-            'discountType': 'discount_type',
-            'discountValue': 'discount_value',
-            'couponCode': 'coupon_code',
-            'extraCharges': 'extra_charges',
-            'gstEnabled': 'gst_enabled',
-            'gstRate': 'gst_rate',
-            'gstAmount': 'gst_amount',
-            'gstNumber': 'gst_number',
-            'panNumber': 'pan_number',
-            'specialInstructions': 'special_instructions',
-            'customerId': 'customer_id',
-            'franchiseId': 'franchise_id'
-        };
-
-        Object.entries(mappings).forEach(([camel, snake]) => {
-            if (insertData[camel] !== undefined) {
-                insertData[snake] = insertData[camel];
-                delete insertData[camel];
-            }
-        });
-
         const { data: order, error } = await this.supabase
             .from('orders')
-            .insert(insertData)
+            .insert(this.toSnakeCase(data))
             .select('*')
             .single();
-
         if (error) throw error;
         return this.mapDates(order);
     }
@@ -358,116 +375,54 @@ export class SupabaseStorage {
             .select('*, customers(name, email, phone)')
             .eq('id', id)
             .single();
-
         if (error) return undefined;
         return this.mapDates(order);
     }
 
     async updateOrder(id: string, data: Partial<InsertOrder>): Promise<Order | undefined> {
-        console.log(`[SupabaseStorage] Updating order ${id} with:`, JSON.stringify(data));
-        const updateData: any = { ...data };
-
-        // Map camelCase to snake_case for update
-        const mappings: Record<string, string> = {
-            'customerPhone': 'customer_phone',
-            'customerName': 'customer_name',
-            'customerEmail': 'customer_email',
-            'orderNumber': 'order_number',
-            'totalAmount': 'total_amount',
-            'paymentStatus': 'payment_status',
-            'pickupDate': 'pickup_date',
-            'shippingAddress': 'shipping_address',
-            'advancePaid': 'advance_paid',
-            'paymentMethod': 'payment_method',
-            'discountType': 'discount_type',
-            'discountValue': 'discount_value',
-            'couponCode': 'coupon_code',
-            'extraCharges': 'extra_charges',
-            'gstEnabled': 'gst_enabled',
-            'gstRate': 'gst_rate',
-            'gstAmount': 'gst_amount',
-            'gstNumber': 'gst_number',
-            'panNumber': 'pan_number',
-            'specialInstructions': 'special_instructions',
-            'customerId': 'customer_id',
-            'franchiseId': 'franchise_id'
-        };
-
-        Object.entries(mappings).forEach(([camel, snake]) => {
-            if (updateData[camel] !== undefined) {
-                updateData[snake] = updateData[camel];
-                delete updateData[camel];
-            }
-        });
-
-        console.log(`[SupabaseStorage] Mapped update data for ${id}:`, JSON.stringify(updateData));
-
         const { data: order, error } = await this.supabase
             .from('orders')
-            .update(updateData)
+            .update(this.toSnakeCase(data))
             .eq('id', id)
             .select('*')
             .single();
-
         if (error) return undefined;
         return this.mapDates(order);
     }
 
     async deleteOrder(id: string): Promise<boolean> {
-        const { error } = await this.supabase
-            .from('orders')
-            .delete()
-            .eq('id', id);
-
+        const { error } = await this.supabase.from('orders').delete().eq('id', id);
         return !error;
     }
 
     async listOrders(franchiseId?: string): Promise<Order[]> {
-        let query = this.supabase
-            .from('orders')
-            .select('*, customers(name, email, phone)');
-
-        if (franchiseId) {
-            query = query.eq('franchise_id', franchiseId);
-        }
-
+        let query = this.supabase.from('orders').select('*, customers(name, email, phone)');
+        if (franchiseId) query = query.eq('franchise_id', franchiseId);
         const { data, error } = await query;
-
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
-
-    async getOrders(): Promise<Order[]> {
-        return this.listOrders();
-    }
-
+    async getOrders(): Promise<Order[]> { return this.listOrders(); }
     async getActiveOrders(): Promise<Order[]> {
         const { data, error } = await this.supabase
             .from('orders')
             .select('*')
             .in('status', ['in_progress', 'shipped', 'out_for_delivery', 'in_transit', 'assigned']);
-
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
     async getAnalyticsSummary(): Promise<any> {
-        // This is a simplified version. For production, consider using RPC or Edge Functions.
         const { count: totalOrders } = await this.supabase.from('orders').select('*', { count: 'exact', head: true });
         const { count: totalCustomers } = await this.supabase.from('customers').select('*', { count: 'exact', head: true });
         const { count: completedOrders } = await this.supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'completed');
+        const { data: orders } = await this.supabase.from('orders').select('total_amount');
+        const totalRevenue = orders?.reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0) || 0;
 
-        // Revenue aggregation (client-side for now as Supabase JS doesn't support SUM easily without RPC)
-        // Ideally: create a view or function in Supabase
-        const { data: orders } = await this.supabase.from('orders').select('totalAmount');
-        const totalRevenue = orders?.reduce((sum, o) => sum + parseFloat(o.totalAmount || '0'), 0) || 0;
-
-        // Recent activity
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-        const { data: recentOrders } = await this.supabase.from('orders').select('*').gt('createdAt', fiveMinutesAgo).order('createdAt', { ascending: false }).limit(10);
-        const { data: recentCustomers } = await this.supabase.from('customers').select('*').gt('createdAt', fiveMinutesAgo).order('createdAt', { ascending: false }).limit(10);
+        const { data: recentOrders } = await this.supabase.from('orders').select('*').gt('created_at', fiveMinutesAgo).order('created_at', { ascending: false }).limit(10);
+        const { data: recentCustomers } = await this.supabase.from('customers').select('*').gt('created_at', fiveMinutesAgo).order('created_at', { ascending: false }).limit(10);
 
-        // Status counts (aggregation in memory for now)
         const { data: allStatuses } = await this.supabase.from('orders').select('status');
         const statusMap = allStatuses?.reduce((acc: any, curr: any) => {
             acc[curr.status] = (acc[curr.status] || 0) + 1;
@@ -492,35 +447,21 @@ export class SupabaseStorage {
         };
     }
 
+    // ======= AUDIT LOGS =======
     async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
         const { data: auditLog, error } = await this.supabase
             .from('audit_logs')
-            .insert(data)
+            .insert(this.toSnakeCase(data))
             .select()
             .single();
-
         if (error) throw error;
         return this.mapDates(auditLog);
     }
 
     async getAuditLogs(params: any): Promise<{ data: AuditLog[]; count: number }> {
-        const {
-            page = 1,
-            limit = 20,
-            employeeId,
-            action,
-            startDate,
-            endDate,
-            entityType,
-            sortBy = 'created_at',
-            sortOrder = 'desc'
-        } = params;
-
+        const { page = 1, limit = 20, employeeId, action, startDate, endDate, entityType, sortBy = 'created_at', sortOrder = 'desc' } = params;
         const offset = (page - 1) * limit;
-
-        let query = this.supabase
-            .from('audit_logs')
-            .select('*', { count: 'exact' });
+        let query = this.supabase.from('audit_logs').select('*', { count: 'exact' });
 
         if (employeeId) query = query.eq('employee_id', employeeId);
         if (action) query = query.eq('action', action);
@@ -528,23 +469,17 @@ export class SupabaseStorage {
         if (startDate) query = query.gte('created_at', startDate);
         if (endDate) query = query.lte('created_at', endDate);
 
-        const { data, error, count } = await query
-            .order(sortBy, { ascending: sortOrder === 'asc' })
-            .range(offset, offset + limit - 1);
-
+        const { data, error, count } = await query.order(sortBy, { ascending: sortOrder === 'asc' }).range(offset, offset + limit - 1);
         if (error) throw error;
-
-        return {
-            data: data.map(item => this.mapDates(item)),
-            count: count || 0
-        };
+        return { data: data.map(item => this.mapDates(item)), count: count || 0 };
     }
 
+    // ======= SEARCH =======
     async searchGlobal(query: string): Promise<any> {
         const { data: orders } = await this.supabase
             .from('orders')
-            .select('id, orderNumber, status')
-            .or(`orderNumber.ilike.%${query}%,customerName.ilike.%${query}%`)
+            .select('id, order_number, status')
+            .or(`order_number.ilike.%${query}%,customer_name.ilike.%${query}%`)
             .limit(5);
 
         const { data: customers } = await this.supabase
@@ -559,7 +494,7 @@ export class SupabaseStorage {
             .or(`name.ilike.%${query}%,sku.ilike.%${query}%`)
             .limit(5);
 
-        const formattedOrders = orders?.map(o => ({ id: o.id, title: o.orderNumber, type: 'order', subtitle: o.status })) || [];
+        const formattedOrders = orders?.map(o => ({ id: o.id, title: o.order_number, type: 'order', subtitle: o.status })) || [];
         const formattedCustomers = customers?.map(c => ({ id: c.id, title: c.name, type: 'customer', subtitle: c.phone })) || [];
         const formattedProducts = products?.map(p => ({ id: p.id, title: p.name, type: 'product', subtitle: p.sku })) || [];
 
@@ -570,21 +505,15 @@ export class SupabaseStorage {
     async createDelivery(data: InsertDelivery): Promise<Delivery> {
         const { data: delivery, error } = await this.supabase
             .from('deliveries')
-            .insert(data)
+            .insert(this.toSnakeCase(data))
             .select()
             .single();
-
         if (error) throw error;
         return this.mapDates(delivery);
     }
 
     async getDelivery(id: string): Promise<Delivery | undefined> {
-        const { data: delivery, error } = await this.supabase
-            .from('deliveries')
-            .select('*')
-            .eq('id', id)
-            .single();
-
+        const { data: delivery, error } = await this.supabase.from('deliveries').select('*').eq('id', id).single();
         if (error) return undefined;
         return this.mapDates(delivery);
     }
@@ -592,83 +521,52 @@ export class SupabaseStorage {
     async updateDelivery(id: string, data: Partial<InsertDelivery>): Promise<Delivery | undefined> {
         const { data: delivery, error } = await this.supabase
             .from('deliveries')
-            .update(data)
+            .update(this.toSnakeCase(data))
             .eq('id', id)
             .select()
             .single();
-
         if (error) return undefined;
         return this.mapDates(delivery);
     }
 
     async getDeliveries(): Promise<Delivery[]> {
-        const { data, error } = await this.supabase
-            .from('deliveries')
-            .select('*');
-
+        const { data, error } = await this.supabase.from('deliveries').select('*');
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
     // ======= DRIVERS =======
     async createDriver(data: InsertDriver): Promise<Driver> {
-        const { data: driver, error } = await this.supabase
-            .from('drivers')
-            .insert(data)
-            .select()
-            .single();
-
+        const { data: driver, error } = await this.supabase.from('drivers').insert(this.toSnakeCase(data)).select().single();
         if (error) throw error;
         return this.mapDates(driver);
     }
 
     async getDriver(id: string): Promise<Driver | null> {
-        const { data: driver, error } = await this.supabase
-            .from('drivers')
-            .select('*')
-            .eq('id', id)
-            .single();
-
+        const { data: driver, error } = await this.supabase.from('drivers').select('*').eq('id', id).single();
         if (error) return null;
         return this.mapDates(driver);
     }
 
     async listDrivers(): Promise<Driver[]> {
-        const { data, error } = await this.supabase
-            .from('drivers')
-            .select('*');
-
+        const { data, error } = await this.supabase.from('drivers').select('*');
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
     async updateDriver(id: string, data: Partial<InsertDriver>): Promise<Driver | null> {
-        const { data: driver, error } = await this.supabase
-            .from('drivers')
-            .update(data)
-            .eq('id', id)
-            .select()
-            .single();
-
+        const { data: driver, error } = await this.supabase.from('drivers').update(this.toSnakeCase(data)).eq('id', id).select().single();
         if (error) return null;
         return this.mapDates(driver);
     }
 
     async deleteDriver(id: string): Promise<boolean> {
-        const { error } = await this.supabase
-            .from('drivers')
-            .delete()
-            .eq('id', id);
-
+        const { error } = await this.supabase.from('drivers').delete().eq('id', id);
         return !error;
     }
 
     async getDriversByStatus(status: string): Promise<Driver[]> {
-        const { data, error } = await this.supabase
-            .from('drivers')
-            .select('*')
-            .eq('status', status);
-
+        const { data, error } = await this.supabase.from('drivers').select('*').eq('status', status);
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
@@ -676,374 +574,207 @@ export class SupabaseStorage {
     async updateDriverLocation(id: string, latitude: number, longitude: number): Promise<Driver | null> {
         const { data: driver, error } = await this.supabase
             .from('drivers')
-            .update({ currentLatitude: latitude, currentLongitude: longitude })
+            .update({ current_latitude: latitude, current_longitude: longitude })
             .eq('id', id)
             .select()
             .single();
-
         if (error) return null;
         return this.mapDates(driver);
     }
 
     // ======= SERVICES =======
     async createService(data: InsertService): Promise<Service> {
-        const { data: service, error } = await this.supabase
-            .from('services')
-            .insert(data)
-            .select()
-            .single();
-
+        const { data: service, error } = await this.supabase.from('services').insert(this.toSnakeCase(data)).select().single();
         if (error) throw error;
         return this.mapDates(service);
     }
 
     async getService(id: string): Promise<Service | undefined> {
-        const { data: service, error } = await this.supabase
-            .from('services')
-            .select('*')
-            .eq('id', id)
-            .single();
-
+        const { data: service, error } = await this.supabase.from('services').select('*').eq('id', id).single();
         if (error) return undefined;
         return this.mapDates(service);
     }
 
     async updateService(id: string, data: Partial<InsertService>): Promise<Service | undefined> {
-        const { data: service, error } = await this.supabase
-            .from('services')
-            .update(data)
-            .eq('id', id)
-            .select()
-            .single();
-
+        const { data: service, error } = await this.supabase.from('services').update(this.toSnakeCase(data)).eq('id', id).select().single();
         if (error) return undefined;
         return this.mapDates(service);
     }
 
     async deleteService(id: string): Promise<boolean> {
-        const { error } = await this.supabase
-            .from('services')
-            .delete()
-            .eq('id', id);
-
+        const { error } = await this.supabase.from('services').delete().eq('id', id);
         return !error;
     }
 
     async getServices(): Promise<Service[]> {
-        const { data, error } = await this.supabase
-            .from('services')
-            .select('*');
-
+        const { data, error } = await this.supabase.from('services').select('*');
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
     // ======= EMPLOYEES =======
     async createEmployee(data: InsertEmployee): Promise<Employee> {
-        const { data: employee, error } = await this.supabase
-            .from('employees')
-            .insert(data)
-            .select()
-            .single();
-
+        const { data: employee, error } = await this.supabase.from('employees').insert(this.toSnakeCase(data)).select().single();
         if (error) throw error;
         return this.mapDates(employee);
     }
 
     async getEmployee(id: string): Promise<Employee | undefined> {
-        const { data: employee, error } = await this.supabase
-            .from('employees')
-            .select('*')
-            .eq('id', id)
-            .single();
-
+        const { data: employee, error } = await this.supabase.from('employees').select('*').eq('id', id).single();
         if (error) return undefined;
         return this.mapDates(employee);
     }
 
     async getEmployeeByEmail(email: string): Promise<Employee | undefined> {
-        const { data: employee, error } = await this.supabase
-            .from('employees')
-            .select('*')
-            .eq('email', email)
-            .single();
-
+        const { data: employee, error } = await this.supabase.from('employees').select('*').eq('email', email).single();
         if (error) return undefined;
         return this.mapDates(employee);
     }
 
     async updateEmployee(id: string, data: Partial<InsertEmployee>): Promise<Employee | undefined> {
-        const { data: employee, error } = await this.supabase
-            .from('employees')
-            .update(data)
-            .eq('id', id)
-            .select()
-            .single();
-
+        const { data: employee, error } = await this.supabase.from('employees').update(this.toSnakeCase(data)).eq('id', id).select().single();
         if (error) return undefined;
         return this.mapDates(employee);
     }
 
     async deleteEmployee(id: string): Promise<boolean> {
-        const { error } = await this.supabase
-            .from('employees')
-            .delete()
-            .eq('id', id);
-
+        const { error } = await this.supabase.from('employees').delete().eq('id', id);
         return !error;
     }
 
     async getEmployees(): Promise<Employee[]> {
-        const { data, error } = await this.supabase
-            .from('employees')
-            .select('*');
-
+        const { data, error } = await this.supabase.from('employees').select('*');
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
     // ======= BARCODES =======
     async createBarcode(data: InsertBarcode): Promise<Barcode> {
-        const { data: barcode, error } = await this.supabase
-            .from('barcodes')
-            .insert(data)
-            .select()
-            .single();
-
+        const { data: barcode, error } = await this.supabase.from('barcodes').insert(this.toSnakeCase(data)).select().single();
         if (error) throw error;
         return this.mapDates(barcode);
     }
 
     async getBarcode(id: string): Promise<Barcode | undefined> {
-        const { data: barcode, error } = await this.supabase
-            .from('barcodes')
-            .select('*')
-            .eq('id', id)
-            .single();
-
+        const { data: barcode, error } = await this.supabase.from('barcodes').select('*').eq('id', id).single();
         if (error) return undefined;
         return this.mapDates(barcode);
     }
 
     async getBarcodeByCode(code: string): Promise<Barcode | undefined> {
-        const { data: barcode, error } = await this.supabase
-            .from('barcodes')
-            .select('*')
-            .eq('code', code)
-            .single();
-
+        const { data: barcode, error } = await this.supabase.from('barcodes').select('*').eq('code', code).single();
         if (error) return undefined;
         return this.mapDates(barcode);
     }
 
     async getBarcodesByEntity(entityType: string, entityId: string): Promise<Barcode[]> {
-        const { data, error } = await this.supabase
-            .from('barcodes')
-            .select('*')
-            .eq('entityType', entityType)
-            .eq('entityId', entityId);
-
+        const { data, error } = await this.supabase.from('barcodes').select('*').eq('entity_type', entityType).eq('entity_id', entityId);
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
     async getBarcodes(): Promise<Barcode[]> {
-        const { data, error } = await this.supabase
-            .from('barcodes')
-            .select('*');
-
+        const { data, error } = await this.supabase.from('barcodes').select('*');
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
     // ======= SHIPMENTS =======
     async getShipments(): Promise<any[]> {
-        const { data, error } = await this.supabase
-            .from('shipments')
-            .select('*');
-
+        const { data, error } = await this.supabase.from('shipments').select('*');
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
     async getShipment(id: string): Promise<any | undefined> {
-        const { data: shipment, error } = await this.supabase
-            .from('shipments')
-            .select('*')
-            .eq('id', id)
-            .single();
-
+        const { data: shipment, error } = await this.supabase.from('shipments').select('*').eq('id', id).single();
         if (error) return undefined;
         return this.mapDates(shipment);
     }
 
     async createShipment(data: any): Promise<any> {
-        const { data: shipment, error } = await this.supabase
-            .from('shipments')
-            .insert(data)
-            .select()
-            .single();
-
+        const { data: shipment, error } = await this.supabase.from('shipments').insert(this.toSnakeCase(data)).select().single();
         if (error) throw error;
         return this.mapDates(shipment);
     }
 
     async updateShipment(id: string, data: any): Promise<any | undefined> {
-        const { data: shipment, error } = await this.supabase
-            .from('shipments')
-            .update(data)
-            .eq('id', id)
-            .select()
-            .single();
-
+        const { data: shipment, error } = await this.supabase.from('shipments').update(this.toSnakeCase(data)).eq('id', id).select().single();
         if (error) return undefined;
         return this.mapDates(shipment);
     }
 
-    // ======= POS TRANSACTIONS =======
+    // ======= ORDER TRANSACTIONS (Fixed Name) =======
     async getPosTransactions(): Promise<any[]> {
-        const { data, error } = await this.supabase
-            .from('posTransactions')
-            .select('*');
-
+        const { data, error } = await this.supabase.from('order_transactions').select('*');
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
     async getPosTransaction(id: string): Promise<any | undefined> {
-        const { data: transaction, error } = await this.supabase
-            .from('posTransactions')
-            .select('*')
-            .eq('id', id)
-            .single();
-
+        const { data: transaction, error } = await this.supabase.from('order_transactions').select('*').eq('id', id).single();
         if (error) return undefined;
         return this.mapDates(transaction);
     }
 
     async createPosTransaction(data: any): Promise<any> {
-        const { data: transaction, error } = await this.supabase
-            .from('posTransactions')
-            .insert(data)
-            .select()
-            .single();
-
+        const { data: transaction, error } = await this.supabase.from('order_transactions').insert(this.toSnakeCase(data)).select().single();
         if (error) throw error;
         return this.mapDates(transaction);
     }
 
     // ======= DASHBOARD METRICS =======
     async getDashboardMetrics(): Promise<any> {
-        // This is a complex query, might be better to do in separate calls or a stored procedure
-        // For now, fetching data and calculating in JS (similar to SQLite implementation)
         const orders = await this.listOrders();
         const customers = await this.listCustomers();
         const products = await this.listProducts();
 
-        const totalRevenue = orders.reduce(
-            (sum, order) => sum + parseFloat(order.totalAmount || "0"),
-            0
-        );
-
+        const totalRevenue = orders.reduce((sum, order) => sum + parseFloat(order.totalAmount || "0"), 0);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        const ordersToday = orders.filter(
-            (order) => order.createdAt && new Date(order.createdAt) >= today
-        ).length;
+        const ordersToday = orders.filter(order => order.createdAt && new Date(order.createdAt) >= today).length;
+        const newCustomersToday = customers.filter(customer => customer.createdAt && new Date(customer.createdAt) >= today).length;
 
-        const newCustomersToday = customers.filter(
-            (customer) => customer.createdAt && new Date(customer.createdAt) >= today
-        ).length;
-
-        return {
-            totalRevenue,
-            totalOrders: ordersToday,
-            newCustomers: newCustomersToday,
-            inventoryItems: products.length
-        };
+        return { totalRevenue, totalOrders: ordersToday, newCustomers: newCustomersToday, inventoryItems: products.length };
     }
 
     // ======= SETTINGS =======
     async getAllSettings(): Promise<any[]> {
-        const { data, error } = await this.supabase
-            .from('settings')
-            .select('*')
-            .order('category', { ascending: true })
-            .order('key', { ascending: true });
-
+        const { data, error } = await this.supabase.from('settings').select('*').order('category', { ascending: true }).order('key', { ascending: true });
         if (error) throw error;
-        return data.map(row => ({
-            ...row,
-            value: JSON.parse(row.value),
-            updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
-        }));
+        return data.map(row => ({ ...row, value: JSON.parse(row.value), updatedAt: row.updated_at ? new Date(row.updated_at) : null }));
     }
 
     async getSettingsByCategory(category: string): Promise<any[]> {
-        const { data, error } = await this.supabase
-            .from('settings')
-            .select('*')
-            .eq('category', category)
-            .order('key', { ascending: true });
-
+        const { data, error } = await this.supabase.from('settings').select('*').eq('category', category).order('key', { ascending: true });
         if (error) throw error;
-        return data.map(row => ({
-            ...row,
-            value: JSON.parse(row.value),
-            updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
-        }));
+        return data.map(row => ({ ...row, value: JSON.parse(row.value), updatedAt: row.updated_at ? new Date(row.updated_at) : null }));
     }
 
     async getSetting(key: string): Promise<any | null> {
-        const { data, error } = await this.supabase
-            .from('settings')
-            .select('*')
-            .eq('key', key)
-            .single();
-
+        const { data, error } = await this.supabase.from('settings').select('*').eq('key', key).single();
         if (error) return null;
-        return {
-            ...data,
-            value: JSON.parse(data.value),
-            updatedAt: data.updatedAt ? new Date(data.updatedAt) : null
-        };
+        return { ...data, value: JSON.parse(data.value), updatedAt: data.updated_at ? new Date(data.updated_at) : null };
     }
 
     async updateSetting(key: string, value: any, category: string, updatedBy: string): Promise<any> {
         const now = new Date().toISOString();
         const valueStr = JSON.stringify(value);
-
-        // Check if exists
         const existing = await this.getSetting(key);
-
         let result;
-        if (existing) {
-            const { data, error } = await this.supabase
-                .from('settings')
-                .update({ value: valueStr, category, updatedBy, updatedAt: now })
-                .eq('key', key)
-                .select()
-                .single();
 
+        if (existing) {
+            const { data, error } = await this.supabase.from('settings').update({ value: valueStr, category, updated_by: updatedBy, updated_at: now }).eq('key', key).select().single();
             if (error) throw error;
             result = data;
         } else {
-            const { data, error } = await this.supabase
-                .from('settings')
-                .insert({ key, value: valueStr, category, updatedBy, updatedAt: now })
-                .select()
-                .single();
-
+            const { data, error } = await this.supabase.from('settings').insert({ key, value: valueStr, category, updated_by: updatedBy, updated_at: now }).select().single();
             if (error) throw error;
             result = data;
         }
 
-        return {
-            ...result,
-            value: JSON.parse(result.value),
-            updatedAt: result.updatedAt ? new Date(result.updatedAt) : null
-        };
+        return { ...result, value: JSON.parse(result.value), updatedAt: result.updated_at ? new Date(result.updated_at) : null };
     }
 
     async updateSettings(settings: any[], updatedBy: string): Promise<any[]> {
@@ -1055,240 +786,164 @@ export class SupabaseStorage {
     }
 
     async deleteAllSettings(): Promise<void> {
-        const { error } = await this.supabase
-            .from('settings')
-            .delete()
-            .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
-
+        const { error } = await this.supabase.from('settings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
         if (error) throw error;
     }
 
     // ======= FRANCHISES =======
     async createFranchise(data: any): Promise<any> {
-        const { data: franchise, error } = await this.supabase
-            .from('franchises')
-            .insert(data)
-            .select()
-            .single();
-
+        const { data: franchise, error } = await this.supabase.from('franchises').insert(this.toSnakeCase(data)).select().single();
         if (error) throw error;
         return this.mapDates(franchise);
     }
 
     async getFranchise(id: string): Promise<any | undefined> {
-        const { data: franchise, error } = await this.supabase
-            .from('franchises')
-            .select('*')
-            .eq('id', id)
-            .single();
-
+        const { data: franchise, error } = await this.supabase.from('franchises').select('*').eq('id', id).single();
         if (error) return undefined;
         return this.mapDates(franchise);
     }
 
     async updateFranchise(id: string, data: any): Promise<any | undefined> {
-        const { data: franchise, error } = await this.supabase
-            .from('franchises')
-            .update(data)
-            .eq('id', id)
-            .select()
-            .single();
-
+        const { data: franchise, error } = await this.supabase.from('franchises').update(this.toSnakeCase(data)).eq('id', id).select().single();
         if (error) return undefined;
         return this.mapDates(franchise);
     }
 
     async deleteFranchise(id: string): Promise<boolean> {
-        const { error } = await this.supabase
-            .from('franchises')
-            .delete()
-            .eq('id', id);
-
+        const { error } = await this.supabase.from('franchises').delete().eq('id', id);
         return !error;
     }
 
     async listFranchises(): Promise<any[]> {
-        const { data, error } = await this.supabase
-            .from('franchises')
-            .select('*');
-
+        const { data, error } = await this.supabase.from('franchises').select('*');
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
-
-
     // ======= TRANSIT ORDERS =======
     async listTransitOrders(): Promise<any[]> {
-        const { data, error } = await this.supabase
-            .from('transit_orders')
-            .select('*')
-            .order('created_at', { ascending: false });
-
+        const { data, error } = await this.supabase.from('transit_orders').select('*').order('created_at', { ascending: false });
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
     async getTransitOrdersByStatus(status: string): Promise<any[]> {
-        const { data, error } = await this.supabase
-            .from('transit_orders')
-            .select('*')
-            .eq('status', status)
-            .order('created_at', { ascending: false });
-
+        const { data, error } = await this.supabase.from('transit_orders').select('*').eq('status', status).order('created_at', { ascending: false });
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
     async getTransitOrdersByType(type: string): Promise<any[]> {
-        const { data, error } = await this.supabase
-            .from('transit_orders')
-            .select('*')
-            .eq('type', type)
-            .order('created_at', { ascending: false });
-
+        const { data, error } = await this.supabase.from('transit_orders').select('*').eq('type', type).order('created_at', { ascending: false });
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
+    async getTransitOrder(id: string): Promise<any | undefined> {
+        const { data, error } = await this.supabase.from('transit_orders').select('*').eq('id', id).single();
+        if (error) return undefined;
+        return this.mapDates(data);
+    }
+
+    async createTransitOrder(data: any): Promise<any> {
+        const { data: transitOrder, error } = await this.supabase.from('transit_orders').insert(this.toSnakeCase(data)).select().single();
+        if (error) throw error;
+        return this.mapDates(transitOrder);
+    }
+
+    async createTransitOrderItem(data: any): Promise<any> {
+        const { data: item, error } = await this.supabase.from('transit_order_items').insert(this.toSnakeCase(data)).select().single();
+        if (error) throw error;
+        return this.mapDates(item);
+    }
+
+    async createTransitStatusHistory(data: any): Promise<any> {
+        const { data: history, error } = await this.supabase.from('transit_status_history').insert(this.toSnakeCase(data)).select().single();
+        if (error) throw error;
+        return this.mapDates(history);
+    }
+
+    async getTransitOrderItems(transitOrderId: string): Promise<any[]> {
+        const { data, error } = await this.supabase.from('transit_order_items').select('*').eq('transit_order_id', transitOrderId);
+        if (error) throw error;
+        return data.map(item => this.mapDates(item));
+    }
+
+    async updateTransitOrder(id: string, data: any): Promise<any> {
+        const { data: transitOrder, error } = await this.supabase.from('transit_orders').update(this.toSnakeCase(data)).eq('id', id).select().single();
+        if (error) throw error;
+        return this.mapDates(transitOrder);
+    }
+
     // ======= DOCUMENTS =======
     async createDocument(data: any): Promise<any> {
-        const { data: document, error } = await this.supabase
-            .from('documents')
-            .insert(data)
-            .select()
-            .single();
-
+        const { data: document, error } = await this.supabase.from('documents').insert(this.toSnakeCase(data)).select().single();
         if (error) throw error;
         return this.mapDates(document);
     }
 
     async listDocuments(filters: any = {}): Promise<any[]> {
-        let query = this.supabase
-            .from('documents')
-            .select('*');
-
-        if (filters.type) {
-            query = query.eq('type', filters.type);
-        }
-
-        if (filters.status) {
-            query = query.eq('status', filters.status);
-        }
-
-        if (filters.limit) {
-            query = query.limit(filters.limit);
-        }
-
+        let query = this.supabase.from('documents').select('*');
+        if (filters.type) query = query.eq('type', filters.type);
+        if (filters.status) query = query.eq('status', filters.status);
+        if (filters.limit) query = query.limit(filters.limit);
         const { data, error } = await query.order('created_at', { ascending: false });
-
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
     async getDocument(id: string): Promise<any | undefined> {
-        const { data: document, error } = await this.supabase
-            .from('documents')
-            .select('*')
-            .eq('id', id)
-            .single();
-
+        const { data: document, error } = await this.supabase.from('documents').select('*').eq('id', id).single();
         if (error) return undefined;
         return this.mapDates(document);
     }
 
     async deleteDocument(id: string): Promise<boolean> {
-        const { error } = await this.supabase
-            .from('documents')
-            .delete()
-            .eq('id', id);
-
+        const { error } = await this.supabase.from('documents').delete().eq('id', id);
         return !error;
     }
 
     // ======= TASKS =======
     async createTask(data: any): Promise<any> {
-        const { data: task, error } = await this.supabase
-            .from('employee_tasks')
-            .insert(data)
-            .select()
-            .single();
-
+        const { data: task, error } = await this.supabase.from('employee_tasks').insert(this.toSnakeCase(data)).select().single();
         if (error) throw error;
         return this.mapDates(task);
     }
 
     async listTasks(franchiseId?: string, employeeId?: string): Promise<any[]> {
-        let query = this.supabase
-            .from('employee_tasks')
-            .select('*');
-
-        if (franchiseId) {
-            query = query.eq('franchise_id', franchiseId);
-        }
-
-        if (employeeId) {
-            query = query.eq('employee_id', employeeId);
-        }
-
+        let query = this.supabase.from('employee_tasks').select('*');
+        if (franchiseId) query = query.eq('franchise_id', franchiseId);
+        if (employeeId) query = query.eq('employee_id', employeeId);
         const { data, error } = await query;
-
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
     async updateTask(id: string, data: any): Promise<any | undefined> {
-        const { data: task, error } = await this.supabase
-            .from('employee_tasks')
-            .update(data)
-            .eq('id', id)
-            .select()
-            .single();
-
+        const { data: task, error } = await this.supabase.from('employee_tasks').update(this.toSnakeCase(data)).eq('id', id).select().single();
         if (error) return undefined;
         return this.mapDates(task);
     }
 
     // ======= ATTENDANCE =======
     async createAttendance(data: any): Promise<any> {
-        const { data: attendance, error } = await this.supabase
-            .from('employee_attendance')
-            .insert(data)
-            .select()
-            .single();
-
+        const { data: attendance, error } = await this.supabase.from('employee_attendance').insert(this.toSnakeCase(data)).select().single();
         if (error) throw error;
         return this.mapDates(attendance);
     }
 
     async listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]> {
-        let query = this.supabase
-            .from('employee_attendance')
-            .select('*');
-
-        if (franchiseId) {
-            query = query.eq('franchise_id', franchiseId);
-        }
-
-        if (employeeId) {
-            query = query.eq('employee_id', employeeId);
-        }
-
+        let query = this.supabase.from('employee_attendance').select('*');
+        if (franchiseId) query = query.eq('franchise_id', franchiseId);
+        if (employeeId) query = query.eq('employee_id', employeeId);
         if (date) {
-            // Supabase date filtering: check if date part matches
-            // Assuming date column is timestamp, we might need range or date_trunc
-            // Simplest for now: client side filter or simple GTE/LTE
             const dateStr = date.toISOString().split('T')[0];
             query = query.gte('date', `${dateStr}T00:00:00`).lte('date', `${dateStr}T23:59:59`);
         }
-
         const { data, error } = await query;
-
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
-    close() {
-        // Supabase client doesn't need explicit closing
-    }
+    close() { }
 }

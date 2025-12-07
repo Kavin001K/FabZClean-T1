@@ -30,6 +30,8 @@ import autoTable from 'jspdf-autotable';
 import JsBarcode from 'jsbarcode';
 
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useAuth } from '@/contexts/auth-context';
 import {
   Card,
   CardContent,
@@ -85,6 +87,7 @@ interface OrderInBatch {
   status: string;
   serviceType?: string;
   weight?: number;
+  id?: string;
 }
 
 interface StoreDetails {
@@ -126,7 +129,7 @@ interface TransitBatch {
   destination: string;
   createdBy: string;
   createdAt: string;
-  status: 'in_transit' | 'completed';
+  status: string;
   orders: OrderInBatch[];
   itemCount: number;
   storeDetails?: StoreDetails;
@@ -613,13 +616,14 @@ const generateTransitPDF = (
 export default function TransitOrdersPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const { employee } = useAuth();
 
   // State for current batch
   const [currentBatch, setCurrentBatch] = useState<OrderInBatch[]>([]);
   const [batchType, setBatchType] = useState<'store_to_factory' | 'factory_to_store'>('store_to_factory');
-  const [barcodeInput, setBarcodeInput] = useState('');
-  const [isScanning, setIsScanning] = useState(false);
+  const [showAddOrderDialog, setShowAddOrderDialog] = useState(false);
+  const [searchOrdersQuery, setSearchOrdersQuery] = useState('');
+  const [selectedEligibleOrders, setSelectedEligibleOrders] = useState<string[]>([]);
 
   // Dialog states
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -636,77 +640,70 @@ export default function TransitOrdersPage() {
     driverName: 'Vijay Singh',
     driverPhone: '+91 98765 43212',
     driverLicense: 'KA0120230012345',
-    employeeName: 'Current User',
-    employeeId: 'EMP001',
-    designation: 'Store Executive',
-    employeePhone: '+91 98765 43213',
+    employeeName: employee?.username || 'Current User',
+    employeeId: employee?.employeeId || 'EMP001',
+    designation: employee?.role || 'Staff',
+    employeePhone: employee?.phone || '+91 98765 43213',
   });
 
-  // Search and filter
-  const [searchQuery, setSearchQuery] = useState('');
+  // Search and filter for History
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Fetch recent orders for smart suggestions
-  const { data: recentOrders = [], isLoading: isLoadingRecentOrders } = useQuery({
-    queryKey: ['recent-orders', batchType],
+  // Fetch eligible orders for adding to batch
+  const { data: eligibleOrders = [], isLoading: isLoadingEligible } = useQuery({
+    queryKey: ['eligible-transit-orders', batchType, employee?.franchiseId],
     queryFn: async () => {
-      const response = await fetch(`/api/transit-suggestions/suggestions?type=${batchType}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch recent orders');
-      }
+      if (!employee?.franchiseId) return [];
+      const response = await fetch(`/api/transit-orders/eligible?type=${batchType === 'store_to_factory' ? 'To Factory' : 'Return to Store'}&franchiseId=${employee.franchiseId}`);
+      if (!response.ok) throw new Error('Failed to fetch eligible orders');
       return response.json();
     },
-    enabled: isScanning, // Only fetch when scanning is active
+    enabled: showAddOrderDialog && !!employee?.franchiseId
   });
 
-  // Fetch transit orders from API
-  const { data: transitHistory = [], isLoading } = useQuery<TransitBatch[]>({
-    queryKey: ['transit-batches'],
+  // Fetch transit history
+  const { data: transitHistory = [], isLoading: isLoadingHistory } = useQuery<TransitBatch[]>({
+    queryKey: ['transit-batches', employee?.franchiseId],
     queryFn: async () => {
-      const response = await fetch('/api/transit/batches');
-      if (!response.ok) {
-        throw new Error('Failed to fetch transit orders');
-      }
+      const url = employee?.franchiseId
+        ? `/api/transit-orders?franchiseId=${employee.franchiseId}`
+        : `/api/transit-orders`;
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch transit orders');
+
       const data = await response.json();
-      // Map database format to component format
-      // Handle paginated response structure
-      const batches = data.data || [];
-      return batches.map((order: any) => ({
+      return data.map((order: any) => ({
         id: order.id,
         transitId: order.transitId,
-        type: order.type,
+        type: order.type === 'To Factory' ? 'store_to_factory' : 'factory_to_store',
         origin: order.origin,
         destination: order.destination,
         createdBy: order.createdBy,
         createdAt: order.createdAt,
-        status: order.status,
-        orders: order.orders || [],
+        status: order.status.toLowerCase().replace(' ', '_'),
+        orders: order.orders || [], // In real app, might need to fetch items separately if not included
         itemCount: order.totalItems || 0,
-        storeDetails: order.storeDetails,
-        factoryDetails: order.factoryDetails,
-        vehicleDetails: order.vehicleNumber ? {
+        storeDetails: order.storeDetails || {},
+        factoryDetails: order.factoryDetails || {},
+        vehicleDetails: {
           vehicleNumber: order.vehicleNumber,
           vehicleType: order.vehicleType,
           driverName: order.driverName,
           driverPhone: order.driverPhone,
-          driverLicense: order.driverLicense,
-        } : undefined,
-        employeeDetails: order.employeeName ? {
+          driverLicense: order.driverLicense
+        },
+        employeeDetails: {
           name: order.employeeName,
           employeeId: order.employeeId,
           designation: order.designation,
-          phone: order.employeePhone,
-        } : undefined,
+          phone: order.employeePhone
+        }
       }));
     },
+    enabled: !!employee
   });
-
-  // Auto-focus barcode input when scanning starts
-  useEffect(() => {
-    if (isScanning && barcodeInputRef.current) {
-      barcodeInputRef.current.focus();
-    }
-  }, [isScanning]);
 
   const handleStartNewBatch = () => {
     if (currentBatch.length > 0) {
@@ -718,130 +715,48 @@ export default function TransitOrdersPage() {
 
   const startNewBatch = () => {
     setCurrentBatch([]);
-    setBarcodeInput('');
-    setIsScanning(true);
+    setSelectedEligibleOrders([]);
+    setShowAddOrderDialog(true);
     setShowClearConfirm(false);
-    setTimeout(() => {
-      barcodeInputRef.current?.focus();
-    }, 100);
   };
 
-  const handleQuickAddOrder = async (orderData: any) => {
-    // Check if already in batch
-    if (currentBatch.some((order) => order.orderNumber === orderData.orderNumber)) {
-      playErrorSound();
-      toast({
-        title: 'Already Added',
-        description: 'Order already in batch',
-        variant: 'destructive',
-      });
-      return;
+  const handleSelectOrder = (orderId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedEligibleOrders(prev => [...prev, orderId]);
+    } else {
+      setSelectedEligibleOrders(prev => prev.filter(id => id !== orderId));
     }
+  };
 
-    // Calculate total items and weight from order items
-    const itemCount = orderData.items?.length || 0;
-    const totalWeight = orderData.items?.reduce((sum: number, item: any) => sum + (item.weight || 0), 0) || 0;
+  const handleAddSelectedOrders = () => {
+    // Convert selected IDs to OrderInBatch objects
+    const selected = eligibleOrders.filter((o: any) => selectedEligibleOrders.includes(o.id || o.orderNumber)); // Adjust based on DB ID vs Order Number
 
-    const orderInBatch: OrderInBatch = {
-      orderNumber: orderData.orderNumber,
-      customerId: orderData.customerId,
-      customerName: orderData.customerName,
-      itemCount: itemCount,
-      status: orderData.status,
-      serviceType: orderData.serviceType || 'Dry Clean',
-      weight: parseFloat(totalWeight.toFixed(1)),
-    };
+    // Fallback: If eligibleOrders uses 'id' but we need 'orderNumber' or vice versa.
+    // Assuming backend returns standard Order objects.
 
-    playSuccessSound();
-    setCurrentBatch([...currentBatch, orderInBatch]);
+    const newItems: OrderInBatch[] = selected.map((o: any) => ({
+      orderNumber: o.orderNumber,
+      customerId: o.customerId,
+      customerName: o.customerName,
+      itemCount: Array.isArray(o.items) ? o.items.length : 0,
+      status: o.status,
+      serviceType: o.service || 'Laundry',
+      weight: 0, // Placeholder
+      id: o.id
+    }));
+
+    // Filter out duplicates
+    const uniqueNewItems = newItems.filter(item => !currentBatch.some(cb => cb.orderNumber === item.orderNumber));
+
+    setCurrentBatch(prev => [...prev, ...uniqueNewItems]);
+    setShowAddOrderDialog(false);
+    setSelectedEligibleOrders([]);
 
     toast({
-      title: 'Order Added',
-      description: `Order ${orderData.orderNumber} added to batch (${itemCount} items)`,
+      title: 'Orders Added',
+      description: `Added ${uniqueNewItems.length} orders to the batch.`,
     });
-  };
-
-  const handleAddOrder = async () => {
-    if (!barcodeInput.trim()) return;
-
-    const orderId = barcodeInput.trim();
-
-    // Check if already in batch
-    if (currentBatch.some((order) => order.orderNumber === orderId)) {
-      playErrorSound();
-      toast({
-        title: 'Error',
-        description: 'Order already in batch',
-        variant: 'destructive',
-      });
-      setBarcodeInput('');
-      return;
-    }
-
-    try {
-      // Fetch order details from API
-      const response = await fetch(`/api/orders/${orderId}`);
-      if (!response.ok) {
-        playErrorSound();
-        toast({
-          title: 'Error',
-          description: 'Order not found',
-          variant: 'destructive',
-        });
-        setBarcodeInput('');
-        return;
-      }
-
-      const orderData = await response.json();
-
-      // Validate order status for transit type
-      const validStatuses = batchType === 'store_to_factory'
-        ? ['in_store', 'ready_for_transit', 'pending']
-        : ['processing', 'completed', 'ready_for_delivery'];
-
-      if (!validStatuses.includes(orderData.status)) {
-        playErrorSound();
-        toast({
-          title: 'Invalid Order Status',
-          description: `Order status "${orderData.status}" is not valid for ${batchType === 'store_to_factory' ? 'store to factory' : 'factory to store'} transit`,
-          variant: 'destructive',
-        });
-        setBarcodeInput('');
-        return;
-      }
-
-      // Calculate total items and weight from order items
-      const itemCount = orderData.items?.length || 0;
-      const totalWeight = orderData.items?.reduce((sum: number, item: any) => sum + (item.weight || 0), 0) || 0;
-
-      const orderInBatch: OrderInBatch = {
-        orderNumber: orderData.orderNumber,
-        customerId: orderData.customerId,
-        customerName: orderData.customerName,
-        itemCount: itemCount,
-        status: orderData.status,
-        serviceType: orderData.serviceType || 'Dry Clean',
-        weight: parseFloat(totalWeight.toFixed(1)),
-      };
-
-      playSuccessSound();
-      setCurrentBatch([...currentBatch, orderInBatch]);
-      setBarcodeInput('');
-      barcodeInputRef.current?.focus();
-
-      toast({
-        title: 'Order Added',
-        description: `Order ${orderId} added to batch (${itemCount} items)`,
-      });
-    } catch (error) {
-      playErrorSound();
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch order details',
-        variant: 'destructive',
-      });
-      setBarcodeInput('');
-    }
   };
 
   const handleRemoveOrder = (orderNumber: string) => {
@@ -870,1003 +785,426 @@ export default function TransitOrdersPage() {
       });
       return;
     }
-
-    // Show dialog to collect vehicle and employee details
     setShowTransitDetailsDialog(true);
   };
 
   const confirmGenerateTransitCopy = async () => {
-    // Generate Transit ID
-    const transitId = `TRN-${Date.now().toString().slice(-6)}`;
-
     try {
-      // Prepare details
+      if (!employee?.franchiseId) {
+        toast({ title: "Error", description: "Employee franchise ID missing", variant: "destructive" });
+        return;
+      }
+
       const storeDetails: StoreDetails = {
-        name: 'FabZ Clean - Store #1',
-        address: '123 Main Street, Bangalore - 560001',
+        name: 'FabZ Clean - Store',
+        address: '123 Main Street',
         phone: '+91 98765 43210',
-        managerName: 'Rajesh Kumar',
+        managerName: 'Manager',
         storeCode: 'STR001',
       };
 
       const factoryDetails: FactoryDetails = {
-        name: 'FabZ Clean - Central Factory',
-        address: '456 Industrial Area, Bangalore - 560099',
+        name: 'FabZ Clean - Factory',
+        address: '456 Ind Area',
         phone: '+91 98765 43211',
-        managerName: 'Suresh Patel',
+        managerName: 'Manager',
         factoryCode: 'FAC001',
       };
 
-      const vehicleDetails: VehicleDetails = {
+      const transitReqData = {
+        type: batchType === 'store_to_factory' ? 'To Factory' : 'Return to Store',
         vehicleNumber: transitDetails.vehicleNumber,
         vehicleType: transitDetails.vehicleType,
         driverName: transitDetails.driverName,
         driverPhone: transitDetails.driverPhone,
         driverLicense: transitDetails.driverLicense,
-      };
-
-      const employeeDetails: EmployeeDetails = {
-        name: transitDetails.employeeName,
-        employeeId: transitDetails.employeeId,
-        designation: transitDetails.designation,
-        phone: transitDetails.employeePhone,
-      };
-
-      // Calculate totals
-      const totalOrders = currentBatch.length;
-      const totalItems = currentBatch.reduce((sum, order) => sum + order.itemCount, 0);
-      const totalWeight = currentBatch.reduce((sum, order) => sum + (order.weight || 0), 0);
-
-      // Prepare transit order data for database
-      const transitOrderData = {
-        transitId,
-        type: batchType,
-        status: 'in_transit',
-        origin: batchType === 'store_to_factory' ? storeDetails.name : factoryDetails.name,
-        destination: batchType === 'store_to_factory' ? factoryDetails.name : storeDetails.name,
-        createdBy: employeeDetails.name,
-        vehicleNumber: vehicleDetails.vehicleNumber,
-        vehicleType: vehicleDetails.vehicleType,
-        driverName: vehicleDetails.driverName,
-        driverPhone: vehicleDetails.driverPhone,
-        driverLicense: vehicleDetails.driverLicense,
-        employeeName: employeeDetails.name,
-        employeeId: employeeDetails.employeeId,
-        designation: employeeDetails.designation,
-        employeePhone: employeeDetails.phone,
-        totalOrders,
-        totalItems,
-        totalWeight,
-        orders: currentBatch,
+        employeeId: employee.id, // Auth Context ID
+        franchiseId: employee.franchiseId,
+        employeeName: employee.username,
+        employeePhone: employee.phone,
+        designation: employee.role,
         storeDetails,
         factoryDetails,
+        origin: batchType === 'store_to_factory' ? storeDetails.name : factoryDetails.name,
+        destination: batchType === 'store_to_factory' ? factoryDetails.name : storeDetails.name,
+        orderIds: currentBatch.map(o => {
+          // Use passed ID
+          return o.id;
+        })
       };
 
-      // Create transit order in database
       const response = await fetch('/api/transit-orders', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(transitOrderData),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(transitReqData),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to create transit order');
-      }
+      if (!response.ok) throw new Error('Failed to create transit order');
+      const result = await response.json();
 
-      const createdTransitOrder = await response.json();
-
-      // Update all order statuses based on transit type
-      // Store to Factory: pending/in_store → processing (when transit created)
-      // Factory to Store: Keep current status until delivered
-      const statusUpdatePromises = currentBatch.map((order) => {
-        const newOrderStatus = batchType === 'store_to_factory' ? 'processing' : order.status;
-
-        return fetch(`/api/orders/${order.orderNumber}/status`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            status: newOrderStatus,
-            notes: batchType === 'store_to_factory'
-              ? `Added to transit ${transitId} - Processing started at factory`
-              : `Added to transit ${transitId} - Returning to store`,
-            updatedBy: employeeDetails.name,
-          }),
-        });
-      });
-
-      await Promise.all(statusUpdatePromises);
-
-      // Generate PDF with all details
+      // Generate PDF
       generateTransitPDF(
-        transitId,
+        result.transitId,
         currentBatch,
         batchType,
         transitDetails.employeeName,
         storeDetails,
         factoryDetails,
-        vehicleDetails,
-        employeeDetails
+        { ...transitDetails },
+        {
+          name: transitDetails.employeeName,
+          employeeId: transitDetails.employeeId,
+          designation: transitDetails.designation,
+          phone: transitDetails.employeePhone
+        }
       );
 
       toast({
         title: 'Transit Order Created',
-        description: `Transit ID: ${transitId} - PDF downloaded and ${totalOrders} orders updated`,
+        description: `Transit ID: ${result.transitId} created successfully.`,
         duration: 5000,
       });
 
-      // Reset batch
       setCurrentBatch([]);
-      setIsScanning(false);
-      setBarcodeInput('');
       setShowTransitDetailsDialog(false);
-
-      // Refresh transit history
       queryClient.invalidateQueries({ queryKey: ['transit-batches'] });
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['eligible-transit-orders'] });
     } catch (error) {
-      console.error('Failed to create transit order:', error);
+      console.error('Failed to create transit:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create transit order. Please try again.',
+        description: 'Failed to create transit order.',
         variant: 'destructive',
       });
     }
   };
 
-  const totalItems = currentBatch.reduce((sum, order) => sum + order.itemCount, 0);
+  const handleUpdateStatus = async (batchId: string, newStatus: string) => {
+    try {
+      const response = await fetch(`/api/transit-orders/${batchId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: newStatus,
+          location: 'Store/Factory', // Simplification
+          updatedBy: employee?.username
+        })
+      });
 
+      if (!response.ok) throw new Error("Failed to update status");
+
+      toast({ title: "Status Updated", description: `Transit updated to ${newStatus}` });
+      queryClient.invalidateQueries({ queryKey: ['transit-batches'] });
+      setShowViewDialog(false);
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+    }
+  };
+
+  // Filter history
   const filteredHistory = transitHistory.filter((batch) => {
-    const matchesSearch = batch.transitId.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || batch.status === statusFilter;
+    const matchesSearch = batch.transitId.toLowerCase().includes(historySearchQuery.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || batch.status === statusFilter ||
+      (statusFilter === 'in_transit' && batch.status === 'in_transit') ||
+      (statusFilter === 'completed' && (batch.status === 'completed' || batch.status === 'received'));
     return matchesSearch && matchesStatus;
   });
-
-  const stats = {
-    inTransit: transitHistory.filter((b) => b.status === 'in_transit').length,
-    completed: transitHistory.filter((b) => b.status === 'completed').length,
-    storeToFactory: transitHistory.filter((b) => b.type === 'store_to_factory').length,
-    factoryToStore: transitHistory.filter((b) => b.type === 'factory_to_store').length,
-  };
 
   return (
     <PageTransition>
       <div className="min-h-screen bg-background p-6 space-y-6">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between"
-        >
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold tracking-tight flex items-center gap-3">
               <Truck className="h-10 w-10 text-primary" />
               Transit Order Management
             </h1>
             <p className="text-muted-foreground mt-2">
-              Create transit batches for store-to-factory and factory-to-store shipments
+              Manage store-to-factory and factory-to-store shipments
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Select value={batchType} onValueChange={(value: any) => setBatchType(value)}>
+            <Select value={batchType} onValueChange={(value: any) => { setBatchType(value); setCurrentBatch([]); }}>
               <SelectTrigger className="w-[220px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="store_to_factory">
-                  <div className="flex items-center gap-2">
-                    <Store className="h-4 w-4" />
-                    Store → Factory
-                  </div>
-                </SelectItem>
-                <SelectItem value="factory_to_store">
-                  <div className="flex items-center gap-2">
-                    <Factory className="h-4 w-4" />
-                    Factory → Store
-                  </div>
-                </SelectItem>
+                <SelectItem value="store_to_factory"><div className="flex items-center gap-2"><Store className="h-4 w-4" /> Store → Factory</div></SelectItem>
+                <SelectItem value="factory_to_store"><div className="flex items-center gap-2"><Factory className="h-4 w-4" /> Factory → Store</div></SelectItem>
               </SelectContent>
             </Select>
             <Button onClick={handleStartNewBatch} size="lg" className="gap-2">
-              <Plus className="h-5 w-5" />
-              Start New Transit Batch
+              <Plus className="h-5 w-5" /> New Transit Batch
             </Button>
           </div>
         </motion.div>
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">In Transit</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{stats.inTransit}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Store → Factory</CardTitle>
-              <Store className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{stats.storeToFactory}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Factory → Store</CardTitle>
-              <Factory className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-600">{stats.factoryToStore}</div>
-            </CardContent>
-          </Card>
-        </div>
-
+        {/* Create Batch Card (Left) & History (Right) */}
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Left: Current Batch Creation */}
-          <Card className="lg:col-span-1">
+
+          {/* LEFT: Current Batch */}
+          <Card className="lg:col-span-1 h-full flex flex-col">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Barcode className="h-5 w-5" />
-                Current Batch
-                {currentBatch.length > 0 && (
-                  <Badge variant="secondary" className="ml-auto">
-                    {currentBatch.length} orders • {totalItems} items
-                  </Badge>
-                )}
+                <Barcode className="h-5 w-5" /> Current Batch ({currentBatch.length})
               </CardTitle>
               <CardDescription>
-                Scan order barcodes to add them to the current transit batch
+                Orders selected for {batchType === 'store_to_factory' ? 'Store → Factory' : 'Factory → Store'}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Barcode Input */}
-              <div className="space-y-2">
-                <Label htmlFor="barcode-input">Scan or Enter Order ID</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="barcode-input"
-                    ref={barcodeInputRef}
-                    value={barcodeInput}
-                    onChange={(e) => setBarcodeInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAddOrder();
-                      }
-                    }}
-                    placeholder="Scan barcode or type Order ID..."
-                    disabled={!isScanning}
-                    className="flex-1"
-                    autoFocus
-                  />
-                  <Button onClick={handleAddOrder} disabled={!isScanning || !barcodeInput.trim()}>
-                    Add
-                  </Button>
-                </div>
-              </div>
+            <CardContent className="flex-1 flex flex-col gap-4">
+              {/* Add Button */}
+              <Button variant="outline" className="w-full text-primary border-primary border-dashed" onClick={() => setShowAddOrderDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" /> Add Orders to Batch
+              </Button>
 
-              {/* Recent Orders Smart Suggestions */}
-              {isScanning && recentOrders.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Quick Add - Recent Orders</Label>
-                    <Badge variant="outline" className="text-xs">
-                      {recentOrders.length} suggested
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto p-2 border rounded-lg bg-muted/30">
-                    {recentOrders.map((order: any) => (
-                      <motion.div
-                        key={order.orderNumber}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className={`p-2 rounded-md border-2 transition-all cursor-pointer ${currentBatch.some(b => b.orderNumber === order.orderNumber)
-                          ? 'border-green-500 bg-green-50 opacity-50 cursor-not-allowed'
-                          : 'border-border bg-background hover:border-primary hover:shadow-sm'
-                          }`}
-                        onClick={() => handleQuickAddOrder(order)}
-                      >
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-mono font-semibold">{order.orderNumber}</span>
-                            {currentBatch.some(b => b.orderNumber === order.orderNumber) && (
-                              <CheckCircle2 className="h-3 w-3 text-green-600" />
-                            )}
-                          </div>
-                          <span className="text-xs text-muted-foreground truncate">{order.customerName}</span>
-                          <div className="flex items-center justify-between text-xs">
-                            <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                              {order.items?.length || 0} items
-                            </Badge>
-                            <span className="text-[10px] text-muted-foreground">
-                              {new Date(order.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Current Batch List */}
-              {currentBatch.length > 0 ? (
-                <div className="border rounded-lg">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">#</TableHead>
-                        <TableHead>Order ID</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead className="text-center">Items</TableHead>
-                        <TableHead className="w-12"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <AnimatePresence>
-                        {currentBatch.map((order, index) => (
-                          <motion.tr
-                            key={order.orderNumber}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            className="border-b"
-                          >
-                            <TableCell className="font-medium">{index + 1}</TableCell>
-                            <TableCell>{order.orderNumber}</TableCell>
-                            <TableCell>{order.customerName}</TableCell>
-                            <TableCell className="text-center">{order.itemCount} pcs</TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveOrder(order.orderNumber)}
-                                className="h-8 w-8 text-destructive hover:text-destructive"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </motion.tr>
-                        ))}
-                      </AnimatePresence>
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="border-2 border-dashed rounded-lg p-12 text-center text-muted-foreground">
-                  <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="font-medium">No orders in batch</p>
-                  <p className="text-sm">
-                    {isScanning
-                      ? 'Scan order barcodes to add them to this batch'
-                      : 'Click "Start New Transit Batch" to begin'}
-                  </p>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleGenerateTransitCopy}
-                  disabled={currentBatch.length === 0}
-                  className="flex-1 gap-2"
-                >
-                  <Printer className="h-4 w-4" />
-                  Generate Transit Copy
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowClearConfirm(true)}
-                  disabled={currentBatch.length === 0}
-                  className="gap-2"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Clear Batch
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Right: Transit History */}
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Transit History
-              </CardTitle>
-              <CardDescription>View and reprint past transit batches</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Search */}
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by Transit ID..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="in_transit">In Transit</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* History List */}
-              <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                {filteredHistory.length > 0 ? (
-                  filteredHistory.map((batch) => (
-                    <motion.div
-                      key={batch.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="border rounded-lg p-4 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold">{batch.transitId}</h4>
-                            <Badge
-                              variant={batch.status === 'completed' ? 'default' : 'secondary'}
-                              className={
-                                batch.status === 'completed'
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-yellow-100 text-yellow-800'
-                              }
-                            >
-                              {batch.status === 'completed' ? 'Completed' : 'In Transit'}
-                            </Badge>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {new Date(batch.createdAt).toLocaleDateString()}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              {batch.createdBy}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Package className="h-3 w-3" />
-                              {batch.itemCount} items
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {batch.type === 'store_to_factory' ? (
-                                <>
-                                  <Store className="h-3 w-3" />
-                                  Store → Factory
-                                </>
-                              ) : (
-                                <>
-                                  <Factory className="h-3 w-3" />
-                                  Factory → Store
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedBatch(batch);
-                              setShowViewDialog(true);
-                            }}
-                            className="gap-1"
-                          >
-                            <Eye className="h-3 w-3" />
-                            View
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1"
-                            onClick={() => {
-                              generateTransitPDF(
-                                batch.transitId,
-                                batch.orders,
-                                batch.type,
-                                batch.createdBy
-                              );
-                              toast({
-                                title: 'Transit Copy Printed',
-                                description: `PDF for ${batch.transitId} downloaded successfully`,
-                              });
-                            }}
-                          >
-                            <Printer className="h-3 w-3" />
-                            Print
-                          </Button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))
-                ) : (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="font-medium">No transit batches found</p>
-                    <p className="text-sm">Create your first transit batch to get started</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Clear Batch Confirmation Dialog */}
-        <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Clear Current Batch?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to discard the current batch? All {currentBatch.length} scanned order(s)
-                will be removed. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={startNewBatch} className="bg-destructive hover:bg-destructive/90">
-                Yes, Clear Batch
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Remove Order Confirmation Dialog */}
-        <AlertDialog open={showRemoveConfirm} onOpenChange={setShowRemoveConfirm}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Remove Order from Batch?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to remove Order ID <strong>{orderToRemove}</strong> from this batch?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setOrderToRemove(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmRemoveOrder} className="bg-destructive hover:bg-destructive/90">
-                Yes, Remove
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* View Batch Details Dialog */}
-        <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Transit Batch Details</DialogTitle>
-              <DialogDescription>
-                {selectedBatch?.transitId} - {selectedBatch?.type === 'store_to_factory' ? 'Store to Factory' : 'Factory to Store'}
-              </DialogDescription>
-            </DialogHeader>
-            {selectedBatch && (
-              <Tabs defaultValue="details" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="details">Details</TabsTrigger>
-                  <TabsTrigger value="orders">Orders</TabsTrigger>
-                  <TabsTrigger value="history">Status History</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="details" className="space-y-4 mt-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-muted-foreground">Created By</Label>
-                      <p className="font-medium">{selectedBatch.createdBy}</p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">Date Created</Label>
-                      <p className="font-medium">
-                        {new Date(selectedBatch.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">Origin</Label>
-                      <p className="font-medium">{selectedBatch.origin}</p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">Destination</Label>
-                      <p className="font-medium">{selectedBatch.destination}</p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">Status</Label>
-                      <Badge
-                        variant={selectedBatch.status === 'completed' ? 'default' : 'secondary'}
-                        className={
-                          selectedBatch.status === 'completed'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }
-                      >
-                        {selectedBatch.status === 'completed' ? 'Completed' : 'In Transit'}
-                      </Badge>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">Total Orders</Label>
-                      <p className="font-medium">{selectedBatch.orders?.length || 0}</p>
-                    </div>
-                  </div>
-                  <Separator />
-                  {selectedBatch.vehicleDetails && (
-                    <>
-                      <div>
-                        <h4 className="font-semibold mb-2">Vehicle Details</h4>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-muted-foreground">Vehicle Number</Label>
-                            <p className="font-medium">{selectedBatch.vehicleDetails.vehicleNumber}</p>
-                          </div>
-                          <div>
-                            <Label className="text-muted-foreground">Vehicle Type</Label>
-                            <p className="font-medium">{selectedBatch.vehicleDetails.vehicleType}</p>
-                          </div>
-                          <div>
-                            <Label className="text-muted-foreground">Driver Name</Label>
-                            <p className="font-medium">{selectedBatch.vehicleDetails.driverName}</p>
-                          </div>
-                          <div>
-                            <Label className="text-muted-foreground">Driver Phone</Label>
-                            <p className="font-medium">{selectedBatch.vehicleDetails.driverPhone}</p>
-                          </div>
-                        </div>
-                      </div>
-                      <Separator />
-                    </>
-                  )}
-                  <div>
-                    <Label>Transit Barcode</Label>
-                    <div className="mt-2 p-4 bg-muted rounded-lg text-center">
-                      <Barcode className="h-12 w-12 mx-auto mb-2" />
-                      <p className="text-xl font-mono font-bold">{selectedBatch.transitId}</p>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="orders" className="mt-4">
-                  <div className="border rounded-lg">
+              {/* Batch Table */}
+              <div className="flex-1 border rounded-lg overflow-hidden relative min-h-[300px]">
+                {currentBatch.length > 0 ? (
+                  <div className="overflow-y-auto max-h-[400px]">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>#</TableHead>
-                          <TableHead>Order ID</TableHead>
+                          <TableHead>ID</TableHead>
                           <TableHead>Customer</TableHead>
-                          <TableHead>Service</TableHead>
-                          <TableHead className="text-right">Items</TableHead>
-                          <TableHead className="text-right">Weight</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {selectedBatch.orders?.map((order, index) => (
+                        {currentBatch.map(order => (
                           <TableRow key={order.orderNumber}>
-                            <TableCell>{index + 1}</TableCell>
                             <TableCell className="font-medium">{order.orderNumber}</TableCell>
                             <TableCell>{order.customerName}</TableCell>
-                            <TableCell>{order.serviceType || 'Dry Clean'}</TableCell>
-                            <TableCell className="text-right">{order.itemCount}</TableCell>
-                            <TableCell className="text-right">
-                              {order.weight ? `${order.weight.toFixed(1)} kg` : 'N/A'}
+                            <TableCell>{order.status}</TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="icon" onClick={() => handleRemoveOrder(order.orderNumber)} className="text-destructive">
+                                <X className="h-4 w-4" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
-                </TabsContent>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
+                    <Package className="h-12 w-12 mb-2 opacity-20" />
+                    <p>No orders added yet</p>
+                  </div>
+                )}
+              </div>
 
-                <TabsContent value="history" className="mt-4">
-                  <TransitStatusHistory transitOrderId={selectedBatch.id} />
-                </TabsContent>
-              </Tabs>
-            )}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowViewDialog(false)}>
-                Close
-              </Button>
-              {selectedBatch && selectedBatch.status === 'in_transit' && (
-                <Button
-                  className="gap-2"
-                  onClick={async () => {
-                    try {
-                      // Update transit order status to completed
-                      const response = await fetch(`/api/transit-orders/${selectedBatch.id}/status`, {
-                        method: 'PATCH',
-                        headers: {
-                          'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                          status: 'completed',
-                          notes: 'Transit completed and delivered',
-                          updatedBy: 'Current User',
-                        }),
-                      });
-
-                      if (!response.ok) {
-                        throw new Error('Failed to update transit status');
-                      }
-
-                      // If factory to store transit, mark all orders as completed (ready for delivery)
-                      if (selectedBatch.type === 'factory_to_store' && selectedBatch.orders) {
-                        const orderStatusUpdates = selectedBatch.orders.map((order) =>
-                          fetch(`/api/orders/${order.orderNumber}/status`, {
-                            method: 'PATCH',
-                            headers: {
-                              'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                              status: 'ready_for_delivery',
-                              notes: `Transit ${selectedBatch.transitId} completed - Returned from factory, ready for delivery`,
-                              updatedBy: 'Current User',
-                            }),
-                          })
-                        );
-
-                        await Promise.all(orderStatusUpdates);
-
-                        toast({
-                          title: 'Transit Completed',
-                          description: `Transit ${selectedBatch.transitId} completed and ${selectedBatch.orders.length} orders marked as ready for delivery`,
-                        });
-                      } else {
-                        toast({
-                          title: 'Transit Completed',
-                          description: `Transit ${selectedBatch.transitId} marked as completed`,
-                        });
-                      }
-
-                      setShowViewDialog(false);
-                      queryClient.invalidateQueries({ queryKey: ['transit-batches'] });
-                      queryClient.invalidateQueries({ queryKey: ['orders'] });
-                    } catch (error) {
-                      toast({
-                        title: 'Error',
-                        description: 'Failed to update transit status',
-                        variant: 'destructive',
-                      });
-                    }
-                  }}
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  Mark as Completed
+              {/* Actions */}
+              <div className="flex gap-2 mt-auto pt-4">
+                <Button onClick={handleGenerateTransitCopy} disabled={currentBatch.length === 0} className="flex-1">
+                  <Printer className="h-4 w-4 mr-2" /> Create & Print
                 </Button>
-              )}
-              <Button
-                className="gap-2"
-                onClick={() => {
-                  if (selectedBatch) {
-                    generateTransitPDF(
-                      selectedBatch.transitId,
-                      selectedBatch.orders,
-                      selectedBatch.type,
-                      selectedBatch.createdBy,
-                      selectedBatch.storeDetails,
-                      selectedBatch.factoryDetails,
-                      selectedBatch.vehicleDetails,
-                      selectedBatch.employeeDetails
-                    );
-                    toast({
-                      title: 'Transit Copy Reprinted',
-                      description: `PDF for ${selectedBatch.transitId} downloaded successfully`,
-                    });
-                  }
-                }}
-              >
-                <Printer className="h-4 w-4" />
-                Reprint Transit Copy
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+                <Button variant="outline" onClick={() => setShowClearConfirm(true)} disabled={currentBatch.length === 0}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Transit Details Dialog - Collect Vehicle & Employee Info */}
-        <Dialog open={showTransitDetailsDialog} onOpenChange={setShowTransitDetailsDialog}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {/* RIGHT: Transit History */}
+          <Card className="lg:col-span-1 h-full flex flex-col">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">History</CardTitle>
+              <div className="flex gap-2 mt-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Search ID..." value={historySearchQuery} onChange={e => setHistorySearchQuery(e.target.value)} className="pl-8" />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="in_transit">In Transit</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="received">Received</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto max-h-[600px] space-y-3">
+              {isLoadingHistory ? (
+                <div className="text-center py-8"><RefreshCw className="animate-spin mx-auto" /></div>
+              ) : filteredHistory.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No records found</div>
+              ) : filteredHistory.map(batch => (
+                <div key={batch.id} className="border rounded-lg p-3 hover:bg-accent/50 transition-colors flex justify-between items-start">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold">{batch.transitId}</span>
+                      <Badge variant={batch.status === 'completed' || batch.status === 'received' ? 'default' : 'secondary'}>
+                        {batch.status.replace('_', ' ').toUpperCase()}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {new Date(batch.createdAt).toLocaleDateString()} | {batch.itemCount} Items
+                    </div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                      {batch.type === 'store_to_factory' ? <Store className="h-3 w-3" /> : <Factory className="h-3 w-3" />}
+                      <span>{batch.type === 'store_to_factory' ? 'Store -> Fac' : 'Fac -> Store'}</span>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => { setSelectedBatch(batch); setShowViewDialog(true); }}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+        </div>
+
+        {/* Add Orders Dialog */}
+        <Dialog open={showAddOrderDialog} onOpenChange={setShowAddOrderDialog}>
+          <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Truck className="h-5 w-5" />
-                Transit Order Details
-              </DialogTitle>
+              <DialogTitle>Add Orders to Batch</DialogTitle>
               <DialogDescription>
-                Please provide vehicle and employee details for this transit order
+                Select eligible orders for {batchType === 'store_to_factory' ? 'Store to Factory' : 'Factory to Store'} transit.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-6">
-              {/* Vehicle Details Section */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-5 w-5 text-orange-600" />
-                  <h3 className="text-lg font-semibold">Vehicle & Driver Details</h3>
-                </div>
-                <Separator />
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="vehicleNumber">Vehicle Number *</Label>
-                    <Input
-                      id="vehicleNumber"
-                      value={transitDetails.vehicleNumber}
-                      onChange={(e) => setTransitDetails({ ...transitDetails, vehicleNumber: e.target.value })}
-                      placeholder="KA-01-AB-1234"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="vehicleType">Vehicle Type *</Label>
-                    <Select
-                      value={transitDetails.vehicleType}
-                      onValueChange={(value) => setTransitDetails({ ...transitDetails, vehicleType: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Tempo Traveller">Tempo Traveller</SelectItem>
-                        <SelectItem value="Mini Van">Mini Van</SelectItem>
-                        <SelectItem value="Pickup Truck">Pickup Truck</SelectItem>
-                        <SelectItem value="Small Van">Small Van</SelectItem>
-                        <SelectItem value="Large Truck">Large Truck</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="driverName">Driver Name *</Label>
-                    <Input
-                      id="driverName"
-                      value={transitDetails.driverName}
-                      onChange={(e) => setTransitDetails({ ...transitDetails, driverName: e.target.value })}
-                      placeholder="Enter driver name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="driverPhone">Driver Phone *</Label>
-                    <Input
-                      id="driverPhone"
-                      value={transitDetails.driverPhone}
-                      onChange={(e) => setTransitDetails({ ...transitDetails, driverPhone: e.target.value })}
-                      placeholder="+91 98765 43210"
-                    />
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label htmlFor="driverLicense">Driver License Number *</Label>
-                    <Input
-                      id="driverLicense"
-                      value={transitDetails.driverLicense}
-                      onChange={(e) => setTransitDetails({ ...transitDetails, driverLicense: e.target.value })}
-                      placeholder="KA0120230012345"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Employee Details Section */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <User className="h-5 w-5 text-purple-600" />
-                  <h3 className="text-lg font-semibold">Employee Details</h3>
-                </div>
-                <Separator />
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="employeeName">Employee Name *</Label>
-                    <Input
-                      id="employeeName"
-                      value={transitDetails.employeeName}
-                      onChange={(e) => setTransitDetails({ ...transitDetails, employeeName: e.target.value })}
-                      placeholder="Enter employee name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="employeeId">Employee ID *</Label>
-                    <Input
-                      id="employeeId"
-                      value={transitDetails.employeeId}
-                      onChange={(e) => setTransitDetails({ ...transitDetails, employeeId: e.target.value })}
-                      placeholder="EMP001"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="designation">Designation *</Label>
-                    <Select
-                      value={transitDetails.designation}
-                      onValueChange={(value) => setTransitDetails({ ...transitDetails, designation: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Store Executive">Store Executive</SelectItem>
-                        <SelectItem value="Store Manager">Store Manager</SelectItem>
-                        <SelectItem value="Warehouse Manager">Warehouse Manager</SelectItem>
-                        <SelectItem value="Logistics Coordinator">Logistics Coordinator</SelectItem>
-                        <SelectItem value="Supervisor">Supervisor</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="employeePhone">Employee Phone *</Label>
-                    <Input
-                      id="employeePhone"
-                      value={transitDetails.employeePhone}
-                      onChange={(e) => setTransitDetails({ ...transitDetails, employeePhone: e.target.value })}
-                      placeholder="+91 98765 43210"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Batch Summary */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-blue-600" />
-                  <h3 className="text-lg font-semibold">Batch Summary</h3>
-                </div>
-                <Separator />
-                <div className="bg-muted p-4 rounded-lg space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium">Transit Type:</span>
-                    <span className="text-sm">{batchType === 'store_to_factory' ? 'Store → Factory' : 'Factory → Store'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium">Total Orders:</span>
-                    <span className="text-sm font-bold">{currentBatch.length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium">Total Items:</span>
-                    <span className="text-sm font-bold">{totalItems}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium">Total Weight:</span>
-                    <span className="text-sm font-bold">
-                      {currentBatch.reduce((sum, order) => sum + (order.weight || 0), 0).toFixed(1)} kg
-                    </span>
-                  </div>
-                </div>
-              </div>
+            <div className="relative mb-4">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Filter orders..." value={searchOrdersQuery} onChange={e => setSearchOrdersQuery(e.target.value)} className="pl-8" />
             </div>
 
+            <div className="flex-1 overflow-y-auto border rounded-md">
+              {isLoadingEligible ? (
+                <div className="p-8 text-center">Loading...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[50px]"></TableHead>
+                      <TableHead>Order ID</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {eligibleOrders
+                      .filter((o: any) => o.orderNumber.toLowerCase().includes(searchOrdersQuery.toLowerCase()) || o.customerName.toLowerCase().includes(searchOrdersQuery.toLowerCase()))
+                      .map((order: any) => {
+                        const isSelected = selectedEligibleOrders.includes(order.id);
+                        return (
+                          <TableRow key={order.id} onClick={() => handleSelectOrder(order.id, !isSelected)} className="cursor-pointer">
+                            <TableCell>
+                              <Checkbox checked={isSelected} onCheckedChange={(c) => handleSelectOrder(order.id, c as boolean)} />
+                            </TableCell>
+                            <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                            <TableCell>{order.customerName}</TableCell>
+                            <TableCell><Badge variant="outline">{order.status}</Badge></TableCell>
+                          </TableRow>
+                        );
+                      })
+                    }
+                    {eligibleOrders.length === 0 && <TableRow><TableCell colSpan={4} className="text-center py-4">No eligible orders found</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+            <div className="flex justify-between items-center mt-4">
+              <span className="text-sm text-muted-foreground">{selectedEligibleOrders.length} orders selected</span>
+              <Button onClick={handleAddSelectedOrders} disabled={selectedEligibleOrders.length === 0}>
+                Add Selected
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* View Details Dialog */}
+        <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Transit Details - {selectedBatch?.transitId}</DialogTitle>
+            </DialogHeader>
+            {selectedBatch && (
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div><strong>Type:</strong> {selectedBatch.type}</div>
+                  <div><strong>Status:</strong> {selectedBatch.status}</div>
+                  <div><strong>Created By:</strong> {selectedBatch.createdBy}</div>
+                  <div><strong>Vehicle:</strong> {selectedBatch.vehicleDetails?.vehicleNumber}</div>
+                </div>
+                <div className="border rounded-md p-2 max-h-[200px] overflow-y-auto">
+                  <h4 className="font-semibold mb-2">Orders</h4>
+                  <ul className="text-sm space-y-1">
+                    {selectedBatch.orders.map((o, i) => (
+                      <li key={i}>{o.orderNumber} - {o.customerName}</li>
+                    ))}
+                  </ul>
+                </div>
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-2">
+                  {selectedBatch.status === 'in_transit' && (
+                    <>
+                      <Button onClick={() => handleUpdateStatus(selectedBatch.id, 'Received')}>Mark as Received</Button>
+                      <Button onClick={() => handleUpdateStatus(selectedBatch.id, 'Completed')} variant="default">Mark Completed</Button>
+                    </>
+                  )}
+                  {selectedBatch.status !== 'in_transit' && (
+                    <Button variant="outline" disabled>
+                      {selectedBatch.status}
+                    </Button>
+                  )}
+                </div>
+                <div className="mt-4">
+                  <TransitStatusHistory transitOrderId={selectedBatch.id} />
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Transit Confirmation Dialog (Simplified) */}
+        <Dialog open={showTransitDetailsDialog} onOpenChange={setShowTransitDetailsDialog}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Confirm Transit</DialogTitle></DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Vehicle Number</Label>
+                <Input value={transitDetails.vehicleNumber} onChange={e => setTransitDetails({ ...transitDetails, vehicleNumber: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Driver Name</Label>
+                <Input value={transitDetails.driverName} onChange={e => setTransitDetails({ ...transitDetails, driverName: e.target.value })} />
+              </div>
+            </div>
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowTransitDetailsDialog(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={confirmGenerateTransitCopy}
-                className="gap-2"
-                disabled={
-                  !transitDetails.vehicleNumber ||
-                  !transitDetails.driverName ||
-                  !transitDetails.employeeName
-                }
-              >
-                <Printer className="h-4 w-4" />
-                Generate & Print Transit Copy
-              </Button>
+              <Button variant="outline" onClick={() => setShowTransitDetailsDialog(false)}>Cancel</Button>
+              <Button onClick={confirmGenerateTransitCopy}>Confirm & Print</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Clear & Remove Alerts */}
+        <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader><AlertDialogTitle>Clear Batch?</AlertDialogTitle></AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setShowClearConfirm(false)}>No</AlertDialogCancel>
+              <AlertDialogAction onClick={startNewBatch}>Yes</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={showRemoveConfirm} onOpenChange={setShowRemoveConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader><AlertDialogTitle>Remove Order?</AlertDialogTitle></AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setShowRemoveConfirm(false)}>No</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmRemoveOrder}>Yes</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
       </div>
     </PageTransition>
   );

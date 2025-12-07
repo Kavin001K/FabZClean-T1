@@ -8,6 +8,7 @@ export default defineConfig({
   schema: "./shared/schema.ts",
   dialect: "postgresql", // Changed to match schema definition (pg-core)
   dbCredentials: {
-    url: process.env.DATABASE_URL || "postgres://user:password@localhost:5432/fabzclean",
+    // Direct connection to DB (no pooler)
+    url: process.env.SUPABASE_DB_URL || "postgres://postgres:Durai%402025@db.rxyatfvjjnvjxwyhhhqn.supabase.co:5432/postgres",
   },
 });

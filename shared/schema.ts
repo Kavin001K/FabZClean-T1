@@ -67,7 +67,7 @@ export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   franchiseId: varchar("franchise_id").references(() => franchises.id),
   orderNumber: text("order_number").notNull(), // Removed unique constraint globally
-  customerId: text("customer_id"), // Added customerId
+  customerId: text("customer_id").references(() => customers.id), // Added customerId with FK
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
   customerPhone: text("customer_phone"),
@@ -188,7 +188,7 @@ export const employees = pgTable("employees", {
   salary: decimal("salary", { precision: 10, scale: 2 }).notNull(),
   hourlyRate: decimal("hourly_rate", { precision: 8, scale: 2 }),
   status: text("status", { enum: ["active", "inactive", "terminated"] }).notNull().default("active"),
-  managerId: varchar("manager_id").references(() => employees.id),
+  managerId: varchar("manager_id").references((): any => employees.id),
   address: jsonb("address"),
   emergencyContact: jsonb("emergency_contact"),
   skills: jsonb("skills"), // Array of skills
@@ -365,3 +365,74 @@ export type Document = typeof documents.$inferSelect;
 export const insertAuditLogSchema = createInsertSchema(auditLogs);
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+export const transitOrders = pgTable("transit_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  transitId: text("transit_id").notNull().unique(),
+  type: text("type").notNull(), // To Factory, Return to Store
+  status: text("status").notNull(), // Pending, In Transit, Received, Completed
+  origin: text("origin"),
+  destination: text("destination"),
+  createdBy: text("created_by"),
+  vehicleNumber: text("vehicle_number"),
+  vehicleType: text("vehicle_type"),
+  driverName: text("driver_name"),
+  driverPhone: text("driver_phone"),
+  driverLicense: text("driver_license"),
+  employeeName: text("employee_name"),
+  employeeId: text("employee_id"),
+  designation: text("designation"),
+  employeePhone: text("employee_phone"),
+  franchiseId: text("franchise_id"),
+  totalOrders: integer("total_orders").default(0),
+  totalItems: integer("total_items").default(0),
+  totalWeight: decimal("total_weight").default("0"),
+  orders: jsonb("orders"), // Stores summary of orders if needed
+  storeDetails: jsonb("store_details"),
+  factoryDetails: jsonb("factory_details"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  dispatchedAt: timestamp("dispatched_at"),
+  receivedAt: timestamp("received_at"),
+});
+
+export const transitOrderItems = pgTable("transit_order_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  transitOrderId: varchar("transit_order_id").references(() => transitOrders.id),
+  orderId: varchar("order_id").references(() => orders.id),
+  orderNumber: text("order_number"),
+  customerId: text("customer_id"),
+  customerName: text("customer_name"),
+  itemCount: integer("item_count").default(0),
+  weight: decimal("weight").default("0"),
+  serviceType: text("service_type"),
+  status: text("status"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const transitStatusHistory = pgTable("transit_status_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  transitOrderId: varchar("transit_order_id").references(() => transitOrders.id),
+  status: text("status").notNull(),
+  notes: text("notes"),
+  location: text("location"), // GPS or place name
+  updatedBy: text("updated_by"),
+  latitude: decimal("latitude"),
+  longitude: decimal("longitude"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTransitOrderSchema = createInsertSchema(transitOrders);
+export const insertTransitOrderItemSchema = createInsertSchema(transitOrderItems);
+export const insertTransitStatusHistorySchema = createInsertSchema(transitStatusHistory);
+
+export type InsertTransitOrder = z.infer<typeof insertTransitOrderSchema>;
+export type TransitOrder = typeof transitOrders.$inferSelect;
+
+export type InsertTransitOrderItem = z.infer<typeof insertTransitOrderItemSchema>;
+export type TransitOrderItem = typeof transitOrderItems.$inferSelect;
+
+export type InsertTransitStatusHistory = z.infer<typeof insertTransitStatusHistorySchema>;
+export type TransitStatusHistory = typeof transitStatusHistory.$inferSelect;

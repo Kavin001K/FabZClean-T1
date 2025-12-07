@@ -417,6 +417,7 @@ export class SQLiteStorage implements IStorage {
       CREATE TABLE IF NOT EXISTS transit_orders (
         id TEXT PRIMARY KEY,
         transitId TEXT UNIQUE NOT NULL,
+        franchiseId TEXT,
         type TEXT NOT NULL,
         status TEXT NOT NULL,
         origin TEXT,
@@ -603,6 +604,18 @@ export class SQLiteStorage implements IStorage {
         if (!columnNames.includes('updatedBy')) {
           console.log('🔄 Migrating settings table: Adding column updatedBy');
           this.db.exec("ALTER TABLE settings ADD COLUMN updatedBy TEXT");
+        }
+      }
+
+      // Check transit_orders table migration
+      const transitOrdersTableExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transit_orders'").get();
+      if (transitOrdersTableExists) {
+        const columns = this.db.prepare("PRAGMA table_info(transit_orders)").all() as any[];
+        const columnNames = columns.map(c => c.name);
+
+        if (!columnNames.includes('franchiseId')) {
+          console.log('🔄 Migrating transit_orders table: Adding column franchiseId');
+          this.db.exec("ALTER TABLE transit_orders ADD COLUMN franchiseId TEXT");
         }
       }
 

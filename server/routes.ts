@@ -27,8 +27,8 @@ import whatsappRoutes from "./routes/whatsapp";
 import settingsRoutes from "./routes/settings";
 import transitSuggestionsRoutes from "./routes/transit-suggestions";
 import franchiseRoutes from "./routes/franchise";
-
 import auditLogsRouter from "./routes/audit-logs";
+import transitOrdersRouter from "./routes/transit-orders";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register WhatsApp routes
@@ -42,6 +42,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Transit Suggestions routes
   app.use("/api/transit-suggestions", transitSuggestionsRoutes);
+
+  // Register Transit Orders routes
+  app.use("/api/transit-orders", transitOrdersRouter);
 
   // Register Franchise routes
   app.use("/api/franchises", franchiseRoutes);

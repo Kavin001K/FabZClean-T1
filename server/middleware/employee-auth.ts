@@ -85,7 +85,7 @@ export function auditMiddleware(action: string, entityType?: string) {
 
                 // Log action asynchronously (don't wait)
                 AuthService.logAction(
-                    req.employee.employeeId,
+                    req.employee.id, // Use UUID from JWT payload
                     req.employee.username,
                     action,
                     entityType || null,
@@ -96,7 +96,8 @@ export function auditMiddleware(action: string, entityType?: string) {
                         body: req.body,
                     },
                     ipAddress,
-                    userAgent
+                    userAgent,
+                    req.employee.franchiseId // Pass franchise config
                 ).catch(err => {
                     console.error('Failed to log action:', err);
                 });
