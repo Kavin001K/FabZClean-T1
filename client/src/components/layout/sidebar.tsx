@@ -37,7 +37,7 @@ const NAV_ITEMS: NavItem[] = [
     to: "/franchise-dashboard",
     label: "Dashboard",
     icon: Home,
-    roles: ["franchise_manager"],
+    roles: ["franchise_manager", "manager"],
   },
   {
     to: "/franchise-management",
@@ -55,13 +55,13 @@ const NAV_ITEMS: NavItem[] = [
     to: "/orders",
     label: "Orders",
     icon: ShoppingCart,
-    roles: ["admin", "employee", "franchise_manager", "factory_manager"],
+    roles: ["admin", "employee", "franchise_manager", "manager", "factory_manager"],
   },
   {
     to: "/customers",
     label: "Customers",
     icon: Users2,
-    roles: ["admin", "employee", "franchise_manager"],
+    roles: ["admin", "employee", "franchise_manager", "manager"],
   },
   {
     to: "/services",
@@ -75,19 +75,18 @@ const NAV_ITEMS: NavItem[] = [
     icon: Package,
     roles: ["admin", "factory_manager"],
   },
-  // DISABLED - Uncomment to reactivate or set VITE_ENABLE_LOGISTICS=true in .env
+  // DISABLED - Uncomment to reactivate
   // {
   //   to: "/logistics",
   //   label: "Logistics",
   //   icon: Truck,
   //   roles: ["admin", "factory_manager", "driver"],
   // },
-  // DISABLED - Uncomment to reactivate or set VITE_ENABLE_LIVE_TRACKING=true in .env
   // {
   //   to: "/live-tracking",
   //   label: "Live Tracking",
   //   icon: MapPin,
-  //   roles: ["admin", "factory_manager", "franchise_manager", "driver"],
+  //   roles: ["admin", "factory_manager", "franchise_manager", "manager", "driver"],
   // },
   {
     to: "/documents",
@@ -105,13 +104,13 @@ const NAV_ITEMS: NavItem[] = [
     to: "/analytics",
     label: "Analytics",
     icon: LineChart,
-    roles: ["admin", "franchise_manager", "factory_manager"],
+    roles: ["admin", "franchise_manager", "manager", "factory_manager"],
   },
   {
     to: "/users",
     label: "User Management",
     icon: Shield,
-    roles: ["admin", "franchise_manager", "factory_manager"],
+    roles: ["admin", "franchise_manager", "manager", "factory_manager"],
   },
   {
     to: "/database-status",
@@ -123,7 +122,7 @@ const NAV_ITEMS: NavItem[] = [
     to: "/admin/audit-logs",
     label: "Audit Logs",
     icon: Shield,
-    roles: ["admin", "franchise_manager"],
+    roles: ["admin", "franchise_manager", "manager"],
   },
 ];
 
@@ -199,6 +198,7 @@ export function Sidebar() {
           <span className="font-medium text-primary">
             {employee?.role === 'admin' && 'Administrator'}
             {employee?.role === 'franchise_manager' && 'Franchise Manager'}
+            {employee?.role === 'manager' && 'Manager'}
             {employee?.role === 'factory_manager' && 'Factory Manager'}
             {employee?.role === 'employee' && 'Employee'}
             {employee?.role === 'driver' && 'Driver'}

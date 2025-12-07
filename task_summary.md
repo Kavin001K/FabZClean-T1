@@ -2,7 +2,10 @@
 
 ## 1. Pollachi Manager Account Access Fixed
 - **Issue:** The Pollachi manager account had the role `manager` in the database, but the frontend and access control middleware expected `franchise_manager`.
-- **Fix:** Implemented role normalization in `AuthService.ts`. When a user logs in or their token is verified, the role `manager` is automatically converted to `franchise_manager`. This ensures they can access the Franchise Dashboard and pass all permission checks without altering the database.
+- **Fix:** 
+    - Implemented role normalization in `AuthService.ts`.
+    - **UI Fix:** Updated `client/src/components/layout/sidebar.tsx` to explicitly accept the legacy `manager` role for franchise dashboard access, ensuring immediate access even if the session token is old.
+    - **Type Fix:** Updated `client/src/contexts/auth-context.tsx` to include `manager` in the Employee type definition.
 
 ## 2. Realtime Audit Logging
 - **Instant Updates:** Modified `AuthService.logAction` to broadcast a `audit_log_created` event via the WebSocket server immediately after saving to the database. This allows the frontend to reflect changes instantly.
@@ -17,3 +20,5 @@
 ## Files Modified
 - `server/auth-service.ts`: Added role normalization and realtime broadcasting.
 - `server/routes/transit-orders.ts`: Added authentication, audit logging, and scope filtering middleware.
+- `client/src/components/layout/sidebar.tsx`: Added `manager` role support.
+- `client/src/contexts/auth-context.tsx`: Added `manager` role type connection.

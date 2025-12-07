@@ -5,7 +5,7 @@ interface Employee {
   id: string;
   employeeId: string;
   username: string;
-  role: 'admin' | 'franchise_manager' | 'factory_manager' | 'employee' | 'driver';
+  role: 'admin' | 'franchise_manager' | 'factory_manager' | 'employee' | 'driver' | 'manager';
   franchiseId?: string;
   factoryId?: string;
   fullName?: string;
