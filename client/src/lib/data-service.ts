@@ -812,6 +812,7 @@ export type RouteStop = {
 };
 
 // Franchises API
+// Franchises API
 export const franchisesApi = {
   async getAll(): Promise<any[]> {
     try {
@@ -827,6 +828,43 @@ export const franchisesApi = {
       return await fetchData<any>(`/franchises/${id}`);
     } catch (error) {
       console.error(`Failed to fetch franchise ${id}:`, error);
+      return null;
+    }
+  },
+
+  async getEmployees(franchiseId: string): Promise<Employee[]> {
+    try {
+      const response = await fetchData<Employee[]>(`/franchises/${franchiseId}/employees`); // Note: Changed to use the new franchise-specific endpoint
+      return response || [];
+    } catch (error) {
+      console.error(`Failed to fetch employees for franchise ${franchiseId}:`, error);
+      return [];
+    }
+  },
+
+  async getAttendance(franchiseId: string, date: string): Promise<any[]> {
+    try {
+      const response = await fetchData<any[]>(`/franchises/${franchiseId}/attendance?date=${date}`);
+      return response || [];
+    } catch (error) {
+      console.error(`Failed to fetch attendance for franchise ${franchiseId}:`, error);
+      return [];
+    }
+  },
+
+  async markAttendance(franchiseId: string, data: any): Promise<any | null> {
+    try {
+      const response = await authorizedFetch(`/franchises/${franchiseId}/attendance`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to mark attendance");
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Failed to mark attendance:", error);
       return null;
     }
   }

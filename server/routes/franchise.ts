@@ -203,7 +203,7 @@ router.post("/:id/attendance", async (req, res) => {
         const validatedData = insertEmployeeAttendanceSchema.parse({
             ...req.body,
             franchiseId,
-            date: new Date(), // Default to now if not provided, or parse from body
+            date: req.body.date ? new Date(req.body.date) : new Date(),
         });
 
         const attendance = await storage.createAttendance(validatedData);
@@ -233,6 +233,21 @@ router.get("/:id/attendance", async (req, res) => {
     } catch (error) {
         console.error("List attendance error:", error);
         res.status(500).json({ message: "Failed to list attendance" });
+    }
+});
+
+// List Employees for Franchise
+router.get("/:id/employees", async (req, res) => {
+    try {
+        const franchiseId = req.params.id;
+        const employees = await storage.getEmployees();
+        // Filter by franchiseId manually if storage doesn't support it directly
+        // Assuming employee object has franchiseId field
+        const franchiseEmployees = employees.filter((emp: any) => emp.franchiseId === franchiseId);
+        res.json(franchiseEmployees);
+    } catch (error) {
+        console.error("List franchise employees error:", error);
+        res.status(500).json({ message: "Failed to list franchise employees" });
     }
 });
 

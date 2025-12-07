@@ -55,7 +55,7 @@ interface EmployeeAttendance {
   checkIn: string | null;
   checkOut: string | null;
   totalHours: number;
-  status: 'present' | 'absent' | 'late' | 'half_day';
+  status: 'present' | 'absent' | 'late' | 'half_day' | null;
   location?: string;
 }
 
@@ -76,7 +76,13 @@ import { employeesApi, ordersApi } from "@/lib/data-service";
 import { DashboardDueToday } from "@/components/dashboard/components/dashboard-due-today";
 import { DashboardRecentOrders } from "@/components/dashboard/components/dashboard-recent-orders";
 
+import { useAuth } from "@/contexts/auth-context";
+import { franchisesApi } from "@/lib/data-service";
+import { useToast } from "@/hooks/use-toast";
+
 export default function FranchiseDashboard() {
+  const { employee } = useAuth();
+  const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const queryClient = useQueryClient();
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
@@ -142,8 +148,9 @@ export default function FranchiseDashboard() {
   };
 
   const { data: employees = [], isLoading: isLoadingEmployees } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => employeesApi.getAll()
+    queryKey: ['franchise-employees', employee?.franchiseId],
+    queryFn: () => employee?.franchiseId ? franchisesApi.getEmployees(employee.franchiseId) : [],
+    enabled: !!employee?.franchiseId
   });
 
   // Fetch orders for the widgets
@@ -151,6 +158,46 @@ export default function FranchiseDashboard() {
     queryKey: ['franchise-orders'],
     queryFn: () => ordersApi.getAll()
   });
+
+  // Fetch attendance records
+  const { data: attendanceRecords = [], isLoading: isLoadingAttendance } = useQuery({
+    queryKey: ['franchise-attendance', employee?.franchiseId, selectedDate],
+    queryFn: () => employee?.franchiseId ? franchisesApi.getAttendance(employee.franchiseId, selectedDate) : [],
+    enabled: !!employee?.franchiseId
+  });
+
+  const handleMarkAttendance = async (employeeId: string, status: 'present' | 'absent' | 'late') => {
+    if (!employee?.franchiseId) return;
+
+    try {
+      const now = new Date();
+      // Set time only if present/late. Absent doesn't need clock in
+      const clockIn = (status === 'present' || status === 'late') ? now.toISOString() : null;
+
+      await franchisesApi.markAttendance(employee.franchiseId, {
+        employeeId,
+        date: new Date(selectedDate),
+        status,
+        clockIn,
+        locationCheckIn: { type: 'manual', by: employee.id }
+      });
+
+      toast({
+        title: "Attendance Updated",
+        description: `Marked employee as ${status}`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['franchise-attendance'] });
+    } catch (error) {
+      console.error("Failed to mark attendance", error);
+      toast({
+        title: "Error",
+        description: "Failed to update attendance",
+        variant: "destructive"
+      });
+    }
+  };
+
 
   const dueTodayOrders = orders.filter((order: any) => {
     if (!order.pickupDate && !order.deliveryDate) return false;
@@ -186,22 +233,41 @@ export default function FranchiseDashboard() {
       o.status === 'out_for_delivery' || o.status === 'in_transit'
     ).length;
 
+    // Calculate attendance metrics from fetched records
+    const presentToday = attendanceRecords.filter((r: any) => r.status === 'present').length;
+    const absentToday = attendanceRecords.filter((r: any) => r.status === 'absent').length;
+    const lateToday = attendanceRecords.filter((r: any) => r.status === 'late').length;
+
     return {
       totalEmployees: employees.length,
-      presentToday: 0, // Needs attendance API
-      absentToday: 0, // Needs attendance API
-      lateToday: 0, // Needs attendance API
+      presentToday,
+      absentToday,
+      lateToday,
       totalRevenue,
       activeDeliveries,
       customerSatisfaction: 4.8, // Placeholder until feedback API
       averageOrderValue
     };
-  }, [orders, employees]);
+  }, [orders, employees, attendanceRecords]);
 
-  // Placeholder attendance data for demonstration
-  const attendanceData: EmployeeAttendance[] = [];
+  // Combine employees with attendance data
+  const attendanceData: EmployeeAttendance[] = employees.map((emp: any) => {
+    const record = attendanceRecords.find((r: any) => r.employeeId === emp.id);
+    return {
+      id: emp.id,
+      employeeId: emp.employeeId,
+      employeeName: emp.fullName || `${emp.firstName} ${emp.lastName}`,
+      position: emp.position,
+      date: selectedDate,
+      checkIn: record?.clockIn ? new Date(record.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
+      checkOut: record?.clockOut ? new Date(record.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
+      totalHours: record?.totalHours ? parseFloat(record.totalHours) : 0,
+      status: record?.status || null, // null means not marked yet
+      location: record?.locationCheckIn?.name || 'Store'
+    };
+  });
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null) => {
     switch (status) {
       case 'present': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
       case 'late': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
@@ -211,7 +277,7 @@ export default function FranchiseDashboard() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string | null) => {
     switch (status) {
       case 'present': return <CheckCircle className="w-4 h-4 text-green-600" />;
       case 'late': return <Clock className="w-4 h-4 text-yellow-600" />;
@@ -256,6 +322,7 @@ export default function FranchiseDashboard() {
                 {selectedDate ? format(new Date(selectedDate), "PPP") : <span>Pick a date</span>}
               </Button>
             </PopoverTrigger>
+
             <PopoverContent className="w-auto p-0">
               <Calendar
                 mode="single"
@@ -397,6 +464,11 @@ export default function FranchiseDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
+                  {attendanceData.length === 0 && !isLoadingEmployees && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No employees found for this franchise.
+                    </div>
+                  )}
                   {attendanceData.map((employee) => (
                     <div
                       key={employee.id}
@@ -432,19 +504,38 @@ export default function FranchiseDashboard() {
                               <span className="text-muted-foreground">Out:</span> {employee.checkOut}
                             </p>
                           )}
-                          <p className="text-sm font-medium">
-                            {employee.totalHours}h worked
-                          </p>
+                          {employee.totalHours > 0 && (
+                            <p className="text-sm font-medium">
+                              {employee.totalHours}h worked
+                            </p>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2">
-                          {getStatusIcon(employee.status)}
-                          <Badge className={getStatusColor(employee.status)}>
-                            {employee.status ? employee.status.replace('_', ' ') : 'Unknown'}
-                          </Badge>
+                          {employee.status ? (
+                            <>
+                              {getStatusIcon(employee.status)}
+                              <Badge className={getStatusColor(employee.status)}>
+                                {employee.status.replace('_', ' ')}
+                              </Badge>
+                              {/* Allow changing status if needed - simplified for now just showing status */}
+                            </>
+                          ) : (
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="outline" className="h-7 px-2 border-green-200 hover:bg-green-50 text-green-700" onClick={() => handleMarkAttendance(employee.id, 'present')}>
+                                P
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-7 px-2 border-yellow-200 hover:bg-yellow-50 text-yellow-700" onClick={() => handleMarkAttendance(employee.id, 'late')}>
+                                L
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-7 px-2 border-red-200 hover:bg-red-50 text-red-700" onClick={() => handleMarkAttendance(employee.id, 'absent')}>
+                                A
+                              </Button>
+                            </div>
+                          )}
                         </div>
 
-                        <Button variant="outline" size="sm">
+                        <Button variant="ghost" size="sm">
                           <Eye className="w-4 h-4" />
                         </Button>
                       </div>
