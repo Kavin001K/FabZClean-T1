@@ -1,0 +1,16 @@
+Installation Complete!
+
+FabZClean-T1 has been successfully installed on your computer.
+
+Getting Started:
+1. You can launch the application from the desktop shortcut or the Start menu.
+2. On your first login, please use the credentials provided by your system administrator.
+3. We recommend checking for updates immediately after the first launch to ensure you have the latest features and security patches.
+
+Support:
+If you encounter any issues or require technical assistance, please contact our support team at support@ace-digital.com.
+
+Thank you for choosing Ace-Digital Pvt Ltd. solutions.
+We hope FabZClean-T1 establishes a new standard of efficiency for your business.
+
+Click 'Finish' to exit the setup.

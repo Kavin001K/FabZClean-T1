@@ -37,8 +37,34 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Search, Filter, RefreshCw, FileText, Printer, ShieldAlert, User, Clock, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import {
+    Calendar as CalendarIcon,
+    Search,
+    Filter,
+    RefreshCw,
+    FileText,
+    Printer,
+    ShieldAlert,
+    User,
+    Clock,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
+    Download,
+    PauseCircle,
+    PlayCircle
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Skeleton, { TableSkeleton } from "@/components/ui/loading-skeleton";
@@ -63,12 +89,13 @@ export default function AuditLogsPage() {
     const [actionFilter, setActionFilter] = useState<string>('all');
     const [date, setDate] = useState<Date | undefined>(undefined);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isLive, setIsLive] = useState(false);
 
     const [sortBy, setSortBy] = useState<string>('createdAt');
     const [sortOrder, setSortOrder] = useState<string>('desc');
 
     // Fetch logs
-    const { data, isLoading, error, refetch } = useQuery({
+    const { data, isLoading, error, refetch, isRefetching } = useQuery({
         queryKey: ['audit-logs', page, limit, actionFilter, date, sortBy, sortOrder],
         queryFn: async () => {
             const params = new URLSearchParams({
@@ -105,7 +132,8 @@ export default function AuditLogsPage() {
             }
 
             return response.json();
-        }
+        },
+        refetchInterval: isLive ? 3000 : false, // Poll every 3 seconds if live
     });
 
     const handleSort = (column: string) => {
@@ -149,16 +177,191 @@ export default function AuditLogsPage() {
         );
     };
 
+    const handleExport = (formatType: 'csv' | 'json') => {
+        if (!data?.data) {
+            toast({
+                title: "Nothing to export",
+                description: "No data available to export.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        const logs: AuditLog[] = data.data;
+
+        if (formatType === 'json') {
+            const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `audit-logs-${format(new Date(), 'yyyy-MM-dd')}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } else if (formatType === 'csv') {
+            const headers = ['Time', 'Employee ID', 'Action', 'Entity Type', 'Entity ID', 'IP Address', 'Details'];
+            const csvRows = [
+                headers.join(','),
+                ...logs.map(log => {
+                    const row = [
+                        new Date(log.createdAt).toISOString(),
+                        log.employeeId,
+                        log.action,
+                        log.entityType,
+                        log.entityId,
+                        log.ipAddress,
+                        `"${JSON.stringify(log.details).replace(/"/g, '""')}"` // Escape quotes for CSV
+                    ];
+                    return row.join(',');
+                })
+            ];
+
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `audit-logs-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        toast({
+            title: "Export Successful",
+            description: `Audit logs exported as ${formatType.toUpperCase()}`,
+        });
+    };
+
     return (
         <div className="p-6 space-y-6 bg-background min-h-screen">
-            {/* ... (keep header) ... */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Audit Logs</h1>
+                    <p className="text-muted-foreground mt-1">
+                        Track system activities and security events
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center space-x-2 bg-muted/50 p-2 rounded-lg border mr-2">
+                        <Switch
+                            id="live-mode"
+                            checked={isLive}
+                            onCheckedChange={setIsLive}
+                        />
+                        <Label htmlFor="live-mode" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                            {isLive ? (
+                                <>
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                    </span>
+                                    Live Updates
+                                </>
+                            ) : (
+                                <>
+                                    <PauseCircle className="h-4 w-4 text-muted-foreground" />
+                                    Paused
+                                </>
+                            )}
+                        </Label>
+                    </div>
 
-            <Card>
-                {/* ... (keep CardHeader) ... */}
-                <CardContent>
-                    {/* ... (keep Filters) ... */}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => refetch()}
+                        disabled={isLoading || isRefetching}
+                        className={isRefetching ? "animate-spin-slow" : ""}
+                    >
+                        <RefreshCw className={cn("h-4 w-4 mr-2", isRefetching && "animate-spin")} />
+                        Refresh
+                    </Button>
 
-                    {/* Table */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                                <Download className="h-4 w-4 mr-2" />
+                                Export
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleExport('csv')}>
+                                Export as CSV
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleExport('json')}>
+                                Export as JSON
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </div>
+
+            <Card className="border-none shadow-md">
+                <CardContent className="p-6">
+                    <div className="flex flex-col md:flex-row gap-4 mb-6">
+                        <div className="flex-1">
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search details or IDs..."
+                                    className="pl-8"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <Select value={actionFilter} onValueChange={setActionFilter}>
+                                <SelectTrigger className="w-[180px]">
+                                    <div className="flex items-center gap-2">
+                                        <Filter className="h-4 w-4" />
+                                        <SelectValue placeholder="Filter by Action" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Actions</SelectItem>
+                                    <SelectItem value="login">Login / Logout</SelectItem>
+                                    <SelectItem value="create_order">Order Creation</SelectItem>
+                                    <SelectItem value="payment_received">Payments</SelectItem>
+                                    <SelectItem value="print">Printing</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant={"outline"}
+                                        className={cn(
+                                            "w-[240px] justify-start text-left font-normal",
+                                            !date && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {date ? format(date, "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        mode="single"
+                                        selected={date}
+                                        onSelect={setDate}
+                                        initialFocus
+                                    />
+                                </PopoverContent>
+                            </Popover>
+
+                            {date && (
+                                <Button variant="ghost" size="icon" onClick={() => setDate(undefined)}>
+                                    <RefreshCw className="h-4 w-4 rotate-45" />
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+
                     {isLoading ? (
                         <div className="space-y-2">
                             <TableSkeleton rows={5} />
@@ -252,7 +455,7 @@ export default function AuditLogsPage() {
                                                                 <AccordionTrigger className="py-0 hover:no-underline">
                                                                     <span className="sr-only">Toggle details</span>
                                                                 </AccordionTrigger>
-                                                                <AccordionContent className="absolute left-0 right-0 bg-muted/50 p-4 mt-2 border-t border-b z-10">
+                                                                <AccordionContent className="absolute left-0 right-0 bg-muted/50 p-4 mt-2 border-t border-b z-10 shadow-md">
                                                                     <div className="max-w-4xl mx-auto">
                                                                         <h4 className="text-sm font-semibold mb-2">Action Details</h4>
                                                                         {formatDetails(log.details)}

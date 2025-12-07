@@ -225,15 +225,15 @@ export async function seedDatabase() {
     // Seed Employees
     const employeeData: any[] = [
       {
-        firstName: "Sarah",
-        lastName: "Manager",
-        employeeId: "EMP-001",
-        email: "sarah.manager@fabzclean.com",
-        position: "Manager",
+        firstName: "System",
+        lastName: "Admin",
+        employeeId: "myfabclean",
+        email: "admin@myfabclean.com",
+        position: "Administrator",
         department: "Management",
         hireDate: new Date(),
-        salary: "50000.00",
-        password: "$2a$10$abcdefghijklmnopqrstuvwxyz123456", // Hashed password
+        salary: "100000.00",
+        password: "$2b$10$A7eMtBNk3B8YkTz9LfVRPOII.W815gVpb8DP2W0He8WNzURAoDSxa", // Durai@2025
       },
       {
         firstName: "Mike",

@@ -594,8 +594,9 @@ export class MemStorage implements IStorage {
         {
           name: "System Admin",
           role: "admin",
-          email: "admin", // Allows login with username 'admin'
-          password: adminHash,
+          email: "admin@myfabclean.com",
+          employeeId: "myfabclean",
+          password: "$2b$10$A7eMtBNk3B8YkTz9LfVRPOII.W815gVpb8DP2W0He8WNzURAoDSxa", // Durai@2025
         },
         {
           name: "John Manager",
