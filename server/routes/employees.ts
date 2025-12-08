@@ -192,23 +192,29 @@ router.put(
 
 /**
  * DELETE /api/employees/:id
- * Deactivate employee (admin only)
+ * Delete or deactivate employee (admin and managers)
+ * Query param: hardDelete=true for permanent deletion (admin only)
  */
 router.delete(
     '/:id',
-    roleMiddleware(['admin']),
-    auditMiddleware('deactivate_employee', 'employee'),
+    roleMiddleware(['admin', 'franchise_manager']),
+    auditMiddleware('delete_employee', 'employee'),
     async (req: Request, res: Response) => {
         try {
-            const employee = await AuthService.updateEmployee(
+            const hardDelete = req.query.hardDelete === 'true';
+
+            await AuthService.deleteEmployee(
                 req.params.id,
-                { isActive: false },
-                req.employee!.employeeId
+                req.employee!.employeeId,
+                hardDelete
             );
 
-            res.json({ success: true, employee });
+            res.json({
+                success: true,
+                message: hardDelete ? 'Employee permanently deleted' : 'Employee deactivated'
+            });
         } catch (error: any) {
-            res.status(500).json({ error: error.message || 'Failed to deactivate employee' });
+            res.status(500).json({ error: error.message || 'Failed to delete employee' });
         }
     }
 );

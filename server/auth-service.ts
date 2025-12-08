@@ -338,7 +338,7 @@ export class AuthService {
     }
 
     /**
-     * Change password
+     * Change password (user changes their own password)
      */
     static async changePassword(employeeId: string, currentPassword: string, newPassword: string): Promise<void> {
         // 1. Get employee
@@ -363,7 +363,161 @@ export class AuthService {
 
         if (upError) throw new Error('Failed to update password');
 
-        await this.logAction(employeeId, emp.employee_id, 'change_password', 'employee', employeeId, {});
+        await this.logAction(emp.id, emp.employee_id, 'change_password', 'employee', employeeId, {}, undefined, undefined, emp.franchise_id);
+    }
+
+    /**
+     * Reset password (admin/manager resets employee password)
+     */
+    static async resetPassword(targetEmployeeId: string, newPassword: string, resetByEmployeeId: string): Promise<void> {
+        // 1. Get the employee who is resetting the password
+        const { data: resetBy, error: resetByError } = await supabase
+            .from('employees')
+            .select('*')
+            .eq('employee_id', resetByEmployeeId)
+            .single();
+
+        if (resetByError || !resetBy) throw new Error('Unauthorized: Resetter not found');
+
+        // 2. Get the target employee
+        const { data: targetEmp, error: targetError } = await supabase
+            .from('employees')
+            .select('*')
+            .eq('employee_id', targetEmployeeId)
+            .single();
+
+        if (targetError || !targetEmp) throw new Error('Target employee not found');
+
+        // 3. Authorization check
+        if (resetBy.role === 'franchise_manager') {
+            // Franchise managers can only reset passwords for employees in their franchise
+            if (targetEmp.franchise_id !== resetBy.franchise_id) {
+                throw new Error('Unauthorized: You can only reset passwords for employees in your franchise');
+            }
+            // Franchise managers cannot reset admin passwords
+            if (targetEmp.role === 'admin') {
+                throw new Error('Unauthorized: You cannot reset admin passwords');
+            }
+        } else if (resetBy.role !== 'admin') {
+            // Only admins and franchise managers can reset passwords
+            throw new Error('Unauthorized: Only admins and managers can reset passwords');
+        }
+
+        // 4. Hash new password
+        const hash = await bcrypt.hash(newPassword, 10);
+
+        // 5. Update password
+        const { error: updateError } = await supabase
+            .from('employees')
+            .update({ password: hash, updated_at: new Date().toISOString() })
+            .eq('employee_id', targetEmployeeId);
+
+        if (updateError) throw new Error('Failed to reset password');
+
+        // 6. Log the action
+        await this.logAction(
+            resetBy.id,
+            resetBy.employee_id,
+            'reset_employee_password',
+            'employee',
+            targetEmployeeId,
+            { target_employee: targetEmp.employee_id, reset_by: resetBy.employee_id },
+            undefined,
+            undefined,
+            resetBy.franchise_id
+        );
+
+        console.log(`✅ Password reset for ${targetEmployeeId} by ${resetByEmployeeId}`);
+    }
+
+    /**
+     * Delete/Deactivate employee (admin/manager only)
+     */
+    static async deleteEmployee(targetEmployeeId: string, deletedByEmployeeId: string, hardDelete: boolean = false): Promise<void> {
+        // 1. Get the employee who is deleting
+        const { data: deletedBy, error: deletedByError } = await supabase
+            .from('employees')
+            .select('*')
+            .eq('employee_id', deletedByEmployeeId)
+            .single();
+
+        if (deletedByError || !deletedBy) throw new Error('Unauthorized: Deleter not found');
+
+        // 2. Get the target employee
+        const { data: targetEmp, error: targetError } = await supabase
+            .from('employees')
+            .select('*')
+            .eq('employee_id', targetEmployeeId)
+            .single();
+
+        if (targetError || !targetEmp) throw new Error('Target employee not found');
+
+        // 3. Authorization check
+        if (deletedBy.role === 'franchise_manager') {
+            // Franchise managers can only delete employees in their franchise
+            if (targetEmp.franchise_id !== deletedBy.franchise_id) {
+                throw new Error('Unauthorized: You can only delete employees in your franchise');
+            }
+            // Franchise managers cannot delete admins
+            if (targetEmp.role === 'admin') {
+                throw new Error('Unauthorized: You cannot delete admin accounts');
+            }
+        } else if (deletedBy.role !== 'admin') {
+            // Only admins and franchise managers can delete employees
+            throw new Error('Unauthorized: Only admins and managers can delete employees');
+        }
+
+        // 4. Prevent self-deletion
+        if (targetEmployeeId === deletedByEmployeeId) {
+            throw new Error('You cannot delete your own account');
+        }
+
+        // 5. Delete or deactivate
+        if (hardDelete && deletedBy.role === 'admin') {
+            // Hard delete (admin only) - CASCADE will handle related records
+            const { error: deleteError } = await supabase
+                .from('employees')
+                .delete()
+                .eq('employee_id', targetEmployeeId);
+
+            if (deleteError) throw new Error('Failed to delete employee');
+
+            await this.logAction(
+                deletedBy.id,
+                deletedBy.employee_id,
+                'delete_employee_hard',
+                'employee',
+                targetEmployeeId,
+                { target_employee: targetEmp.employee_id, deleted_by: deletedBy.employee_id },
+                undefined,
+                undefined,
+                deletedBy.franchise_id
+            );
+
+            console.log(`✅ Employee ${targetEmployeeId} permanently deleted by ${deletedByEmployeeId}`);
+        } else {
+            // Soft delete (deactivate)
+            const { error: updateError } = await supabase
+                .from('employees')
+                .update({ status: 'terminated', updated_at: new Date().toISOString() })
+                .eq('employee_id', targetEmployeeId);
+
+            if (updateError) throw new Error('Failed to deactivate employee');
+
+            await this.logAction(
+                deletedBy.id,
+                deletedBy.employee_id,
+                'deactivate_employee',
+                'employee',
+                targetEmployeeId,
+                { target_employee: targetEmp.employee_id, deactivated_by: deletedBy.employee_id },
+                undefined,
+                undefined,
+                deletedBy.franchise_id
+            );
+
+            console.log(`✅ Employee ${targetEmployeeId} deactivated by ${deletedByEmployeeId}`);
+        }
     }
 
 
