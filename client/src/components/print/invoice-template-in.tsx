@@ -82,44 +82,69 @@ const isInterStateTransaction = (companyGSTIN: string, customerGSTIN: string): b
 };
 
 const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
+  // Defensive check for data
+  if (!data) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center', color: 'red' }}>
+        Error: Invoice data is missing
+      </div>
+    );
+  }
+
   const {
-    invoiceNumber,
-    invoiceDate,
-    dueDate,
+    invoiceNumber = 'INV-000',
+    invoiceDate = new Date().toISOString(),
+    dueDate = new Date().toISOString(),
     customer,
-    items,
-    subtotal,
-    total,
+    items = [],
+    subtotal = 0,
+    total = 0,
     qrCode,
-    enableGST = false, // Default to false
-    franchiseId, // Get franchise ID from data
+    enableGST = false,
+    franchiseId,
   } = data;
 
-  // Get franchise-specific company details
+  // Defensive check for customer
+  const safeCustomer = {
+    name: customer?.name || 'Customer',
+    address: customer?.address || 'Address not provided',
+    phone: customer?.phone || 'N/A',
+    email: customer?.email || '',
+    taxId: customer?.taxId || '',
+  };
+
+  // Get franchise-specific company details with fallback
   const franchise = getFranchiseById(franchiseId);
 
   const companyDetails = {
     name: "Fab Clean",
-    branchName: franchise.name,
-    address: getFormattedAddress(franchise),
-    phone: franchise.phone,
-    email: franchise.email || "support@myfabclean.com",
-    taxId: franchise.gstNumber,
+    branchName: franchise?.name || 'FabZClean',
+    address: franchise ? getFormattedAddress(franchise) : 'Address not available',
+    phone: franchise?.phone || '+91 93630 59595',
+    email: franchise?.email || "support@myfabclean.com",
+    taxId: franchise?.gstNumber || '',
     logo: "/assets/logo.webp"
   };
 
-  const isInterState = enableGST && customer?.taxId && companyDetails.taxId
-    ? validateGSTIN(companyDetails.taxId) && validateGSTIN(customer.taxId)
-      ? isInterStateTransaction(companyDetails.taxId, customer.taxId)
+  const isInterState = enableGST && safeCustomer.taxId && companyDetails.taxId
+    ? validateGSTIN(companyDetails.taxId) && validateGSTIN(safeCustomer.taxId)
+      ? isInterStateTransaction(companyDetails.taxId, safeCustomer.taxId)
       : false
     : false;
 
-  // Calculate GST breakdown
-  const itemsWithGST = items.map(item => {
-    const gstRate = item.taxRate || 18;
-    const gstBreakdown = calculateGST(item.total, gstRate, isInterState);
+  // Calculate GST breakdown with safe items array
+  const safeItems = Array.isArray(items) ? items : [];
+  const itemsWithGST = safeItems.map(item => {
+    const gstRate = item?.taxRate || 18;
+    const itemTotal = item?.total || 0;
+    const gstBreakdown = calculateGST(itemTotal, gstRate, isInterState);
     return {
-      ...item,
+      description: item?.description || 'Service',
+      quantity: item?.quantity || 1,
+      unitPrice: item?.unitPrice || 0,
+      total: itemTotal,
+      taxRate: gstRate,
+      hsn: item?.hsn || '',
       gstBreakdown
     };
   });
@@ -255,11 +280,10 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
           <div>
             <h3 style={{ fontSize: '11px', fontWeight: 'bold', color: colors.primary, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Bill To</h3>
             <div style={{ fontSize: '15px' }}>
-              <p style={{ fontWeight: 'bold', margin: '0 0 4px 0', fontSize: '18px', color: colors.secondary }}>{customer.name}</p>
-              {/* Added full address display logic */}
-              <p style={{ margin: '0 0 4px 0', whiteSpace: 'pre-line', color: '#374151', minHeight: '40px' }}>{customer.address || "Address not provided"}</p>
-              <p style={{ margin: '0 0 4px 0', color: '#374151' }}>{customer.phone}</p>
-              {enableGST && customer.taxId && <p style={{ fontWeight: '600', margin: '8px 0 0 0', fontSize: '13px' }}>GSTIN: {customer.taxId}</p>}
+              <p style={{ fontWeight: 'bold', margin: '0 0 4px 0', fontSize: '18px', color: colors.secondary }}>{safeCustomer.name}</p>
+              <p style={{ margin: '0 0 4px 0', whiteSpace: 'pre-line', color: '#374151', minHeight: '40px' }}>{safeCustomer.address}</p>
+              <p style={{ margin: '0 0 4px 0', color: '#374151' }}>{safeCustomer.phone}</p>
+              {enableGST && safeCustomer.taxId && <p style={{ fontWeight: '600', margin: '8px 0 0 0', fontSize: '13px' }}>GSTIN: {safeCustomer.taxId}</p>}
             </div>
           </div>
 

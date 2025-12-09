@@ -217,65 +217,112 @@ export function OrderConfirmationDialog({
         }
 
         setSendingWhatsApp(true);
+
+        const customerName = order.customerName || 'Valued Customer';
+        const orderNum = order.orderNumber || order.id || 'N/A';
+        const billUrl = `${window.location.origin}/bill/${orderNum}?enableGST=${enableGST}`;
+
         try {
             console.log('📱 Starting WhatsApp send process...');
 
-            // Step 1: Generate and upload PDF first
-            console.log('📄 Generating invoice PDF...');
-            const { convertOrderToInvoiceData } = await import('@/lib/print-driver');
-            const invoiceData = convertOrderToInvoiceData(order);
+            let pdfUrl: string | undefined;
 
-            // Generate QR Code for PDF
+            // Try to generate and upload PDF (with error fallback)
             try {
-                // Dynamic import for QRCode
-                const QRCodeModule = await import('qrcode');
-                // Handle both ES module and CommonJS
-                const toDataURL = QRCodeModule.toDataURL || (QRCodeModule.default && QRCodeModule.default.toDataURL);
+                console.log('📄 Generating invoice PDF...');
+                const { convertOrderToInvoiceData } = await import('@/lib/print-driver');
 
-                if (toDataURL) {
-                    const upiId = "8825702072@okbizaxis";
-                    const upiUrl = `upi://pay?pa=${upiId}&pn=FabZClean&am=${totalAmount}&cu=INR`;
-                    invoiceData.qrCode = await toDataURL(upiUrl);
+                // Ensure order has required fields for invoice
+                const safeOrder = {
+                    ...order,
+                    customerName: customerName,
+                    orderNumber: orderNum,
+                    totalAmount: totalAmount.toString(),
+                    items: Array.isArray(order.items) ? order.items : [],
+                };
+
+                const invoiceData = convertOrderToInvoiceData(safeOrder);
+
+                // Validate invoice data
+                if (!invoiceData || !(invoiceData as any).customer) {
+                    throw new Error('Invalid invoice data generated');
                 }
-            } catch (e) {
-                console.error("QR gen failed for PDF", e);
+
+                // Generate QR Code for PDF
+                try {
+                    const QRCodeModule = await import('qrcode');
+                    const toDataURL = QRCodeModule.toDataURL || (QRCodeModule.default && QRCodeModule.default.toDataURL);
+                    if (toDataURL) {
+                        const upiId = "8825702072@okbizaxis";
+                        const upiUrl = `upi://pay?pa=${upiId}&pn=FabZClean&am=${totalAmount}&cu=INR`;
+                        invoiceData.qrCode = await toDataURL(upiUrl);
+                    }
+                } catch (e) {
+                    console.warn("QR gen failed for PDF (non-blocking)", e);
+                }
+
+                // Generate PDF blob
+                const pdfBlob = await generatePDFBlob(invoiceData);
+
+                // Upload PDF to server
+                console.log('☁️ Uploading PDF to server...');
+                const uploadedDoc = await uploadPDFToServer(pdfBlob, invoiceData);
+
+                if (uploadedDoc?.fileUrl) {
+                    pdfUrl = uploadedDoc.fileUrl;
+                    console.log('✅ PDF uploaded successfully:', pdfUrl);
+                }
+            } catch (pdfError) {
+                console.error('⚠️ PDF generation/upload failed (will send text only):', pdfError);
+                // Continue without PDF - will send text message
             }
 
-            // Generate PDF and get the uploaded document info
-            const pdfBlob = await generatePDFBlob(invoiceData);
-
-            // Step 2: Upload PDF to server
-            console.log('☁️ Uploading PDF to server...');
-            const uploadedDoc = await uploadPDFToServer(pdfBlob, invoiceData);
-
-            if (!uploadedDoc || !uploadedDoc.fileUrl) {
-                throw new Error('Failed to upload PDF to server');
-            }
-
-            console.log('✅ PDF uploaded successfully:', uploadedDoc.fileUrl);
-
-            // Step 3: Send WhatsApp message with PDF URL
+            // Send WhatsApp message (with or without PDF)
             console.log('💬 Sending WhatsApp message...');
             const success = await WhatsAppService.sendOrderBill(
                 customerPhone,
-                order.orderNumber,
-                order.customerName || 'Valued Customer',
+                orderNum,
+                customerName,
                 totalAmount,
-                `${window.location.origin}/bill/${order.orderNumber}?enableGST=${enableGST}`,
-                uploadedDoc.fileUrl // Use the uploaded PDF URL
+                billUrl,
+                pdfUrl // May be undefined if PDF failed
             );
 
             if (success) {
                 toast({
                     title: "Sent!",
-                    description: "WhatsApp message with bill sent successfully.",
+                    description: pdfUrl
+                        ? "WhatsApp message with bill sent successfully."
+                        : "WhatsApp message sent (bill link only).",
                 });
             } else {
-                toast({
-                    title: "Failed",
-                    description: "Could not send WhatsApp message. Check console for details.",
-                    variant: "destructive",
-                });
+                // Fallback: Try sending simple text via backend
+                console.log('⚠️ Standard send failed, trying fallback...');
+                try {
+                    const fallbackResponse = await fetch('/api/whatsapp/send-text', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            phone: customerPhone,
+                            message: `🧾 *FabZClean Invoice*\n\nHi ${customerName}!\n\nYour order *#${orderNum}* for ₹${totalAmount.toFixed(2)} has been confirmed.\n\n📋 View Bill: ${billUrl}\n\nThank you for choosing FabZClean!`
+                        })
+                    });
+
+                    if (fallbackResponse.ok) {
+                        toast({
+                            title: "Sent!",
+                            description: "WhatsApp message sent successfully.",
+                        });
+                    } else {
+                        throw new Error('Fallback also failed');
+                    }
+                } catch (fallbackError) {
+                    toast({
+                        title: "Failed",
+                        description: "Could not send WhatsApp message. Please try again.",
+                        variant: "destructive",
+                    });
+                }
             }
         } catch (error) {
             console.error("WhatsApp error:", error);

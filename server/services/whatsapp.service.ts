@@ -85,3 +85,52 @@ export const sendWhatsAppBill = async (params: SendBillParams) => {
         throw new Error('Failed to send WhatsApp message');
     }
 };
+
+// Simple text message sender (fallback when PDF is not available)
+interface SendTextParams {
+    customerPhone: string;
+    message: string;
+}
+
+export const sendWhatsAppText = async (params: SendTextParams) => {
+    try {
+        const url = 'https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/';
+
+        // Clean phone number - ensure it has country code
+        let phone = params.customerPhone.replace(/[+\s-]/g, '');
+        if (!phone.startsWith('91')) {
+            phone = '91' + phone;
+        }
+
+        const data = {
+            integrated_number: MSG91_INTEGRATED_NUMBER,
+            content_type: "text",
+            payload: {
+                messaging_product: "whatsapp",
+                type: "text",
+                to: phone,
+                text: {
+                    body: params.message
+                }
+            }
+        };
+
+        const config = {
+            headers: {
+                'Content-Type': 'application/json',
+                'authkey': MSG91_AUTH_KEY
+            }
+        };
+
+        console.log('Sending WhatsApp Text Payload:', JSON.stringify(data, null, 2));
+
+        const response = await axios.post(url, data, config);
+        console.log('WhatsApp Text Response:', response.data);
+
+        return response.data;
+
+    } catch (error: any) {
+        console.error('WhatsApp Text Service Error:', error.response?.data || error.message);
+        throw new Error('Failed to send WhatsApp text message');
+    }
+};
