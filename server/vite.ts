@@ -39,21 +39,21 @@ export async function setupVite(app: Express, server: Server) {
 
   // Vite middleware handles all module requests (/src/*, /node_modules/*, etc.)
   app.use(vite.middlewares);
-  
+
   // Catch-all route for HTML pages (only for non-API, non-asset requests)
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
-    
+
     // Skip API routes
     if (url.startsWith("/api")) {
       return next();
     }
 
     // Skip asset requests (Vite middleware handles these)
-    if (url.startsWith("/src/") || 
-        url.startsWith("/node_modules/") || 
-        url.startsWith("/@") ||
-        url.includes(".") && !url.endsWith(".html")) {
+    if (url.startsWith("/src/") ||
+      url.startsWith("/node_modules/") ||
+      url.startsWith("/@") ||
+      url.includes(".") && !url.endsWith(".html")) {
       return next();
     }
 
@@ -92,7 +92,29 @@ export function serveStatic(app: Express) {
 
   log(`✅ Serving static files from: ${distPath}`);
 
-  app.use(express.static(distPath));
+  // Serve static assets with proper cache headers
+  // Hashed files (JS, CSS) can be cached forever since filenames change on rebuild
+  // HTML and non-hashed files get short cache to ensure updates are picked up
+  app.use(express.static(distPath, {
+    maxAge: '1d', // Default: 1 day cache
+    etag: true,
+    setHeaders: (res, filePath) => {
+      // HTML files: no cache to always get latest
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
+      // Hashed assets (contain fingerprint in name): cache for 1 year
+      else if (filePath.match(/\.[a-f0-9]{8}\.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|webp)$/)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+      // Other assets: cache for 1 day
+      else {
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+      }
+    }
+  }));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (req, res, next) => {
@@ -100,6 +122,10 @@ export function serveStatic(app: Express) {
     if (req.originalUrl.startsWith("/api")) {
       return next();
     }
+    // Set no-cache for HTML to ensure fresh content
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
