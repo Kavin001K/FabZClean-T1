@@ -25,13 +25,61 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false,
     minify: 'esbuild',
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 600, // Reduced from 1000
+    target: 'es2020',
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-popover', '@radix-ui/react-select']
-        }
+        // Better code splitting for smaller chunks
+        manualChunks: (id) => {
+          // React core
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'react-vendor';
+          }
+          // React Query / TanStack
+          if (id.includes('@tanstack/react-query')) {
+            return 'tanstack';
+          }
+          // UI Components (Radix)
+          if (id.includes('@radix-ui/')) {
+            return 'radix-ui';
+          }
+          // Charts
+          if (id.includes('recharts') || id.includes('d3-')) {
+            return 'charts';
+          }
+          // Date utilities
+          if (id.includes('date-fns') || id.includes('dayjs') || id.includes('luxon')) {
+            return 'date-utils';
+          }
+          // Supabase
+          if (id.includes('@supabase/')) {
+            return 'supabase';
+          }
+          // Form handling
+          if (id.includes('react-hook-form') || id.includes('zod') || id.includes('@hookform/')) {
+            return 'forms';
+          }
+          // Icons
+          if (id.includes('lucide-react')) {
+            return 'icons';
+          }
+          // PDF/Print
+          if (id.includes('jspdf') || id.includes('html2canvas')) {
+            return 'pdf';
+          }
+          // Animation
+          if (id.includes('framer-motion')) {
+            return 'animation';
+          }
+          // Other vendor libraries
+          if (id.includes('node_modules/')) {
+            return 'vendor';
+          }
+        },
+        // Optimize chunk file names
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
       }
     }
   },
@@ -39,6 +87,7 @@ export default defineConfig({
     logOverride: { 'this-is-undefined-in-esm': 'silent' },
     target: 'es2020',
     drop: ['console', 'debugger'],
+    legalComments: 'none', // Remove license comments to reduce size
   },
   server: {
     fs: {
@@ -49,8 +98,8 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
     hmr: {
-      // clientPort: 5000, // Removed to allow auto-detection (should match window.location.port)
+      // clientPort: 5000, // Removed to allow auto-detection
     },
-    // Proxy is not needed in middleware mode as Express handles API routes
   },
 });
+
