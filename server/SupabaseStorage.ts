@@ -638,8 +638,17 @@ export class SupabaseStorage {
     }
 
     async deleteEmployee(id: string): Promise<boolean> {
-        const { error } = await this.supabase.from('employees').delete().eq('id', id);
-        return !error;
+        const { error, count } = await this.supabase
+            .from('employees')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Delete employee error:', error);
+            throw new Error(error.message || 'Failed to delete employee');
+        }
+
+        return true;
     }
 
     async getEmployees(): Promise<Employee[]> {

@@ -412,10 +412,14 @@ export const employeesApi = {
       const response = await authorizedFetch(`/employees/${id}`, {
         method: "DELETE",
       });
-      return response.ok;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to delete employee: ${response.status}`);
+      }
+      return true;
     } catch (error) {
       console.error(`Failed to delete employee ${id}:`, error);
-      return false;
+      throw error;
     }
   },
 };
