@@ -9,28 +9,41 @@
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 
   /* New FabClean Theme */
-  --color-primary: 132 204 22;  /* Lime Green */
-  --color-accent: 251 146 60;   /* Orange */
-  
+  --color-primary: 132 204 22;
+  /* Lime Green */
+  --color-accent: 251 146 60;
+  /* Orange */
+
   /* Semantic Colors */
-  --color-success: 34 197 94;   /* Success Green (#22C55E) */
-  --color-warning: 249 115 22;  /* Warning Orange (#F97316) */
-  --color-destructive: 239 68 68; /* Error Red (#EF4444) */
+  --color-success: 34 197 94;
+  /* Success Green (#22C55E) */
+  --color-warning: 249 115 22;
+  /* Warning Orange (#F97316) */
+  --color-destructive: 239 68 68;
+  /* Error Red (#EF4444) */
 
   /* Light Mode Theme */
-  --background: 249 250 251; /* Neutral Background (#F9FAFB) */
-  --foreground: 55 65 81;   /* Neutral Text (#374151) */
-  --card: 255 255 255;      /* Neutral UI Elements (#FFFFFF) */
+  --background: 249 250 251;
+  /* Neutral Background (#F9FAFB) */
+  --foreground: 55 65 81;
+  /* Neutral Text (#374151) */
+  --card: 255 255 255;
+  /* Neutral UI Elements (#FFFFFF) */
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--card-foreground);
-  --muted: 229 231 235;      /* Lighter gray for muted backgrounds */
-  --muted-foreground: 156 163 175; /* Mid-gray for muted text (#9CA3AF) */
-  --border: 229 231 235; /* Corresponds to gray-200 */
-  --input: 209 213 219;  /* Corresponds to gray-300 */
+  --muted: 229 231 235;
+  /* Lighter gray for muted backgrounds */
+  --muted-foreground: 156 163 175;
+  /* Mid-gray for muted text (#9CA3AF) */
+  --border: 229 231 235;
+  /* Corresponds to gray-200 */
+  --input: 209 213 219;
+  /* Corresponds to gray-300 */
   --primary: var(--color-primary);
   --primary-foreground: 255 255 255;
-  --secondary: 55 65 81; /* Dark gray for secondary buttons */
+  --secondary: 55 65 81;
+  /* Dark gray for secondary buttons */
   --secondary-foreground: 255 255 255;
   --accent: var(--color-accent);
   --accent-foreground: 255 255 255;
@@ -46,19 +59,27 @@
 
 .dark {
   /* Dark Mode Theme */
-  --background: 17 24 39;    /* Dark Mode Background (#111827) */
-  --foreground: 209 213 219; /* Lighter gray text */
-  --card: 31 41 55;        /* Dark Mode UI Elements (#1F2937) */
+  --background: 17 24 39;
+  /* Dark Mode Background (#111827) */
+  --foreground: 209 213 219;
+  /* Lighter gray text */
+  --card: 31 41 55;
+  /* Dark Mode UI Elements (#1F2937) */
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--card-foreground);
-  --muted: 55 65 81;        /* Darker gray for muted backgrounds */
-  --muted-foreground: 156 163 175; /* Mid-gray for muted text (#9CA3AF) */
-  --border: 55 65 81;       /* Darker border */
-  --input: 75 85 99;        /* Darker input */
+  --muted: 55 65 81;
+  /* Darker gray for muted backgrounds */
+  --muted-foreground: 156 163 175;
+  /* Mid-gray for muted text (#9CA3AF) */
+  --border: 55 65 81;
+  /* Darker border */
+  --input: 75 85 99;
+  /* Darker input */
   --primary: var(--color-primary);
   --primary-foreground: 255 255 255;
-  --secondary: 209 213 219; /* Light gray for secondary buttons */
+  --secondary: 209 213 219;
+  /* Light gray for secondary buttons */
   --secondary-foreground: 17 24 39;
   --accent: var(--color-accent);
   --accent-foreground: 255 255 255;
@@ -88,19 +109,23 @@
   }
 
   /* Enhanced Typography Hierarchy */
-  h1, .h1 {
+  h1,
+  .h1 {
     @apply text-h1 font-bold;
   }
 
-  h2, .h2 {
+  h2,
+  .h2 {
     @apply text-h2 font-bold;
   }
 
-  h3, .h3 {
+  h3,
+  .h3 {
     @apply text-h3 font-semibold;
   }
 
-  p, .body {
+  p,
+  .body {
     @apply text-body;
   }
 
@@ -123,7 +148,9 @@
   }
 
   /* Enhanced Input Base Styles */
-  input, textarea, select {
+  input,
+  textarea,
+  select {
     font-family: var(--font-sans);
     font-size: var(--text-base);
   }
@@ -148,6 +175,7 @@
 }
 
 @layer components {
+
   /* Main Content Area */
   .main-content {
     @apply transition-transform duration-300 ease-in-out;
@@ -165,9 +193,11 @@
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 150ms;
   }
+
   .btn:hover {
     @apply opacity-90;
   }
+
   .btn:active {
     @apply scale-95;
   }
@@ -186,34 +216,41 @@
   .interactive-row {
     @apply cursor-pointer transition-colors;
   }
+
   .interactive-row:hover {
     @apply bg-muted/50;
   }
 }
 
 @layer utilities {
+
   /* Animation Utilities */
   .animate-in {
     animation: enter 0.2s ease-out;
   }
+
   .animate-out {
     animation: exit 0.15s ease-in;
   }
+
   @keyframes enter {
     from {
       opacity: 0;
       transform: scale(0.95);
     }
+
     to {
       opacity: 1;
       transform: scale(1);
     }
   }
+
   @keyframes exit {
     from {
       opacity: 1;
       transform: scale(1);
     }
+
     to {
       opacity: 0;
       transform: scale(0.95);
@@ -224,15 +261,19 @@
   .animate-delay-100 {
     animation-delay: 100ms;
   }
+
   .animate-delay-200 {
     animation-delay: 200ms;
   }
+
   .animate-delay-300 {
     animation-delay: 300ms;
   }
+
   .animate-delay-400 {
     animation-delay: 400ms;
   }
+
   .animate-delay-500 {
     animation-delay: 500ms;
   }
@@ -251,9 +292,11 @@
     .grid-desktop-4 {
       @apply grid-cols-4;
     }
+
     .grid-desktop-3 {
       @apply grid-cols-3;
     }
+
     .grid-desktop-2 {
       @apply grid-cols-2;
     }
@@ -276,6 +319,7 @@
   .hover-lift {
     @apply transition-all duration-300 ease-out;
   }
+
   .hover-lift:hover {
     @apply transform -translate-y-1 shadow-lg;
   }
@@ -283,6 +327,7 @@
   .hover-glow {
     @apply transition-all duration-300;
   }
+
   .hover-glow:hover {
     box-shadow: 0 0 20px rgba(132, 204, 22, 0.4);
   }
@@ -290,6 +335,7 @@
   .hover-scale {
     @apply transition-transform duration-300 ease-out;
   }
+
   .hover-scale:hover {
     @apply scale-105;
   }
@@ -331,6 +377,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -370,4 +417,39 @@ html {
 ::selection {
   background-color: rgb(var(--primary) / 0.3);
   color: rgb(var(--foreground));
+}
+
+/* Thin Scrollbar - for sidebar and compact areas */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgb(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--muted-foreground) / 0.5);
+}
+
+/* Firefox scrollbar support */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--muted-foreground) / 0.3) transparent;
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

@@ -719,10 +719,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Status is required" });
       }
 
+      // Get the old order status for audit log
+      const oldOrder = await storage.getOrder(req.params.id);
+      const previousStatus = oldOrder?.status || 'unknown';
+
       const order = await storage.updateOrder(req.params.id, { status });
 
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Log to audit trail
+      try {
+        const auditAction = `order_status_${status}`;
+        await storage.createAuditLog({
+          employeeId: updatedBy || 'system',
+          action: auditAction,
+          entityType: 'order',
+          entityId: req.params.id,
+          details: {
+            orderNumber: order.orderNumber,
+            previousStatus,
+            newStatus: status,
+            notes: notes || null,
+            customerName: order.customerName
+          },
+          ipAddress: req.ip || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        });
+      } catch (auditError) {
+        console.error('Audit log error (non-blocking):', auditError);
       }
 
       // Trigger real-time update

@@ -173,7 +173,7 @@ export function Sidebar() {
           <img src="/assets/logo.webp" alt="FabzClean Logo" className="h-10 w-auto" />
         </Link>
       </div>
-      <nav className="flex flex-1 flex-col gap-2 p-4 font-medium">
+      <nav className="flex flex-1 flex-col gap-2 p-4 font-medium overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/50">
         {filteredNav.map((item) => (
           <NavLink key={item.to} to={item.to} icon={item.icon}>
             {item.label}

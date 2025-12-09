@@ -58,17 +58,40 @@ router.get('/', jwtRequired, requireRole(AUDIT_VIEW_ROLES), async (req, res) => 
 // Get unique actions for filter dropdown
 router.get('/actions', jwtRequired, requireRole(AUDIT_VIEW_ROLES), async (req, res) => {
     try {
-        // This is a bit of a hack since Supabase doesn't support DISTINCT easily via JS client in all cases
-        // But we can use a stored procedure or just fetch distinct values if the table isn't huge
-        // For now, let's just return a static list of known actions or fetch recent ones
-
-        // Better approach: RPC call if we had one, or just hardcode common ones + fetch recent
+        // Comprehensive list of all tracked actions for filtering
         const knownActions = [
-            'login', 'logout',
-            'create_order', 'update_order', 'delete_order', 'update_order_status',
-            'payment_received', 'print_document',
-            'create_employee', 'update_employee',
-            'change_password'
+            // Authentication
+            'login', 'logout', 'failed_login', 'password_change',
+
+            // Order Management
+            'create_order', 'update_order', 'delete_order',
+            'order_status_pending', 'order_status_processing', 'order_status_ready',
+            'order_status_completed', 'order_status_cancelled', 'order_status_delivered',
+
+            // Transit & Logistics
+            'create_transit', 'update_transit', 'complete_transit', 'cancel_transit',
+
+            // Payment
+            'payment_received', 'payment_pending', 'mark_paid', 'refund_issued',
+
+            // Printing & Documents
+            'print_invoice', 'print_tags', 'print_document', 'export_report',
+
+            // User Management
+            'create_employee', 'update_employee', 'delete_employee',
+            'revoke_access', 'restore_access', 'role_change',
+
+            // Customer Management
+            'create_customer', 'update_customer', 'delete_customer',
+
+            // Service Management
+            'create_service', 'update_service', 'delete_service',
+
+            // Inventory
+            'add_inventory', 'update_inventory', 'low_stock_alert',
+
+            // System
+            'settings_update', 'backup_created', 'data_export'
         ];
 
         res.json(createSuccessResponse(knownActions));

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -24,7 +26,15 @@ import {
   Download,
   FileText,
   Users,
-  Shield
+  Shield,
+  Trash2,
+  Lock,
+  Unlock,
+  MoreVertical,
+  Calendar,
+  Building,
+  Briefcase,
+  AlertTriangle
 } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
 
@@ -58,6 +68,8 @@ export default function EmployeeManagement() {
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("personal");
@@ -132,6 +144,63 @@ export default function EmployeeManagement() {
       toast({ title: "Error", description: error.message || "Failed to update employee", variant: "destructive" });
     }
   });
+
+  // Delete mutation
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: (id: string) => employeesApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      setIsDeleteDialogOpen(false);
+      setSelectedEmployee(null);
+      toast({ title: "User Deleted", description: "The user has been permanently removed from the system." });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message || "Failed to delete employee", variant: "destructive" });
+    }
+  });
+
+  // Revoke/Restore access mutation
+  const toggleAccessMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'active' | 'inactive' }) =>
+      employeesApi.update(id, { status }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      const action = variables.status === 'inactive' ? 'revoked' : 'restored';
+      toast({
+        title: `Access ${action.charAt(0).toUpperCase() + action.slice(1)}`,
+        description: `User access has been ${action} successfully.`
+      });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message || "Failed to update access", variant: "destructive" });
+    }
+  });
+
+  // View user handler
+  const handleViewEmployee = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setIsViewDialogOpen(true);
+  };
+
+  // Delete user handler
+  const handleDeleteEmployee = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setIsDeleteDialogOpen(true);
+  };
+
+  // Confirm delete
+  const confirmDelete = () => {
+    if (selectedEmployee) {
+      deleteEmployeeMutation.mutate(selectedEmployee.id);
+    }
+  };
+
+  // Toggle access (revoke/restore)
+  const handleToggleAccess = (employee: Employee) => {
+    const newStatus = employee.status === 'active' ? 'inactive' : 'active';
+    toggleAccessMutation.mutate({ id: employee.id, status: newStatus });
+  };
+
 
   const departments = ['Operations', 'Logistics', 'Customer Service', 'Quality Control', 'Management'];
   const positions = [
@@ -612,8 +681,10 @@ export default function EmployeeManagement() {
                 employees.map((employee: any) => (
                   <div key={employee.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-                        <span className="text-lg font-medium text-primary-foreground">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${employee.status === 'active' ? 'bg-primary' : 'bg-muted'
+                        }`}>
+                        <span className={`text-lg font-medium ${employee.status === 'active' ? 'text-primary-foreground' : 'text-muted-foreground'
+                          }`}>
                           {employee.fullName ? employee.fullName.split(' ').map((n: string) => n[0]).join('') : 'U'}
                         </span>
                       </div>
@@ -625,7 +696,7 @@ export default function EmployeeManagement() {
                             {employee.role}
                           </Badge>
                           <Badge className={getStatusColor(employee.status)}>
-                            {employee.status}
+                            {employee.status === 'active' ? 'Active' : employee.status === 'inactive' ? 'Revoked' : employee.status}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
@@ -645,9 +716,57 @@ export default function EmployeeManagement() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEditEmployee(employee)}>
+                      {/* Quick action buttons */}
+                      <Button variant="ghost" size="sm" onClick={() => handleViewEmployee(employee)} title="View Details">
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleEditEmployee(employee)} title="Edit User">
                         <Edit className="w-4 h-4" />
                       </Button>
+
+                      {/* Dropdown for more actions */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewEmployee(employee)}>
+                            <Eye className="w-4 h-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditEmployee(employee)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit User
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleToggleAccess(employee)}
+                            className={employee.status === 'active' ? 'text-amber-600' : 'text-green-600'}
+                          >
+                            {employee.status === 'active' ? (
+                              <>
+                                <Lock className="w-4 h-4 mr-2" />
+                                Revoke Access
+                              </>
+                            ) : (
+                              <>
+                                <Unlock className="w-4 h-4 mr-2" />
+                                Restore Access
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteEmployee(employee)}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete User
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 ))
@@ -834,6 +953,188 @@ export default function EmployeeManagement() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* View User Details Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              User Details
+            </DialogTitle>
+            <DialogDescription>
+              Comprehensive information about this user account.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedEmployee && (
+            <div className="space-y-6">
+              {/* User Header */}
+              <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center ${selectedEmployee.status === 'active' ? 'bg-primary' : 'bg-muted border-2 border-muted-foreground/30'
+                  }`}>
+                  <span className={`text-2xl font-bold ${selectedEmployee.status === 'active' ? 'text-primary-foreground' : 'text-muted-foreground'
+                    }`}>
+                    {selectedEmployee.fullName ? selectedEmployee.fullName.split(' ').map((n: string) => n[0]).join('') : 'U'}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold">{selectedEmployee.fullName}</h3>
+                  <p className="text-muted-foreground">{selectedEmployee.position}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="outline">
+                      <Shield className="w-3 h-3 mr-1" />
+                      {selectedEmployee.role?.replace('_', ' ').toUpperCase()}
+                    </Badge>
+                    <Badge className={getStatusColor(selectedEmployee.status)}>
+                      {selectedEmployee.status === 'active' ? 'Active' : selectedEmployee.status === 'inactive' ? 'Access Revoked' : selectedEmployee.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <Mail className="w-4 h-4" /> Contact Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Email:</span>
+                    <p className="font-medium">{selectedEmployee.email}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Phone:</span>
+                    <p className="font-medium">{selectedEmployee.phone}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Address:</span>
+                    <p className="font-medium">{selectedEmployee.address || 'Not provided'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Emergency Contact:</span>
+                    <p className="font-medium">{selectedEmployee.emergencyContact || 'Not provided'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Work Information */}
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <Briefcase className="w-4 h-4" /> Work Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Employee ID:</span>
+                    <p className="font-medium font-mono">{selectedEmployee.employeeId}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Department:</span>
+                    <p className="font-medium">{selectedEmployee.department}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Hire Date:</span>
+                    <p className="font-medium">{selectedEmployee.hireDate ? new Date(selectedEmployee.hireDate).toLocaleDateString() : 'Not set'}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Working Hours:</span>
+                    <p className="font-medium">{selectedEmployee.workingHours || 8} hours/day</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Compensation */}
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <DollarSign className="w-4 h-4" /> Compensation
+                </h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Salary Type:</span>
+                    <p className="font-medium capitalize">{selectedEmployee.salaryType || 'Monthly'}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">
+                      {selectedEmployee.salaryType === 'hourly' ? 'Hourly Rate:' : 'Monthly Salary:'}
+                    </span>
+                    <p className="font-medium text-primary">
+                      {selectedEmployee.salaryType === 'hourly'
+                        ? `₹${selectedEmployee.hourlyRate || 0}/hr`
+                        : `₹${(selectedEmployee as any).salary || selectedEmployee.baseSalary || 0}/month`
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              {selectedEmployee.notes && (
+                <div>
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> Notes
+                  </h4>
+                  <p className="text-sm bg-muted/50 p-3 rounded-lg">{selectedEmployee.notes}</p>
+                </div>
+              )}
+
+              {/* Actions */}
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
+                  Close
+                </Button>
+                <Button onClick={() => { setIsViewDialogOpen(false); handleEditEmployee(selectedEmployee); }}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit User
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              Delete User Permanently
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="space-y-4">
+                <p>
+                  Are you sure you want to delete <strong>{selectedEmployee?.fullName}</strong>?
+                  This action cannot be undone.
+                </p>
+                <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 p-4 rounded-lg">
+                  <p className="text-sm text-red-800 dark:text-red-300">
+                    <strong>Warning:</strong> This will permanently remove:
+                  </p>
+                  <ul className="text-sm text-red-700 dark:text-red-400 list-disc list-inside mt-2">
+                    <li>User account and login credentials</li>
+                    <li>All associated activity logs</li>
+                    <li>Task and assignment history</li>
+                  </ul>
+                </div>
+                <p className="text-sm">
+                  Consider <strong>revoking access</strong> instead if you want to preserve historical data.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={deleteEmployeeMutation.isPending}
+            >
+              {deleteEmployeeMutation.isPending ? "Deleting..." : "Delete Permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
