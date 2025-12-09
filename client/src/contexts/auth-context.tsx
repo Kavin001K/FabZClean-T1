@@ -24,6 +24,7 @@ interface Employee {
   qualifications?: string;
   notes?: string;
   address?: string;
+  settings?: any; // JSONB column
 }
 
 interface AuthContextType {

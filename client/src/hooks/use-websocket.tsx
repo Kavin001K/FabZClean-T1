@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { isElectron } from '@/lib/utils';
 
 interface WebSocketMessage {
   type: string;
@@ -19,14 +20,21 @@ interface UseWebSocketOptions {
   enabled?: boolean;
 }
 
+// Electron-optimized defaults
+const ELECTRON_RECONNECT_INTERVAL = 2000;  // Faster in desktop app
+const BROWSER_RECONNECT_INTERVAL = 3000;
+const ELECTRON_MAX_RECONNECTS = 10;        // More attempts in Electron (local network)
+const BROWSER_MAX_RECONNECTS = 5;
+const HEARTBEAT_INTERVAL = 30000;          // Ping every 30 seconds to keep connection alive
+
 export function useWebSocket({
   url,
   onMessage,
   onOpen,
   onClose,
   onError,
-  reconnectInterval = 3000,
-  maxReconnectAttempts = 5,
+  reconnectInterval = isElectron() ? ELECTRON_RECONNECT_INTERVAL : BROWSER_RECONNECT_INTERVAL,
+  maxReconnectAttempts = isElectron() ? ELECTRON_MAX_RECONNECTS : BROWSER_MAX_RECONNECTS,
   enabled = true
 }: UseWebSocketOptions) {
   const [isConnected, setIsConnected] = useState(false);

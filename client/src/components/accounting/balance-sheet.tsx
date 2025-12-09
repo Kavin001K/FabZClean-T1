@@ -193,7 +193,7 @@ export function BalanceSheet() {
 
   const renderSection = (section: BalanceSheetSection | null | undefined, level: number = 0) => {
     if (!section || !section.accounts) return null;
-    
+
     return (
       <>
         {section.title && (
@@ -272,6 +272,7 @@ export function BalanceSheet() {
                   mode="single"
                   selected={asOfDate}
                   onSelect={(date) => date && setAsOfDate(date)}
+                  disabled={(date) => date > new Date()}
                 />
               </PopoverContent>
             </Popover>

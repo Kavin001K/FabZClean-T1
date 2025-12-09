@@ -41,16 +41,32 @@ export default function ProfilePage() {
 
     const handleSave = async () => {
         try {
-            // TODO: Implement profile update API call
+            const res = await fetch(`/api/employees/${employee?.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    fullName: formData.fullName,
+                    email: formData.email,
+                    phone: formData.phone,
+                }),
+            });
+
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.message || 'Failed to update profile');
+            }
+
             toast({
                 title: 'Profile Updated',
                 description: 'Your profile has been updated successfully.',
             });
             setIsEditing(false);
-        } catch (error) {
+        } catch (error: any) {
             toast({
                 title: 'Error',
-                description: 'Failed to update profile. Please try again.',
+                description: error.message || 'Failed to update profile. Please try again.',
                 variant: 'destructive',
             });
         }
@@ -59,9 +75,9 @@ export default function ProfilePage() {
     const handlePasswordChange = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
-        const currentPassword = formData.get('currentPassword');
-        const newPassword = formData.get('newPassword');
-        const confirmPassword = formData.get('confirmPassword');
+        const currentPassword = formData.get('currentPassword') as string;
+        const newPassword = formData.get('newPassword') as string;
+        const confirmPassword = formData.get('confirmPassword') as string;
 
         if (newPassword !== confirmPassword) {
             toast({
@@ -72,17 +88,42 @@ export default function ProfilePage() {
             return;
         }
 
+        if (newPassword.length < 8) {
+            toast({
+                title: 'Error',
+                description: 'Password must be at least 8 characters long.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
         try {
-            // TODO: Implement password change API call
+            const res = await fetch('/api/auth/change-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    employeeId: employee?.id,
+                    currentPassword,
+                    newPassword,
+                }),
+            });
+
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.message || 'Failed to change password');
+            }
+
             toast({
                 title: 'Password Changed',
                 description: 'Your password has been changed successfully.',
             });
             e.currentTarget.reset();
-        } catch (error) {
+        } catch (error: any) {
             toast({
                 title: 'Error',
-                description: 'Failed to change password. Please try again.',
+                description: error.message || 'Failed to change password. Please try again.',
                 variant: 'destructive',
             });
         }

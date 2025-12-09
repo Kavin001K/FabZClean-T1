@@ -147,6 +147,8 @@ export interface InvoicePrintData {
   invoiceDate: string;
   dueDate?: string;
   orderNumber?: string;
+  franchiseId?: string; // For franchise-specific details
+  enableGST?: boolean; // Whether to show GST on invoice
   customerInfo: {
     name: string;
     address: string;
@@ -181,38 +183,104 @@ export interface InvoicePrintData {
   qrCode?: string;
 }
 
+// Import franchise config for company details
+import { getFranchiseById, getFormattedAddress } from './franchise-config';
+
+/**
+ * Parse address object to human-readable string
+ * Handles all common address formats and returns clean text
+ */
+function parseAddressObject(addr: any): string {
+  if (!addr) return 'Address not provided';
+
+  // If it's already a string, return it
+  if (typeof addr === 'string') return addr;
+
+  // Common address field names in order of preference
+  const parts: string[] = [];
+
+  // Street/line1
+  if (addr.street) parts.push(addr.street);
+  else if (addr.line1) parts.push(addr.line1);
+  else if (addr.address1) parts.push(addr.address1);
+  else if (addr.addressLine1) parts.push(addr.addressLine1);
+
+  // Line 2 (apartment, building, etc.)
+  if (addr.line2) parts.push(addr.line2);
+  else if (addr.address2) parts.push(addr.address2);
+  else if (addr.apartment) parts.push(addr.apartment);
+  else if (addr.building) parts.push(addr.building);
+
+  // City
+  if (addr.city) parts.push(addr.city);
+  else if (addr.town) parts.push(addr.town);
+  else if (addr.locality) parts.push(addr.locality);
+
+  // State/Province
+  if (addr.state) parts.push(addr.state);
+  else if (addr.province) parts.push(addr.province);
+  else if (addr.region) parts.push(addr.region);
+
+  // Postal code
+  if (addr.postalCode) parts.push(addr.postalCode);
+  else if (addr.zipCode) parts.push(addr.zipCode);
+  else if (addr.pincode) parts.push(addr.pincode);
+  else if (addr.zip) parts.push(addr.zip);
+
+  // Country
+  if (addr.country) parts.push(addr.country);
+
+  // If we found valid parts, join them
+  if (parts.length > 0) {
+    return parts.filter(Boolean).join(', ');
+  }
+
+  // Fallback: try to extract any string values from the object
+  const values = Object.values(addr).filter(v => typeof v === 'string' && v.trim());
+  if (values.length > 0) {
+    return values.join(', ');
+  }
+
+  return 'Address not provided';
+}
+
+
 // Utility function to convert Order data to InvoicePrintData
-export function convertOrderToInvoiceData(order: any): InvoicePrintData {
-  // Default company information - you should update this with your actual company details
+export function convertOrderToInvoiceData(order: any, enableGST: boolean = false): InvoicePrintData {
+  // Get franchise-specific company details
+  const franchiseId = order?.franchiseId || order?.franchise_id;
+  const franchise = getFranchiseById(franchiseId);
+
   const companyInfo = {
     name: "FabZClean",
-    address: "123 Business Street, City, State 12345\nIndia",
-    phone: "+91 93630 59595",
-    email: "support@myfabclean.com",
+    address: getFormattedAddress(franchise),
+    phone: franchise.phone,
+    email: franchise.email || "support@myfabclean.com",
     website: "www.myfabclean.com",
-    taxId: "33AITPD3522F1ZK" // Updated GSTIN
+    taxId: enableGST ? franchise.gstNumber : undefined
   };
 
-  // Parse customer address
+  // Parse customer address - always return human-readable text, never JSON
   let customerAddress = 'Address not provided';
-  if (order.shippingAddress) {
-    if (typeof order.shippingAddress === 'string') {
-      customerAddress = order.shippingAddress;
-    } else if (typeof order.shippingAddress === 'object') {
-      // Handle address object
-      const addr = order.shippingAddress;
-      const parts = [
-        addr.street || addr.line1,
-        addr.line2,
-        addr.city,
-        addr.state,
-        addr.postalCode || addr.zipCode,
-        addr.country
-      ].filter(Boolean);
-      customerAddress = parts.join(', ');
+  const rawAddress = order.shippingAddress || order.address || order.customerAddress;
+
+  if (rawAddress) {
+    if (typeof rawAddress === 'string') {
+      // If it's a string, check if it's a JSON string and parse it
+      if (rawAddress.startsWith('{') || rawAddress.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(rawAddress);
+          customerAddress = parseAddressObject(parsed);
+        } catch {
+          // Not valid JSON, use as-is
+          customerAddress = rawAddress;
+        }
+      } else {
+        customerAddress = rawAddress;
+      }
+    } else if (typeof rawAddress === 'object' && rawAddress !== null) {
+      customerAddress = parseAddressObject(rawAddress);
     }
-  } else if (order.address) {
-    customerAddress = typeof order.address === 'string' ? order.address : JSON.stringify(order.address);
   }
 
   // Parse order items
@@ -229,7 +297,7 @@ export function convertOrderToInvoiceData(order: any): InvoicePrintData {
         quantity,
         unitPrice,
         total,
-        taxRate: parseFloat(String(item.taxRate)) || 0.18 // Default 18% GST
+        taxRate: enableGST ? (parseFloat(String(item.taxRate)) || 18) : 0 // 18% GST if enabled
       };
     });
   } else {
@@ -241,9 +309,9 @@ export function convertOrderToInvoiceData(order: any): InvoicePrintData {
       name: serviceName,
       description: `Order ${order.orderNumber || order.id}`,
       quantity: 1,
-      unitPrice: totalAmount / 1.18, // Assuming 18% tax included
-      total: totalAmount / 1.18,
-      taxRate: 0.18
+      unitPrice: enableGST ? totalAmount / 1.18 : totalAmount, // Remove GST from base price if GST enabled
+      total: enableGST ? totalAmount / 1.18 : totalAmount,
+      taxRate: enableGST ? 18 : 0
     }];
   }
 
@@ -256,7 +324,7 @@ export function convertOrderToInvoiceData(order: any): InvoicePrintData {
       quantity: 1,
       unitPrice: charge,
       total: charge,
-      taxRate: 0.18
+      taxRate: enableGST ? 18 : 0
     });
   }
 
@@ -279,20 +347,26 @@ export function convertOrderToInvoiceData(order: any): InvoicePrintData {
         quantity: 1,
         unitPrice: -discountAmount,
         total: -discountAmount,
-        taxRate: 0.18
+        taxRate: enableGST ? 18 : 0
       });
     }
   }
 
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-  const tax = items.reduce((sum, item) => sum + (item.total * (item.taxRate || 0.18)), 0);
+  const tax = enableGST ? items.reduce((sum, item) => sum + (item.total * (item.taxRate || 0) / 100), 0) : 0;
   const total = subtotal + tax;
 
+  // Generate invoice number with franchise prefix
+  const branchCode = franchise.branchCode;
+  const invoiceNumber = `${branchCode}-${order.orderNumber || order.id}`;
+
   return {
-    invoiceNumber: `INV-${order.orderNumber || order.id}`,
+    invoiceNumber,
     invoiceDate: order.createdAt ? new Date(order.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
     orderNumber: order.orderNumber || order.id,
+    franchiseId: franchiseId,
+    enableGST,
     customerInfo: {
       name: order.customerName || order.customer?.name || 'Customer',
       address: customerAddress,
@@ -307,7 +381,9 @@ export function convertOrderToInvoiceData(order: any): InvoicePrintData {
     paymentMethod: order.paymentMethod || 'Cash',
     paymentStatus: order.paymentStatus || order.status || 'Pending',
     notes: order.notes || order.specialInstructions || `Order Status: ${order.status}`,
-    terms: 'Payment due within 30 days of invoice date. Interest @ 18% p.a. will be charged on delayed payments.',
+    terms: enableGST
+      ? 'GST Invoice. Tax is calculated at applicable rates. Payment due within 30 days.'
+      : 'Payment due within 30 days of invoice date.',
     status: order.status
   };
 }

@@ -349,6 +349,7 @@ export default function AuditLogsPage() {
                                         mode="single"
                                         selected={date}
                                         onSelect={setDate}
+                                        disabled={(date) => date > new Date()}
                                         initialFocus
                                     />
                                 </PopoverContent>

@@ -280,6 +280,8 @@ CREATE TABLE IF NOT EXISTS drivers (
   status TEXT DEFAULT 'active',
   current_latitude DECIMAL(10, 8),
   current_longitude DECIMAL(11, 8),
+  vehicle_type TEXT DEFAULT 'Bike',
+  vehicle_number TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

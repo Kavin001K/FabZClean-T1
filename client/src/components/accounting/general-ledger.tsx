@@ -204,7 +204,7 @@ export function GeneralLedger() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} />
+                  <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} disabled={(date) => date > new Date()} />
                 </PopoverContent>
               </Popover>
             </div>
@@ -218,7 +218,7 @@ export function GeneralLedger() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={dateTo} onSelect={setDateTo} />
+                  <Calendar mode="single" selected={dateTo} onSelect={setDateTo} disabled={(date) => date > new Date()} />
                 </PopoverContent>
               </Popover>
             </div>
@@ -330,7 +330,7 @@ export function GeneralLedger() {
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Difference</p>
                       <p className="text-lg font-bold">
-                        ${Math.abs(totals.debit - formatUSD(totals.credit))}
+                        ${formatUSD(Math.abs(totals.debit - totals.credit))}
                       </p>
                     </div>
                   </div>

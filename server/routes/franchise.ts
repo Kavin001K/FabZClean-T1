@@ -200,16 +200,53 @@ router.get("/:id/tasks", async (req, res) => {
 router.post("/:id/attendance", async (req, res) => {
     try {
         const franchiseId = req.params.id;
-        const validatedData = insertEmployeeAttendanceSchema.parse({
-            ...req.body,
+        const { employeeId, date, status, clockIn, clockOut, locationCheckIn } = req.body;
+
+        // Parse and validate the date
+        const attendanceDate = date ? new Date(date) : new Date();
+        const dateString = attendanceDate.toISOString().split('T')[0];
+
+        console.log('Marking attendance:', {
             franchiseId,
-            date: req.body.date ? new Date(req.body.date) : new Date(),
+            employeeId,
+            date: dateString,
+            status,
+            clockIn,
+            clockOut
         });
 
-        const attendance = await storage.createAttendance(validatedData);
+        // Check if attendance already exists for this employee on this date
+        const existingAttendance = await storage.listAttendance(franchiseId, employeeId, attendanceDate);
+
+        let attendance;
+        if (existingAttendance && existingAttendance.length > 0) {
+            // Update existing attendance
+            console.log('Updating existing attendance:', existingAttendance[0].id);
+            attendance = await storage.updateAttendance(existingAttendance[0].id, {
+                status,
+                clockIn: clockIn || existingAttendance[0].clockIn,
+                clockOut: clockOut || existingAttendance[0].clockOut,
+                locationCheckIn: locationCheckIn || existingAttendance[0].locationCheckIn,
+            });
+        } else {
+            // Create new attendance record
+            console.log('Creating new attendance record');
+            const validatedData = insertEmployeeAttendanceSchema.parse({
+                franchiseId,
+                employeeId,
+                date: attendanceDate,
+                status,
+                clockIn: clockIn ? new Date(clockIn) : null,
+                clockOut: clockOut ? new Date(clockOut) : null,
+                locationCheckIn,
+            });
+            attendance = await storage.createAttendance(validatedData);
+        }
+
+        console.log('Attendance saved:', attendance);
         res.status(201).json(attendance);
     } catch (error) {
-        console.error("Mark attendance error:", error);
+        console.error("Mark attendance error:", error instanceof Error ? error.message : String(error));
         if (error instanceof z.ZodError) {
             res.status(400).json({ message: "Validation error", errors: error.errors });
         } else {
@@ -241,9 +278,10 @@ router.get("/:id/employees", async (req, res) => {
     try {
         const franchiseId = req.params.id;
         const employees = await storage.getEmployees();
-        // Filter by franchiseId manually if storage doesn't support it directly
-        // Assuming employee object has franchiseId field
-        const franchiseEmployees = employees.filter((emp: any) => emp.franchiseId === franchiseId);
+        // Filter by franchiseId and exclude admin role
+        const franchiseEmployees = employees.filter((emp: any) =>
+            emp.franchiseId === franchiseId && emp.role !== 'admin'
+        );
         res.json(franchiseEmployees);
     } catch (error) {
         console.error("List franchise employees error:", error);

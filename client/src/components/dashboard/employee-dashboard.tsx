@@ -4,16 +4,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import { 
-  CheckCircle, 
-  Clock, 
-  AlertCircle, 
-  TrendingUp, 
-  Calendar, 
-  Users, 
+import {
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  TrendingUp,
+  Calendar,
+  Users,
   Package,
   Target,
-  User
+  User,
+  Truck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -115,7 +116,7 @@ export default function EmployeeDashboard() {
             </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">In Progress</CardTitle>
@@ -128,7 +129,7 @@ export default function EmployeeDashboard() {
             </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pending Tasks</CardTitle>
@@ -141,7 +142,7 @@ export default function EmployeeDashboard() {
             </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Efficiency</CardTitle>
@@ -170,10 +171,9 @@ export default function EmployeeDashboard() {
               {todayTasks.map((task) => (
                 <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${
-                      task.status === "completed" ? "bg-green-500" :
-                      task.status === "in-progress" ? "bg-blue-500" : "bg-gray-300"
-                    }`} />
+                    <div className={`w-3 h-3 rounded-full ${task.status === "completed" ? "bg-green-500" :
+                        task.status === "in-progress" ? "bg-blue-500" : "bg-gray-300"
+                      }`} />
                     <div>
                       <p className="font-medium">{task.title}</p>
                       <div className="flex items-center gap-2 mt-1">
@@ -218,9 +218,8 @@ export default function EmployeeDashboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className={`w-2 h-2 rounded-full ${
-                      member.status === "online" ? "bg-green-500" : "bg-gray-400"
-                    }`} />
+                    <div className={`w-2 h-2 rounded-full ${member.status === "online" ? "bg-green-500" : "bg-gray-400"
+                      }`} />
                     <p className="text-xs text-muted-foreground">
                       {member.tasksCompleted} tasks
                     </p>
@@ -322,9 +321,9 @@ export default function EmployeeDashboard() {
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/tracking">
-                <Clock className="mr-2 h-4 w-4" />
-                Track Orders
+              <Link href="/transit-orders">
+                <Truck className="mr-2 h-4 w-4" />
+                Create Transit
               </Link>
             </Button>
           </div>

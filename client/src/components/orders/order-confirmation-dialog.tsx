@@ -17,7 +17,6 @@ import { formatCurrency, customersApi } from '@/lib/data-service';
 import { WhatsAppService } from '@/lib/whatsapp-service';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
-import { generateTagHTML } from '@/lib/print-templates';
 import { printDriver } from '@/lib/print-driver';
 
 interface OrderConfirmationDialogProps {
@@ -149,15 +148,18 @@ export function OrderConfirmationDialog({
             // Import the conversion function
             const { convertOrderToInvoiceData } = await import('@/lib/print-driver');
 
-            // Convert order to invoice data format
-            const invoiceData = convertOrderToInvoiceData(order);
-            // Set enableGST based on prop
-            (invoiceData as any).enableGST = enableGST;
+            // Convert order to invoice data format with GST setting
+            const invoiceData = convertOrderToInvoiceData(order, enableGST);
 
             console.log('Invoice data converted:', invoiceData);
 
             // Use the print driver to print the invoice
             await printDriver.printInvoice(invoiceData);
+
+            toast({
+                title: enableGST ? "GST Invoice Printed" : "Invoice Printed",
+                description: `Invoice ${invoiceData.invoiceNumber} has been generated.`,
+            });
         } catch (error) {
             console.error("Print failed:", error);
             toast({
@@ -185,50 +187,20 @@ export function OrderConfirmationDialog({
             return;
         }
 
-        const htmlContent = generateTagHTML(order, order.items);
-
-        // Create a hidden iframe
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0px';
-        iframe.style.height = '0px';
-        iframe.style.border = 'none';
-        document.body.appendChild(iframe);
-
-        const doc = iframe.contentWindow?.document;
-        if (doc) {
-            doc.open();
-            doc.write(htmlContent);
-            doc.close();
-
-            // Wait for content to load (especially images/barcodes) then print
-            iframe.onload = () => {
-                setTimeout(() => {
-                    try {
-                        iframe.contentWindow?.focus();
-                        iframe.contentWindow?.print();
-                    } catch (error) {
-                        console.error('Print failed:', error);
-                        toast({
-                            title: "Print Error",
-                            description: "Failed to print tags.",
-                            variant: "destructive",
-                        });
-                    } finally {
-                        // Cleanup after a delay to ensure print dialog has opened
-                        setTimeout(() => {
-                            if (document.body.contains(iframe)) {
-                                document.body.removeChild(iframe);
-                            }
-                        }, 1000);
-                    }
-                }, 500);
-            };
-        } else {
-            console.error('Failed to create print iframe');
+        // Use the optimized printTags function from print-templates
+        try {
+            import('@/lib/print-templates').then(({ printTags }) => {
+                printTags(order, order.items);
+                toast({
+                    title: "Printing Tags",
+                    description: "Tags sent to printer.",
+                });
+            });
+        } catch (error) {
+            console.error('Print failed:', error);
             toast({
                 title: "Print Error",
-                description: "Failed to initialize printer.",
+                description: "Failed to print tags.",
                 variant: "destructive",
             });
         }

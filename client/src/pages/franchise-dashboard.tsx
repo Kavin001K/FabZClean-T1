@@ -44,7 +44,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatNumber } from "@/lib/data";
 import EmployeeManagement from "@/components/employee-management";
-import AttendanceTracker from "@/components/attendance-tracker";
+import TransitOrdersPage from "@/pages/transit-orders";
 
 interface EmployeeAttendance {
   id: string;
@@ -94,6 +94,10 @@ export default function FranchiseDashboard() {
     dueDate: '',
     estimatedHours: ''
   });
+
+  // Attendance dialog state
+  const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeAttendance | null>(null);
 
   const handleSaveTask = async () => {
     try {
@@ -167,32 +171,101 @@ export default function FranchiseDashboard() {
   });
 
   const handleMarkAttendance = async (employeeId: string, status: 'present' | 'absent' | 'late') => {
-    if (!employee?.franchiseId) return;
+    if (!employee?.franchiseId) {
+      console.error('No franchise ID available');
+      return;
+    }
 
     try {
+      console.log('handleMarkAttendance called:', {
+        employeeId,
+        status,
+        franchiseId: employee.franchiseId,
+        selectedDate
+      });
+
       const now = new Date();
       // Set time only if present/late. Absent doesn't need clock in
       const clockIn = (status === 'present' || status === 'late') ? now.toISOString() : null;
 
-      await franchisesApi.markAttendance(employee.franchiseId, {
+      const payload = {
         employeeId,
         date: new Date(selectedDate),
         status,
         clockIn,
         locationCheckIn: { type: 'manual', by: employee.id }
-      });
+      };
+
+      console.log('Sending attendance payload:', payload);
+
+      const result = await franchisesApi.markAttendance(employee.franchiseId, payload);
+
+      console.log('Attendance marked successfully:', result);
 
       toast({
-        title: "Attendance Updated",
-        description: `Marked employee as ${status}`,
+        title: "Attendance Saved",
+        description: `Marked as ${status} for ${format(new Date(selectedDate), "PPP")}`,
       });
 
-      queryClient.invalidateQueries({ queryKey: ['franchise-attendance'] });
+      await queryClient.invalidateQueries({ queryKey: ['franchise-attendance'] });
+      await queryClient.refetchQueries({ queryKey: ['franchise-attendance'] });
     } catch (error) {
-      console.error("Failed to mark attendance", error);
+      console.error("Failed to mark attendance:", error);
       toast({
         title: "Error",
-        description: "Failed to update attendance",
+        description: error instanceof Error ? error.message : "Failed to update attendance",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleViewAttendance = (emp: EmployeeAttendance) => {
+    setSelectedEmployee(emp);
+    setIsAttendanceDialogOpen(true);
+  };
+
+  const handleUpdateAttendance = async (newStatus: 'present' | 'absent' | 'late') => {
+    if (!selectedEmployee || !employee?.franchiseId) return;
+
+    try {
+      const now = new Date();
+      const clockIn = (newStatus === 'present' || newStatus === 'late') ? now.toISOString() : null;
+
+      console.log('Marking attendance:', {
+        franchiseId: employee.franchiseId,
+        employeeId: selectedEmployee.id,
+        date: selectedDate,
+        status: newStatus
+      });
+
+      // Mark attendance and wait for completion
+      const result = await franchisesApi.markAttendance(employee.franchiseId, {
+        employeeId: selectedEmployee.id,
+        date: new Date(selectedDate),
+        status: newStatus,
+        clockIn,
+        locationCheckIn: { type: 'manual', by: employee.id }
+      });
+
+      console.log('Attendance marked result:', result);
+
+      // Wait for queries to invalidate and refetch
+      await queryClient.invalidateQueries({ queryKey: ['franchise-attendance'] });
+      await queryClient.refetchQueries({ queryKey: ['franchise-attendance'] });
+
+      toast({
+        title: "Attendance Saved",
+        description: `Marked as ${newStatus} for ${format(new Date(selectedDate), "PPP")}`,
+      });
+
+      // Close dialog immediately after successful save
+      setIsAttendanceDialogOpen(false);
+      setSelectedEmployee(null);
+    } catch (error) {
+      console.error("Failed to update attendance:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save attendance. Please try again.",
         variant: "destructive"
       });
     }
@@ -314,21 +387,23 @@ export default function FranchiseDashboard() {
               <Button
                 variant={"outline"}
                 className={cn(
-                  "w-[240px] justify-start text-left font-normal",
+                  "w-[280px] justify-start text-left font-normal",
                   !selectedDate && "text-muted-foreground"
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDate ? format(new Date(selectedDate), "PPP") : <span>Pick a date</span>}
+                {selectedDate ? format(new Date(selectedDate + "T00:00:00"), "PPP") : <span>Pick a date</span>}
               </Button>
             </PopoverTrigger>
 
-            <PopoverContent className="w-auto p-0">
+            <PopoverContent className="w-auto p-4" align="start">
               <Calendar
                 mode="single"
-                selected={selectedDate ? new Date(selectedDate) : undefined}
-                onSelect={(date) => setSelectedDate(date ? date.toISOString().split('T')[0] : '')}
+                selected={selectedDate ? new Date(selectedDate + "T00:00:00") : undefined}
+                onSelect={(date) => setSelectedDate(date ? format(date, "yyyy-MM-dd") : '')}
+                disabled={(date) => date > new Date()}
                 initialFocus
+                className="rounded-md border"
               />
             </PopoverContent>
           </Popover>
@@ -404,7 +479,7 @@ export default function FranchiseDashboard() {
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
           <TabsTrigger value="employees">Employees</TabsTrigger>
-          <TabsTrigger value="tracker">Tracker</TabsTrigger>
+          <TabsTrigger value="transit">Transit</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
           <TabsTrigger value="operations">Operations</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -460,7 +535,33 @@ export default function FranchiseDashboard() {
             {/* Employee List */}
             <Card className="lg:col-span-2">
               <CardHeader>
-                <CardTitle>Employee Attendance - {new Date(selectedDate).toLocaleDateString()}</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Employee Attendance</CardTitle>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-[240px] justify-start text-left font-normal",
+                          !selectedDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {selectedDate ? format(new Date(selectedDate), "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-4" align="end">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate ? new Date(selectedDate + "T00:00:00") : undefined}
+                        onSelect={(date) => setSelectedDate(date ? format(date, "yyyy-MM-dd") : '')}
+                        disabled={(date) => date > new Date()}
+                        initialFocus
+                        className="rounded-md border"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -535,8 +636,13 @@ export default function FranchiseDashboard() {
                           )}
                         </div>
 
-                        <Button variant="ghost" size="sm">
-                          <Eye className="w-4 h-4" />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewAttendance(employee)}
+                          title="View/Edit Attendance"
+                        >
+                          <Eye className="w-4 w-4" />
                         </Button>
                       </div>
                     </div>
@@ -553,21 +659,10 @@ export default function FranchiseDashboard() {
         </TabsContent>
 
         {/* Tracker Tab */}
-        <TabsContent value="tracker" className="space-y-6">
-          {isLoadingEmployees ? (
-            <div className="flex justify-center p-8">Loading employees...</div>
-          ) : (
-            <AttendanceTracker employees={(employees as any[]).map(emp => ({
-              id: emp.id,
-              employeeId: emp.employeeId,
-              name: emp.fullName || emp.username,
-              position: emp.position || 'Employee',
-              salaryType: emp.salaryType || 'monthly',
-              baseSalary: Number(emp.baseSalary) || 0,
-              hourlyRate: Number(emp.hourlyRate) || 0,
-              workingHours: Number(emp.workingHours) || 8
-            }))} />
-          )}
+        <TabsContent value="transit" className="space-y-6">
+          <div className="bg-background rounded-lg border shadow-sm">
+            <TransitOrdersPage />
+          </div>
         </TabsContent>
 
         {/* Performance Tab */}
@@ -826,6 +921,118 @@ export default function FranchiseDashboard() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleSaveTask}>Assign Task</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Attendance Detail Dialog */}
+      <Dialog open={isAttendanceDialogOpen} onOpenChange={setIsAttendanceDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Attendance Details</DialogTitle>
+            <DialogDescription>
+              View and edit attendance for {selectedEmployee?.employeeName}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedEmployee && (
+            <div className="space-y-4 py-4">
+              {/* Employee Info */}
+              <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+                <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
+                  <span className="text-lg font-medium text-primary-foreground">
+                    {selectedEmployee.employeeName.split(' ').map(n => n[0]).join('')}
+                  </span>
+                </div>
+                <div>
+                  <p className="font-medium">{selectedEmployee.employeeName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedEmployee.position} • {selectedEmployee.employeeId}
+                  </p>
+                </div>
+              </div>
+
+              {/* Attendance Info */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Date:</span>
+                  <span className="text-sm font-semibold">{format(new Date(selectedDate), "PPP")}</span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Current Status:</span>
+                  <Badge className={getStatusColor(selectedEmployee.status)}>
+                    {selectedEmployee.status || 'Not Marked'}
+                  </Badge>
+                </div>
+
+                {selectedEmployee.checkIn && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Clock In:</span>
+                    <span className="text-sm">{selectedEmployee.checkIn}</span>
+                  </div>
+                )}
+
+                {selectedEmployee.checkOut && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Clock Out:</span>
+                    <span className="text-sm">{selectedEmployee.checkOut}</span>
+                  </div>
+                )}
+
+                {selectedEmployee.totalHours > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Total Hours:</span>
+                    <span className="text-sm font-bold">{selectedEmployee.totalHours}h</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Location:</span>
+                  <span className="text-sm">{selectedEmployee.location}</span>
+                </div>
+              </div>
+
+              {/* Update Status */}
+              <div className="pt-4 border-t">
+                <Label className="text-sm font-medium mb-3 block">Update Status:</Label>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant={selectedEmployee.status === 'present' ? 'default' : 'outline'}
+                    className="flex-1 border-green-200 hover:bg-green-50 text-green-700"
+                    onClick={() => handleUpdateAttendance('present')}
+                  >
+                    <CheckCircle className="w-4 h-4 mr-1" />
+                    Present
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={selectedEmployee.status === 'late' ? 'default' : 'outline'}
+                    className="flex-1 border-yellow-200 hover:bg-yellow-50 text-yellow-700"
+                    onClick={() => handleUpdateAttendance('late')}
+                  >
+                    <Clock className="w-4 h-4 mr-1" />
+                    Late
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={selectedEmployee.status === 'absent' ? 'default' : 'outline'}
+                    className="flex-1 border-red-200 hover:bg-red-50 text-red-700"
+                    onClick={() => handleUpdateAttendance('absent')}
+                  >
+                    <AlertTriangle className="w-4 h-4 mr-1" />
+                    Absent
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAttendanceDialogOpen(false)}>
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

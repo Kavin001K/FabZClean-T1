@@ -8,11 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
-import { 
-  Clock, 
-  Calendar, 
-  Users, 
-  Download, 
+import {
+  Clock,
+  Calendar,
+  Users,
+  Download,
   Upload,
   CheckCircle,
   AlertTriangle,
@@ -88,30 +88,30 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
     const generateDemoData = () => {
       const records: AttendanceRecord[] = [];
       const calculations: SalaryCalculation[] = [];
-      
+
       employees.forEach(employee => {
         // Generate attendance records for the last 30 days
         for (let i = 0; i < 30; i++) {
           const date = new Date();
           date.setDate(date.getDate() - i);
           const dateStr = date.toISOString().split('T')[0];
-          
+
           // Random attendance status
           const statuses = ['present', 'present', 'present', 'late', 'absent'];
           const status = statuses[Math.floor(Math.random() * statuses.length)];
-          
+
           let checkIn = null;
           let checkOut = null;
           let totalHours = 0;
           let overtimeHours = 0;
-          
+
           if (status === 'present' || status === 'late') {
             checkIn = status === 'late' ? '09:30' : '09:00';
             checkOut = '17:30';
             totalHours = 8.5;
             overtimeHours = totalHours > employee.workingHours ? totalHours - employee.workingHours : 0;
           }
-          
+
           records.push({
             id: `att-${employee.id}-${dateStr}`,
             employeeId: employee.id,
@@ -128,19 +128,19 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
             notes: ''
           });
         }
-        
+
         // Generate salary calculation for current month
         const currentMonth = new Date().toISOString().slice(0, 7);
         const monthlyRecords = records.filter(r => r.employeeId === employee.id && r.date.startsWith(currentMonth));
-        
+
         const hoursWorked = monthlyRecords.reduce((sum, r) => sum + r.totalHours, 0);
         const overtimeHours = monthlyRecords.reduce((sum, r) => sum + r.overtimeHours, 0);
         const presentDays = monthlyRecords.filter(r => r.status === 'present' || r.status === 'late').length;
         const totalDays = monthlyRecords.length;
-        
+
         let baseSalary = 0;
         let overtimePay = 0;
-        
+
         if (employee.salaryType === 'hourly') {
           baseSalary = hoursWorked * (employee.hourlyRate || 0);
           overtimePay = overtimeHours * (employee.hourlyRate || 0) * 1.5; // 1.5x overtime rate
@@ -148,10 +148,10 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
           baseSalary = employee.baseSalary;
           overtimePay = overtimeHours * (employee.hourlyRate || 250) * 1.5;
         }
-        
+
         const deductions = baseSalary * 0.1; // 10% deductions (tax, PF, etc.)
         const bonuses = presentDays >= 25 ? baseSalary * 0.05 : 0; // 5% bonus for good attendance
-        
+
         calculations.push({
           employeeId: employee.id,
           employeeName: employee.name,
@@ -167,7 +167,7 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
           attendanceRate: (presentDays / totalDays) * 100
         });
       });
-      
+
       setAttendanceRecords(records);
       setSalaryCalculations(calculations);
     };
@@ -188,7 +188,7 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
     const employee = employees.find(emp => emp.id === selectedEmployee);
     if (!employee) return;
 
-    const existingRecord = attendanceRecords.find(r => 
+    const existingRecord = attendanceRecords.find(r =>
       r.employeeId === selectedEmployee && r.date === selectedDate
     );
 
@@ -314,7 +314,7 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
   };
 
   const todayRecords = attendanceRecords.filter(r => r.date === selectedDate);
-  const currentMonthRecords = attendanceRecords.filter(r => 
+  const currentMonthRecords = attendanceRecords.filter(r =>
     r.date.startsWith(new Date().toISOString().slice(0, 7))
   );
 
@@ -418,6 +418,7 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
               <Input
                 id="attendance-date"
                 type="date"
+                max={new Date().toISOString().split('T')[0]}
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
               />
@@ -450,7 +451,7 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-4">
                         <div className="text-right">
                           {record.checkIn && (
@@ -470,7 +471,7 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
                             )}
                           </p>
                         </div>
-                        
+
                         <div className="flex items-center gap-2">
                           {getStatusIcon(record.status)}
                           <Badge className={getStatusColor(record.status)}>
@@ -511,7 +512,7 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
                         <p className="text-sm text-muted-foreground">Net Salary</p>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                       <div>
                         <p className="text-muted-foreground">Base Salary</p>
@@ -530,7 +531,7 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
                         <p className="font-medium text-red-600">-{formatCurrency(calc.deductions)}</p>
                       </div>
                     </div>
-                    
+
                     <div className="mt-3 pt-3 border-t flex items-center justify-between">
                       <div className="flex items-center gap-4 text-sm">
                         <span>
@@ -574,23 +575,24 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="manual-date">Select Date</Label>
                   <Input
                     id="manual-date"
                     type="date"
+                    max={new Date().toISOString().split('T')[0]}
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
                   />
                 </div>
               </div>
-              
+
               <Button onClick={handleManualEntry} disabled={!selectedEmployee}>
                 <CheckCircle className="w-4 h-4 mr-2" />
                 Add Present Record
               </Button>
-              
+
               <div className="p-4 bg-muted/50 rounded-lg">
                 <h4 className="font-semibold mb-2">Manual Entry Info</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
@@ -626,14 +628,14 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
                 </SelectContent>
               </Select>
             </div>
-            
+
             <p className="text-sm text-muted-foreground">
-              {exportType === 'attendance' 
+              {exportType === 'attendance'
                 ? 'Export all attendance records with employee details and hours worked.'
                 : 'Export salary calculations including base pay, overtime, and deductions.'
               }
             </p>
-            
+
             <div className="flex gap-2">
               <Button onClick={() => exportData(exportType)} className="flex-1">
                 <FileText className="w-4 h-4 mr-2" />

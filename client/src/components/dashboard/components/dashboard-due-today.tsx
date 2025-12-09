@@ -153,6 +153,7 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
                 mode="single"
                 selected={selectedDate}
                 onSelect={(date) => date && setSelectedDate(date)}
+                disabled={(date) => date > new Date()}
                 initialFocus
               />
             </PopoverContent>
@@ -163,6 +164,7 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
             size="icon"
             className="h-8 w-8"
             onClick={() => setSelectedDate(addDays(selectedDate, 1))}
+            disabled={isToday || selectedDate > new Date()}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>

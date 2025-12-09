@@ -408,7 +408,7 @@ export function generatePrintHTML(config: PrintConfig): string {
   return html;
 }
 
-import { isElectron } from "./utils";
+import { isElectron, isWindows } from "./utils";
 
 export function printDocument(config: PrintConfig) {
   const html = generatePrintHTML(config);
@@ -421,6 +421,7 @@ export function printDocument(config: PrintConfig) {
     iframe.style.width = '0';
     iframe.style.height = '0';
     iframe.style.border = '0';
+    iframe.style.visibility = 'hidden';
     document.body.appendChild(iframe);
 
     const doc = iframe.contentWindow?.document;
@@ -430,15 +431,24 @@ export function printDocument(config: PrintConfig) {
       doc.close();
 
       iframe.contentWindow?.focus();
+
+      // Windows needs slightly longer delays for print dialog
+      const printDelay = isWindows() ? 800 : 500;
+      const cleanupDelay = isWindows() ? 8000 : 5000;
+
       setTimeout(() => {
-        iframe.contentWindow?.print();
-        // Cleanup
+        try {
+          iframe.contentWindow?.print();
+        } catch (e) {
+          console.error('Print failed:', e);
+        }
+        // Cleanup - wait longer on Windows for print dialog
         setTimeout(() => {
           if (document.body.contains(iframe)) {
             document.body.removeChild(iframe);
           }
-        }, 5000); // Wait longer for user interaction
-      }, 500);
+        }, cleanupDelay);
+      }, printDelay);
     }
   } else {
     const printWindow = window.open('', '_blank');
@@ -558,42 +568,44 @@ export function printDashboardSummary(metrics: any) {
 }
 
 export function generateTagHTML(order: any, items: any[]): string {
-  let tagsHtml = '';
+  // 1. Flatten items into individual tags
+  interface TagItem {
+    name: string;
+    index: number;
+    total: number;
+  }
+  const allTags: TagItem[] = [];
   items.forEach((item: any) => {
     const qty = parseInt(String(item.quantity || 1));
-    const itemName = item.productName || item.name || 'Garment';
-
+    const itemName = item.productName || item.serviceName || item.name || 'Garment';
     for (let i = 1; i <= qty; i++) {
-      tagsHtml += `
-        <div class="tag-wrapper">
-          <div class="brand">FabZClean</div>
-          <div class="meta">${new Date().toLocaleDateString('en-IN')}</div>
-          
-          <div class="customer">${order.customerName?.substring(0, 15) || 'Guest'}</div>
-          
-          <div class="item-box">
-            <div>${itemName}</div>
-            <span class="counter">${i}/${qty}</span>
-          </div>
-
-          ${order.notes ? `<div style="font-size:10px; font-weight:bold; margin-top:5px;">⚠️ ${order.notes}</div>` : ''}
-          
-          <div class="barcode-container">
-            <svg class="barcode"
-              jsbarcode-format="CODE128"
-              jsbarcode-value="${order.orderNumber}"
-              jsbarcode-textmargin="0"
-              jsbarcode-fontoptions="bold"
-              jsbarcode-height="30"
-              jsbarcode-width="1.5"
-              jsbarcode-displayValue="false"
-              jsbarcode-fontSize="10"
-            ></svg>
-          </div>
-          <div class="footer-id">#${order.orderNumber}</div>
-        </div>
-      `;
+      allTags.push({ name: itemName, index: i, total: qty });
     }
+  });
+
+  // 2. Generate continuous vertical layout - ALL tags in one column, NO page breaks
+  let contentHtml = '';
+  allTags.forEach((tag) => {
+    contentHtml += `
+      <div class="tag-wrapper">
+        <div class="brand">FabZClean</div>
+        <div class="meta">${new Date().toLocaleDateString('en-IN')}</div>
+        
+        <div class="customer">${order.customerName?.substring(0, 15) || 'Guest'}</div>
+        
+        <div class="item-box">
+          <div>${tag.name}</div>
+          <span class="counter">${tag.index}/${tag.total}</span>
+        </div>
+
+        <div class="notes-section">
+          <div class="notes-label">NOTES:</div>
+          <div class="notes-content">${order.specialInstructions || order.notes || '-'}</div>
+        </div>
+        
+        <div class="footer-id">#${order.orderNumber}</div>
+      </div>
+    `;
   });
 
   return `
@@ -601,87 +613,202 @@ export function generateTagHTML(order: any, items: any[]): string {
   <html>
     <head>
       <title>Tags #${order.orderNumber}</title>
-      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
       <style>
-        /* RESET & BASICS */
+        /* RESET & BASICS - Optimized for TSC TE244 Label Printer */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
-          font-family: 'Courier New', monospace; 
-          background: white; 
-          width: 58mm; /* Force width for 58mm printers */
+          font-family: 'Arial', 'Helvetica Neue', sans-serif; 
+          background: white;
+          width: 58mm; /* Standard label width for TSC TE244 */
+          margin: 0 auto;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         
-        /* PRINT SETTINGS */
+        /* PRINT SETTINGS - Continuous roll / label printer */
         @media print {
-          @page { margin: 0; size: 58mm auto; }
-          body { margin: 0; }
+          @page { 
+            margin: 0; 
+            size: 58mm auto; /* Width fixed, height auto for continuous roll */
+          }
+          body { 
+            margin: 0; 
+            width: 58mm;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          
+          /* Allow natural page overflow */
+          html, body {
+            height: auto !important;
+            overflow: visible !important;
+          }
         }
 
-        /* TAG STYLING */
+        /* TAG CONTAINER - Holds all tags in a continuous column */
+        .tags-container {
+          display: flex;
+          flex-direction: column;
+          width: 100%;
+        }
+
+        /* TAG STYLING - Continuous vertical layout, NO page breaks */
         .tag-wrapper {
           width: 100%;
-          padding: 5px 2px 10px 2px;
-          border-bottom: 2px dashed black; /* Visual cut line */
-          page-break-after: always; /* CRITICAL: Forces printer to cut */
+          padding: 3mm 2mm;
+          border-bottom: 1px dashed #333;
           text-align: center;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          background: white;
+          /* NO page-break-after - tags flow continuously */
+          page-break-inside: avoid; /* Don't break a single tag across pages */
+        }
+        
+        /* Add top border to first tag for visual consistency */
+        .tag-wrapper:first-child {
+          border-top: 1px dashed #333;
         }
 
-        .brand { font-size: 16px; font-weight: 900; text-transform: uppercase; margin-bottom: 5px; }
-        .meta { font-size: 10px; margin-bottom: 8px; border-bottom: 1px solid #000; padding-bottom: 4px; }
+        .brand { 
+          font-size: 12px; 
+          font-weight: 900; 
+          text-transform: uppercase; 
+          margin-bottom: 1px;
+          letter-spacing: 0.5px;
+        }
+        
+        .meta { 
+          font-size: 8px; 
+          margin-bottom: 2px; 
+          border-bottom: 1px solid #000; 
+          padding-bottom: 1px; 
+        }
         
         /* ITEM HIGHLIGHT */
         .item-box {
-          border: 2px solid black;
-          padding: 5px;
-          margin: 5px 0;
-          font-size: 14px;
+          border: 1px solid black;
+          padding: 2px;
+          margin: 2px 0;
+          font-size: 11px;
           font-weight: bold;
           background: #fff;
         }
 
         .counter {
-          font-size: 24px;
+          font-size: 16px;
           font-weight: 900;
           display: block;
-          margin-top: 2px;
+          margin-top: 1px;
         }
 
         .customer { 
-          font-size: 12px; 
+          font-size: 10px; 
           font-weight: bold; 
           overflow: hidden; 
           text-overflow: ellipsis; 
           white-space: nowrap; 
-          margin-bottom: 5px;
+          margin-bottom: 1px;
         }
 
-        .barcode-container {
-          margin-top: 5px;
-          display: flex;
-          justify-content: center;
-        }
-        
-        .barcode {
-          width: 100%;
-          max-width: 180px;
+        .notes-section {
+          margin-top: 2px;
+          border-top: 1px dotted #999;
+          padding-top: 1px;
         }
 
-        .footer-id { font-size: 10px; font-family: sans-serif; margin-top: 2px; }
+        .notes-label {
+          font-size: 7px;
+          font-weight: bold;
+          color: #444;
+        }
+
+        .notes-content {
+          font-size: 9px;
+          font-weight: bold;
+          word-break: break-word;
+          line-height: 1.1;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          max-height: 2.2em;
+        }
+
+        .footer-id { 
+          font-size: 8px; 
+          font-family: 'Courier New', monospace; 
+          margin-top: 1px;
+          font-weight: bold;
+        }
       </style>
     </head>
     <body>
-      ${tagsHtml}
-      <script>
-        // Initialize barcodes
-        window.onload = () => { 
-          try {
-            JsBarcode(".barcode").init();
-          } catch (e) {
-            console.error("Barcode generation failed", e);
-          }
-        };
-      </script>
+      <div class="tags-container">
+        ${contentHtml}
+      </div>
     </body>
   </html>
 `;
+}
+
+/**
+ * Print tags using an iframe - optimized for Electron/Desktop environment
+ * Supports Windows, Mac, and Linux with OS-specific optimizations
+ * @param order - The order object containing customer info and order number
+ * @param items - Array of items to print tags for
+ */
+export function printTags(order: any, items: any[]): void {
+  const htmlContent = generateTagHTML(order, items);
+
+  // Create a hidden iframe for printing
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = 'none';
+  iframe.style.visibility = 'hidden';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow?.document;
+  if (doc) {
+    doc.open();
+    doc.write(htmlContent);
+    doc.close();
+
+    // OS-specific delays for optimal printing
+    // Windows needs longer delays for print spooler
+    const isDesktop = isElectron();
+    const isWin = isWindows();
+
+    const printDelay = isDesktop
+      ? (isWin ? 1000 : 800)  // Windows: 1s, Mac: 800ms
+      : 500;                  // Browser: 500ms
+
+    const cleanupDelay = isDesktop
+      ? (isWin ? 8000 : 5000) // Windows: 8s, Mac: 5s
+      : 2000;                 // Browser: 2s
+
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (error) {
+        console.error('Print failed:', error);
+      } finally {
+        // Cleanup with OS-specific delay
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, cleanupDelay);
+      }
+    }, printDelay);
+  } else {
+    console.error('Failed to create print iframe');
+    document.body.removeChild(iframe);
+  }
 }

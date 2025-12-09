@@ -1,10 +1,12 @@
 import React from 'react';
+import { getFranchiseById, getFormattedAddress, type FranchiseBranchInfo } from '@/lib/franchise-config';
 
 interface InvoiceData {
   invoiceNumber: string;
   invoiceDate: string;
   dueDate: string;
-  enableGST?: boolean; // Added toggle
+  enableGST?: boolean; // GST toggle
+  franchiseId?: string; // Franchise ID for branch-specific details
   company: {
     name: string;
     address: string;
@@ -90,16 +92,19 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
     total,
     qrCode,
     enableGST = false, // Default to false
+    franchiseId, // Get franchise ID from data
   } = data;
 
-  // HARDCODED COMPANY DETAILS FROM MYFABCLEAN.IN
+  // Get franchise-specific company details
+  const franchise = getFranchiseById(franchiseId);
+
   const companyDetails = {
     name: "Fab Clean",
-    // Added "Opp to HDFC Bank" as requested
-    address: "#16, Venkatramana Round Road,\nOpp to HDFC Bank,\nMahalingapuram, Pollachi - 642002",
-    phone: "+91 93630 59595",
-    email: "support@myfabclean.com",
-    taxId: "33AITPD3522F1ZK",
+    branchName: franchise.name,
+    address: getFormattedAddress(franchise),
+    phone: franchise.phone,
+    email: franchise.email || "support@myfabclean.com",
+    taxId: franchise.gstNumber,
     logo: "/assets/logo.webp"
   };
 

@@ -112,10 +112,10 @@ interface DateRangeFilterProps {
   className?: string;
 }
 
-export default function DateRangeFilter({ 
-  dateRange, 
-  onDateRangeChange, 
-  className 
+export default function DateRangeFilter({
+  dateRange,
+  onDateRangeChange,
+  className
 }: DateRangeFilterProps) {
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
 
@@ -130,11 +130,11 @@ export default function DateRangeFilter({
     if (!dateRange.from || !dateRange.to) {
       return 'Select date range';
     }
-    
+
     if (dateRange.from.getTime() === dateRange.to.getTime()) {
       return format(dateRange.from, 'MMM dd, yyyy');
     }
-    
+
     return `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`;
   };
 
@@ -183,6 +183,7 @@ export default function DateRangeFilter({
             }}
             numberOfMonths={2}
             className="rounded-md border"
+            disabled={(date) => date > new Date()}
           />
         </PopoverContent>
       </Popover>

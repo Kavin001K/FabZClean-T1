@@ -945,5 +945,17 @@ export class SupabaseStorage {
         return data.map(item => this.mapDates(item));
     }
 
+    async updateAttendance(id: string, data: any): Promise<any> {
+        const { data: attendance, error } = await this.supabase
+            .from('employee_attendance')
+            .update(this.toSnakeCase(data))
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return this.mapDates(attendance);
+    }
+
     close() { }
 }

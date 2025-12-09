@@ -2,7 +2,7 @@ import { Link, useLocation } from 'wouter';
 import { useEffect, useState } from 'react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, RefreshCw } from 'lucide-react';
 import { NotificationCenter } from '@/components/notification-center';
 import { GlobalSearch } from '@/components/global-search';
 import { UserMenu } from '@/components/layout/user-menu';
@@ -21,6 +21,7 @@ interface HeaderProps {
 export function Header({ onToggleSidebar, isSidebarVisible }: HeaderProps) {
   const [location] = useLocation();
   const [paths, setPaths] = useState(['Dashboard']);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     const pathSegments = location.split('/').filter(p => p);
@@ -38,11 +39,22 @@ export function Header({ onToggleSidebar, isSidebarVisible }: HeaderProps) {
         event.preventDefault();
         onToggleSidebar();
       }
+      // Keyboard shortcut for refresh (Ctrl/Cmd + R)
+      if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
+        event.preventDefault();
+        handleRefresh();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onToggleSidebar]);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    // Reload the entire app
+    window.location.reload();
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
@@ -86,6 +98,16 @@ export function Header({ onToggleSidebar, isSidebarVisible }: HeaderProps) {
         <GlobalSearch />
       </div>
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="h-8 w-8"
+          title="Refresh app (⌘R)"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+        </Button>
         <NotificationCenter />
         <UserMenu />
       </div>

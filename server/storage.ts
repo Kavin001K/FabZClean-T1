@@ -27,6 +27,7 @@ export interface IStorage {
   // Attendance methods
   createAttendance(data: any): Promise<any>;
   listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]>;
+  updateAttendance(id: string, data: any): Promise<any>;
 
   // Order methods
   // Order methods
@@ -62,6 +63,7 @@ export class MemStorage implements IStorage {
   // Attendance methods
   async createAttendance(data: any): Promise<any> { return null; }
   async listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]> { return []; }
+  async updateAttendance(id: string, data: any): Promise<any> { return null; }
 
   private async initializeData() {
     // Check if database already has data to avoid duplicating

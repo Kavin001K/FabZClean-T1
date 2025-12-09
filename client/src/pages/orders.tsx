@@ -12,6 +12,7 @@ import { PageTransition, FadeIn } from "@/components/ui/page-transition";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
@@ -1231,7 +1232,7 @@ function OrdersComponent() {
                                   className="w-full justify-start text-left font-normal"
                                 >
                                   <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {filters.dateFrom ? formatDate(filters.dateFrom.toISOString()) : 'Pick date'}
+                                  {filters.dateFrom ? format(filters.dateFrom, "PPP") : 'Pick date'}
                                 </Button>
                               </PopoverTrigger>
                               <PopoverContent className="w-auto p-0" align="start">
@@ -1239,6 +1240,7 @@ function OrdersComponent() {
                                   mode="single"
                                   selected={filters.dateFrom}
                                   onSelect={(date) => setFilters(prev => ({ ...prev, dateFrom: date }))}
+                                  disabled={(date) => date > new Date()}
                                   initialFocus
                                 />
                               </PopoverContent>
@@ -1253,7 +1255,7 @@ function OrdersComponent() {
                                   className="w-full justify-start text-left font-normal"
                                 >
                                   <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {filters.dateTo ? formatDate(filters.dateTo.toISOString()) : 'Pick date'}
+                                  {filters.dateTo ? format(filters.dateTo, "PPP") : 'Pick date'}
                                 </Button>
                               </PopoverTrigger>
                               <PopoverContent className="w-auto p-0" align="start">
@@ -1261,6 +1263,7 @@ function OrdersComponent() {
                                   mode="single"
                                   selected={filters.dateTo}
                                   onSelect={(date) => setFilters(prev => ({ ...prev, dateTo: date }))}
+                                  disabled={(date) => date > new Date()}
                                   initialFocus
                                 />
                               </PopoverContent>
@@ -1467,7 +1470,7 @@ function OrdersComponent() {
                     ))}
                     {filters.dateFrom && (
                       <Badge variant="secondary" className="gap-1">
-                        From: {formatDate(filters.dateFrom.toISOString())}
+                        From: {format(filters.dateFrom, "PPP")}
                         <X
                           className="h-3 w-3 cursor-pointer"
                           onClick={() => setFilters(prev => ({ ...prev, dateFrom: undefined }))}
@@ -1476,7 +1479,7 @@ function OrdersComponent() {
                     )}
                     {filters.dateTo && (
                       <Badge variant="secondary" className="gap-1">
-                        To: {formatDate(filters.dateTo.toISOString())}
+                        To: {format(filters.dateTo, "PPP")}
                         <X
                           className="h-3 w-3 cursor-pointer"
                           onClick={() => setFilters(prev => ({ ...prev, dateTo: undefined }))}

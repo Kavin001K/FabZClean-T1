@@ -115,7 +115,7 @@ export default function Settings() {
     avatar: ''
   });
 
-  // Load profile from auth context
+  // Load profile and settings from auth context
   useEffect(() => {
     if (employee) {
       setProfile({
@@ -128,6 +128,21 @@ export default function Settings() {
         hireDate: employee.hireDate ? new Date(employee.hireDate).toISOString().split('T')[0] : '',
         avatar: ''
       });
+
+      // Load saved settings if they exist
+      if (employee.settings) {
+        // We cast employee.settings to any to merge, assuming it matches the shape or we merge partially
+        const savedSettings = typeof employee.settings === 'string'
+          ? JSON.parse(employee.settings)
+          : employee.settings;
+
+        if (savedSettings && typeof savedSettings === 'object') {
+          setSettings(prev => ({
+            ...prev,
+            ...savedSettings
+          }));
+        }
+      }
     }
   }, [employee]);
 
@@ -150,11 +165,11 @@ export default function Settings() {
     }));
   };
 
-  const handleNestedSettingChange = (parentKey: string, childKey: string, value: string | number | boolean) => {
+  const handleNestedSettingChange = (parentKey: string, childKey: string, value: any) => {
     setSettings(prev => ({
       ...prev,
       [parentKey]: {
-        ...prev[parentKey as keyof typeof prev],
+        ...(prev[parentKey as keyof typeof prev] as any),
         [childKey]: value
       }
     }));
@@ -275,17 +290,42 @@ export default function Settings() {
     });
   };
 
-  const handleSettingsSave = () => {
-    addNotification({
-      type: 'success',
-      title: 'Settings Saved!',
-      message: 'All settings have been saved successfully.',
-    });
+  // Settings Save Mutation
+  const saveSettingsMutation = useMutation({
+    mutationFn: async (newSettings: typeof settings) => {
+      if (!employee?.employeeId) throw new Error("No employee ID");
+      // Update employee with new settings
+      return await employeesApi.update(employee.employeeId, {
+        settings: newSettings
+      });
+    },
+    onSuccess: () => {
+      addNotification({
+        type: 'success',
+        title: 'Settings Saved!',
+        message: 'All settings have been saved successfully.',
+      });
 
-    toast({
-      title: "Settings Saved",
-      description: "Your settings have been updated successfully.",
-    });
+      toast({
+        title: "Settings Saved",
+        description: "Your settings have been updated successfully.",
+      });
+
+      // Refresh user data
+      queryClient.invalidateQueries({ queryKey: ['employee', employee?.employeeId] });
+    },
+    onError: (error: any) => {
+      console.error("Failed to save settings:", error);
+      toast({
+        title: "Save Failed",
+        description: "Could not save settings. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleSettingsSave = () => {
+    saveSettingsMutation.mutate(settings);
   };
 
   const exportSettings = () => {

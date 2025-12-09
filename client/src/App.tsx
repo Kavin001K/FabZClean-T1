@@ -19,21 +19,20 @@ import Orders from "@/pages/orders";
 import OrderDetail from "@/pages/order-detail";
 import Services from "@/pages/services";
 import CreateOrder from "@/pages/create-order";
-// import Tracking from "@/pages/tracking";
-// import LiveTracking from "@/pages/live-tracking";
+import { MainLayout } from "@/components/layout/main-layout";
 import Documents from "@/pages/documents";
 import Customers from "@/pages/customers";
 import Analytics from "@/pages/analytics";
-import { MainLayout } from "@/components/layout/main-layout";
 import Inventory from "@/pages/inventory";
-// import Logistics from "@/pages/logistics";
 import TransitOrders from "@/pages/transit-orders";
+
 import DebugPage from "@/pages/debug";
 import EmployeeDashboardPage from "@/pages/employee-dashboard";
 import UserManagementPage from "@/pages/user-management";
 import FranchiseDashboard from "@/pages/franchise-dashboard";
 import FranchiseManagement from "@/pages/franchise-management";
 import Settings from "@/pages/settings";
+import ProfilePage from "@/pages/profile";
 import DatabaseStatus from "@/pages/database-status";
 import PerformanceAnalytics from "@/components/analytics";
 import Accounting from "@/pages/accounting";
@@ -43,6 +42,7 @@ import WorkerPortal from "@/pages/worker-portal";
 import BillView from "@/pages/bill-view";
 import TestInvoice from "@/pages/test-invoice";
 import AuditLogsPage from "@/pages/admin/audit-logs";
+import ReportsPage from "@/pages/reports";
 
 function Router() {
   return (
@@ -127,21 +127,15 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      {/* <Route path="/tracking">
+
+
+      <Route path="/profile">
         <ProtectedRoute>
           <MainLayout>
-            <Tracking />
+            <ProfilePage />
           </MainLayout>
         </ProtectedRoute>
       </Route>
-
-      <Route path="/live-tracking">
-        <ProtectedRoute allowedRoles={['admin', 'employee', 'franchise_manager', 'driver']}>
-          <MainLayout>
-            <LiveTracking />
-          </MainLayout>
-        </ProtectedRoute>
-      </Route> */}
 
       <Route path="/documents">
         <ProtectedRoute>
@@ -159,13 +153,15 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      {/* <Route path="/logistics">
-        <ProtectedRoute allowedRoles={['admin', 'employee', 'franchise_manager']}>
+      <Route path="/reports">
+        <ProtectedRoute allowedRoles={['admin', 'franchise_manager']}>
           <MainLayout>
-            <Logistics />
+            <ReportsPage />
           </MainLayout>
         </ProtectedRoute>
-      </Route> */}
+      </Route>
+
+
 
       <Route path="/transit-orders">
         <ProtectedRoute allowedRoles={['admin', 'employee', 'franchise_manager', 'factory_manager']}>
@@ -272,7 +268,7 @@ function Router() {
       </Route>
 
       <Route component={NotFound} />
-    </Switch>
+    </Switch >
   );
 }
 

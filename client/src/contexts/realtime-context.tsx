@@ -30,7 +30,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   // ✅ Use Supabase Realtime for driver locations (works on Vercel Serverless)
   const { data: supabaseDrivers } = useSupabaseRealtime({
     tableName: 'drivers',
-    selectQuery: 'id, name, status, currentLatitude, currentLongitude, updatedAt, vehicleType, vehicleNumber',
+    // Fix: Use correct snake_case column names. vehicle_type and vehicle_number DO exist.
+    selectQuery: 'id, name, status, current_latitude, current_longitude, updated_at, vehicle_type, vehicle_number',
   });
 
   // Map Supabase drivers to DriverLocation format
@@ -41,13 +42,17 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       driverId: d.id,
       driverName: d.name,
       orderId: '', // Would need a join or separate query for this
-      latitude: d.currentLatitude || 0,
-      longitude: d.currentLongitude || 0,
+      // Fix: Map from snake_case to camelCase
+      latitude: d.current_latitude || 0,
+      longitude: d.current_longitude || 0,
       heading: 0,
       speed: 0,
       status: d.status,
       estimatedArrival: new Date().toISOString(), // Placeholder
-      lastUpdated: d.updatedAt || new Date().toISOString(),
+      lastUpdated: d.updated_at || new Date().toISOString(),
+      // Map vehicle info
+      vehicleType: d.vehicle_type || 'Bike',
+      vehicleNumber: d.vehicle_number || 'NA'
     }));
   }, [supabaseDrivers]);
 

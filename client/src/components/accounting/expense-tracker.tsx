@@ -419,7 +419,7 @@ export function ExpenseTracker() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} />
+                    <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} disabled={(date) => date > new Date()} />
                   </PopoverContent>
                 </Popover>
               </div>
@@ -433,7 +433,7 @@ export function ExpenseTracker() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={dateTo} onSelect={setDateTo} />
+                    <Calendar mode="single" selected={dateTo} onSelect={setDateTo} disabled={(date) => date > new Date()} />
                   </PopoverContent>
                 </Popover>
               </div>
