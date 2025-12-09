@@ -13,7 +13,9 @@ export default function Dashboard() {
     if (employee) {
       if (employee.role === 'franchise_manager') {
         setLocation('/franchise-dashboard');
-      } else if (employee.role === 'employee' || employee.role === 'driver' || employee.role === 'factory_manager') {
+      } else if (employee.role === 'factory_manager') {
+        setLocation('/factory-dashboard');
+      } else if (employee.role === 'employee' || employee.role === 'driver' || employee.role === 'staff') {
         setLocation('/employee-dashboard');
       }
     }

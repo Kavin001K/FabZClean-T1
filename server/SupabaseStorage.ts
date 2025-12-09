@@ -115,7 +115,25 @@ export class SupabaseStorage {
             'ip_address': 'ipAddress',
             'user_agent': 'userAgent',
             'created_at': 'createdAt',
-            'updated_at': 'updatedAt'
+            'updated_at': 'updatedAt',
+            // Transit mappings
+            'transit_id': 'transitId',
+            'transit_order_id': 'transitOrderId',
+            'dispatched_at': 'dispatchedAt',
+            'completed_at': 'completedAt',
+            'received_at': 'receivedAt',
+            'store_details': 'storeDetails',
+            'factory_details': 'factoryDetails',
+            'total_items': 'totalItems',
+            'total_weight': 'totalWeight',
+            'service_type': 'serviceType',
+            'item_count': 'itemCount',
+            'vehicle_number': 'vehicleNumber',
+            'vehicle_type': 'vehicleType',
+            'driver_license': 'driverLicense',
+            'driver_phone': 'driverPhone',
+            'employee_name': 'employeeName',
+            'employee_phone': 'employeePhone'
         };
 
         Object.entries(mappings).forEach(([snake, camel]) => {
@@ -220,7 +238,25 @@ export class SupabaseStorage {
             'ipAddress': 'ip_address',
             'userAgent': 'user_agent',
             'createdAt': 'created_at',
-            'updatedAt': 'updated_at'
+            'updatedAt': 'updated_at',
+            // Transit-related mappings
+            'transitId': 'transit_id',
+            'transitOrderId': 'transit_order_id',
+            'dispatchedAt': 'dispatched_at',
+            'completedAt': 'completed_at',
+            'receivedAt': 'received_at',
+            'storeDetails': 'store_details',
+            'factoryDetails': 'factory_details',
+            'totalItems': 'total_items',
+            'totalWeight': 'total_weight',
+            'serviceType': 'service_type',
+            'itemCount': 'item_count',
+            'vehicleNumber': 'vehicle_number',
+            'vehicleType': 'vehicle_type',
+            'driverLicense': 'driver_license',
+            'driverPhone': 'driver_phone',
+            'employeeName': 'employee_name',
+            'employeePhone': 'employee_phone'
         };
 
         // If key exists in mappings, use snake_case. If not, preserve original (e.g. 'status', 'email', 'name')

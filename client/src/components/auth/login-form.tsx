@@ -38,7 +38,9 @@ export const LoginForm: React.FC = () => {
             setLocation('/');
           } else if (employee.role === 'franchise_manager') {
             setLocation('/franchise-dashboard');
-          } else if (employee.role === 'employee' || employee.role === 'driver' || employee.role === 'factory_manager') {
+          } else if (employee.role === 'factory_manager') {
+            setLocation('/factory-dashboard');
+          } else if (employee.role === 'employee' || employee.role === 'driver' || employee.role === 'staff') {
             setLocation('/employee-dashboard');
           } else {
             setLocation('/');
@@ -78,13 +80,13 @@ export const LoginForm: React.FC = () => {
               </Alert>
             )}
             <div className="space-y-2">
-              <Label htmlFor="username">Username or Email</Label>
+              <Label htmlFor="username">User ID or Email</Label>
               <div className="relative">
                 <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="username"
                   type="text"
-                  placeholder="Enter username or email"
+                  placeholder="Enter User ID or Email"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="pl-10"

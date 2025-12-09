@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { API_BASE as API_BASE_URL } from '../lib/data-service';
 
+// Define all valid roles
+export type EmployeeRole = 'admin' | 'franchise_manager' | 'factory_manager' | 'employee' | 'driver' | 'manager' | 'staff';
+
 interface Employee {
   id: string;
   employeeId: string;
   username: string;
-  role: 'admin' | 'franchise_manager' | 'factory_manager' | 'employee' | 'driver' | 'manager';
+  role: EmployeeRole | string; // Allow any string role for flexibility
   franchiseId?: string;
   factoryId?: string;
   fullName?: string;

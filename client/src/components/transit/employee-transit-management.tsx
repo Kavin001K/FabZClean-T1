@@ -147,11 +147,22 @@ export default function EmployeeTransitManagement() {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [isScanning, setIsScanning] = useState(false);
 
+  // Helper to get auth headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('employee_token');
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+  };
+
   // Fetch transit orders with caching
   const { data: transitOrders = [], isLoading: transitLoading, refetch: refetchTransit } = useCachedQuery(
     ['employee-transit-management'],
     async () => {
-      const response = await fetch('/api/transit-orders');
+      const response = await fetch('/api/transit-orders', {
+        headers: getAuthHeaders()
+      });
       if (!response.ok) throw new Error('Failed to fetch transit orders');
       return response.json();
     },
@@ -162,20 +173,21 @@ export default function EmployeeTransitManagement() {
     }
   );
 
-  // Fetch recent orders for batch creation
-  const { data: recentOrders = [], isLoading: ordersLoading } = useCachedQuery(
-    ['recent-orders-for-transit'],
-    async () => {
-      const response = await fetch('/api/orders/recent');
-      if (!response.ok) throw new Error('Failed to fetch recent orders');
+  // Fetch eligible orders for batch creation
+  const { data: eligibleOrders = [], isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
+    queryKey: ['eligible-orders', batchType],
+    queryFn: async () => {
+      const typeParam = batchType === 'store_to_factory' ? 'To Factory' : 'Return to Store';
+      const response = await fetch(`/api/transit-orders/eligible?type=${encodeURIComponent(typeParam)}`, {
+        headers: getAuthHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to fetch eligible orders');
       return response.json();
     },
-    {
-      cacheName: 'recent-orders',
-      ttl: 5 * 60 * 1000, // 5 minutes
-      staleTime: 30000
-    }
-  );
+    // Refresh every time we open the tab or change type
+    refetchOnMount: true,
+    staleTime: 0
+  });
 
   // Search functionality
   const searchFields = ['transitId', 'origin', 'destination', 'createdBy', 'status', 'type'];
@@ -206,7 +218,7 @@ export default function EmployeeTransitManagement() {
       const now = new Date();
       const days = parseInt(filters.dateRange);
       const cutoffDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-      filtered = filtered.filter((transit: TransitOrder) => 
+      filtered = filtered.filter((transit: TransitOrder) =>
         new Date(transit.createdAt) >= cutoffDate
       );
     }
@@ -250,9 +262,7 @@ export default function EmployeeTransitManagement() {
     mutationFn: async ({ transitId, status, notes }: { transitId: string; status: string; notes?: string }) => {
       const response = await fetch(`/api/transit-orders/${transitId}/status`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ status, notes, updatedBy: 'Employee' }),
       });
       if (!response.ok) throw new Error('Failed to update transit status');
@@ -279,9 +289,7 @@ export default function EmployeeTransitManagement() {
     mutationFn: async (transitData: any) => {
       const response = await fetch('/api/transit-orders', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(transitData),
       });
       if (!response.ok) throw new Error('Failed to create transit order');
@@ -289,12 +297,13 @@ export default function EmployeeTransitManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employee-transit-management'] });
+      queryClient.invalidateQueries({ queryKey: ['eligible-orders'] });
       setCurrentBatch([]);
       setIsScanning(false);
       setShowCreateTransit(false);
       toast({
         title: "Transit Order Created",
-        description: "Transit order has been created successfully.",
+        description: "Transit order has been created and orders are now processing.",
       });
     },
     onError: () => {
@@ -628,9 +637,9 @@ export default function EmployeeTransitManagement() {
                         </Badge>
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {transit.origin} → {transit.destination} • 
-                        {transit.totalItems} items • 
-                        {transit.totalWeight.toFixed(1)} kg • 
+                        {transit.origin} → {transit.destination} •
+                        {transit.totalItems} items •
+                        {transit.totalWeight.toFixed(1)} kg •
                         {new Date(transit.createdAt).toLocaleDateString()}
                       </div>
                     </div>
@@ -790,162 +799,297 @@ export default function EmployeeTransitManagement() {
 
         {/* Create Batch Tab */}
         <TabsContent value="create-batch" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Barcode className="w-5 h-5" />
-                <span>Create New Transit Batch</span>
+          <Card className="overflow-visible">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Truck className="w-5 h-5" />
+                  <span>Create New Transit Batch</span>
+                </div>
+                <Badge variant="outline" className="text-base px-3 py-1">
+                  {currentBatch.length} orders selected
+                </Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Batch Type Selection */}
-              <div className="space-y-2">
-                <Label>Transit Type</Label>
-                <Select value={batchType} onValueChange={(value: any) => setBatchType(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="store_to_factory">
-                      <div className="flex items-center gap-2">
-                        <Store className="h-4 w-4" />
-                        Store → Factory
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="factory_to_store">
-                      <div className="flex items-center gap-2">
-                        <Factory className="h-4 w-4" />
-                        Factory → Store
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Barcode Input */}
-              <div className="space-y-2">
-                <Label htmlFor="barcode-input">Scan or Enter Order ID</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="barcode-input"
-                    value={barcodeInput}
-                    onChange={(e) => setBarcodeInput(e.target.value)}
-                    placeholder="Scan barcode or type Order ID..."
-                    disabled={!isScanning}
-                    className="flex-1"
-                  />
-                  <Button onClick={() => setIsScanning(!isScanning)}>
-                    {isScanning ? 'Stop Scanning' : 'Start Scanning'}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Recent Orders Quick Add */}
-              {isScanning && recentOrders.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Quick Add - Recent Orders</Label>
-                  <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto p-2 border rounded-lg bg-muted/30">
-                    {recentOrders.slice(0, 10).map((order: any) => (
-                      <div
-                        key={order.orderNumber}
-                        className={`p-2 rounded-md border-2 transition-all cursor-pointer ${
-                          currentBatch.some(b => b.orderNumber === order.orderNumber)
-                            ? 'border-green-500 bg-green-50 opacity-50 cursor-not-allowed'
-                            : 'border-border bg-background hover:border-primary hover:shadow-sm'
-                        }`}
-                        onClick={() => handleAddOrderToBatch(order)}
-                      >
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-mono font-semibold">{order.orderNumber}</span>
-                            {currentBatch.some(b => b.orderNumber === order.orderNumber) && (
-                              <CheckCircle2 className="h-3 w-3 text-green-600" />
-                            )}
-                          </div>
-                          <span className="text-xs text-muted-foreground truncate">{order.customerName}</span>
-                          <div className="flex items-center justify-between text-xs">
-                            <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                              {order.items?.length || 0} items
-                            </Badge>
-                            <span className="text-[10px] text-muted-foreground">
-                              {new Date(order.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
+            <CardContent className="space-y-6">
+              {/* Batch Configuration - Compact Row */}
+              <div className="flex flex-col lg:flex-row gap-4 p-4 bg-muted/30 rounded-lg">
+                <div className="flex-1 space-y-2">
+                  <Label className="text-sm font-semibold">Transit Route</Label>
+                  <Select
+                    value={batchType}
+                    onValueChange={(value: any) => {
+                      setBatchType(value);
+                      setCurrentBatch([]);
+                    }}
+                  >
+                    <SelectTrigger className="bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="store_to_factory">
+                        <div className="flex items-center gap-2">
+                          <Store className="h-4 w-4 text-blue-600" />
+                          <span>Store → Factory (Pending Orders)</span>
                         </div>
-                      </div>
-                    ))}
+                      </SelectItem>
+                      <SelectItem value="factory_to_store">
+                        <div className="flex items-center gap-2">
+                          <Factory className="h-4 w-4 text-purple-600" />
+                          <span>Factory → Store (Processing Orders)</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex-1 space-y-2">
+                  <Label className="text-sm font-semibold">Quick Add by Order ID</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={barcodeInput}
+                      onChange={(e) => setBarcodeInput(e.target.value)}
+                      placeholder="Scan or type Order ID..."
+                      className="bg-background"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && barcodeInput.trim()) {
+                          const order = eligibleOrders.find((o: any) =>
+                            o.orderNumber?.toLowerCase() === barcodeInput.toLowerCase() ||
+                            o.id === barcodeInput
+                          );
+                          if (order) {
+                            handleAddOrderToBatch(order);
+                            setBarcodeInput('');
+                          } else {
+                            toast({
+                              title: "Order Not Found",
+                              description: "Order is not in the eligible list for this route.",
+                              variant: "destructive"
+                            });
+                          }
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        const order = eligibleOrders.find((o: any) =>
+                          o.orderNumber?.toLowerCase() === barcodeInput.toLowerCase() ||
+                          o.id === barcodeInput
+                        );
+                        if (order) {
+                          handleAddOrderToBatch(order);
+                          setBarcodeInput('');
+                        } else if (barcodeInput.trim()) {
+                          toast({
+                            title: "Order Not Found",
+                            description: "Order is not in the eligible list for this route.",
+                            variant: "destructive"
+                          });
+                        }
+                      }}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {/* Current Batch List */}
-              {currentBatch.length > 0 ? (
-                <div className="border rounded-lg">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">#</TableHead>
-                        <TableHead>Order ID</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead className="text-center">Items</TableHead>
-                        <TableHead className="text-center">Weight</TableHead>
-                        <TableHead className="w-12"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {currentBatch.map((order, index) => (
-                        <TableRow key={order.orderNumber}>
-                          <TableCell className="font-medium">{index + 1}</TableCell>
-                          <TableCell>{order.orderNumber}</TableCell>
-                          <TableCell>{order.customerName}</TableCell>
-                          <TableCell className="text-center">{order.itemCount} pcs</TableCell>
-                          <TableCell className="text-center">{order.weight?.toFixed(1)} kg</TableCell>
-                          <TableCell>
+              {/* Two Column Layout for Order Selection */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" style={{ maxHeight: 'calc(100vh - 450px)', minHeight: '500px' }}>
+                {/* Available Orders Panel */}
+                <div className="flex flex-col border rounded-lg overflow-hidden">
+                  <div className="flex items-center justify-between p-3 bg-muted/50 border-b">
+                    <div className="flex items-center gap-2">
+                      <Package className="w-4 h-4 text-muted-foreground" />
+                      <span className="font-medium">Available Orders</span>
+                      <Badge variant="secondary">{eligibleOrders.length}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Select all eligible orders not already in batch
+                          const ordersToAdd = eligibleOrders.filter((o: any) =>
+                            !currentBatch.some(b => b.orderNumber === o.orderNumber)
+                          );
+                          const newOrders = ordersToAdd.map((order: any) => ({
+                            orderNumber: order.orderNumber,
+                            customerId: order.customerId,
+                            customerName: order.customerName,
+                            itemCount: order.items?.length || 0,
+                            status: order.status,
+                            serviceType: order.serviceType || 'Dry Clean',
+                            weight: order.items?.reduce((sum: number, item: any) => sum + (item.weight || 0), 0) || 0,
+                          }));
+                          setCurrentBatch([...currentBatch, ...newOrders]);
+                          toast({
+                            title: "All Orders Added",
+                            description: `${ordersToAdd.length} orders added to batch`,
+                          });
+                        }}
+                        disabled={eligibleOrders.length === 0 || eligibleOrders.length === currentBatch.length}
+                        className="h-7 text-xs"
+                      >
+                        <CheckCircle2 className="w-3 h-3 mr-1" />
+                        Select All
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => refetchOrders()}
+                        className="h-7"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto" style={{ maxHeight: '450px' }}>
+                    {ordersLoading ? (
+                      <div className="flex items-center justify-center h-full min-h-[200px]">
+                        <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : eligibleOrders.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-muted-foreground p-4 text-center">
+                        <CheckCircle2 className="w-10 h-10 mb-3 opacity-30" />
+                        <p className="font-medium">No eligible orders</p>
+                        <p className="text-sm">All orders are either in transit or completed.</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y">
+                        {eligibleOrders.map((order: any) => {
+                          const isSelected = currentBatch.some(b => b.orderNumber === order.orderNumber);
+                          return (
+                            <div
+                              key={order.orderNumber}
+                              className={`flex items-center gap-3 p-3 cursor-pointer transition-colors hover:bg-muted/50 ${isSelected ? 'bg-primary/10 border-l-4 border-l-primary' : ''
+                                }`}
+                              onClick={() => {
+                                if (isSelected) {
+                                  handleRemoveOrderFromBatch(order.orderNumber);
+                                } else {
+                                  handleAddOrderToBatch(order);
+                                }
+                              }}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => {
+                                  if (checked) handleAddOrderToBatch(order);
+                                  else handleRemoveOrderFromBatch(order.orderNumber);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono font-semibold text-sm">{order.orderNumber}</span>
+                                  <Badge variant="outline" className="text-[10px] px-1.5">
+                                    {order.status}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                                  <span className="truncate">{order.customerName || 'No customer'}</span>
+                                  <span>•</span>
+                                  <span>{order.items?.length || 0} items</span>
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Selected Batch Panel */}
+                <div className="flex flex-col border rounded-lg overflow-hidden border-primary/30">
+                  <div className="flex items-center justify-between p-3 bg-primary/10 border-b">
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-primary" />
+                      <span className="font-medium">Transit Batch</span>
+                      <Badge className="bg-primary">{currentBatch.length}</Badge>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setCurrentBatch([])}
+                      disabled={currentBatch.length === 0}
+                      className="h-7 text-xs text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="w-3 h-3 mr-1" />
+                      Clear All
+                    </Button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto" style={{ maxHeight: '350px' }}>
+                    {currentBatch.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-muted-foreground p-4 text-center">
+                        <Package className="w-10 h-10 mb-3 opacity-30" />
+                        <p className="font-medium">No orders selected</p>
+                        <p className="text-sm">Click on orders from the left to add them.</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y">
+                        {currentBatch.map((order, index) => (
+                          <div
+                            key={order.orderNumber}
+                            className="flex items-center gap-3 p-3 hover:bg-muted/30 group"
+                          >
+                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                              {index + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-mono font-semibold text-sm">{order.orderNumber}</div>
+                              <div className="text-xs text-muted-foreground truncate">{order.customerName}</div>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {order.itemCount} items
+                            </div>
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => handleRemoveOrderFromBatch(order.orderNumber)}
-                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                               <X className="h-4 w-4" />
                             </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="border-2 border-dashed rounded-lg p-12 text-center text-muted-foreground">
-                  <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="font-medium">No orders in batch</p>
-                  <p className="text-sm">
-                    {isScanning
-                      ? 'Scan order barcodes to add them to this batch'
-                      : 'Click "Start Scanning" to begin'}
-                  </p>
-                </div>
-              )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleCreateTransitOrder}
-                  disabled={currentBatch.length === 0}
-                  className="flex-1 gap-2"
-                >
-                  <Printer className="h-4 w-4" />
-                  Create Transit Order
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentBatch([])}
-                  disabled={currentBatch.length === 0}
-                  className="gap-2"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Clear Batch
-                </Button>
+                  {/* Batch Summary Footer */}
+                  <div className="border-t bg-muted/30 p-3">
+                    <div className="flex justify-between text-sm mb-3">
+                      <span className="text-muted-foreground">Total Items:</span>
+                      <span className="font-semibold">{currentBatch.reduce((acc, o) => acc + o.itemCount, 0)}</span>
+                    </div>
+                    <Button
+                      onClick={handleCreateTransitOrder}
+                      disabled={currentBatch.length === 0 || createTransitMutation.isPending}
+                      className="w-full h-11 text-base font-semibold"
+                      size="lg"
+                    >
+                      {createTransitMutation.isPending ? (
+                        <>
+                          <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Truck className="mr-2 h-5 w-5" />
+                          Create Transit Order ({currentBatch.length} orders)
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

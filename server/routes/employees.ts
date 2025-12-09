@@ -85,7 +85,7 @@ router.post(
             }
 
             // Replace the hardcoded array with a robust check
-            const ALLOWED_ROLES = ['admin', 'franchise_manager', 'factory_manager', 'employee', 'driver'] as const;
+            const ALLOWED_ROLES = ['admin', 'franchise_manager', 'factory_manager', 'staff', 'employee', 'driver'] as const;
 
             if (!ALLOWED_ROLES.includes(role as any)) {
                 return res.status(400).json({
@@ -95,7 +95,7 @@ router.post(
 
             // Franchise managers can only create employees for their franchise
             if (req.employee!.role === 'franchise_manager') {
-                const ALLOWED_FRANCHISE_ROLES = ['factory_manager', 'employee', 'driver'];
+                const ALLOWED_FRANCHISE_ROLES = ['factory_manager', 'staff', 'employee', 'driver'];
                 if (!ALLOWED_FRANCHISE_ROLES.includes(role)) {
                     return res.status(403).json({ error: 'Franchise managers can only create factory managers, employees, and drivers' });
                 }

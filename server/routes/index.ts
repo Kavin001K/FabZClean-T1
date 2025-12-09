@@ -2,6 +2,7 @@ import { Express } from 'express';
 import ordersRouter from './orders';
 import customersRouter from './customers';
 import transitRouter from './transit';
+import transitOrdersRouter from './transit-orders';
 import deliveriesRouter from './deliveries';
 import driversRouter from './drivers';
 import productsRouter from './products';
@@ -157,6 +158,7 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/documents', documentsRouter);
   app.use('/api/franchises', franchiseRouter);
   app.use('/api/tasks', tasksRouter);
+  app.use('/api/transit-orders', transitOrdersRouter);
 
   // API v1 routes
   app.use('/api/v1/orders', ordersRouter);

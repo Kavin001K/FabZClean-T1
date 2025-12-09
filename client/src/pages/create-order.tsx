@@ -1046,6 +1046,12 @@ export default function CreateOrder() {
                         mode="single"
                         selected={pickupDate}
                         onSelect={setPickupDate}
+                        disabled={(date) => {
+                          // Disable past dates and today - only allow future dates
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          return date <= today;
+                        }}
                         initialFocus
                       />
                     </PopoverContent>

@@ -145,14 +145,18 @@ export default function EmployeeManagement() {
     }
   });
 
-  // Delete mutation
+  // Delete mutation - This uses soft delete (deactivate) by default
+  // Orders, logs, and other data are preserved
   const deleteEmployeeMutation = useMutation({
     mutationFn: (id: string) => employeesApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       setIsDeleteDialogOpen(false);
       setSelectedEmployee(null);
-      toast({ title: "User Deleted", description: "The user has been permanently removed from the system." });
+      toast({
+        title: "User Deactivated",
+        description: "The user has been deactivated and can no longer log in. All their data (orders, logs, etc.) has been preserved."
+      });
     },
     onError: (error) => {
       toast({ title: "Error", description: error.message || "Failed to delete employee", variant: "destructive" });
@@ -209,17 +213,16 @@ export default function EmployeeManagement() {
   ];
 
   // Determine available roles based on current user
-  // Determine available roles based on current user
   const getAvailableRoles = () => {
     if (!currentUser) return [];
     if (currentUser.role === 'admin') {
-      return ['admin', 'franchise_manager', 'factory_manager', 'employee', 'driver'];
+      return ['admin', 'franchise_manager', 'factory_manager', 'staff', 'employee', 'driver'];
     }
     if (currentUser.role === 'franchise_manager') {
-      return ['factory_manager', 'employee', 'driver'];
+      return ['factory_manager', 'staff', 'employee', 'driver'];
     }
     if (currentUser.role === 'factory_manager') {
-      return ['employee', 'driver'];
+      return ['staff', 'employee', 'driver'];
     }
     return [];
   };
@@ -1098,26 +1101,26 @@ export default function EmployeeManagement() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-red-600">
               <AlertTriangle className="w-5 h-5" />
-              Delete User Permanently
+              Deactivate User Account
             </AlertDialogTitle>
             <AlertDialogDescription>
               <div className="space-y-4">
                 <p>
-                  Are you sure you want to delete <strong>{selectedEmployee?.fullName}</strong>?
-                  This action cannot be undone.
+                  Are you sure you want to deactivate <strong>{selectedEmployee?.fullName}</strong>?
                 </p>
-                <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 p-4 rounded-lg">
-                  <p className="text-sm text-red-800 dark:text-red-300">
-                    <strong>Warning:</strong> This will permanently remove:
+                <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
+                  <p className="text-sm text-amber-800 dark:text-amber-300">
+                    <strong>What happens when you deactivate:</strong>
                   </p>
-                  <ul className="text-sm text-red-700 dark:text-red-400 list-disc list-inside mt-2">
-                    <li>User account and login credentials</li>
-                    <li>All associated activity logs</li>
-                    <li>Task and assignment history</li>
+                  <ul className="text-sm text-amber-700 dark:text-amber-400 list-disc list-inside mt-2">
+                    <li>User will no longer be able to log in</li>
+                    <li>All orders created by this user are preserved</li>
+                    <li>All audit logs and activity history are preserved</li>
+                    <li>User can be reactivated later if needed</li>
                   </ul>
                 </div>
-                <p className="text-sm">
-                  Consider <strong>revoking access</strong> instead if you want to preserve historical data.
+                <p className="text-sm text-muted-foreground">
+                  This is the recommended way to remove a user - it preserves all historical data for audit and reporting purposes.
                 </p>
               </div>
             </AlertDialogDescription>
@@ -1126,10 +1129,10 @@ export default function EmployeeManagement() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-amber-600 hover:bg-amber-700 text-white"
               disabled={deleteEmployeeMutation.isPending}
             >
-              {deleteEmployeeMutation.isPending ? "Deleting..." : "Delete Permanently"}
+              {deleteEmployeeMutation.isPending ? "Deactivating..." : "Deactivate User"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

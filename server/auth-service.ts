@@ -228,19 +228,56 @@ export class AuthService {
         const firstName = names[0];
         const lastName = names.slice(1).join(' ') || 'Staff';
 
+        // Auto-generate employee_id based on franchise and role
+        // Format: FZC[franchiseNum][roleCode][sequenceNum]
+        // e.g., FZC01ST03 = Franchise 1, Staff, #3
+        const roleCodeMap: Record<string, string> = {
+            'admin': 'AD',
+            'franchise_manager': 'MG',
+            'factory_manager': 'FM',
+            'staff': 'ST',
+            'employee': 'ST',
+            'driver': 'DR'
+        };
+
+        const roleCode = roleCodeMap[data.role] || 'XX';
+
+        // Get franchise code from franchiseId (e.g., 'franchise-pollachi' -> '01')
+        let franchiseNum = '01';
+        if (data.franchiseId) {
+            // Count franchises or extract from ID
+            const { data: franchises } = await supabase
+                .from('franchises')
+                .select('id')
+                .order('created_at', { ascending: true });
+            if (franchises) {
+                const idx = franchises.findIndex(f => f.id === data.franchiseId);
+                franchiseNum = String(idx + 1).padStart(2, '0');
+            }
+        }
+
+        // Count existing employees with same role in same franchise for sequence
+        const { count } = await supabase
+            .from('employees')
+            .select('*', { count: 'exact', head: true })
+            .eq('role', data.role)
+            .eq('franchise_id', data.franchiseId || '');
+
+        const sequenceNum = String((count || 0) + 1).padStart(2, '0');
+        const generatedEmployeeId = `FZC${franchiseNum}${roleCode}${sequenceNum}`;
+
         // Insert employee
         const { data: emp, error } = await supabase
             .from('employees')
             .insert({
-                employee_id: data.username, // Using username as employee_id
+                employee_id: generatedEmployeeId,
                 first_name: firstName,
                 last_name: lastName,
                 email: data.email,
                 phone: data.phone,
-                password: passwordHash, // Storing hash in 'password' column
+                password: passwordHash,
                 role: data.role,
                 franchise_id: data.franchiseId || null,
-                // factory_id: data.factoryId, // If column exists? Schema didn't show factory_id in create table, checking...
                 status: 'active',
                 position: data.position || 'Staff',
                 department: data.department || 'Operations',
@@ -619,20 +656,29 @@ export class AuthService {
                 });
 
             // Broadcast realtime event
-            const { realtimeServer } = require('./websocket-server');
-            realtimeServer.broadcast({
-                type: 'audit_log_created',
-                data: {
-                    franchise_id: franchiseId,
-                    employee_id: employeeId,
-                    username,
-                    action,
-                    entity_type: entityType,
-                    entity_id: entityId,
-                    details,
-                    created_at: new Date().toISOString()
+            // Broadcast realtime event
+            try {
+                // Dynamic import for ESM compatibility
+                // @ts-ignore
+                const { realtimeServer } = await import('./websocket-server');
+                if (realtimeServer) {
+                    realtimeServer.broadcast({
+                        type: 'audit_log_created',
+                        data: {
+                            franchise_id: franchiseId,
+                            employee_id: employeeId,
+                            username,
+                            action,
+                            entity_type: entityType,
+                            entity_id: entityId,
+                            details,
+                            created_at: new Date().toISOString()
+                        }
+                    });
                 }
-            });
+            } catch (importError) {
+                console.warn("Realtime server import failed, skipping broadcast", importError);
+            }
 
         } catch (e) {
             console.error("Audit log failed:", e);

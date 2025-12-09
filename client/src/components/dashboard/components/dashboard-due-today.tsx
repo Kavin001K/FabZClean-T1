@@ -40,23 +40,31 @@ interface DashboardDueTodayProps {
   franchiseId?: string;
 }
 
+// Date-based color coding:
+// Red: Overdue (past due date)
+// Orange: Due today
+// Blue: Tomorrow and day after tomorrow
+// Green: 3+ days from now
 const getUrgencyColor = (hoursLeft: number) => {
-  if (hoursLeft <= 2) return 'text-red-600 bg-red-50';
-  if (hoursLeft <= 6) return 'text-orange-600 bg-orange-50';
-  return 'text-green-600 bg-green-50';
+  if (hoursLeft < 0) return 'text-red-600 bg-red-100 border-red-200'; // Overdue
+  if (hoursLeft < 24) return 'text-orange-600 bg-orange-100 border-orange-200'; // Due today
+  if (hoursLeft < 72) return 'text-blue-600 bg-blue-100 border-blue-200'; // Tomorrow & day after
+  return 'text-green-600 bg-green-100 border-green-200'; // 3+ days
 };
 
 const getUrgencyIcon = (hoursLeft: number) => {
-  if (hoursLeft <= 2) return <AlertTriangle className="h-4 w-4" />;
-  if (hoursLeft <= 6) return <Clock className="h-4 w-4" />;
-  return <CheckCircle className="h-4 w-4" />;
+  if (hoursLeft < 0) return <AlertTriangle className="h-4 w-4" />; // Overdue
+  if (hoursLeft < 24) return <Clock className="h-4 w-4" />; // Today
+  return <CheckCircle className="h-4 w-4" />; // Future
 };
 
 const getUrgencyText = (hoursLeft: number) => {
-  if (hoursLeft <= 0) return 'Overdue';
-  if (hoursLeft <= 2) return 'Urgent';
-  if (hoursLeft <= 6) return 'Due Soon';
-  return 'On Track';
+  if (hoursLeft < 0) return 'Overdue';
+  if (hoursLeft < 24) return 'Due Today';
+  if (hoursLeft < 48) return 'Tomorrow';
+  if (hoursLeft < 72) return 'Day After';
+  const days = Math.ceil(hoursLeft / 24);
+  return `In ${days} days`;
 };
 
 const calculateHoursLeft = (dueDate: string) => {
@@ -153,7 +161,6 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
                 mode="single"
                 selected={selectedDate}
                 onSelect={(date) => date && setSelectedDate(date)}
-                disabled={(date) => date > new Date()}
                 initialFocus
               />
             </PopoverContent>
@@ -164,7 +171,6 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
             size="icon"
             className="h-8 w-8"
             onClick={() => setSelectedDate(addDays(selectedDate, 1))}
-            disabled={isToday || selectedDate > new Date()}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>

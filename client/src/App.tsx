@@ -43,6 +43,7 @@ import BillView from "@/pages/bill-view";
 import TestInvoice from "@/pages/test-invoice";
 import AuditLogsPage from "@/pages/admin/audit-logs";
 import ReportsPage from "@/pages/reports";
+import OrderTracking from "@/pages/order-tracking";
 
 function Router() {
   return (
@@ -53,6 +54,7 @@ function Router() {
       />
       <Route path="/account-inactive" component={AccountInactivePage} />
       <Route path="/bill/:orderNumber" component={BillView} />
+      <Route path="/tracking/:id" component={OrderTracking} />
 
       {/* Protected routes */}
       <Route path="/">
@@ -88,7 +90,7 @@ function Router() {
       </Route>
 
       <Route path="/inventory">
-        <ProtectedRoute allowedRoles={['admin', 'employee', 'franchise_manager', 'factory_manager']}>
+        <ProtectedRoute allowedRoles={['admin', 'factory_manager']}>
           <MainLayout>
             <Inventory />
           </MainLayout>
@@ -172,7 +174,15 @@ function Router() {
       </Route>
 
       <Route path="/employee-dashboard">
-        <ProtectedRoute allowedRoles={['employee']}>
+        <ProtectedRoute allowedRoles={['employee', 'driver', 'staff', 'factory_manager']}>
+          <MainLayout>
+            <EmployeeDashboardPage />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/factory-dashboard">
+        <ProtectedRoute allowedRoles={['factory_manager']}>
           <MainLayout>
             <EmployeeDashboardPage />
           </MainLayout>

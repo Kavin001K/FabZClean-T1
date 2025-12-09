@@ -88,6 +88,7 @@ interface OrderInBatch {
   serviceType?: string;
   weight?: number;
   id?: string;
+  franchiseId?: string;
 }
 
 interface StoreDetails {
@@ -163,7 +164,17 @@ const TransitStatusHistory: React.FC<{ transitOrderId: string }> = ({ transitOrd
   const { data: statusHistory = [], isLoading } = useQuery<StatusHistoryEntry[]>({
     queryKey: ['transit-status-history', transitOrderId],
     queryFn: async () => {
-      const response = await fetch(`/api/transit-orders/${transitOrderId}/status-history`);
+      const token = localStorage.getItem('employee_token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`/api/transit-orders/${transitOrderId}/status-history`, {
+        headers
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch status history');
       }
@@ -243,11 +254,39 @@ const TransitStatusHistory: React.FC<{ transitOrderId: string }> = ({ transitOrd
 };
 
 // PDF Generation with Comprehensive Details - A4 Format
-const generateTransitPDF = (
+const FRANCHISE_ADDRESSES: Record<string, { address: string; phone: string; code: string }> = {
+  'franchise-pollachi': {
+    address: '14/1, New Scheme Road, Pollachi - 642001',
+    phone: '+91 98422 12345',
+    code: 'POL',
+  },
+  'franchise-kenathukadavu': {
+    address: '45, Coimbatore Main Road, Kenathukadavu - 642109',
+    phone: '+91 98422 67890',
+    code: 'KKD',
+  },
+  'default': {
+    address: 'FabZ Clean Store',
+    phone: '+91 98422 00000',
+    code: 'STR',
+  }
+};
+
+const MAIN_FACTORY = {
+  name: 'FabZ Clean - Central Factory',
+  address: 'SF No. 123, Industrial Estate, Pollachi - 642003',
+  phone: '+91 98422 99999',
+  managerName: 'Factory Manager',
+  factoryCode: 'FAC-MAIN'
+};
+
+const generateTransitPDF = async (
   transitId: string,
   orders: OrderInBatch[],
   batchType: 'store_to_factory' | 'factory_to_store',
   createdBy: string = 'Current User',
+  createdById: string = '', // Added ID
+  createdByDesignation: string = '', // Added Designation
   storeDetails?: StoreDetails,
   factoryDetails?: FactoryDetails,
   vehicleDetails?: VehicleDetails,
@@ -259,368 +298,242 @@ const generateTransitPDF = (
     format: 'a4',
   });
 
-  const pageWidth = 210; // A4 width in mm
-  const pageHeight = 297; // A4 height in mm
+  const pageWidth = 210;
   const margin = 15;
   let currentY = margin;
 
-  // Mock data if not provided
-  const store: StoreDetails = storeDetails || {
-    name: 'FabZ Clean - Store #1',
-    address: '123 Main Street, Bangalore - 560001',
-    phone: '+91 98765 43210',
-    managerName: 'Rajesh Kumar',
-    storeCode: 'STR001',
-  };
+  // Colors
+  const COLOR_PRIMARY = [230, 81, 0]; // Deep Orange (FabZ Clean Brand)
+  const COLOR_SECONDARY = [33, 33, 33]; // Dark Grey
+  const COLOR_ACCENT = [255, 143, 0]; // Amber
+  const COLOR_LIGHT = [250, 250, 250];
 
-  const factory: FactoryDetails = factoryDetails || {
-    name: 'FabZ Clean - Central Factory',
-    address: '456 Industrial Area, Bangalore - 560099',
-    phone: '+91 98765 43211',
-    managerName: 'Suresh Patel',
-    factoryCode: 'FAC001',
-  };
+  // Load Logo
+  try {
+    const logoUrl = '/assets/logo.png'; // Prefer PNG
+    // If using webp, might need conversion, but let's try assuming a PNG exists or we use text as fallback if fails
+    // For now, let's use a text fallback if image fails, but try to load specific Asset
+    const img = new Image();
+    img.src = '/assets/logo.webp';
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = resolve; // Continue even if logo fails
+    });
+    doc.addImage(img, 'WEBP', margin, currentY, 40, 15);
+  } catch (e) {
+    console.warn("Logo load failed", e);
+    // Fallback text
+    doc.setFontSize(16);
+    doc.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+    doc.setFont('helvetica', 'bold');
+    doc.text('FABZ CLEAN', margin, currentY + 10);
+  }
 
-  const vehicle: VehicleDetails = vehicleDetails || {
-    vehicleNumber: 'KA-01-AB-1234',
-    vehicleType: 'Tempo Traveller',
-    driverName: 'Vijay Singh',
-    driverPhone: '+91 98765 43212',
-    driverLicense: 'KA0120230012345',
-  };
-
-  const employee: EmployeeDetails = employeeDetails || {
-    name: createdBy,
-    employeeId: 'EMP' + Math.floor(Math.random() * 1000).toString().padStart(3, '0'),
-    designation: 'Store Executive',
-    phone: '+91 98765 43213',
-  };
-
-  // ===== HEADER SECTION =====
-  // Company Logo Area (placeholder)
-  doc.setDrawColor(0);
-  doc.setLineWidth(0.5);
-  doc.rect(margin, currentY, 40, 20);
-  doc.setFontSize(8);
+  // Header Text
+  doc.setFontSize(24);
+  doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'bold');
-  doc.text('FABZ CLEAN', margin + 20, currentY + 10, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6);
-  doc.text('Laundry Services', margin + 20, currentY + 14, { align: 'center' });
-
-  // Document Title
-  doc.setFontSize(22);
-  doc.setFont('helvetica', 'bold');
-  doc.text('TRANSIT ORDER', pageWidth / 2, currentY + 8, { align: 'center' });
+  doc.text('TRANSIT ORDER', pageWidth - margin, currentY + 10, { align: 'right' });
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text(batchType === 'store_to_factory' ? 'Store to Factory' : 'Factory to Store', pageWidth / 2, currentY + 15, { align: 'center' });
+  doc.setTextColor(100, 100, 100);
+  doc.text(batchType === 'store_to_factory' ? 'Store to Factory' : 'Factory to Store', pageWidth - margin, currentY + 16, { align: 'right' });
 
   currentY += 25;
 
-  // Transit ID Barcode
+  // Transit Barcode
   const canvas = document.createElement('canvas');
   JsBarcode(canvas, transitId, {
     format: 'CODE128',
     width: 2,
-    height: 50,
+    height: 40,
     displayValue: true,
-    fontSize: 16,
+    fontSize: 14,
     textMargin: 2,
     margin: 0,
+    lineColor: "#000"
   });
   const barcodeDataUrl = canvas.toDataURL('image/png');
-  doc.addImage(barcodeDataUrl, 'PNG', (pageWidth - 100) / 2, currentY, 100, 20);
+  doc.addImage(barcodeDataUrl, 'PNG', (pageWidth - 80) / 2, currentY, 80, 20);
   currentY += 25;
 
-  // Date & Time Box
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('en-IN');
-  const timeStr = now.toLocaleTimeString('en-IN');
+  // Meta Info Box
+  doc.setFillColor(245, 245, 245);
+  doc.setDrawColor(200, 200, 200);
+  doc.rect(margin, currentY, pageWidth - 2 * margin, 14, 'FD');
 
-  doc.setFillColor(240, 240, 240);
-  doc.rect(margin, currentY, pageWidth - 2 * margin, 12, 'F');
+  const midPoint = margin + (pageWidth - 2 * margin) / 2;
+
+  doc.setTextColor(0, 0, 0);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.text('Date & Time:', margin + 3, currentY + 5);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`${dateStr} | ${timeStr}`, margin + 30, currentY + 5);
+  doc.text('Date & Time:', margin + 5, currentY + 5);
+  doc.text('Status:', margin + 5, currentY + 10);
 
-  doc.setFont('helvetica', 'bold');
-  doc.text('Transit ID:', pageWidth - margin - 60, currentY + 5);
   doc.setFont('helvetica', 'normal');
-  doc.text(transitId, pageWidth - margin - 35, currentY + 5);
+  doc.text(`${new Date().toLocaleString('en-IN')}`, margin + 30, currentY + 5);
+  doc.setTextColor(0, 150, 0);
+  doc.text('IN TRANSIT', margin + 30, currentY + 10);
 
-  doc.setFont('helvetica', 'bold');
-  doc.text('Status:', margin + 3, currentY + 9);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(0, 128, 0);
-  doc.text('IN TRANSIT', margin + 30, currentY + 9);
   doc.setTextColor(0, 0, 0);
-
-  currentY += 15;
-
-  // ===== ORIGIN & DESTINATION SECTION =====
-  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('SHIPMENT DETAILS', margin, currentY);
-  currentY += 6;
+  doc.text('Transit ID:', midPoint + 5, currentY + 8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(transitId, midPoint + 30, currentY + 8);
 
-  const origin = batchType === 'store_to_factory' ? store : factory;
-  const destination = batchType === 'store_to_factory' ? factory : store;
+  currentY += 20;
 
-  // Origin Box
-  doc.setDrawColor(0);
-  doc.setLineWidth(0.3);
-  doc.rect(margin, currentY, (pageWidth - 2 * margin - 5) / 2, 28);
-
-  doc.setFillColor(52, 152, 219);
-  doc.rect(margin, currentY, (pageWidth - 2 * margin - 5) / 2, 6, 'F');
+  // Shipment Details Header
+  doc.setFillColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+  doc.rect(margin, currentY, pageWidth - 2 * margin, 8, 'F');
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.text('FROM (ORIGIN)', margin + 3, currentY + 4);
-
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.text(origin.name, margin + 3, currentY + 10);
-  doc.setFont('helvetica', 'normal');
-
-  const originLines = doc.splitTextToSize(origin.address, 80);
-  doc.text(originLines, margin + 3, currentY + 14);
-
-  doc.setFontSize(7);
-  doc.text(`Phone: ${origin.phone}`, margin + 3, currentY + 22);
-  doc.text(`Code: ${batchType === 'store_to_factory' ? (origin as StoreDetails).storeCode : (origin as FactoryDetails).factoryCode}`, margin + 3, currentY + 26);
-
-  // Destination Box
-  const destX = margin + (pageWidth - 2 * margin - 5) / 2 + 5;
-  doc.rect(destX, currentY, (pageWidth - 2 * margin - 5) / 2, 28);
-
-  doc.setFillColor(231, 76, 60);
-  doc.rect(destX, currentY, (pageWidth - 2 * margin - 5) / 2, 6, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.text('TO (DESTINATION)', destX + 3, currentY + 4);
-
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.text(destination.name, destX + 3, currentY + 10);
-  doc.setFont('helvetica', 'normal');
-
-  const destLines = doc.splitTextToSize(destination.address, 80);
-  doc.text(destLines, destX + 3, currentY + 14);
-
-  doc.setFontSize(7);
-  doc.text(`Phone: ${destination.phone}`, destX + 3, currentY + 22);
-  doc.text(`Code: ${batchType === 'store_to_factory' ? (destination as FactoryDetails).factoryCode : (destination as StoreDetails).storeCode}`, destX + 3, currentY + 26);
-
-  currentY += 32;
-
-  // ===== EMPLOYEE & VEHICLE DETAILS =====
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text('PERSONNEL & VEHICLE DETAILS', margin, currentY);
-  currentY += 6;
-
-  // Employee Details Box
-  doc.setDrawColor(0);
-  doc.rect(margin, currentY, (pageWidth - 2 * margin - 5) / 2, 24);
-
-  doc.setFillColor(155, 89, 182);
-  doc.rect(margin, currentY, (pageWidth - 2 * margin - 5) / 2, 6, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.text('EMPLOYEE DETAILS', margin + 3, currentY + 4);
-
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(8);
-  doc.text(`Name: ${employee.name}`, margin + 3, currentY + 10);
-  doc.text(`ID: ${employee.employeeId}`, margin + 3, currentY + 14);
-  doc.text(`Designation: ${employee.designation}`, margin + 3, currentY + 18);
-  doc.text(`Phone: ${employee.phone}`, margin + 3, currentY + 22);
-
-  // Vehicle & Driver Details Box
-  doc.rect(destX, currentY, (pageWidth - 2 * margin - 5) / 2, 24);
-
-  doc.setFillColor(230, 126, 34);
-  doc.rect(destX, currentY, (pageWidth - 2 * margin - 5) / 2, 6, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.text('VEHICLE & DRIVER DETAILS', destX + 3, currentY + 4);
-
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(8);
-  doc.text(`Driver: ${vehicle.driverName}`, destX + 3, currentY + 10);
-  doc.text(`Vehicle: ${vehicle.vehicleNumber}`, destX + 3, currentY + 14);
-  doc.text(`Type: ${vehicle.vehicleType}`, destX + 3, currentY + 18);
-  doc.text(`License: ${vehicle.driverLicense}`, destX + 3, currentY + 22);
-
-  currentY += 28;
-
-  // ===== ORDER DETAILS TABLE =====
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text('ORDER DETAILS', margin, currentY);
-  currentY += 2;
-
-  const totalItems = orders.reduce((sum, order) => sum + order.itemCount, 0);
-  const totalWeight = orders.reduce((sum, order) => sum + (order.weight || 0), 0);
-
-  const tableData = orders.map((order, index) => [
-    (index + 1).toString(),
-    order.orderNumber,
-    order.customerName,
-    order.customerId,
-    order.serviceType || 'Dry Clean',
-    order.itemCount.toString(),
-    order.weight ? order.weight.toFixed(1) + ' kg' : 'N/A',
-  ]);
-
-  autoTable(doc, {
-    startY: currentY + 2,
-    head: [['#', 'Order ID', 'Customer Name', 'Customer ID', 'Service', 'Items', 'Weight']],
-    body: tableData,
-    foot: [['', '', 'TOTAL', '', '', totalItems.toString(), totalWeight.toFixed(1) + ' kg']],
-    theme: 'grid',
-    headStyles: {
-      fillColor: [52, 73, 94],
-      fontSize: 8,
-      fontStyle: 'bold',
-      halign: 'center',
-    },
-    bodyStyles: {
-      fontSize: 7,
-    },
-    footStyles: {
-      fillColor: [236, 240, 241],
-      textColor: [0, 0, 0],
-      fontStyle: 'bold',
-      fontSize: 8,
-    },
-    columnStyles: {
-      0: { cellWidth: 10, halign: 'center' },
-      1: { cellWidth: 30 },
-      2: { cellWidth: 40 },
-      3: { cellWidth: 30 },
-      4: { cellWidth: 25 },
-      5: { cellWidth: 15, halign: 'center' },
-      6: { cellWidth: 20, halign: 'center' },
-    },
-    margin: { left: margin, right: margin },
-  });
-
-  currentY = (doc as any).lastAutoTable.finalY + 8;
-
-  // ===== SIGNATURE SECTION =====
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text('SIGNATURES', margin, currentY);
-  currentY += 6;
-
-  const signBoxWidth = (pageWidth - 2 * margin - 10) / 3;
-  const signBoxHeight = 30;
-
-  // Store Manager Signature
-  doc.setDrawColor(0);
-  doc.rect(margin, currentY, signBoxWidth, signBoxHeight);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Store Manager', margin + signBoxWidth / 2, currentY + 4, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.text(store.managerName, margin + signBoxWidth / 2, currentY + 8, { align: 'center' });
-
-  doc.setDrawColor(150);
-  doc.line(margin + 3, currentY + signBoxHeight - 10, margin + signBoxWidth - 3, currentY + signBoxHeight - 10);
-  doc.setFontSize(6);
-  doc.text('Signature & Date', margin + signBoxWidth / 2, currentY + signBoxHeight - 5, { align: 'center' });
-  doc.text('Name:', margin + 3, currentY + signBoxHeight - 2);
-
-  // Driver Signature
-  const driverX = margin + signBoxWidth + 5;
-  doc.rect(driverX, currentY, signBoxWidth, signBoxHeight);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Driver', driverX + signBoxWidth / 2, currentY + 4, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.text(vehicle.driverName, driverX + signBoxWidth / 2, currentY + 8, { align: 'center' });
-
-  doc.line(driverX + 3, currentY + signBoxHeight - 10, driverX + signBoxWidth - 3, currentY + signBoxHeight - 10);
-  doc.setFontSize(6);
-  doc.text('Signature & Date', driverX + signBoxWidth / 2, currentY + signBoxHeight - 5, { align: 'center' });
-  doc.text('Name:', driverX + 3, currentY + signBoxHeight - 2);
-
-  // Factory Manager Signature
-  const factoryX = driverX + signBoxWidth + 5;
-  doc.rect(factoryX, currentY, signBoxWidth, signBoxHeight);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Factory Manager', factoryX + signBoxWidth / 2, currentY + 4, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.text(factory.managerName, factoryX + signBoxWidth / 2, currentY + 8, { align: 'center' });
-
-  doc.line(factoryX + 3, currentY + signBoxHeight - 10, factoryX + signBoxWidth - 3, currentY + signBoxHeight - 10);
-  doc.setFontSize(6);
-  doc.text('Signature & Date', factoryX + signBoxWidth / 2, currentY + signBoxHeight - 5, { align: 'center' });
-  doc.text('Name:', factoryX + 3, currentY + signBoxHeight - 2);
-
-  currentY += signBoxHeight + 8;
-
-  // ===== IMPORTANT NOTES =====
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text('IMPORTANT NOTES:', margin, currentY);
-  currentY += 5;
+  doc.text('SHIPMENT DETAILS', margin + 5, currentY + 5.5);
+  currentY += 8;
 
-  doc.setFontSize(7);
+  // Origin / Destination Grid
+  const colWidth = (pageWidth - 2 * margin) / 2;
+
+  // Origin
+  doc.setDrawColor(200, 200, 200);
+  doc.rect(margin, currentY, colWidth, 35);
+  doc.setTextColor(COLOR_SECONDARY[0], COLOR_SECONDARY[1], COLOR_SECONDARY[2]);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('FROM (ORIGIN)', margin + 5, currentY + 5);
+
+  const origin = batchType === 'store_to_factory' ? storeDetails : factoryDetails;
+  doc.setFontSize(9);
+  doc.text(origin?.name || 'Unknown', margin + 5, currentY + 12);
   doc.setFont('helvetica', 'normal');
-  const notes = [
-    '1. Please verify all items before accepting the shipment.',
-    '2. Any damages or missing items must be reported immediately.',
-    '3. This document must be signed by all parties involved.',
-    '4. Keep this copy for your records.',
-    '5. Scan the barcode at destination to update order status.',
-  ];
+  doc.setFontSize(8);
+  // Address wrap
+  const originAddr = doc.splitTextToSize(origin?.address || '', colWidth - 10);
+  doc.text(originAddr, margin + 5, currentY + 17);
+  doc.text(`Phone: ${origin?.phone}`, margin + 5, currentY + 30);
 
-  notes.forEach((note) => {
-    doc.text(note, margin + 2, currentY);
-    currentY += 4;
+  // Destination
+  doc.rect(margin + colWidth, currentY, colWidth, 35);
+  doc.setFont('helvetica', 'bold');
+  doc.text('TO (DESTINATION)', margin + colWidth + 5, currentY + 5);
+
+  const dest = batchType === 'store_to_factory' ? factoryDetails : storeDetails;
+  doc.setFontSize(9);
+  doc.text(dest?.name || 'Unknown', margin + colWidth + 5, currentY + 12);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  const destAddr = doc.splitTextToSize(dest?.address || '', colWidth - 10);
+  doc.text(destAddr, margin + colWidth + 5, currentY + 17);
+  doc.text(`Phone: ${dest?.phone}`, margin + colWidth + 5, currentY + 30);
+
+  currentY += 40;
+
+  // Personnel & Vehicle
+  doc.setFillColor(COLOR_SECONDARY[0], COLOR_SECONDARY[1], COLOR_SECONDARY[2]);
+  doc.rect(margin, currentY, pageWidth - 2 * margin, 8, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('LOGISTICS DETAILS', margin + 5, currentY + 5.5);
+  currentY += 8;
+
+  doc.setDrawColor(200, 200, 200);
+  doc.rect(margin, currentY, pageWidth - 2 * margin, 32);
+
+  // Split into Employee and Driver columns
+  // Employee
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('CREATED BY (EMPLOYEE)', margin + 5, currentY + 5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Name: ${createdBy}`, margin + 5, currentY + 12);
+  doc.text(`ID: ${createdById || employeeDetails?.employeeId || '-'}`, margin + 5, currentY + 16);
+  doc.text(`Role: ${createdByDesignation || employeeDetails?.designation || '-'}`, margin + 5, currentY + 20);
+  doc.text(`Phone: ${employeeDetails?.phone || '-'}`, margin + 5, currentY + 24);
+
+  // Divider
+  doc.line(margin + colWidth, currentY, margin + colWidth, currentY + 32);
+
+  // Driver
+  doc.setFont('helvetica', 'bold');
+  doc.text('DRIVER & VEHICLE', margin + colWidth + 5, currentY + 5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Driver Name: ${vehicleDetails?.driverName || '-'}`, margin + colWidth + 5, currentY + 12);
+  doc.text(`Phone: ${vehicleDetails?.driverPhone || '-'}`, margin + colWidth + 5, currentY + 16);
+  doc.text(`License No: ${vehicleDetails?.driverLicense || '-'}`, margin + colWidth + 5, currentY + 20);
+  doc.text(`Vehicle No: ${vehicleDetails?.vehicleNumber || '-'}`, margin + colWidth + 5, currentY + 24);
+  doc.text(`Type: ${vehicleDetails?.vehicleType || '-'}`, margin + colWidth + 5, currentY + 28);
+
+  currentY += 38;
+
+  // Orders Table
+  (doc as any).autoTable({
+    startY: currentY,
+    head: [['#', 'Order ID', 'Customer', 'Service', 'Items', 'Weight']],
+    body: orders.map((o, i) => [
+      i + 1,
+      o.orderNumber,
+      o.customerName,
+      o.serviceType || 'Laundry',
+      o.itemCount || 0,
+      o.weight ? `${o.weight} kg` : 'N/A'
+    ]),
+    theme: 'grid',
+    headStyles: { fillColor: COLOR_PRIMARY, textColor: 255, fontSize: 9 },
+    styles: { fontSize: 8, cellPadding: 2 },
+    columnStyles: {
+      0: { cellWidth: 10 },
+      1: { cellWidth: 45 }, // Increased from 35
+      2: { cellWidth: 65 }, // Increased from 45
+      3: { cellWidth: 25 },
+      4: { cellWidth: 15 },
+      5: { cellWidth: 20 }
+    },
+    margin: { left: margin, right: margin }
   });
 
-  // ===== FOOTER =====
-  doc.setDrawColor(52, 73, 94);
-  doc.setLineWidth(0.5);
-  doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+  currentY = (doc as any).lastAutoTable.finalY + 15;
 
+  // Signatures
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+
+  const signatureY = currentY + 20;
+
+  doc.line(margin, signatureY, margin + 50, signatureY);
+  doc.text('Store Manager', margin + 10, signatureY + 5);
+
+  doc.line(midPoint - 25, signatureY, midPoint + 25, signatureY);
+  doc.text('Driver Signature', midPoint - 10, signatureY + 5);
+
+  doc.line(pageWidth - margin - 50, signatureY, pageWidth - margin, signatureY);
+  doc.text('Factory Manager', pageWidth - margin - 40, signatureY + 5);
+
+  // Footer Disclaimer
   doc.setFontSize(7);
-  doc.setTextColor(100);
-  doc.text('FabZ Clean - Laundry Management System', pageWidth / 2, pageHeight - 10, { align: 'center' });
-  doc.text(`Generated on ${dateStr} at ${timeStr}`, pageWidth / 2, pageHeight - 6, { align: 'center' });
-  doc.text('This is a computer-generated document. For any queries, contact support.', pageWidth / 2, pageHeight - 3, { align: 'center' });
+  doc.text('This is a computer-generated document. No signature required.', pageWidth / 2, doc.internal.pageSize.height - 10, { align: 'center' });
 
-  // Save PDF
-  doc.save(`Transit_${transitId}_${dateStr.replace(/\//g, '-')}.pdf`);
-
-  return doc;
+  doc.save(`Transit_${transitId}.pdf`);
 };
+
 
 export default function TransitOrdersPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { employee } = useAuth();
+  const isFactoryManager = employee?.role === 'factory_manager';
 
   // State for current batch
   const [currentBatch, setCurrentBatch] = useState<OrderInBatch[]>([]);
-  const [batchType, setBatchType] = useState<'store_to_factory' | 'factory_to_store'>('store_to_factory');
+  // Default batch type based on role
+  const [batchType, setBatchType] = useState<'store_to_factory' | 'factory_to_store'>(
+    isFactoryManager ? 'factory_to_store' : 'store_to_factory'
+  );
   const [showAddOrderDialog, setShowAddOrderDialog] = useState(false);
   const [searchOrdersQuery, setSearchOrdersQuery] = useState('');
   const [selectedEligibleOrders, setSelectedEligibleOrders] = useState<string[]>([]);
@@ -630,6 +543,69 @@ export default function TransitOrdersPage() {
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [orderToRemove, setOrderToRemove] = useState<string | null>(null);
   const [showViewDialog, setShowViewDialog] = useState(false);
+
+  // Lookup state
+  const [showLookupDialog, setShowLookupDialog] = useState(false);
+  const [lookupQuery, setLookupQuery] = useState('');
+  const [lookupResult, setLookupResult] = useState<any>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+
+  const handleLookupOrder = async () => {
+    if (!lookupQuery) return;
+    setLookupLoading(true);
+    setLookupResult(null);
+    try {
+      // Try precise ID match first, then search
+      // For now assume full ID or we search list?
+      // Let's use the eligible list for search if possible, or global search API
+      // Using global search API is better: /api/orders?search=...
+      const response = await fetch(`/api/orders?search=${encodeURIComponent(lookupQuery)}&limit=1`, {
+        headers: getAuthHeaders()
+      });
+      if (!response.ok) throw new Error('Search failed');
+      const data = await response.json();
+      if (data.data && data.data.length > 0) {
+        setLookupResult(data.data[0]);
+      } else {
+        toast({ title: 'Not Found', description: 'No order found matching query.', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to lookup order.', variant: 'destructive' });
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
+  const handleAddLookupToBatch = () => {
+    if (!lookupResult) return;
+    const order = lookupResult;
+
+    // Check if already in batch
+    if (currentBatch.some(o => o.orderNumber === order.orderNumber)) {
+      toast({ title: 'Already Added', description: 'Order is already in the batch.' });
+      return;
+    }
+
+    // Add to batch
+    const newItem: OrderInBatch = {
+      orderNumber: order.orderNumber,
+      customerId: order.customerId,
+      customerName: order.customerName,
+      itemCount: order.items ? order.items.length : 0,
+      status: order.status,
+      serviceType: 'Laundry', // fallback
+      weight: 0,
+      id: order.id,
+      franchiseId: order.franchiseId
+    };
+
+    setCurrentBatch(prev => [...prev, newItem]);
+    toast({ title: 'Added', description: 'Order added to batch.' });
+    setShowLookupDialog(false);
+    setLookupQuery('');
+    setLookupResult(null);
+  };
+
   const [selectedBatch, setSelectedBatch] = useState<TransitBatch | null>(null);
   const [showTransitDetailsDialog, setShowTransitDetailsDialog] = useState(false);
 
@@ -650,27 +626,49 @@ export default function TransitOrdersPage() {
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
+  // Helper for auth headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('employee_token');
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+  };
+
   // Fetch eligible orders for adding to batch
   const { data: eligibleOrders = [], isLoading: isLoadingEligible } = useQuery({
     queryKey: ['eligible-transit-orders', batchType, employee?.franchiseId],
     queryFn: async () => {
-      if (!employee?.franchiseId) return [];
-      const response = await fetch(`/api/transit-orders/eligible?type=${batchType === 'store_to_factory' ? 'To Factory' : 'Return to Store'}&franchiseId=${employee.franchiseId}`);
+      if (!employee?.franchiseId && !isFactoryManager) return [];
+      const typeParam = batchType === 'store_to_factory' ? 'To Factory' : 'Return to Store';
+
+      let url = `/api/transit-orders/eligible?type=${encodeURIComponent(typeParam)}`;
+      if (employee?.franchiseId) {
+        url += `&franchiseId=${employee.franchiseId}`;
+      }
+
+      const response = await fetch(url, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Failed to fetch eligible orders');
-      return response.json();
+
+      const data = await response.json();
+      return data.map((order: any) => ({
+        ...order,
+        franchiseId: order.franchiseId // Ensure franchiseId is mapped
+      }));
     },
-    enabled: showAddOrderDialog && !!employee?.franchiseId
+    enabled: showAddOrderDialog && (!!employee?.franchiseId || isFactoryManager)
   });
 
   // Fetch transit history
   const { data: transitHistory = [], isLoading: isLoadingHistory } = useQuery<TransitBatch[]>({
     queryKey: ['transit-batches', employee?.franchiseId],
     queryFn: async () => {
-      const url = employee?.franchiseId
-        ? `/api/transit-orders?franchiseId=${employee.franchiseId}`
-        : `/api/transit-orders`;
+      let url = `/api/transit-orders`;
+      if (employee?.franchiseId) {
+        url += `?franchiseId=${employee.franchiseId}`;
+      }
 
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Failed to fetch transit orders');
 
       const data = await response.json();
@@ -682,8 +680,8 @@ export default function TransitOrdersPage() {
         destination: order.destination,
         createdBy: order.createdBy,
         createdAt: order.createdAt,
-        status: order.status.toLowerCase().replace(' ', '_'),
-        orders: order.orders || [], // In real app, might need to fetch items separately if not included
+        status: order.status?.toLowerCase().replace(' ', '_') || 'pending',
+        orders: order.orders || [],
         itemCount: order.totalItems || 0,
         storeDetails: order.storeDetails || {},
         factoryDetails: order.factoryDetails || {},
@@ -743,8 +741,10 @@ export default function TransitOrdersPage() {
       status: o.status,
       serviceType: o.service || 'Laundry',
       weight: 0, // Placeholder
-      id: o.id
+      id: o.id,
+      franchiseId: o.franchiseId // Added franchiseId
     }));
+
 
     // Filter out duplicates
     const uniqueNewItems = newItems.filter(item => !currentBatch.some(cb => cb.orderNumber === item.orderNumber));
@@ -790,26 +790,103 @@ export default function TransitOrdersPage() {
 
   const confirmGenerateTransitCopy = async () => {
     try {
-      if (!employee?.franchiseId) {
+      if (!employee?.franchiseId && !isFactoryManager) {
         toast({ title: "Error", description: "Employee franchise ID missing", variant: "destructive" });
         return;
       }
 
+      // Handle Factory Manager Grouping (Return to Store)
+      if (isFactoryManager && batchType === 'factory_to_store') {
+        const groups: Record<string, OrderInBatch[]> = {};
+        currentBatch.forEach(o => {
+          const fid = o.franchiseId || 'unknown';
+          if (!groups[fid]) groups[fid] = [];
+          groups[fid].push(o);
+        });
+
+        let createdCount = 0;
+        for (const franchiseId of Object.keys(groups)) {
+          const batch = groups[franchiseId];
+
+          // Use placeholders or backend-resolved data
+          const transitReqData = {
+            type: 'Return to Store',
+            vehicleNumber: transitDetails.vehicleNumber,
+            vehicleType: transitDetails.vehicleType,
+            driverName: transitDetails.driverName,
+            driverPhone: transitDetails.driverPhone,
+            driverLicense: transitDetails.driverLicense,
+            employeeId: employee?.id,
+            franchiseId: franchiseId,
+            employeeName: employee?.fullName || employee?.username,
+            employeePhone: employee?.phone,
+            designation: employee?.role,
+            storeDetails: {}, // Backend should populate
+            factoryDetails: MAIN_FACTORY,
+            origin: MAIN_FACTORY.name,
+            destination: 'Store',
+            orderIds: batch.map(o => o.id)
+          };
+
+          const response = await fetch('/api/transit-orders', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(transitReqData)
+          });
+
+          if (!response.ok) {
+            console.error(`Failed to create transit for franchise ${franchiseId}`);
+            continue;
+          }
+
+          const result = await response.json();
+          createdCount++;
+
+          // Generate PDF using response data
+          await generateTransitPDF(
+            result.transitId,
+            batch,
+            batchType,
+            employee?.fullName || 'Factory Manager',
+            employee?.employeeId, // ID
+            employee?.role, // Designation
+            result.storeDetails || { name: 'Store', address: '', phone: '', managerName: '', storeCode: '' },
+            result.factoryDetails || MAIN_FACTORY,
+            { ...transitDetails },
+            {
+              name: employee?.fullName || employee?.username || 'Factory Manager',
+              employeeId: employee?.employeeId || '',
+              designation: employee?.role,
+              phone: employee?.phone || ''
+            }
+          );
+        }
+
+        toast({
+          title: 'Batch Completed',
+          description: `Created ${createdCount} transit orders successfully.`,
+          duration: 5000,
+        });
+
+        setCurrentBatch([]);
+        setShowTransitDetailsDialog(false);
+        queryClient.invalidateQueries({ queryKey: ['transit-batches'] });
+        queryClient.invalidateQueries({ queryKey: ['eligible-transit-orders'] });
+        return;
+      }
+
+      // Standard Store Logic (Store to Factory)
+      const franchiseLoc = FRANCHISE_ADDRESSES[employee?.franchiseId || ''] || FRANCHISE_ADDRESSES['default'];
+
       const storeDetails: StoreDetails = {
-        name: 'FabZ Clean - Store',
-        address: '123 Main Street',
-        phone: '+91 98765 43210',
-        managerName: 'Manager',
-        storeCode: 'STR001',
+        name: `FabZ Clean - ${employee?.franchiseId?.includes('pollachi') ? 'Pollachi' : 'Kenathukadavu'} Store`,
+        address: franchiseLoc.address,
+        phone: franchiseLoc.phone,
+        managerName: employee?.fullName || 'Manager',
+        storeCode: franchiseLoc.code,
       };
 
-      const factoryDetails: FactoryDetails = {
-        name: 'FabZ Clean - Factory',
-        address: '456 Ind Area',
-        phone: '+91 98765 43211',
-        managerName: 'Manager',
-        factoryCode: 'FAC001',
-      };
+      const factoryDetails: FactoryDetails = MAIN_FACTORY;
 
       const transitReqData = {
         type: batchType === 'store_to_factory' ? 'To Factory' : 'Return to Store',
@@ -818,11 +895,11 @@ export default function TransitOrdersPage() {
         driverName: transitDetails.driverName,
         driverPhone: transitDetails.driverPhone,
         driverLicense: transitDetails.driverLicense,
-        employeeId: employee.id, // Auth Context ID
-        franchiseId: employee.franchiseId,
-        employeeName: employee.username,
-        employeePhone: employee.phone,
-        designation: employee.role,
+        employeeId: employee?.id, // Auth Context ID
+        franchiseId: employee?.franchiseId,
+        employeeName: employee?.fullName || employee?.username, // Use full name
+        employeePhone: employee?.phone,
+        designation: employee?.role,
         storeDetails,
         factoryDetails,
         origin: batchType === 'store_to_factory' ? storeDetails.name : factoryDetails.name,
@@ -835,27 +912,29 @@ export default function TransitOrdersPage() {
 
       const response = await fetch('/api/transit-orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(transitReqData),
       });
 
       if (!response.ok) throw new Error('Failed to create transit order');
       const result = await response.json();
 
-      // Generate PDF
-      generateTransitPDF(
+      // Generate PDF with updated details
+      await generateTransitPDF(
         result.transitId,
         currentBatch,
         batchType,
-        transitDetails.employeeName,
+        employee?.fullName || employee?.username || 'Employee', // Name
+        employee?.employeeId, // ID
+        employee?.role, // Designation
         storeDetails,
         factoryDetails,
         { ...transitDetails },
         {
-          name: transitDetails.employeeName,
-          employeeId: transitDetails.employeeId,
-          designation: transitDetails.designation,
-          phone: transitDetails.employeePhone
+          name: employee?.fullName || employee?.username || 'Employee',
+          employeeId: employee?.employeeId || '',
+          designation: employee?.role,
+          phone: employee?.phone || ''
         }
       );
 
@@ -870,10 +949,11 @@ export default function TransitOrdersPage() {
       queryClient.invalidateQueries({ queryKey: ['transit-batches'] });
       queryClient.invalidateQueries({ queryKey: ['eligible-transit-orders'] });
     } catch (error) {
-      console.error('Failed to create transit:', error);
+      console.error('Error creating transit order:', error);
+      playErrorSound();
       toast({
-        title: 'Error',
-        description: 'Failed to create transit order.',
+        title: 'Creation Failed',
+        description: 'Failed to create transit order. Please try again.',
         variant: 'destructive',
       });
     }
@@ -883,7 +963,7 @@ export default function TransitOrdersPage() {
     try {
       const response = await fetch(`/api/transit-orders/${batchId}/status`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           status: newStatus,
           location: 'Store/Factory', // Simplification
@@ -925,13 +1005,31 @@ export default function TransitOrdersPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {isFactoryManager && (
+              <Button onClick={() => setShowLookupDialog(true)} size="lg" variant="secondary" className="gap-2">
+                <Search className="h-5 w-5" /> Lookup Order
+              </Button>
+            )}
             <Select value={batchType} onValueChange={(value: any) => { setBatchType(value); setCurrentBatch([]); }}>
+
               <SelectTrigger className="w-[220px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="store_to_factory"><div className="flex items-center gap-2"><Store className="h-4 w-4" /> Store → Factory</div></SelectItem>
-                <SelectItem value="factory_to_store"><div className="flex items-center gap-2"><Factory className="h-4 w-4" /> Factory → Store</div></SelectItem>
+                {/* Store→Factory: Available to franchise_manager and staff */}
+                {!isFactoryManager && (
+                  <SelectItem value="store_to_factory">
+                    <div className="flex items-center gap-2"><Store className="h-4 w-4" /> Store → Factory</div>
+                  </SelectItem>
+                )}
+                {/* Factory→Store: Only for Factory Manager */}
+                {isFactoryManager && (
+                  <>
+                    <SelectItem value="factory_to_store">
+                      <div className="flex items-center gap-2"><Factory className="h-4 w-4" /> Factory → Store</div>
+                    </SelectItem>
+                  </>
+                )}
               </SelectContent>
             </Select>
             <Button onClick={handleStartNewBatch} size="lg" className="gap-2">
@@ -1124,35 +1222,51 @@ export default function TransitOrdersPage() {
           <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle>Transit Details - {selectedBatch?.transitId}</DialogTitle>
+              <DialogDescription>Details of transit batch {selectedBatch?.transitId}</DialogDescription>
             </DialogHeader>
             {selectedBatch && (
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div><strong>Type:</strong> {selectedBatch.type}</div>
-                  <div><strong>Status:</strong> {selectedBatch.status}</div>
+                  <div><strong>Status:</strong> <Badge variant={selectedBatch.status === 'in_transit' ? 'secondary' : 'default'}>{selectedBatch.status}</Badge></div>
                   <div><strong>Created By:</strong> {selectedBatch.createdBy}</div>
                   <div><strong>Vehicle:</strong> {selectedBatch.vehicleDetails?.vehicleNumber}</div>
+                  <div><strong>Driver:</strong> {selectedBatch.vehicleDetails?.driverName || 'N/A'}</div>
+                  <div><strong>Total Orders:</strong> {selectedBatch.orders.length}</div>
                 </div>
-                <div className="border rounded-md p-2 max-h-[200px] overflow-y-auto">
-                  <h4 className="font-semibold mb-2">Orders</h4>
-                  <ul className="text-sm space-y-1">
+                <div className="border rounded-md p-3 max-h-[250px] overflow-y-auto">
+                  <h4 className="font-semibold mb-2">Orders in this Batch</h4>
+                  <div className="space-y-2">
                     {selectedBatch.orders.map((o, i) => (
-                      <li key={i}>{o.orderNumber} - {o.customerName}</li>
+                      <div key={i} className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                        <div>
+                          <p className="font-medium">{o.orderNumber}</p>
+                          <p className="text-sm text-muted-foreground">{o.customerName}</p>
+                        </div>
+                        <Badge variant="outline">{o.status || 'pending'}</Badge>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
-                {/* Action Buttons */}
+                {/* Action Buttons - Only Factory Manager can mark as Received/Completed */}
                 <div className="flex justify-end gap-2">
-                  {selectedBatch.status === 'in_transit' && (
+                  {selectedBatch.status === 'in_transit' && isFactoryManager && (
                     <>
-                      <Button onClick={() => handleUpdateStatus(selectedBatch.id, 'Received')}>Mark as Received</Button>
-                      <Button onClick={() => handleUpdateStatus(selectedBatch.id, 'Completed')} variant="default">Mark Completed</Button>
+                      <Button onClick={() => handleUpdateStatus(selectedBatch.id, 'Received')} className="bg-blue-600 hover:bg-blue-700">
+                        Mark as Received
+                      </Button>
+                      <Button onClick={() => handleUpdateStatus(selectedBatch.id, 'Completed')} variant="default" className="bg-green-600 hover:bg-green-700">
+                        Mark Completed
+                      </Button>
                     </>
                   )}
+                  {selectedBatch.status === 'in_transit' && !isFactoryManager && (
+                    <p className="text-sm text-muted-foreground italic">Only Factory Manager can update transit status</p>
+                  )}
                   {selectedBatch.status !== 'in_transit' && (
-                    <Button variant="outline" disabled>
+                    <Badge variant={selectedBatch.status === 'Completed' ? 'default' : 'secondary'} className="text-sm px-4 py-2">
                       {selectedBatch.status}
-                    </Button>
+                    </Badge>
                   )}
                 </div>
                 <div className="mt-4">
@@ -1166,15 +1280,54 @@ export default function TransitOrdersPage() {
         {/* Create Transit Confirmation Dialog (Simplified) */}
         <Dialog open={showTransitDetailsDialog} onOpenChange={setShowTransitDetailsDialog}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Confirm Transit</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Confirm Transit</DialogTitle>
+              <DialogDescription>Please review the details before creating the transit order.</DialogDescription>
+            </DialogHeader>
             <div className="py-4 space-y-4">
-              <div className="space-y-2">
-                <Label>Vehicle Number</Label>
-                <Input value={transitDetails.vehicleNumber} onChange={e => setTransitDetails({ ...transitDetails, vehicleNumber: e.target.value })} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Vehicle Number *</Label>
+                  <Input
+                    value={transitDetails.vehicleNumber}
+                    onChange={e => setTransitDetails({ ...transitDetails, vehicleNumber: e.target.value })}
+                    placeholder="KA-01-AB-1234"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Vehicle Type</Label>
+                  <Input
+                    value={transitDetails.vehicleType}
+                    onChange={e => setTransitDetails({ ...transitDetails, vehicleType: e.target.value })}
+                    placeholder="Tempo / Van / Truck"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Driver Name *</Label>
+                  <Input
+                    value={transitDetails.driverName}
+                    onChange={e => setTransitDetails({ ...transitDetails, driverName: e.target.value })}
+                    placeholder="Driver's full name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Driver Phone *</Label>
+                  <Input
+                    value={transitDetails.driverPhone}
+                    onChange={e => setTransitDetails({ ...transitDetails, driverPhone: e.target.value })}
+                    placeholder="+91 98765 43210"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label>Driver Name</Label>
-                <Input value={transitDetails.driverName} onChange={e => setTransitDetails({ ...transitDetails, driverName: e.target.value })} />
+                <Label>Driver License Number *</Label>
+                <Input
+                  value={transitDetails.driverLicense}
+                  onChange={e => setTransitDetails({ ...transitDetails, driverLicense: e.target.value })}
+                  placeholder="KA0120230012345"
+                />
               </div>
             </div>
             <DialogFooter>
@@ -1204,6 +1357,55 @@ export default function TransitOrdersPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Lookup Dialog */}
+        <Dialog open={showLookupDialog} onOpenChange={setShowLookupDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Lookup Order</DialogTitle>
+              <DialogDescription>Enter Order ID or Last 4 Digits to search.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Order ID / Number..."
+                  value={lookupQuery}
+                  onChange={e => setLookupQuery(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleLookupOrder()}
+                />
+                <Button onClick={handleLookupOrder} disabled={lookupLoading}>
+                  {lookupLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                </Button>
+              </div>
+
+              {lookupResult && (
+                <div className="border rounded-md p-4 bg-muted/20 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-bold text-lg">{lookupResult.orderNumber}</h3>
+                      <p className="text-sm text-muted-foreground">{lookupResult.customerName}</p>
+                      <Badge className="mt-1">{lookupResult.status}</Badge>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-mono text-sm">{lookupResult.franchiseId || 'Unknown Franchise'}</p>
+                      <p className="text-xl font-bold">{lookupResult.totalAmount}</p>
+                    </div>
+                  </div>
+
+                  <div className="text-sm border-t pt-2">
+                    <p><strong>Items:</strong> {lookupResult.items?.length || 0}</p>
+                    <p><strong>Service:</strong> {lookupResult.service || 'Laundry'}</p>
+                  </div>
+
+                  <Button onClick={handleAddLookupToBatch} className="w-full mt-2">
+                    Add to Batch
+                  </Button>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
 
       </div>
     </PageTransition>

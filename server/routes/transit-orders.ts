@@ -80,30 +80,88 @@ router.get("/", async (req, res) => {
 // GET eligible orders for transit
 router.get("/eligible", async (req, res) => {
     try {
-        const { franchiseId, type } = req.query;
-        if (!franchiseId) return res.status(400).json({ message: "Franchise ID required" });
+        const { type } = req.query;
+        // franchiseId comes from scopeMiddleware for non-admin users, or from query for admin
+        const franchiseId = req.query.franchiseId as string | undefined;
 
-        // Get all orders for franchise
-        // We can use storage.listOrders() then filter. 
+        console.log(`[Transit] Fetching eligible orders - type: ${type}, franchiseId: ${franchiseId}`);
+
+        // Get all orders
         const allOrders = await storage.listOrders();
-        const franchiseOrders = allOrders.filter((o: Order) => o.franchiseId === franchiseId);
+        console.log(`[Transit] Total orders in database: ${allOrders.length}`);
 
-        let eligibleOrders: Order[] = [];
-        if (type === 'To Factory') {
-            // Logic: Status is Pending
-            eligibleOrders = franchiseOrders.filter((o: Order) => o.status === 'pending');
-        } else if (type === 'Return to Store') {
-            // Logic: Status is Processing (at factory) and NOT already in an active transit
-            // Actually, if it's "Processing", it might be in an ongoing "To Factory" transit?
-            // Once "To Factory" transit is 'Completed' (arrived at factory), the orders remain 'Processing'.
-            // Now we want to move them BACK.
-            // We need to ensure they aren't in another active transit.
-            // For simplicity: Status 'processing'.
-            eligibleOrders = franchiseOrders.filter((o: Order) => o.status === 'processing');
+        // Filter by franchise if provided (admin may see all if no franchiseId)
+        let franchiseOrders = allOrders;
+        if (franchiseId) {
+            franchiseOrders = allOrders.filter((o: Order) =>
+                o.franchiseId === franchiseId || !o.franchiseId
+            );
+            console.log(`[Transit] Orders after franchise filter: ${franchiseOrders.length}`);
         }
 
+        // Get orders that are already in active transit
+        const activeTransits = await storage.listTransitOrders();
+        const ordersInActiveTransit = new Set<string>();
+
+        for (const transit of activeTransits) {
+            const transitStatus = transit.status?.toLowerCase();
+            if (transitStatus === 'in_transit' || transitStatus === 'in transit' || transitStatus === 'pending') {
+                try {
+                    const items = await storage.getTransitOrderItems(transit.id);
+                    items.forEach((item: any) => {
+                        if (item.orderId) ordersInActiveTransit.add(item.orderId);
+                    });
+                } catch (e) {
+                    console.warn(`Could not fetch items for transit ${transit.id}`);
+                }
+            }
+        }
+
+        console.log(`[Transit] Orders already in active transit: ${ordersInActiveTransit.size}`);
+
+        let eligibleOrders: Order[] = [];
+
+        // Helper function for case-insensitive status check
+        const statusMatches = (orderStatus: string, targetStatus: string) => {
+            return orderStatus?.toLowerCase() === targetStatus.toLowerCase();
+        };
+
+        if (type === 'To Factory') {
+            // Orders eligible for Store -> Factory: pending status, not in active transit
+            eligibleOrders = franchiseOrders.filter((o: Order) => {
+                const isPending = statusMatches(o.status, 'pending');
+                const notInTransit = !ordersInActiveTransit.has(o.id);
+                return isPending && notInTransit;
+            });
+            console.log(`[Transit] Eligible for 'To Factory': ${eligibleOrders.length}`);
+        } else if (type === 'Return to Store') {
+            // Orders eligible for Factory -> Store: processing status (at factory)
+            eligibleOrders = franchiseOrders.filter((o: Order) => {
+                const isProcessing = statusMatches(o.status, 'processing');
+                const notInTransit = !ordersInActiveTransit.has(o.id);
+                return isProcessing && notInTransit;
+            });
+            console.log(`[Transit] Eligible for 'Return to Store': ${eligibleOrders.length}`);
+        } else {
+            // No type specified, return all non-completed, non-transit orders
+            eligibleOrders = franchiseOrders.filter((o: Order) => {
+                const statusLower = o.status?.toLowerCase();
+                const isPendingOrProcessing = statusLower === 'pending' || statusLower === 'processing';
+                const notInTransit = !ordersInActiveTransit.has(o.id);
+                return isPendingOrProcessing && notInTransit;
+            });
+            console.log(`[Transit] Eligible for all types: ${eligibleOrders.length}`);
+        }
+
+        // Log sample order for debugging
+        if (franchiseOrders.length > 0) {
+            console.log(`[Transit] Sample order status: "${franchiseOrders[0].status}" (type: ${typeof franchiseOrders[0].status})`);
+        }
+
+        console.log(`[Transit] Final eligible orders: ${eligibleOrders.length}`);
         res.json(eligibleOrders);
     } catch (error) {
+        console.error("Fetch eligible orders error:", error);
         res.status(500).json({ message: "Failed to fetch eligible orders" });
     }
 });
@@ -125,27 +183,23 @@ router.post("/", auditMiddleware('create_transit_order', 'transit_order'), async
         // Generate Transit ID (TR-TIMESTAMP)
         const transitId = `TR-${Date.now()}`;
 
-        // 1. Create Transit Record
+        // 1. Create Transit Record (only include columns that exist in table)
         const transitData = {
             transitId,
             type,
             status: 'In Transit',
             vehicleNumber,
+            vehicleType,
             driverName,
             driverPhone,
-            driverLicense,
-            vehicleType,
-            employeeId, // Track who created it
+            employeeId,
             employeeName,
-            employeePhone,
-            designation,
             franchiseId,
             origin,
             destination,
             totalOrders: orderIds.length,
             storeDetails,
-            factoryDetails,
-            dispatchedAt: new Date().toISOString()
+            factoryDetails
         };
 
         const newTransit = await storage.createTransitOrder(transitData);
@@ -154,7 +208,7 @@ router.post("/", auditMiddleware('create_transit_order', 'transit_order'), async
         for (const orderId of orderIds) {
             const order = await storage.getOrder(orderId);
             if (order) {
-                // Create Item
+                // Create Item (only include columns that exist in table)
                 await storage.createTransitOrderItem({
                     transitOrderId: newTransit.id,
                     orderId: order.id,
@@ -162,7 +216,7 @@ router.post("/", auditMiddleware('create_transit_order', 'transit_order'), async
                     customerId: order.customerId,
                     customerName: order.customerName,
                     status: 'In Transit',
-                    serviceType: order.service || 'Laundry' // Fallback
+                    franchiseId: order.franchiseId
                 });
 
                 // Update Order Status
@@ -182,9 +236,14 @@ router.post("/", auditMiddleware('create_transit_order', 'transit_order'), async
         }
 
         res.json(newTransit);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Create transit error:", error);
-        res.status(500).json({ message: "Failed to create transit order" });
+        console.error("Error details:", error?.message, error?.code, error?.details);
+        res.status(500).json({
+            message: "Failed to create transit order",
+            error: error?.message || 'Unknown error',
+            details: error?.details || null
+        });
     }
 });
 
@@ -196,16 +255,20 @@ router.put("/:id/status", auditMiddleware('update_transit_status', 'transit_orde
 
         if (!transit) return res.status(404).json({ message: "Transit order not found" });
 
-        // Update Transit
-        await storage.updateTransitOrder(req.params.id, { status, completedAt: status === 'Completed' ? new Date() : null });
+        // Update Transit (only use columns that exist)
+        const updateData: any = { status };
+        await storage.updateTransitOrder(req.params.id, updateData);
 
-        // History
-        await storage.createTransitStatusHistory({
-            transitOrderId: req.params.id,
-            status,
-            location,
-            updatedBy
-        });
+        // History (only use columns that exist in transit_status_history table)
+        try {
+            await storage.createTransitStatusHistory({
+                transitOrderId: req.params.id,
+                status
+            });
+        } catch (historyError) {
+            console.warn('Could not create transit history:', historyError);
+            // Don't fail the update if history fails
+        }
 
         // Update Linked Orders
         const items = await storage.getTransitOrderItems(req.params.id);

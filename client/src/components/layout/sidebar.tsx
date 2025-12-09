@@ -41,6 +41,12 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["franchise_manager", "manager"],
   },
   {
+    to: "/factory-dashboard",
+    label: "Factory Dashboard",
+    icon: Home,
+    roles: ["factory_manager"],
+  },
+  {
     to: "/franchise-management",
     label: "Franchises",
     icon: Building2,
@@ -50,62 +56,55 @@ const NAV_ITEMS: NavItem[] = [
     to: "/employee-dashboard",
     label: "Dashboard",
     icon: Home,
-    roles: ["employee", "driver", "factory_manager"],
+    roles: ["employee", "driver", "staff"],
   },
   {
     to: "/orders",
     label: "Orders",
     icon: ShoppingCart,
-    roles: ["admin", "employee", "franchise_manager", "manager", "factory_manager"],
+    roles: ["admin", "employee", "franchise_manager", "manager", "factory_manager", "staff"],
   },
   {
     to: "/customers",
     label: "Customers",
     icon: Users2,
-    roles: ["admin", "employee", "franchise_manager", "manager"],
+    roles: ["admin", "employee", "franchise_manager", "manager", "staff"],
+  },
+  {
+    to: "/transit-orders",
+    label: "Transit Orders",
+    icon: Truck,
+    roles: ["admin", "franchise_manager", "manager", "factory_manager"],
   },
   {
     to: "/services",
     label: "Services",
     icon: Scissors,
-    roles: ["admin", "employee", "factory_manager"],
+    roles: ["admin", "franchise_manager", "manager"],
   },
   {
     to: "/inventory",
     label: "Inventory",
     icon: Package,
-    roles: ["admin", "factory_manager"],
+    roles: ["admin", "factory_manager"], // Only admin and factory_manager
   },
-  // DISABLED - Uncomment to reactivate
-  // {
-  //   to: "/logistics",
-  //   label: "Logistics",
-  //   icon: Truck,
-  //   roles: ["admin", "factory_manager", "driver"],
-  // },
-  // {
-  //   to: "/live-tracking",
-  //   label: "Live Tracking",
-  //   icon: MapPin,
-  //   roles: ["admin", "factory_manager", "franchise_manager", "manager", "driver"],
-  // },
   {
     to: "/documents",
     label: "Documents",
     icon: FileText,
-    roles: ["admin", "employee", "factory_manager"],
+    roles: ["admin", "franchise_manager", "manager", "staff"],
   },
   {
     to: "/accounting",
     label: "Accounting",
     icon: Calculator,
-    roles: ["admin", "factory_manager"],
+    roles: ["admin", "franchise_manager", "manager"],
   },
   {
     to: "/reports",
     label: "Reports",
     icon: BarChart3,
-    roles: ["admin", "franchise_manager"],
+    roles: ["admin", "franchise_manager", "manager"],
   },
   {
     to: "/analytics",
@@ -117,13 +116,13 @@ const NAV_ITEMS: NavItem[] = [
     to: "/users",
     label: "User Management",
     icon: Shield,
-    roles: ["admin", "franchise_manager", "manager", "factory_manager"],
+    roles: ["admin", "franchise_manager", "manager"],
   },
   {
     to: "/database-status",
     label: "Database Status",
     icon: Server,
-    roles: ["admin", "factory_manager"],
+    roles: ["admin"],
   },
   {
     to: "/admin/audit-logs",
@@ -209,7 +208,8 @@ export function Sidebar() {
             {employee?.role === 'factory_manager' && 'Factory Manager'}
             {employee?.role === 'employee' && 'Employee'}
             {employee?.role === 'driver' && 'Driver'}
-            {!employee?.role && 'Unknown'}
+            {employee?.role === 'staff' && 'Staff'}
+            {!['admin', 'franchise_manager', 'manager', 'factory_manager', 'employee', 'driver', 'staff'].includes(employee?.role || '') && (employee?.role || 'Unknown')}
           </span>
         </div>
         <Link
