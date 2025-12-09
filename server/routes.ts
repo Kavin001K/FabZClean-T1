@@ -378,6 +378,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/employees/:id", async (req, res) => {
     try {
       const validatedData = insertEmployeeSchema.partial().parse(req.body);
+
+      // Get original employee for comparison
+      const originalEmployee = await storage.getEmployee(req.params.id);
+
       const employee = await storage.updateEmployee(
         req.params.id,
         validatedData,
@@ -385,6 +389,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
+      }
+
+      // Log to audit trail
+      try {
+        let action = 'update_employee';
+        const details: any = {
+          employeeName: employee.fullName,
+          employeeId: employee.employeeId
+        };
+
+        // Detect access revoke/restore
+        if (originalEmployee?.status !== employee.status) {
+          if (employee.status === 'inactive') {
+            action = 'revoke_access';
+            details.previousStatus = originalEmployee?.status;
+            details.reason = 'Access revoked';
+          } else if (employee.status === 'active' && originalEmployee?.status === 'inactive') {
+            action = 'restore_access';
+            details.previousStatus = 'inactive';
+            details.reason = 'Access restored';
+          }
+        }
+
+        // Detect role change
+        if (originalEmployee?.role !== employee.role) {
+          action = 'role_change';
+          details.previousRole = originalEmployee?.role;
+          details.newRole = employee.role;
+        }
+
+        await storage.createAuditLog({
+          employeeId: req.body.updatedBy || 'system',
+          action: action,
+          entityType: 'employee',
+          entityId: employee.id,
+          details,
+          ipAddress: req.ip || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        });
+      } catch (auditError) {
+        console.error('Audit log error (non-blocking):', auditError);
       }
 
       // Trigger real-time update
@@ -405,7 +450,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/employees/:id", async (req, res) => {
     try {
+      // Get employee info before delete for audit
+      const employee = await storage.getEmployee(req.params.id);
+
       await storage.deleteEmployee(req.params.id);
+
+      // Log to audit trail
+      try {
+        await storage.createAuditLog({
+          employeeId: req.body.deletedBy || 'system',
+          action: 'delete_employee',
+          entityType: 'employee',
+          entityId: req.params.id,
+          details: {
+            employeeName: employee?.fullName || 'Unknown',
+            employeeIdCode: employee?.employeeId || 'Unknown',
+            role: employee?.role || 'Unknown'
+          },
+          ipAddress: req.ip || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        });
+      } catch (auditError) {
+        console.error('Audit log error (non-blocking):', auditError);
+      }
 
       // Trigger real-time update
       realtimeServer.broadcast({ type: "employee_deleted", data: { id: req.params.id } });
@@ -628,6 +695,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
 
+      // Log to audit trail
+      try {
+        await storage.createAuditLog({
+          employeeId: req.body.createdBy || 'system',
+          action: 'create_order',
+          entityType: 'order',
+          entityId: order.id,
+          details: {
+            orderNumber: order.orderNumber,
+            customerName: order.customerName,
+            totalAmount: order.totalAmount,
+            franchiseId: order.franchiseId,
+            itemCount: order.items?.length || 0
+          },
+          ipAddress: req.ip || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        });
+      } catch (auditError) {
+        console.error('Audit log error (non-blocking):', auditError);
+      }
+
       // Trigger real-time update
       await realtimeServer.triggerUpdate("order", "created", order);
 
@@ -648,10 +736,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/orders/:id", async (req, res) => {
     try {
       const validatedData = insertOrderSchema.partial().parse(req.body);
+
+      // Get original order for comparison
+      const originalOrder = await storage.getOrder(req.params.id);
+
       const order = await storage.updateOrder(req.params.id, validatedData);
 
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Log to audit trail with specific action for payment changes
+      try {
+        let action = 'update_order';
+        const details: any = {
+          orderNumber: order.orderNumber,
+          customerName: order.customerName
+        };
+
+        // Detect payment status change
+        if (originalOrder?.paymentStatus !== order.paymentStatus) {
+          if (order.paymentStatus === 'paid') {
+            action = 'mark_paid';
+            details.previousPaymentStatus = originalOrder?.paymentStatus;
+            details.newPaymentStatus = 'paid';
+            details.totalAmount = order.totalAmount;
+          } else {
+            action = 'payment_received';
+            details.previousPaymentStatus = originalOrder?.paymentStatus;
+            details.newPaymentStatus = order.paymentStatus;
+          }
+        }
+
+        // Detect status change
+        if (originalOrder?.status !== order.status) {
+          details.previousStatus = originalOrder?.status;
+          details.newStatus = order.status;
+        }
+
+        await storage.createAuditLog({
+          employeeId: req.body.updatedBy || 'system',
+          action: action,
+          entityType: 'order',
+          entityId: order.id,
+          details,
+          ipAddress: req.ip || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        });
+      } catch (auditError) {
+        console.error('Audit log error (non-blocking):', auditError);
       }
 
       // Trigger real-time update
@@ -1435,6 +1568,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/transit-orders", async (req, res) => {
     try {
       const transitOrder = await storage.createTransitOrder(req.body);
+
+      // Log to audit trail
+      try {
+        await storage.createAuditLog({
+          employeeId: req.body.createdBy || 'system',
+          action: 'create_transit',
+          entityType: 'transit_order',
+          entityId: transitOrder.id,
+          details: {
+            transitNumber: transitOrder.transitNumber,
+            type: transitOrder.type,
+            origin: transitOrder.originFranchiseId,
+            destination: transitOrder.destinationFranchiseId,
+            orderCount: req.body.orderIds?.length || 0
+          },
+          ipAddress: req.ip || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        });
+      } catch (auditError) {
+        console.error('Audit log error (non-blocking):', auditError);
+      }
 
       // Trigger real-time update
       realtimeServer.broadcast({ type: "transit_order_created", data: transitOrder });

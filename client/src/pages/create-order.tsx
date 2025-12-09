@@ -24,6 +24,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CustomerAutocomplete } from "@/components/customer-autocomplete";
 import { OrderConfirmationDialog } from "@/components/orders/order-confirmation-dialog";
+import { useAuth } from "@/contexts/auth-context";
+import { generateOrderNumber } from "@/lib/franchise-config";
 
 interface ServiceItem {
   service: Service;
@@ -85,6 +87,7 @@ export default function CreateOrder() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { printInvoice } = useInvoicePrint();
+  const { employee: currentUser } = useAuth();
 
   // Fetch services - only active ones
   const { data: servicesData, isLoading: servicesLoading, isError: servicesError } = useQuery<Service[]>({
@@ -658,8 +661,12 @@ export default function CreateOrder() {
       return;
     }
 
+    // Get franchise ID from current user for order number prefix
+    const franchiseId = currentUser?.franchiseId || null;
+
     const orderData: any = {
-      orderNumber: `ORD-${Date.now()}`,
+      orderNumber: generateOrderNumber(franchiseId),
+      franchiseId: franchiseId, // Include franchise for tracking
       customerId: currentCustomerId,
       customerName,
       customerEmail: customerEmail || undefined,
