@@ -241,6 +241,13 @@ export class SerializationService {
         : serialized.totalOrders;
     }
 
+    // Convert creditBalance to number if it's a string
+    if (serialized.creditBalance !== undefined) {
+      serialized.creditBalance = typeof serialized.creditBalance === 'string'
+        ? parseFloat(serialized.creditBalance)
+        : serialized.creditBalance;
+    }
+
     // Handle loyalty points
     if (includeLoyalty && customer.loyaltyPoints !== undefined) {
       serialized.loyaltyPoints = parseInt(customer.loyaltyPoints) || 0;

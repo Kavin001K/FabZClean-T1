@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
-import { PlusCircle, User, Calendar as CalendarIcon, Truck, DollarSign, Search, CheckCircle, X, Loader2, AlertCircle, History, Package, TrendingUp, Clock, ShoppingBag, Zap } from "lucide-react";
+import { PlusCircle, User, Calendar as CalendarIcon, Truck, DollarSign, Search, CheckCircle, X, Loader2, AlertCircle, History, Package, TrendingUp, Clock, ShoppingBag, Zap, CreditCard } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -24,6 +24,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CustomerAutocomplete } from "@/components/customer-autocomplete";
 import { OrderConfirmationDialog } from "@/components/orders/order-confirmation-dialog";
+import OrderDetailsDialog from "@/components/orders/order-details-dialog";
 import { useAuth } from "@/contexts/auth-context";
 import { generateOrderNumber } from "@/lib/franchise-config";
 
@@ -40,6 +41,13 @@ interface ServiceItem {
 }
 
 export default function CreateOrder() {
+  const { toast } = useToast();
+  const { addNotification } = useNotifications();
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const { printInvoice } = useInvoicePrint();
+  const { employee: currentUser } = useAuth();
+
   // Customer state
   const [phoneNumber, setPhoneNumber] = useState('');
   const [searchingCustomer, setSearchingCustomer] = useState(false);
@@ -78,6 +86,27 @@ export default function CreateOrder() {
   const [gstNumber, setGstNumber] = useState('');
   const [panNumber, setPanNumber] = useState('');
 
+  // Credit Balance Alert
+  useEffect(() => {
+    if (foundCustomer?.creditBalance && Number(foundCustomer.creditBalance) > 0) {
+      toast({
+        title: "Credit Balance Due",
+        description: `This customer has a pending credit balance of ₹${Number(foundCustomer.creditBalance).toLocaleString('en-IN')}`,
+        variant: "destructive",
+        duration: 5000,
+      });
+    }
+  }, [foundCustomer, toast]);
+
+  // Sync payment status with payment method
+  useEffect(() => {
+    if (paymentMethod === 'credit') {
+      setPaymentStatus('credit');
+    } else if (paymentStatus === 'credit' && paymentMethod !== 'credit') {
+      setPaymentStatus('pending'); // Revert to pending if user switches away from credit
+    }
+  }, [paymentMethod, paymentStatus]);
+
   // Express Order - Priority with 50% extra charge and 2-day delivery
   const [isExpressOrder, setIsExpressOrder] = useState(false);
 
@@ -97,12 +126,11 @@ export default function CreateOrder() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
 
-  const { toast } = useToast();
-  const { addNotification } = useNotifications();
-  const [, setLocation] = useLocation();
-  const queryClient = useQueryClient();
-  const { printInvoice } = useInvoicePrint();
-  const { employee: currentUser } = useAuth();
+  // History order details
+  const [selectedHistoryOrder, setSelectedHistoryOrder] = useState<Order | null>(null);
+  const [isHistoryDetailsOpen, setIsHistoryDetailsOpen] = useState(false);
+
+
 
   // Fetch services - only active ones
   const { data: servicesData, isLoading: servicesLoading, isError: servicesError } = useQuery<Service[]>({
@@ -1659,6 +1687,7 @@ export default function CreateOrder() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="credit">Credit</SelectItem>
                         <SelectItem value="card">Credit/Debit Card</SelectItem>
                         <SelectItem value="upi">UPI</SelectItem>
                         <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
@@ -1872,12 +1901,12 @@ export default function CreateOrder() {
                             <p className="text-xl font-bold text-blue-700 dark:text-blue-300">₹{customerStats.totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
                           </div>
 
-                          <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/30 dark:to-purple-900/20 p-3 rounded-lg border border-purple-200/50 dark:border-purple-800/50">
+                          <div className="bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 p-3 rounded-lg border border-red-200/50 dark:border-red-800/50">
                             <div className="flex items-center gap-2 mb-1">
-                              <DollarSign className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                              <span className="text-[10px] uppercase tracking-wider font-medium text-purple-600 dark:text-purple-400">Avg Order</span>
+                              <CreditCard className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                              <span className="text-[10px] uppercase tracking-wider font-medium text-red-600 dark:text-red-400">Credit Due</span>
                             </div>
-                            <p className="text-xl font-bold text-purple-700 dark:text-purple-300">₹{customerStats.avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                            <p className="text-xl font-bold text-red-700 dark:text-red-300">₹{(foundCustomer?.creditBalance ? Number(foundCustomer.creditBalance) : 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
                           </div>
 
                           <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/30 dark:to-amber-900/20 p-3 rounded-lg border border-amber-200/50 dark:border-amber-800/50">
@@ -1926,7 +1955,11 @@ export default function CreateOrder() {
                               {customerOrders.slice(0, 5).map((order, idx) => (
                                 <div
                                   key={order.id || idx}
-                                  className="flex items-center justify-between p-2.5 bg-muted/30 hover:bg-muted/50 rounded-lg transition-colors border border-transparent hover:border-primary/10"
+                                  onClick={() => {
+                                    setSelectedHistoryOrder(order);
+                                    setIsHistoryDetailsOpen(true);
+                                  }}
+                                  className="flex items-center justify-between p-2.5 bg-muted/30 hover:bg-muted/50 rounded-lg transition-colors border border-transparent hover:border-primary/10 cursor-pointer"
                                 >
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
@@ -2074,6 +2107,17 @@ export default function CreateOrder() {
         onClose={() => {
           setIsModalOpen(false);
         }}
+      />
+
+      {/* History Order Details Dialog */}
+      <OrderDetailsDialog
+        order={selectedHistoryOrder}
+        isOpen={isHistoryDetailsOpen}
+        onClose={() => setIsHistoryDetailsOpen(false)}
+        onEdit={() => { }}
+        onCancel={() => { }}
+        onNextStep={() => { }}
+        onPrintInvoice={() => { }}
       />
     </div>
   );

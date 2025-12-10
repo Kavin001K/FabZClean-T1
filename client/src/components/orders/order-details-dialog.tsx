@@ -369,7 +369,7 @@ export default React.memo(function OrderDetailsDialog({
           <div className="flex flex-wrap gap-2 pt-4 border-t">
             {/* Payment Warning for completion */}
             {(order.status === 'ready_for_pickup' || order.status === 'out_for_delivery') &&
-              (order as any).paymentStatus !== 'paid' && (
+              (order as any).paymentStatus !== 'paid' && (order as any).paymentStatus !== 'credit' && (
                 <div className="w-full p-3 bg-amber-50 border border-amber-200 rounded-lg mb-2 dark:bg-amber-900/20 dark:border-amber-800">
                   <p className="text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2">
                     <AlertCircle className="h-4 w-4" />
@@ -385,7 +385,7 @@ export default React.memo(function OrderDetailsDialog({
                 className="gap-2"
                 disabled={
                   (nextStatus === 'completed' || nextStatus === 'delivered') &&
-                  (order as any).paymentStatus !== 'paid'
+                  (order as any).paymentStatus !== 'paid' && (order as any).paymentStatus !== 'credit'
                 }
               >
                 <PlusCircle className="h-4 w-4" />

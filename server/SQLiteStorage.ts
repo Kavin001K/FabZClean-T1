@@ -160,6 +160,7 @@ export class SQLiteStorage implements IStorage {
         address TEXT,
         totalOrders INTEGER,
         totalSpent TEXT,
+        creditBalance TEXT DEFAULT '0',
         lastOrder TEXT,
         createdAt TEXT,
         updatedAt TEXT,
@@ -616,6 +617,18 @@ export class SQLiteStorage implements IStorage {
         if (!columnNames.includes('franchiseId')) {
           console.log('🔄 Migrating transit_orders table: Adding column franchiseId');
           this.db.exec("ALTER TABLE transit_orders ADD COLUMN franchiseId TEXT");
+        }
+      }
+
+      // Check customers table migration
+      const customersTableExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='customers'").get();
+      if (customersTableExists) {
+        const columns = this.db.prepare("PRAGMA table_info(customers)").all() as any[];
+        const columnNames = columns.map(c => c.name);
+
+        if (!columnNames.includes('creditBalance')) {
+          console.log('🔄 Migrating customers table: Adding column creditBalance');
+          this.db.exec("ALTER TABLE customers ADD COLUMN creditBalance TEXT DEFAULT '0'");
         }
       }
 
@@ -2483,6 +2496,11 @@ export class SQLiteStorage implements IStorage {
     }
 
     return attendance;
+  }
+
+  async updateAttendance(id: string, data: any): Promise<any> {
+    this.updateRecord("employee_attendance", id, data);
+    return this.getRecord("employee_attendance", id);
   }
 
   // Document methods
