@@ -28,6 +28,7 @@ import TransitOrders from "@/pages/transit-orders";
 
 import DebugPage from "@/pages/debug";
 import EmployeeDashboardPage from "@/pages/employee-dashboard";
+import FactoryDashboard from "@/pages/factory-dashboard";
 import UserManagementPage from "@/pages/user-management";
 import FranchiseDashboard from "@/pages/franchise-dashboard";
 import FranchiseManagement from "@/pages/franchise-management";
@@ -174,7 +175,7 @@ function Router() {
       </Route>
 
       <Route path="/employee-dashboard">
-        <ProtectedRoute allowedRoles={['employee', 'driver', 'staff', 'factory_manager']}>
+        <ProtectedRoute allowedRoles={['employee', 'driver', 'staff']}>
           <MainLayout>
             <EmployeeDashboardPage />
           </MainLayout>
@@ -184,7 +185,7 @@ function Router() {
       <Route path="/factory-dashboard">
         <ProtectedRoute allowedRoles={['factory_manager']}>
           <MainLayout>
-            <EmployeeDashboardPage />
+            <FactoryDashboard />
           </MainLayout>
         </ProtectedRoute>
       </Route>

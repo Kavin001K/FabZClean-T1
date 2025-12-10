@@ -133,7 +133,11 @@ export class SupabaseStorage {
             'driver_license': 'driverLicense',
             'driver_phone': 'driverPhone',
             'employee_name': 'employeeName',
-            'employee_phone': 'employeePhone'
+            'employee_phone': 'employeePhone',
+            // Delivery-related mappings
+            'fulfillment_type': 'fulfillmentType',
+            'delivery_charges': 'deliveryCharges',
+            'delivery_address': 'deliveryAddress'
         };
 
         Object.entries(mappings).forEach(([snake, camel]) => {
@@ -256,7 +260,11 @@ export class SupabaseStorage {
             'driverLicense': 'driver_license',
             'driverPhone': 'driver_phone',
             'employeeName': 'employee_name',
-            'employeePhone': 'employee_phone'
+            'employeePhone': 'employee_phone',
+            // Delivery-related mappings
+            'fulfillmentType': 'fulfillment_type',
+            'deliveryCharges': 'delivery_charges',
+            'deliveryAddress': 'delivery_address'
         };
 
         // If key exists in mappings, use snake_case. If not, preserve original (e.g. 'status', 'email', 'name')
@@ -387,12 +395,14 @@ export class SupabaseStorage {
         return !error;
     }
 
-    async listCustomers(): Promise<Customer[]> {
-        const { data, error } = await this.supabase.from('customers').select('*');
+    async listCustomers(franchiseId?: string): Promise<Customer[]> {
+        let query = this.supabase.from('customers').select('*');
+        if (franchiseId) query = query.eq('franchise_id', franchiseId);
+        const { data, error } = await query;
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
-    async getCustomers(): Promise<Customer[]> { return this.listCustomers(); }
+    async getCustomers(franchiseId?: string): Promise<Customer[]> { return this.listCustomers(franchiseId); }
 
     // ======= ORDERS =======
     async createOrder(data: InsertOrder): Promise<Order> {
@@ -642,8 +652,10 @@ export class SupabaseStorage {
         return !error;
     }
 
-    async getServices(): Promise<Service[]> {
-        const { data, error } = await this.supabase.from('services').select('*');
+    async getServices(franchiseId?: string): Promise<Service[]> {
+        let query = this.supabase.from('services').select('*');
+        if (franchiseId) query = query.eq('franchise_id', franchiseId);
+        const { data, error } = await query;
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
@@ -866,20 +878,26 @@ export class SupabaseStorage {
     }
 
     // ======= TRANSIT ORDERS =======
-    async listTransitOrders(): Promise<any[]> {
-        const { data, error } = await this.supabase.from('transit_orders').select('*').order('created_at', { ascending: false });
+    async listTransitOrders(franchiseId?: string): Promise<any[]> {
+        let query = this.supabase.from('transit_orders').select('*').order('created_at', { ascending: false });
+        if (franchiseId) query = query.eq('franchise_id', franchiseId);
+        const { data, error } = await query;
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
-    async getTransitOrdersByStatus(status: string): Promise<any[]> {
-        const { data, error } = await this.supabase.from('transit_orders').select('*').eq('status', status).order('created_at', { ascending: false });
+    async getTransitOrdersByStatus(status: string, franchiseId?: string): Promise<any[]> {
+        let query = this.supabase.from('transit_orders').select('*').eq('status', status).order('created_at', { ascending: false });
+        if (franchiseId) query = query.eq('franchise_id', franchiseId);
+        const { data, error } = await query;
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
-    async getTransitOrdersByType(type: string): Promise<any[]> {
-        const { data, error } = await this.supabase.from('transit_orders').select('*').eq('type', type).order('created_at', { ascending: false });
+    async getTransitOrdersByType(type: string, franchiseId?: string): Promise<any[]> {
+        let query = this.supabase.from('transit_orders').select('*').eq('type', type).order('created_at', { ascending: false });
+        if (franchiseId) query = query.eq('franchise_id', franchiseId);
+        const { data, error } = await query;
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
@@ -918,6 +936,16 @@ export class SupabaseStorage {
         const { data: transitOrder, error } = await this.supabase.from('transit_orders').update(this.toSnakeCase(data)).eq('id', id).select().single();
         if (error) throw error;
         return this.mapDates(transitOrder);
+    }
+
+    async getTransitStatusHistory(transitOrderId: string): Promise<any[]> {
+        const { data, error } = await this.supabase
+            .from('transit_status_history')
+            .select('*')
+            .eq('transit_order_id', transitOrderId)
+            .order('created_at', { ascending: false });
+        if (error) return [];
+        return data.map(item => this.mapDates(item));
     }
 
     // ======= DOCUMENTS =======

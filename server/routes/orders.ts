@@ -47,6 +47,93 @@ const ADMIN_ONLY: UserRole[] = ["admin"];
 router.use(rateLimit(60000, 100)); // 100 requests per minute
 router.use(jwtRequired);
 
+// Search orders by query (order number, barcode, customer name, etc.)
+router.get('/search', async (req, res) => {
+  try {
+    const query = (req.query.q as string || '').trim();
+
+    if (!query) {
+      return res.json([]);
+    }
+
+    const allOrders = await storage.listOrders();
+    const queryLower = query.toLowerCase();
+
+    // Search across multiple fields
+    const matchingOrders = allOrders.filter((order: Order) => {
+      // Match by order number (exact or partial)
+      if (order.orderNumber?.toLowerCase().includes(queryLower)) return true;
+
+      // Match by order ID (UUID)
+      if (order.id?.toLowerCase() === queryLower) return true;
+
+      // Match by customer name
+      if (order.customerName?.toLowerCase().includes(queryLower)) return true;
+
+      // Match by customer phone
+      if (order.customerPhone?.includes(query)) return true;
+
+      // Match by customer email
+      if (order.customerEmail?.toLowerCase().includes(queryLower)) return true;
+
+      // Search within items (service names, custom names)
+      if (Array.isArray(order.items)) {
+        for (const item of order.items) {
+          if (item.serviceName?.toLowerCase().includes(queryLower)) return true;
+          if ((item as any).customName?.toLowerCase().includes(queryLower)) return true;
+        }
+      }
+
+      return false;
+    });
+
+    // Also search transit orders if the query looks like a transit ID
+    let transitMatches: any[] = [];
+    if (query.startsWith('TR-') || query.startsWith('tr-')) {
+      try {
+        const allTransits = await storage.listTransitOrders();
+        transitMatches = allTransits.filter((t: any) =>
+          t.transitId?.toLowerCase().includes(queryLower)
+        );
+      } catch (e) {
+        console.warn('Transit search failed:', e);
+      }
+    }
+
+    // Serialize and limit results
+    const serializedOrders = matchingOrders.slice(0, 20).map((order: Order) => serializeOrder(order));
+
+    // If searching for transit and found matches, include transit info in response
+    if (transitMatches.length > 0) {
+      // Find orders that are in the matched transits
+      const transitItems = await Promise.all(
+        transitMatches.map(async (t: any) => {
+          try {
+            const items = await storage.getTransitOrderItems(t.id);
+            return items.map((item: any) => item.orderId);
+          } catch (e) {
+            return [];
+          }
+        })
+      );
+      const transitOrderIds = new Set(transitItems.flat());
+
+      // Add transit-related orders to results
+      const transitRelatedOrders = allOrders.filter((o: Order) => transitOrderIds.has(o.id));
+      for (const order of transitRelatedOrders) {
+        if (!serializedOrders.find((so: any) => so.id === order.id)) {
+          serializedOrders.push(serializeOrder(order));
+        }
+      }
+    }
+
+    res.json(serializedOrders);
+  } catch (error) {
+    console.error('Search orders error:', error);
+    res.status(500).json(createErrorResponse('Failed to search orders', 500));
+  }
+});
+
 // Get orders with pagination and search
 router.get('/', async (req, res) => {
   try {
@@ -60,9 +147,9 @@ router.get('/', async (req, res) => {
     const user = (req as any).user;
     let franchiseId = undefined;
 
-    if (user && user.role !== 'admin') {
+    if (user && user.role !== 'admin' && user.role !== 'factory_manager') {
       franchiseId = user.franchiseId;
-    } else if (user && user.role === 'admin' && req.query.franchiseId) {
+    } else if (user && (user.role === 'admin' || user.role === 'factory_manager') && req.query.franchiseId) {
       // Allow admin to filter by specific franchise if needed
       franchiseId = req.query.franchiseId as string;
     }
@@ -341,6 +428,18 @@ router.patch(
       const order = await storage.getOrder(orderId);
       if (!order) {
         return res.status(404).json(createErrorResponse('Order not found', 404));
+      }
+
+      /**
+       * PAYMENT VALIDATION:
+       * Orders cannot be marked as 'completed' or 'delivered' unless payment is 'paid'
+       * This ensures no order is handed over without payment being collected
+       */
+      if ((status === 'completed' || status === 'delivered') && order.paymentStatus !== 'paid') {
+        return res.status(400).json(createErrorResponse(
+          'Payment must be marked as paid before completing or delivering the order',
+          400
+        ));
       }
 
       const updatedOrder = await storage.updateOrder(orderId, { status });

@@ -125,7 +125,7 @@ interface EmployeeDetails {
 interface TransitBatch {
   id: string;
   transitId: string;
-  type: 'store_to_factory' | 'factory_to_store';
+  type: 'store_to_factory' | 'factory_to_store' | 'To Factory' | 'Return to Store';
   origin: string;
   destination: string;
   createdBy: string;
@@ -133,6 +133,8 @@ interface TransitBatch {
   status: string;
   orders: OrderInBatch[];
   itemCount: number;
+  totalOrders?: number;
+  employeeName?: string;
   storeDetails?: StoreDetails;
   factoryDetails?: FactoryDetails;
   vehicleDetails?: VehicleDetails;
@@ -703,6 +705,18 @@ export default function TransitOrdersPage() {
     enabled: !!employee
   });
 
+  // Fetch linked orders for selected transit batch
+  const { data: linkedOrders = [], isLoading: isLoadingLinkedOrders } = useQuery<any[]>({
+    queryKey: ['transit-linked-orders', selectedBatch?.id],
+    queryFn: async () => {
+      if (!selectedBatch?.id) return [];
+      const response = await fetch(`/api/transit-orders/${selectedBatch.id}/items`, { headers: getAuthHeaders() });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!selectedBatch?.id && showViewDialog
+  });
+
   const handleStartNewBatch = () => {
     if (currentBatch.length > 0) {
       setShowClearConfirm(true);
@@ -1132,25 +1146,61 @@ export default function TransitOrdersPage() {
               ) : filteredHistory.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No records found</div>
               ) : filteredHistory.map(batch => (
-                <div key={batch.id} className="border rounded-lg p-3 hover:bg-accent/50 transition-colors flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold">{batch.transitId}</span>
-                      <Badge variant={batch.status === 'completed' || batch.status === 'received' ? 'default' : 'secondary'}>
-                        {batch.status.replace('_', ' ').toUpperCase()}
-                      </Badge>
+                <div
+                  key={batch.id}
+                  className={`border rounded-lg p-4 hover:shadow-md transition-all cursor-pointer ${batch.status === 'Completed' || batch.status === 'completed' ? 'bg-green-50 dark:bg-green-950/20 border-green-200' :
+                    batch.status === 'Received' || batch.status === 'received' ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-200' :
+                      batch.status === 'in_transit' ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200' :
+                        'bg-muted/30'
+                    }`}
+                  onClick={() => { setSelectedBatch(batch); setShowViewDialog(true); }}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-primary">{batch.transitId}</span>
+                        <Badge
+                          className={
+                            batch.status === 'Completed' || batch.status === 'completed' ? 'bg-green-500' :
+                              batch.status === 'Received' || batch.status === 'received' ? 'bg-blue-500' :
+                                batch.status === 'in_transit' ? 'bg-yellow-500' : 'bg-gray-500'
+                          }
+                        >
+                          {batch.status?.replace('_', ' ').toUpperCase()}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(batch.createdAt).toLocaleDateString()}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Package className="h-3 w-3" />
+                          {batch.orders?.length || batch.itemCount || 0} Orders
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs">
+                        {batch.type === 'store_to_factory' || batch.type === 'To Factory' ? (
+                          <>
+                            <Store className="h-3 w-3 text-orange-500" />
+                            <ArrowRight className="h-3 w-3" />
+                            <Factory className="h-3 w-3 text-purple-500" />
+                            <span className="ml-1">Store → Factory</span>
+                          </>
+                        ) : (
+                          <>
+                            <Factory className="h-3 w-3 text-purple-500" />
+                            <ArrowRight className="h-3 w-3" />
+                            <Store className="h-3 w-3 text-green-500" />
+                            <span className="ml-1">Factory → Store</span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {new Date(batch.createdAt).toLocaleDateString()} | {batch.itemCount} Items
-                    </div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                      {batch.type === 'store_to_factory' ? <Store className="h-3 w-3" /> : <Factory className="h-3 w-3" />}
-                      <span>{batch.type === 'store_to_factory' ? 'Store -> Fac' : 'Fac -> Store'}</span>
-                    </div>
+                    <Button size="sm" variant="ghost">
+                      <Eye className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => { setSelectedBatch(batch); setShowViewDialog(true); }}>
-                    <Eye className="h-4 w-4" />
-                  </Button>
                 </div>
               ))}
             </CardContent>
@@ -1217,63 +1267,214 @@ export default function TransitOrdersPage() {
           </DialogContent>
         </Dialog>
 
-        {/* View Details Dialog */}
+        {/* View Details Dialog - Enhanced */}
         <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Transit Details - {selectedBatch?.transitId}</DialogTitle>
-              <DialogDescription>Details of transit batch {selectedBatch?.transitId}</DialogDescription>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader className="pb-4 border-b">
+              <div className="flex items-center justify-between">
+                <div>
+                  <DialogTitle className="text-xl flex items-center gap-2">
+                    <Truck className="h-5 w-5" />
+                    Transit Order Details
+                  </DialogTitle>
+                  <DialogDescription className="mt-1">
+                    Complete information for this transit shipment
+                  </DialogDescription>
+                </div>
+                {selectedBatch && (
+                  <div className="text-right">
+                    <p className="text-lg font-bold font-mono">{selectedBatch.transitId}</p>
+                    <Badge
+                      className={
+                        selectedBatch.status === 'in_transit' ? 'bg-yellow-500' :
+                          selectedBatch.status === 'Received' ? 'bg-blue-500' :
+                            selectedBatch.status === 'Completed' ? 'bg-green-500' : 'bg-gray-500'
+                      }
+                    >
+                      {selectedBatch.status?.replace('_', ' ').toUpperCase()}
+                    </Badge>
+                  </div>
+                )}
+              </div>
             </DialogHeader>
             {selectedBatch && (
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div><strong>Type:</strong> {selectedBatch.type}</div>
-                  <div><strong>Status:</strong> <Badge variant={selectedBatch.status === 'in_transit' ? 'secondary' : 'default'}>{selectedBatch.status}</Badge></div>
-                  <div><strong>Created By:</strong> {selectedBatch.createdBy}</div>
-                  <div><strong>Vehicle:</strong> {selectedBatch.vehicleDetails?.vehicleNumber}</div>
-                  <div><strong>Driver:</strong> {selectedBatch.vehicleDetails?.driverName || 'N/A'}</div>
-                  <div><strong>Total Orders:</strong> {selectedBatch.orders.length}</div>
-                </div>
-                <div className="border rounded-md p-3 max-h-[250px] overflow-y-auto">
-                  <h4 className="font-semibold mb-2">Orders in this Batch</h4>
-                  <div className="space-y-2">
-                    {selectedBatch.orders.map((o, i) => (
-                      <div key={i} className="flex justify-between items-center p-2 bg-muted/50 rounded">
-                        <div>
-                          <p className="font-medium">{o.orderNumber}</p>
-                          <p className="text-sm text-muted-foreground">{o.customerName}</p>
-                        </div>
-                        <Badge variant="outline">{o.status || 'pending'}</Badge>
-                      </div>
-                    ))}
+              <div className="flex-1 overflow-y-auto py-4 space-y-6">
+                {/* Transit Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-4 bg-muted/50 rounded-lg border">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Type</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {selectedBatch.type === 'store_to_factory' || selectedBatch.type === 'To Factory' ? (
+                        <>
+                          <Store className="h-4 w-4 text-orange-500" />
+                          <span className="font-medium">Store → Factory</span>
+                        </>
+                      ) : (
+                        <>
+                          <Factory className="h-4 w-4 text-green-500" />
+                          <span className="font-medium">Factory → Store</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg border">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Orders</p>
+                    <p className="text-2xl font-bold mt-1">{selectedBatch.orders?.length || selectedBatch.totalOrders || 0}</p>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg border">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Created</p>
+                    <p className="font-medium mt-1">{new Date(selectedBatch.createdAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(selectedBatch.createdAt).toLocaleTimeString()}</p>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg border">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Created By</p>
+                    <p className="font-medium mt-1 flex items-center gap-1">
+                      <User className="h-4 w-4" />
+                      {selectedBatch.createdBy || selectedBatch.employeeName || 'System'}
+                    </p>
                   </div>
                 </div>
-                {/* Action Buttons - Only Factory Manager can mark as Received/Completed */}
-                <div className="flex justify-end gap-2">
-                  {selectedBatch.status === 'in_transit' && isFactoryManager && (
-                    <>
-                      <Button onClick={() => handleUpdateStatus(selectedBatch.id, 'Received')} className="bg-blue-600 hover:bg-blue-700">
-                        Mark as Received
-                      </Button>
-                      <Button onClick={() => handleUpdateStatus(selectedBatch.id, 'Completed')} variant="default" className="bg-green-600 hover:bg-green-700">
-                        Mark Completed
-                      </Button>
-                    </>
-                  )}
-                  {selectedBatch.status === 'in_transit' && !isFactoryManager && (
-                    <p className="text-sm text-muted-foreground italic">Only Factory Manager can update transit status</p>
-                  )}
-                  {selectedBatch.status !== 'in_transit' && (
-                    <Badge variant={selectedBatch.status === 'Completed' ? 'default' : 'secondary'} className="text-sm px-4 py-2">
-                      {selectedBatch.status}
-                    </Badge>
-                  )}
+
+                {/* Vehicle & Driver Info */}
+                {(selectedBatch.vehicleDetails?.vehicleNumber || selectedBatch.vehicleDetails?.driverName) && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <h4 className="font-semibold flex items-center gap-2 mb-3">
+                      <Truck className="h-4 w-4" />
+                      Vehicle & Driver Details
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Vehicle Number</p>
+                        <p className="font-medium">{selectedBatch.vehicleDetails?.vehicleNumber || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Vehicle Type</p>
+                        <p className="font-medium">{selectedBatch.vehicleDetails?.vehicleType || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Driver Name</p>
+                        <p className="font-medium">{selectedBatch.vehicleDetails?.driverName || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Driver Phone</p>
+                        <p className="font-medium">{selectedBatch.vehicleDetails?.driverPhone || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Orders Table */}
+                <div>
+                  <h4 className="font-semibold flex items-center gap-2 mb-3">
+                    <Package className="h-4 w-4" />
+                    Orders in this Shipment ({linkedOrders.length || selectedBatch.orders?.length || 0})
+                  </h4>
+                  <div className="border rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
+                    {isLoadingLinkedOrders ? (
+                      <div className="flex items-center justify-center py-8">
+                        <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-muted/90 z-10">
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="font-semibold">Order #</TableHead>
+                            <TableHead className="font-semibold">Customer</TableHead>
+                            <TableHead className="font-semibold">Items</TableHead>
+                            <TableHead className="font-semibold">Total</TableHead>
+                            <TableHead className="font-semibold">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(linkedOrders.length > 0 ? linkedOrders : selectedBatch.orders || []).map((item: any, idx: number) => {
+                            const order = item.order || item;
+                            return (
+                              <TableRow key={idx} className="hover:bg-muted/30">
+                                <TableCell>
+                                  <span className="font-mono font-medium text-primary">{order.orderNumber || item.orderNumber}</span>
+                                </TableCell>
+                                <TableCell>{order.customerName || item.customerName || 'N/A'}</TableCell>
+                                <TableCell>
+                                  {order.items?.length || order.itemCount || '-'}
+                                </TableCell>
+                                <TableCell>
+                                  ₹{parseFloat(order.totalAmount || '0').toLocaleString('en-IN')}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className={
+                                    (order.status || item.status) === 'processing' ? 'border-blue-500 text-blue-500' :
+                                      (order.status || item.status) === 'ready_for_pickup' ? 'border-green-500 text-green-500' :
+                                        (order.status || item.status) === 'in_transit' ? 'border-yellow-500 text-yellow-500' :
+                                          (order.status || item.status) === 'completed' ? 'border-emerald-500 text-emerald-500' :
+                                            ''
+                                  }>
+                                    {(order.status || item.status)?.replace(/_/g, ' ') || 'pending'}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                          {(linkedOrders.length === 0 && (!selectedBatch.orders || selectedBatch.orders.length === 0)) && (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                                No orders linked to this transit
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
                 </div>
-                <div className="mt-4">
+
+                {/* Transit Status History */}
+                <div>
+                  <h4 className="font-semibold flex items-center gap-2 mb-3">
+                    <Clock className="h-4 w-4" />
+                    Status Timeline
+                  </h4>
                   <TransitStatusHistory transitOrderId={selectedBatch.id} />
                 </div>
               </div>
             )}
+
+            {/* Footer Actions */}
+            <DialogFooter className="pt-4 border-t mt-auto">
+              <div className="flex items-center justify-between w-full">
+                <div>
+                  {selectedBatch?.status === 'in_transit' && !isFactoryManager && (
+                    <p className="text-sm text-muted-foreground italic">
+                      Only Factory Manager can update transit status
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setShowViewDialog(false)}>
+                    Close
+                  </Button>
+                  {selectedBatch?.status === 'in_transit' && isFactoryManager && (
+                    <>
+                      <Button
+                        onClick={() => handleUpdateStatus(selectedBatch.id, 'Received')}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Mark as Received
+                      </Button>
+                    </>
+                  )}
+                  {selectedBatch?.status === 'Received' && isFactoryManager && (
+                    <Button
+                      onClick={() => handleUpdateStatus(selectedBatch.id, 'Completed')}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Mark Completed
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 

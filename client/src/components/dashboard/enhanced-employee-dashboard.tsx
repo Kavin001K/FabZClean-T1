@@ -70,6 +70,7 @@ import { useAuth } from '@/contexts/auth-context';
 
 import { DashboardDueToday } from "./components/dashboard-due-today";
 import { DashboardRecentOrders } from "./components/dashboard-recent-orders";
+import { DashboardReadyOrders } from "./components/dashboard-ready-orders";
 
 interface DashboardOrder {
   id: string;
@@ -465,6 +466,9 @@ export default function EnhancedEmployeeDashboard() {
               isLoading={ordersLoading}
             />
           </div>
+
+          {/* Ready for Pickup/Delivery */}
+          <DashboardReadyOrders />
 
           {/* Quick Stats Grid */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

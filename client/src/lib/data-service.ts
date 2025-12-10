@@ -655,14 +655,19 @@ export const formatPercentage = (num: number): string => {
 
 // Status and priority helpers
 export const getStatusColor = (status: string): string => {
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     pending: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400",
     processing: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
     completed: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
     cancelled: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400",
+    in_transit: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400",
+    ready_for_transit: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400",
+    ready_for_pickup: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
+    out_for_delivery: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400",
+    delivered: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
   };
 
-  return statusColors[status.toLowerCase() as keyof typeof statusColors] || statusColors.pending;
+  return statusColors[status.toLowerCase()] || statusColors.pending;
 };
 
 export const getPriorityColor = (priority: string): string => {
@@ -687,17 +692,30 @@ export const getStockStatusText = (quantity: number, reorderLevel: number = 10):
   return "In Stock";
 };
 
-// Order workflow helpers
+// Order workflow helpers - Extended for laundry workflow
 export const orderWorkflow = [
-  'pending', 'processing', 'completed'
+  'pending',      // Just created
+  'in_transit',   // Being sent to factory
+  'processing',   // At factory being cleaned
+  'ready_for_transit', // Processed, ready to return to store
+  'ready_for_pickup',  // Returned to store, waiting for customer
+  'out_for_delivery',  // Being delivered to customer (if delivery type)
+  'completed'     // Customer received
 ] as const;
 
 export const getNextStatus = (currentStatus: Order['status']): Order['status'] | null => {
-  const currentIndex = orderWorkflow.indexOf(currentStatus as any);
-  if (currentIndex === -1 || currentIndex === orderWorkflow.length - 1) {
-    return null;
-  }
-  return orderWorkflow[currentIndex + 1] as Order['status'];
+  const statusMap: Record<string, Order['status'] | null> = {
+    'pending': 'processing',
+    'processing': 'ready_for_transit',
+    'ready_for_transit': 'ready_for_pickup',
+    'ready_for_pickup': 'out_for_delivery',
+    'out_for_delivery': 'completed',
+    'in_transit': 'processing',
+    'completed': null,
+    'cancelled': null,
+    'delivered': null
+  };
+  return statusMap[currentStatus] || null;
 };
 
 export const getPreviousStatus = (currentStatus: Order['status']): Order['status'] | null => {

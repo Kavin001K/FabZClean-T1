@@ -33,6 +33,9 @@ import {
   XCircle,
   Printer,
   FileText,
+  Truck,
+  Package,
+  Store,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/data-service";
 import type { Order } from "@shared/schema";
@@ -57,12 +60,37 @@ export interface OrdersTableProps {
   className?: string;
 }
 
+// Format status for display - converts snake_case to Human Readable
+const formatStatusDisplay = (status: string) => {
+  const statusLabels: Record<string, string> = {
+    'pending': 'Pending',
+    'in_transit': 'In Transit',
+    'processing': 'Processing',
+    'ready_for_transit': 'Ready to Ship',
+    'ready_for_pickup': 'Ready for Pickup',
+    'out_for_delivery': 'Out for Delivery',
+    'completed': 'Completed',
+    'delivered': 'Delivered',
+    'cancelled': 'Cancelled',
+    'in_store': 'At Store',
+    'assigned': 'Assigned',
+    'shipped': 'Shipped'
+  };
+  return statusLabels[status] || status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+};
+
 const getStatusIcon = (status: Order['status']) => {
   switch (status) {
     case 'completed': return <CheckCircle className="h-3 w-3" />;
+    case 'delivered': return <CheckCircle className="h-3 w-3" />;
     case 'processing': return <Clock className="h-3 w-3" />;
     case 'pending': return <AlertCircle className="h-3 w-3" />;
     case 'cancelled': return <XCircle className="h-3 w-3" />;
+    case 'in_transit': return <Truck className="h-3 w-3" />;
+    case 'ready_for_transit': return <Package className="h-3 w-3" />;
+    case 'ready_for_pickup': return <CheckCircle className="h-3 w-3" />;
+    case 'out_for_delivery': return <Truck className="h-3 w-3" />;
+    case 'in_store': return <Store className="h-3 w-3" />;
     default: return <AlertCircle className="h-3 w-3" />;
   }
 };
@@ -70,9 +98,15 @@ const getStatusIcon = (status: Order['status']) => {
 const getStatusColor = (status: Order['status']) => {
   switch (status) {
     case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+    case 'delivered': return 'bg-green-100 text-green-800 border-green-200';
     case 'processing': return 'bg-blue-100 text-blue-800 border-blue-200';
     case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
+    case 'in_transit': return 'bg-purple-100 text-purple-800 border-purple-200';
+    case 'ready_for_transit': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+    case 'ready_for_pickup': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    case 'out_for_delivery': return 'bg-orange-100 text-orange-800 border-orange-200';
+    case 'in_store': return 'bg-teal-100 text-teal-800 border-teal-200';
     default: return 'bg-gray-100 text-gray-800 border-gray-200';
   }
 };
@@ -331,7 +365,7 @@ export default React.memo(function OrdersTable({
                   <Badge className={cn("border", getStatusColor(order.status))}>
                     <span className="flex items-center gap-1">
                       {getStatusIcon(order.status)}
-                      <span className="capitalize">{order.status}</span>
+                      <span>{formatStatusDisplay(order.status)}</span>
                     </span>
                   </Badge>
                 </TableCell>

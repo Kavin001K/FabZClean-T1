@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
 import { PlusCircle, User, Calendar as CalendarIcon, Truck, DollarSign, Search, CheckCircle, X, Loader2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
@@ -33,6 +33,10 @@ interface ServiceItem {
   // Allows per‑order price override without mutating the original service price
   priceOverride: number;
   subtotal: number;
+  // Editable service name for this order
+  customName: string;
+  // Note to print on the tag for this service
+  tagNote: string;
 }
 
 export default function CreateOrder() {
@@ -73,6 +77,14 @@ export default function CreateOrder() {
   const [enableGST, setEnableGST] = useState(false);
   const [gstNumber, setGstNumber] = useState('');
   const [panNumber, setPanNumber] = useState('');
+
+  // Fulfillment type (pickup or delivery)
+  const [fulfillmentType, setFulfillmentType] = useState<'pickup' | 'delivery'>('pickup');
+  const [deliveryCharges, setDeliveryCharges] = useState(0);
+  const [deliveryStreet, setDeliveryStreet] = useState('');
+  const [deliveryCity, setDeliveryCity] = useState('');
+  const [deliveryZip, setDeliveryZip] = useState('');
+  const [savedAddresses, setSavedAddresses] = useState<Array<{ street: string, city: string, zip: string, label?: string }>>([]);
 
   // Calculation state
   const [subtotal, setSubtotal] = useState(0);
@@ -135,36 +147,52 @@ export default function CreateOrder() {
 
         // Handle address which could be jsonb or string
         let addressStr = "";
+        const extractedAddresses: Array<{ street: string, city: string, zip: string, label?: string }> = [];
+
         if (customer.address) {
           try {
             const rawAddr = customer.address;
-            // If it's a string, try to parse it first
             const addrObj = typeof rawAddr === 'string' && rawAddr.startsWith('{')
               ? JSON.parse(rawAddr)
               : rawAddr;
 
             if (typeof addrObj === 'object' && addrObj !== null) {
-              // It's an object (or parsed object), look for line1
-              if (addrObj.line1) {
-                addressStr = addrObj.line1;
+              // Check if it's an array of addresses
+              if (Array.isArray(addrObj)) {
+                addrObj.forEach((addr: any, idx: number) => {
+                  extractedAddresses.push({
+                    street: addr.street || addr.line1 || '',
+                    city: addr.city || '',
+                    zip: addr.zip || addr.pincode || '',
+                    label: addr.label || `Address ${idx + 1}`
+                  });
+                });
               } else {
-                // Fallback: stringify the whole object if no line1
-                addressStr = JSON.stringify(addrObj);
+                // Single address object
+                addressStr = addrObj.line1 || addrObj.street || '';
+                extractedAddresses.push({
+                  street: addrObj.street || addrObj.line1 || '',
+                  city: addrObj.city || '',
+                  zip: addrObj.zip || addrObj.pincode || '',
+                  label: 'Primary Address'
+                });
               }
             } else {
-              // It's a simple string
               addressStr = String(addrObj);
+              extractedAddresses.push({ street: addressStr, city: '', zip: '', label: 'Primary Address' });
             }
           } catch (e) {
-            // If parsing fails, use as is
             addressStr = String(customer.address);
+            extractedAddresses.push({ street: addressStr, city: '', zip: '', label: 'Primary Address' });
           }
         }
+
         setCustomerAddress(addressStr);
+        setSavedAddresses(extractedAddresses.filter(a => a.street));
 
         toast({
           title: "Customer Found!",
-          description: `Auto-filled data for ${customer.name}`,
+          description: `Auto-filled data for ${customer.name}${extractedAddresses.length > 0 ? ` (${extractedAddresses.length} saved address${extractedAddresses.length > 1 ? 'es' : ''})` : ''}`,
         });
       } else {
         setFoundCustomer(null);
@@ -345,6 +373,8 @@ export default function CreateOrder() {
         quantity: 1,
         priceOverride: parseFloat(serviceToAdd.price),
         subtotal: parseFloat(serviceToAdd.price),
+        customName: serviceToAdd.name,
+        tagNote: '',
       }]);
     }
   };
@@ -395,6 +425,11 @@ export default function CreateOrder() {
     // Add extra charges
     calculatedTotal += extraCharges;
 
+    // Add delivery charges if applicable
+    if (fulfillmentType === 'delivery') {
+      calculatedTotal += deliveryCharges;
+    }
+
     // Apply GST if enabled (18%)
     if (enableGST) {
       calculatedTotal += calculatedTotal * 0.18;
@@ -402,7 +437,7 @@ export default function CreateOrder() {
 
     // Ensure total is not negative
     setTotalAmount(Math.max(0, calculatedTotal));
-  }, [subtotal, discountType, discountValue, extraCharges, enableGST]);
+  }, [subtotal, discountType, discountValue, extraCharges, enableGST, fulfillmentType, deliveryCharges]);
 
   // Create order mutation
   const createOrderMutation = useMutation({
@@ -453,6 +488,31 @@ export default function CreateOrder() {
         setIsModalOpen(true);
         queryClient.invalidateQueries({ queryKey: ["orders"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
+
+        // Save new delivery address to customer if it's a delivery order with a new address
+        if (fulfillmentType === 'delivery' && deliveryStreet && foundCustomer?.id) {
+          const isNewAddress = !savedAddresses.some(
+            addr => addr.street.toLowerCase() === deliveryStreet.toLowerCase()
+          );
+
+          if (isNewAddress) {
+            try {
+              // Update customer with new address added to their saved addresses
+              const newAddressList = [
+                ...savedAddresses,
+                { street: deliveryStreet, city: deliveryCity, zip: deliveryZip, label: `Delivery Address ${savedAddresses.length + 1}` }
+              ];
+
+              await customersApi.update(foundCustomer.id, {
+                address: newAddressList
+              });
+
+              console.log('✅ Saved new delivery address to customer');
+            } catch (e) {
+              console.warn('Could not save new address:', e);
+            }
+          }
+        }
 
         addNotification({
           type: 'success',
@@ -703,6 +763,15 @@ export default function CreateOrder() {
       ).toFixed(2) : "0.00",
       gstNumber: enableGST ? gstNumber : undefined,
       panNumber: enableGST ? panNumber : undefined,
+      // Fulfillment & Delivery
+      fulfillmentType: fulfillmentType,
+      deliveryCharges: fulfillmentType === 'delivery' ? deliveryCharges.toFixed(2) : "0",
+      deliveryAddress: fulfillmentType === 'delivery' && deliveryStreet ? {
+        street: deliveryStreet,
+        city: deliveryCity || 'Unknown',
+        zip: deliveryZip || '000000',
+        country: 'India'
+      } : undefined,
     };
 
     createOrderMutation.mutate(orderData);
@@ -956,52 +1025,89 @@ export default function CreateOrder() {
                       <TableBody>
                         <AnimatePresence>
                           {selectedServices.map((item) => (
-                            <motion.tr
-                              key={item.service.id}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, x: 20 }}
-                              transition={{ duration: 0.2 }}
-                              className="border-b"
-                            >
-                              <TableCell className="font-medium">{item.service.name}</TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  value={item.quantity}
-                                  onChange={(e) => handleUpdateQuantity(item.service.id, parseInt(e.target.value) || 0)}
-                                  className="w-20"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={item.priceOverride}
-                                  onChange={(e) => {
-                                    const newPrice = parseFloat(e.target.value) || 0;
-                                    const updated = selectedServices.map(s =>
-                                      s.service.id === item.service.id ? { ...s, priceOverride: newPrice, subtotal: s.quantity * newPrice } : s
-                                    );
-                                    setSelectedServices(updated);
-                                  }}
-                                  className="w-24"
-                                />
-                              </TableCell>
-                              <TableCell className="font-semibold">₹{item.subtotal.toFixed(2)}</TableCell>
-                              <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRemoveService(item.service.id)}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </TableCell>
-                            </motion.tr>
+                            <React.Fragment key={item.service.id}>
+                              <motion.tr
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 20 }}
+                                transition={{ duration: 0.2 }}
+                                className="border-b-0"
+                              >
+                                <TableCell className="font-medium">
+                                  <Input
+                                    value={item.customName}
+                                    onChange={(e) => {
+                                      const updated = selectedServices.map(s =>
+                                        s.service.id === item.service.id ? { ...s, customName: e.target.value } : s
+                                      );
+                                      setSelectedServices(updated);
+                                    }}
+                                    className="w-full font-medium"
+                                    placeholder="Service name"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={item.quantity}
+                                    onChange={(e) => handleUpdateQuantity(item.service.id, parseInt(e.target.value) || 0)}
+                                    className="w-20"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={item.priceOverride}
+                                    onChange={(e) => {
+                                      const newPrice = parseFloat(e.target.value) || 0;
+                                      const updated = selectedServices.map(s =>
+                                        s.service.id === item.service.id ? { ...s, priceOverride: newPrice, subtotal: s.quantity * newPrice } : s
+                                      );
+                                      setSelectedServices(updated);
+                                    }}
+                                    className="w-24"
+                                  />
+                                </TableCell>
+                                <TableCell className="font-semibold">₹{item.subtotal.toFixed(2)}</TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoveService(item.service.id)}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </TableCell>
+                              </motion.tr>
+                              {/* Tag Note Row */}
+                              <motion.tr
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="border-b bg-muted/30"
+                              >
+                                <TableCell colSpan={5} className="py-2 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground whitespace-nowrap">Tag Note:</span>
+                                    <Input
+                                      value={item.tagNote}
+                                      onChange={(e) => {
+                                        const updated = selectedServices.map(s =>
+                                          s.service.id === item.service.id ? { ...s, tagNote: e.target.value } : s
+                                        );
+                                        setSelectedServices(updated);
+                                      }}
+                                      className="h-8 text-sm flex-1"
+                                      placeholder="e.g., Delicate fabric, No bleach, Special care..."
+                                    />
+                                  </div>
+                                </TableCell>
+                              </motion.tr>
+                            </React.Fragment>
                           ))}
                         </AnimatePresence>
                       </TableBody>
@@ -1067,6 +1173,166 @@ export default function CreateOrder() {
                     rows={3}
                   />
                 </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Fulfillment Type - Pickup or Delivery */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.35 }}
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Truck className="h-5 w-5 mr-2" />
+                  Fulfillment Type
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Pickup or Delivery Toggle */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    type="button"
+                    variant={fulfillmentType === 'pickup' ? 'default' : 'outline'}
+                    className={cn(
+                      "h-16 flex flex-col gap-1",
+                      fulfillmentType === 'pickup' && "bg-green-600 hover:bg-green-700"
+                    )}
+                    onClick={() => setFulfillmentType('pickup')}
+                  >
+                    <User className="h-5 w-5" />
+                    <span>Self Pickup</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={fulfillmentType === 'delivery' ? 'default' : 'outline'}
+                    className={cn(
+                      "h-16 flex flex-col gap-1",
+                      fulfillmentType === 'delivery' && "bg-blue-600 hover:bg-blue-700"
+                    )}
+                    onClick={() => setFulfillmentType('delivery')}
+                  >
+                    <Truck className="h-5 w-5" />
+                    <span>Home Delivery</span>
+                  </Button>
+                </div>
+
+                {/* Delivery Options - Only show when delivery is selected */}
+                {fulfillmentType === 'delivery' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-4 pt-4 border-t"
+                  >
+                    {/* Delivery Charges */}
+                    <div className="space-y-2">
+                      <Label>Delivery Charges (₹)</Label>
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        value={deliveryCharges || ''}
+                        onChange={(e) => setDeliveryCharges(parseFloat(e.target.value) || 0)}
+                        className="bg-background"
+                      />
+                    </div>
+
+                    {/* Saved Addresses Dropdown */}
+                    {savedAddresses.length > 0 && (
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          Saved Addresses ({savedAddresses.length})
+                        </Label>
+                        <Select
+                          onValueChange={(value) => {
+                            const addr = savedAddresses[parseInt(value)];
+                            if (addr) {
+                              setDeliveryStreet(addr.street);
+                              setDeliveryCity(addr.city);
+                              setDeliveryZip(addr.zip);
+                              toast({
+                                title: "Address Selected",
+                                description: `Using ${addr.label || 'saved address'}`,
+                              });
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="bg-background">
+                            <SelectValue placeholder="Select a saved address..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {savedAddresses.map((addr, idx) => (
+                              <SelectItem key={idx} value={String(idx)}>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{addr.label || `Address ${idx + 1}`}</span>
+                                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                    {addr.street}{addr.city ? `, ${addr.city}` : ''}{addr.zip ? ` - ${addr.zip}` : ''}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {/* Use Registered Address Button */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        setDeliveryStreet(customerAddress);
+                        setDeliveryCity('');
+                        setDeliveryZip('');
+                        toast({
+                          title: "Address Copied",
+                          description: "Customer's registered address used for delivery",
+                        });
+                      }}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Use Customer's Registered Address
+                    </Button>
+
+                    {/* Delivery Address Fields */}
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label>Street / Building / Area</Label>
+                        <Input
+                          placeholder="Enter delivery address"
+                          value={deliveryStreet}
+                          onChange={(e) => setDeliveryStreet(e.target.value)}
+                          className="bg-background"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>City</Label>
+                          <Input
+                            placeholder="City"
+                            value={deliveryCity}
+                            onChange={(e) => setDeliveryCity(e.target.value)}
+                            className="bg-background"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>PIN Code</Label>
+                          <Input
+                            placeholder="000000"
+                            value={deliveryZip}
+                            onChange={(e) => setDeliveryZip(e.target.value)}
+                            className="bg-background"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
               </CardContent>
             </Card>
           </motion.div>

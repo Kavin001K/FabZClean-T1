@@ -18,6 +18,8 @@ import {
   PlusCircle,
   Printer,
   Navigation,
+  Package,
+  Store,
 } from "lucide-react";
 import { formatCurrency, formatDate, getNextStatus } from "@/lib/data-service";
 import type { Order } from "@shared/schema";
@@ -34,12 +36,37 @@ export interface OrderDetailsDialogProps {
   onPrintInvoice: (order: Order) => void;
 }
 
+// Format status for display - converts snake_case to Human Readable
+const formatStatusDisplay = (status: string) => {
+  const statusLabels: Record<string, string> = {
+    'pending': 'Pending',
+    'in_transit': 'In Transit',
+    'processing': 'Processing',
+    'ready_for_transit': 'Ready to Ship',
+    'ready_for_pickup': 'Ready for Pickup',
+    'out_for_delivery': 'Out for Delivery',
+    'completed': 'Completed',
+    'delivered': 'Delivered',
+    'cancelled': 'Cancelled',
+    'in_store': 'At Store',
+    'assigned': 'Assigned',
+    'shipped': 'Shipped'
+  };
+  return statusLabels[status] || status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+};
+
 const getStatusIcon = (status: Order['status']) => {
   switch (status) {
     case 'completed': return <CheckCircle className="h-4 w-4" />;
+    case 'delivered': return <CheckCircle className="h-4 w-4" />;
     case 'processing': return <Clock className="h-4 w-4" />;
     case 'pending': return <AlertCircle className="h-4 w-4" />;
     case 'cancelled': return <XCircle className="h-4 w-4" />;
+    case 'in_transit': return <Navigation className="h-4 w-4" />;
+    case 'ready_for_transit': return <Package className="h-4 w-4" />;
+    case 'ready_for_pickup': return <CheckCircle className="h-4 w-4" />;
+    case 'out_for_delivery': return <Navigation className="h-4 w-4" />;
+    case 'in_store': return <Store className="h-4 w-4" />;
     default: return <AlertCircle className="h-4 w-4" />;
   }
 };
@@ -47,9 +74,15 @@ const getStatusIcon = (status: Order['status']) => {
 const getStatusColor = (status: Order['status']) => {
   switch (status) {
     case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+    case 'delivered': return 'bg-green-100 text-green-800 border-green-200';
     case 'processing': return 'bg-blue-100 text-blue-800 border-blue-200';
     case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
+    case 'in_transit': return 'bg-purple-100 text-purple-800 border-purple-200';
+    case 'ready_for_transit': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+    case 'ready_for_pickup': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    case 'out_for_delivery': return 'bg-orange-100 text-orange-800 border-orange-200';
+    case 'in_store': return 'bg-teal-100 text-teal-800 border-teal-200';
     default: return 'bg-gray-100 text-gray-800 border-gray-200';
   }
 };
@@ -103,14 +136,14 @@ export default React.memo(function OrderDetailsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Order Details: {order.id}
             <Badge className={cn("border", getStatusColor(order.status))}>
               <span className="flex items-center gap-1">
                 {getStatusIcon(order.status)}
-                <span className="capitalize">{order.status}</span>
+                <span>{formatStatusDisplay(order.status)}</span>
               </span>
             </Badge>
           </DialogTitle>
@@ -119,7 +152,7 @@ export default React.memo(function OrderDetailsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="flex-1 overflow-y-auto space-y-6 py-4 pr-2">
           {/* Order Information Grid */}
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-4">
@@ -260,6 +293,43 @@ export default React.memo(function OrderDetailsDialog({
             </div>
           </div>
 
+          {/* Fulfillment Type & Delivery Info */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">Fulfillment Details</p>
+            <div className="p-4 bg-muted/50 rounded-lg">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Fulfillment Type</p>
+                  <Badge className={cn(
+                    "mt-1",
+                    (order as any).fulfillmentType === 'delivery'
+                      ? "bg-blue-100 text-blue-800 border-blue-200"
+                      : "bg-green-100 text-green-800 border-green-200"
+                  )}>
+                    {(order as any).fulfillmentType === 'delivery' ? '🚚 Home Delivery' : '🏪 Self Pickup'}
+                  </Badge>
+                </div>
+                {(order as any).deliveryCharges && parseFloat((order as any).deliveryCharges) > 0 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Delivery Charges</p>
+                    <p className="font-medium">{formatCurrency((order as any).deliveryCharges)}</p>
+                  </div>
+                )}
+              </div>
+              {(order as any).fulfillmentType === 'delivery' && (order as any).deliveryAddress && (
+                <div className="mt-3 pt-3 border-t">
+                  <p className="text-sm text-muted-foreground">Delivery Address</p>
+                  <p className="font-medium mt-1">
+                    {typeof (order as any).deliveryAddress === 'object'
+                      ? `${(order as any).deliveryAddress.street || ''}${(order as any).deliveryAddress.city ? `, ${(order as any).deliveryAddress.city}` : ''}${(order as any).deliveryAddress.zip ? ` - ${(order as any).deliveryAddress.zip}` : ''}`
+                      : (order as any).deliveryAddress
+                    }
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Notes */}
           {(order as any).notes && (
             <div className="space-y-2">
@@ -297,13 +367,36 @@ export default React.memo(function OrderDetailsDialog({
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2 pt-4 border-t">
+            {/* Payment Warning for completion */}
+            {(order.status === 'ready_for_pickup' || order.status === 'out_for_delivery') &&
+              (order as any).paymentStatus !== 'paid' && (
+                <div className="w-full p-3 bg-amber-50 border border-amber-200 rounded-lg mb-2 dark:bg-amber-900/20 dark:border-amber-800">
+                  <p className="text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <strong>Payment Required:</strong> Order must be marked as "Paid" before it can be completed or delivered.
+                  </p>
+                </div>
+              )}
+
+            {/* Next Step Button with context-aware label */}
             {nextStatus && (
               <Button
                 onClick={() => onNextStep(order)}
                 className="gap-2"
+                disabled={
+                  (nextStatus === 'completed' || nextStatus === 'delivered') &&
+                  (order as any).paymentStatus !== 'paid'
+                }
               >
                 <PlusCircle className="h-4 w-4" />
-                Next Step: {nextStatus}
+                {order.status === 'ready_for_pickup' && (order as any).fulfillmentType === 'delivery'
+                  ? 'Start Delivery'
+                  : order.status === 'ready_for_pickup'
+                    ? 'Hand Over to Customer'
+                    : order.status === 'out_for_delivery'
+                      ? 'Mark as Delivered'
+                      : `Move to ${nextStatus.replace(/_/g, ' ')}`
+                }
               </Button>
             )}
 
@@ -325,7 +418,7 @@ export default React.memo(function OrderDetailsDialog({
               Print Invoice
             </Button>
 
-            {order.status !== 'completed' && order.status !== 'cancelled' && (
+            {order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'delivered' && (
               <Button
                 variant="outline"
                 onClick={() => onCancel(order)}

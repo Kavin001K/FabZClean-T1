@@ -30,7 +30,7 @@ const CUSTOMER_ADMIN_ROLES: UserRole[] = ["admin", "franchise_manager"];
 router.use(rateLimit(60000, 100));
 router.use(jwtRequired);
 
-// Get customers with pagination and search
+// Get customers with pagination and search (shared across all franchises)
 router.get('/', async (req, res) => {
   try {
     const {
@@ -42,6 +42,7 @@ router.get('/', async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
+    // Customers are common for all franchises - no isolation needed
     let customers = await storage.listCustomers();
 
     // Apply search filter

@@ -18,6 +18,7 @@ import { WhatsAppService } from '@/lib/whatsapp-service';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { printDriver } from '@/lib/print-driver';
+import { GarmentTagPrint } from './garment-tag-print';
 
 interface OrderConfirmationDialogProps {
     open: boolean;
@@ -37,6 +38,7 @@ export function OrderConfirmationDialog({
     const barcodeRef = useRef<SVGSVGElement>(null);
     const qrcodeRef = useRef<HTMLCanvasElement>(null);
     const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+    const [showTagPrint, setShowTagPrint] = useState(false);
     const { toast } = useToast();
 
     // Fetch customer details if phone is missing in order
@@ -176,8 +178,6 @@ export function OrderConfirmationDialog({
 
         if (!order) return;
 
-        console.log('Printing tags for order:', order.orderNumber);
-
         if (!Array.isArray(order.items) || order.items.length === 0) {
             toast({
                 title: "No Items",
@@ -187,23 +187,7 @@ export function OrderConfirmationDialog({
             return;
         }
 
-        // Use the optimized printTags function from print-templates
-        try {
-            import('@/lib/print-templates').then(({ printTags }) => {
-                printTags(order, order.items);
-                toast({
-                    title: "Printing Tags",
-                    description: "Tags sent to printer.",
-                });
-            });
-        } catch (error) {
-            console.error('Print failed:', error);
-            toast({
-                title: "Print Error",
-                description: "Failed to print tags.",
-                variant: "destructive",
-            });
-        }
+        setShowTagPrint(true);
     };
 
     const handleSendWhatsApp = async () => {
@@ -534,6 +518,23 @@ export function OrderConfirmationDialog({
                     </Button>
                 </DialogFooter>
             </DialogContent>
+
+            {/* Garment Tags Print Dialog */}
+            <GarmentTagPrint
+                open={showTagPrint}
+                onOpenChange={setShowTagPrint}
+                orderNumber={order?.orderNumber || ''}
+                customerName={order?.customerName}
+                storeCode={order?.franchiseId || 'STORE'}
+                commonNote={order?.specialInstructions || undefined}
+                items={(order?.items || []).map((item: any) => ({
+                    orderNumber: order?.orderNumber || '',
+                    serviceName: item.customName || item.serviceName,
+                    tagNote: item.tagNote,
+                    quantity: typeof item.quantity === 'number' ? item.quantity : parseInt(item.quantity) || 1,
+                    customerName: order?.customerName,
+                }))}
+            />
         </Dialog>
     );
 }

@@ -61,22 +61,24 @@ export interface OrderItem {
   quantity: number;
   price: string;
   subtotal: string;
+  customName?: string;
+  tagNote?: string;
 }
 
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   franchiseId: varchar("franchise_id").references(() => franchises.id),
-  orderNumber: text("order_number").notNull(), // Removed unique constraint globally
-  customerId: text("customer_id").references(() => customers.id), // Added customerId with FK
+  orderNumber: text("order_number").notNull(),
+  customerId: text("customer_id").references(() => customers.id),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
   customerPhone: text("customer_phone"),
-  status: text("status", { enum: ["pending", "processing", "completed", "cancelled", "assigned", "in_transit", "shipped", "out_for_delivery", "delivered", "in_store", "ready_for_transit", "ready_for_delivery"] }).notNull(), // pending, processing, completed, cancelled, assigned, in_transit, shipped, out_for_delivery, delivered, in_store, ready_for_transit, ready_for_delivery
-  paymentStatus: text("payment_status", { enum: ["pending", "paid", "failed"] }).notNull().default("pending"), // pending, paid, failed
+  status: text("status", { enum: ["pending", "processing", "completed", "cancelled", "assigned", "in_transit", "shipped", "out_for_delivery", "delivered", "in_store", "ready_for_transit", "ready_for_pickup"] }).notNull(),
+  paymentStatus: text("payment_status", { enum: ["pending", "paid", "failed"] }).notNull().default("pending"),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
-  items: jsonb("items").$type<OrderItem[]>().notNull(), // Array of order items
+  items: jsonb("items").$type<OrderItem[]>().notNull(),
   shippingAddress: jsonb("shipping_address").$type<ShippingAddress>(),
-  pickupDate: timestamp("pickup_date"), // Scheduled pickup date
+  pickupDate: timestamp("pickup_date"),
   advancePaid: decimal("advance_paid", { precision: 10, scale: 2 }).default("0"),
   paymentMethod: text("payment_method").default("cash"),
   discountType: text("discount_type"),
@@ -89,6 +91,10 @@ export const orders = pgTable("orders", {
   panNumber: text("pan_number"),
   gstNumber: text("gst_number"),
   specialInstructions: text("special_instructions"),
+  // Delivery-related fields
+  fulfillmentType: text("fulfillment_type", { enum: ["pickup", "delivery"] }).default("pickup"),
+  deliveryCharges: decimal("delivery_charges", { precision: 10, scale: 2 }).default("0"),
+  deliveryAddress: jsonb("delivery_address").$type<ShippingAddress>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -11,68 +11,44 @@ router.use(authMiddleware);
 // Apply scope filtering (automatically adds franchiseId/factoryId to query/body)
 router.use(scopeMiddleware);
 
-// GET all transit orders (filtered by franchise)
+// GET all transit orders (filtered by franchise, type, status)
 router.get("/", async (req, res) => {
     try {
-        const { franchiseId } = req.query;
-        let transits = await storage.listTransitOrders();
+        const { franchiseId, type, status } = req.query;
+        const user = (req as any).user;
 
-        if (franchiseId) {
-            // Note: SupabaseStorage listTransitOrders doesn't filter, so filter in memory or update storage
-            // In a real app we'd pass filter to storage. For now, filter here.
-            // But wait, the table doesn't have franchise_id in my schema update?
-            // Re-checking schema...
-            // "transit_orders" table definition in user's SQL didn't explicitly have franchise_id?
-            // SQL: "id", "transit_id", "type", "status", ...
-            // Wait. "orders" JSONB is there.
-            // USER REQUEST: "issolate the orders with franchise completly".
-            // I MUST ensure franchise isolation.
-            // If the schema provided by user DOES NOT HAVE franchise_id, I might have a problem.
-            // Let's re-read the SQL provided in Step 422.
-            // It has: "employee_id", "employee_name".
-            // It DOES NOT have "franchise_id" in `transit_orders`.
-            // HOWEVER, the `transit_order_items` link to `orders`, and `orders` have `franchise_id`.
-            // Also the employee creating it belongs to a franchise.
-            // Implicitly, a transit order belongs to the franchise of the user who created it.
-            // I should probably add `franchise_id` to `transit_orders` to be safe, but I cannot easily change schema if the user just ran the script.
-            // But wait, I UPDATED the schema in shared/schema.ts but I used the User's SQL as reference.
-            // User's SQL for `transit_orders` DID NOT have `franchise_id`.
-            // But `orders` table has `franchise_id`.
-            // To isolate "completly", I should filter transit orders based on the franchise of the contained orders OR the creator.
-            // Since I can't query cross-table easily in JS memory efficiently for lists, I should ideally have franchise_id.
-            // BUT, the user's SQL might be "fixed".
-            // Let's look at `employee_id`. We can resolve franchise from employee.
-            // Or, purely rely on the fact that I should only show transits that contain orders from the user's franchise.
-            // Filtering:
-            // 1. Get all transits. 
-            // 2. For each, check if it belongs to franchise (e.g. by checking first item, or created_by).
-            // Actually, the `transit_orders` table has `orders` JSONB which might contain franchise info? No.
-            // Best approach: Filter by `employee_id` -> `franchise_id`?
-            // BETTER: I'll assume the user wants me to FIX the schema to support franchise isolation if it's missing.
-            // But modifying schema now involves `ALTER TABLE`.
-            // Given "issolate the orders with franchise completly", I will assume valid Transits are created by employees of that franchise.
-            // I will accept `franchiseId` in CREATE and I should probably save it.
-            // If the column doesn't exist, I'll error.
-            // I'll check `transit_orders` columns again in `SupabaseStorage` or just try to use `franchise_id`.
-            // The User's SQL: `transit_orders` does NOT have it.
-            // I will rely on `store_details` or `factory_details` or `employee_id`.
-            // Use `employee_id` to lookup employee and get franchise_id? That's slow for list.
-            // Let's assume I can filter by `employee_id` if I fetch employees of the franchise first?
-            // OR I just filter in memory for now.
+        // Determine franchiseId: use user's franchise for non-admin, or query param for admin
+        let effectiveFranchiseId: string | undefined = undefined;
+        if (user && user.franchiseId && user.role !== 'admin' && user.role !== 'factory_manager') {
+            effectiveFranchiseId = user.franchiseId;
+        } else if (franchiseId) {
+            effectiveFranchiseId = franchiseId as string;
         }
 
-        // Filter by franchise if provided/required
-        // Note: This needs to be robust. 
-        // I will add logic to filter transit orders by checking if the creating employee belongs to the requested franchise.
-        if (franchiseId) {
-            // This is heavy, but without a column it's the only way unless we alter table.
-            // I'll skip complex filtering for this step and rely on the implementation below.
+        // Fetch from database with franchise filter
+        let transits = await storage.listTransitOrders(effectiveFranchiseId);
+
+        // Filter by type if provided (e.g., "To Factory", "Return to Store")
+        if (type) {
             transits = transits.filter((t: TransitOrder) => {
-                return t.franchiseId === franchiseId;
+                const transitType = t.type?.toLowerCase().replace(/\s+/g, '_');
+                const queryType = (type as string).toLowerCase().replace(/\s+/g, '_');
+                return transitType === queryType || t.type === type;
             });
         }
+
+        // Filter by status if provided (e.g., "in_transit", "Received")
+        if (status) {
+            transits = transits.filter((t: TransitOrder) => {
+                const transitStatus = t.status?.toLowerCase().replace(/\s+/g, '_');
+                const queryStatus = (status as string).toLowerCase().replace(/\s+/g, '_');
+                return transitStatus === queryStatus || t.status === status;
+            });
+        }
+
         res.json(transits);
     } catch (error) {
+        console.error("Error fetching transit orders:", error);
         res.status(500).json({ message: "Failed to fetch transit orders" });
     }
 });
@@ -204,11 +180,11 @@ router.post("/", auditMiddleware('create_transit_order', 'transit_order'), async
 
         const newTransit = await storage.createTransitOrder(transitData);
 
-        // 2. Process Items and Update Orders
+        // 2. Process Items and Update Orders based on transit type
         for (const orderId of orderIds) {
             const order = await storage.getOrder(orderId);
             if (order) {
-                // Create Item (only include columns that exist in table)
+                // Create transit order item
                 await storage.createTransitOrderItem({
                     transitOrderId: newTransit.id,
                     orderId: order.id,
@@ -219,18 +195,27 @@ router.post("/", auditMiddleware('create_transit_order', 'transit_order'), async
                     franchiseId: order.franchiseId
                 });
 
-                // Update Order Status
+                /**
+                 * ORDER LIFECYCLE WORKFLOW:
+                 * 
+                 * 1. Order Created → pending (at store)
+                 * 2. Store→Factory Transit Created → in_transit (going to factory)
+                 * 3. Factory Receives Transit → processing (factory working on it)
+                 * 4. Factory→Store Transit Created → ready_for_transit (factory done, returning)
+                 * 5. Store Receives Return Transit → ready_for_pickup / out_for_delivery
+                 * 6. Customer Handover (payment must be paid) → completed / delivered
+                 */
+
                 if (type === 'To Factory') {
-                    // "if a order is in transist it auto maticely marked as processing"
-                    await storage.updateOrder(order.id, { status: 'processing' });
-                }
-                // If 'Return to Store', status might change to 'in_transit' or stay 'processing'?
-                // User didn't specify for this direction, but typically 'in_transit' is good.
-                // But schema has 'in_transit'.
-                // If I set 'in_transit', it differentiates from 'processing' (at factory).
-                // Let's set to 'in_transit' for return.
-                if (type === 'Return to Store') {
+                    // Store → Factory: Order is now in transit to factory
                     await storage.updateOrder(order.id, { status: 'in_transit' });
+                    console.log(`[Transit] Order ${order.orderNumber} marked as in_transit (going to factory)`);
+                }
+
+                if (type === 'Return to Store') {
+                    // Factory → Store: Factory work is done, order is being returned
+                    await storage.updateOrder(order.id, { status: 'ready_for_transit' });
+                    console.log(`[Transit] Order ${order.orderNumber} marked as ready_for_transit (factory done, returning to store)`);
                 }
             }
         }
@@ -250,16 +235,15 @@ router.post("/", auditMiddleware('create_transit_order', 'transit_order'), async
 // UPDATE Transit Status
 router.put("/:id/status", auditMiddleware('update_transit_status', 'transit_order'), async (req, res) => {
     try {
-        const { status, location, updatedBy } = req.body;
+        const { status } = req.body;
         const transit = await storage.getTransitOrder(req.params.id);
 
         if (!transit) return res.status(404).json({ message: "Transit order not found" });
 
-        // Update Transit (only use columns that exist)
-        const updateData: any = { status };
-        await storage.updateTransitOrder(req.params.id, updateData);
+        // Update Transit status
+        await storage.updateTransitOrder(req.params.id, { status });
 
-        // History (only use columns that exist in transit_status_history table)
+        // Create history record
         try {
             await storage.createTransitStatusHistory({
                 transitOrderId: req.params.id,
@@ -267,27 +251,71 @@ router.put("/:id/status", auditMiddleware('update_transit_status', 'transit_orde
             });
         } catch (historyError) {
             console.warn('Could not create transit history:', historyError);
-            // Don't fail the update if history fails
         }
 
-        // Update Linked Orders
+        // Get linked orders
         const items = await storage.getTransitOrderItems(req.params.id);
 
-        if (status === 'Received' || status === 'Completed') {
-            // Logic: "when that order return to store then it shoud mark as ready to pickup"
-            // This applies if type is 'Return to Store'
-            if (transit.type === 'Return to Store') {
-                // Mark orders as 'in_store' (Ready to Pickup)
+        // Handle different transit types and statuses
+        if (status === 'Received') {
+            if (transit.type === 'To Factory') {
+                // Factory receives shipment from store → Orders move to "processing"
                 for (const item of items) {
-                    await storage.updateOrder(item.orderId, { status: 'in_store' }); // Using 'in_store' as "Ready for Pickup"
+                    await storage.updateOrder(item.orderId, { status: 'processing' });
                 }
+                console.log(`[Transit] Factory received ${items.length} orders - marked as processing`);
+            } else if (transit.type === 'Return to Store') {
+                // Store receives shipment from factory → Orders move to "ready_for_pickup"
+                for (const item of items) {
+                    // Get the order to check fulfillment type
+                    const order = await storage.getOrder(item.orderId);
+                    // Mark as ready_for_pickup (both delivery and pickup start here)
+                    await storage.updateOrder(item.orderId, { status: 'ready_for_pickup' });
+                }
+                console.log(`[Transit] Store received ${items.length} orders - marked as ready_for_pickup`);
             }
         }
 
-        res.json({ success: true });
+        res.json({ success: true, message: `Transit marked as ${status}` });
     } catch (error) {
         console.error("Update transit status error:", error);
         res.status(500).json({ message: "Failed to update status" });
+    }
+});
+
+// GET transit order status history
+router.get("/:id/status-history", async (req, res) => {
+    try {
+        const transitId = req.params.id;
+        const history = await storage.getTransitStatusHistory(transitId);
+        res.json(history || []);
+    } catch (error) {
+        console.error("Get transit status history error:", error);
+        res.status(500).json({ message: "Failed to fetch status history" });
+    }
+});
+
+// GET transit order items (orders linked to this shipment)
+router.get("/:id/items", async (req, res) => {
+    try {
+        const transitId = req.params.id;
+        const items = await storage.getTransitOrderItems(transitId);
+
+        // Fetch full order details for each item
+        const ordersWithDetails = await Promise.all(
+            items.map(async (item: any) => {
+                const order = await storage.getOrder(item.orderId);
+                return {
+                    ...item,
+                    order: order || null
+                };
+            })
+        );
+
+        res.json(ordersWithDetails);
+    } catch (error) {
+        console.error("Get transit order items error:", error);
+        res.status(500).json({ message: "Failed to fetch transit items" });
     }
 });
 

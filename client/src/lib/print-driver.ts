@@ -262,7 +262,10 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
 
   // Parse customer address - always return human-readable text, never JSON
   let customerAddress = 'Address not provided';
-  const rawAddress = order.shippingAddress || order.address || order.customerAddress;
+  // Use delivery address if fulfillment type is delivery, otherwise fallback to standard address fields
+  const rawAddress = (order.fulfillmentType === 'delivery' && order.deliveryAddress)
+    ? order.deliveryAddress
+    : (order.shippingAddress || order.address || order.customerAddress);
 
   if (rawAddress) {
     if (typeof rawAddress === 'string') {
@@ -321,6 +324,19 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
     items.push({
       name: 'Extra Charges',
       description: 'Additional fees',
+      quantity: 1,
+      unitPrice: charge,
+      total: charge,
+      taxRate: enableGST ? 18 : 0
+    });
+  }
+
+  // Add Delivery Charges
+  if (order.deliveryCharges && parseFloat(String(order.deliveryCharges)) > 0) {
+    const charge = parseFloat(String(order.deliveryCharges));
+    items.push({
+      name: 'Delivery Charges',
+      description: 'Fee for home delivery',
       quantity: 1,
       unitPrice: charge,
       total: charge,

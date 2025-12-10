@@ -132,6 +132,48 @@ export function generateOrderNumber(franchiseId?: string | null): string {
 }
 
 /**
+ * Generate a unique transit ID
+ * Format: TR-BRANCHCODE-TIMESTAMP (e.g., TR-POL-1765335084330)
+ */
+export function generateTransitId(franchiseId?: string | null): string {
+    const franchise = getFranchiseById(franchiseId);
+    const branchCode = franchise.branchCode;
+    return `TR-${branchCode}-${Date.now()}`;
+}
+
+/**
+ * Generate a unique item barcode for garment tags
+ * Format: ORDERNUM-ITEMINDEX-RANDOM (e.g., POL-20251209-0001-01-A3B2)
+ * This ensures each physical garment has a unique trackable code
+ */
+export function generateItemBarcode(orderNumber: string, itemIndex: number): string {
+    const paddedIndex = String(itemIndex + 1).padStart(2, '0');
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `${orderNumber}-${paddedIndex}-${randomSuffix}`;
+}
+
+/**
+ * Generate a unique service code
+ * Format: SVC-BRANCHCODE-XXXX (e.g., SVC-POL-0001)
+ */
+export function generateServiceCode(franchiseId?: string | null): string {
+    const franchise = getFranchiseById(franchiseId);
+    const branchCode = franchise.branchCode;
+    const random = Math.floor(Math.random() * 9000 + 1000);
+    return `SVC-${branchCode}-${random}`;
+}
+
+/**
+ * Generate a unique customer ID
+ * Format: CUS-BRANCHCODE-TIMESTAMP (e.g., CUS-POL-1765335084330)
+ */
+export function generateCustomerId(franchiseId?: string | null): string {
+    const franchise = getFranchiseById(franchiseId);
+    const branchCode = franchise.branchCode;
+    return `CUS-${branchCode}-${Date.now()}`;
+}
+
+/**
  * Get formatted address for display
  */
 export function getFormattedAddress(franchise: FranchiseBranchInfo): string {

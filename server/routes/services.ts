@@ -3,9 +3,10 @@ import { db } from '../db';
 
 const router = express.Router();
 
-// GET all services
+// GET all services (shared across all franchises)
 router.get('/', async (req, res) => {
     try {
+        // Services are common for all franchises - no isolation needed
         const services = await db.getServices();
         // Return array directly for frontend compatibility
         res.json(services);
