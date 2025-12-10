@@ -134,6 +134,20 @@ router.get("/eligible", async (req, res) => {
             console.log(`[Transit] Sample order status: "${franchiseOrders[0].status}" (type: ${typeof franchiseOrders[0].status})`);
         }
 
+        // Sort eligible orders: Express orders first, then by due date for fast transit
+        eligibleOrders.sort((a: Order, b: Order) => {
+            const aIsExpress = (a as any).isExpressOrder || (a as any).is_express_order || (a as any).priority === 'high';
+            const bIsExpress = (b as any).isExpressOrder || (b as any).is_express_order || (b as any).priority === 'high';
+
+            if (aIsExpress && !bIsExpress) return -1;
+            if (!aIsExpress && bIsExpress) return 1;
+
+            // Then by due date
+            const dateA = a.pickupDate ? new Date(a.pickupDate).getTime() : Infinity;
+            const dateB = b.pickupDate ? new Date(b.pickupDate).getTime() : Infinity;
+            return dateA - dateB;
+        });
+
         console.log(`[Transit] Final eligible orders: ${eligibleOrders.length}`);
         res.json(eligibleOrders);
     } catch (error) {

@@ -8,7 +8,8 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Printer, MessageCircle, FileText, Tag, Loader2, CheckCircle2, QrCode } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle, Printer, MessageCircle, FileText, Tag, Loader2, CheckCircle2, QrCode, Zap } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 // @ts-ignore
 import QRCode from 'qrcode';
@@ -429,6 +430,15 @@ export function OrderConfirmationDialog({
                         <DialogDescription className="text-sm text-gray-500">
                             Order <span className="font-mono font-bold text-emerald-600">#{order.orderNumber}</span> has been created.
                         </DialogDescription>
+                        {/* Express Order Badge */}
+                        {((order as any)?.isExpressOrder || (order as any)?.is_express_order) && (
+                            <div className="flex justify-center pt-2">
+                                <Badge className="bg-orange-500 text-white animate-pulse gap-1">
+                                    <Zap className="h-3 w-3" />
+                                    EXPRESS ORDER - PRIORITY
+                                </Badge>
+                            </div>
+                        )}
                     </div>
                 </DialogHeader>
 
@@ -526,11 +536,13 @@ export function OrderConfirmationDialog({
                 orderNumber={order?.orderNumber || ''}
                 customerName={order?.customerName}
                 storeCode={order?.franchiseId || 'STORE'}
-                commonNote={order?.specialInstructions || undefined}
+                commonNote={(order as any)?.specialInstructions || (order as any)?.special_instructions || undefined}
+                isExpressOrder={(order as any)?.isExpressOrder || (order as any)?.is_express_order || false}
+                dueDate={order?.pickupDate ? String(order.pickupDate) : (order as any)?.dueDate ? String((order as any).dueDate) : undefined}
                 items={(order?.items || []).map((item: any) => ({
                     orderNumber: order?.orderNumber || '',
-                    serviceName: item.customName || item.serviceName,
-                    tagNote: item.tagNote,
+                    serviceName: item.customName || item.serviceName || item.service_name || 'Unknown Service',
+                    tagNote: item.tagNote || item.tag_note,
                     quantity: typeof item.quantity === 'number' ? item.quantity : parseInt(item.quantity) || 1,
                     customerName: order?.customerName,
                 }))}

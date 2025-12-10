@@ -38,14 +38,14 @@ export function registerAllRoutes(app: Express): void {
     try {
       const { type, date } = req.query;
 
-      // Enforce franchise isolation
-      const user = (req as any).user;
+      // Enforce franchise isolation - use req.employee from auth middleware
+      const employee = (req as any).employee;
       let franchiseId = undefined;
 
-      if (user && user.role !== 'admin') {
-        franchiseId = user.franchiseId;
-      } else if (user && user.role === 'admin' && req.query.franchiseId) {
-        franchiseId = req.query.franchiseId as string;
+      if (employee && employee.role !== 'admin' && employee.role !== 'factory_manager') {
+        franchiseId = employee.franchiseId;
+      } else if (employee && (employee.role === 'admin' || employee.role === 'factory_manager') && req.query.franchiseId) {
+        franchiseId = req.query.franchiseId === 'all' ? undefined : req.query.franchiseId as string;
       }
 
       // Pass franchiseId to listOrders to filter at source (efficient)

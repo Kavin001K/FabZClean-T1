@@ -28,8 +28,16 @@ router.get('/suggestions', async (req: Request, res: Response) => {
             );
         }
 
-        // Sort by due date (priority) - orders due sooner come first
+        // Sort by: 1) Express orders first (priority), 2) Due date (orders due sooner come first)
         suggestions.sort((a: any, b: any) => {
+            // Express/Priority orders always come first
+            const aIsExpress = a.isExpressOrder || a.is_express_order || a.priority === 'high' || a.priority === 'urgent';
+            const bIsExpress = b.isExpressOrder || b.is_express_order || b.priority === 'high' || b.priority === 'urgent';
+
+            if (aIsExpress && !bIsExpress) return -1;
+            if (!aIsExpress && bIsExpress) return 1;
+
+            // Then sort by due date
             const dateA = a.pickupDate ? new Date(a.pickupDate).getTime() : 0;
             const dateB = b.pickupDate ? new Date(b.pickupDate).getTime() : 0;
 

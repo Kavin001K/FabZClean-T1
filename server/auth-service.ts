@@ -30,7 +30,7 @@ export interface EmployeeJWTPayload {
     id: string; // Add UUID
     employeeId: string;
     username: string;
-    role: 'admin' | 'franchise_manager' | 'factory_manager';
+    role: 'admin' | 'franchise_manager' | 'factory_manager' | 'employee' | 'staff' | 'driver' | 'manager';
     franchiseId?: string;
     factoryId?: string;
 }
@@ -39,7 +39,7 @@ export interface AuthEmployee {
     id: string;
     employeeId: string;
     username: string;
-    role: 'admin' | 'franchise_manager' | 'factory_manager';
+    role: 'admin' | 'franchise_manager' | 'factory_manager' | 'employee' | 'staff' | 'driver' | 'manager';
     franchiseId?: string;
     factoryId?: string;
     fullName?: string;
@@ -67,20 +67,47 @@ export class AuthService {
     static async login(username: string, password: string, ipAddress?: string): Promise<{ token: string; employee: AuthEmployee }> {
         console.log(`🔐 Attempting login for: ${username}`);
 
-        // 1. Try Local Storage (SQLite) first (Keep existing logic if needed, or simplify)
+        // 1. Try Local Storage (SQLite) first
         try {
             const localEmployee = await storage.getEmployeeByEmail(username) as any;
             if (localEmployee && localEmployee.password) {
-                // ... existing local auth logic can remain or be skipped if we trust supabase primarily ...
-                // For now, let's keep the focus on Supabase fix as requested.
+                const isValidLocal = await bcrypt.compare(password, localEmployee.password);
+                if (isValidLocal && localEmployee.status === 'active') {
+                    let normalizedRole = localEmployee.role;
+                    if (normalizedRole === 'manager') normalizedRole = 'franchise_manager';
+
+                    const payload: EmployeeJWTPayload = {
+                        id: localEmployee.id,
+                        employeeId: localEmployee.employee_id || localEmployee.employeeId,
+                        username: localEmployee.email || localEmployee.employee_id,
+                        role: normalizedRole as any,
+                        franchiseId: localEmployee.franchise_id || localEmployee.franchiseId,
+                        factoryId: localEmployee.factory_id || localEmployee.factoryId,
+                    };
+                    const token = jwt.sign(payload, FINAL_SECRET, { expiresIn: JWT_EXPIRY });
+
+                    const employee: AuthEmployee = {
+                        id: localEmployee.id,
+                        employeeId: localEmployee.employee_id || localEmployee.employeeId,
+                        username: localEmployee.employee_id || localEmployee.employeeId,
+                        role: normalizedRole as any,
+                        franchiseId: localEmployee.franchise_id || localEmployee.franchiseId,
+                        factoryId: localEmployee.factory_id || localEmployee.factoryId,
+                        fullName: `${localEmployee.first_name || ''} ${localEmployee.last_name || ''}`.trim() || localEmployee.fullName,
+                        email: localEmployee.email,
+                        phone: localEmployee.phone,
+                        isActive: localEmployee.status === 'active',
+                    };
+                    console.log(`✅ Login successful (local) for: ${username}`);
+                    return { token, employee };
+                }
             }
         } catch (err) {
-            // Ignore
+            // Ignore local errors, continue to Supabase
         }
 
-        // 2. Supabase Auth (Fixed for 'employees' table)
+        // 2. Try Supabase 'employees' table
         try {
-            // Fetch employee by employee_id or email
             const { data: employees, error } = await supabase
                 .from('employees')
                 .select('*')
@@ -88,75 +115,112 @@ export class AuthService {
 
             const emp = employees?.[0];
 
-            if (error || !emp) {
-                console.warn(`❌ Login failed: User not found for ${username}`);
-                throw new Error('Invalid username or password');
+            if (!error && emp && emp.status === 'active' && emp.password) {
+                const isValidPassword = await bcrypt.compare(password, emp.password);
+                if (isValidPassword) {
+                    await this.logAction(emp.id, emp.employee_id, 'login', null, null, { email: emp.email }, ipAddress, undefined, emp.franchise_id);
+
+                    let normalizedRole = emp.role;
+                    if (emp.role === 'manager') normalizedRole = 'franchise_manager';
+
+                    const payload: EmployeeJWTPayload = {
+                        id: emp.id,
+                        employeeId: emp.employee_id,
+                        username: emp.email || emp.employee_id,
+                        role: normalizedRole as any,
+                        franchiseId: emp.franchise_id,
+                        factoryId: emp.factory_id || undefined,
+                    };
+
+                    const token = jwt.sign(payload, FINAL_SECRET, { expiresIn: JWT_EXPIRY });
+
+                    const employee: AuthEmployee = {
+                        id: emp.id,
+                        employeeId: emp.employee_id,
+                        username: emp.employee_id,
+                        role: normalizedRole as any,
+                        franchiseId: emp.franchise_id,
+                        factoryId: emp.factory_id,
+                        fullName: `${emp.first_name} ${emp.last_name}`,
+                        email: emp.email,
+                        phone: emp.phone,
+                        isActive: emp.status === 'active',
+                        position: emp.position,
+                        department: emp.department,
+                        hireDate: emp.hire_date ? new Date(emp.hire_date) : undefined,
+                        baseSalary: emp.salary ? parseFloat(emp.salary) : undefined,
+                    };
+
+                    console.log(`✅ Login successful (employees table) for: ${username}`);
+                    return { token, employee };
+                }
             }
-
-            // Check if account is active
-            if (emp.status !== 'active') {
-                throw new Error('Account is inactive');
-            }
-
-            // Verify password
-            // Note: In new schema, 'password' column holds the hash
-            const isValidPassword = await bcrypt.compare(password, emp.password);
-            if (!isValidPassword) {
-                console.warn(`❌ Login failed: Invalid password for ${username}`);
-                throw new Error('Invalid username or password');
-            }
-
-            // Update last login - 'employees' doesn't have last_login, maybe update 'updated_at' or ignore
-            // await supabase.from('employees').update({ updated_at: new Date() }).eq('id', emp.id);
-
-            // Log login action
-            // FIX: Use emp.id (UUID) and pass franchise_id
-            await this.logAction(emp.id, emp.employee_id, 'login', null, null, { email: emp.email }, ipAddress, undefined, emp.franchise_id);
-
-            // Normalize role for legacy/seed data compatibility
-            let normalizedRole = emp.role;
-            if (emp.role === 'manager') {
-                normalizedRole = 'franchise_manager';
-            }
-
-            // Generate JWT
-            const payload: EmployeeJWTPayload = {
-                id: emp.id,
-                employeeId: emp.employee_id,
-                username: emp.email || emp.employee_id,
-                role: normalizedRole as any,
-                franchiseId: emp.franchise_id,
-                factoryId: emp.factory_id || undefined, // undefined if not present
-            };
-
-            const token = jwt.sign(payload, FINAL_SECRET, { expiresIn: JWT_EXPIRY });
-
-            const employee: AuthEmployee = {
-                id: emp.id,
-                employeeId: emp.employee_id,
-                username: emp.employee_id, // Use employee_id as primary username handle
-                role: normalizedRole as any,
-                franchiseId: emp.franchise_id,
-                factoryId: emp.factory_id, // Might be null
-                fullName: `${emp.first_name} ${emp.last_name}`,
-                email: emp.email,
-                phone: emp.phone,
-                isActive: emp.status === 'active',
-                // Map other HR fields if needed
-                position: emp.position,
-                department: emp.department,
-                hireDate: emp.hire_date ? new Date(emp.hire_date) : undefined,
-                baseSalary: emp.salary ? parseFloat(emp.salary) : undefined,
-            };
-
-            return { token, employee };
         } catch (err: any) {
-            console.error(`Login error: ${err.message}`);
-            try {
-                // Try to log failure if possible (might fail if audit_logs schema mismatch or generic error)
-            } catch (e) { }
-            throw err;
+            console.log(`ℹ️ employees table check failed: ${err.message}`);
         }
+
+        // 3. Try Supabase 'auth_employees' table (for factory managers and other auth users)
+        try {
+            const { data: authEmployees, error } = await supabase
+                .from('auth_employees')
+                .select('*')
+                .or(`employee_id.eq."${username}",email.eq."${username}",username.eq."${username}"`);
+
+            const authEmp = authEmployees?.[0];
+
+            if (!error && authEmp && authEmp.is_active === true) {
+                // Check password_hash column in auth_employees
+                const passwordHash = authEmp.password_hash || authEmp.password;
+                if (passwordHash) {
+                    const isValidPassword = await bcrypt.compare(password, passwordHash);
+                    if (isValidPassword) {
+                        // Log login action
+                        try {
+                            await this.logAction(authEmp.id, authEmp.employee_id, 'login', null, null, { email: authEmp.email }, ipAddress, undefined, authEmp.franchise_id);
+                        } catch (e) {
+                            // Ignore logging errors
+                        }
+
+                        const payload: EmployeeJWTPayload = {
+                            id: authEmp.id,
+                            employeeId: authEmp.employee_id,
+                            username: authEmp.username || authEmp.email || authEmp.employee_id,
+                            role: authEmp.role as any,
+                            franchiseId: authEmp.franchise_id || undefined,
+                            factoryId: authEmp.factory_id || undefined,
+                        };
+
+                        const token = jwt.sign(payload, FINAL_SECRET, { expiresIn: JWT_EXPIRY });
+
+                        const employee: AuthEmployee = {
+                            id: authEmp.id,
+                            employeeId: authEmp.employee_id,
+                            username: authEmp.employee_id,
+                            role: authEmp.role as any,
+                            franchiseId: authEmp.franchise_id,
+                            factoryId: authEmp.factory_id,
+                            fullName: authEmp.full_name || authEmp.username,
+                            email: authEmp.email,
+                            phone: authEmp.phone,
+                            isActive: authEmp.is_active === true,
+                            position: authEmp.position,
+                            department: authEmp.department,
+                            hireDate: authEmp.hire_date ? new Date(authEmp.hire_date) : undefined,
+                            baseSalary: authEmp.base_salary ? parseFloat(authEmp.base_salary) : undefined,
+                        };
+
+                        console.log(`✅ Login successful (auth_employees table) for: ${username}`);
+                        return { token, employee };
+                    }
+                }
+            }
+        } catch (err: any) {
+            console.log(`ℹ️ auth_employees table check failed: ${err.message}`);
+        }
+
+        // All attempts failed
+        console.warn(`❌ Login failed: Invalid credentials for ${username}`);
+        throw new Error('Invalid username or password');
     }
 
     /**
@@ -166,34 +230,62 @@ export class AuthService {
         try {
             const payload = jwt.verify(token, FINAL_SECRET) as EmployeeJWTPayload;
 
-            // Check Supabase 'employees' table
-            const { data: emp, error } = await supabase
-                .from('employees')
-                .select('*') // Select all to get 'id' (UUID) if needed for verification recalculation
-                .eq('employee_id', payload.employeeId)
-                .single();
+            // 1. Try Supabase 'employees' table first
+            try {
+                const { data: emp, error } = await supabase
+                    .from('employees')
+                    .select('*')
+                    .eq('employee_id', payload.employeeId)
+                    .single();
 
-            if (error || !emp || emp.status !== 'active') {
-                // Try local check if supabase failed (fallback)
-                const local = await storage.getEmployee(payload.employeeId); // Assuming payload.employeeId maps to id in local?
-                if (local && local.status === 'active') return payload;
+                if (!error && emp && emp.status === 'active') {
+                    let normalizedRole = emp.role;
+                    if (emp.role === 'manager') normalizedRole = 'franchise_manager';
 
-                throw new Error('Invalid or inactive employee');
+                    return {
+                        ...payload,
+                        id: emp.id,
+                        franchiseId: emp.franchise_id,
+                        factoryId: emp.factory_id,
+                        role: normalizedRole as any
+                    };
+                }
+            } catch (e) {
+                // Continue to auth_employees
             }
 
-            // Normalize role
-            let normalizedRole = emp.role;
-            if (emp.role === 'manager') {
-                normalizedRole = 'franchise_manager';
+            // 2. Try Supabase 'auth_employees' table
+            try {
+                const { data: authEmp, error } = await supabase
+                    .from('auth_employees')
+                    .select('*')
+                    .eq('employee_id', payload.employeeId)
+                    .single();
+
+                if (!error && authEmp && authEmp.is_active === true) {
+                    return {
+                        ...payload,
+                        id: authEmp.id,
+                        franchiseId: authEmp.franchise_id || undefined,
+                        factoryId: authEmp.factory_id || undefined,
+                        role: authEmp.role as any
+                    };
+                }
+            } catch (e) {
+                // Continue to local check
             }
 
-            // Ensure we return the most up-to-date payload, esp. with UUID if missing in old tokens
-            return {
-                ...payload,
-                id: emp.id,
-                franchiseId: emp.franchise_id,
-                role: normalizedRole as any
-            };
+            // 3. Try local storage as final fallback
+            try {
+                const local = await storage.getEmployee(payload.employeeId);
+                if (local && local.status === 'active') {
+                    return payload;
+                }
+            } catch (e) {
+                // All checks failed
+            }
+
+            throw new Error('Invalid or inactive employee');
         } catch (error) {
             throw new Error('Invalid or expired token');
         }
@@ -560,32 +652,98 @@ export class AuthService {
 
     /**
      * Get employee by ID
+     * Checks both 'employees' and 'auth_employees' tables
      */
     static async getEmployee(employeeId: string): Promise<AuthEmployee | null> {
-        const { data: emp, error } = await supabase
-            .from('employees')
-            .select('*')
-            .eq('employee_id', employeeId)
-            .single();
+        // 1. Try Supabase 'employees' table first
+        try {
+            const { data: emp, error } = await supabase
+                .from('employees')
+                .select('*')
+                .eq('employee_id', employeeId)
+                .single();
 
-        if (error || !emp) return null;
+            if (!error && emp) {
+                let normalizedRole = emp.role;
+                if (emp.role === 'manager') normalizedRole = 'franchise_manager';
 
-        return {
-            id: emp.id,
-            employeeId: emp.employee_id,
-            username: emp.employee_id,
-            role: emp.role as any,
-            franchiseId: emp.franchise_id,
-            fullName: `${emp.first_name} ${emp.last_name}`,
-            email: emp.email,
-            phone: emp.phone,
-            isActive: emp.status === 'active',
-            position: emp.position,
-            department: emp.department,
-            hireDate: emp.hire_date ? new Date(emp.hire_date) : undefined,
-            baseSalary: emp.salary ? parseFloat(emp.salary) : 0,
-            address: emp.address ? JSON.stringify(emp.address) : undefined, // simple cast
-        };
+                return {
+                    id: emp.id,
+                    employeeId: emp.employee_id,
+                    username: emp.employee_id,
+                    role: normalizedRole as any,
+                    franchiseId: emp.franchise_id,
+                    factoryId: emp.factory_id,
+                    fullName: `${emp.first_name} ${emp.last_name}`,
+                    email: emp.email,
+                    phone: emp.phone,
+                    isActive: emp.status === 'active',
+                    position: emp.position,
+                    department: emp.department,
+                    hireDate: emp.hire_date ? new Date(emp.hire_date) : undefined,
+                    baseSalary: emp.salary ? parseFloat(emp.salary) : 0,
+                    address: emp.address ? JSON.stringify(emp.address) : undefined,
+                };
+            }
+        } catch (e) {
+            // Continue to auth_employees
+        }
+
+        // 2. Try Supabase 'auth_employees' table
+        try {
+            const { data: authEmp, error } = await supabase
+                .from('auth_employees')
+                .select('*')
+                .eq('employee_id', employeeId)
+                .single();
+
+            if (!error && authEmp && authEmp.is_active === true) {
+                return {
+                    id: authEmp.id,
+                    employeeId: authEmp.employee_id,
+                    username: authEmp.username || authEmp.employee_id,
+                    role: authEmp.role as any,
+                    franchiseId: authEmp.franchise_id,
+                    factoryId: authEmp.factory_id,
+                    fullName: authEmp.full_name || authEmp.username,
+                    email: authEmp.email,
+                    phone: authEmp.phone,
+                    isActive: authEmp.is_active === true,
+                    position: authEmp.position,
+                    department: authEmp.department,
+                    hireDate: authEmp.hire_date ? new Date(authEmp.hire_date) : undefined,
+                    baseSalary: authEmp.base_salary ? parseFloat(authEmp.base_salary) : 0,
+                };
+            }
+        } catch (e) {
+            // Continue to local storage
+        }
+
+        // 3. Try local storage as fallback
+        try {
+            const localEmployee = await storage.getEmployee(employeeId) as any;
+            if (localEmployee && localEmployee.status === 'active') {
+                let normalizedRole = localEmployee.role;
+                if (normalizedRole === 'manager') normalizedRole = 'franchise_manager';
+
+                return {
+                    id: localEmployee.id,
+                    employeeId: localEmployee.employee_id || localEmployee.employeeId,
+                    username: localEmployee.employee_id || localEmployee.employeeId,
+                    role: normalizedRole as any,
+                    franchiseId: localEmployee.franchise_id || localEmployee.franchiseId,
+                    factoryId: localEmployee.factory_id || localEmployee.factoryId,
+                    fullName: `${localEmployee.first_name || ''} ${localEmployee.last_name || ''}`.trim() || localEmployee.fullName,
+                    email: localEmployee.email,
+                    phone: localEmployee.phone,
+                    isActive: localEmployee.status === 'active',
+                };
+            }
+        } catch (e) {
+            // All checks failed
+        }
+
+        return null;
     }
 
     /**

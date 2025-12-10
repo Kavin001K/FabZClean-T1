@@ -13,6 +13,11 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS gst_amount DECIMAL(10, 2) DEFAULT 0.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS pan_number TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS gst_number TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS special_instructions TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS fulfillment_type TEXT DEFAULT 'pickup';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_charges DECIMAL(10, 2) DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_address JSONB;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_express_order BOOLEAN DEFAULT false;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS priority TEXT DEFAULT 'normal';
 
 -- Verify columns were added
 SELECT column_name, data_type 

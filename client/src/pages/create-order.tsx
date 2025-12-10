@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
-import { PlusCircle, User, Calendar as CalendarIcon, Truck, DollarSign, Search, CheckCircle, X, Loader2, AlertCircle } from "lucide-react";
+import { PlusCircle, User, Calendar as CalendarIcon, Truck, DollarSign, Search, CheckCircle, X, Loader2, AlertCircle, History, Package, TrendingUp, Clock, ShoppingBag, Zap } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -78,6 +78,9 @@ export default function CreateOrder() {
   const [gstNumber, setGstNumber] = useState('');
   const [panNumber, setPanNumber] = useState('');
 
+  // Express Order - Priority with 50% extra charge and 2-day delivery
+  const [isExpressOrder, setIsExpressOrder] = useState(false);
+
   // Fulfillment type (pickup or delivery)
   const [fulfillmentType, setFulfillmentType] = useState<'pickup' | 'delivery'>('pickup');
   const [deliveryCharges, setDeliveryCharges] = useState(0);
@@ -123,6 +126,58 @@ export default function CreateOrder() {
   });
 
   const customers = Array.isArray(customersData) ? customersData : [];
+
+  // Fetch customer's order history when a customer is selected
+  const { data: customerOrdersData, isLoading: customerOrdersLoading } = useQuery<Order[]>({
+    queryKey: ["customer-orders", foundCustomer?.id],
+    queryFn: async () => {
+      if (!foundCustomer?.id) return [];
+      const allOrders = await ordersApi.getAll();
+      // Filter orders for this customer
+      return allOrders
+        .filter(order => order.customerId === foundCustomer.id)
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+        .slice(0, 10); // Last 10 orders
+    },
+    enabled: !!foundCustomer?.id,
+  });
+
+  const customerOrders = Array.isArray(customerOrdersData) ? customerOrdersData : [];
+
+  // Calculate customer stats
+  const customerStats = React.useMemo(() => {
+    if (!customerOrders.length) return null;
+
+    const totalSpent = customerOrders.reduce((sum, order) =>
+      sum + parseFloat(order.totalAmount || '0'), 0);
+    const completedOrders = customerOrders.filter(o =>
+      o.status === 'completed' || o.status === 'delivered').length;
+    const avgOrderValue = totalSpent / customerOrders.length;
+
+    // Find most used services
+    const serviceCounts: Record<string, number> = {};
+    customerOrders.forEach(order => {
+      const items = (order.items as any[]) || [];
+      items.forEach(item => {
+        const name = item.serviceName || item.productName || 'Unknown';
+        serviceCounts[name] = (serviceCounts[name] || 0) + item.quantity;
+      });
+    });
+
+    const topServices = Object.entries(serviceCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name]) => name);
+
+    return {
+      totalOrders: customerOrders.length,
+      totalSpent,
+      completedOrders,
+      avgOrderValue,
+      topServices,
+      lastOrderDate: customerOrders[0]?.createdAt,
+    };
+  }, [customerOrders]);
 
   // Customer search by phone
   const handleFetchCustomer = async () => {
@@ -405,22 +460,54 @@ export default function CreateOrder() {
     setSelectedServices(selectedServices.filter(s => s.service.id !== serviceId));
   };
 
-  // Calculate subtotal
-  useEffect(() => {
-    const newSubtotal = selectedServices.reduce((sum, item) => sum + item.subtotal, 0);
-    setSubtotal(newSubtotal);
+  // Calculate base subtotal (without express surcharge - for display purposes)
+  const baseSubtotal = React.useMemo(() => {
+    return selectedServices.reduce((sum, item) => sum + item.subtotal, 0);
   }, [selectedServices]);
+
+  // Calculate express surcharge amount (50% of base subtotal)
+  const expressSurcharge = React.useMemo(() => {
+    return isExpressOrder ? baseSubtotal * 0.5 : 0;
+  }, [baseSubtotal, isExpressOrder]);
+
+  // Calculate subtotal including express surcharge
+  useEffect(() => {
+    setSubtotal(baseSubtotal + expressSurcharge);
+  }, [baseSubtotal, expressSurcharge]);
+
+  // Auto-set due date: 2 days for express, 7 days for regular
+  useEffect(() => {
+    const today = new Date();
+    const daysToAdd = isExpressOrder ? 2 : 7;
+    const dueDate = new Date(today.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+    setPickupDate(dueDate);
+  }, [isExpressOrder]);
+
+  // Calculate discount amount for display
+  const discountAmount = React.useMemo(() => {
+    if (discountType === 'percentage') {
+      return (subtotal * discountValue) / 100;
+    } else if (discountType === 'fixed') {
+      return discountValue;
+    }
+    return 0;
+  }, [subtotal, discountType, discountValue]);
+
+  // Calculate GST amount for display
+  const gstAmount = React.useMemo(() => {
+    if (!enableGST) return 0;
+    const afterDiscount = subtotal - discountAmount;
+    const afterExtra = afterDiscount + extraCharges;
+    const afterDelivery = fulfillmentType === 'delivery' ? afterExtra + deliveryCharges : afterExtra;
+    return afterDelivery * 0.18;
+  }, [enableGST, subtotal, discountAmount, extraCharges, fulfillmentType, deliveryCharges]);
 
   // Calculate total with discounts and charges
   useEffect(() => {
     let calculatedTotal = subtotal;
 
     // Apply discount
-    if (discountType === 'percentage') {
-      calculatedTotal -= (subtotal * discountValue) / 100;
-    } else if (discountType === 'fixed') {
-      calculatedTotal -= discountValue;
-    }
+    calculatedTotal -= discountAmount;
 
     // Add extra charges
     calculatedTotal += extraCharges;
@@ -432,12 +519,12 @@ export default function CreateOrder() {
 
     // Apply GST if enabled (18%)
     if (enableGST) {
-      calculatedTotal += calculatedTotal * 0.18;
+      calculatedTotal += gstAmount;
     }
 
     // Ensure total is not negative
     setTotalAmount(Math.max(0, calculatedTotal));
-  }, [subtotal, discountType, discountValue, extraCharges, enableGST, fulfillmentType, deliveryCharges]);
+  }, [subtotal, discountAmount, extraCharges, enableGST, fulfillmentType, deliveryCharges, gstAmount]);
 
   // Create order mutation
   const createOrderMutation = useMutation({
@@ -482,6 +569,29 @@ export default function CreateOrder() {
           newOrder.customerName = newOrder.customer_name || customerName;
         }
 
+        // 6. Ensure Special Instructions (Order Notes) - critical for tags
+        if (!newOrder.specialInstructions) {
+          newOrder.specialInstructions = newOrder.special_instructions || specialInstructions;
+        }
+
+        // 7. Ensure Express Order flag
+        if (newOrder.isExpressOrder === undefined) {
+          newOrder.isExpressOrder = newOrder.is_express_order || isExpressOrder;
+        }
+
+        // 8. Ensure items have tagNote for garment tags
+        if (newOrder.items && Array.isArray(newOrder.items)) {
+          newOrder.items = newOrder.items.map((item: any, index: number) => {
+            const formItem = selectedServices[index];
+            return {
+              ...item,
+              serviceName: item.serviceName || item.service_name || item.productName || formItem?.service?.name || 'Unknown',
+              customName: item.customName || item.custom_name || formItem?.customName,
+              tagNote: item.tagNote || item.tag_note || formItem?.tagNote || '',
+            };
+          });
+        }
+
         console.log('✅ Normalized Order for Dialog:', newOrder);
 
         setCreatedOrder(newOrder);
@@ -514,17 +624,34 @@ export default function CreateOrder() {
           }
         }
 
+        // Add notification - highlight express orders
+        const isExpress = (newOrder as any).isExpressOrder;
         addNotification({
-          type: 'success',
-          title: 'Order Created Successfully!',
-          message: `Order ${newOrder.orderNumber} has been created for ${newOrder.customerName}`,
+          type: isExpress ? 'warning' : 'success',
+          title: isExpress ? '⚡ EXPRESS Order Created!' : 'Order Created Successfully!',
+          message: isExpress
+            ? `PRIORITY: Order ${newOrder.orderNumber} for ${newOrder.customerName} - 2 day delivery`
+            : `Order ${newOrder.orderNumber} has been created for ${newOrder.customerName}`,
           actionUrl: '/orders',
           actionText: 'View Orders'
         });
 
+        // If express order, add additional priority notification
+        if (isExpress) {
+          addNotification({
+            type: 'warning',
+            title: '🔥 Fast Track Required',
+            message: `Express order ${newOrder.orderNumber} needs priority transit processing`,
+            actionUrl: '/transit-orders',
+            actionText: 'Go to Transit'
+          });
+        }
+
         toast({
-          title: "Order Created Successfully!",
-          description: `Order ${newOrder.orderNumber} has been created and saved.`,
+          title: isExpress ? "⚡ Express Order Created!" : "Order Created Successfully!",
+          description: isExpress
+            ? `Priority order ${newOrder.orderNumber} - 50% surcharge applied, 2-day delivery`
+            : `Order ${newOrder.orderNumber} has been created and saved.`,
         });
 
         // Automatically send WhatsApp notification with PDF
@@ -635,6 +762,13 @@ export default function CreateOrder() {
     setEnableGST(true);
     setGstNumber('');
     setPanNumber('');
+    // Reset express order and fulfillment
+    setIsExpressOrder(false);
+    setFulfillmentType('pickup');
+    setDeliveryCharges(0);
+    setDeliveryStreet('');
+    setDeliveryCity('');
+    setDeliveryZip('');
   };
 
   // Validate phone number
@@ -772,6 +906,9 @@ export default function CreateOrder() {
         zip: deliveryZip || '000000',
         country: 'India'
       } : undefined,
+      // Express/Priority Order
+      isExpressOrder: isExpressOrder,
+      priority: isExpressOrder ? 'high' : 'normal',
     };
 
     createOrderMutation.mutate(orderData);
@@ -810,12 +947,6 @@ export default function CreateOrder() {
       </div>
     );
   }
-
-  const discountAmount = discountType === 'percentage'
-    ? (subtotal * discountValue) / 100
-    : discountType === 'fixed'
-      ? discountValue
-      : 0;
 
   return (
     <div className="p-4 md:p-6 lg:p-8 animate-fade-in">
@@ -1351,6 +1482,40 @@ export default function CreateOrder() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Express Order Toggle - Priority with 50% surcharge */}
+                <div className={cn(
+                  "flex items-center justify-between space-x-2 p-4 rounded-lg border-2 transition-all",
+                  isExpressOrder
+                    ? "border-orange-500 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30"
+                    : "border-dashed border-gray-300 bg-muted/10"
+                )}>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="express-mode" className="text-base font-semibold">
+                        ⚡ Express Order
+                      </Label>
+                      {isExpressOrder && (
+                        <Badge className="bg-orange-500 text-white animate-pulse">
+                          PRIORITY
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {isExpressOrder
+                        ? "🔥 50% surcharge applied • 2-day delivery • Fast tracked transit"
+                        : "Enable for priority processing (+50% charge, 2-day delivery)"
+                      }
+                    </p>
+                  </div>
+                  <Switch
+                    id="express-mode"
+                    checked={isExpressOrder}
+                    onCheckedChange={setIsExpressOrder}
+                    className={isExpressOrder ? "data-[state=checked]:bg-orange-500" : ""}
+                  />
+                </div>
+
+                {/* GST Toggle */}
                 <div className="flex items-center justify-between space-x-2 border p-3 rounded-md bg-muted/20">
                   <div className="space-y-0.5">
                     <Label htmlFor="gst-mode" className="text-base">Enable GST (18%)</Label>
@@ -1536,59 +1701,99 @@ export default function CreateOrder() {
                 </div>
 
                 <div className="border-t pt-4 space-y-2">
+                  {/* Base Subtotal (services only, before express) */}
                   <div className="flex justify-between text-sm">
-                    <span>Subtotal</span>
-                    <span className="font-medium">₹{subtotal.toFixed(2)}</span>
+                    <span>Services Subtotal</span>
+                    <span className="font-medium">₹{baseSubtotal.toFixed(2)}</span>
                   </div>
 
                   <AnimatePresence>
+                    {/* Express Order Surcharge */}
+                    {isExpressOrder && expressSurcharge > 0 && (
+                      <motion.div
+                        key="express-surcharge"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="flex justify-between text-sm text-orange-600 dark:text-orange-400"
+                      >
+                        <span className="flex items-center gap-1">
+                          <Zap className="h-3.5 w-3.5" /> Express Surcharge (50%)
+                        </span>
+                        <span>+₹{expressSurcharge.toFixed(2)}</span>
+                      </motion.div>
+                    )}
+
+                    {/* Discount */}
                     {discountType !== 'none' && discountValue > 0 && (
                       <motion.div
                         key="discount-summary"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="flex justify-between text-sm text-red-600"
+                        className="flex justify-between text-sm text-red-600 dark:text-red-400"
                       >
                         <span>
-                          Discount {discountType === 'percentage' ? `(${discountValue}%)` : ''}
+                          Discount {discountType === 'percentage' ? `(${discountValue}%)` : '(Fixed)'}
                         </span>
                         <span>-₹{discountAmount.toFixed(2)}</span>
                       </motion.div>
                     )}
 
+                    {/* Extra/Custom Charges */}
                     {extraCharges > 0 && (
                       <motion.div
                         key="extra-charges-summary"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="flex justify-between text-sm text-blue-600"
+                        className="flex justify-between text-sm text-blue-600 dark:text-blue-400"
                       >
                         <span>{extraChargesLabel || 'Extra Charges'}</span>
                         <span>+₹{extraCharges.toFixed(2)}</span>
                       </motion.div>
                     )}
 
+                    {/* Delivery Charges */}
+                    {fulfillmentType === 'delivery' && deliveryCharges > 0 && (
+                      <motion.div
+                        key="delivery-charges-summary"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="flex justify-between text-sm text-purple-600 dark:text-purple-400"
+                      >
+                        <span className="flex items-center gap-1">
+                          <Truck className="h-3.5 w-3.5" /> Delivery Charges
+                        </span>
+                        <span>+₹{deliveryCharges.toFixed(2)}</span>
+                      </motion.div>
+                    )}
+
+                    {/* GST */}
                     {enableGST && (
                       <motion.div
                         key="gst-summary"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="flex justify-between text-sm text-amber-600"
+                        className="flex justify-between text-sm text-amber-600 dark:text-amber-400"
                       >
                         <span>GST (18%)</span>
-                        <span>+₹{((subtotal - (discountType === 'percentage' ? (subtotal * discountValue) / 100 : discountType === 'fixed' ? discountValue : 0) + extraCharges) * 0.18).toFixed(2)}</span>
+                        <span>+₹{gstAmount.toFixed(2)}</span>
                       </motion.div>
                     )}
                   </AnimatePresence>
 
+                  {/* Total Amount */}
                   <div className="border-t pt-2 flex justify-between font-bold text-lg">
                     <span>Total Amount</span>
-                    <span>₹{totalAmount.toFixed(2)}</span>
+                    <span className={isExpressOrder ? "text-orange-600 dark:text-orange-400" : ""}>
+                      ₹{totalAmount.toFixed(2)}
+                    </span>
                   </div>
 
+                  {/* Payment Details */}
                   <AnimatePresence>
                     {advancePayment && parseFloat(advancePayment) > 0 && (
                       <motion.div
@@ -1598,17 +1803,14 @@ export default function CreateOrder() {
                         exit={{ opacity: 0, height: 0 }}
                         className="space-y-2 pt-2 border-t"
                       >
-                        <div className="flex justify-between text-sm text-green-600">
-                          <span>Advance Payment</span>
-                          <span>₹{parseFloat(advancePayment || '0').toFixed(2)}</span>
+                        <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                          <span>Advance Paid ({paymentMethod.toUpperCase()})</span>
+                          <span>-₹{parseFloat(advancePayment || '0').toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between font-semibold text-red-600">
+                        <div className="flex justify-between font-semibold text-red-600 dark:text-red-400 text-lg">
                           <span>Balance Due</span>
-                          <span>₹{(totalAmount - parseFloat(advancePayment || '0')).toFixed(2)}</span>
+                          <span>₹{Math.max(0, totalAmount - parseFloat(advancePayment || '0')).toFixed(2)}</span>
                         </div>
-                        <Badge variant="outline" className="w-full justify-center">
-                          {paymentMethod.toUpperCase()}
-                        </Badge>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -1624,6 +1826,156 @@ export default function CreateOrder() {
               </CardContent>
             </Card>
           </motion.div>
+
+          {/* Customer History Section */}
+          <AnimatePresence>
+            {foundCustomer && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3, delay: 0.3 }}
+                className="mt-4"
+              >
+                <Card className="border-2 border-primary/20 bg-gradient-to-br from-background to-primary/5">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <div className="p-1.5 rounded-lg bg-primary/10">
+                        <History className="h-4 w-4 text-primary" />
+                      </div>
+                      Customer History
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {customerOrdersLoading ? (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        <span className="ml-2 text-sm text-muted-foreground">Loading history...</span>
+                      </div>
+                    ) : customerStats ? (
+                      <>
+                        {/* Customer Stats Grid */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 p-3 rounded-lg border border-emerald-200/50 dark:border-emerald-800/50">
+                            <div className="flex items-center gap-2 mb-1">
+                              <ShoppingBag className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                              <span className="text-[10px] uppercase tracking-wider font-medium text-emerald-600 dark:text-emerald-400">Total Orders</span>
+                            </div>
+                            <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">{customerStats.totalOrders}</p>
+                          </div>
+
+                          <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 p-3 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                            <div className="flex items-center gap-2 mb-1">
+                              <TrendingUp className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                              <span className="text-[10px] uppercase tracking-wider font-medium text-blue-600 dark:text-blue-400">Total Spent</span>
+                            </div>
+                            <p className="text-xl font-bold text-blue-700 dark:text-blue-300">₹{customerStats.totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                          </div>
+
+                          <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/30 dark:to-purple-900/20 p-3 rounded-lg border border-purple-200/50 dark:border-purple-800/50">
+                            <div className="flex items-center gap-2 mb-1">
+                              <DollarSign className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                              <span className="text-[10px] uppercase tracking-wider font-medium text-purple-600 dark:text-purple-400">Avg Order</span>
+                            </div>
+                            <p className="text-xl font-bold text-purple-700 dark:text-purple-300">₹{customerStats.avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                          </div>
+
+                          <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/30 dark:to-amber-900/20 p-3 rounded-lg border border-amber-200/50 dark:border-amber-800/50">
+                            <div className="flex items-center gap-2 mb-1">
+                              <CheckCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                              <span className="text-[10px] uppercase tracking-wider font-medium text-amber-600 dark:text-amber-400">Completed</span>
+                            </div>
+                            <p className="text-xl font-bold text-amber-700 dark:text-amber-300">{customerStats.completedOrders}</p>
+                          </div>
+                        </div>
+
+                        {/* Favorite Services */}
+                        {customerStats.topServices.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                              <Package className="h-3 w-3" />
+                              Favorite Services
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {customerStats.topServices.map((service, idx) => (
+                                <Badge
+                                  key={idx}
+                                  variant="secondary"
+                                  className="text-[10px] bg-primary/10 text-primary hover:bg-primary/20"
+                                >
+                                  {service}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Last Order Date */}
+                        {customerStats.lastOrderDate && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg">
+                            <Clock className="h-3 w-3" />
+                            <span>Last order: {format(new Date(customerStats.lastOrderDate), 'dd MMM yyyy')}</span>
+                          </div>
+                        )}
+
+                        {/* Recent Orders List */}
+                        {customerOrders.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground">Recent Orders</p>
+                            <div className="max-h-[180px] overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                              {customerOrders.slice(0, 5).map((order, idx) => (
+                                <div
+                                  key={order.id || idx}
+                                  className="flex items-center justify-between p-2.5 bg-muted/30 hover:bg-muted/50 rounded-lg transition-colors border border-transparent hover:border-primary/10"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-mono font-medium text-primary truncate">
+                                        {order.orderNumber || `#${order.id?.slice(0, 8)}`}
+                                      </span>
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          "text-[9px] px-1.5 py-0",
+                                          order.status === 'completed' || order.status === 'delivered'
+                                            ? "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400"
+                                            : order.status === 'processing'
+                                              ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400"
+                                              : order.status === 'cancelled'
+                                                ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400"
+                                                : "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                        )}
+                                      >
+                                        {order.status?.replace(/_/g, ' ')}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                                      {order.createdAt ? format(new Date(order.createdAt), 'dd MMM yy') : 'N/A'}
+                                    </p>
+                                  </div>
+                                  <span className="text-sm font-semibold text-foreground">
+                                    ₹{parseFloat(order.totalAmount || '0').toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center py-6">
+                        <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                          <Package className="h-6 w-6 text-muted-foreground/50" />
+                        </div>
+                        <p className="text-sm text-muted-foreground">No previous orders</p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">This is a new customer!</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 

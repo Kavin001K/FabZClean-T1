@@ -137,7 +137,10 @@ export class SupabaseStorage {
             // Delivery-related mappings
             'fulfillment_type': 'fulfillmentType',
             'delivery_charges': 'deliveryCharges',
-            'delivery_address': 'deliveryAddress'
+            'delivery_address': 'deliveryAddress',
+            // Express/Priority mappings
+            'is_express_order': 'isExpressOrder',
+            'priority': 'priority'
         };
 
         Object.entries(mappings).forEach(([snake, camel]) => {
@@ -264,7 +267,10 @@ export class SupabaseStorage {
             // Delivery-related mappings
             'fulfillmentType': 'fulfillment_type',
             'deliveryCharges': 'delivery_charges',
-            'deliveryAddress': 'delivery_address'
+            'deliveryAddress': 'delivery_address',
+            // Express/Priority mappings
+            'isExpressOrder': 'is_express_order',
+            'priority': 'priority'
         };
 
         // If key exists in mappings, use snake_case. If not, preserve original (e.g. 'status', 'email', 'name')

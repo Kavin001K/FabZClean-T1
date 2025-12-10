@@ -95,6 +95,9 @@ export const orders = pgTable("orders", {
   fulfillmentType: text("fulfillment_type", { enum: ["pickup", "delivery"] }).default("pickup"),
   deliveryCharges: decimal("delivery_charges", { precision: 10, scale: 2 }).default("0"),
   deliveryAddress: jsonb("delivery_address").$type<ShippingAddress>(),
+  // Express Order / Priority
+  isExpressOrder: boolean("is_express_order").default(false),
+  priority: text("priority", { enum: ["normal", "high", "urgent"] }).default("normal"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

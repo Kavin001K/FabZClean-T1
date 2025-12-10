@@ -24,6 +24,7 @@ interface InvoiceData {
         total: number;
     }>;
     subtotal: number;
+    deliveryCharges?: number;
     total: number;
     paymentTerms: string;
     notes?: string;
@@ -42,6 +43,7 @@ const SimpleInvoiceTemplate: React.FC<{ data: InvoiceData }> = ({ data }) => {
         customer,
         items,
         subtotal,
+        deliveryCharges = 0,
         total,
         qrCode,
     } = data;
@@ -128,6 +130,12 @@ const SimpleInvoiceTemplate: React.FC<{ data: InvoiceData }> = ({ data }) => {
                         <span>Subtotal</span>
                         <span>{formatIndianCurrency(subtotal)}</span>
                     </div>
+                    {deliveryCharges > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <span>Delivery Charges</span>
+                            <span>{formatIndianCurrency(deliveryCharges)}</span>
+                        </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 'bold', color: colors.secondary, borderTop: `2px solid ${colors.primary}`, paddingTop: '10px' }}>
                         <span>Total</span>
                         <span>{formatIndianCurrency(total)}</span>
