@@ -111,404 +111,279 @@ export function GarmentTagPrint({
   };
 
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
     const allTags = getAllTags();
-    const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '';
+    const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '';
 
+    // Generate individual service tags - ULTRA COMPACT for 40mm x 40mm labels
     const tagsHtml = allTags.map(({ item, globalIndex, serviceIndex, serviceTotalQty }) => {
+      // Truncate customer name to fit
+      const shortCustomer = (customerName || 'Customer').substring(0, 12).toUpperCase();
+      // Truncate service name if too long
+      const shortService = item.serviceName.length > 12 ? item.serviceName.substring(0, 11) + '.' : item.serviceName;
+
       return `
         <div class="tag ${isExpressOrder ? 'express' : ''}">
-          ${isExpressOrder ? '<div class="priority-banner">⚡ EXPRESS</div>' : ''}
-          
-          <div class="tag-header">
-            <span class="order-num">${orderNumber}</span>
-            <div class="index-box">
-              <span class="service-index">${serviceIndex}/${serviceTotalQty}</span>
-              <span class="global-index">#${globalIndex}</span>
-            </div>
+          <div class="tag-row-1">
+            <span class="order-id">${orderNumber}</span>
+            <span class="count-badge">${serviceIndex}/${serviceTotalQty}</span>
           </div>
-          
-          <div class="customer-name">${customerName || 'Customer'}</div>
-          
-          <div class="service-name">${item.serviceName}</div>
-          
-          ${item.tagNote ? `<div class="service-note"><span class="note-label">Note:</span> ${item.tagNote}</div>` : ''}
-          
-          ${commonNote ? `<div class="order-note"><span class="note-label">Order:</span> ${commonNote}</div>` : ''}
-          
-          <div class="tag-footer">
+          <div class="customer">${shortCustomer}</div>
+          <div class="service">${shortService}</div>
+          ${item.tagNote ? `<div class="note">${item.tagNote.substring(0, 25)}</div>` : ''}
+          <div class="tag-bottom">
             <span class="store">${storeCode}</span>
-            ${formattedDueDate ? `<span class="due">Due: ${formattedDueDate}</span>` : ''}
+            ${formattedDueDate ? `<span class="due">${formattedDueDate}</span>` : ''}
           </div>
         </div>
       `;
     }).join('');
 
-    // Calculate items summary for header
-    const itemsSummary = items.map(item => `${item.serviceName} x${item.quantity}`).join(', ');
+    // ORDER SUMMARY HEADER TAG - Also fits 40mm x 40mm
+    const itemsSummary = items.map(item => `${item.serviceName.substring(0, 6)} x${item.quantity}`).join(', ');
+    const shortCustomerHeader = (customerName || 'N/A').substring(0, 14);
 
-    // ORDER SUMMARY HEADER TAG (printed first, with barcode)
     const headerTagHtml = `
       <div class="header-tag ${isExpressOrder ? 'express' : ''}">
-        ${isExpressOrder ? '<div class="header-priority">⚡ EXPRESS ORDER - PRIORITY</div>' : ''}
-        
-        <div class="header-title">ORDER SUMMARY</div>
-        
-        <div class="barcode-container">
-          <svg id="header-barcode"></svg>
+        ${isExpressOrder ? '<div class="express-bar">⚡EXPRESS</div>' : ''}
+        <div class="h-title">ORDER</div>
+        <div class="barcode-wrap"><svg id="header-barcode"></svg></div>
+        <div class="h-order">${orderNumber}</div>
+        <div class="h-info">
+          <div class="h-row"><span>Cust:</span><span>${shortCustomerHeader}</span></div>
+          <div class="h-row"><span>Items:</span><span>${totalItems} pcs</span></div>
+          ${formattedDueDate ? `<div class="h-row ${isExpressOrder ? 'due-exp' : ''}"><span>Due:</span><span>${formattedDueDate}</span></div>` : ''}
         </div>
-        
-        <div class="header-order-num">${orderNumber}</div>
-        
-        <div class="header-info">
-          <div class="header-row">
-            <span class="label">Customer:</span>
-            <span class="value">${customerName || 'N/A'}</span>
-          </div>
-          <div class="header-row">
-            <span class="label">Total Items:</span>
-            <span class="value">${totalItems} pcs</span>
-          </div>
-          <div class="header-row">
-            <span class="label">Services:</span>
-            <span class="value small">${itemsSummary}</span>
-          </div>
-          ${formattedDueDate ? `
-          <div class="header-row ${isExpressOrder ? 'express-due' : ''}">
-            <span class="label">${isExpressOrder ? '⚡ Due:' : 'Due Date:'}</span>
-            <span class="value">${formattedDueDate}</span>
-          </div>
-          ` : ''}
-          ${commonNote ? `
-          <div class="header-notes">
-            <span class="note-title">Special Instructions:</span>
-            <span class="note-text">${commonNote}</span>
-          </div>
-          ` : ''}
-        </div>
-        
-        <div class="header-footer">
-          <span>${storeCode}</span>
-          <span>${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-        </div>
+        <div class="h-foot"><span>${storeCode}</span><span>${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span></div>
       </div>
     `;
 
-    printWindow.document.write(`
+    const printHTML = `
       <!DOCTYPE html>
       <html>
       <head>
         <title>Tags - ${orderNumber}</title>
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
         <style>
+          /* ============================================
+             TSC BARCODE PRINTER - 40mm x 40mm LABELS
+             Zero Wastage Print Settings
+             ============================================ */
+          
           @page {
-            size: 55mm auto;
-            margin: 0.5mm;
+            size: 40mm 40mm;
+            margin: 0 !important;
           }
           
-          * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-          }
+          * { box-sizing: border-box; margin: 0; padding: 0; }
           
-          body {
-            font-family: 'Arial', 'Helvetica', sans-serif;
-            font-size: 8px;
-            line-height: 1.1;
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 40mm;
             background: white;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 7px;
+            line-height: 1.1;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           
           .tags-container {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            gap: 1mm;
-            padding: 0.5mm;
+            width: 40mm;
+            gap: 0;
+            padding: 0;
+            margin: 0;
           }
           
-          /* HEADER TAG STYLES */
+          /* ========== HEADER TAG (40mm x 40mm) ========== */
           .header-tag {
-            width: 52mm;
-            padding: 1.5mm;
-            border: 2px solid #333;
-            border-radius: 3px;
-            background: white;
-            page-break-inside: avoid;
-            margin-bottom: 0;
-          }
-          
-          .header-tag.express {
-            border-color: #f97316;
-            background: linear-gradient(135deg, #fff7ed 0%, #ffffff 50%);
-          }
-          
-          .header-priority {
-            text-align: center;
-            background: linear-gradient(90deg, #f97316, #ea580c);
-            color: white;
-            padding: 1px 4px;
-            font-size: 7px;
-            font-weight: 900;
-            border-radius: 2px;
-            margin-bottom: 1mm;
-          }
-          
-          .header-title {
-            text-align: center;
-            font-size: 9px;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 1mm 0;
-            border-bottom: 1px solid #333;
-            margin-bottom: 1mm;
-          }
-          
-          .barcode-container {
-            text-align: center;
-            margin: 1mm 0;
-          }
-          
-          .barcode-container svg {
-            max-width: 100%;
-            height: 12mm;
-          }
-          
-          .header-order-num {
-            text-align: center;
-            font-family: 'Courier New', monospace;
-            font-size: 8px;
-            font-weight: bold;
-            margin-bottom: 1mm;
-          }
-          
-          .header-info {
-            padding: 1mm 0;
-            border-top: 1px dashed #aaa;
-            border-bottom: 1px dashed #aaa;
-          }
-          
-          .header-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.5mm 0;
-            font-size: 7px;
-          }
-          
-          .header-row.express-due {
-            background: #fef3c7;
-            padding: 0.5mm 1mm;
-            border-radius: 1px;
-            font-weight: bold;
-          }
-          
-          .header-row .label {
-            font-weight: 600;
-            color: #6b7280;
-          }
-          
-          .header-row .value {
-            font-weight: bold;
-            color: #111;
-          }
-          
-          .header-row .value.small {
-            font-size: 6px;
-            max-width: 25mm;
-            text-align: right;
-          }
-          
-          .header-notes {
-            margin-top: 1mm;
+            width: 40mm;
+            height: 40mm;
             padding: 1mm;
-            background: #e0e7ff;
-            border-radius: 2px;
+            border: 1px solid #000;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            page-break-after: always;
           }
           
-          .header-notes .note-title {
-            display: block;
-            font-weight: 700;
-            color: #3730a3;
+          .header-tag.express { border: 1.5px solid #f97316; }
+          
+          .express-bar {
+            background: #f97316;
+            color: white;
+            text-align: center;
             font-size: 6px;
+            font-weight: 900;
+            padding: 0.5mm;
+            margin: -1mm -1mm 0.5mm -1mm;
+          }
+          
+          .h-title {
+            text-align: center;
+            font-size: 8px;
+            font-weight: 900;
+            border-bottom: 0.5px solid #333;
+            padding-bottom: 0.5mm;
             margin-bottom: 0.5mm;
           }
           
-          .header-notes .note-text {
-            font-size: 7px;
-            color: #1e1b4b;
+          .barcode-wrap {
+            text-align: center;
+            height: 8mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
           }
           
-          .header-footer {
+          .barcode-wrap svg {
+            max-width: 36mm;
+            height: 7mm;
+          }
+          
+          .h-order {
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            font-size: 7px;
+            font-weight: bold;
+            margin-bottom: 0.5mm;
+          }
+          
+          .h-info {
+            flex: 1;
+            border-top: 0.5px dashed #888;
+            border-bottom: 0.5px dashed #888;
+            padding: 0.5mm 0;
+          }
+          
+          .h-row {
             display: flex;
             justify-content: space-between;
-            margin-top: 1mm;
-            padding-top: 1mm;
-            border-top: 1px solid #ddd;
             font-size: 6px;
-            color: #6b7280;
+            padding: 0.3mm 0;
           }
           
+          .h-row span:first-child { color: #666; }
+          .h-row span:last-child { font-weight: bold; }
+          
+          .due-exp { background: #fef3c7; padding: 0.3mm 0.5mm; }
+          
+          .h-foot {
+            display: flex;
+            justify-content: space-between;
+            font-size: 5px;
+            color: #666;
+            padding-top: 0.5mm;
+          }
+          
+          /* ========== INDIVIDUAL TAG (40mm x 40mm) ========== */
           .tag {
-            width: 52mm;
-            min-height: 22mm;
-            border: 1.5px solid #333;
-            border-radius: 3px;
+            width: 40mm;
+            height: 40mm;
             padding: 1mm;
+            border: 1px solid #000;
+            background: white;
             display: flex;
             flex-direction: column;
-            background: white;
-            page-break-inside: avoid;
-            position: relative;
-            gap: 0.5mm;
+            page-break-after: always;
           }
           
-          .tag.express {
-            border: 2px solid #f97316;
-            background: linear-gradient(135deg, #fff7ed 0%, #ffffff 50%);
-          }
+          .tag.express { border: 1.5px solid #f97316; background: #fffbeb; }
           
-          .priority-banner {
-            position: absolute;
-            top: -1px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(90deg, #f97316, #ea580c);
-            color: white;
-            font-size: 6px;
-            font-weight: 900;
-            padding: 0px 6px;
-            border-radius: 0 0 4px 4px;
-            letter-spacing: 0.5px;
-            z-index: 10;
-          }
-          
-          .tag-header {
+          .tag-row-1 {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-weight: bold;
-            font-size: 7px;
-            padding: 0.5mm 0;
-            border-bottom: 1px dashed #aaa;
-            margin-top: ${isExpressOrder ? '2mm' : '0'};
+            border-bottom: 0.5px dashed #aaa;
+            padding-bottom: 0.5mm;
+            margin-bottom: 0.5mm;
           }
           
-          .order-num {
+          .order-id {
             font-family: 'Courier New', monospace;
             font-size: 6px;
+            font-weight: bold;
           }
           
-          .index-box {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 0;
-          }
-          
-          .service-index {
+          .count-badge {
             font-size: 10px;
             font-weight: 900;
-            color: #1f2937;
             background: #f3f4f6;
-            padding: 0 3px;
-            border-radius: 2px;
-            line-height: 1;
+            padding: 0 2px;
+            border-radius: 1px;
           }
           
-          .global-index {
-            font-size: 6px;
-            font-weight: 600;
-            color: #6b7280;
-            line-height: 1;
-          }
-          
-          .customer-name {
-            font-weight: 800;
-            font-size: 9px;
+          .customer {
             text-align: center;
-            color: #1f2937;
-            padding: 0.5mm 0;
-            text-transform: uppercase;
+            font-size: 8px;
+            font-weight: 800;
+            padding: 1mm 0;
+            border-bottom: 0.5px solid #eee;
             letter-spacing: 0.2px;
-            border-bottom: 1px solid #eee;
-            white-space: nowrap;
+          }
+          
+          .service {
+            text-align: center;
+            font-size: 11px;
+            font-weight: 900;
+            text-transform: uppercase;
+            padding: 2mm 0;
+            background: #f9fafb;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          
+          .note {
+            font-size: 5px;
+            background: #fef3c7;
+            padding: 0.5mm;
+            text-align: center;
             overflow: hidden;
+            white-space: nowrap;
             text-overflow: ellipsis;
           }
           
-          .service-name {
-            font-weight: 900;
-            font-size: 12px;
-            text-align: center;
-            text-transform: uppercase;
-            color: #111827;
-            padding: 1mm 0;
-            background: #f9fafb;
-            border-radius: 2px;
-            line-height: 1;
-            margin: 0.5mm 0;
-          }
-          
-          .service-note, .order-note {
-            font-size: 7px;
-            padding: 0.5mm 1.5mm;
-            background: #fef3c7;
-            border-radius: 2px;
-            word-wrap: break-word;
-            line-height: 1.1;
-            margin-bottom: 0.5mm;
-          }
-          
-          .order-note {
-            background: #e0e7ff;
-          }
-          
-          .note-label {
-            font-weight: 700;
-            color: #92400e;
-          }
-          
-          .order-note .note-label {
-            color: #3730a3;
-          }
-          
-          .tag-footer {
+          .tag-bottom {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            font-size: 6px;
+            font-size: 5px;
             padding-top: 0.5mm;
-            border-top: 1px dashed #aaa;
+            border-top: 0.5px dashed #aaa;
             margin-top: auto;
           }
           
-          .store {
-            font-weight: 700;
-            color: #6b7280;
-          }
-          
-          .due {
-            font-weight: 700;
-            color: ${isExpressOrder ? '#ea580c' : '#059669'};
-          }
+          .store { color: #666; font-weight: 600; }
+          .due { font-weight: 700; color: ${isExpressOrder ? '#ea580c' : '#059669'}; }
 
+          /* ========== PRINT OVERRIDE ========== */
           @media print {
-            body { 
-              background: white;
-              print-color-adjust: exact; 
-              -webkit-print-color-adjust: exact; 
-              margin: 0;
-              padding: 0;
+            html, body { 
+              margin: 0 !important;
+              padding: 0 !important;
+              width: 40mm !important;
+              background: white !important;
+              print-color-adjust: exact !important;
+              -webkit-print-color-adjust: exact !important;
             }
+            
+            @page {
+              size: 40mm 40mm !important;
+              margin: 0 !important;
+            }
+            
             .tags-container {
-              gap: 1mm;
-              padding: 0;
+              gap: 0 !important;
+              padding: 0 !important;
+              margin: 0 !important;
             }
+            
             .header-tag, .tag {
-              page-break-inside: avoid;
+              page-break-after: always;
+              margin: 0 !important;
             }
           }
         </style>
@@ -524,22 +399,73 @@ export function GarmentTagPrint({
               if (typeof JsBarcode !== 'undefined') {
                 JsBarcode("#header-barcode", "${orderNumber}", {
                   format: "CODE128",
-                  width: 1.5,
-                  height: 30,
+                  width: 1.2,
+                  height: 18,
                   displayValue: false,
-                  margin: 1
+                  margin: 0
                 });
               }
             } catch(e) { 
-              console.log('Barcode generation error:', e); 
+              console.log('Barcode error:', e); 
             }
-            setTimeout(function() { window.print(); }, 300);
+            
+            // Electron/Windows detection for optimized printing
+            const isElectron = (typeof window !== 'undefined' && window.process && window.process.type === 'renderer') ||
+                               (typeof navigator !== 'undefined' && navigator.userAgent.indexOf('Electron') >= 0);
+            const isWindows = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('win');
+            
+            setTimeout(function() { 
+              window.print(); 
+            }, isElectron ? (isWindows ? 800 : 400) : 300);
           }
         </script>
       </body>
       </html>
-    `);
-    printWindow.document.close();
+    `;
+
+    // Electron-optimized iframe printing for Windows
+    const isElectronEnv = (typeof window !== 'undefined' && (window as any).process && (window as any).process.type === 'renderer') ||
+      (typeof navigator !== 'undefined' && navigator.userAgent.indexOf('Electron') >= 0);
+
+    if (isElectronEnv) {
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:none;visibility:hidden;';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(printHTML);
+        doc.close();
+
+        const isWindowsEnv = navigator.userAgent.toLowerCase().includes('win');
+        const printDelay = isWindowsEnv ? 1000 : 600;
+        const cleanupDelay = isWindowsEnv ? 10000 : 6000;
+
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          } catch (error) {
+            console.error('Print failed:', error);
+          }
+
+          setTimeout(() => {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          }, cleanupDelay);
+        }, printDelay);
+      }
+    } else {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert('Please allow popups to print.');
+        return;
+      }
+      printWindow.document.write(printHTML);
+      printWindow.document.close();
+    }
   };
 
   const allTags = getAllTags();

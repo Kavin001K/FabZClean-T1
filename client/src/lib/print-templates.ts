@@ -583,27 +583,18 @@ export function generateTagHTML(order: any, items: any[]): string {
     }
   });
 
-  // 2. Generate continuous vertical layout - ALL tags in one column, NO page breaks
+  // 2. Generate compact tags for 40mm x 40mm labels
   let contentHtml = '';
   allTags.forEach((tag) => {
+    const shortName = tag.name.length > 10 ? tag.name.substring(0, 9) + '.' : tag.name;
     contentHtml += `
-      <div class="tag-wrapper">
+      <div class="tag">
         <div class="brand">FabZClean</div>
-        <div class="meta">${new Date().toLocaleDateString('en-IN')}</div>
-        
-        <div class="customer">${order.customerName?.substring(0, 15) || 'Guest'}</div>
-        
-        <div class="item-box">
-          <div>${tag.name}</div>
-          <span class="counter">${tag.index}/${tag.total}</span>
-        </div>
-
-        <div class="notes-section">
-          <div class="notes-label">NOTES:</div>
-          <div class="notes-content">${order.specialInstructions || order.notes || '-'}</div>
-        </div>
-        
-        <div class="footer-id">#${order.orderNumber}</div>
+        <div class="customer">${(order.customerName || 'Guest').substring(0, 12).toUpperCase()}</div>
+        <div class="item">${shortName}</div>
+        <div class="counter">${tag.index}/${tag.total}</div>
+        <div class="notes">${(order.specialInstructions || order.notes || '-').substring(0, 20)}</div>
+        <div class="footer">#${order.orderNumber}</div>
       </div>
     `;
   });
@@ -614,133 +605,118 @@ export function generateTagHTML(order: any, items: any[]): string {
     <head>
       <title>Tags #${order.orderNumber}</title>
       <style>
-        /* RESET & BASICS - Optimized for TSC TE244 Label Printer */
+        /* TSC BARCODE PRINTER - 40mm x 40mm LABELS */
+        @page { 
+          size: 40mm 40mm;
+          margin: 0 !important;
+        }
+        
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { 
-          font-family: 'Arial', 'Helvetica Neue', sans-serif; 
+        
+        html, body { 
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 40mm;
           background: white;
-          width: 58mm; /* Standard label width for TSC TE244 */
-          margin: 0 auto;
+          font-family: Arial, Helvetica, sans-serif;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
         }
         
-        /* PRINT SETTINGS - Continuous roll / label printer */
         @media print {
-          @page { 
-            margin: 0; 
-            size: 58mm auto; /* Width fixed, height auto for continuous roll */
-          }
-          body { 
-            margin: 0; 
-            width: 58mm;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+          html, body { 
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 40mm !important;
+            height: auto !important;
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
           }
           
-          /* Allow natural page overflow */
-          html, body {
-            height: auto !important;
-            overflow: visible !important;
+          @page { 
+            size: 40mm 40mm !important;
+            margin: 0 !important;
+          }
+          
+          .tags-container {
+            gap: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          
+          .tag {
+            page-break-after: always;
+            margin: 0 !important;
           }
         }
 
-        /* TAG CONTAINER - Holds all tags in a continuous column */
         .tags-container {
           display: flex;
           flex-direction: column;
-          width: 100%;
+          width: 40mm;
+          gap: 0;
+          padding: 0;
+          margin: 0;
         }
 
-        /* TAG STYLING - Continuous vertical layout, NO page breaks */
-        .tag-wrapper {
-          width: 100%;
-          padding: 3mm 2mm;
-          border-bottom: 1px dashed #333;
+        .tag {
+          width: 40mm;
+          height: 40mm;
+          padding: 1mm;
+          border: 1px solid #000;
           text-align: center;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
           background: white;
-          /* NO page-break-after - tags flow continuously */
-          page-break-inside: avoid; /* Don't break a single tag across pages */
-        }
-        
-        /* Add top border to first tag for visual consistency */
-        .tag-wrapper:first-child {
-          border-top: 1px dashed #333;
+          page-break-after: always;
         }
 
         .brand { 
-          font-size: 12px; 
+          font-size: 9px; 
           font-weight: 900; 
-          text-transform: uppercase; 
-          margin-bottom: 1px;
-          letter-spacing: 0.5px;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+          border-bottom: 0.5px solid #000;
+          padding-bottom: 0.5mm;
         }
         
-        .meta { 
-          font-size: 8px; 
-          margin-bottom: 2px; 
-          border-bottom: 1px solid #000; 
-          padding-bottom: 1px; 
-        }
-        
-        /* ITEM HIGHLIGHT */
-        .item-box {
-          border: 1px solid black;
-          padding: 2px;
-          margin: 2px 0;
-          font-size: 11px;
+        .customer { 
+          font-size: 7px; 
           font-weight: bold;
-          background: #fff;
+          padding: 0.5mm 0;
+        }
+        
+        .item {
+          font-size: 10px;
+          font-weight: 900;
+          text-transform: uppercase;
+          background: #f3f4f6;
+          padding: 1mm;
         }
 
         .counter {
-          font-size: 16px;
+          font-size: 14px;
           font-weight: 900;
-          display: block;
-          margin-top: 1px;
+          padding: 1mm 0;
         }
 
-        .customer { 
-          font-size: 10px; 
-          font-weight: bold; 
-          overflow: hidden; 
-          text-overflow: ellipsis; 
-          white-space: nowrap; 
-          margin-bottom: 1px;
-        }
-
-        .notes-section {
-          margin-top: 2px;
-          border-top: 1px dotted #999;
-          padding-top: 1px;
-        }
-
-        .notes-label {
-          font-size: 7px;
-          font-weight: bold;
-          color: #444;
-        }
-
-        .notes-content {
-          font-size: 9px;
-          font-weight: bold;
-          word-break: break-word;
-          line-height: 1.1;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
+        .notes {
+          font-size: 6px;
+          color: #666;
+          border-top: 0.5px dotted #999;
+          padding-top: 0.5mm;
           overflow: hidden;
-          max-height: 2.2em;
+          white-space: nowrap;
+          text-overflow: ellipsis;
         }
 
-        .footer-id { 
-          font-size: 8px; 
+        .footer { 
+          font-size: 6px; 
           font-family: 'Courier New', monospace; 
-          margin-top: 1px;
           font-weight: bold;
+          border-top: 0.5px solid #ddd;
+          padding-top: 0.5mm;
         }
       </style>
     </head>
