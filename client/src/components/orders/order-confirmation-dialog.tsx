@@ -21,6 +21,7 @@ import { useQuery } from '@tanstack/react-query';
 import { printDriver } from '@/lib/print-driver';
 import { GarmentTagPrint } from './garment-tag-print';
 import { generateUPIUrl, PAYMENT_CONFIG } from '@/lib/franchise-config';
+import { smartItemSummary } from '@/lib/item-summarizer';
 
 interface OrderConfirmationDialogProps {
     open: boolean;
@@ -261,26 +262,10 @@ export function OrderConfirmationDialog({
                 // Continue without PDF - will send text message
             }
 
-            // Calculate Main Item name for message
-            const getItems = () => Array.isArray(order.items) ? order.items : [];
-            const items = getItems();
-            let mainItemName = "Laundry Items";
-            if (items.length > 0) {
-                const firstItem = items[0] as any;
-                // Try to get name from various common properties
-                mainItemName = firstItem.name ||
-                    firstItem.productName ||
-                    firstItem.description ||
-                    (firstItem.product && firstItem.product.name) ||
-                    "Laundry Items";
-
-                // Add count if more than 1 item? 
-                // User request says "This includes your Cotton Sarees and..."
-                // If I have 10 items, "This includes your T-Shirt and..." is okay.
-                if (items.length > 1) {
-                    mainItemName = `${mainItemName} + ${items.length - 1} items`;
-                }
-            }
+            // Smart Item Summarization using shared utility
+            // Strategy: 1 item = full name, 2 items = "A & B", 3+ items = "A & X others"
+            const mainItemName = smartItemSummary(order.items as any[]);
+            console.log(`📦 Item summary: "${mainItemName}" (${Array.isArray(order.items) ? order.items.length : 0} items)`);
 
             // Send WhatsApp message (with or without PDF)
             console.log('💬 Sending WhatsApp message...');

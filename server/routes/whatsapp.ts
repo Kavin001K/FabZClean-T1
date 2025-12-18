@@ -1,6 +1,7 @@
 // server/routes/whatsapp.ts
 import { Router } from "express";
 import { sendInvoiceWhatsApp, sendTextWhatsApp } from "../services/whatsapp.service";
+import { smartItemSummary } from "../utils/item-summarizer";
 
 const router = Router();
 
@@ -54,6 +55,7 @@ router.post("/send-bill", async (req, res) => {
             orderId,
             amount,
             mainItem,
+            items, // Optional: Array of items for smart summarization
             pdfUrl
         } = req.body;
 
@@ -62,10 +64,17 @@ router.post("/send-bill", async (req, res) => {
             return res.status(400).json({ error: "Missing required fields (customerName, customerPhone)" });
         }
 
+        // Smart Item Summary: Use provided mainItem, or generate from items array
+        const itemSummary = mainItem || smartItemSummary(items) || "Laundry Items";
+        console.log(`📦 WhatsApp item summary: "${itemSummary}"`);
+
         // If no PDF URL, send text message instead (optimized message)
         if (!pdfUrl) {
-            const itemText = mainItem ? `This includes your ${mainItem} and home delivery charges.` : "This includes home delivery charges.";
-            const message = `Hi ${customerName}! 👋 Your laundry order is Processing! 🧺\n\nWe have generated Invoice ${orderId} for ₹${amount || '0.00'}. ${itemText}\n\nPayment Options: Scan the QR in the invoice or use UPI / Google Pay / PhonePe.\n📄 Terms: https://myfabclean.com/terms\n\nThanks for choosing Fab Clean!`;
+            const itemText = itemSummary !== "Laundry Items"
+                ? `This includes your ${itemSummary}.`
+                : "";
+
+            const message = `Hi ${customerName}! 👋 Your laundry order is Processing! 🧺\n\nWe have generated Invoice ${orderId} for ₹${amount || '0.00'}.${itemText ? ` ${itemText}` : ''}\n\nPayment Options: Scan the QR in the invoice or use UPI / Google Pay / PhonePe.\n📄 Terms: https://myfabclean.com/terms\n\nThanks for choosing Fab Clean!`;
 
             await sendTextWhatsApp({
                 phoneNumber: customerPhone,
@@ -83,7 +92,7 @@ router.post("/send-bill", async (req, res) => {
             customerName,
             invoiceNumber: orderId,
             amount: String(amount || "0.00"),
-            itemName: mainItem || "Laundry Items",
+            itemName: itemSummary,
         });
 
         res.json({ success: true, message: "WhatsApp bill sent successfully", data: result });
