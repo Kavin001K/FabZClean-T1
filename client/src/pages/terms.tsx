@@ -5,17 +5,47 @@
  * NOT included in navigation - completely isolated
  * 
  * Professional legal document with premium typography
- * Features: Scroll unrolling animation on page load
+ * Features: Enhanced scroll unrolling animation with particles and effects
  */
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+
+// Particle component for sparkle effects
+const Particle = ({ delay, duration, x, y, size }: { delay: number; duration: number; x: number; y: number; size: number }) => (
+    <div
+        className="absolute rounded-full bg-amber-300/80 animate-pulse"
+        style={{
+            left: `${x}%`,
+            top: `${y}%`,
+            width: `${size}px`,
+            height: `${size}px`,
+            animationDelay: `${delay}ms`,
+            animationDuration: `${duration}ms`,
+            boxShadow: '0 0 6px 2px rgba(251, 191, 36, 0.6)',
+        }}
+    />
+);
 
 export default function TermsPage() {
     const currentYear = new Date().getFullYear();
     const [isLoading, setIsLoading] = useState(true);
-    const [scrollPhase, setScrollPhase] = useState(0); // 0: closed, 1: opening, 2: open, 3: content visible
+    const [scrollPhase, setScrollPhase] = useState(0);
+    const [showParticles, setShowParticles] = useState(false);
+    const [textReveal, setTextReveal] = useState(0);
+
+    // Generate random particles
+    const particles = useMemo(() =>
+        Array.from({ length: 20 }, (_, i) => ({
+            id: i,
+            x: Math.random() * 100,
+            y: Math.random() * 100,
+            size: Math.random() * 4 + 2,
+            delay: Math.random() * 1000,
+            duration: Math.random() * 1000 + 500,
+        })), []
+    );
 
     // Load professional fonts and trigger animation
     useEffect(() => {
@@ -25,140 +55,302 @@ export default function TermsPage() {
         link.rel = 'stylesheet';
         document.head.appendChild(link);
 
-        // Start animation sequence
-        const timer1 = setTimeout(() => setScrollPhase(1), 300);  // Start opening
-        const timer2 = setTimeout(() => setScrollPhase(2), 1200); // Fully open
-        const timer3 = setTimeout(() => setScrollPhase(3), 1800); // Show content
-        const timer4 = setTimeout(() => setIsLoading(false), 2500); // Complete
+        // Enhanced animation sequence with more phases
+        const timers = [
+            setTimeout(() => setScrollPhase(1), 200),   // Glow appears
+            setTimeout(() => setScrollPhase(2), 600),   // Top rod appears  
+            setTimeout(() => setScrollPhase(3), 1000),  // Parchment starts unrolling
+            setTimeout(() => setShowParticles(true), 1200), // Particles start
+            setTimeout(() => setScrollPhase(4), 1600),  // Bottom rod appears
+            setTimeout(() => setTextReveal(1), 1800),   // Logo appears
+            setTimeout(() => setTextReveal(2), 2100),   // Title appears
+            setTimeout(() => setTextReveal(3), 2400),   // Subtitle appears
+            setTimeout(() => setScrollPhase(5), 2800),  // Seal stamps
+            setTimeout(() => setScrollPhase(6), 3400),  // Flash effect
+            setTimeout(() => setIsLoading(false), 3800), // Complete
+        ];
 
         return () => {
             document.head.removeChild(link);
-            clearTimeout(timer1);
-            clearTimeout(timer2);
-            clearTimeout(timer3);
-            clearTimeout(timer4);
+            timers.forEach(t => clearTimeout(t));
         };
     }, []);
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-stone-800 via-stone-900 to-stone-950 overflow-hidden">
+        <div className="min-h-screen bg-gradient-to-b from-stone-900 via-stone-950 to-black overflow-hidden">
 
             {/* Scroll Opening Animation Overlay */}
             {isLoading && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-b from-stone-800 via-stone-900 to-stone-950">
-                    {/* Animated scroll/parchment */}
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-b from-stone-900 via-stone-950 to-black overflow-hidden">
+
+                    {/* Ambient background glow */}
+                    <div
+                        className={`absolute w-[600px] h-[600px] rounded-full transition-all duration-1000 ease-out ${scrollPhase >= 1 ? 'opacity-30 scale-100' : 'opacity-0 scale-50'
+                            }`}
+                        style={{
+                            background: 'radial-gradient(circle, rgba(217,119,6,0.3) 0%, rgba(120,53,15,0.1) 50%, transparent 70%)',
+                            filter: 'blur(40px)',
+                        }}
+                    />
+
+                    {/* Floating particles */}
+                    {showParticles && (
+                        <div className="absolute inset-0 pointer-events-none">
+                            {particles.map(p => (
+                                <Particle key={p.id} {...p} />
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Main scroll container */}
                     <div className="relative flex flex-col items-center">
-                        {/* Top scroll rod */}
+
+                        {/* Top scroll rod with glow */}
                         <div
-                            className={`w-72 h-6 bg-gradient-to-b from-amber-700 via-amber-800 to-amber-900 rounded-full shadow-2xl transition-all duration-700 ease-out ${scrollPhase >= 1 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
+                            className={`relative w-80 h-7 transition-all ease-out ${scrollPhase >= 2 ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-75 -translate-y-8'
                                 }`}
                             style={{
-                                boxShadow: '0 4px 20px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.2)'
+                                transitionDuration: '800ms',
+                                transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
                             }}
                         >
-                            {/* Rod decorations */}
-                            <div className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-amber-600 rounded-full shadow-inner" />
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-amber-600 rounded-full shadow-inner" />
+                            {/* Glow effect */}
+                            <div
+                                className="absolute inset-0 rounded-full blur-md"
+                                style={{
+                                    background: 'linear-gradient(to bottom, #d97706, #92400e)',
+                                    opacity: 0.5,
+                                }}
+                            />
+                            {/* Rod */}
+                            <div
+                                className="relative w-full h-full rounded-full"
+                                style={{
+                                    background: 'linear-gradient(to bottom, #f59e0b, #b45309, #78350f)',
+                                    boxShadow: '0 4px 20px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.3), inset 0 -2px 4px rgba(0,0,0,0.3)',
+                                }}
+                            >
+                                {/* Rod decorations */}
+                                <div className="absolute left-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full" style={{ background: 'linear-gradient(135deg, #fbbf24, #b45309)', boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.4)' }} />
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full" style={{ background: 'linear-gradient(135deg, #fbbf24, #b45309)', boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.4)' }} />
+                                {/* Center ornament */}
+                                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-3 rounded-full" style={{ background: 'linear-gradient(to bottom, #fcd34d, #b45309)', boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.5)' }} />
+                            </div>
                         </div>
 
-                        {/* Unrolling parchment */}
+                        {/* Unrolling parchment with effects */}
                         <div
-                            className={`relative bg-gradient-to-b from-amber-50 via-orange-50 to-amber-100 shadow-2xl overflow-hidden transition-all duration-1000 ease-out ${scrollPhase >= 1 ? 'opacity-100' : 'opacity-0'
+                            className={`relative overflow-hidden transition-all ease-out ${scrollPhase >= 3 ? 'opacity-100' : 'opacity-0'
                                 }`}
                             style={{
-                                width: '280px',
-                                height: scrollPhase >= 2 ? '400px' : scrollPhase >= 1 ? '100px' : '0px',
-                                boxShadow: '0 10px 40px rgba(0,0,0,0.4), inset 0 0 30px rgba(139,69,19,0.1)',
-                                borderLeft: '2px solid rgba(139,69,19,0.2)',
-                                borderRight: '2px solid rgba(139,69,19,0.2)',
+                                width: '300px',
+                                height: scrollPhase >= 4 ? '420px' : scrollPhase >= 3 ? '80px' : '0px',
+                                transitionDuration: '1200ms',
+                                transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                                background: 'linear-gradient(180deg, #fef3c7 0%, #fde68a 20%, #fef3c7 50%, #fde68a 80%, #fef3c7 100%)',
+                                boxShadow: `
+                  0 20px 60px rgba(0,0,0,0.5),
+                  inset 0 0 60px rgba(180,83,9,0.1),
+                  inset 2px 0 8px rgba(0,0,0,0.1),
+                  inset -2px 0 8px rgba(0,0,0,0.1)
+                `,
+                                borderLeft: '3px solid rgba(180,83,9,0.2)',
+                                borderRight: '3px solid rgba(180,83,9,0.2)',
                             }}
                         >
+                            {/* Parchment edge shadows */}
+                            <div className="absolute top-0 left-0 w-4 h-full bg-gradient-to-r from-black/10 to-transparent" />
+                            <div className="absolute top-0 right-0 w-4 h-full bg-gradient-to-l from-black/10 to-transparent" />
+
+                            {/* Unroll line effect */}
+                            <div
+                                className={`absolute left-0 right-0 h-1 bg-gradient-to-b from-amber-900/30 to-transparent transition-all duration-500 ${scrollPhase >= 4 ? 'opacity-0 bottom-0' : 'opacity-100 bottom-0'
+                                    }`}
+                            />
+
                             {/* Parchment texture overlay */}
                             <div
-                                className="absolute inset-0 opacity-30"
+                                className="absolute inset-0 opacity-20 mix-blend-overlay"
                                 style={{
-                                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`
+                                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`
                                 }}
                             />
 
                             {/* Content on parchment */}
-                            <div
-                                className={`absolute inset-0 flex flex-col items-center justify-center p-8 transition-all duration-700 ${scrollPhase >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-                                    }`}
-                            >
-                                {/* Logo */}
-                                <img
-                                    src="/assets/fabclean-logo.png"
-                                    alt="Fab Clean"
-                                    className="h-16 object-contain mb-6"
+                            <div className="absolute inset-0 flex flex-col items-center justify-center p-10">
+
+                                {/* Decorative top border */}
+                                <div
+                                    className={`w-48 h-0.5 mb-6 transition-all duration-700 ${textReveal >= 1 ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'
+                                        }`}
+                                    style={{
+                                        background: 'linear-gradient(90deg, transparent, #92400e, #b45309, #92400e, transparent)',
+                                        transitionDelay: '100ms',
+                                    }}
                                 />
 
-                                {/* Decorative line */}
-                                <div className="w-32 h-0.5 bg-gradient-to-r from-transparent via-amber-700 to-transparent mb-4" />
+                                {/* Logo with glow */}
+                                <div
+                                    className={`relative transition-all duration-700 ${textReveal >= 1 ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-90'
+                                        }`}
+                                    style={{ transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+                                >
+                                    <div className="absolute inset-0 blur-xl bg-amber-500/30 scale-150" />
+                                    <img
+                                        src="/assets/fabclean-logo.png"
+                                        alt="Fab Clean"
+                                        className="relative h-16 object-contain drop-shadow-lg"
+                                    />
+                                </div>
 
-                                {/* Title */}
+                                {/* Decorative divider */}
+                                <div
+                                    className={`flex items-center gap-2 my-5 transition-all duration-500 ${textReveal >= 2 ? 'opacity-100' : 'opacity-0'
+                                        }`}
+                                >
+                                    <div className="w-12 h-px bg-gradient-to-r from-transparent to-amber-700" />
+                                    <div className="w-2 h-2 rotate-45 bg-amber-700" />
+                                    <div className="w-12 h-px bg-gradient-to-l from-transparent to-amber-700" />
+                                </div>
+
+                                {/* Title with letter animation */}
                                 <h1
-                                    className="text-2xl font-bold text-stone-800 text-center mb-2"
-                                    style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                                    className={`text-2xl font-bold text-stone-800 text-center mb-2 transition-all duration-700 ${textReveal >= 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                                        }`}
+                                    style={{
+                                        fontFamily: "'Cormorant Garamond', Georgia, serif",
+                                        textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                    }}
                                 >
                                     Terms & Conditions
                                 </h1>
 
                                 <p
-                                    className="text-xs text-stone-500 tracking-widest uppercase mb-6"
-                                    style={{ fontFamily: "'Source Sans 3', sans-serif" }}
+                                    className={`text-xs text-stone-600 tracking-[0.3em] uppercase mb-6 transition-all duration-700 ${textReveal >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                                        }`}
+                                    style={{
+                                        fontFamily: "'Source Sans 3', sans-serif",
+                                        transitionDelay: '150ms',
+                                    }}
                                 >
                                     Official Document
                                 </p>
 
-                                {/* Loading indicator */}
-                                <div className="flex items-center gap-2 text-stone-600">
-                                    <div className="flex gap-1">
-                                        <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                        <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                        <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                {/* Elegant loading indicator */}
+                                <div
+                                    className={`flex flex-col items-center gap-3 transition-all duration-500 ${textReveal >= 3 ? 'opacity-100' : 'opacity-0'
+                                        }`}
+                                >
+                                    <div className="flex gap-2">
+                                        {[0, 1, 2].map(i => (
+                                            <div
+                                                key={i}
+                                                className="w-2 h-2 bg-emerald-600 rounded-full"
+                                                style={{
+                                                    animation: 'bounce 1s infinite',
+                                                    animationDelay: `${i * 150}ms`,
+                                                }}
+                                            />
+                                        ))}
                                     </div>
+                                    <p
+                                        className="text-xs text-stone-500 animate-pulse"
+                                        style={{ fontFamily: "'Source Sans 3', sans-serif" }}
+                                    >
+                                        Preparing document...
+                                    </p>
                                 </div>
 
-                                <p
-                                    className="text-xs text-stone-500 mt-4"
-                                    style={{ fontFamily: "'Source Sans 3', sans-serif" }}
+                                {/* Decorative wax seal with stamp animation */}
+                                <div
+                                    className={`absolute bottom-8 right-8 transition-all ${scrollPhase >= 5 ? 'opacity-100 scale-100 rotate-0' : 'opacity-0 scale-150 rotate-45'
+                                        }`}
+                                    style={{
+                                        transitionDuration: '500ms',
+                                        transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                    }}
                                 >
-                                    Preparing document...
-                                </p>
-
-                                {/* Decorative seal */}
-                                <div className="absolute bottom-8 right-8 w-16 h-16 rounded-full bg-gradient-to-br from-red-700 to-red-900 shadow-lg flex items-center justify-center opacity-80">
-                                    <div className="w-12 h-12 rounded-full border-2 border-red-300/50 flex items-center justify-center">
-                                        <span className="text-red-100 font-bold text-xs" style={{ fontFamily: "'Cormorant Garamond', serif" }}>FC</span>
+                                    <div
+                                        className="w-16 h-16 rounded-full shadow-xl flex items-center justify-center"
+                                        style={{
+                                            background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 50%, #7f1d1d 100%)',
+                                            boxShadow: '0 4px 20px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.2)',
+                                        }}
+                                    >
+                                        <div
+                                            className="w-12 h-12 rounded-full border-2 border-red-300/40 flex items-center justify-center"
+                                            style={{
+                                                background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                                            }}
+                                        >
+                                            <span
+                                                className="text-red-100 font-bold text-sm"
+                                                style={{ fontFamily: "'Cormorant Garamond', serif", textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+                                            >
+                                                FC
+                                            </span>
+                                        </div>
                                     </div>
+                                    {/* Seal shine */}
+                                    <div
+                                        className={`absolute top-1 left-3 w-4 h-2 rounded-full bg-white/30 blur-sm transition-opacity duration-300 ${scrollPhase >= 5 ? 'opacity-100' : 'opacity-0'
+                                            }`}
+                                        style={{ transitionDelay: '200ms' }}
+                                    />
                                 </div>
                             </div>
                         </div>
 
-                        {/* Bottom scroll rod */}
+                        {/* Bottom scroll rod with glow */}
                         <div
-                            className={`w-72 h-6 bg-gradient-to-t from-amber-700 via-amber-800 to-amber-900 rounded-full shadow-2xl transition-all duration-700 ease-out ${scrollPhase >= 2 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
+                            className={`relative w-80 h-7 transition-all ease-out ${scrollPhase >= 4 ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-75 translate-y-8'
                                 }`}
                             style={{
-                                boxShadow: '0 4px 20px rgba(0,0,0,0.5), inset 0 -2px 4px rgba(255,255,255,0.2)',
-                                transitionDelay: scrollPhase >= 2 ? '200ms' : '0ms'
+                                transitionDuration: '800ms',
+                                transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
                             }}
                         >
-                            <div className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-amber-600 rounded-full shadow-inner" />
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-amber-600 rounded-full shadow-inner" />
+                            {/* Glow effect */}
+                            <div
+                                className="absolute inset-0 rounded-full blur-md"
+                                style={{
+                                    background: 'linear-gradient(to top, #d97706, #92400e)',
+                                    opacity: 0.5,
+                                }}
+                            />
+                            {/* Rod */}
+                            <div
+                                className="relative w-full h-full rounded-full"
+                                style={{
+                                    background: 'linear-gradient(to top, #f59e0b, #b45309, #78350f)',
+                                    boxShadow: '0 -4px 20px rgba(0,0,0,0.6), inset 0 -2px 4px rgba(255,255,255,0.3), inset 0 2px 4px rgba(0,0,0,0.3)',
+                                }}
+                            >
+                                <div className="absolute left-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full" style={{ background: 'linear-gradient(135deg, #fbbf24, #b45309)', boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.4)' }} />
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full" style={{ background: 'linear-gradient(135deg, #fbbf24, #b45309)', boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.4)' }} />
+                                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-3 rounded-full" style={{ background: 'linear-gradient(to top, #fcd34d, #b45309)', boxShadow: 'inset 0 -1px 2px rgba(255,255,255,0.5)' }} />
+                            </div>
                         </div>
                     </div>
+
+                    {/* Flash transition effect */}
+                    <div
+                        className={`absolute inset-0 bg-white transition-opacity duration-300 pointer-events-none ${scrollPhase >= 6 ? 'opacity-100' : 'opacity-0'
+                            }`}
+                        style={{
+                            transitionDelay: scrollPhase >= 6 ? '0ms' : '0ms',
+                        }}
+                    />
                 </div>
             )}
 
             {/* Main Content - Fades in after animation */}
             <div
-                className={`transition-all duration-1000 ${isLoading ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+                className={`transition-all duration-1000 ease-out ${isLoading ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100 blur-0'
                     }`}
             >
                 {/* Professional Header */}
-                <header className="bg-white/95 backdrop-blur-sm border-b border-stone-200 sticky top-0 z-40 shadow-sm">
+                <header className="bg-white/95 backdrop-blur-sm border-b border-stone-200 sticky top-0 z-40 shadow-lg">
                     <div className="max-w-4xl mx-auto px-8 py-5">
                         <div className="flex items-center justify-center">
                             <img
@@ -172,11 +364,11 @@ export default function TermsPage() {
 
                 {/* Main Document */}
                 <main className="max-w-4xl mx-auto px-8 py-12">
-                    <Card className="border border-stone-200 shadow-2xl bg-gradient-to-b from-white via-orange-50/20 to-stone-50 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <Card className="border border-stone-200 shadow-2xl bg-gradient-to-b from-white via-orange-50/20 to-stone-50 backdrop-blur-sm">
                         <CardContent className="p-10 md:p-14">
 
                             {/* Document Title */}
-                            <div className="text-center mb-14 pb-8 border-b-2 border-stone-300 animate-in fade-in slide-in-from-top-4 duration-700 delay-200">
+                            <div className="text-center mb-14 pb-8 border-b-2 border-stone-300">
                                 {/* Decorative top element */}
                                 <div className="flex justify-center mb-6">
                                     <div className="flex items-center gap-4">
@@ -206,7 +398,7 @@ export default function TermsPage() {
 
                             {/* Preamble */}
                             <div
-                                className="mb-12 p-8 bg-gradient-to-br from-stone-50 to-stone-100/50 rounded-xl border border-stone-200 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300"
+                                className="mb-12 p-8 bg-gradient-to-br from-stone-50 to-stone-100/50 rounded-xl border border-stone-200"
                                 style={{ fontFamily: "'Source Sans 3', sans-serif" }}
                             >
                                 <p className="text-stone-700 leading-relaxed text-justify text-lg">
@@ -221,7 +413,7 @@ export default function TermsPage() {
                             </div>
 
                             {/* Table of Contents */}
-                            <div className="mb-14 p-8 bg-emerald-50/70 rounded-xl border border-emerald-200/70 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-400">
+                            <div className="mb-14 p-8 bg-emerald-50/70 rounded-xl border border-emerald-200/70">
                                 <h2
                                     className="text-lg font-bold text-emerald-800 uppercase tracking-widest mb-6 text-center"
                                     style={{ fontFamily: "'Source Sans 3', sans-serif" }}
@@ -262,122 +454,52 @@ export default function TermsPage() {
                             {/* Section 1 */}
                             <section id="section-1" className="mb-14 scroll-mt-24">
                                 <div className="flex items-baseline gap-4 mb-8 pb-4 border-b-2 border-emerald-600">
-                                    <span
-                                        className="text-5xl font-bold text-emerald-600"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
-                                        1
-                                    </span>
-                                    <h2
-                                        className="text-2xl font-bold text-stone-800 uppercase tracking-wide"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
+                                    <span className="text-5xl font-bold text-emerald-600" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>1</span>
+                                    <h2 className="text-2xl font-bold text-stone-800 uppercase tracking-wide" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
                                         Service Agreement and Acceptance
                                     </h2>
                                 </div>
 
-                                <div
-                                    className="space-y-8 text-stone-700 leading-relaxed text-justify"
-                                    style={{ fontFamily: "'Source Sans 3', sans-serif" }}
-                                >
+                                <div className="space-y-8 text-stone-700 leading-relaxed text-justify" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
                                     <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">1.1 Scope of Services: The Fab Clean Service Portfolio</h3>
+                                        <h3 className="font-bold text-stone-900 text-lg mb-3">1.1 Scope of Services</h3>
                                         <p className="mb-5 text-base leading-7">
-                                            Fab Clean, operating through an extensive, quality-controlled, and professionally audited
-                                            network of independently owned and operated franchises, delivers a comprehensive and diverse
-                                            array of professional textile care services meticulously engineered to satisfy a wide spectrum
-                                            of customer requirements, utilizing cutting-edge textile science and environmentally conscientious
-                                            methodologies. These specialized services encompass, but are not exclusively limited to, the
-                                            following core offerings:
+                                            Fab Clean delivers comprehensive textile care services including:
                                         </p>
-                                        <ul className="list-none space-y-5 ml-4">
+                                        <ul className="list-none space-y-4 ml-4">
                                             <li className="flex gap-4">
                                                 <span className="text-emerald-600 font-bold text-lg flex-shrink-0">a)</span>
-                                                <div>
-                                                    <strong className="text-stone-900">High-Volume Standard Services (Wash and Fold):</strong>
-                                                    <span className="block mt-1 text-stone-600">
-                                                        This represents our most economical and time-efficient solution, intended for everyday
-                                                        apparel, linens, and general articles. The service incorporates routine laundering in
-                                                        commercial-grade, temperature-controlled machines, machine drying to standard specifications,
-                                                        and professional folding or bagging. Articles are cleaned collectively with other routine
-                                                        customer items to optimize efficiency and maintain cost-effectiveness.
-                                                    </span>
-                                                </div>
+                                                <div><strong className="text-stone-900">High-Volume Standard Services (Wash and Fold)</strong> - Economical laundering for everyday apparel and linens.</div>
                                             </li>
                                             <li className="flex gap-4">
                                                 <span className="text-emerald-600 font-bold text-lg flex-shrink-0">b)</span>
-                                                <div>
-                                                    <strong className="text-stone-900">Premium Garment Dry Cleaning:</strong>
-                                                    <span className="block mt-1 text-stone-600">
-                                                        A sophisticated and essential process dedicated to preserving the integrity of structured,
-                                                        delicate, or high-value garments. This service employs specialized, non-water-based solvents
-                                                        and high-precision, temperature-regulated equipment for suits, evening wear, silks, wools,
-                                                        and cashmere.
-                                                    </span>
-                                                </div>
+                                                <div><strong className="text-stone-900">Premium Garment Dry Cleaning</strong> - Specialized care for suits, silks, wools, and cashmere.</div>
                                             </li>
                                             <li className="flex gap-4">
                                                 <span className="text-emerald-600 font-bold text-lg flex-shrink-0">c)</span>
-                                                <div>
-                                                    <strong className="text-stone-900">Professional Pressing and Finishing:</strong>
-                                                    <span className="block mt-1 text-stone-600">
-                                                        Meticulous hand-ironing, industrial steaming, and precise finishing techniques for a crisp,
-                                                        wrinkle-free, ready-to-wear finish. Items are returned on high-quality hangers with
-                                                        protective coverings.
-                                                    </span>
-                                                </div>
+                                                <div><strong className="text-stone-900">Professional Pressing and Finishing</strong> - Meticulous hand-ironing and steaming.</div>
                                             </li>
                                             <li className="flex gap-4">
                                                 <span className="text-emerald-600 font-bold text-lg flex-shrink-0">d)</span>
-                                                <div>
-                                                    <strong className="text-stone-900">Specialized Fabric Treatments:</strong>
-                                                    <span className="block mt-1 text-stone-600">
-                                                        Expert care for leather, suede, specialized synthetics, antique lace, cashmere, and
-                                                        down-filled articles requiring unique chemical processes and extended turnaround times.
-                                                    </span>
-                                                </div>
+                                                <div><strong className="text-stone-900">Specialized Fabric Treatments</strong> - Expert care for leather, suede, and delicates.</div>
                                             </li>
                                             <li className="flex gap-4">
                                                 <span className="text-emerald-600 font-bold text-lg flex-shrink-0">e)</span>
-                                                <div>
-                                                    <strong className="text-stone-900">Dedicated Stain Removal Efforts:</strong>
-                                                    <span className="block mt-1 text-stone-600">
-                                                        Advanced, multi-step chemical techniques to minimize persistent stains.
-                                                        <strong> Note: 100% stain removal is not guaranteed</strong> for all stain types.
-                                                    </span>
-                                                </div>
+                                                <div><strong className="text-stone-900">Stain Removal</strong> - Advanced techniques (100% removal not guaranteed).</div>
                                             </li>
                                             <li className="flex gap-4">
                                                 <span className="text-emerald-600 font-bold text-lg flex-shrink-0">f)</span>
-                                                <div>
-                                                    <strong className="text-stone-900">Minor Repair or Alteration Services:</strong>
-                                                    <span className="block mt-1 text-stone-600">
-                                                        Basic services including button replacement, simple re-stitching, and hem tacking.
-                                                        Availability varies by franchise location.
-                                                    </span>
-                                                </div>
+                                                <div><strong className="text-stone-900">Minor Repairs</strong> - Button replacement, re-stitching (varies by location).</div>
                                             </li>
                                         </ul>
                                     </div>
-
                                     <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">1.2 Contractual Obligation Commencement</h3>
-                                        <p className="text-base leading-7">
-                                            The act of placing an order with any Fab Clean franchise—whether in-store, via mobile app,
-                                            website, telephone, or authorized third-party collection—automatically signifies your
-                                            unconditional entry into a legally binding service agreement. The agreement commences when
-                                            a Fab Clean representative officially accepts, inspects, documents, and tags your items
-                                            for processing. The service agreement is finalized upon issuance of an itemized service receipt.
-                                        </p>
+                                        <h3 className="font-bold text-stone-900 text-lg mb-3">1.2 Contractual Obligation</h3>
+                                        <p className="text-base leading-7">Placing an order signifies entry into a legally binding agreement. The agreement commences when items are accepted, inspected, and tagged.</p>
                                     </div>
-
                                     <div>
                                         <h3 className="font-bold text-stone-900 text-lg mb-3">1.3 Right to Refuse Service</h3>
-                                        <p className="text-base leading-7">
-                                            We reserve the right, at our sole discretion, to refuse service to any customer or decline
-                                            any item. Grounds include: items posing equipment/safety risks, bio-hazardous materials,
-                                            missing care labels, or policy/ethical violations.
-                                        </p>
+                                        <p className="text-base leading-7">We reserve the right to refuse service for items posing safety risks, bio-hazards, or missing care labels.</p>
                                     </div>
                                 </div>
                             </section>
@@ -387,59 +509,28 @@ export default function TermsPage() {
                             {/* Section 2 */}
                             <section id="section-2" className="mb-14 scroll-mt-24">
                                 <div className="flex items-baseline gap-4 mb-8 pb-4 border-b-2 border-emerald-600">
-                                    <span
-                                        className="text-5xl font-bold text-emerald-600"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
-                                        2
-                                    </span>
-                                    <h2
-                                        className="text-2xl font-bold text-stone-800 uppercase tracking-wide"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
+                                    <span className="text-5xl font-bold text-emerald-600" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>2</span>
+                                    <h2 className="text-2xl font-bold text-stone-800 uppercase tracking-wide" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
                                         Order Placement, Processing & Delivery
                                     </h2>
                                 </div>
 
-                                <div
-                                    className="space-y-8 text-stone-700 leading-relaxed text-justify"
-                                    style={{ fontFamily: "'Source Sans 3', sans-serif" }}
-                                >
+                                <div className="space-y-8 text-stone-700 leading-relaxed text-justify" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
                                     <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">2.1 Order Submission and Confirmation</h3>
-                                        <p className="text-base leading-7">
-                                            Orders may be submitted at franchise locations, via telephone, or through our digital platforms.
-                                            A valid order is confirmed upon issuance of an itemized service receipt detailing item count,
-                                            service type, and estimated cost. <strong>The Customer bears responsibility for verifying
-                                                this information</strong> and must report discrepancies before items depart for processing.
-                                        </p>
+                                        <h3 className="font-bold text-stone-900 text-lg mb-3">2.1 Order Submission</h3>
+                                        <p className="text-base leading-7">Orders confirmed upon issuance of itemized service receipt. <strong>Customer responsibility to verify.</strong></p>
                                     </div>
-
                                     <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">2.2 Estimated Turnaround Time</h3>
-                                        <p className="text-base leading-7">
-                                            All quoted delivery times are estimates subject to adjustment based on service complexity,
-                                            workload, equipment maintenance, and external circumstances. We will notify customers of
-                                            delays exceeding 24 hours from the initial estimate.
-                                        </p>
+                                        <h3 className="font-bold text-stone-900 text-lg mb-3">2.2 Turnaround Time</h3>
+                                        <p className="text-base leading-7">All times are estimates. Notifications for delays exceeding 24 hours.</p>
                                     </div>
-
                                     <div>
                                         <h3 className="font-bold text-stone-900 text-lg mb-3">2.3 Express Services</h3>
-                                        <p className="text-base leading-7">
-                                            Express Orders are available for certain garment categories at an additional,
-                                            <strong> non-refundable premium surcharge</strong>. If we miss an express deadline due to
-                                            our operational failure (excluding Force Majeure), the express surcharge will be refunded.
-                                        </p>
+                                        <p className="text-base leading-7">Available at <strong>non-refundable premium surcharge</strong>.</p>
                                     </div>
-
                                     <div className="bg-amber-50 border-l-4 border-amber-500 p-6 rounded-r-xl">
-                                        <h3 className="font-bold text-amber-900 text-lg mb-3">2.4 Unclaimed Items Policy — IMPORTANT</h3>
-                                        <p className="text-amber-900 text-base leading-7">
-                                            Items must be collected within <strong>30 calendar days</strong> of the delivery date.
-                                            After <strong>60 calendar days</strong>, unclaimed items will be deemed abandoned and may
-                                            be disposed of, donated, or liquidated without further notice or liability.
-                                        </p>
+                                        <h3 className="font-bold text-amber-900 text-lg mb-3">2.4 Unclaimed Items — IMPORTANT</h3>
+                                        <p className="text-amber-900 text-base leading-7">Collect within <strong>30 days</strong>. After <strong>60 days</strong>, items deemed abandoned.</p>
                                     </div>
                                 </div>
                             </section>
@@ -449,55 +540,17 @@ export default function TermsPage() {
                             {/* Section 3 */}
                             <section id="section-3" className="mb-14 scroll-mt-24">
                                 <div className="flex items-baseline gap-4 mb-8 pb-4 border-b-2 border-emerald-600">
-                                    <span
-                                        className="text-5xl font-bold text-emerald-600"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
-                                        3
-                                    </span>
-                                    <h2
-                                        className="text-2xl font-bold text-stone-800 uppercase tracking-wide"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
+                                    <span className="text-5xl font-bold text-emerald-600" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>3</span>
+                                    <h2 className="text-2xl font-bold text-stone-800 uppercase tracking-wide" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
                                         Pricing, Payments & Financial Terms
                                     </h2>
                                 </div>
 
-                                <div
-                                    className="space-y-8 text-stone-700 leading-relaxed text-justify"
-                                    style={{ fontFamily: "'Source Sans 3', sans-serif" }}
-                                >
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">3.1 Pricing Structure</h3>
-                                        <p className="text-base leading-7">
-                                            Prices are calculated based on: service type, garment category (complexity), material
-                                            composition (specialty fabrics incur higher costs), and unique handling requirements.
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">3.2 Payment Obligations</h3>
-                                        <p className="text-base leading-7">
-                                            Full payment is due upon collection or delivery. Items will not be released until payment
-                                            is received. We accept cash, UPI, credit/debit cards, and digital payment methods.
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">3.3 Price Guarantee</h3>
-                                        <p className="text-base leading-7">
-                                            <strong>The price documented on your service receipt will be honored</strong> for that
-                                            specific order. Price adjustments will not be applied retrospectively to orders in process.
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">3.4 Credit Facilities</h3>
-                                        <p className="text-base leading-7">
-                                            Credit is not standard practice and may only be extended to pre-approved corporate or
-                                            commercial customers at franchise management's discretion.
-                                        </p>
-                                    </div>
+                                <div className="space-y-8 text-stone-700 leading-relaxed text-justify" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">3.1 Pricing</h3><p className="text-base leading-7">Based on service type, garment category, and material composition.</p></div>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">3.2 Payment</h3><p className="text-base leading-7">Due upon collection. We accept cash, UPI, cards, and digital payments.</p></div>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">3.3 Price Guarantee</h3><p className="text-base leading-7"><strong>Receipt price honored</strong> for that order.</p></div>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">3.4 Credit</h3><p className="text-base leading-7">Only for pre-approved corporate customers.</p></div>
                                 </div>
                             </section>
 
@@ -506,62 +559,21 @@ export default function TermsPage() {
                             {/* Section 4 */}
                             <section id="section-4" className="mb-14 scroll-mt-24">
                                 <div className="flex items-baseline gap-4 mb-8 pb-4 border-b-2 border-emerald-600">
-                                    <span
-                                        className="text-5xl font-bold text-emerald-600"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
-                                        4
-                                    </span>
-                                    <h2
-                                        className="text-2xl font-bold text-stone-800 uppercase tracking-wide"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
+                                    <span className="text-5xl font-bold text-emerald-600" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>4</span>
+                                    <h2 className="text-2xl font-bold text-stone-800 uppercase tracking-wide" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
                                         Limitations of Liability & Claims
                                     </h2>
                                 </div>
 
-                                <div
-                                    className="space-y-8 text-stone-700 leading-relaxed text-justify"
-                                    style={{ fontFamily: "'Source Sans 3', sans-serif" }}
-                                >
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">4.1 Delicate Items Disclaimer</h3>
-                                        <p className="text-base leading-7">
-                                            Fab Clean shall not be liable for damage to inherently delicate components including:
-                                            beading, sequins, ornamental elements, decorative trim, buttons, or damage from inherent
-                                            garment defects—unless documented in writing at order submission.
-                                        </p>
-                                    </div>
-
+                                <div className="space-y-8 text-stone-700 leading-relaxed text-justify" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">4.1 Delicate Items</h3><p className="text-base leading-7">Not liable for damage to beading, sequins, or embellishments unless documented.</p></div>
                                     <div className="bg-red-50 border-l-4 border-red-600 p-6 rounded-r-xl">
-                                        <h3 className="font-bold text-red-900 text-lg mb-3">4.2 Claims Procedure — CRITICAL NOTICE</h3>
-                                        <p className="text-red-900 text-base leading-7 mb-4">
-                                            Claims must be submitted <strong>IN WRITING</strong> within <strong>24 HOURS</strong> of
-                                            delivery/collection. <strong>Claims after this period will be automatically rejected.</strong>
-                                        </p>
-                                        <p className="text-red-900 text-base leading-7">
-                                            Maximum liability per item: <strong>10 times (10×) the service charge</strong> for that item.
-                                            This is the total, exclusive, and final compensation available.
-                                        </p>
+                                        <h3 className="font-bold text-red-900 text-lg mb-3">4.2 Claims — CRITICAL</h3>
+                                        <p className="text-red-900 text-base leading-7 mb-3">Submit <strong>IN WRITING within 24 HOURS</strong>. Late claims rejected.</p>
+                                        <p className="text-red-900 text-base leading-7">Max liability: <strong>10× service charge</strong>.</p>
                                     </div>
-
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">4.3 Fabric Defects Exclusion</h3>
-                                        <p className="text-base leading-7">
-                                            We are not liable for: color fading despite following care instructions, expected shrinkage
-                                            (1-3%), texture changes, inherent fabric defects, missing/faulty care labels, or wear and
-                                            age-related degradation.
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">4.4 Personal Belongings</h3>
-                                        <p className="text-base leading-7">
-                                            Customers must empty all pockets and check detachable parts before submission.
-                                            <strong> Fab Clean assumes no liability</strong> for items left in pockets. Found items
-                                            are held for 7 days before disposal.
-                                        </p>
-                                    </div>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">4.3 Exclusions</h3><p className="text-base leading-7">Not liable for color fading, shrinkage (1-3%), or age-related wear.</p></div>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">4.4 Personal Belongings</h3><p className="text-base leading-7">Empty pockets before submission. <strong>No liability for pocket contents.</strong></p></div>
                                 </div>
                             </section>
 
@@ -570,49 +582,16 @@ export default function TermsPage() {
                             {/* Section 5 */}
                             <section id="section-5" className="mb-14 scroll-mt-24">
                                 <div className="flex items-baseline gap-4 mb-8 pb-4 border-b-2 border-emerald-600">
-                                    <span
-                                        className="text-5xl font-bold text-emerald-600"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
-                                        5
-                                    </span>
-                                    <h2
-                                        className="text-2xl font-bold text-stone-800 uppercase tracking-wide"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
+                                    <span className="text-5xl font-bold text-emerald-600" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>5</span>
+                                    <h2 className="text-2xl font-bold text-stone-800 uppercase tracking-wide" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
                                         Privacy, Data Protection & Communication
                                     </h2>
                                 </div>
 
-                                <div
-                                    className="space-y-8 text-stone-700 leading-relaxed text-justify"
-                                    style={{ fontFamily: "'Source Sans 3', sans-serif" }}
-                                >
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">5.1 Data Collection</h3>
-                                        <p className="text-base leading-7">
-                                            We collect customer information (name, address, contact details, order history) strictly
-                                            for service provision, order fulfillment, payment processing, and operational analytics,
-                                            in compliance with applicable data protection laws.
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">5.2 Confidentiality</h3>
-                                        <p className="text-base leading-7">
-                                            Your data will not be sold or shared with third parties, except where legally mandated
-                                            or necessary for service fulfillment (e.g., delivery partners, payment processors).
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">5.3 Communications</h3>
-                                        <p className="text-base leading-7">
-                                            By providing your contact details, you consent to receive service updates, order
-                                            notifications, and promotional offers via SMS, email, or WhatsApp. You may opt-out
-                                            of marketing communications at any time.
-                                        </p>
-                                    </div>
+                                <div className="space-y-8 text-stone-700 leading-relaxed text-justify" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">5.1 Data Collection</h3><p className="text-base leading-7">Used for service provision and analytics. Compliant with data protection laws.</p></div>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">5.2 Confidentiality</h3><p className="text-base leading-7">Data not sold or shared except where legally required.</p></div>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">5.3 Communications</h3><p className="text-base leading-7">Consent to receive updates via SMS, email, WhatsApp. Opt-out available.</p></div>
                                 </div>
                             </section>
 
@@ -621,39 +600,15 @@ export default function TermsPage() {
                             {/* Section 6 */}
                             <section id="section-6" className="mb-14 scroll-mt-24">
                                 <div className="flex items-baseline gap-4 mb-8 pb-4 border-b-2 border-emerald-600">
-                                    <span
-                                        className="text-5xl font-bold text-emerald-600"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
-                                        6
-                                    </span>
-                                    <h2
-                                        className="text-2xl font-bold text-stone-800 uppercase tracking-wide"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
+                                    <span className="text-5xl font-bold text-emerald-600" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>6</span>
+                                    <h2 className="text-2xl font-bold text-stone-800 uppercase tracking-wide" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
                                         Franchise Operations & Dispute Resolution
                                     </h2>
                                 </div>
 
-                                <div
-                                    className="space-y-8 text-stone-700 leading-relaxed text-justify"
-                                    style={{ fontFamily: "'Source Sans 3', sans-serif" }}
-                                >
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">6.1 Franchise Network</h3>
-                                        <p className="text-base leading-7">
-                                            Fab Clean operates through independently owned and operated franchises. Each franchise
-                                            is a separate legal entity responsible for its operations, staffing, and customer service.
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">6.2 Dispute Resolution</h3>
-                                        <p className="text-base leading-7">
-                                            Complaints must first be addressed <strong>in writing</strong> with the servicing franchise.
-                                            Only if unresolved may matters be escalated to Fab Clean Corporate Support for mediation.
-                                        </p>
-                                    </div>
+                                <div className="space-y-8 text-stone-700 leading-relaxed text-justify" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">6.1 Franchise Network</h3><p className="text-base leading-7">Independently owned franchises. Each is a separate legal entity.</p></div>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">6.2 Dispute Resolution</h3><p className="text-base leading-7">Address complaints <strong>in writing</strong> to the franchise first. Escalate to Corporate only if unresolved.</p></div>
                                 </div>
                             </section>
 
@@ -662,48 +617,16 @@ export default function TermsPage() {
                             {/* Section 7 */}
                             <section id="section-7" className="mb-14 scroll-mt-24">
                                 <div className="flex items-baseline gap-4 mb-8 pb-4 border-b-2 border-emerald-600">
-                                    <span
-                                        className="text-5xl font-bold text-emerald-600"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
-                                        7
-                                    </span>
-                                    <h2
-                                        className="text-2xl font-bold text-stone-800 uppercase tracking-wide"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
+                                    <span className="text-5xl font-bold text-emerald-600" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>7</span>
+                                    <h2 className="text-2xl font-bold text-stone-800 uppercase tracking-wide" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
                                         General Provisions
                                     </h2>
                                 </div>
 
-                                <div
-                                    className="space-y-8 text-stone-700 leading-relaxed text-justify"
-                                    style={{ fontFamily: "'Source Sans 3', sans-serif" }}
-                                >
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">7.1 Governing Law</h3>
-                                        <p className="text-base leading-7">
-                                            These Terms shall be governed by the laws of the jurisdiction where the servicing
-                                            franchise is located. Customers consent to the exclusive jurisdiction of courts in
-                                            the franchise's operational territory.
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">7.2 Updates to Terms</h3>
-                                        <p className="text-base leading-7">
-                                            These Terms may be updated periodically. The current version on our website supersedes
-                                            all prior versions. Continued use of services constitutes acceptance of modified terms.
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-bold text-stone-900 text-lg mb-3">7.3 Severability</h3>
-                                        <p className="text-base leading-7">
-                                            If any provision is found unenforceable, remaining provisions shall continue in full
-                                            force and effect.
-                                        </p>
-                                    </div>
+                                <div className="space-y-8 text-stone-700 leading-relaxed text-justify" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">7.1 Governing Law</h3><p className="text-base leading-7">Governed by laws of the franchise's jurisdiction.</p></div>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">7.2 Updates</h3><p className="text-base leading-7">Terms may be updated. Continued use constitutes acceptance.</p></div>
+                                    <div><h3 className="font-bold text-stone-900 text-lg mb-3">7.3 Severability</h3><p className="text-base leading-7">Invalid provisions do not affect remaining terms.</p></div>
                                 </div>
                             </section>
 
@@ -712,104 +635,52 @@ export default function TermsPage() {
                             {/* Section 8 - Contact */}
                             <section id="section-8" className="mb-14 scroll-mt-24">
                                 <div className="flex items-baseline gap-4 mb-8 pb-4 border-b-2 border-emerald-600">
-                                    <span
-                                        className="text-5xl font-bold text-emerald-600"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
-                                        8
-                                    </span>
-                                    <h2
-                                        className="text-2xl font-bold text-stone-800 uppercase tracking-wide"
-                                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                    >
+                                    <span className="text-5xl font-bold text-emerald-600" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>8</span>
+                                    <h2 className="text-2xl font-bold text-stone-800 uppercase tracking-wide" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
                                         Contact Information
                                     </h2>
                                 </div>
 
-                                <div
-                                    className="text-stone-700 leading-relaxed"
-                                    style={{ fontFamily: "'Source Sans 3', sans-serif" }}
-                                >
-                                    <p className="mb-6 text-justify text-base leading-7">
-                                        For formal inquiries, escalation of unresolved disputes, or questions regarding these terms:
-                                    </p>
-
+                                <div className="text-stone-700 leading-relaxed" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
                                     <div className="bg-gradient-to-br from-stone-50 to-stone-100 border border-stone-200 rounded-xl p-8">
                                         <div className="flex items-center gap-5 mb-6 pb-6 border-b border-stone-300">
-                                            <img
-                                                src="/assets/fabclean-logo.png"
-                                                alt="Fab Clean"
-                                                className="h-14 object-contain"
-                                            />
+                                            <img src="/assets/fabclean-logo.png" alt="Fab Clean" className="h-14 object-contain" />
                                             <div>
-                                                <p className="font-bold text-stone-900 text-xl" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
-                                                    Corporate Support
-                                                </p>
-                                                <p className="text-sm text-stone-500">Mediation and Escalation Department</p>
+                                                <p className="font-bold text-stone-900 text-xl" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>Corporate Support</p>
+                                                <p className="text-sm text-stone-500">Mediation and Escalation</p>
                                             </div>
                                         </div>
                                         <div className="space-y-3 text-stone-700 text-base">
-                                            <p>
-                                                <span className="font-semibold text-stone-900">Email:</span>{" "}
-                                                <a href="mailto:support@myfabclean.com" className="text-emerald-600 hover:text-emerald-700 hover:underline transition-colors">
-                                                    support@myfabclean.com
-                                                </a>
-                                            </p>
-                                            <p>
-                                                <span className="font-semibold text-stone-900">Website:</span>{" "}
-                                                <a href="https://www.myfabclean.com" target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:text-emerald-700 hover:underline transition-colors">
-                                                    www.myfabclean.com
-                                                </a>
-                                            </p>
+                                            <p><span className="font-semibold text-stone-900">Email:</span> <a href="mailto:support@myfabclean.com" className="text-emerald-600 hover:underline">support@myfabclean.com</a></p>
+                                            <p><span className="font-semibold text-stone-900">Website:</span> <a href="https://www.myfabclean.com" target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline">www.myfabclean.com</a></p>
                                         </div>
                                     </div>
                                 </div>
                             </section>
 
                             {/* Acceptance Notice */}
-                            <div
-                                className="mt-14 p-10 bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-2 border-emerald-200 rounded-xl"
-                                style={{ fontFamily: "'Source Sans 3', sans-serif" }}
-                            >
-                                <h3
-                                    className="text-xl font-bold text-emerald-900 uppercase tracking-wider mb-5 text-center"
-                                    style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                >
+                            <div className="mt-14 p-10 bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-2 border-emerald-200 rounded-xl" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
+                                <h3 className="text-xl font-bold text-emerald-900 uppercase tracking-wider mb-5 text-center" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
                                     Acknowledgment and Acceptance
                                 </h3>
                                 <p className="text-emerald-800 leading-relaxed text-center max-w-3xl mx-auto text-base">
                                     By utilizing Fab Clean services, you acknowledge that you have read, fully understood,
                                     and unconditionally agree to be bound by these Terms & Conditions in their entirety.
-                                    These terms constitute the complete and exclusive agreement between you and Fab Clean
-                                    regarding the provision of textile care services.
                                 </p>
                             </div>
 
                             {/* Document Footer */}
                             <div className="mt-14 pt-10 border-t-2 border-stone-300 text-center">
-                                <img
-                                    src="/assets/fabclean-logo.png"
-                                    alt="Fab Clean"
-                                    className="h-12 object-contain mx-auto mb-5 opacity-70"
-                                />
-                                <p
-                                    className="text-base text-stone-600 font-medium"
-                                    style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
-                                >
+                                <img src="/assets/fabclean-logo.png" alt="Fab Clean" className="h-12 object-contain mx-auto mb-5 opacity-70" />
+                                <p className="text-base text-stone-600 font-medium" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
                                     © {currentYear} Fab Clean. All Rights Reserved.
                                 </p>
-                                <p
-                                    className="text-sm text-stone-500 mt-1"
-                                    style={{ fontFamily: "'Source Sans 3', sans-serif" }}
-                                >
+                                <p className="text-sm text-stone-500 mt-1" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
                                     Professional Laundry & Dry Cleaning Services
                                 </p>
                                 <div className="mt-6 pt-6 border-t border-stone-200">
-                                    <p
-                                        className="text-xs text-stone-400 tracking-wider"
-                                        style={{ fontFamily: "'Source Sans 3', sans-serif" }}
-                                    >
-                                        DOCUMENT ID: FC-TC-{currentYear}-V2.1 | CLASSIFICATION: PUBLIC | LAST REVISED: DECEMBER {currentYear}
+                                    <p className="text-xs text-stone-400 tracking-wider" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
+                                        DOCUMENT ID: FC-TC-{currentYear}-V2.1 | PUBLIC | DECEMBER {currentYear}
                                     </p>
                                 </div>
                             </div>
@@ -818,6 +689,14 @@ export default function TermsPage() {
                     </Card>
                 </main>
             </div>
+
+            {/* Global animation keyframes */}
+            <style>{`
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+      `}</style>
         </div>
     );
 }
