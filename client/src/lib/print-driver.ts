@@ -736,18 +736,22 @@ export class PrintDriver {
         console.error("Failed to generate QR code", e);
       }
 
-      // 1. Prepare Data
+      // 1. Prepare Data with franchise and GST info
       const invoiceData = {
         invoiceNumber: data.invoiceNumber,
         invoiceDate: data.invoiceDate,
         dueDate: data.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        // Pass franchiseId for strict franchise isolation
+        franchiseId: data.franchiseId,
+        // Pass GST flag for tax invoice generation
+        enableGST: data.enableGST || false,
         company: {
           name: data.companyInfo.name,
           address: data.companyInfo.address,
           phone: data.companyInfo.phone,
           email: data.companyInfo.email,
-          taxId: data.companyInfo.taxId || 'GSTIN-NOT-PROVIDED',
-          logo: '/assets/logo.webp'
+          taxId: data.companyInfo.taxId || '33AITPD3522F1ZK',
+          logo: '/assets/fabclean-logo.png'
         },
         customer: {
           name: data.customerInfo.name,
@@ -761,13 +765,14 @@ export class PrintDriver {
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           total: item.total,
-          taxRate: item.taxRate || 18,
-          hsn: '998314'
+          taxRate: data.enableGST ? (item.taxRate || 18) : 0,
+          hsn: '998314' // HSN for laundry services
         })),
         subtotal: data.subtotal,
         taxAmount: data.tax,
+        deliveryCharges: 0, // Will be included in items if applicable
         total: data.total,
-        paymentTerms: data.terms || 'Payment due within 30 days',
+        paymentTerms: data.terms || 'Payment due within 7 days',
         notes: data.notes,
         status: data.status,
         qrCode: qrCodeDataUrl

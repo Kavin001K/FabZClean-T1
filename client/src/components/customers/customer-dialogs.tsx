@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { formatAddress, parseAddress, createAddressObject } from '@/lib/address-utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   TrendingUp,
@@ -41,14 +42,19 @@ import { formatDate, formatCurrency } from '@/lib/data-service';
 import { cn } from '@/lib/utils';
 import type { Customer, Order } from '../../../../shared/schema';
 
-// Form validation schemas
+// Form validation schemas - with separate address fields
 const customerFormSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name must be less than 50 characters'),
   email: z.string().refine((val) => !val || z.string().email().safeParse(val).success, {
     message: 'Please enter a valid email address',
   }).optional(),
   phone: z.string().min(10, 'Phone number must be at least 10 digits').max(15, 'Phone number must be less than 15 digits'),
-  address: z.string().optional(), // Simple string for now - matches text input in UI
+  // Separate address fields for clean data collection
+  addressStreet: z.string().optional(),
+  addressCity: z.string().optional(),
+  addressPincode: z.string().refine((val) => !val || /^\d{6}$/.test(val.replace(/\s/g, '')), {
+    message: 'Pincode must be 6 digits',
+  }).optional(),
   notes: z.string().optional(),
   // New fields for enhanced customer management
   companyName: z.string().optional(),
@@ -134,13 +140,26 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   onDeleteCustomer,
   orders = [],
 }) => {
+  // Parse existing address for edit form
+  const existingAddress = React.useMemo(() => {
+    if (!selectedCustomer?.address) return { street: '', city: '', pincode: '' };
+    const parsed = parseAddress(selectedCustomer.address);
+    return {
+      street: parsed.street,
+      city: parsed.city,
+      pincode: parsed.pincode,
+    };
+  }, [selectedCustomer?.address]);
+
   const editForm = useForm<CustomerFormData>({
     resolver: zodResolver(customerFormSchema),
     defaultValues: {
       name: selectedCustomer?.name || '',
       email: selectedCustomer?.email || '',
       phone: selectedCustomer?.phone || '',
-      address: typeof selectedCustomer?.address === 'string' ? selectedCustomer.address : '',
+      addressStreet: existingAddress.street,
+      addressCity: existingAddress.city,
+      addressPincode: existingAddress.pincode,
       notes: '',
     },
   });
@@ -151,7 +170,9 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
       name: '',
       email: '',
       phone: '',
-      address: '',
+      addressStreet: '',
+      addressCity: '',
+      addressPincode: '',
       notes: '',
     },
   });
@@ -247,7 +268,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Address</Label>
                       <p className="text-sm">
-                        {typeof selectedCustomer.address === 'string' ? selectedCustomer.address : 'Not provided'}
+                        {formatAddress(parseAddress(selectedCustomer.address))}
                       </p>
                     </div>
                   </div>
@@ -466,21 +487,50 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="edit-address">Address</Label>
-                  <Textarea
-                    id="edit-address"
-                    {...editForm.register('address')}
-                    placeholder="Enter customer address"
-                    className={cn(
-                      editForm.formState.errors.address && 'border-red-500'
-                    )}
-                  />
-                  {editForm.formState.errors.address && (
-                    <p className="text-sm text-red-500">
-                      {editForm.formState.errors.address.message}
-                    </p>
-                  )}
+                {/* Address Fields - Collected Separately */}
+                <div className="space-y-4 border-t pt-4">
+                  <h4 className="font-semibold text-sm text-muted-foreground">Address</h4>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-street">Street Address</Label>
+                    <Input
+                      id="edit-street"
+                      {...editForm.register('addressStreet')}
+                      placeholder="e.g., 1/85 Zamin Kottampatty"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-city">City</Label>
+                      <Input
+                        id="edit-city"
+                        {...editForm.register('addressCity')}
+                        placeholder="e.g., Pollachi"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-pincode">Pincode</Label>
+                      <Input
+                        id="edit-pincode"
+                        {...editForm.register('addressPincode')}
+                        placeholder="e.g., 642123"
+                        maxLength={6}
+                        className={cn(
+                          editForm.formState.errors.addressPincode && 'border-red-500'
+                        )}
+                      />
+                      {editForm.formState.errors.addressPincode && (
+                        <p className="text-sm text-red-500">
+                          {editForm.formState.errors.addressPincode.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    State: Tamil Nadu, Country: India (default)
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -711,21 +761,50 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="create-address">Address</Label>
-                <Textarea
-                  id="create-address"
-                  {...createForm.register('address')}
-                  placeholder="Enter customer address"
-                  className={cn(
-                    createForm.formState.errors.address && 'border-red-500'
-                  )}
-                />
-                {createForm.formState.errors.address && (
-                  <p className="text-sm text-red-500">
-                    {createForm.formState.errors.address.message}
-                  </p>
-                )}
+              {/* Address Fields - Collected Separately */}
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-semibold text-sm text-muted-foreground">Address (Optional)</h4>
+
+                <div className="space-y-2">
+                  <Label htmlFor="create-street">Street Address</Label>
+                  <Input
+                    id="create-street"
+                    {...createForm.register('addressStreet')}
+                    placeholder="e.g., 1/85 Zamin Kottampatty"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="create-city">City</Label>
+                    <Input
+                      id="create-city"
+                      {...createForm.register('addressCity')}
+                      placeholder="e.g., Pollachi"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="create-pincode">Pincode</Label>
+                    <Input
+                      id="create-pincode"
+                      {...createForm.register('addressPincode')}
+                      placeholder="e.g., 642123"
+                      maxLength={6}
+                      className={cn(
+                        createForm.formState.errors.addressPincode && 'border-red-500'
+                      )}
+                    />
+                    {createForm.formState.errors.addressPincode && (
+                      <p className="text-sm text-red-500">
+                        {createForm.formState.errors.addressPincode.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  State: Tamil Nadu, Country: India (default)
+                </p>
               </div>
 
               <div className="space-y-2">

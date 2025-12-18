@@ -56,6 +56,7 @@ import { CustomerDialogs } from '@/components/customers/customer-dialogs';
 import { customersApi, ordersApi } from '@/lib/data-service';
 import { exportCustomersEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportCustomersToExcel } from '@/lib/excel-exports';
+import { createAddressObject } from '@/lib/address-utils';
 import type { Customer, Order } from '../../../shared/schema';
 
 // Helper functions
@@ -298,15 +299,44 @@ export default function Customers() {
     }
   };
 
-  const handleCreateCustomer = (customerData: Partial<Customer>) => {
-    createCustomerMutation.mutate(customerData);
+  const handleCreateCustomer = (customerData: any) => {
+    // Transform address fields to proper address object
+    const addressObj = createAddressObject({
+      street: customerData.addressStreet || '',
+      city: customerData.addressCity || '',
+      pincode: customerData.addressPincode || '',
+    });
+
+    const transformedData: Partial<Customer> = {
+      name: customerData.name,
+      phone: customerData.phone,
+      email: customerData.email || undefined,
+      address: addressObj.street ? addressObj : undefined,
+    };
+
+    createCustomerMutation.mutate(transformedData);
   };
 
-  const handleUpdateCustomer = (customerData: Partial<Customer>) => {
+  const handleUpdateCustomer = (customerData: any) => {
     if (!selectedCustomer) return;
+
+    // Transform address fields to proper address object
+    const addressObj = createAddressObject({
+      street: customerData.addressStreet || '',
+      city: customerData.addressCity || '',
+      pincode: customerData.addressPincode || '',
+    });
+
+    const transformedData: Partial<Customer> = {
+      name: customerData.name,
+      phone: customerData.phone,
+      email: customerData.email || undefined,
+      address: addressObj.street ? addressObj : undefined,
+    };
+
     editCustomerMutation.mutate({
       customerId: selectedCustomer.id,
-      customerData,
+      customerData: transformedData,
     });
   };
 

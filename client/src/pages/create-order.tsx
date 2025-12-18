@@ -27,6 +27,7 @@ import { OrderConfirmationDialog } from "@/components/orders/order-confirmation-
 import OrderDetailsDialog from "@/components/orders/order-details-dialog";
 import { useAuth } from "@/contexts/auth-context";
 import { generateOrderNumber } from "@/lib/franchise-config";
+import { createAddressObject, parseAndFormatAddress, parseAddress } from "@/lib/address-utils";
 
 interface ServiceItem {
   service: Service;
@@ -63,7 +64,10 @@ export default function CreateOrder() {
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [newCustomerEmail, setNewCustomerEmail] = useState('');
-  const [newCustomerAddress, setNewCustomerAddress] = useState('');
+  // Separate address fields for clean data collection
+  const [newCustomerStreet, setNewCustomerStreet] = useState('');
+  const [newCustomerCity, setNewCustomerCity] = useState('');
+  const [newCustomerPincode, setNewCustomerPincode] = useState('');
   const [newCustomerNotes, setNewCustomerNotes] = useState('');
 
   // Services state
@@ -112,7 +116,7 @@ export default function CreateOrder() {
 
   // Fulfillment type (pickup or delivery)
   const [fulfillmentType, setFulfillmentType] = useState<'pickup' | 'delivery'>('pickup');
-  const [deliveryCharges, setDeliveryCharges] = useState(0);
+  const [deliveryCharges, setDeliveryCharges] = useState(50); // Default ₹50 delivery charges
   const [deliveryStreet, setDeliveryStreet] = useState('');
   const [deliveryCity, setDeliveryCity] = useState('');
   const [deliveryZip, setDeliveryZip] = useState('');
@@ -228,10 +232,12 @@ export default function CreateOrder() {
         setCustomerEmail(customer.email || "");
         setCustomerPhone(customer.phone || phoneNumber);
 
-        // Handle address which could be jsonb or string
-        let addressStr = "";
-        const extractedAddresses: Array<{ street: string, city: string, zip: string, label?: string }> = [];
+        // Use centralized address utility for proper formatting
+        const formattedAddress = parseAndFormatAddress(customer.address);
+        setCustomerAddress(formattedAddress === 'Address not provided' ? '' : formattedAddress);
 
+        // Extract addresses for delivery selection
+        const extractedAddresses: Array<{ street: string, city: string, zip: string, label?: string }> = [];
         if (customer.address) {
           try {
             const rawAddr = customer.address;
@@ -240,7 +246,6 @@ export default function CreateOrder() {
               : rawAddr;
 
             if (typeof addrObj === 'object' && addrObj !== null) {
-              // Check if it's an array of addresses
               if (Array.isArray(addrObj)) {
                 addrObj.forEach((addr: any, idx: number) => {
                   extractedAddresses.push({
@@ -251,8 +256,6 @@ export default function CreateOrder() {
                   });
                 });
               } else {
-                // Single address object
-                addressStr = addrObj.line1 || addrObj.street || '';
                 extractedAddresses.push({
                   street: addrObj.street || addrObj.line1 || '',
                   city: addrObj.city || '',
@@ -260,17 +263,11 @@ export default function CreateOrder() {
                   label: 'Primary Address'
                 });
               }
-            } else {
-              addressStr = String(addrObj);
-              extractedAddresses.push({ street: addressStr, city: '', zip: '', label: 'Primary Address' });
             }
           } catch (e) {
-            addressStr = String(customer.address);
-            extractedAddresses.push({ street: addressStr, city: '', zip: '', label: 'Primary Address' });
+            // Ignore parse errors for delivery addresses
           }
         }
-
-        setCustomerAddress(addressStr);
         setSavedAddresses(extractedAddresses.filter(a => a.street));
 
         toast({
@@ -301,34 +298,9 @@ export default function CreateOrder() {
     setCustomerEmail(customer.email || "");
     setCustomerPhone(customer.phone || "");
 
-    // Handle address which could be jsonb or string
-    let addressStr = "";
-    if (customer.address) {
-      try {
-        const rawAddr = customer.address;
-        // If it's a string, try to parse it first
-        const addrObj = typeof rawAddr === 'string' && rawAddr.startsWith('{')
-          ? JSON.parse(rawAddr)
-          : rawAddr;
-
-        if (typeof addrObj === 'object' && addrObj !== null) {
-          // It's an object (or parsed object), look for line1
-          if (addrObj.line1) {
-            addressStr = addrObj.line1;
-          } else {
-            // Fallback: stringify the whole object if no line1
-            addressStr = JSON.stringify(addrObj);
-          }
-        } else {
-          // It's a simple string
-          addressStr = String(addrObj);
-        }
-      } catch (e) {
-        // If parsing fails, use as is
-        addressStr = String(customer.address);
-      }
-    }
-    setCustomerAddress(addressStr);
+    // Use centralized address utility for proper formatting
+    const formattedAddress = parseAndFormatAddress(customer.address);
+    setCustomerAddress(formattedAddress === 'Address not provided' ? '' : formattedAddress);
 
     toast({
       title: "Customer Selected!",
@@ -350,34 +322,9 @@ export default function CreateOrder() {
         setCustomerEmail(newCustomer.email || "");
         setCustomerPhone(newCustomer.phone || "");
 
-        // Handle address which could be jsonb or string
-        let addressStr = "";
-        if (newCustomer.address) {
-          try {
-            const rawAddr = newCustomer.address;
-            // If it's a string, try to parse it first
-            const addrObj = typeof rawAddr === 'string' && rawAddr.startsWith('{')
-              ? JSON.parse(rawAddr)
-              : rawAddr;
-
-            if (typeof addrObj === 'object' && addrObj !== null) {
-              // It's an object (or parsed object), look for line1
-              if (addrObj.line1) {
-                addressStr = addrObj.line1;
-              } else {
-                // Fallback: stringify the whole object if no line1
-                addressStr = JSON.stringify(addrObj);
-              }
-            } else {
-              // It's a simple string
-              addressStr = String(addrObj);
-            }
-          } catch (e) {
-            // If parsing fails, use as is
-            addressStr = String(newCustomer.address);
-          }
-        }
-        setCustomerAddress(addressStr);
+        // Use centralized address utility for proper formatting
+        const formattedAddress = parseAndFormatAddress(newCustomer.address);
+        setCustomerAddress(formattedAddress === 'Address not provided' ? '' : formattedAddress);
 
         queryClient.invalidateQueries({ queryKey: ["customers"] });
 
@@ -391,7 +338,9 @@ export default function CreateOrder() {
         setNewCustomerName('');
         setNewCustomerPhone('');
         setNewCustomerEmail('');
-        setNewCustomerAddress('');
+        setNewCustomerStreet('');
+        setNewCustomerCity('');
+        setNewCustomerPincode('');
         setNewCustomerNotes('');
       }
     },
@@ -426,12 +375,28 @@ export default function CreateOrder() {
       return;
     }
 
+    // Validate pincode if provided (6 digits)
+    if (newCustomerPincode && !/^\d{6}$/.test(newCustomerPincode)) {
+      toast({
+        title: "Validation Error",
+        description: "Pincode must be 6 digits",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create proper address object
+    const addressObj = newCustomerStreet ? createAddressObject({
+      street: newCustomerStreet,
+      city: newCustomerCity,
+      pincode: newCustomerPincode,
+    }) : undefined;
+
     createCustomerMutation.mutate({
       name: newCustomerName,
       phone: newCustomerPhone,
       email: newCustomerEmail || undefined,
-      // Send address as an object to satisfy jsonb requirement
-      address: newCustomerAddress ? { line1: newCustomerAddress } : undefined,
+      address: addressObj,
     });
   };
 
@@ -1391,11 +1356,13 @@ export default function CreateOrder() {
                       <Label>Delivery Charges (₹)</Label>
                       <Input
                         type="number"
-                        placeholder="0"
-                        value={deliveryCharges || ''}
+                        placeholder="50"
+                        value={deliveryCharges}
                         onChange={(e) => setDeliveryCharges(parseFloat(e.target.value) || 0)}
                         className="bg-background"
+                        min={0}
                       />
+                      <p className="text-xs text-muted-foreground">Default: ₹50 (editable)</p>
                     </div>
 
                     {/* Saved Addresses Dropdown */}
@@ -1445,9 +1412,11 @@ export default function CreateOrder() {
                       size="sm"
                       className="w-full"
                       onClick={() => {
-                        setDeliveryStreet(customerAddress);
-                        setDeliveryCity('');
-                        setDeliveryZip('');
+                        // Parse the customer address to extract city and pincode
+                        const parsedAddr = parseAddress(foundCustomer?.address);
+                        setDeliveryStreet(parsedAddr.street || customerAddress);
+                        setDeliveryCity(parsedAddr.city || '');
+                        setDeliveryZip(parsedAddr.pincode || '');
                         toast({
                           title: "Address Copied",
                           description: "Customer's registered address used for delivery",
@@ -1564,27 +1533,15 @@ export default function CreateOrder() {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="space-y-4 pt-2"
+                      className="pt-2"
                     >
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="gstNumber">GST Number</Label>
-                          <Input
-                            id="gstNumber"
-                            placeholder="Enter GSTIN"
-                            value={gstNumber}
-                            onChange={(e) => setGstNumber(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="panNumber">PAN Number</Label>
-                          <Input
-                            id="panNumber"
-                            placeholder="Enter PAN"
-                            value={panNumber}
-                            onChange={(e) => setPanNumber(e.target.value)}
-                          />
-                        </div>
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <p className="text-sm text-green-800 font-medium">
+                          ✓ GST Invoice will be generated
+                        </p>
+                        <p className="text-xs text-green-600 mt-1">
+                          GSTIN: 33AITPD3522F1ZK • 18% GST (9% CGST + 9% SGST)
+                        </p>
                       </div>
                     </motion.div>
                   )}
@@ -2053,15 +2010,42 @@ export default function CreateOrder() {
                 onChange={(e) => setNewCustomerEmail(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="newCustomerAddress">Address</Label>
-              <Textarea
-                id="newCustomerAddress"
-                placeholder="Customer's address (optional)"
-                value={newCustomerAddress}
-                onChange={(e) => setNewCustomerAddress(e.target.value)}
-                rows={3}
-              />
+            {/* Address Fields - Collected Separately */}
+            <div className="space-y-4 border-t pt-4">
+              <h4 className="font-semibold text-sm text-muted-foreground">Address (Optional)</h4>
+              <div className="space-y-2">
+                <Label htmlFor="newCustomerStreet">Street Address</Label>
+                <Input
+                  id="newCustomerStreet"
+                  placeholder="e.g., 1/85 Zamin Kottampatty"
+                  value={newCustomerStreet}
+                  onChange={(e) => setNewCustomerStreet(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="newCustomerCity">City</Label>
+                  <Input
+                    id="newCustomerCity"
+                    placeholder="e.g., Pollachi"
+                    value={newCustomerCity}
+                    onChange={(e) => setNewCustomerCity(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="newCustomerPincode">Pincode</Label>
+                  <Input
+                    id="newCustomerPincode"
+                    placeholder="e.g., 642123"
+                    value={newCustomerPincode}
+                    onChange={(e) => setNewCustomerPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    maxLength={6}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                State: Tamil Nadu, Country: India (default)
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="newCustomerNotes">Notes</Label>
