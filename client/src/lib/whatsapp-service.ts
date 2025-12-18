@@ -108,7 +108,8 @@ export class WhatsAppService {
         customerName: string,
         totalAmount: number,
         billUrl: string,
-        pdfUrl?: string
+        pdfUrl?: string,
+        mainItem?: string
     ): Promise<boolean> {
         try {
             // Call our backend proxy to avoid CORS and hide API keys
@@ -123,7 +124,8 @@ export class WhatsAppService {
                     customerPhone: phone,
                     orderId: orderNumber,
                     amount: totalAmount,
-                    pdfUrl: pdfUrl
+                    pdfUrl: pdfUrl,
+                    mainItem: mainItem
                 })
             });
 

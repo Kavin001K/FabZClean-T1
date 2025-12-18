@@ -10,7 +10,7 @@ interface SendBillParams {
     customerPhone: string;
     orderId: string;
     amount: string;       // For body_3
-    paymentLink: string;  // For body_4
+    mainItem: string;     // For body_4
     pdfUrl: string;       // The hosted URL of the PDF
 }
 
@@ -57,7 +57,7 @@ export const sendWhatsAppBill = async (params: SendBillParams) => {
                                 },
                                 body_4: {
                                     type: "text",
-                                    value: params.paymentLink // {{4}}
+                                    value: params.mainItem // {{4}}
                                 }
                             }
                         }

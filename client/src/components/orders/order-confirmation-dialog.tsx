@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { printDriver } from '@/lib/print-driver';
 import { GarmentTagPrint } from './garment-tag-print';
+import { generateUPIUrl, PAYMENT_CONFIG } from '@/lib/franchise-config';
 
 interface OrderConfirmationDialogProps {
     open: boolean;
@@ -111,8 +112,7 @@ export function OrderConfirmationDialog({
 
                     // Only generate QR if there is a balance due
                     if (balanceDue > 0) {
-                        const upiId = "8825702072@okbizaxis";
-                        const upiUrl = `upi://pay?pa=${upiId}&pn=FabZClean&am=${balanceDue.toFixed(2)}&tr=${order.orderNumber}&tn=Order-${order.orderNumber}`;
+                        const upiUrl = generateUPIUrl(balanceDue, order.orderNumber, `Order-${order.orderNumber}`);
 
                         QRCode.toCanvas(qrcodeRef.current, upiUrl, {
                             width: 100,
@@ -238,8 +238,7 @@ export function OrderConfirmationDialog({
                     const QRCodeModule = await import('qrcode');
                     const toDataURL = QRCodeModule.toDataURL || (QRCodeModule.default && QRCodeModule.default.toDataURL);
                     if (toDataURL) {
-                        const upiId = "8825702072@okbizaxis";
-                        const upiUrl = `upi://pay?pa=${upiId}&pn=FabZClean&am=${totalAmount}&cu=INR`;
+                        const upiUrl = generateUPIUrl(totalAmount);
                         invoiceData.qrCode = await toDataURL(upiUrl);
                     }
                 } catch (e) {
@@ -262,6 +261,27 @@ export function OrderConfirmationDialog({
                 // Continue without PDF - will send text message
             }
 
+            // Calculate Main Item name for message
+            const getItems = () => Array.isArray(order.items) ? order.items : [];
+            const items = getItems();
+            let mainItemName = "Laundry Items";
+            if (items.length > 0) {
+                const firstItem = items[0] as any;
+                // Try to get name from various common properties
+                mainItemName = firstItem.name ||
+                    firstItem.productName ||
+                    firstItem.description ||
+                    (firstItem.product && firstItem.product.name) ||
+                    "Laundry Items";
+
+                // Add count if more than 1 item? 
+                // User request says "This includes your Cotton Sarees and..."
+                // If I have 10 items, "This includes your T-Shirt and..." is okay.
+                if (items.length > 1) {
+                    mainItemName = `${mainItemName} + ${items.length - 1} items`;
+                }
+            }
+
             // Send WhatsApp message (with or without PDF)
             console.log('💬 Sending WhatsApp message...');
             const success = await WhatsAppService.sendOrderBill(
@@ -270,7 +290,8 @@ export function OrderConfirmationDialog({
                 customerName,
                 totalAmount,
                 billUrl,
-                pdfUrl // May be undefined if PDF failed
+                pdfUrl, // May be undefined if PDF failed
+                mainItemName
             );
 
             if (success) {

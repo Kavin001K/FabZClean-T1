@@ -195,6 +195,9 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
         padding: '30px 40px',
         position: 'relative',
         overflow: 'hidden',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
       }}>
         {/* Decorative circles */}
         <div style={{
@@ -206,49 +209,62 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
           borderRadius: '50%',
           background: 'rgba(255,255,255,0.1)',
         }}></div>
-        <div style={{
-          position: 'absolute',
-          right: '50px',
-          bottom: '-30px',
-          width: '100px',
-          height: '100px',
-          borderRadius: '50%',
-          background: 'rgba(255,255,255,0.05)',
-        }}></div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
-          {/* Company Info */}
+        <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: '20px' }}>
+          {/* Logo Container */}
+          <div style={{
+            background: colors.white,
+            padding: '8px',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          }}>
+            <img
+              src="/assets/logo.webp"
+              alt="Fab Clean"
+              style={{
+                height: '50px',
+                width: 'auto',
+                objectFit: 'contain'
+              }}
+            />
+          </div>
+
           <div>
             <h1 style={{
-              fontSize: '36px',
+              fontSize: '28px',
               fontWeight: '800',
-              margin: '0 0 8px 0',
-              letterSpacing: '-1px',
+              margin: '0',
+              letterSpacing: '-0.5px',
+              lineHeight: '1.2'
             }}>
               {companyDetails.name}
             </h1>
-            <p style={{ fontSize: '13px', opacity: 0.9, margin: '0' }}>
+            <p style={{ fontSize: '12px', opacity: 0.9, margin: '2px 0 0 0' }}>
               Premium Laundry & Dry Cleaning Services
             </p>
           </div>
+        </div>
 
-          {/* Invoice Type Badge */}
-          <div style={{ textAlign: 'right' }}>
-            <div style={{
-              display: 'inline-block',
-              background: 'rgba(255,255,255,0.2)',
-              padding: '8px 20px',
-              borderRadius: '6px',
-              marginBottom: '8px',
-            }}>
-              <span style={{ fontSize: '18px', fontWeight: '700', letterSpacing: '2px' }}>
-                {invoiceType}
-              </span>
-            </div>
-            <p style={{ fontSize: '20px', fontWeight: '700', margin: '0', fontFamily: 'monospace' }}>
-              #{invoiceNumber}
-            </p>
+        {/* Invoice Meta */}
+        <div style={{ textAlign: 'right', position: 'relative', zIndex: 1 }}>
+          <div style={{
+            display: 'inline-block',
+            background: 'rgba(255,255,255,0.2)',
+            padding: '6px 16px',
+            borderRadius: '4px',
+            marginBottom: '6px',
+            backdropFilter: 'blur(4px)'
+          }}>
+            <span style={{ fontSize: '14px', fontWeight: '700', letterSpacing: '2px' }}>
+              {invoiceType}
+            </span>
           </div>
+          <p style={{ fontSize: '18px', fontWeight: '700', margin: '0', fontFamily: 'monospace' }}>
+            #{invoiceNumber}
+          </p>
         </div>
       </div>
 
@@ -260,15 +276,15 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
 
           {/* From Section */}
           <div style={{
-            background: colors.background,
+            background: colors.white, // Changed to white for subtlety
             padding: '20px',
             borderRadius: '10px',
-            border: `1px solid ${colors.border}`,
+            border: `1px solid ${colors.border}`, // Simple border
           }}>
             <h3 style={{
               fontSize: '10px',
               fontWeight: '700',
-              color: colors.primary,
+              color: colors.textLight, // Muted color
               textTransform: 'uppercase',
               letterSpacing: '1.5px',
               margin: '0 0 12px 0',
@@ -276,16 +292,14 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
               alignItems: 'center',
               gap: '6px',
             }}>
-              <span style={{ width: '4px', height: '12px', background: colors.primary, borderRadius: '2px' }}></span>
               From
             </h3>
-            <p style={{ fontWeight: '700', fontSize: '16px', margin: '0 0 8px 0', color: colors.dark }}>
-              {companyDetails.name}
+            {/* Removed large Name since it is in Header */}
+            <p style={{ margin: '0 0 4px 0', color: colors.text, fontSize: '13px', lineHeight: '1.5' }}>
+              <strong>{companyDetails.address.split(',')[0]}</strong><br />
+              {companyDetails.address.split(',').slice(1).join(', ')}
             </p>
-            <p style={{ margin: '0 0 4px 0', color: colors.textLight, fontSize: '12px' }}>
-              {companyDetails.address}
-            </p>
-            <p style={{ margin: '0 0 4px 0', color: colors.textLight, fontSize: '12px' }}>
+            <p style={{ margin: '8px 0 2px 0', color: colors.textLight, fontSize: '12px' }}>
               📞 {companyDetails.phone}
             </p>
             <p style={{ margin: '0 0 8px 0', color: colors.textLight, fontSize: '12px' }}>
@@ -294,16 +308,16 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
             {enableGST && (
               <div style={{
                 marginTop: '10px',
-                padding: '8px 10px',
-                background: colors.white,
-                borderRadius: '6px',
+                paddingTop: '8px',
+                borderTop: `1px dashed ${colors.border}`,
                 fontSize: '11px',
+                color: colors.textLight
               }}>
-                <p style={{ margin: '0 0 2px 0', fontWeight: '600' }}>
-                  <span style={{ color: colors.textLight }}>GSTIN:</span> {companyDetails.gstin}
+                <p style={{ margin: '0 0 2px 0' }}>
+                  GSTIN: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: colors.dark }}>{companyDetails.gstin}</span>
                 </p>
-                <p style={{ margin: '0', fontWeight: '600' }}>
-                  <span style={{ color: colors.textLight }}>PAN:</span> {companyDetails.pan}
+                <p style={{ margin: '0' }}>
+                  PAN: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: colors.dark }}>{companyDetails.pan}</span>
                 </p>
               </div>
             )}
@@ -425,32 +439,43 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
           {/* Left: QR & Bank Details */}
           <div style={{ flex: 1 }}>
             {qrCode && (
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={{
+                display: 'flex',
+                gap: '16px',
+                alignItems: 'center',
+                marginBottom: '15px',
+                padding: '12px',
+                background: colors.white,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '8px',
+                width: 'fit-content' // Keep it compact
+              }}>
                 <div style={{
-                  padding: '10px',
+                  padding: '4px',
                   background: colors.white,
-                  borderRadius: '10px',
-                  border: `2px solid ${colors.primary}`,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  borderRadius: '4px',
                 }}>
-                  <img src={qrCode} alt="QR Code" style={{ width: '80px', height: '80px', display: 'block' }} />
+                  <img src={qrCode} alt="QR Code" style={{ width: '70px', height: '70px', display: 'block' }} />
                 </div>
                 <div>
-                  <p style={{ fontWeight: '700', color: colors.primary, margin: '0 0 4px 0', fontSize: '13px' }}>Scan to Pay</p>
-                  <p style={{ color: colors.textLight, margin: '0', fontSize: '11px' }}>UPI / Google Pay / PhonePe</p>
+                  <p style={{ fontWeight: '700', color: colors.primary, margin: '0 0 2px 0', fontSize: '13px' }}>Scan to Pay</p>
+                  <p style={{ color: colors.textLight, margin: '0', fontSize: '10px' }}>UPI / GPay / PhonePe</p>
+                  <p style={{ color: colors.primary, margin: '2px 0 0 0', fontSize: '10px', fontWeight: '600' }}>Fab Clean</p>
                 </div>
               </div>
             )}
 
             <div style={{
               background: colors.background,
-              padding: '15px',
+              padding: '12px',
               borderRadius: '8px',
               border: `1px dashed ${colors.border}`,
             }}>
-              <p style={{ fontWeight: '600', color: colors.primary, margin: '0 0 6px 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>Terms & Conditions</p>
-              <p style={{ color: colors.textLight, margin: '0', fontSize: '11px', lineHeight: '1.6' }}>
-                Payment due within 7 days. For T&C visit: <a href="https://myfabclean.com/terms" style={{ color: colors.primary, textDecoration: 'none', fontWeight: '600' }}>myfabclean.com/terms</a>
+              <p style={{ fontWeight: '600', color: colors.primary, margin: '0 0 4px 0', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>Terms & Conditions</p>
+              <p style={{ color: colors.textLight, margin: '0', fontSize: '10px', lineHeight: '1.4' }}>
+                1. Payment due on delivery.<br />
+                2. We are not responsible for natural wear & tear.<br />
+                3. For full terms visit: <a href="https://myfabclean.com/terms" style={{ color: colors.primary, textDecoration: 'none' }}>myfabclean.com/terms</a>
               </p>
             </div>
           </div>

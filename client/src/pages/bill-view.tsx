@@ -10,6 +10,7 @@ import { formatCurrency, formatDate } from "@/lib/data-service";
 // @ts-ignore
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
+import { generateUPIUrl } from '@/lib/franchise-config';
 
 export default function BillView() {
     const [, params] = useRoute("/bill/:orderNumber");

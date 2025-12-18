@@ -4,6 +4,36 @@
  * NEW FRANCHISES: Add your franchise here following the existing pattern.
  */
 
+// ==========================================
+// PAYMENT CONFIGURATION (CENTRALIZED)
+// ==========================================
+export const PAYMENT_CONFIG = {
+    // Primary UPI ID for all payment collections
+    UPI_ID: '9886788858@pz',
+    // Display name shown in UPI apps
+    PAYEE_NAME: 'Fab Clean',
+    // Currency
+    CURRENCY: 'INR',
+} as const;
+
+/**
+ * Generate UPI payment URL for QR code
+ * @param amount - Payment amount
+ * @param orderId - Order reference number
+ * @param note - Payment note/description
+ */
+export function generateUPIUrl(amount: number, orderId?: string, note?: string): string {
+    const params = new URLSearchParams();
+    params.set('pa', PAYMENT_CONFIG.UPI_ID);
+    params.set('pn', PAYMENT_CONFIG.PAYEE_NAME);
+    params.set('am', amount.toFixed(2));
+    params.set('cu', PAYMENT_CONFIG.CURRENCY);
+    if (orderId) params.set('tr', orderId);
+    if (note) params.set('tn', note);
+    return `upi://pay?${params.toString()}`;
+}
+// ==========================================
+
 export interface FranchiseBranchInfo {
     id: string;
     name: string;

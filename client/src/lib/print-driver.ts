@@ -728,9 +728,9 @@ export class PrintDriver {
       // Generate QR Code for UPI Payment
       let qrCodeDataUrl: string | undefined = undefined;
       try {
-        // Use the UPI ID from existing code
-        const upiId = "8825702072@okbizaxis";
-        const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(data.companyInfo.name)}&am=${data.total}&cu=INR`;
+        // Use centralized UPI configuration
+        const { generateUPIUrl } = await import('./franchise-config');
+        const upiUrl = generateUPIUrl(data.total, data.orderNumber);
         qrCodeDataUrl = await QRCode.toDataURL(upiUrl);
       } catch (e) {
         console.error("Failed to generate QR code", e);

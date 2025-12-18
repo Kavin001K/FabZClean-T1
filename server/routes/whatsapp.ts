@@ -10,6 +10,7 @@ router.post('/send-bill', async (req, res) => {
             customerPhone,
             orderId,
             amount,
+            mainItem,
             pdfUrl
         } = req.body;
 
@@ -18,12 +19,10 @@ router.post('/send-bill', async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields (customerName, customerPhone)' });
         }
 
-        // Generate a payment link
-        const paymentLink = `https://myfabclean.com/pay/${orderId}`;
-
-        // If no PDF URL, send text message instead
+        // If no PDF URL, send text message instead (using the optimized text)
         if (!pdfUrl) {
-            const message = `🧾 *FabZClean Invoice*\n\nHi ${customerName}!\n\nYour order *#${orderId}* for ₹${amount || '0.00'} has been confirmed.\n\n📋 View Bill: https://myfabclean.com/bill/${orderId}\n\nThank you for choosing FabZClean!`;
+            const itemText = mainItem ? `This includes your ${mainItem} and home delivery charges.` : 'This includes home delivery charges.';
+            const message = `Hi ${customerName}! 👋 Your laundry order is Processing! 🧺\n\nWe have generated Invoice ${orderId} for ₹${amount || '0.00'}. ${itemText}\n\nPayment Options: Scan the QR in the invoice or use UPI / Google Pay / PhonePe.\n📄 Terms: https://myfabclean.com/terms\n\nThanks for choosing Fab Clean!`;
 
             await sendWhatsAppText({
                 customerPhone,
@@ -38,7 +37,7 @@ router.post('/send-bill', async (req, res) => {
             customerPhone,
             orderId,
             amount: amount || "0.00",
-            paymentLink,
+            mainItem: mainItem || "Laundry Items",
             pdfUrl
         });
 
