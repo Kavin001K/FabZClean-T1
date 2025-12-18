@@ -799,61 +799,91 @@ export class PrintDriver {
       });
       console.log('✅ Template rendered');
 
-      // 3. Convert to Image (html2canvas)
-      console.log('🎨 Converting to image...');
+      // 3. Convert to Image (html2canvas) - OPTIMIZED for smaller file size
+      console.log('🎨 Converting to image (optimized)...');
       const canvas = await html2canvas(container, {
-        scale: 2,
+        scale: 1.5, // Balanced scale for quality/size
         useCORS: true,
-        allowTaint: false, // Changed to false to prevent security errors
+        allowTaint: false,
         backgroundColor: '#ffffff',
         logging: false,
         windowWidth: 794,
-        windowHeight: 1123
+        windowHeight: 1123,
+        imageTimeout: 5000,
+        removeContainer: false,
       });
-      console.log('✅ Image created');
+      console.log('✅ Image created:', canvas.width, 'x', canvas.height);
 
-      // 4. Generate PDF (jsPDF)
-      console.log('📄 Generating PDF...');
+      // 4. Generate PDF with SMART COMPRESSION
+      console.log('📄 Generating PDF with smart compression...');
 
-      // Use JPEG for better compatibility if PNG fails, but try PNG first
-      let imgData;
-      let imgFormat: 'PNG' | 'JPEG' = 'PNG';
+      // Smart compression algorithm - finds optimal quality
+      const MAX_SIZE_KB = 8000; // 8MB target (buffer for 10MB limit)
+      const MIN_QUALITY = 0.5;
+      const QUALITY_STEP = 0.05;
 
-      try {
-        imgData = canvas.toDataURL('image/png');
-        // Basic validation of data URL
-        if (!imgData || imgData.length < 100) {
-          throw new Error('Invalid PNG data');
-        }
-      } catch (e) {
-        console.warn('PNG generation failed, falling back to JPEG', e);
-        imgData = canvas.toDataURL('image/jpeg', 0.95);
-        imgFormat = 'JPEG';
-      }
+      let currentQuality = 0.8; // Start at 80%
+      let pdfBlob: Blob;
+      let attempts = 0;
+      const maxAttempts = 8;
 
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
+      // Adaptive compression loop
+      do {
+        attempts++;
+        console.log(`   Attempt ${attempts}: Quality=${(currentQuality * 100).toFixed(0)}%`);
 
-      const imgWidth = 210;
-      const pageHeight = 297;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
+        // Generate compressed image
+        const imgData = canvas.toDataURL('image/jpeg', currentQuality);
+        const imgFormat: 'JPEG' = 'JPEG';
 
-      pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+        // Create PDF with compression enabled
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4',
+          compress: true,
+        });
 
-      while (heightLeft > 5) { // Add 5mm tolerance to prevent blank pages from rounding errors
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight);
+        const imgWidth = 210;
+        const pageHeight = 297;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        let heightLeft = imgHeight;
+        let position = 0;
+
+        // Add images with FAST mode for additional optimization
+        pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight, undefined, 'FAST');
         heightLeft -= pageHeight;
-      }
 
-      const pdfBlob = pdf.output('blob');
+        // Handle multi-page
+        while (heightLeft > 5) {
+          position = heightLeft - imgHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight, undefined, 'FAST');
+          heightLeft -= pageHeight;
+        }
+
+        pdfBlob = pdf.output('blob');
+        const sizeKB = pdfBlob.size / 1024;
+        console.log(`   Result: ${sizeKB.toFixed(0)} KB`);
+
+        // If under target, we're done!
+        if (sizeKB <= MAX_SIZE_KB) {
+          console.log(`✅ Compression successful: ${sizeKB.toFixed(0)} KB at ${(currentQuality * 100).toFixed(0)}% quality`);
+          break;
+        }
+
+        // Reduce quality for next attempt
+        currentQuality = Math.max(MIN_QUALITY, currentQuality - QUALITY_STEP);
+
+        if (currentQuality <= MIN_QUALITY && attempts >= maxAttempts) {
+          console.warn(`⚠️ Reached minimum quality. Final size: ${sizeKB.toFixed(0)} KB`);
+          break;
+        }
+      } while (attempts < maxAttempts);
+
+      const fileSizeMB = (pdfBlob.size / (1024 * 1024)).toFixed(2);
+      console.log(`📊 Final PDF size: ${fileSizeMB} MB`);
+
       const filename = `invoice-${data.invoiceNumber}-${Date.now()}.pdf`;
       console.log('✅ PDF generated');
 
@@ -886,8 +916,8 @@ export class PrintDriver {
 
       if (isElectron()) {
         console.log('🖥️ Electron detected, initiating direct print...');
-        pdf.autoPrint();
-        const blobUrl = pdf.output('bloburl') as unknown as string;
+        // Create blob URL for printing
+        const blobUrl = URL.createObjectURL(pdfBlob);
 
         const iframe = document.createElement('iframe');
         iframe.style.position = 'fixed';
@@ -909,7 +939,15 @@ export class PrintDriver {
           }, 60000); // 1 minute cleanup
         }, 1000);
       } else {
-        pdf.save(filename);
+        // Download the PDF blob
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
         console.log('✅ Download initiated');
       }
 

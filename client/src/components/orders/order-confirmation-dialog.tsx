@@ -343,6 +343,7 @@ export function OrderConfirmationDialog({
     };
 
     // Helper function to generate PDF blob
+    // Helper function to generate PDF blob - OPTIMIZED for lightweight files
     const generatePDFBlob = async (invoiceData: any): Promise<Blob> => {
         const jsPDF = (await import('jspdf')).default;
         const html2canvas = (await import('html2canvas')).default;
@@ -365,43 +366,54 @@ export function OrderConfirmationDialog({
             setTimeout(resolve, 1500);
         });
 
-        // Convert to canvas
+        // Convert to canvas - OPTIMIZED settings
         const canvas = await html2canvas(container, {
-            scale: 2,
+            scale: 1.5, // Reduced from 2 for smaller file size
             useCORS: true,
-            allowTaint: false, // Changed to false to prevent security errors
+            allowTaint: false,
             backgroundColor: '#ffffff',
             logging: false,
+            imageTimeout: 5000,
         });
 
-        // Create PDF
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        // Create PDF with compression
+        const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4',
+            compress: true // Enable compression
+        });
 
-        // Use JPEG for better compatibility if PNG fails, but try PNG first
-        let imgData;
-        let imgFormat: 'PNG' | 'JPEG' = 'PNG';
-
-        try {
-            imgData = canvas.toDataURL('image/png');
-            // Basic validation of data URL
-            if (!imgData || imgData.length < 100) {
-                throw new Error('Invalid PNG data');
-            }
-        } catch (e) {
-            console.warn('PNG generation failed, falling back to JPEG', e);
-            imgData = canvas.toDataURL('image/jpeg', 0.95);
-            imgFormat = 'JPEG';
-        }
+        // Always use JPEG with compression for smaller file size
+        const imgData = canvas.toDataURL('image/jpeg', 0.7); // 70% quality
+        const imgFormat: 'JPEG' = 'JPEG';
 
         const imgWidth = 210;
+        const pageHeight = 297;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        pdf.addImage(imgData, imgFormat, 0, 0, imgWidth, imgHeight);
+        let heightLeft = imgHeight;
+        let position = 0;
+
+        // Add image with FAST compression
+        pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight, undefined, 'FAST');
+        heightLeft -= pageHeight;
+
+        // Handle multi-page if content is longer
+        while (heightLeft > 5) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight, undefined, 'FAST');
+            heightLeft -= pageHeight;
+        }
 
         // Cleanup
         root.unmount();
         document.body.removeChild(container);
 
-        return pdf.output('blob');
+        const pdfBlob = pdf.output('blob');
+        console.log(`📊 PDF size: ${(pdfBlob.size / (1024 * 1024)).toFixed(2)} MB`);
+
+        return pdfBlob;
     };
 
     // Helper function to upload PDF to server

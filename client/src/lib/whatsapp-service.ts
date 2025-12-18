@@ -1,107 +1,49 @@
-// WhatsApp Service for mygreentick.co.in API integration
-const WHATSAPP_CONFIG = {
-    baseUrl: 'https://mygreentick.co.in/api',
-    accessToken: '679765b5a5b37', // Keep this as fallback or use env var
-    instanceId: '609ACF2833326', // Updated with a likely real ID or remove placeholder check
-};
+// client/src/lib/whatsapp-service.ts
+// WhatsApp Service - Calls backend API to send messages
 
-export interface WhatsAppMessage {
-    number: string; // Phone number without + or country code decorations (e.g., "919876543210")
-    type: 'text' | 'media';
-    message: string;
-    media_url?: string;
-    filename?: string;
+export interface SendInvoiceParams {
+    phoneNumber: string;
+    pdfUrl: string;
+    customerName: string;
+    invoiceNumber: string;
+    amount: string;
+    itemName: string;
 }
 
 export class WhatsAppService {
     /**
-     * Send text message via WhatsApp
+     * Send Invoice via WhatsApp with PDF attachment (NEW API)
      */
-    static async sendText(phone: string, message: string): Promise<boolean> {
-        // Removed placeholder check to allow attempting with configured ID
+    static async sendInvoice(data: SendInvoiceParams): Promise<{ success: boolean; data?: any }> {
         try {
-            // Clean phone number - remove +, spaces, hyphens
-            const cleanPhone = phone.replace(/[\s\+\-\(\)]/g, '');
-
-            // Ensure phone has country code (add 91 for India if not present)
-            const formattedPhone = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
-
-            const url = `${WHATSAPP_CONFIG.baseUrl}/send?` + new URLSearchParams({
-                number: formattedPhone,
-                type: 'text',
-                message: message,
-                instance_id: WHATSAPP_CONFIG.instanceId,
-                access_token: WHATSAPP_CONFIG.accessToken,
-            }).toString();
-
-            const response = await fetch(url, {
-                method: 'POST',
+            const response = await fetch("/api/whatsapp/send-invoice", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${localStorage.getItem("employee_token")}`,
+                },
+                body: JSON.stringify({
+                    ...data,
+                    filename: `Invoice-${data.invoiceNumber}.pdf`,
+                }),
             });
 
             if (!response.ok) {
-                console.error('WhatsApp send failed:', await response.text());
-                return false;
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || "Failed to send WhatsApp message");
             }
 
-            const data = await response.json();
-            console.log('WhatsApp message sent:', data);
-            return true;
+            return await response.json();
         } catch (error) {
-            console.error('WhatsApp send error:', error);
-            return false;
+            console.error("Error sending invoice:", error);
+            throw error;
         }
     }
 
     /**
-     * Send media/file with message via WhatsApp
+     * Send Order Bill via WhatsApp (Legacy API - uses /send-bill endpoint)
+     * Kept for backward compatibility with existing code
      */
-    static async sendMedia(
-        phone: string,
-        message: string,
-        mediaUrl: string,
-        filename?: string
-    ): Promise<boolean> {
-        // Removed placeholder check
-        try {
-            const cleanPhone = phone.replace(/[\s\+\-\(\)]/g, '');
-            const formattedPhone = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
-
-            const params: Record<string, string> = {
-                number: formattedPhone,
-                type: 'media',
-                message: message,
-                media_url: mediaUrl,
-                instance_id: WHATSAPP_CONFIG.instanceId,
-                access_token: WHATSAPP_CONFIG.accessToken,
-            };
-
-            if (filename) {
-                params.filename = filename;
-            }
-
-            const url = `${WHATSAPP_CONFIG.baseUrl}/send?` + new URLSearchParams(params).toString();
-
-            const response = await fetch(url, {
-                method: 'POST',
-            });
-
-            if (!response.ok) {
-                console.error('WhatsApp media send failed:', await response.text());
-                return false;
-            }
-
-            const data = await response.json();
-            console.log('WhatsApp media sent:', data);
-            return true;
-        } catch (error) {
-            console.error('WhatsApp media send error:', error);
-            return false;
-        }
-    }
-
-    /**
-   * Send order bill via WhatsApp with PDF attachment
-   */
     static async sendOrderBill(
         phone: string,
         orderNumber: string,
@@ -112,61 +54,61 @@ export class WhatsAppService {
         mainItem?: string
     ): Promise<boolean> {
         try {
-            // Call our backend proxy to avoid CORS and hide API keys
-            const response = await fetch('/api/whatsapp/send-bill', {
-                method: 'POST',
+            const response = await fetch("/api/whatsapp/send-bill", {
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('employee_token')}`
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${localStorage.getItem("employee_token")}`,
                 },
                 body: JSON.stringify({
-                    customerName: customerName,
+                    customerName,
                     customerPhone: phone,
                     orderId: orderNumber,
                     amount: totalAmount,
-                    pdfUrl: pdfUrl,
-                    mainItem: mainItem
-                })
+                    pdfUrl,
+                    mainItem,
+                }),
             });
 
             if (!response.ok) {
-                console.error('WhatsApp backend send failed:', await response.text());
+                console.error("WhatsApp backend send failed:", await response.text());
                 return false;
             }
 
             const data = await response.json();
             return data.success;
         } catch (error) {
-            console.error('WhatsApp send error:', error);
+            console.error("WhatsApp send error:", error);
             return false;
         }
     }
 
     /**
-     * Get QR code for instance login (for admin setup)
+     * Send plain text message via WhatsApp
      */
-    static getQRCodeUrl(): string {
-        return `${WHATSAPP_CONFIG.baseUrl}/get_qrcode?` + new URLSearchParams({
-            instance_id: WHATSAPP_CONFIG.instanceId,
-            access_token: WHATSAPP_CONFIG.accessToken,
-        }).toString();
-    }
-
-    /**
-     * Reboot/reconnect instance
-     */
-    static async reconnect(): Promise<boolean> {
+    static async sendText(phone: string, message: string): Promise<boolean> {
         try {
-            const url = `${WHATSAPP_CONFIG.baseUrl}/reconnect?` + new URLSearchParams({
-                instance_id: WHATSAPP_CONFIG.instanceId,
-                access_token: WHATSAPP_CONFIG.accessToken,
-            }).toString();
+            const response = await fetch("/api/whatsapp/send-text", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${localStorage.getItem("employee_token")}`,
+                },
+                body: JSON.stringify({ phone, message }),
+            });
 
-            const response = await fetch(url, { method: 'POST' });
-            return response.ok;
+            if (!response.ok) {
+                console.error("WhatsApp text send failed:", await response.text());
+                return false;
+            }
+
+            return true;
         } catch (error) {
-            console.error('WhatsApp reconnect error:', error);
+            console.error("WhatsApp text send error:", error);
             return false;
         }
     }
 }
+
+// Export standalone function for simpler imports
+export const sendInvoice = WhatsAppService.sendInvoice;

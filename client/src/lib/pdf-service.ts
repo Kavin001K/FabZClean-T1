@@ -44,17 +44,18 @@ export class PDFService {
                         // Get the content to capture
                         const content = iframeDocument.body;
 
-                        // Capture the content as canvas
+                        // Capture the content as canvas - OPTIMIZED
                         const canvas = await html2canvas(content, {
-                            scale: 1.5, // Reduced from 2 to 1.5 for smaller file size
+                            scale: 1.5,
                             useCORS: true,
                             logging: false,
                             backgroundColor: '#ffffff',
+                            imageTimeout: 5000,
                         });
 
-                        // Create PDF
-                        const imgWidth = 210; // A4 width in mm
-                        const pageHeight = 297; // A4 height in mm
+                        // Create PDF with compression
+                        const imgWidth = 210;
+                        const pageHeight = 297;
                         const imgHeight = (canvas.height * imgWidth) / canvas.width;
                         let heightLeft = imgHeight;
 
@@ -62,20 +63,21 @@ export class PDFService {
                             orientation: options.orientation || 'portrait',
                             unit: 'mm',
                             format: options.format || 'a4',
+                            compress: true,
                         });
 
                         let position = 0;
 
-                        // Add image to PDF
-                        const imgData = canvas.toDataURL('image/jpeg', options.quality || 0.8);
-                        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                        // Use JPEG with 70% quality for smaller file size
+                        const imgData = canvas.toDataURL('image/jpeg', 0.7);
+                        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
                         heightLeft -= pageHeight;
 
-                        // Add more pages if content is longer than one page
-                        while (heightLeft >= 0) {
+                        // Add more pages if content is longer
+                        while (heightLeft > 5) {
                             position = heightLeft - imgHeight;
                             pdf.addPage();
-                            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
                             heightLeft -= pageHeight;
                         }
 
@@ -113,27 +115,30 @@ export class PDFService {
         options: PDFGenerationOptions = {}
     ): Promise<Blob> {
         try {
-            // Capture element as canvas
+            // Capture element as canvas - OPTIMIZED
             const canvas = await html2canvas(element, {
-                scale: 2,
+                scale: 1.5, // Reduced for smaller file
                 useCORS: true,
                 logging: false,
                 backgroundColor: '#ffffff',
+                imageTimeout: 5000,
             });
 
-            // Create PDF
-            const imgWidth = 210; // A4 width in mm
-            const pageHeight = 297; // A4 height in mm
+            // Create PDF with compression
+            const imgWidth = 210;
+            const pageHeight = 297;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
             const pdf = new jsPDF({
                 orientation: options.orientation || 'portrait',
                 unit: 'mm',
                 format: options.format || 'a4',
+                compress: true,
             });
 
-            const imgData = canvas.toDataURL('image/jpeg', options.quality || 0.95);
-            pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+            // Use JPEG with 70% quality
+            const imgData = canvas.toDataURL('image/jpeg', 0.7);
+            pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
 
             // Convert to blob
             return pdf.output('blob');
