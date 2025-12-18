@@ -3,18 +3,22 @@
  * 
  * WYSIWYG Print System - What You See Is What You Print!
  * 
+ * Tag Layout:
+ * - ORDER SUMMARY: 40mm width × AUTO height (variable content)
+ * - SERVICE TAGS: 40mm × 30mm (4cm × 3cm) STRICT with overflow:hidden
+ * 
  * Features:
- * - Customer name (full, not truncated)
+ * - Customer name with overflow protection
  * - Item index (1/5 format with global count)
- * - Service name (FULL - no more truncation)
- * - Notes with proper visibility
+ * - Service name (compressed to fit)
+ * - Notes with ellipsis if too long
  * - Priority indicator for express orders
  * - Barcode on order summary only
  * 
  * Optimizations:
  * - High-DPI rendering for thermal printers
- * - Embedded fonts for consistent output
- * - Zero wastage layout
+ * - Monospace font for clean output
+ * - Compressed spacing to fit all content
  * - Electron-specific print handling
  */
 
@@ -119,28 +123,18 @@ export function GarmentTagPrint({
     const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '';
     const displayCustomer = (customerName || 'Customer').toUpperCase();
 
-    // Generate individual service tags - OPTIMIZED for readability
-    const tagsHtml = allTags.map(({ item, globalIndex, serviceIndex, serviceTotalQty }) => {
+    // Generate individual service tags - COMPACT 4cm x 3cm (40mm x 30mm) layout with EXPRESS watermark
+    const tagsHtml = allTags.map(({ item, globalIndex }) => {
       return `
         <div class="tag ${isExpressOrder ? 'express' : ''}">
+          ${isExpressOrder ? '<div class="express-watermark">EXPRESS</div>' : ''}
           <div class="tag-header">
             <span class="order-id">${orderNumber}</span>
-            <div class="count-box">
-              <span class="count-main">${globalIndex}/${totalItems}</span>
-              <span class="count-sub">#${serviceIndex}/${serviceTotalQty}</span>
-            </div>
+            <span class="count-main">${globalIndex}/${totalItems}</span>
           </div>
-          <div class="divider"></div>
           <div class="customer">${displayCustomer}</div>
-          <div class="service-box">
-            <div class="service">${item.serviceName.toUpperCase()}</div>
-          </div>
-          ${item.tagNote ? `<div class="note"><span class="note-label">Note:</span> ${item.tagNote}</div>` : ''}
-          <div class="divider dashed"></div>
-          <div class="tag-footer">
-            <span class="store">${storeCode}</span>
-            ${formattedDueDate ? `<span class="due">Due: ${formattedDueDate}</span>` : ''}
-          </div>
+          <div class="service">${item.serviceName.toUpperCase()}</div>
+          ${item.tagNote ? `<div class="note">Note: ${item.tagNote}</div>` : ''}
         </div>
       `;
     }).join('');
@@ -191,12 +185,13 @@ export function GarmentTagPrint({
         <style>
           /*=============================================
             GARMENT TAG PRINT STYLES
-            Optimized for 50mm x 30mm Thermal Labels
+            - Header Tag: 40mm width x AUTO height
+            - Service Tags: 40mm x 30mm (4cm x 3cm) STRICT
             High DPI + Electron Compatible
           =============================================*/
           
           @page {
-            size: 50mm 30mm;
+            size: 40mm auto;
             margin: 0 !important;
             padding: 0 !important;
           }
@@ -216,29 +211,28 @@ export function GarmentTagPrint({
           body {
             margin: 0 !important;
             padding: 0 !important;
-            width: 50mm;
+            width: 40mm;
             background: #fff;
-            font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+            font-family: 'Consolas', 'Courier New', monospace;
             font-size: 8pt;
-            font-weight: 700;
-            line-height: 1.2;
-            color: #000;
+            font-weight: 600;
+            line-height: 1.1;
+            color: #333;
           }
           
           .tags-wrapper {
-            width: 50mm;
+            width: 40mm;
             display: flex;
             flex-direction: column;
             gap: 0;
           }
           
-          /*========== HEADER TAG ==========*/
+          /*========== HEADER TAG (Order Summary) - AUTO HEIGHT ==========*/
           .header-tag {
-            width: 50mm;
-            min-height: 30mm;
-            padding: 2mm;
+            width: 40mm;
+            padding: 1.5mm;
             background: #fff;
-            border: 0.3mm solid #000;
+            border: 0.4mm dashed #333;
             display: flex;
             flex-direction: column;
             page-break-after: always;
@@ -246,230 +240,194 @@ export function GarmentTagPrint({
           }
           
           .header-tag.express {
-            border-color: #ea580c;
+            border-color: #c2410c;
+            border-style: solid;
             border-width: 0.5mm;
           }
           
           .express-banner {
-            background: linear-gradient(135deg, #ea580c, #f97316);
+            background: #333;
             color: #fff;
             text-align: center;
             font-size: 7pt;
             font-weight: 800;
-            padding: 1mm 0;
-            margin: -2mm -2mm 1.5mm -2mm;
-            letter-spacing: 0.5pt;
+            padding: 0.8mm 0;
+            margin: -1.5mm -1.5mm 1mm -1.5mm;
           }
           
           .header-title {
             text-align: center;
-            font-size: 9pt;
+            font-size: 8pt;
             font-weight: 800;
-            letter-spacing: 0.3pt;
-            padding-bottom: 1mm;
+            padding-bottom: 0.5mm;
+            border-bottom: 0.3mm dashed #666;
+            margin-bottom: 0.5mm;
           }
           
           .barcode-container {
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 1mm 0;
+            padding: 0.5mm 0;
             background: #fff;
           }
           
           .barcode-container svg {
-            max-width: 44mm;
-            height: 8mm;
+            max-width: 36mm;
+            height: 6mm;
           }
           
           .order-number {
             text-align: center;
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 7pt;
+            font-size: 6pt;
             font-weight: 700;
-            color: #374151;
-            padding: 0.5mm 0;
-            background: #f3f4f6;
-            border-radius: 1mm;
-            margin: 0.5mm 0;
-          }
-          
-          .divider {
-            height: 0.2mm;
-            background: #d1d5db;
-            margin: 1mm 0;
-          }
-          
-          .divider.dashed {
-            background: transparent;
-            border-top: 0.2mm dashed #9ca3af;
+            color: #333;
+            padding: 0.3mm 0;
+            border-bottom: 0.2mm dashed #999;
+            margin-bottom: 0.5mm;
           }
           
           .info-grid {
             display: flex;
             flex-direction: column;
-            gap: 0.5mm;
-            padding: 0.5mm 0;
+            gap: 0.3mm;
           }
           
           .info-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 7pt;
-            padding: 0.3mm 0;
+            font-size: 6pt;
+            padding: 0.2mm 0;
           }
           
           .info-row.highlight {
-            background: #fef3c7;
-            padding: 0.5mm 1mm;
-            border-radius: 0.5mm;
+            background: #eee;
+            padding: 0.3mm 0.5mm;
             margin: 0 -0.5mm;
           }
           
           .info-label {
-            color: #374151;
-            font-weight: 700;
+            color: #555;
+            font-weight: 600;
           }
           
           .info-value {
             font-weight: 700;
-            color: #111827;
+            color: #111;
             text-align: right;
-            max-width: 60%;
-            overflow: hidden;
-            text-overflow: ellipsis;
           }
           
           .due-text {
-            color: ${isExpressOrder ? '#ea580c' : '#059669'};
+            color: ${isExpressOrder ? '#c2410c' : '#059669'};
           }
           
           .header-footer {
             display: flex;
             justify-content: space-between;
-            font-size: 6pt;
-            color: #374151;
-            font-weight: 700;
-            padding-top: 0.5mm;
+            font-size: 5pt;
+            color: #555;
+            font-weight: 600;
+            padding-top: 0.3mm;
+            border-top: 0.2mm dashed #999;
+            margin-top: 0.5mm;
           }
           
-          /*========== INDIVIDUAL TAG ==========*/
+          /*========== SERVICE TAG (STRICT 4cm x 3cm) ==========*/
           .tag {
-            width: 50mm;
-            min-height: 30mm;
+            width: 40mm;
+            height: 30mm;
+            max-height: 30mm;
             padding: 1.5mm;
             background: #fff;
-            border: 0.3mm solid #000;
+            border: 0.4mm dashed #333;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
             page-break-after: always;
             page-break-inside: avoid;
           }
           
           .tag.express {
-            border-color: #ea580c;
-            border-width: 0.5mm;
-            background: linear-gradient(180deg, #fffbeb 0%, #fff 100%);
+            border-color: #c2410c;
+            border-style: solid;
+            position: relative;
+          }
+          
+          .express-watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-25deg);
+            font-size: 14pt;
+            font-weight: 900;
+            color: #ea580c;
+            opacity: 0.12;
+            letter-spacing: 2pt;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 0;
           }
           
           .tag-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: center;
+            padding-bottom: 0.5mm;
+            border-bottom: 0.2mm dashed #999;
+            flex-shrink: 0;
           }
           
           .order-id {
-            font-family: 'Consolas', 'Courier New', monospace;
             font-size: 6pt;
-            font-weight: 800;
-            color: #374151;
-          }
-          
-          .count-box {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 0;
+            font-weight: 700;
+            color: #333;
           }
           
           .count-main {
-            font-size: 11pt;
+            font-size: 9pt;
             font-weight: 900;
-            line-height: 1;
-            background: #f3f4f6;
-            padding: 0.5mm 1.5mm;
-            border-radius: 1mm;
-          }
-          
-          .count-sub {
-            font-size: 5pt;
-            color: #374151;
-            font-weight: 700;
+            color: #111;
           }
           
           .customer {
             text-align: center;
-            font-size: 9pt;
-            font-weight: 800;
-            padding: 1mm 0;
-            letter-spacing: 0.2pt;
-            color: #111827;
+            font-size: 8pt;
+            font-weight: 700;
+            padding: 1mm 0 0.5mm 0;
+            color: #222;
+            flex-shrink: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
           }
           
-          .service-box {
+          .service {
+            text-align: center;
+            font-size: 9pt;
+            font-weight: 800;
+            color: #111;
+            padding: 0.5mm 0;
             flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #f9fafb;
-            border-radius: 1mm;
-            padding: 1.5mm;
-            margin: 0.5mm 0;
-            min-height: 8mm;
-          }
-          
-          .service {
-            font-size: 12pt;
-            font-weight: 900;
-            text-align: center;
-            letter-spacing: 0.3pt;
+            overflow: hidden;
+            word-break: break-word;
             line-height: 1.1;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
           }
           
           .note {
-            background: #fef3c7;
-            padding: 0.8mm 1mm;
-            border-radius: 0.5mm;
-            font-size: 6pt;
-            font-weight: 700;
             text-align: center;
-            margin: 0.5mm 0;
-          }
-          
-          .note-label {
-            font-weight: 700;
-            color: #92400e;
-          }
-          
-          .tag-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 0.5mm;
             font-size: 6pt;
-          }
-          
-          .store {
-            color: #374151;
-            font-weight: 800;
-          }
-          
-          .due {
-            font-weight: 900;
-            color: ${isExpressOrder ? '#ea580c' : '#059669'};
+            font-weight: 600;
+            color: #333;
+            padding: 0.5mm;
+            border-top: 0.2mm dashed #999;
+            flex-shrink: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
           }
           
           /*========== PRINT MEDIA QUERY ==========*/
@@ -477,14 +435,14 @@ export function GarmentTagPrint({
             html, body {
               margin: 0 !important;
               padding: 0 !important;
-              width: 50mm !important;
+              width: 40mm !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
               color-adjust: exact !important;
             }
             
             @page {
-              size: 50mm 30mm !important;
+              size: 40mm auto !important;
               margin: 0 !important;
             }
             
@@ -492,14 +450,23 @@ export function GarmentTagPrint({
               gap: 0 !important;
             }
             
-            .header-tag, .tag {
+            .header-tag {
               page-break-after: always !important;
               page-break-inside: avoid !important;
               margin: 0 !important;
               box-shadow: none !important;
             }
             
-            /* Remove any borders that might cause issues */
+            .tag {
+              page-break-after: always !important;
+              page-break-inside: avoid !important;
+              margin: 0 !important;
+              box-shadow: none !important;
+              height: 30mm !important;
+              max-height: 30mm !important;
+              overflow: hidden !important;
+            }
+            
             .header-tag:last-child,
             .tag:last-child {
               page-break-after: auto;
@@ -638,22 +605,22 @@ export function GarmentTagPrint({
             )}
           </DialogTitle>
           <DialogDescription>
-            {allTags.length} tags • Optimized for 50mm × 30mm thermal labels
+            {allTags.length} tags • Optimized for 40mm × 30mm (4×3 cm) thermal labels
           </DialogDescription>
         </DialogHeader>
 
         {/* Preview - Vertical Layout */}
-        <div ref={printRef} className="flex flex-col items-center gap-2 p-4 bg-gray-100 rounded-lg max-h-[50vh] overflow-auto">
+        <div ref={printRef} className="flex flex-col items-center gap-2 p-4 bg-gray-800 rounded-lg max-h-[50vh] overflow-auto">
 
           {/* Order Summary Header Preview */}
-          <div className={`w-[52mm] bg-white border-2 rounded p-2 text-[8px] shadow-lg flex flex-col gap-0.5 ${isExpressOrder ? 'border-orange-500 bg-gradient-to-br from-orange-50 to-white' : 'border-gray-800'
+          <div className={`w-[40mm] bg-white border-2 border-dashed rounded p-2 text-[8px] shadow-lg flex flex-col gap-0.5 ${isExpressOrder ? 'border-orange-500' : 'border-gray-600'
             }`}>
             {isExpressOrder && (
-              <div className="text-center bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[8px] font-bold py-0.5 rounded -mt-0.5 -mx-0.5 mb-1">
-                ⚡ EXPRESS ORDER - PRIORITY
+              <div className="text-center bg-gray-800 text-white text-[8px] font-bold py-0.5 rounded -mt-0.5 -mx-0.5 mb-1">
+                ⚡ EXPRESS ORDER
               </div>
             )}
-            <div className="text-center font-bold text-[10px] border-b border-gray-800 pb-0.5">
+            <div className="text-center font-bold text-[10px] border-b border-dashed border-gray-600 pb-0.5">
               ORDER SUMMARY
             </div>
 
@@ -662,10 +629,10 @@ export function GarmentTagPrint({
               <svg ref={previewBarcodeRef} className="max-w-full h-8"></svg>
             </div>
 
-            <div className="text-center font-mono text-[9px] font-semibold text-gray-700 bg-gray-100 py-0.5 rounded">
+            <div className="text-center font-mono text-[9px] font-semibold text-gray-700 py-0.5">
               {orderNumber}
             </div>
-            <div className="space-y-0.5 text-[8px] border-t border-dashed border-gray-300 pt-1 mt-0.5">
+            <div className="space-y-0.5 text-[8px] border-t border-dashed border-gray-400 pt-1 mt-0.5">
               <div className="flex justify-between">
                 <span className="text-gray-500">Customer:</span>
                 <span className="font-semibold text-gray-800 truncate max-w-[100px]">{customerName || 'N/A'}</span>
@@ -675,7 +642,7 @@ export function GarmentTagPrint({
                 <span className="font-semibold text-gray-800">{totalItems} pcs</span>
               </div>
               {formattedDueDate && (
-                <div className={`flex justify-between ${isExpressOrder ? 'bg-amber-100 px-0.5 rounded' : ''}`}>
+                <div className={`flex justify-between ${isExpressOrder ? 'bg-gray-100 px-0.5 rounded' : ''}`}>
                   <span className="text-gray-500">{isExpressOrder ? '⚡ Due:' : 'Due Date:'}</span>
                   <span className={`font-semibold ${isExpressOrder ? 'text-orange-600' : 'text-emerald-600'}`}>
                     {formattedDueDate}
@@ -683,13 +650,7 @@ export function GarmentTagPrint({
                 </div>
               )}
             </div>
-            {commonNote && (
-              <div className="bg-indigo-100 p-0.5 rounded mt-0.5">
-                <div className="text-[6px] font-bold text-indigo-700">Special Instructions:</div>
-                <div className="text-[7px] text-indigo-900 leading-tight">{commonNote}</div>
-              </div>
-            )}
-            <div className="flex justify-between text-[6px] text-gray-400 pt-0.5 border-t border-gray-200 mt-0.5">
+            <div className="flex justify-between text-[6px] text-gray-400 pt-0.5 border-t border-dashed border-gray-400 mt-0.5">
               <span>{storeCode}</span>
               <span>{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
             </div>
@@ -697,61 +658,49 @@ export function GarmentTagPrint({
 
           {/* Divider */}
           <div className="w-full flex items-center gap-2 px-2">
-            <div className="flex-1 border-t border-dashed border-gray-300"></div>
-            <span className="text-[8px] text-gray-400 font-medium">Service Tags</span>
-            <div className="flex-1 border-t border-dashed border-gray-300"></div>
+            <div className="flex-1 border-t border-dashed border-gray-500"></div>
+            <span className="text-[8px] text-gray-400 font-medium">Service Tags (4×3 cm)</span>
+            <div className="flex-1 border-t border-dashed border-gray-500"></div>
           </div>
 
-          {allTags.map(({ item, globalIndex, serviceIndex, serviceTotalQty }) => (
+          {/* Service Tags - Compact 4x3cm preview with overflow hidden */}
+          {allTags.map(({ item, globalIndex }) => (
             <div
               key={`preview-${globalIndex}`}
-              className={`w-[52mm] bg-white border-[1.5px] rounded-[3px] p-1.5 text-[8px] shadow-sm flex flex-col gap-0.5 ${isExpressOrder ? 'border-orange-500 bg-gradient-to-br from-orange-50 to-white' : 'border-gray-700'
+              className={`w-[40mm] h-[30mm] bg-white border-2 border-dashed rounded p-1.5 font-mono text-[8px] shadow-sm flex flex-col overflow-hidden relative ${isExpressOrder ? 'border-orange-500' : 'border-gray-600'
                 }`}
-              style={{ minHeight: '26mm' }}
             >
-              {/* Header - Matches Print Layout */}
-              <div className="flex justify-between items-start">
-                <span className="font-mono text-[6px] text-gray-500 font-semibold">{orderNumber}</span>
-                <div className="flex flex-col items-end">
-                  <span className="font-black text-[12px] bg-gray-100 px-1.5 py-0.5 rounded leading-none">{globalIndex}/{totalItems}</span>
-                  <span className="text-[5px] text-gray-400 font-medium">#{serviceIndex}/{serviceTotalQty}</span>
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="h-[1px] bg-gray-200 my-0.5"></div>
-
-              {/* Customer - Full Name, No Truncation */}
-              <div className="font-bold text-center text-[10px] uppercase tracking-wide text-gray-900 py-0.5">
-                {customerName || 'Customer'}
-              </div>
-
-              {/* Service - Full Name in Box */}
-              <div className="flex-1 flex items-center justify-center bg-gray-50 rounded py-1 my-0.5">
-                <div className="font-black text-center text-[13px] uppercase leading-tight break-words">
-                  {item.serviceName}
-                </div>
-              </div>
-
-              {/* Service Note */}
-              {item.tagNote && (
-                <div className="text-[7px] bg-amber-100 px-1.5 py-0.5 rounded text-center">
-                  <span className="font-bold text-amber-700">Note:</span> {item.tagNote}
+              {/* EXPRESS Watermark for express orders */}
+              {isExpressOrder && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                  <span className="text-orange-500 text-[14px] font-black opacity-10 rotate-[-25deg] tracking-widest">
+                    EXPRESS
+                  </span>
                 </div>
               )}
 
-              {/* Divider */}
-              <div className="border-t border-dashed border-gray-300 mt-auto"></div>
-
-              {/* Footer */}
-              <div className="flex justify-between text-[6px] pt-0.5 items-center">
-                <span className="font-semibold text-gray-500">{storeCode}</span>
-                {formattedDueDate && (
-                  <span className={`font-bold ${isExpressOrder ? 'text-orange-600' : 'text-emerald-600'}`}>
-                    Due: {formattedDueDate}
-                  </span>
-                )}
+              {/* Header Row - Order ID and Count */}
+              <div className="flex justify-between items-center pb-0.5 border-b border-dashed border-gray-400 flex-shrink-0 relative z-10">
+                <span className="text-[6px] text-gray-600 font-semibold truncate max-w-[60%]">{orderNumber}</span>
+                <span className="text-[9px] font-black text-gray-900">{globalIndex}/{totalItems}</span>
               </div>
+
+              {/* Customer Name */}
+              <div className="text-center text-[8px] font-bold text-gray-800 uppercase tracking-wide py-1 flex-shrink-0 truncate relative z-10">
+                {customerName || 'Customer'}
+              </div>
+
+              {/* Service Name */}
+              <div className="text-center text-[9px] font-bold text-gray-900 uppercase flex-1 flex items-center justify-center overflow-hidden relative z-10">
+                <span className="break-words line-clamp-2">{item.serviceName}</span>
+              </div>
+
+              {/* Note (if any) */}
+              {item.tagNote && (
+                <div className="text-[6px] text-gray-600 text-center pt-0.5 border-t border-dashed border-gray-400 flex-shrink-0 truncate relative z-10">
+                  Note: {item.tagNote}
+                </div>
+              )}
             </div>
           ))}
         </div>

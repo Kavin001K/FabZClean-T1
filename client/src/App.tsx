@@ -45,6 +45,7 @@ import TestInvoice from "@/pages/test-invoice";
 import AuditLogsPage from "@/pages/admin/audit-logs";
 import ReportsPage from "@/pages/reports";
 import OrderTracking from "@/pages/order-tracking";
+import TermsPage from "@/pages/terms";
 
 function Router() {
   return (
@@ -56,6 +57,7 @@ function Router() {
       <Route path="/account-inactive" component={AccountInactivePage} />
       <Route path="/bill/:orderNumber" component={BillView} />
       <Route path="/tracking/:id" component={OrderTracking} />
+      <Route path="/terms" component={TermsPage} />
 
       {/* Protected routes */}
       <Route path="/">
