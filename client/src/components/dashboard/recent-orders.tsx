@@ -125,78 +125,96 @@ export default React.memo(function RecentOrders({
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {displayOrders.map((order, index) => (
-            <div
-              key={order.id || index}
-              className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex items-center space-x-4">
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback className="text-xs">
-                    {order.customerName ?
-                      order.customerName.split(' ').map(n => n[0]).join('').toUpperCase() :
-                      'N/A'
-                    }
-                  </AvatarFallback>
-                </Avatar>
-                <div className="space-y-1 min-w-0 flex-1">
-                  <div className="flex items-center space-x-3">
-                    <p className="text-sm font-medium leading-none truncate">
-                      {order.customerName || 'Unknown Customer'}
-                    </p>
-                    {/* EXPRESS Badge */}
-                    {(order.isExpressOrder || order.is_express_order) && (
-                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white text-[10px] px-1.5 py-0.5 flex items-center gap-1">
-                        <span>⚡</span>
-                        EXPRESS
+          {displayOrders.map((order, index) => {
+            const isExpress = order.isExpressOrder || order.is_express_order || (order as any).priority === 'high';
+            return (
+              <div
+                key={order.id || index}
+                className={`relative flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors overflow-hidden ${isExpress ? 'border-orange-400 bg-orange-50/50 dark:bg-orange-950/20' : ''
+                  }`}
+              >
+                {/* EXPRESS Stamp Watermark */}
+                {isExpress && (
+                  <div className="absolute top-1/2 right-8 transform -translate-y-1/2 rotate-[-15deg] pointer-events-none z-0">
+                    <span className="text-orange-500/15 text-3xl font-black tracking-widest">
+                      EXPRESS
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center space-x-4 relative z-10">
+                  <Avatar className={`h-10 w-10 ${isExpress ? 'ring-2 ring-orange-400' : ''}`}>
+                    <AvatarFallback className={`text-xs ${isExpress ? 'bg-orange-100 text-orange-700' : ''}`}>
+                      {order.customerName ?
+                        order.customerName.split(' ').map(n => n[0]).join('').toUpperCase() :
+                        'N/A'
+                      }
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                      <p className={`text-sm font-medium leading-none truncate ${isExpress ? 'text-orange-800 dark:text-orange-200' : ''}`}>
+                        {order.customerName || 'Unknown Customer'}
+                      </p>
+                      {/* EXPRESS Badge - Prominent Stamp Style */}
+                      {isExpress && (
+                        <Badge className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[10px] px-2 py-0.5 flex items-center gap-1 shadow-sm animate-pulse">
+                          <span className="text-xs">⚡</span>
+                          EXPRESS
+                        </Badge>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className={cn("text-xs border", getStatusColor(order.status))}
+                      >
+                        <span className="flex items-center space-x-1">
+                          {getStatusIcon(order.status)}
+                          <span className="capitalize">{order.status}</span>
+                        </span>
                       </Badge>
-                    )}
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <p className="text-xs text-muted-foreground">
+                        #{order.orderNumber || (order.id ? order.id.slice(-8) : 'N/A')}
+                      </p>
+                      <span className="text-xs text-muted-foreground">•</span>
+                      <p className="text-xs text-muted-foreground">
+                        {order.service || 'Dry Cleaning'}
+                      </p>
+                      <span className="text-xs text-muted-foreground">•</span>
+                      <p className="text-xs text-muted-foreground">
+                        {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Unknown Date'}
+                      </p>
+                    </div>
                     <Badge
                       variant="outline"
-                      className={cn("text-xs border", getStatusColor(order.status))}
+                      className={cn("text-xs border w-fit", getPaymentStatusColor(order.paymentStatus))}
                     >
-                      <span className="flex items-center space-x-1">
-                        {getStatusIcon(order.status)}
-                        <span className="capitalize">{order.status}</span>
-                      </span>
+                      Payment: {order.paymentStatus || 'Unknown'}
                     </Badge>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <p className="text-xs text-muted-foreground">
-                      #{order.orderNumber || (order.id ? order.id.slice(-8) : 'N/A')}
-                    </p>
-                    <span className="text-xs text-muted-foreground">•</span>
-                    <p className="text-xs text-muted-foreground">
-                      {order.service || 'Dry Cleaning'}
-                    </p>
-                    <span className="text-xs text-muted-foreground">•</span>
-                    <p className="text-xs text-muted-foreground">
-                      {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Unknown Date'}
-                    </p>
+                </div>
+                <div className="flex items-center space-x-3 relative z-10">
+                  <div className="text-right">
+                    <div className={`font-semibold text-sm ${isExpress ? 'text-orange-600' : ''}`}>
+                      {formatCurrency(order.total || 0)}
+                    </div>
+                    {isExpress && (
+                      <div className="text-[10px] text-orange-500 font-medium">
+                        Priority
+                      </div>
+                    )}
                   </div>
-                  <Badge
-                    variant="outline"
-                    className={cn("text-xs border w-fit", getPaymentStatusColor(order.paymentStatus))}
-                  >
-                    Payment: {order.paymentStatus || 'Unknown'}
-                  </Badge>
+                  <Link to={order.id ? `/orders/${order.id}` : '#'}>
+                    <Button variant={isExpress ? "default" : "ghost"} size="sm" className={`text-xs ${isExpress ? 'bg-orange-500 hover:bg-orange-600' : ''}`}>
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                  </Link>
                 </div>
               </div>
-              <div className="flex items-center space-x-3">
-                <div className="text-right">
-                  <div className="font-semibold text-sm">
-                    {formatCurrency(order.total || 0)}
-                  </div>
-                </div>
-                <Link to={order.id ? `/orders/${order.id}` : '#'}>
-                  <Button variant="ghost" size="sm" className="text-xs">
-                    <Eye className="h-3 w-3 mr-1" />
-                    View
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </CardContent>
     </Card>

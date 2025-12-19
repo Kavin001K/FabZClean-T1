@@ -164,9 +164,19 @@ export default function CreateOrder() {
     queryKey: ["customer-orders", foundCustomer?.id],
     queryFn: async () => {
       if (!foundCustomer?.id) return [];
-      const allOrders = await ordersApi.getAll();
-      // Filter orders for this customer
-      return allOrders
+      if (!foundCustomer?.id) return [];
+
+      let orders: Order[] = [];
+
+      // search by phone (priority)
+      if (foundCustomer.phone) {
+        orders = await ordersApi.search(foundCustomer.phone);
+      } else if (foundCustomer.email) {
+        orders = await ordersApi.search(foundCustomer.email);
+      }
+
+      // Filter strictly for this customer and sort
+      return orders
         .filter(order => order.customerId === foundCustomer.id)
         .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
         .slice(0, 10); // Last 10 orders

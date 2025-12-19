@@ -4,6 +4,8 @@ import { insertTransitOrderSchema, TransitOrder, Order } from "../../shared/sche
 import { z } from "zod";
 import { authMiddleware, auditMiddleware, scopeMiddleware } from "../middleware/employee-auth";
 
+
+
 const router = Router();
 
 // Protect all routes
@@ -14,15 +16,28 @@ router.use(scopeMiddleware);
 // GET all transit orders (filtered by franchise, type, status)
 router.get("/", async (req, res) => {
     try {
-        const { franchiseId, type, status } = req.query;
-        const user = (req as any).user;
+        const { type, status } = req.query;
 
-        // Determine franchiseId: use user's franchise for non-admin, or query param for admin
+        // STRICT FRANCHISE ISOLATION
+        const employee = req.employee;
         let effectiveFranchiseId: string | undefined = undefined;
-        if (user && user.franchiseId && user.role !== 'admin' && user.role !== 'factory_manager') {
-            effectiveFranchiseId = user.franchiseId;
-        } else if (franchiseId) {
-            effectiveFranchiseId = franchiseId as string;
+
+        if (employee) {
+            if (employee.role === 'admin' || employee.role === 'factory_manager') {
+                // Admin/Factory manager can filter by any franchise or see all
+                effectiveFranchiseId = req.query.franchiseId as string | undefined;
+                console.log(`[Transit GET] Admin/FM viewing transits, filter: ${effectiveFranchiseId || 'ALL'}`);
+            } else {
+                // All other roles MUST use their own franchise
+                if (!employee.franchiseId) {
+                    return res.status(403).json({
+                        message: 'Access denied - no franchise assignment',
+                        error: 'Your account is not assigned to any franchise.'
+                    });
+                }
+                effectiveFranchiseId = employee.franchiseId;
+                console.log(`[Transit GET] User ${employee.username} viewing transits for franchise: ${effectiveFranchiseId}`);
+            }
         }
 
         // Fetch from database with franchise filter
@@ -57,23 +72,32 @@ router.get("/", async (req, res) => {
 router.get("/eligible", async (req, res) => {
     try {
         const { type } = req.query;
-        // franchiseId comes from scopeMiddleware for non-admin users, or from query for admin
-        const franchiseId = req.query.franchiseId as string | undefined;
 
-        console.log(`[Transit] Fetching eligible orders - type: ${type}, franchiseId: ${franchiseId}`);
+        // STRICT FRANCHISE ISOLATION for eligible orders
+        const employee = req.employee;
+        let effectiveFranchiseId: string | undefined = undefined;
 
-        // Get all orders
-        const allOrders = await storage.listOrders();
-        console.log(`[Transit] Total orders in database: ${allOrders.length}`);
-
-        // Filter by franchise if provided (admin may see all if no franchiseId)
-        let franchiseOrders = allOrders;
-        if (franchiseId) {
-            franchiseOrders = allOrders.filter((o: Order) =>
-                o.franchiseId === franchiseId || !o.franchiseId
-            );
-            console.log(`[Transit] Orders after franchise filter: ${franchiseOrders.length}`);
+        if (employee) {
+            if (employee.role === 'admin' || employee.role === 'factory_manager') {
+                // Admin/Factory manager can filter by any franchise or see all
+                effectiveFranchiseId = req.query.franchiseId as string | undefined;
+            } else {
+                // All other roles MUST use their own franchise
+                if (!employee.franchiseId) {
+                    return res.status(403).json({
+                        message: 'Access denied - no franchise assignment',
+                        error: 'Your account is not assigned to any franchise.'
+                    });
+                }
+                effectiveFranchiseId = employee.franchiseId;
+            }
         }
+
+        console.log(`[Transit] Fetching eligible orders - type: ${type}, franchise: ${effectiveFranchiseId}`);
+
+        // Get orders filtered by franchise
+        const allOrders = await storage.listOrders(effectiveFranchiseId);
+        console.log(`[Transit] Orders for franchise ${effectiveFranchiseId}: ${allOrders.length}`);
 
         // Get orders that are already in active transit
         const activeTransits = await storage.listTransitOrders();
@@ -104,7 +128,7 @@ router.get("/eligible", async (req, res) => {
 
         if (type === 'To Factory') {
             // Orders eligible for Store -> Factory: pending status, not in active transit
-            eligibleOrders = franchiseOrders.filter((o: Order) => {
+            eligibleOrders = allOrders.filter((o: Order) => {
                 const isPending = statusMatches(o.status, 'pending');
                 const notInTransit = !ordersInActiveTransit.has(o.id);
                 return isPending && notInTransit;
@@ -112,7 +136,7 @@ router.get("/eligible", async (req, res) => {
             console.log(`[Transit] Eligible for 'To Factory': ${eligibleOrders.length}`);
         } else if (type === 'Return to Store') {
             // Orders eligible for Factory -> Store: processing status (at factory)
-            eligibleOrders = franchiseOrders.filter((o: Order) => {
+            eligibleOrders = allOrders.filter((o: Order) => {
                 const isProcessing = statusMatches(o.status, 'processing');
                 const notInTransit = !ordersInActiveTransit.has(o.id);
                 return isProcessing && notInTransit;
@@ -120,7 +144,7 @@ router.get("/eligible", async (req, res) => {
             console.log(`[Transit] Eligible for 'Return to Store': ${eligibleOrders.length}`);
         } else {
             // No type specified, return all non-completed, non-transit orders
-            eligibleOrders = franchiseOrders.filter((o: Order) => {
+            eligibleOrders = allOrders.filter((o: Order) => {
                 const statusLower = o.status?.toLowerCase();
                 const isPendingOrProcessing = statusLower === 'pending' || statusLower === 'processing';
                 const notInTransit = !ordersInActiveTransit.has(o.id);
@@ -130,8 +154,8 @@ router.get("/eligible", async (req, res) => {
         }
 
         // Log sample order for debugging
-        if (franchiseOrders.length > 0) {
-            console.log(`[Transit] Sample order status: "${franchiseOrders[0].status}" (type: ${typeof franchiseOrders[0].status})`);
+        if (allOrders.length > 0) {
+            console.log(`[Transit] Sample order status: "${allOrders[0].status}" (type: ${typeof allOrders[0].status})`);
         }
 
         // Sort eligible orders: Express orders first, then by due date for fast transit
@@ -165,16 +189,34 @@ router.post("/", auditMiddleware('create_transit_order', 'transit_order'), async
             storeDetails, factoryDetails, origin, destination
         } = req.body;
 
+        // STRICT FRANCHISE ISOLATION
+        const employee = req.employee;
+        let effectiveFranchiseId = franchiseId;
+
+        // Non-admin/factory_manager users must use their own franchiseId
+        if (employee && employee.role !== 'admin' && employee.role !== 'factory_manager') {
+            if (!employee.franchiseId) {
+                return res.status(403).json({
+                    message: 'Cannot create transit - no franchise assignment',
+                    error: 'Your account is not assigned to any franchise.'
+                });
+            }
+            effectiveFranchiseId = employee.franchiseId;
+            console.log(`[Transit] Enforcing franchise isolation: ${effectiveFranchiseId} (user: ${employee.username})`);
+        }
+
         // Validate required fields
         if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
             return res.status(400).json({ message: "No orders selected" });
         }
 
-        // Generate Transit ID (TR-TIMESTAMP)
-        const transitId = `TR-${Date.now()}`;
 
-        // 1. Create Transit Record (only include columns that exist in table)
+        // Generate new Transit ID format: TRN-2025POL001A-F
+        const transitId = await storage.getNextTransitId(effectiveFranchiseId, type);
+
+        // 1. Create Transit Record
         const transitData = {
+            id: transitId,
             transitId,
             type,
             status: 'In Transit',
@@ -182,9 +224,9 @@ router.post("/", auditMiddleware('create_transit_order', 'transit_order'), async
             vehicleType,
             driverName,
             driverPhone,
-            employeeId,
-            employeeName,
-            franchiseId,
+            employeeId: employeeId || employee?.employeeId,
+            employeeName: employeeName || employee?.username,
+            franchiseId: effectiveFranchiseId,
             origin,
             destination,
             totalOrders: orderIds.length,
@@ -192,22 +234,30 @@ router.post("/", auditMiddleware('create_transit_order', 'transit_order'), async
             factoryDetails
         };
 
+        console.log(`[Transit] Creating transit order: ${transitId}`);
+        console.log(`[Transit] Type: ${type}, Orders: ${orderIds.length}, Franchise: ${effectiveFranchiseId}`);
+
         const newTransit = await storage.createTransitOrder(transitData);
+        console.log(`[Transit] Created transit:`, newTransit?.id, 'ID:', transitId, 'Orders:', newTransit?.totalOrders || newTransit?.total_orders);
 
         // 2. Process Items and Update Orders based on transit type
         for (const orderId of orderIds) {
             const order = await storage.getOrder(orderId);
             if (order) {
-                // Create transit order item
-                await storage.createTransitOrderItem({
-                    transitOrderId: newTransit.id,
-                    orderId: order.id,
-                    orderNumber: order.orderNumber,
-                    customerId: order.customerId,
-                    customerName: order.customerName,
-                    status: 'In Transit',
-                    franchiseId: order.franchiseId
-                });
+                // Try to create transit order item, but don't fail if it errors
+                try {
+                    await storage.createTransitOrderItem({
+                        transitOrderId: newTransit.id,
+                        orderId: order.id,
+                        orderNumber: order.orderNumber,
+                        customerId: order.customerId,
+                        customerName: order.customerName,
+                        status: 'In Transit'
+                    });
+                } catch (itemError: any) {
+                    console.warn(`[Transit] Could not create item for order ${order.orderNumber}:`, itemError?.message);
+                    // Continue processing - don't fail the entire transit creation
+                }
 
                 /**
                  * ORDER LIFECYCLE WORKFLOW:

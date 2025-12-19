@@ -18,6 +18,8 @@ import {
     type InsertEmployee,
     type AuditLog,
     type InsertAuditLog,
+    type TransitOrder,
+    type InsertTransitOrder
 } from "../shared/schema";
 import { Driver, InsertDriver } from "./SQLiteStorage";
 
@@ -411,7 +413,68 @@ export class SupabaseStorage {
     async getCustomers(franchiseId?: string): Promise<Customer[]> { return this.listCustomers(franchiseId); }
 
     // ======= ORDERS =======
+
+    /**
+     * Get the branch code from franchiseId
+     * Maps franchiseId to 3-letter branch code
+     * Handles formats: 'pollachi', 'franchise-pollachi', 'FR-001', etc.
+     */
+    private getBranchCode(franchiseId?: string): string {
+        if (!franchiseId) return 'FAB';
+
+        const branchCodes: Record<string, string> = {
+            'pollachi': 'POL',
+            'kinathukadavu': 'KIN',
+            'coimbatore': 'CBE',
+        };
+
+        let normalizedId = franchiseId.toLowerCase().trim();
+
+        // Handle 'franchise-xxx' format
+        if (normalizedId.startsWith('franchise-')) {
+            normalizedId = normalizedId.replace('franchise-', '');
+        }
+
+        return branchCodes[normalizedId] || normalizedId.substring(0, 3).toUpperCase();
+    }
+
+    /**
+     * Generate next order number using atomic database function
+     * Format: FZC-2025POL0001A
+     */
+    async getNextOrderNumber(franchiseId?: string): Promise<string> {
+        const branchCode = this.getBranchCode(franchiseId);
+
+        try {
+            // Try to use the database function for atomic sequence generation
+            const { data, error } = await this.supabase.rpc('get_next_order_number', {
+                p_branch_code: branchCode
+            });
+
+            if (data && !error) {
+                return data;
+            }
+
+            // Fallback: Generate manually if function doesn't exist
+            console.warn('[OrderNumber] Database function not found, using fallback');
+        } catch (err) {
+            console.warn('[OrderNumber] RPC failed, using fallback:', err);
+        }
+
+        // Fallback generation
+        const currentYear = new Date().getFullYear();
+        const timestamp = Date.now();
+        const sequence = (timestamp % 9999) + 1;
+        const paddedSequence = String(sequence).padStart(4, '0');
+        return `FZC-${currentYear}${branchCode}${paddedSequence}A`;
+    }
+
     async createOrder(data: InsertOrder): Promise<Order> {
+        // Generate order number if not provided
+        if (!data.orderNumber) {
+            data.orderNumber = await this.getNextOrderNumber((data as any).franchiseId);
+        }
+
         const { data: order, error } = await this.supabase
             .from('orders')
             .insert(this.toSnakeCase(data))
@@ -448,11 +511,58 @@ export class SupabaseStorage {
     }
 
     async listOrders(franchiseId?: string): Promise<Order[]> {
-        let query = this.supabase.from('orders').select('*, customers(name, email, phone)');
+        let query = this.supabase.from('orders').select('*');
         if (franchiseId) query = query.eq('franchise_id', franchiseId);
         const { data, error } = await query;
         if (error) throw error;
         return data.map(item => this.mapDates(item));
+    }
+
+    // ======= TRANSIT ORDERS =======
+
+    /**
+     * Generate next transit ID using atomic database function
+     * Format: TRN-2025POL001A-F
+     */
+    async getNextTransitId(franchiseId?: string, type: 'To Factory' | 'Return to Store' | string = 'To Factory'): Promise<string> {
+        const branchCode = this.getBranchCode(franchiseId);
+
+        // Direction indicator: F (To Factory) or S (To Store)
+        const direction = type === 'To Factory' || type === 'store_to_factory' ? 'F' : 'S';
+
+        try {
+            // Try to use the database function for atomic sequence generation
+            // Function returns "2025POL001A" part
+            const { data, error } = await this.supabase.rpc('get_next_transit_number', {
+                p_branch_code: branchCode
+            });
+
+            if (data && !error) {
+                return `TRN-${data}-${direction}`;
+            }
+
+            console.warn('[TransitID] Database function not found/error, using fallback:', error?.message);
+        } catch (err) {
+            console.warn('[TransitID] RPC failed, using fallback:', err);
+        }
+
+        // Fallback generation (Timestamp based)
+        const currentYear = new Date().getFullYear();
+        const timestamp = Date.now();
+        const sequence = (timestamp % 999) + 1;
+        const paddedSequence = String(sequence).padStart(3, '0');
+        const suffix = 'A'; // Simplified fallback
+
+        return `TRN-${currentYear}${branchCode}${paddedSequence}${suffix}-${direction}`;
+    }
+
+    async listTransitOrders(franchiseId?: string): Promise<TransitOrder[]> {
+        let query = this.supabase.from('transit_orders').select('*');
+        if (franchiseId) query = query.eq('franchise_id', franchiseId);
+
+        const { data, error } = await query.order('created_at', { ascending: false });
+        if (error) throw error;
+        return data.map(t => this.mapDates(t));
     }
     async getOrders(): Promise<Order[]> { return this.listOrders(); }
     async getActiveOrders(): Promise<Order[]> {
@@ -883,14 +993,7 @@ export class SupabaseStorage {
         return data.map(item => this.mapDates(item));
     }
 
-    // ======= TRANSIT ORDERS =======
-    async listTransitOrders(franchiseId?: string): Promise<any[]> {
-        let query = this.supabase.from('transit_orders').select('*').order('created_at', { ascending: false });
-        if (franchiseId) query = query.eq('franchise_id', franchiseId);
-        const { data, error } = await query;
-        if (error) throw error;
-        return data.map(item => this.mapDates(item));
-    }
+
 
     async getTransitOrdersByStatus(status: string, franchiseId?: string): Promise<any[]> {
         let query = this.supabase.from('transit_orders').select('*').eq('status', status).order('created_at', { ascending: false });

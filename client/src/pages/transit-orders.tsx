@@ -138,6 +138,7 @@ interface TransitBatch {
   orders: OrderInBatch[];
   itemCount: number;
   totalOrders?: number;
+  franchiseId?: string;
   employeeName?: string;
   storeDetails?: StoreDetails;
   factoryDetails?: FactoryDetails;
@@ -688,7 +689,9 @@ export default function TransitOrdersPage() {
         createdAt: order.createdAt,
         status: order.status?.toLowerCase().replace(' ', '_') || 'pending',
         orders: order.orders || [],
-        itemCount: order.totalItems || 0,
+        totalOrders: order.totalOrders || order.total_orders || 0,
+        itemCount: order.totalOrders || order.total_orders || order.totalItems || 0,
+        franchiseId: order.franchiseId || order.franchise_id,
         storeDetails: order.storeDetails || {},
         factoryDetails: order.factoryDetails || {},
         vehicleDetails: {
@@ -999,13 +1002,24 @@ export default function TransitOrdersPage() {
     }
   };
 
-  // Filter history
+  // Filter history with franchise isolation
   const filteredHistory = transitHistory.filter((batch) => {
     const matchesSearch = batch.transitId.toLowerCase().includes(historySearchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || batch.status === statusFilter ||
       (statusFilter === 'in_transit' && batch.status === 'in_transit') ||
       (statusFilter === 'completed' && (batch.status === 'completed' || batch.status === 'received'));
-    return matchesSearch && matchesStatus;
+
+    // Franchise isolation: Store employees only see transits related to their franchise
+    // Factory managers see all transits
+    let matchesFranchise = true;
+    if (!isFactoryManager && employee?.franchiseId) {
+      // Check if this transit belongs to their franchise
+      matchesFranchise = batch.franchiseId === employee.franchiseId ||
+        (batch.storeDetails as any)?.storeCode?.includes(employee.franchiseId) ||
+        !batch.franchiseId; // Also show if no franchise set (legacy data)
+    }
+
+    return matchesSearch && matchesStatus && matchesFranchise;
   });
 
   return (
@@ -1180,7 +1194,7 @@ export default function TransitOrdersPage() {
                         </span>
                         <span className="flex items-center gap-1">
                           <Package className="h-3 w-3" />
-                          {batch.orders?.length || batch.itemCount || 0} Orders
+                          {batch.totalOrders || (batch as any).total_orders || batch.orders?.length || 0} Orders
                         </span>
                       </div>
                       <div className="flex items-center gap-1 text-xs">
@@ -1234,8 +1248,41 @@ export default function TransitOrdersPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[50px]"></TableHead>
-                      <TableHead>Order ID</TableHead>
+                      <TableHead className="w-[50px]">
+                        {/* Select All Checkbox */}
+                        <Checkbox
+                          checked={
+                            eligibleOrders.length > 0 &&
+                            eligibleOrders
+                              .filter((o: any) => o.orderNumber.toLowerCase().includes(searchOrdersQuery.toLowerCase()) || o.customerName.toLowerCase().includes(searchOrdersQuery.toLowerCase()))
+                              .every((o: any) => selectedEligibleOrders.includes(o.id))
+                          }
+                          onCheckedChange={(checked) => {
+                            const filteredOrders = eligibleOrders.filter((o: any) =>
+                              o.orderNumber.toLowerCase().includes(searchOrdersQuery.toLowerCase()) ||
+                              o.customerName.toLowerCase().includes(searchOrdersQuery.toLowerCase())
+                            );
+                            if (checked) {
+                              // Select all filtered orders
+                              const allIds = filteredOrders.map((o: any) => o.id);
+                              setSelectedEligibleOrders((prev: string[]) => [...new Set([...prev, ...allIds])]);
+                            } else {
+                              // Deselect all filtered orders
+                              const filteredIds = filteredOrders.map((o: any) => o.id);
+                              setSelectedEligibleOrders((prev: string[]) => prev.filter(id => !filteredIds.includes(id)));
+                            }
+                          }}
+                          aria-label="Select all orders"
+                        />
+                      </TableHead>
+                      <TableHead>
+                        <div className="flex items-center gap-2">
+                          Order ID
+                          <span className="text-xs text-muted-foreground font-normal">
+                            ({eligibleOrders.filter((o: any) => o.orderNumber.toLowerCase().includes(searchOrdersQuery.toLowerCase()) || o.customerName.toLowerCase().includes(searchOrdersQuery.toLowerCase())).length})
+                          </span>
+                        </div>
+                      </TableHead>
                       <TableHead>Customer</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
@@ -1498,9 +1545,16 @@ export default function TransitOrdersPage() {
             <DialogFooter className="pt-4 border-t mt-auto">
               <div className="flex items-center justify-between w-full">
                 <div>
-                  {selectedBatch?.status === 'in_transit' && !isFactoryManager && (
+                  {selectedBatch?.status === 'in_transit' && (
                     <p className="text-sm text-muted-foreground italic">
-                      Only Factory Manager can update transit status
+                      {isFactoryManager && (selectedBatch.type === 'store_to_factory' || selectedBatch.type === 'To Factory')
+                        ? 'You can mark this shipment as received at the factory'
+                        : !isFactoryManager && (selectedBatch.type === 'factory_to_store' || selectedBatch.type === 'Return to Store')
+                          ? 'You can mark this shipment as received at your store'
+                          : isFactoryManager
+                            ? 'This is a Factory→Store transit. Store employee will mark it received.'
+                            : 'This is a Store→Factory transit. Factory will mark it received.'
+                      }
                     </p>
                   )}
                 </div>
@@ -1508,21 +1562,40 @@ export default function TransitOrdersPage() {
                   <Button variant="outline" onClick={() => setShowViewDialog(false)}>
                     Close
                   </Button>
-                  {selectedBatch?.status === 'in_transit' && isFactoryManager && (
+                  {/* 
+                    Mark as Received Logic:
+                    - Factory Manager can mark "Store → Factory" transits as Received
+                    - Store Employee/Manager can mark "Factory → Store" transits as Received (at their franchise)
+                  */}
+                  {selectedBatch?.status === 'in_transit' && (
                     <>
-                      <Button
-                        onClick={() => handleUpdateStatus(selectedBatch.id, 'Received')}
-                        className="bg-blue-600 hover:bg-blue-700"
-                      >
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                        Mark as Received
-                      </Button>
+                      {/* Factory Manager receives Store → Factory shipments */}
+                      {isFactoryManager && (selectedBatch.type === 'store_to_factory' || selectedBatch.type === 'To Factory') && (
+                        <Button
+                          onClick={() => handleUpdateStatus(selectedBatch.id, 'Received')}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          Mark as Received (Factory)
+                        </Button>
+                      )}
+
+                      {/* Store Employee/Manager receives Factory → Store shipments (only for their franchise) */}
+                      {!isFactoryManager && (selectedBatch.type === 'factory_to_store' || selectedBatch.type === 'Return to Store') && (
+                        <Button
+                          onClick={() => handleUpdateStatus(selectedBatch.id, 'Received')}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          Mark as Received (Store)
+                        </Button>
+                      )}
                     </>
                   )}
-                  {selectedBatch?.status === 'Received' && isFactoryManager && (
+                  {selectedBatch?.status === 'received' && isFactoryManager && (
                     <Button
                       onClick={() => handleUpdateStatus(selectedBatch.id, 'Completed')}
-                      className="bg-green-600 hover:bg-green-700"
+                      className="bg-emerald-600 hover:bg-emerald-700"
                     >
                       <CheckCircle2 className="h-4 w-4 mr-2" />
                       Mark Completed

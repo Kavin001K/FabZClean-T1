@@ -66,7 +66,8 @@ export class OrderService {
             order.customerName?.toLowerCase().includes(searchTerm) ||
             order.customerEmail?.toLowerCase().includes(searchTerm) ||
             order.id.toLowerCase().includes(searchTerm) ||
-            order.orderNumber?.toLowerCase().includes(searchTerm)
+            order.orderNumber?.toLowerCase().includes(searchTerm) ||
+            order.customerPhone?.toLowerCase().includes(searchTerm)
         );
       }
 

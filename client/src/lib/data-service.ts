@@ -146,9 +146,15 @@ async function fetchData<T>(endpoint: string, init: RequestInit = {}): Promise<T
 
 // Orders API
 export const ordersApi = {
-  async getAll(): Promise<Order[]> {
+  async getAll(params: Record<string, any> = {}): Promise<Order[]> {
     try {
-      const response = await fetchData<{ data: Order[]; pagination?: any } | Order[]>("/orders?limit=1000");
+      // Build query string from params
+      const queryParams = new URLSearchParams({
+        limit: '100', // Default lower limit
+        ...params
+      });
+
+      const response = await fetchData<{ data: Order[]; pagination?: any } | Order[]>(`/orders?${queryParams.toString()}`);
       // Handle paginated response
       if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
         return response.data;
@@ -162,6 +168,10 @@ export const ordersApi = {
       console.error('Failed to fetch orders:', error);
       return [];
     }
+  },
+
+  async search(query: string): Promise<Order[]> {
+    return this.getAll({ search: query });
   },
 
   async getById(id: string): Promise<Order | null> {

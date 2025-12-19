@@ -2590,4 +2590,67 @@ export class SQLiteStorage implements IStorage {
   close(): void {
     this.db.close();
   }
+
+  /**
+   * Generate next transit ID for SQLite
+   * Format: TRN-2025POL001A-F
+   */
+  async getNextTransitId(franchiseId?: string, type: 'To Factory' | 'Return to Store' | string = 'To Factory'): Promise<string> {
+    const branchCode = this.getBranchCode(franchiseId);
+    const currentYear = new Date().getFullYear();
+
+    // Direction indicator: F (To Factory) or S (To Store)
+    const direction = type === 'To Factory' || type === 'store_to_factory' ? 'F' : 'S';
+
+    // Simple unique ID generation for SQLite (using timestamp and sequence fallback)
+    // Since we don't have atomic sequences in SQLite easily without extra tables
+    const timestamp = Date.now();
+    const sequence = (timestamp % 999) + 1;
+    const paddedSequence = String(sequence).padStart(3, '0');
+    const suffix = 'A';
+
+    return `TRN-${currentYear}${branchCode}${paddedSequence}${suffix}-${direction}`;
+  }
+
+  // Helper to get branch code (duplicated helper for SQLite context)
+  private getBranchCode(franchiseId?: string): string {
+    if (!franchiseId) return 'FAB';
+
+    const branchCodes: Record<string, string> = {
+      'pollachi': 'POL',
+      'kinathukadavu': 'KIN',
+      'coimbatore': 'CBE',
+    };
+
+    let normalizedId = franchiseId.toLowerCase().trim();
+    if (normalizedId.startsWith('franchise-')) {
+      normalizedId = normalizedId.replace('franchise-', '');
+    }
+
+    return branchCodes[normalizedId] || normalizedId.substring(0, 3).toUpperCase();
+  }
+
+  async updateTransitStatus(id: string, status: string, notes?: string, location?: string, updatedBy?: string): Promise<any> {
+    const now = new Date().toISOString();
+
+    // Update main order status
+    this.db.prepare(
+      "UPDATE transit_orders SET status = ?, updatedAt = ? WHERE id = ?"
+    ).run(status, now, id);
+
+    // Add history entry
+    const historyId = randomUUID();
+
+    // Check if table exists (it should based on schema)
+    try {
+      this.db.prepare(`
+        INSERT INTO transit_status_history (id, transitOrderId, status, notes, location, updatedBy, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(historyId, id, status, notes || null, location || null, updatedBy || null, now);
+    } catch (e) {
+      console.warn("Could not write status history for SQLite:", e);
+    }
+
+    return this.getRecord('transit_orders', id);
+  }
 }

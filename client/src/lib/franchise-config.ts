@@ -149,26 +149,174 @@ export function getFranchiseForInvoice(order: any): FranchiseBranchInfo {
 }
 
 /**
- * Generate a unique order number with franchise prefix
- * Format: BRANCHCODE-YYYYMMDD-XXXX (e.g., POL-20251209-0001)
+ * Generate a unique order number with new format
+ * Format: FZC-YYYY+BRANCHCODE+NNNN+LETTER
+ * Example: FZC-2025POL0001A
+ * 
+ * Rules:
+ * - FZC = FabZClean (constant)
+ * - YYYY = Current year (2025, 2026, etc.)
+ * - BRANCHCODE = Branch code (POL, KIN, etc.)
+ * - NNNN = 4-digit sequential number (0001-9999)
+ * - LETTER = A-Z suffix (starts with A, increments when NNNN reaches 9999)
+ * 
+ * When 9999A is reached, it rolls over to 0001B
+ * When 9999Z is reached, it resets to new year or throws error
  */
-export function generateOrderNumber(franchiseId?: string | null): string {
+export async function generateOrderNumber(franchiseId?: string | null, storage?: any): Promise<string> {
     const franchise = getFranchiseById(franchiseId);
     const branchCode = franchise.branchCode;
-    const date = new Date();
-    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
-    const random = Math.floor(Math.random() * 9000 + 1000); // 4 digit random
-    return `${branchCode}-${dateStr}-${random}`;
+    const currentYear = new Date().getFullYear();
+
+    // Generate the order number parts
+    const prefix = 'FZC';
+
+    // Get or create sequence for this branch and year
+    let sequenceNumber = 1;
+    let suffixLetter = 'A';
+
+    // Try to get the latest order number from the database for this branch
+    try {
+        if (storage && storage.supabase) {
+            // Query the order_sequences table for current sequence
+            const { data: seqData, error: seqError } = await storage.supabase
+                .from('order_sequences')
+                .select('*')
+                .eq('branch_code', branchCode)
+                .eq('year', currentYear)
+                .single();
+
+            if (seqData && !seqError) {
+                sequenceNumber = seqData.sequence_number + 1;
+                suffixLetter = seqData.suffix_letter || 'A';
+
+                // Check for rollover
+                if (sequenceNumber > 9999) {
+                    sequenceNumber = 1;
+                    suffixLetter = String.fromCharCode(suffixLetter.charCodeAt(0) + 1);
+
+                    // If we exceeded Z, start over with warning (should rarely happen)
+                    if (suffixLetter > 'Z') {
+                        console.error('[ORDER] Sequence overflow! Starting from A again.');
+                        suffixLetter = 'A';
+                    }
+                }
+
+                // Update the sequence
+                await storage.supabase
+                    .from('order_sequences')
+                    .update({
+                        sequence_number: sequenceNumber,
+                        suffix_letter: suffixLetter,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', seqData.id);
+            } else {
+                // No sequence exists, create one
+                await storage.supabase
+                    .from('order_sequences')
+                    .insert({
+                        branch_code: branchCode,
+                        year: currentYear,
+                        sequence_number: 1,
+                        suffix_letter: 'A'
+                    });
+            }
+        } else {
+            // Fallback: Use timestamp-based sequence (for when storage is not available)
+            // This ensures uniqueness even without database
+            const timestamp = Date.now();
+            const lastFour = timestamp % 9999 + 1;
+            sequenceNumber = lastFour;
+        }
+    } catch (error) {
+        console.warn('[ORDER] Failed to get sequence from database, using fallback:', error);
+        // Fallback: Use timestamp-based sequence
+        const timestamp = Date.now();
+        sequenceNumber = (timestamp % 9999) + 1;
+    }
+
+    // Format the order number
+    const paddedSequence = String(sequenceNumber).padStart(4, '0');
+    return `${prefix}-${currentYear}${branchCode}${paddedSequence}${suffixLetter}`;
 }
 
 /**
- * Generate a unique transit ID
- * Format: TR-BRANCHCODE-TIMESTAMP (e.g., TR-POL-1765335084330)
+ * Synchronous version for cases where async is not possible
+ * Uses timestamp-based fallback
  */
-export function generateTransitId(franchiseId?: string | null): string {
+export function generateOrderNumberSync(franchiseId?: string | null): string {
     const franchise = getFranchiseById(franchiseId);
     const branchCode = franchise.branchCode;
-    return `TR-${branchCode}-${Date.now()}`;
+    const currentYear = new Date().getFullYear();
+
+    // Use timestamp for uniqueness
+    const timestamp = Date.now();
+    const sequence = (timestamp % 9999) + 1;
+    const paddedSequence = String(sequence).padStart(4, '0');
+
+    return `FZC-${currentYear}${branchCode}${paddedSequence}A`;
+}
+
+/**
+ * Generate a unique transit ID with new format
+ * Format: TRN-YYYY+BRANCHCODE+NNN+LETTER-DIRECTION
+ * Example: TRN-2025POL001A-F (To Factory) or TRN-2025POL001A-S (To Store)
+ * 
+ * Rules:
+ * - TRN = Transit (constant)
+ * - YYYY = Current year
+ * - BRANCHCODE = Origin branch code (POL, KIN, etc.)
+ * - NNN = 3-digit sequential number (001-999)
+ * - LETTER = A-Z suffix (increments when NNN reaches 999)
+ * - DIRECTION = F (To Factory) or S (Return to Store)
+ */
+export function generateTransitId(
+    franchiseId?: string | null,
+    transitType: 'To Factory' | 'Return to Store' | string = 'To Factory'
+): string {
+    const franchise = getFranchiseById(franchiseId);
+    const branchCode = franchise.branchCode;
+    const currentYear = new Date().getFullYear();
+
+    // Direction indicator
+    const direction = transitType === 'To Factory' || transitType === 'store_to_factory' ? 'F' : 'S';
+
+    // Generate sequence (using timestamp for uniqueness)
+    const timestamp = Date.now();
+    const sequence = (timestamp % 999) + 1;
+    const paddedSequence = String(sequence).padStart(3, '0');
+
+    // Use milliseconds for suffix to ensure uniqueness
+    const suffixIndex = Math.floor((timestamp / 1000) % 26);
+    const suffix = String.fromCharCode(65 + suffixIndex); // A-Z
+
+    return `TRN-${currentYear}${branchCode}${paddedSequence}${suffix}-${direction}`;
+}
+
+/**
+ * Parse transit ID to extract components
+ */
+export function parseTransitId(transitId: string): {
+    prefix: string;
+    year: number;
+    branchCode: string;
+    sequence: number;
+    suffix: string;
+    direction: 'F' | 'S';
+} | null {
+    // Format: TRN-2025POL001A-F
+    const match = transitId.match(/^TRN-(\d{4})([A-Z]{3})(\d{3})([A-Z])-([FS])$/);
+    if (!match) return null;
+
+    return {
+        prefix: 'TRN',
+        year: parseInt(match[1]),
+        branchCode: match[2],
+        sequence: parseInt(match[3]),
+        suffix: match[4],
+        direction: match[5] as 'F' | 'S'
+    };
 }
 
 /**

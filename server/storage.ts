@@ -36,6 +36,13 @@ export interface IStorage {
   getAnalyticsSummary(): Promise<any>;
   searchGlobal(query: string): Promise<any>;
 
+  // Transit methods
+  createTransitOrder(data: any): Promise<any>;
+  getNextTransitId(franchiseId?: string, type?: string): Promise<string>;
+  listTransitOrders(franchiseId?: string): Promise<any[]>;
+  getTransitOrdersByStatus(status: string, franchiseId?: string): Promise<any[]>;
+  updateTransitStatus(id: string, status: string, notes?: string, location?: string, updatedBy?: string): Promise<any>;
+
   // Audit Log methods
   createAuditLog(data: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(params: any): Promise<{ data: AuditLog[]; count: number }>;
@@ -64,6 +71,13 @@ export class MemStorage implements IStorage {
   async createAttendance(data: any): Promise<any> { return null; }
   async listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]> { return []; }
   async updateAttendance(id: string, data: any): Promise<any> { return null; }
+
+  // Transit methods
+  async createTransitOrder(data: any): Promise<any> { return null; }
+  async getNextTransitId(franchiseId?: string, type?: string): Promise<string> { return `TRN-${Date.now()}`; }
+  async listTransitOrders(franchiseId?: string): Promise<any[]> { return []; }
+  async getTransitOrdersByStatus(status: string, franchiseId?: string): Promise<any[]> { return []; }
+  async updateTransitStatus(id: string, status: string, notes?: string, location?: string, updatedBy?: string): Promise<any> { return null; }
 
   private async initializeData() {
     // Check if database already has data to avoid duplicating

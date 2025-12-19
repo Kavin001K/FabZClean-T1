@@ -56,7 +56,15 @@ router.get('/search', async (req, res) => {
       return res.json([]);
     }
 
-    const allOrders = await storage.listOrders();
+    // Apply franchise isolation to search
+    const employee = req.employee;
+    let franchiseId: string | undefined = undefined;
+
+    if (employee && employee.role !== 'admin' && employee.role !== 'factory_manager') {
+      franchiseId = employee.franchiseId;
+    }
+
+    const allOrders = await storage.listOrders(franchiseId);
     const queryLower = query.toLowerCase();
 
     // Search across multiple fields
@@ -91,7 +99,7 @@ router.get('/search', async (req, res) => {
     let transitMatches: any[] = [];
     if (query.startsWith('TR-') || query.startsWith('tr-')) {
       try {
-        const allTransits = await storage.listTransitOrders();
+        const allTransits = await storage.listTransitOrders(franchiseId);
         transitMatches = allTransits.filter((t: any) =>
           t.transitId?.toLowerCase().includes(queryLower)
         );
@@ -143,15 +151,34 @@ router.get('/', async (req, res) => {
     const status = req.query.status as string;
     const customerEmail = req.query.customerEmail as string;
 
-    // Enforce franchise isolation
-    const user = (req as any).user;
-    let franchiseId = undefined;
+    // Log incoming request for debugging 400 errors
+    console.log(`[GET /api/orders] Query: ${JSON.stringify(req.query)}`);
 
-    if (user && user.role !== 'admin' && user.role !== 'factory_manager') {
-      franchiseId = user.franchiseId;
-    } else if (user && (user.role === 'admin' || user.role === 'factory_manager') && req.query.franchiseId) {
-      // Allow admin to filter by specific franchise if needed
-      franchiseId = req.query.franchiseId as string;
+    // STRICT FRANCHISE ISOLATION
+    // Only admin and factory_manager can see all orders
+    // All other roles MUST be filtered by their franchise
+    const employee = req.employee;
+    let franchiseId: string | undefined = undefined;
+
+    if (employee) {
+      if (employee.role === 'admin') {
+        // Admin can optionally filter by franchise
+        franchiseId = req.query.franchiseId as string | undefined;
+      } else if (employee.role === 'factory_manager') {
+        // Factory manager sees all orders (they process orders from all franchises)
+        franchiseId = req.query.franchiseId as string | undefined;
+      } else {
+        // ALL other roles (franchise_manager, employee, etc.) MUST be filtered
+        if (!employee.franchiseId) {
+          console.error(`[ORDERS] User ${employee.username} has no franchiseId - blocking access`);
+          return res.status(403).json({
+            error: 'Access denied - no franchise assignment',
+            message: 'Your account is not assigned to any franchise. Please contact admin.'
+          });
+        }
+        franchiseId = employee.franchiseId;
+        // console.log(`[ORDERS] Filtering orders for franchise: ${franchiseId} (user: ${employee.username})`);
+      }
     }
 
     const filters = {
@@ -180,7 +207,16 @@ router.get('/', async (req, res) => {
     res.json(response);
   } catch (error) {
     console.error('Get orders error:', error);
-    res.status(500).json(createErrorResponse('Failed to fetch orders', 500));
+    if (error instanceof z.ZodError) {
+      return res.status(400).json(createErrorResponse('Validation failed', 400));
+    }
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    // If it's a known validation error string
+    if (message.toLowerCase().includes('validation') || message.toLowerCase().includes('invalid')) {
+      return res.status(400).json(createErrorResponse(message, 400));
+    }
+
+    res.status(500).json(createErrorResponse(`Failed to fetch orders: ${message}`, 500));
   }
 });
 
@@ -262,12 +298,21 @@ router.post(
     try {
       const orderData = req.body;
 
-      // Enforce franchise isolation
-      const user = (req as any).user;
-      if (user && user.role !== 'admin') {
-        orderData.franchiseId = user.franchiseId;
-      } else if (user && user.role === 'admin' && !orderData.franchiseId) {
-        // Admins should ideally provide a franchiseId, but if missing, standard defaults apply
+      // STRICT FRANCHISE ISOLATION for order creation
+      const employee = req.employee;
+      if (employee && employee.role !== 'admin') {
+        // Non-admin users MUST have their franchise assigned
+        if (!employee.franchiseId) {
+          return res.status(403).json({
+            error: 'Cannot create order',
+            message: 'Your account is not assigned to any franchise.'
+          });
+        }
+        orderData.franchiseId = employee.franchiseId;
+        console.log(`[CREATE ORDER] Assigning to franchise: ${employee.franchiseId}`);
+      } else if (!orderData.franchiseId) {
+        // Admins should ideally provide a franchiseId
+        console.warn('[CREATE ORDER] Admin creating order without franchiseId');
       }
 
       // Use OrderService to create order (includes external validation and enrichment)

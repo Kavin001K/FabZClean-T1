@@ -195,26 +195,27 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
       overflow: 'hidden',
     }}>
 
-      {/* EXPRESS Watermark Background */}
-      {isExpressOrder && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%) rotate(-35deg)',
-          fontSize: '100px',
-          fontWeight: '900',
-          color: colors.express,
-          opacity: 0.04,
-          letterSpacing: '12px',
-          whiteSpace: 'nowrap',
-          pointerEvents: 'none',
-          zIndex: 0,
-          userSelect: 'none',
-        }}>
-          EXPRESS
-        </div>
-      )}
+      {/* Fab Clean Logo Watermark - Appears on ALL invoices */}
+      <div style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        opacity: 0.04,
+        pointerEvents: 'none',
+        zIndex: 0,
+        userSelect: 'none',
+      }}>
+        <img
+          src="/assets/logo.webp"
+          alt=""
+          style={{
+            width: '400px',
+            height: 'auto',
+            filter: 'grayscale(100%)',
+          }}
+        />
+      </div>
 
       {/* Header Section */}
       <div style={{
@@ -528,20 +529,145 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
           </div>
 
           {/* Right: Totals */}
-          <div style={{ width: '300px' }}>
+          <div style={{ width: '300px', position: 'relative' }}>
+            {/* Traditional EXPRESS Stamp - Rubber Stamp Style */}
+            {isExpressOrder && (
+              <div style={{
+                position: 'absolute',
+                top: '-60px',
+                right: '5px',
+                transform: 'rotate(-15deg)',
+                zIndex: 10,
+              }}>
+                {/* Outer circle with grunge effect */}
+                <div style={{
+                  width: '100px',
+                  height: '100px',
+                  borderRadius: '50%',
+                  border: `4px solid ${colors.express}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  background: `rgba(255,255,255,0.9)`,
+                  boxShadow: `
+                    inset 0 0 0 3px ${colors.expressLight},
+                    inset 0 0 0 5px ${colors.express}
+                  `,
+                }}>
+                  {/* Express text curved at top */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '8px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    fontSize: '8px',
+                    fontWeight: '800',
+                    color: colors.express,
+                    letterSpacing: '3px',
+                    textTransform: 'uppercase',
+                  }}>
+                    ★ EXPRESS ★
+                  </div>
+
+                  {/* Center EXPRESS text - main */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <span style={{
+                      fontSize: '18px',
+                      fontWeight: '900',
+                      color: colors.express,
+                      letterSpacing: '1px',
+                      textTransform: 'uppercase',
+                      lineHeight: '1',
+                      textShadow: '1px 1px 0 rgba(0,0,0,0.1)',
+                    }}>EXPRESS</span>
+                    <span style={{
+                      fontSize: '7px',
+                      fontWeight: '700',
+                      color: colors.express,
+                      letterSpacing: '2px',
+                      textTransform: 'uppercase',
+                      marginTop: '2px',
+                    }}>⚡ PRIORITY ⚡</span>
+                  </div>
+
+                  {/* Bottom text */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '8px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    fontSize: '7px',
+                    fontWeight: '700',
+                    color: colors.express,
+                    letterSpacing: '1px',
+                    textTransform: 'uppercase',
+                  }}>
+                    FAB CLEAN
+                  </div>
+
+                  {/* Decorative stars */}
+                  <div style={{
+                    position: 'absolute',
+                    left: '15px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: colors.express,
+                    fontSize: '8px',
+                  }}>★</div>
+                  <div style={{
+                    position: 'absolute',
+                    right: '15px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: colors.express,
+                    fontSize: '8px',
+                  }}>★</div>
+                </div>
+              </div>
+            )}
+
             <div style={{
               background: colors.white,
               padding: '20px',
               borderRadius: '10px',
               border: `1px solid ${colors.border}`,
+              position: 'relative',
+              overflow: 'hidden',
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px' }}>
+              {/* Fab Clean Watermark Logo */}
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                opacity: 0.06,
+                fontSize: '28px',
+                fontWeight: '900',
+                color: colors.primary,
+                letterSpacing: '2px',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                userSelect: 'none',
+                textAlign: 'center',
+                lineHeight: '1.2',
+              }}>
+                <div style={{ fontSize: '24px' }}>fab clean</div>
+                <div style={{ fontSize: '10px', letterSpacing: '4px' }}>PREMIUM LAUNDRY</div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px', position: 'relative', zIndex: 1 }}>
                 <span style={{ color: colors.textLight }}>Subtotal</span>
                 <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{formatIndianCurrency(itemsSubtotal)}</span>
               </div>
 
               {deliveryCharges > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px', position: 'relative', zIndex: 1 }}>
                   <span style={{ color: colors.textLight }}>Delivery</span>
                   <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{formatIndianCurrency(deliveryCharges)}</span>
                 </div>
@@ -558,6 +684,8 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                   background: colors.expressLight,
                   borderRadius: '6px',
                   border: `1px solid ${colors.express}30`,
+                  position: 'relative',
+                  zIndex: 1,
                 }}>
                   <span style={{
                     color: colors.express,
@@ -576,12 +704,12 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
 
               {enableGST && (
                 <>
-                  <div style={{ height: '1px', background: colors.border, margin: '12px 0' }}></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px' }}>
+                  <div style={{ height: '1px', background: colors.border, margin: '12px 0', position: 'relative', zIndex: 1 }}></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px', position: 'relative', zIndex: 1 }}>
                     <span style={{ color: colors.textLight }}>CGST @ 9%</span>
                     <span style={{ fontFamily: 'monospace' }}>{formatIndianCurrency(cgstAmount)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '12px', position: 'relative', zIndex: 1 }}>
                     <span style={{ color: colors.textLight }}>SGST @ 9%</span>
                     <span style={{ fontFamily: 'monospace' }}>{formatIndianCurrency(sgstAmount)}</span>
                   </div>
@@ -593,9 +721,11 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                 background: `linear-gradient(90deg, ${colors.primary}, ${colors.accent})`,
                 margin: '15px 0',
                 borderRadius: '2px',
+                position: 'relative',
+                zIndex: 1,
               }}></div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
                 <span style={{ fontWeight: '700', fontSize: '14px', color: colors.dark, textTransform: 'uppercase' }}>Grand Total</span>
                 <span style={{
                   fontSize: '24px',
@@ -616,6 +746,8 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                 color: colors.textLight,
                 fontStyle: 'italic',
                 textAlign: 'center',
+                position: 'relative',
+                zIndex: 1,
               }}>
                 {convertToWords(grandTotal)}
               </div>
