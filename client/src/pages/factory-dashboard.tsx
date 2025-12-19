@@ -34,7 +34,8 @@ import {
     RefreshCw,
     Store,
     Shirt,
-    Loader2
+    Loader2,
+    Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -568,25 +569,60 @@ export default function FactoryDashboard() {
                                 </div>
                             ) : (
                                 <div className="space-y-3">
-                                    {processingItems.map((item: any) => (
-                                        <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                            <div>
-                                                <p className="font-medium">{item.orderNumber}</p>
-                                                <p className="text-sm text-muted-foreground">{item.customerName}</p>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <Badge>{item.status}</Badge>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => markReadyMutation.mutate(item.id)}
-                                                    disabled={markReadyMutation.isPending}
+                                    {processingItems
+                                        .sort((a: any, b: any) => {
+                                            // Sort EXPRESS orders first
+                                            const aExpress = a.isExpressOrder || a.is_express_order || a.priority === 'high';
+                                            const bExpress = b.isExpressOrder || b.is_express_order || b.priority === 'high';
+                                            if (aExpress && !bExpress) return -1;
+                                            if (!aExpress && bExpress) return 1;
+                                            return 0;
+                                        })
+                                        .map((item: any) => {
+                                            const isExpress = item.isExpressOrder || item.is_express_order || item.priority === 'high';
+                                            return (
+                                                <div
+                                                    key={item.id}
+                                                    className={`flex items-center justify-between p-3 border rounded-lg ${isExpress
+                                                            ? 'border-orange-400 bg-orange-50 dark:bg-orange-950/20 relative overflow-hidden'
+                                                            : ''
+                                                        }`}
                                                 >
-                                                    {markReadyMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Mark Ready"}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ))}
+                                                    {/* EXPRESS Watermark */}
+                                                    {isExpress && (
+                                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                            <span className="text-orange-500/10 text-4xl font-black rotate-[-15deg]">
+                                                                EXPRESS
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    <div className="relative z-10">
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-medium">{item.orderNumber}</p>
+                                                            {isExpress && (
+                                                                <Badge className="bg-orange-500 text-white text-[9px] px-1.5 py-0 flex items-center gap-0.5 h-5">
+                                                                    <Zap className="h-3 w-3" />
+                                                                    EXPRESS
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-sm text-muted-foreground">{item.customerName}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 relative z-10">
+                                                        <Badge className={isExpress ? 'bg-orange-100 text-orange-800 border-orange-300' : ''}>{item.status}</Badge>
+                                                        <Button
+                                                            size="sm"
+                                                            variant={isExpress ? "default" : "outline"}
+                                                            className={isExpress ? "bg-orange-600 hover:bg-orange-700" : ""}
+                                                            onClick={() => markReadyMutation.mutate(item.id)}
+                                                            disabled={markReadyMutation.isPending}
+                                                        >
+                                                            {markReadyMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Mark Ready"}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                 </div>
                             )}
                         </CardContent>

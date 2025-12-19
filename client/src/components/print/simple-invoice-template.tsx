@@ -25,10 +25,12 @@ interface InvoiceData {
     }>;
     subtotal: number;
     deliveryCharges?: number;
+    expressSurcharge?: number;
     total: number;
     paymentTerms: string;
     notes?: string;
     qrCode?: string;
+    isExpressOrder?: boolean;
 }
 
 // Self-contained utility functions
@@ -44,8 +46,10 @@ const SimpleInvoiceTemplate: React.FC<{ data: InvoiceData }> = ({ data }) => {
         items,
         subtotal,
         deliveryCharges = 0,
+        expressSurcharge = 0,
         total,
         qrCode,
+        isExpressOrder = false,
     } = data;
 
     // HARDCODED COMPANY DETAILS
@@ -63,7 +67,9 @@ const SimpleInvoiceTemplate: React.FC<{ data: InvoiceData }> = ({ data }) => {
         secondary: '#3f6212', // Dark Green
         light: '#ecfccb', // Light Lime
         text: '#1a1a1a',
-        gray: '#6b7280'
+        gray: '#6b7280',
+        express: '#ea580c', // Orange for EXPRESS
+        expressLight: '#fff7ed', // Light orange bg
     };
 
     return (
@@ -77,17 +83,58 @@ const SimpleInvoiceTemplate: React.FC<{ data: InvoiceData }> = ({ data }) => {
             lineHeight: '1.5',
             color: colors.text,
             margin: '0 auto',
-            position: 'relative'
+            position: 'relative',
+            overflow: 'hidden'
         }}>
+            {/* EXPRESS Watermark Background */}
+            {isExpressOrder && (
+                <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%) rotate(-35deg)',
+                    fontSize: '120px',
+                    fontWeight: '900',
+                    color: colors.express,
+                    opacity: 0.06,
+                    letterSpacing: '15px',
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                    zIndex: 0,
+                    userSelect: 'none',
+                }}>
+                    EXPRESS
+                </div>
+            )}
+
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px', position: 'relative', zIndex: 1 }}>
                 <div>
                     <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: colors.secondary }}>{companyDetails.name}</h1>
                     <p style={{ whiteSpace: 'pre-line', color: colors.gray, fontSize: '12px' }}>{companyDetails.address}</p>
                     <p style={{ color: colors.gray, fontSize: '12px' }}>{companyDetails.phone}</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                    <h2 style={{ fontSize: '32px', fontWeight: 'bold', color: colors.primary }}>INVOICE</h2>
+                    {/* EXPRESS Badge */}
+                    {isExpressOrder && (
+                        <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: `linear-gradient(135deg, ${colors.express} 0%, #c2410c 100%)`,
+                            color: 'white',
+                            padding: '6px 14px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            marginBottom: '8px',
+                            boxShadow: '0 2px 8px rgba(234, 88, 12, 0.3)',
+                            letterSpacing: '1px',
+                        }}>
+                            ⚡ EXPRESS ORDER
+                        </div>
+                    )}
+                    <h2 style={{ fontSize: '32px', fontWeight: 'bold', color: isExpressOrder ? colors.express : colors.primary }}>INVOICE</h2>
                     <p style={{ fontWeight: 'bold' }}>#{invoiceNumber}</p>
                     <p style={{ fontSize: '12px' }}>Date: {new Date(invoiceDate).toLocaleDateString('en-IN')}</p>
                 </div>
@@ -124,8 +171,8 @@ const SimpleInvoiceTemplate: React.FC<{ data: InvoiceData }> = ({ data }) => {
             </table>
 
             {/* Totals */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <div style={{ width: '250px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', position: 'relative', zIndex: 1 }}>
+                <div style={{ width: '280px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                         <span>Subtotal</span>
                         <span>{formatIndianCurrency(subtotal)}</span>
@@ -136,7 +183,40 @@ const SimpleInvoiceTemplate: React.FC<{ data: InvoiceData }> = ({ data }) => {
                             <span>{formatIndianCurrency(deliveryCharges)}</span>
                         </div>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 'bold', color: colors.secondary, borderTop: `2px solid ${colors.primary}`, paddingTop: '10px' }}>
+                    {/* EXPRESS Surcharge */}
+                    {isExpressOrder && expressSurcharge > 0 && (
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            marginBottom: '10px',
+                            padding: '8px 10px',
+                            background: colors.expressLight,
+                            borderRadius: '6px',
+                            border: `1px solid ${colors.express}30`,
+                        }}>
+                            <span style={{
+                                color: colors.express,
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                            }}>
+                                ⚡ Express Surcharge (50%)
+                            </span>
+                            <span style={{ color: colors.express, fontWeight: '700' }}>
+                                {formatIndianCurrency(expressSurcharge)}
+                            </span>
+                        </div>
+                    )}
+                    <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        color: isExpressOrder ? colors.express : colors.secondary,
+                        borderTop: `2px solid ${isExpressOrder ? colors.express : colors.primary}`,
+                        paddingTop: '10px'
+                    }}>
                         <span>Total</span>
                         <span>{formatIndianCurrency(total)}</span>
                     </div>

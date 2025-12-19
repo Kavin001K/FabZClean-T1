@@ -79,6 +79,7 @@ import {
   Grid3x3,
   PlusCircle,
   Settings,
+  Zap,
 } from "lucide-react";
 
 // Data Service
@@ -1659,7 +1660,16 @@ function OrdersComponent() {
                                   />
                                 </TableCell>
                                 <TableCell className="font-mono font-medium">
-                                  {order.orderNumber}
+                                  <div className="flex items-center gap-2">
+                                    {order.orderNumber}
+                                    {/* EXPRESS Badge */}
+                                    {((order as any).isExpressOrder || (order as any).is_express_order) && (
+                                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white text-[9px] px-1.5 py-0 flex items-center gap-0.5 h-5">
+                                        <Zap className="h-3 w-3" />
+                                        EXPRESS
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </TableCell>
                                 <TableCell>
                                   <div>

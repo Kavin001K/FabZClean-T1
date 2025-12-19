@@ -24,6 +24,7 @@ import {
   Calendar,
   Eye,
   RefreshCw,
+  Zap,
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -89,6 +90,9 @@ interface OrderInBatch {
   weight?: number;
   id?: string;
   franchiseId?: string;
+  isExpressOrder?: boolean;
+  is_express_order?: boolean;
+  priority?: string;
 }
 
 interface StoreDetails {
@@ -1239,16 +1243,43 @@ export default function TransitOrdersPage() {
                   <TableBody>
                     {eligibleOrders
                       .filter((o: any) => o.orderNumber.toLowerCase().includes(searchOrdersQuery.toLowerCase()) || o.customerName.toLowerCase().includes(searchOrdersQuery.toLowerCase()))
+                      .sort((a: any, b: any) => {
+                        // Sort EXPRESS orders first
+                        const aExpress = a.isExpressOrder || a.is_express_order || a.priority === 'high';
+                        const bExpress = b.isExpressOrder || b.is_express_order || b.priority === 'high';
+                        if (aExpress && !bExpress) return -1;
+                        if (!aExpress && bExpress) return 1;
+                        return 0;
+                      })
                       .map((order: any) => {
                         const isSelected = selectedEligibleOrders.includes(order.id);
+                        const isExpress = order.isExpressOrder || order.is_express_order || order.priority === 'high';
                         return (
-                          <TableRow key={order.id} onClick={() => handleSelectOrder(order.id, !isSelected)} className="cursor-pointer">
+                          <TableRow
+                            key={order.id}
+                            onClick={() => handleSelectOrder(order.id, !isSelected)}
+                            className={`cursor-pointer ${isExpress ? 'bg-orange-50 dark:bg-orange-950/20 border-l-4 border-l-orange-500' : ''}`}
+                          >
                             <TableCell>
                               <Checkbox checked={isSelected} onCheckedChange={(c) => handleSelectOrder(order.id, c as boolean)} />
                             </TableCell>
-                            <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                {order.orderNumber}
+                                {isExpress && (
+                                  <Badge className="bg-orange-500 text-white text-[9px] px-1.5 py-0 flex items-center gap-0.5 h-5">
+                                    <Zap className="h-3 w-3" />
+                                    EXPRESS
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell>{order.customerName}</TableCell>
-                            <TableCell><Badge variant="outline">{order.status}</Badge></TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={isExpress ? 'border-orange-400 text-orange-700' : ''}>
+                                {order.status}
+                              </Badge>
+                            </TableCell>
                           </TableRow>
                         );
                       })
@@ -1386,34 +1417,59 @@ export default function TransitOrdersPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {(linkedOrders.length > 0 ? linkedOrders : selectedBatch.orders || []).map((item: any, idx: number) => {
-                            const order = item.order || item;
-                            return (
-                              <TableRow key={idx} className="hover:bg-muted/30">
-                                <TableCell>
-                                  <span className="font-mono font-medium text-primary">{order.orderNumber || item.orderNumber}</span>
-                                </TableCell>
-                                <TableCell>{order.customerName || item.customerName || 'N/A'}</TableCell>
-                                <TableCell>
-                                  {order.items?.length || order.itemCount || '-'}
-                                </TableCell>
-                                <TableCell>
-                                  ₹{parseFloat(order.totalAmount || '0').toLocaleString('en-IN')}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className={
-                                    (order.status || item.status) === 'processing' ? 'border-blue-500 text-blue-500' :
-                                      (order.status || item.status) === 'ready_for_pickup' ? 'border-green-500 text-green-500' :
-                                        (order.status || item.status) === 'in_transit' ? 'border-yellow-500 text-yellow-500' :
-                                          (order.status || item.status) === 'completed' ? 'border-emerald-500 text-emerald-500' :
-                                            ''
-                                  }>
-                                    {(order.status || item.status)?.replace(/_/g, ' ') || 'pending'}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
+                          {(linkedOrders.length > 0 ? linkedOrders : selectedBatch.orders || [])
+                            .sort((a: any, b: any) => {
+                              // Sort EXPRESS orders first
+                              const orderA = a.order || a;
+                              const orderB = b.order || b;
+                              const aExpress = orderA.isExpressOrder || orderA.is_express_order || orderA.priority === 'high';
+                              const bExpress = orderB.isExpressOrder || orderB.is_express_order || orderB.priority === 'high';
+                              if (aExpress && !bExpress) return -1;
+                              if (!aExpress && bExpress) return 1;
+                              return 0;
+                            })
+                            .map((item: any, idx: number) => {
+                              const order = item.order || item;
+                              const isExpress = order.isExpressOrder || order.is_express_order || order.priority === 'high';
+                              return (
+                                <TableRow
+                                  key={idx}
+                                  className={`hover:bg-muted/30 ${isExpress ? 'bg-orange-50 dark:bg-orange-950/20 border-l-4 border-l-orange-500' : ''}`}
+                                >
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono font-medium text-primary">{order.orderNumber || item.orderNumber}</span>
+                                      {isExpress && (
+                                        <Badge className="bg-orange-500 text-white text-[9px] px-1.5 py-0 flex items-center gap-0.5 h-5">
+                                          <Zap className="h-3 w-3" />
+                                          EXPRESS
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>{order.customerName || item.customerName || 'N/A'}</TableCell>
+                                  <TableCell>
+                                    {order.items?.length || order.itemCount || '-'}
+                                  </TableCell>
+                                  <TableCell>
+                                    ₹{parseFloat(order.totalAmount || '0').toLocaleString('en-IN')}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className={
+                                      isExpress ? 'border-orange-400 text-orange-700' :
+                                        (order.status || item.status) === 'processing' ? 'border-blue-500 text-blue-500' :
+                                          (order.status || item.status) === 'ready_for_pickup' ? 'border-green-500 text-green-500' :
+                                            (order.status || item.status) === 'in_transit' ? 'border-yellow-500 text-yellow-500' :
+                                              (order.status || item.status) === 'completed' ? 'border-emerald-500 text-emerald-500' :
+                                                ''
+                                    }>
+                                      {isExpress && '⚡ '}
+                                      {(order.status || item.status)?.replace(/_/g, ' ') || 'pending'}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
                           {(linkedOrders.length === 0 && (!selectedBatch.orders || selectedBatch.orders.length === 0)) && (
                             <TableRow>
                               <TableCell colSpan={5} className="text-center text-muted-foreground py-8">

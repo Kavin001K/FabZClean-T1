@@ -21,6 +21,8 @@ export interface Order {
   total: number;
   service?: string;
   createdAt: string;
+  isExpressOrder?: boolean;
+  is_express_order?: boolean;
 }
 
 interface RecentOrdersProps {
@@ -142,6 +144,13 @@ export default React.memo(function RecentOrders({
                     <p className="text-sm font-medium leading-none truncate">
                       {order.customerName || 'Unknown Customer'}
                     </p>
+                    {/* EXPRESS Badge */}
+                    {(order.isExpressOrder || order.is_express_order) && (
+                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white text-[10px] px-1.5 py-0.5 flex items-center gap-1">
+                        <span>⚡</span>
+                        EXPRESS
+                      </Badge>
+                    )}
                     <Badge
                       variant="outline"
                       className={cn("text-xs border", getStatusColor(order.status))}

@@ -230,9 +230,11 @@ export default function BillView() {
                 subtotal: subtotal,
                 taxAmount: calculatedTax,
                 deliveryCharges: deliveryCharges,
+                expressSurcharge: (order as any).expressSurcharge ? Number((order as any).expressSurcharge) : 0,
                 total: calculatedTotal,
                 paymentTerms: "Due on receipt",
-                qrCode: qrCodeUrl || undefined
+                qrCode: qrCodeUrl || undefined,
+                isExpressOrder: (order as any).isExpressOrder || (order as any).is_express_order || false
             };
 
             return <InvoiceTemplateIN data={invoiceData} />;
@@ -266,8 +268,10 @@ export default function BillView() {
                 subtotal: subtotal,
                 total: totalAmount, // Use stored total for simple bill
                 deliveryCharges: deliveryCharges,
+                expressSurcharge: (order as any).expressSurcharge ? Number((order as any).expressSurcharge) : 0,
                 paymentTerms: "Due on receipt",
-                qrCode: qrCodeUrl || undefined
+                qrCode: qrCodeUrl || undefined,
+                isExpressOrder: (order as any).isExpressOrder || (order as any).is_express_order || false
             };
 
             return <SimpleInvoiceTemplate data={invoiceData} />;
