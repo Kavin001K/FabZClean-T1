@@ -8,17 +8,17 @@ export const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
-    
+
     // Allow all localhost origins for development
     if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
       return callback(null, true);
     }
-    
+
     // Get allowed origins from environment variable (comma-separated list)
-    const envOrigins = process.env.ALLOWED_ORIGINS 
+    const envOrigins = process.env.ALLOWED_ORIGINS
       ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
       : [];
-    
+
     // Static IP support - allow HTTP/HTTPS from static IP if configured
     const staticIP = process.env.STATIC_IP;
     if (staticIP) {
@@ -28,7 +28,7 @@ export const corsOptions = {
         envOrigins.push(`http://${staticIP}`);
       }
     }
-    
+
     const allowedOrigins = [...envOrigins];
 
     // Check if origin matches any allowed origin
@@ -99,7 +99,7 @@ export const jwtRequired = employeeAuthMiddleware;
  */
 export const requireRole = (allowedRoles: UserRole[] | string[]) => {
   // Convert UserRole[] to string[] if needed
-  const roles = allowedRoles.map(role => 
+  const roles = allowedRoles.map(role =>
     typeof role === 'string' ? role : role as string
   );
   return employeeRoleMiddleware(roles);
@@ -119,11 +119,16 @@ export const validateInput = (schema: z.ZodSchema) => {
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error('[VALIDATION ERROR] Path:', req.path);
+        console.error('[VALIDATION ERROR] Details:', JSON.stringify(error.errors, null, 2));
+        console.error('[VALIDATION ERROR] Body Keys:', Object.keys(req.body || {}));
         return res.status(400).json({
           error: 'Validation error',
-          details: error.errors
+          details: error.errors,
+          path: req.path
         });
       }
+      console.error('[VALIDATION ERROR] Unknown:', error);
       return res.status(500).json({ error: 'Internal validation error' });
     }
   };

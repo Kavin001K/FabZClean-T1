@@ -38,6 +38,7 @@ export default function OrderTracking() {
         queryKey: ['order-tracking', orderId],
         queryFn: async () => {
             const token = localStorage.getItem('employee_token');
+            console.log('[Order Tracking] Fetching order:', orderId);
             const response = await fetch(`/api/orders/${orderId}`, {
                 headers: {
                     'Content-Type': 'application/json',
@@ -50,7 +51,12 @@ export default function OrderTracking() {
                 }
                 throw new Error('Failed to fetch order');
             }
-            return response.json();
+            const result = await response.json();
+            console.log('[Order Tracking] Raw API Response:', result);
+            // Extract order from response wrapper (API returns { success, data, ... })
+            const orderData = result?.data || result;
+            console.log('[Order Tracking] Extracted Order:', orderData);
+            return orderData;
         },
         enabled: !!orderId
     });
@@ -121,10 +127,10 @@ export default function OrderTracking() {
                         </div>
                         <Badge
                             className={`text-lg px-4 py-2 ${order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                    order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                                        order.status === 'in_transit' ? 'bg-yellow-100 text-yellow-800' :
-                                            order.status === 'ready' ? 'bg-purple-100 text-purple-800' :
-                                                'bg-gray-100 text-gray-800'
+                                order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                                    order.status === 'in_transit' ? 'bg-yellow-100 text-yellow-800' :
+                                        order.status === 'ready' ? 'bg-purple-100 text-purple-800' :
+                                            'bg-gray-100 text-gray-800'
                                 }`}
                         >
                             {order.status?.replace('_', ' ').toUpperCase()}
@@ -161,8 +167,8 @@ export default function OrderTracking() {
                                         <div key={step.key} className="flex flex-col items-center z-10">
                                             <div
                                                 className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${isCompleted
-                                                        ? 'bg-primary text-primary-foreground shadow-lg'
-                                                        : 'bg-muted text-muted-foreground'
+                                                    ? 'bg-primary text-primary-foreground shadow-lg'
+                                                    : 'bg-muted text-muted-foreground'
                                                     } ${isCurrent ? 'ring-4 ring-primary/30 scale-110' : ''}`}
                                             >
                                                 <StepIcon className="w-5 h-5" />

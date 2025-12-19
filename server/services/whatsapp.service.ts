@@ -93,6 +93,7 @@ export async function sendInvoiceWhatsApp({
     try {
         console.log(`📱 Sending WhatsApp to ${cleanPhone} with invoice ${invoiceNumber}`);
         console.log('📄 PDF URL:', pdfUrl);
+        console.log('📦 MSG91 Payload:', raw);
 
         const response = await fetch(
             "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",

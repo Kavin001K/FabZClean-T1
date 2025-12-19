@@ -303,7 +303,26 @@ export const insertProductSchema = createInsertSchema(products);
 
 export const insertOrderSchema = createInsertSchema(orders, {
   pickupDate: z.coerce.date().optional().nullable(),
-});
+  // Allow string or number for decimal fields
+  totalAmount: z.union([z.string(), z.number()]).transform(val => val.toString()),
+  advancePaid: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+  discountValue: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+  extraCharges: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+  gstRate: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+  gstAmount: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+  deliveryCharges: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+  // Allow any array for items
+  items: z.any(),
+  // Allow any object for jsonb fields
+  shippingAddress: z.any().optional().nullable(),
+  deliveryAddress: z.any().optional().nullable(),
+  // Boolean coercion
+  gstEnabled: z.coerce.boolean().optional().default(false),
+  isExpressOrder: z.coerce.boolean().optional().default(false),
+  // Timestamps
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+}).passthrough();
 
 export const insertDeliverySchema = createInsertSchema(deliveries);
 

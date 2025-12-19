@@ -26,7 +26,7 @@ import { CustomerAutocomplete } from "@/components/customer-autocomplete";
 import { OrderConfirmationDialog } from "@/components/orders/order-confirmation-dialog";
 import OrderDetailsDialog from "@/components/orders/order-details-dialog";
 import { useAuth } from "@/contexts/auth-context";
-import { generateOrderNumber } from "@/lib/franchise-config";
+import { generateOrderNumberSync } from "@/lib/franchise-config";
 import { createAddressObject, parseAndFormatAddress, parseAddress } from "@/lib/address-utils";
 
 interface ServiceItem {
@@ -862,7 +862,7 @@ export default function CreateOrder() {
     const franchiseId = currentUser?.franchiseId || null;
 
     const orderData: any = {
-      orderNumber: generateOrderNumber(franchiseId),
+      orderNumber: generateOrderNumberSync(franchiseId),
       franchiseId: franchiseId, // Include franchise for tracking
       customerId: currentCustomerId,
       customerName,
