@@ -46,6 +46,9 @@ import AuditLogsPage from "@/pages/admin/audit-logs";
 import ReportsPage from "@/pages/reports";
 import OrderTracking from "@/pages/order-tracking";
 import TermsPage from "@/pages/terms";
+import PrivacyPage from "@/pages/privacy";
+import RefundPage from "@/pages/refund";
+import CookiesPage from "@/pages/cookies";
 
 function Router() {
   return (
@@ -58,6 +61,9 @@ function Router() {
       <Route path="/bill/:orderNumber" component={BillView} />
       <Route path="/tracking/:id" component={OrderTracking} />
       <Route path="/terms" component={TermsPage} />
+      <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/refund" component={RefundPage} />
+      <Route path="/cookies" component={CookiesPage} />
 
       {/* Protected routes */}
       <Route path="/">

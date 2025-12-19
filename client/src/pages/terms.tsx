@@ -302,6 +302,21 @@ export default function TermsPage() {
                 </div>
             </div>
 
+            {/* Legal Navigation */}
+            <div className="bg-white border-b border-slate-200 py-4">
+                <div className="max-w-5xl mx-auto px-6">
+                    <div className="flex items-center justify-center gap-4 flex-wrap">
+                        <span className="px-4 py-2 text-sm bg-emerald-100 text-emerald-700 rounded-full font-medium">Terms & Conditions</span>
+                        <span className="text-slate-300">|</span>
+                        <a href="/privacy" className="px-4 py-2 text-sm text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors">Privacy Policy</a>
+                        <span className="text-slate-300">|</span>
+                        <a href="/refund" className="px-4 py-2 text-sm text-slate-600 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-colors">Refund Policy</a>
+                        <span className="text-slate-300">|</span>
+                        <a href="/cookies" className="px-4 py-2 text-sm text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-full transition-colors">Cookie Policy</a>
+                    </div>
+                </div>
+            </div>
+
             {/* Main Content */}
             <main className="max-w-5xl mx-auto px-6 py-12">
 
