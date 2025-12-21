@@ -1,6 +1,11 @@
 // server/routes/whatsapp.ts
 import { Router } from "express";
-import { sendInvoiceWhatsApp, sendTextWhatsApp } from "../services/whatsapp.service";
+import {
+    sendInvoiceWhatsApp,
+    sendTextWhatsApp,
+    getTemplateForSendCount,
+    MAX_RESENDS,
+} from "../services/whatsapp.service";
 import { smartItemSummary } from "../utils/item-summarizer";
 
 const router = Router();
@@ -8,6 +13,7 @@ const router = Router();
 /**
  * POST /api/whatsapp/send-invoice
  * Send invoice via WhatsApp with PDF attachment
+ * Supports template cycling based on sendCount
  */
 router.post("/send-invoice", async (req, res) => {
     try {
@@ -19,12 +25,27 @@ router.post("/send-invoice", async (req, res) => {
             invoiceNumber,
             amount,
             itemName,
+            sendCount = 0,
         } = req.body;
 
         // Basic validation
         if (!phoneNumber || !pdfUrl) {
             return res.status(400).json({ error: "Missing required fields (phoneNumber, pdfUrl)" });
         }
+
+        // Check max resends
+        if (sendCount >= MAX_RESENDS) {
+            return res.status(400).json({
+                success: false,
+                error: `Maximum messages (${MAX_RESENDS}) already sent for this order`,
+                canResendAgain: false,
+            });
+        }
+
+        // Get template based on send count
+        const templateType = getTemplateForSendCount(sendCount);
+
+        console.log(`[WhatsApp] Send #${sendCount + 1} using template: ${templateType}`);
 
         const result = await sendInvoiceWhatsApp({
             phoneNumber,
@@ -34,18 +55,29 @@ router.post("/send-invoice", async (req, res) => {
             invoiceNumber: invoiceNumber || "N/A",
             amount: String(amount || "0.00"),
             itemName: itemName || "Laundry Items",
+            templateType,
         });
 
-        res.json({ success: true, data: result });
+        const newSendCount = sendCount + 1;
+
+        res.json({
+            success: result.success,
+            error: result.error,
+            templateUsed: result.templateUsed,
+            newSendCount,
+            canResendAgain: newSendCount < MAX_RESENDS,
+            remainingSends: MAX_RESENDS - newSendCount,
+        });
     } catch (error) {
-        console.error("WhatsApp Route Error:", error);
+        console.error("[WhatsApp] Route Error:", error);
         res.status(500).json({ success: false, error: "Failed to send message" });
     }
 });
 
 /**
- * POST /api/whatsapp/send-bill (Legacy endpoint - redirects to send-invoice)
- * Kept for backward compatibility
+ * POST /api/whatsapp/send-bill
+ * Send bill notification via WhatsApp
+ * Supports template cycling based on sendCount
  */
 router.post("/send-bill", async (req, res) => {
     try {
@@ -55,8 +87,9 @@ router.post("/send-bill", async (req, res) => {
             orderId,
             amount,
             mainItem,
-            items, // Optional: Array of items for smart summarization
-            pdfUrl
+            items,
+            pdfUrl,
+            sendCount = 0,
         } = req.body;
 
         // Validate inputs
@@ -64,11 +97,25 @@ router.post("/send-bill", async (req, res) => {
             return res.status(400).json({ error: "Missing required fields (customerName, customerPhone)" });
         }
 
-        // Smart Item Summary: Use provided mainItem, or generate from items array
-        const itemSummary = mainItem || smartItemSummary(items) || "Laundry Items";
-        console.log(`📦 WhatsApp item summary: "${itemSummary}"`);
+        // Check max resends
+        if (sendCount >= MAX_RESENDS) {
+            return res.status(400).json({
+                success: false,
+                error: `Maximum messages (${MAX_RESENDS}) already sent for this order`,
+                canResendAgain: false,
+                newSendCount: sendCount,
+            });
+        }
 
-        // If no PDF URL, send text message instead (optimized message)
+        // Smart Item Summary
+        const itemSummary = mainItem || smartItemSummary(items) || "Laundry Items";
+        console.log(`[WhatsApp] Bill for order ${orderId}, sendCount: ${sendCount}, item: "${itemSummary}"`);
+
+        // Get template based on send count
+        const templateType = getTemplateForSendCount(sendCount);
+        console.log(`[WhatsApp] Using template: ${templateType}`);
+
+        // If no PDF URL, send text message instead
         if (!pdfUrl) {
             const itemText = itemSummary !== "Laundry Items"
                 ? `This includes your ${itemSummary}.`
@@ -76,15 +123,23 @@ router.post("/send-bill", async (req, res) => {
 
             const message = `Hi ${customerName}! 👋 Your laundry order is Processing! 🧺\n\nWe have generated Invoice ${orderId} for ₹${amount || '0.00'}.${itemText ? ` ${itemText}` : ''}\n\nPayment Options: Scan the QR in the invoice or use UPI / Google Pay / PhonePe.\n📄 Terms: https://myfabclean.com/terms\n\nThanks for choosing Fab Clean!`;
 
-            await sendTextWhatsApp({
+            const textResult = await sendTextWhatsApp({
                 phoneNumber: customerPhone,
                 message,
             });
 
-            return res.json({ success: true, message: "WhatsApp text message sent successfully" });
+            const newSendCount = sendCount + 1;
+
+            return res.json({
+                success: textResult.success,
+                error: textResult.error,
+                message: "WhatsApp text message sent",
+                newSendCount,
+                canResendAgain: newSendCount < MAX_RESENDS,
+            });
         }
 
-        // Send with PDF attachment
+        // Send with PDF attachment using appropriate template
         const result = await sendInvoiceWhatsApp({
             phoneNumber: customerPhone,
             pdfUrl,
@@ -93,11 +148,22 @@ router.post("/send-bill", async (req, res) => {
             invoiceNumber: orderId,
             amount: String(amount || "0.00"),
             itemName: itemSummary,
+            templateType,
         });
 
-        res.json({ success: true, message: "WhatsApp bill sent successfully", data: result });
+        const newSendCount = sendCount + 1;
+
+        res.json({
+            success: result.success,
+            error: result.error,
+            message: "WhatsApp bill sent successfully",
+            templateUsed: result.templateUsed,
+            newSendCount,
+            canResendAgain: newSendCount < MAX_RESENDS,
+            remainingSends: MAX_RESENDS - newSendCount,
+        });
     } catch (error) {
-        console.error("WhatsApp Bill Error:", error);
+        console.error("[WhatsApp] Bill Error:", error);
         res.status(500).json({ success: false, error: "Failed to send WhatsApp message" });
     }
 });
@@ -114,15 +180,19 @@ router.post("/send-text", async (req, res) => {
             return res.status(400).json({ error: "Missing required fields (phone, message)" });
         }
 
-        await sendTextWhatsApp({
+        const result = await sendTextWhatsApp({
             phoneNumber: phone,
             message,
         });
 
-        res.json({ success: true, message: "WhatsApp message sent successfully" });
+        res.json({
+            success: result.success,
+            error: result.error,
+            message: result.success ? "WhatsApp message sent successfully" : "Failed to send",
+        });
     } catch (error) {
-        console.error("WhatsApp text send error:", error);
-        res.status(500).json({ error: "Failed to send WhatsApp message" });
+        console.error("[WhatsApp] Text send error:", error);
+        res.status(500).json({ success: false, error: "Failed to send WhatsApp message" });
     }
 });
 

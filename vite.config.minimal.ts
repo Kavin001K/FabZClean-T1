@@ -25,35 +25,56 @@ export default defineConfig({
     target: 'es2020',
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          recharts: ['recharts'],
-          framer: ['framer-motion'],
-          radix: [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-popover',
-            '@radix-ui/react-select',
-            '@radix-ui/react-slot',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-toast',
-            '@radix-ui/react-tooltip'
-          ],
-          pdf: ['jspdf', 'html2canvas'],
-          utils: ['date-fns', 'lucide-react']
-        }
-      }
+        // Aggressive manual chunking for better code splitting
+        manualChunks: (id) => {
+          // Core React
+          if (id.includes('node_modules/react-dom')) return 'react-dom';
+          if (id.includes('node_modules/react/')) return 'react';
+
+          // Charts - heavy library
+          if (id.includes('recharts') || id.includes('d3-')) return 'charts';
+
+          // PDF generation - heavy, lazy load
+          if (id.includes('jspdf') || id.includes('html2canvas')) return 'pdf';
+
+          // Animation library
+          if (id.includes('framer-motion')) return 'framer';
+
+          // UI Components - Radix
+          if (id.includes('@radix-ui')) return 'radix-ui';
+
+          // Tanstack Query
+          if (id.includes('@tanstack')) return 'tanstack';
+
+          // Supabase
+          if (id.includes('@supabase')) return 'supabase';
+
+          // Icons
+          if (id.includes('lucide-react')) return 'icons';
+
+          // Forms
+          if (id.includes('react-hook-form') || id.includes('@hookform')) return 'forms';
+
+          // Date utilities
+          if (id.includes('date-fns')) return 'date-utils';
+
+          // QR/Barcode
+          if (id.includes('qrcode') || id.includes('jsbarcode')) return 'barcodes';
+
+          // Misc vendor
+          if (id.includes('node_modules')) return 'vendor';
+        },
+      },
     },
-    chunkSizeWarningLimit: 1000
+    chunkSizeWarningLimit: 500,
   },
   esbuild: {
     target: 'es2020',
     logOverride: { 'this-is-undefined-in-esm': 'silent' },
-    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
   },
   optimizeDeps: {
-    include: ['react', 'react-dom'],
-    exclude: ['@types/node']
+    include: ['react', 'react-dom', '@tanstack/react-query'],
+    exclude: ['@types/node'],
   },
   server: {
     fs: {

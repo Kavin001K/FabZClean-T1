@@ -18,6 +18,7 @@ import healthRouter from './health';
 import databaseRouter from './database';
 import pdfRouter from './pdf';
 import whatsappRouter from './whatsapp';
+import whatsappFlowRouter from './whatsapp-flow';
 import tasksRouter from './tasks';
 import documentsRouter from './documents';
 import transitSuggestionsRouter from './transit-suggestions';
@@ -189,6 +190,9 @@ export function registerAllRoutes(app: Express): void {
 
   // PDF upload route
   app.use('/api', pdfRouter);
+
+  // WhatsApp Flow endpoint (public - no auth for Meta webhooks)
+  app.use('/api/whatsapp-flow', whatsappFlowRouter);
 
   // Legacy API routes (for backward compatibility)
   app.use('/api/orders', ordersRouter);

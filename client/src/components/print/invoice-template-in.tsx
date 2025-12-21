@@ -530,104 +530,33 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
 
           {/* Right: Totals */}
           <div style={{ width: '300px', position: 'relative' }}>
-            {/* Traditional EXPRESS Stamp - Rubber Stamp Style */}
+            {/* EXPRESS Stamp - Semi-transparent like real rubber stamp */}
             {isExpressOrder && (
               <div style={{
                 position: 'absolute',
-                top: '-60px',
-                right: '5px',
-                transform: 'rotate(-15deg)',
-                zIndex: 10,
+                top: '5px',
+                right: '-20px',
+                transform: 'rotate(12deg)',
+                zIndex: 15,
+                pointerEvents: 'none',
+                opacity: 0.85,
               }}>
-                {/* Outer circle with grunge effect */}
                 <div style={{
                   width: '100px',
                   height: '100px',
                   borderRadius: '50%',
-                  border: `4px solid ${colors.express}`,
+                  border: '3px solid rgba(234,88,12,0.7)',
+                  background: 'transparent',
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  position: 'relative',
-                  background: `rgba(255,255,255,0.9)`,
-                  boxShadow: `
-                    inset 0 0 0 3px ${colors.expressLight},
-                    inset 0 0 0 5px ${colors.express}
-                  `,
+                  boxShadow: 'inset 0 0 0 4px rgba(234,88,12,0.6)',
                 }}>
-                  {/* Express text curved at top */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '8px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    fontSize: '8px',
-                    fontWeight: '800',
-                    color: colors.express,
-                    letterSpacing: '3px',
-                    textTransform: 'uppercase',
-                  }}>
-                    ★ EXPRESS ★
-                  </div>
-
-                  {/* Center EXPRESS text - main */}
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <span style={{
-                      fontSize: '18px',
-                      fontWeight: '900',
-                      color: colors.express,
-                      letterSpacing: '1px',
-                      textTransform: 'uppercase',
-                      lineHeight: '1',
-                      textShadow: '1px 1px 0 rgba(0,0,0,0.1)',
-                    }}>EXPRESS</span>
-                    <span style={{
-                      fontSize: '7px',
-                      fontWeight: '700',
-                      color: colors.express,
-                      letterSpacing: '2px',
-                      textTransform: 'uppercase',
-                      marginTop: '2px',
-                    }}>⚡ PRIORITY ⚡</span>
-                  </div>
-
-                  {/* Bottom text */}
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '8px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    fontSize: '7px',
-                    fontWeight: '700',
-                    color: colors.express,
-                    letterSpacing: '1px',
-                    textTransform: 'uppercase',
-                  }}>
-                    FAB CLEAN
-                  </div>
-
-                  {/* Decorative stars */}
-                  <div style={{
-                    position: 'absolute',
-                    left: '15px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: colors.express,
-                    fontSize: '8px',
-                  }}>★</div>
-                  <div style={{
-                    position: 'absolute',
-                    right: '15px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: colors.express,
-                    fontSize: '8px',
-                  }}>★</div>
+                  <span style={{ fontSize: '8px', fontWeight: '800', color: 'rgba(234,88,12,0.8)', letterSpacing: '2px' }}>★ EXPRESS ★</span>
+                  <span style={{ fontSize: '18px', fontWeight: '900', color: 'rgba(234,88,12,0.85)', letterSpacing: '1px', lineHeight: '1.1' }}>EXPRESS</span>
+                  <span style={{ fontSize: '7px', fontWeight: '700', color: 'rgba(234,88,12,0.8)', letterSpacing: '2px' }}>PRIORITY</span>
+                  <span style={{ fontSize: '8px', fontWeight: '800', color: 'rgba(234,88,12,0.8)', letterSpacing: '1px', marginTop: '2px' }}>FAB CLEAN</span>
                 </div>
               </div>
             )}

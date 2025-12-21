@@ -181,6 +181,7 @@ export interface InvoicePrintData {
   terms?: string;
   status?: string;
   qrCode?: string;
+  isExpressOrder?: boolean;
 }
 
 // Import franchise config for company details
@@ -295,7 +296,7 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
       const total = item.total ? parseFloat(String(item.total)) : (quantity * unitPrice);
 
       return {
-        name: item.name || item.serviceName || item.description || 'Service Item',
+        name: item.serviceName || item.service_name || item.customName || item.name || item.productName || item.description || 'Laundry Service',
         description: item.description || item.details,
         quantity,
         unitPrice,
@@ -400,7 +401,8 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
     terms: enableGST
       ? 'GST Invoice. Tax is calculated at applicable rates. Payment due within 30 days.'
       : 'Payment due within 30 days of invoice date.',
-    status: order.status
+    status: order.status,
+    isExpressOrder: order.isExpressOrder || order.is_express_order || false
   };
 }
 
@@ -761,7 +763,7 @@ export class PrintDriver {
           taxId: undefined
         },
         items: data.items.map(item => ({
-          description: item.description || item.name,
+          description: item.name || item.description || 'Laundry Service',
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           total: item.total,
@@ -775,7 +777,8 @@ export class PrintDriver {
         paymentTerms: data.terms || 'Payment due within 7 days',
         notes: data.notes,
         status: data.status,
-        qrCode: qrCodeDataUrl
+        qrCode: qrCodeDataUrl,
+        isExpressOrder: data.isExpressOrder || false
       };
 
       console.log('✅ Data prepared');

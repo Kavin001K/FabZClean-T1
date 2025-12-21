@@ -9,13 +9,13 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Printer, MessageCircle, FileText, Tag, Loader2, CheckCircle2, QrCode, Zap } from 'lucide-react';
+import { CheckCircle, Printer, MessageCircle, FileText, Tag, Loader2, CheckCircle2, QrCode, Zap, Ban } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 // @ts-ignore
 import QRCode from 'qrcode';
 import { Order } from '../../../../shared/schema';
 import { formatCurrency, customersApi } from '@/lib/data-service';
-import { WhatsAppService } from '@/lib/whatsapp-service';
+import { WhatsAppService, MAX_WHATSAPP_SENDS } from '@/lib/whatsapp-service';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { printDriver } from '@/lib/print-driver';
@@ -42,6 +42,8 @@ export function OrderConfirmationDialog({
     const qrcodeRef = useRef<HTMLCanvasElement>(null);
     const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
     const [showTagPrint, setShowTagPrint] = useState(false);
+    const [whatsappSendCount, setWhatsappSendCount] = useState(0);
+    const [autoSendTriggered, setAutoSendTriggered] = useState(false);
     const { toast } = useToast();
 
     // Fetch customer details if phone is missing in order
@@ -53,6 +55,10 @@ export function OrderConfirmationDialog({
 
     // Get effective phone number
     const customerPhone = order?.customerPhone || customerData?.phone;
+
+    // Check if more sends are allowed
+    const canSendWhatsApp = whatsappSendCount < MAX_WHATSAPP_SENDS;
+    const remainingSends = MAX_WHATSAPP_SENDS - whatsappSendCount;
 
     // Calculate total amount from order
     const getTotalAmount = (): number => {
@@ -137,12 +143,29 @@ export function OrderConfirmationDialog({
         return () => clearTimeout(timer);
     }, [open, order, totalAmount]);
 
-    // Auto-send WhatsApp when dialog opens
+    // Auto-send WhatsApp when dialog opens (on order creation)
     useEffect(() => {
-        if (open && order && customerPhone && !sendingWhatsApp) {
-            // Optional: Auto-send logic can be placed here if desired
+        if (open && order && customerPhone && !sendingWhatsApp && !autoSendTriggered && whatsappSendCount === 0) {
+            // Auto-send bill on order creation
+            setAutoSendTriggered(true);
+            console.log('[WhatsApp] Auto-sending bill on order creation...');
+
+            // Delay slightly to allow dialog to render
+            const timer = setTimeout(() => {
+                handleSendWhatsApp();
+            }, 1000);
+
+            return () => clearTimeout(timer);
         }
-    }, [open, order, customerPhone, sendingWhatsApp]);
+    }, [open, order, customerPhone, autoSendTriggered, whatsappSendCount]);
+
+    // Reset state when dialog closes
+    useEffect(() => {
+        if (!open) {
+            setAutoSendTriggered(false);
+            setWhatsappSendCount(0);
+        }
+    }, [open]);
 
     const handlePrintBill = async () => {
         if (!order) return;
@@ -202,6 +225,16 @@ export function OrderConfirmationDialog({
             return;
         }
 
+        // Check if we've reached the limit
+        if (!canSendWhatsApp) {
+            toast({
+                title: "Limit Reached",
+                description: `Maximum ${MAX_WHATSAPP_SENDS} WhatsApp messages already sent for this order.`,
+                variant: "destructive",
+            });
+            return;
+        }
+
         setSendingWhatsApp(true);
 
         const customerName = order.customerName || 'Valued Customer';
@@ -209,16 +242,15 @@ export function OrderConfirmationDialog({
         const billUrl = `${window.location.origin}/bill/${orderNum}?enableGST=${enableGST}`;
 
         try {
-            console.log('📱 Starting WhatsApp send process...');
+            console.log(`[WhatsApp] Send #${whatsappSendCount + 1} starting...`);
 
             let pdfUrl: string | undefined;
 
             // Try to generate and upload PDF (with error fallback)
             try {
-                console.log('📄 Generating invoice PDF...');
+                console.log('[WhatsApp] Generating invoice PDF...');
                 const { convertOrderToInvoiceData } = await import('@/lib/print-driver');
 
-                // Ensure order has required fields for invoice
                 const safeOrder = {
                     ...order,
                     customerName: customerName,
@@ -229,8 +261,7 @@ export function OrderConfirmationDialog({
 
                 const invoiceData = convertOrderToInvoiceData(safeOrder);
 
-                // Validate invoice data
-                if (!invoiceData || !(invoiceData as any).customer) {
+                if (!invoiceData || !(invoiceData as any).customerInfo) {
                     throw new Error('Invalid invoice data generated');
                 }
 
@@ -243,80 +274,64 @@ export function OrderConfirmationDialog({
                         invoiceData.qrCode = await toDataURL(upiUrl);
                     }
                 } catch (e) {
-                    console.warn("QR gen failed for PDF (non-blocking)", e);
+                    console.warn("[WhatsApp] QR gen failed (non-blocking)", e);
                 }
 
                 // Generate PDF blob
                 const pdfBlob = await generatePDFBlob(invoiceData);
 
                 // Upload PDF to server
-                console.log('☁️ Uploading PDF to server...');
+                console.log('[WhatsApp] Uploading PDF to server...');
                 const uploadedDoc = await uploadPDFToServer(pdfBlob, invoiceData);
 
                 if (uploadedDoc?.fileUrl) {
                     pdfUrl = uploadedDoc.fileUrl;
-                    console.log('✅ PDF uploaded successfully:', pdfUrl);
+                    console.log('[WhatsApp] PDF uploaded:', pdfUrl);
                 }
             } catch (pdfError) {
-                console.error('⚠️ PDF generation/upload failed (will send text only):', pdfError);
-                // Continue without PDF - will send text message
+                console.error('[WhatsApp] PDF generation failed (will send text only):', pdfError);
             }
 
-            // Smart Item Summarization using shared utility
-            // Strategy: 1 item = full name, 2 items = "A & B", 3+ items = "A & X others"
+            // Smart Item Summarization
             const mainItemName = smartItemSummary(order.items as any[]);
-            console.log(`📦 Item summary: "${mainItemName}" (${Array.isArray(order.items) ? order.items.length : 0} items)`);
+            console.log(`[WhatsApp] Item summary: "${mainItemName}"`);
 
-            // Send WhatsApp message (with or without PDF)
-            console.log('💬 Sending WhatsApp message...');
-            const success = await WhatsAppService.sendOrderBill(
+            // Send WhatsApp message with current send count
+            console.log(`[WhatsApp] Sending message (sendCount: ${whatsappSendCount})...`);
+            const result = await WhatsAppService.sendOrderBill(
                 customerPhone,
                 orderNum,
                 customerName,
                 totalAmount,
                 billUrl,
-                pdfUrl, // May be undefined if PDF failed
-                mainItemName
+                pdfUrl,
+                mainItemName,
+                whatsappSendCount // Pass current send count
             );
 
-            if (success) {
+            if (result.success) {
+                // Update send count
+                const newCount = result.newSendCount ?? (whatsappSendCount + 1);
+                setWhatsappSendCount(newCount);
+
+                const templateName = result.templateUsed ||
+                    (whatsappSendCount === 0 ? 'Order' : whatsappSendCount === 1 ? 'Bill' : 'Invoice');
+
                 toast({
                     title: "Sent!",
-                    description: pdfUrl
-                        ? "WhatsApp message with bill sent successfully."
-                        : "WhatsApp message sent (bill link only).",
+                    description: result.canResendAgain
+                        ? `WhatsApp ${templateName} sent. ${MAX_WHATSAPP_SENDS - newCount} resend(s) remaining.`
+                        : `WhatsApp ${templateName} sent. No more resends available.`,
                 });
             } else {
-                // Fallback: Try sending simple text via backend
-                console.log('⚠️ Standard send failed, trying fallback...');
-                try {
-                    const fallbackResponse = await fetch('/api/whatsapp/send-text', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            phone: customerPhone,
-                            message: `🧾 *FabZClean Invoice*\n\nHi ${customerName}!\n\nYour order *#${orderNum}* for ₹${totalAmount.toFixed(2)} has been confirmed.\n\n📋 View Bill: ${billUrl}\n\nThank you for choosing FabZClean!`
-                        })
-                    });
-
-                    if (fallbackResponse.ok) {
-                        toast({
-                            title: "Sent!",
-                            description: "WhatsApp message sent successfully.",
-                        });
-                    } else {
-                        throw new Error('Fallback also failed');
-                    }
-                } catch (fallbackError) {
-                    toast({
-                        title: "Failed",
-                        description: "Could not send WhatsApp message. Please try again.",
-                        variant: "destructive",
-                    });
-                }
+                toast({
+                    title: "Failed",
+                    description: result.error || "Could not send WhatsApp message. Please try again.",
+                    variant: "destructive",
+                });
             }
         } catch (error) {
-            console.error("WhatsApp error:", error);
+            console.error("[WhatsApp] Error:", error);
             toast({
                 title: "Error",
                 description: error instanceof Error ? error.message : "An error occurred while sending message.",
@@ -522,18 +537,26 @@ export function OrderConfirmationDialog({
                     </div>
                     <Button
                         onClick={handleSendWhatsApp}
-                        disabled={sendingWhatsApp || !customerPhone}
-                        className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-bold shadow-sm hover:shadow-md transition-all"
+                        disabled={sendingWhatsApp || !customerPhone || !canSendWhatsApp}
+                        className={`w-full font-bold shadow-sm hover:shadow-md transition-all ${canSendWhatsApp
+                                ? 'bg-[#25D366] hover:bg-[#128C7E] text-white'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            }`}
                     >
                         {sendingWhatsApp ? (
                             <>
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                 Sending...
                             </>
+                        ) : !canSendWhatsApp ? (
+                            <>
+                                <Ban className="h-4 w-4 mr-2" />
+                                Limit Reached ({MAX_WHATSAPP_SENDS}/{MAX_WHATSAPP_SENDS})
+                            </>
                         ) : (
                             <>
                                 <MessageCircle className="h-4 w-4 mr-2" />
-                                Send on WhatsApp
+                                {whatsappSendCount === 0 ? 'Send on WhatsApp' : `Resend Bill (${remainingSends} left)`}
                             </>
                         )}
                     </Button>

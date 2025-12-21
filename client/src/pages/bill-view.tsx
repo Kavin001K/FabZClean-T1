@@ -220,7 +220,7 @@ export default function BillView() {
                     taxId: order.gstNumber || undefined
                 },
                 items: Array.isArray(order.items) ? order.items.map((item: any) => ({
-                    description: item.productName || item.name,
+                    description: item.serviceName || item.service_name || item.customName || item.productName || item.name || item.description || 'Laundry Service',
                     quantity: item.quantity,
                     unitPrice: item.price,
                     total: item.price * item.quantity,

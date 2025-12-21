@@ -10,45 +10,57 @@ import { SettingsProvider } from "@/contexts/settings-context";
 import { AuthProvider } from "@/contexts/auth-context";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { Suspense, lazy } from "react";
+import { Loader2 } from "lucide-react";
+
+// Critical pages - loaded immediately
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import UnauthorizedPage from "@/pages/unauthorized";
 import AccountInactivePage from "@/pages/account-inactive";
 import Dashboard from "@/pages/dashboard";
-import Orders from "@/pages/orders";
-import OrderDetail from "@/pages/order-detail";
-import Services from "@/pages/services";
-import CreateOrder from "@/pages/create-order";
 import { MainLayout } from "@/components/layout/main-layout";
-import Documents from "@/pages/documents";
-import Customers from "@/pages/customers";
-import Analytics from "@/pages/analytics";
-import Inventory from "@/pages/inventory";
-import TransitOrders from "@/pages/transit-orders";
 
-import DebugPage from "@/pages/debug";
-import EmployeeDashboardPage from "@/pages/employee-dashboard";
-import FactoryDashboard from "@/pages/factory-dashboard";
-import UserManagementPage from "@/pages/user-management";
-import FranchiseDashboard from "@/pages/franchise-dashboard";
-import FranchiseManagement from "@/pages/franchise-management";
-import Settings from "@/pages/settings";
-import ProfilePage from "@/pages/profile";
-import DatabaseStatus from "@/pages/database-status";
-import PerformanceAnalytics from "@/components/analytics";
-import Accounting from "@/pages/accounting";
-import { InvoiceGenerator } from "@/components/invoice-generator";
-import CustomerPortal from "@/pages/customer-portal";
-import WorkerPortal from "@/pages/worker-portal";
-import BillView from "@/pages/bill-view";
-import TestInvoice from "@/pages/test-invoice";
-import AuditLogsPage from "@/pages/admin/audit-logs";
-import ReportsPage from "@/pages/reports";
-import OrderTracking from "@/pages/order-tracking";
-import TermsPage from "@/pages/terms";
-import PrivacyPage from "@/pages/privacy";
-import RefundPage from "@/pages/refund";
-import CookiesPage from "@/pages/cookies";
+// Lazy loaded pages - loaded on demand
+const Orders = lazy(() => import("@/pages/orders"));
+const OrderDetail = lazy(() => import("@/pages/order-detail"));
+const Services = lazy(() => import("@/pages/services"));
+const CreateOrder = lazy(() => import("@/pages/create-order"));
+const Documents = lazy(() => import("@/pages/documents"));
+const Customers = lazy(() => import("@/pages/customers"));
+const Analytics = lazy(() => import("@/pages/analytics"));
+const Inventory = lazy(() => import("@/pages/inventory"));
+const TransitOrders = lazy(() => import("@/pages/transit-orders"));
+const DebugPage = lazy(() => import("@/pages/debug"));
+const EmployeeDashboardPage = lazy(() => import("@/pages/employee-dashboard"));
+const FactoryDashboard = lazy(() => import("@/pages/factory-dashboard"));
+const UserManagementPage = lazy(() => import("@/pages/user-management"));
+const FranchiseDashboard = lazy(() => import("@/pages/franchise-dashboard"));
+const FranchiseManagement = lazy(() => import("@/pages/franchise-management"));
+const Settings = lazy(() => import("@/pages/settings"));
+const ProfilePage = lazy(() => import("@/pages/profile"));
+const DatabaseStatus = lazy(() => import("@/pages/database-status"));
+const PerformanceAnalytics = lazy(() => import("@/components/analytics"));
+const Accounting = lazy(() => import("@/pages/accounting"));
+const InvoiceGenerator = lazy(() => import("@/components/invoice-generator").then(m => ({ default: m.InvoiceGenerator })));
+const CustomerPortal = lazy(() => import("@/pages/customer-portal"));
+const WorkerPortal = lazy(() => import("@/pages/worker-portal"));
+const BillView = lazy(() => import("@/pages/bill-view"));
+const TestInvoice = lazy(() => import("@/pages/test-invoice"));
+const AuditLogsPage = lazy(() => import("@/pages/admin/audit-logs"));
+const ReportsPage = lazy(() => import("@/pages/reports"));
+const OrderTracking = lazy(() => import("@/pages/order-tracking"));
+const TermsPage = lazy(() => import("@/pages/terms"));
+const PrivacyPage = lazy(() => import("@/pages/privacy"));
+const RefundPage = lazy(() => import("@/pages/refund"));
+const CookiesPage = lazy(() => import("@/pages/cookies"));
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[400px]">
+    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  </div>
+);
 
 function Router() {
   return (
@@ -319,12 +331,14 @@ function App() {
                   <TooltipProvider>
                     <NotificationProvider>
                       <Toaster />
-                      <ErrorBoundary>
-                        <Router />
-                      </ErrorBoundary>
-                      <ErrorBoundary>
-                        <PerformanceAnalytics />
-                      </ErrorBoundary>
+                      <Suspense fallback={<PageLoader />}>
+                        <ErrorBoundary>
+                          <Router />
+                        </ErrorBoundary>
+                        <ErrorBoundary>
+                          <PerformanceAnalytics />
+                        </ErrorBoundary>
+                      </Suspense>
                     </NotificationProvider>
                   </TooltipProvider>
                 </ThemeProvider>
