@@ -687,6 +687,26 @@ export class SQLiteStorage implements IStorage {
       : undefined;
   }
 
+  // ======= JSON PARSING HELPER =======
+  /**
+   * Safely parse a JSON string. Returns the original value if not valid JSON.
+   * This prevents errors when a field contains a plain string instead of JSON.
+   */
+  private safeJsonParse(value: any): any {
+    if (value === null || value === undefined) return value;
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    // Only attempt JSON parse if it looks like JSON (starts with { or [)
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+      return value; // Return plain string as-is
+    }
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value; // Return original on parse failure
+    }
+  }
+
   // ======= GENERIC CRUD HELPERS =======
   private insertRecord<T extends Record<string, any>>(
     table: string,
@@ -796,16 +816,8 @@ export class SQLiteStorage implements IStorage {
         console.warn("Failed to parse order items:", e);
       }
     }
-    if (
-      table === "orders" &&
-      row.shippingAddress &&
-      typeof row.shippingAddress === "string"
-    ) {
-      try {
-        row.shippingAddress = JSON.parse(row.shippingAddress);
-      } catch (e) {
-        console.warn("Failed to parse shipping address:", e);
-      }
+    if (table === "orders" && row.shippingAddress) {
+      row.shippingAddress = this.safeJsonParse(row.shippingAddress);
     }
     if (
       table === "deliveries" &&
@@ -959,16 +971,8 @@ export class SQLiteStorage implements IStorage {
             console.warn("Failed to parse order items:", e);
           }
         }
-        if (
-          table === "orders" &&
-          row.shippingAddress &&
-          typeof row.shippingAddress === "string"
-        ) {
-          try {
-            row.shippingAddress = JSON.parse(row.shippingAddress);
-          } catch (e) {
-            console.warn("Failed to parse shipping address:", e);
-          }
+        if (table === "orders" && row.shippingAddress) {
+          row.shippingAddress = this.safeJsonParse(row.shippingAddress);
         }
         if (
           table === "deliveries" &&
@@ -1119,8 +1123,8 @@ export class SQLiteStorage implements IStorage {
         if (row.items && typeof row.items === "string") {
           try { row.items = JSON.parse(row.items); } catch (e) { }
         }
-        if (row.shippingAddress && typeof row.shippingAddress === "string") {
-          try { row.shippingAddress = JSON.parse(row.shippingAddress); } catch (e) { }
+        if (row.shippingAddress) {
+          row.shippingAddress = this.safeJsonParse(row.shippingAddress);
         }
         // Parse timestamps
         Object.keys(row).forEach((key) => {
@@ -1150,8 +1154,8 @@ export class SQLiteStorage implements IStorage {
       if (row.items && typeof row.items === "string") {
         try { row.items = JSON.parse(row.items); } catch (e) { }
       }
-      if (row.shippingAddress && typeof row.shippingAddress === "string") {
-        try { row.shippingAddress = JSON.parse(row.shippingAddress); } catch (e) { }
+      if (row.shippingAddress) {
+        row.shippingAddress = this.safeJsonParse(row.shippingAddress);
       }
       // Parse dates
       Object.keys(row).forEach((key) => {
