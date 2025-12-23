@@ -6,6 +6,7 @@
  */
 
 import { LRUCache } from 'lru-cache';
+import os from 'os';
 
 // ============================================================================
 // Performance Monitoring
@@ -431,7 +432,7 @@ export class MemoryManager {
 
   checkMemoryUsage(): { usage: number; isHigh: boolean; shouldGC: boolean } {
     const memUsage = process.memoryUsage();
-    const totalMemory = require('os').totalmem();
+    const totalMemory = os.totalmem();
     const usagePercent = memUsage.heapUsed / totalMemory;
 
     return {

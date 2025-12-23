@@ -8,11 +8,15 @@ import { corsOptions, errorHandler } from "./middleware/auth";
 import { registerAllRoutes } from "./routes/index";
 import { db as storage } from "./db";
 import { realtimeServer } from "./websocket-server";
+import { performanceMiddleware, getPerformanceStats } from "./performance-optimizer";
 
 const app = express();
 
 // Enable CORS
 app.use(cors(corsOptions));
+
+// Performance monitoring middleware
+app.use(performanceMiddleware());
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -33,6 +37,11 @@ app.get('/api/test', (req, res) => {
     message: 'Server is working!',
     version: '1.0.0'
   });
+});
+
+// Performance metrics endpoint
+app.get('/api/performance', (req, res) => {
+  res.json(getPerformanceStats());
 });
 
 (async () => {
