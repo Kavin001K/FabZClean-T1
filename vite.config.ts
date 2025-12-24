@@ -31,9 +31,10 @@ export default defineConfig({
       output: {
         // Better code splitting for smaller chunks
         manualChunks: (id) => {
-          // React core
+          // React core - MUST keep react and react-dom in the SAME chunk
+          // Separating them causes "Cannot read properties of undefined (reading 'exports')" error
           if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
-            return 'react-vendor';
+            return 'react';
           }
           // React Query / TanStack
           if (id.includes('@tanstack/react-query')) {

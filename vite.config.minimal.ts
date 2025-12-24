@@ -27,9 +27,8 @@ export default defineConfig({
       output: {
         // Aggressive manual chunking for better code splitting
         manualChunks: (id) => {
-          // Core React
-          if (id.includes('node_modules/react-dom')) return 'react-dom';
-          if (id.includes('node_modules/react/')) return 'react';
+          // Core React - MUST be in the same chunk to avoid exports undefined error
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) return 'react';
 
           // Charts - heavy library
           if (id.includes('recharts') || id.includes('d3-')) return 'charts';
