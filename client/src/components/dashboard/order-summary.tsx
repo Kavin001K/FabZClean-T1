@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
-import type { OrderTransaction } from "../../../shared/schema";
+import type { OrderTransaction } from "@shared/schema";
 
 export default function OrderSummary() {
   const { data: transactions, isLoading } = useQuery<OrderTransaction[]>({
@@ -20,12 +20,12 @@ export default function OrderSummary() {
     return new Date(transaction.createdAt) >= today;
   }) || [];
 
-  const todayRevenue = todayTransactions.reduce((sum, transaction) => 
+  const todayRevenue = todayTransactions.reduce((sum, transaction) =>
     sum + parseFloat(transaction.totalAmount), 0
   );
 
-  const averageTransaction = todayTransactions.length > 0 
-    ? todayRevenue / todayTransactions.length 
+  const averageTransaction = todayTransactions.length > 0
+    ? todayRevenue / todayTransactions.length
     : 0;
 
   if (isLoading) {
@@ -94,10 +94,10 @@ export default function OrderSummary() {
           </div>
         </div>
 
-        <Button 
-          size="sm" 
-          variant="outline" 
-          className="mt-4 w-full" 
+        <Button
+          size="sm"
+          variant="outline"
+          className="mt-4 w-full"
           data-testid="create-new-order"
           onClick={() => {
             window.location.href = '/create-order';

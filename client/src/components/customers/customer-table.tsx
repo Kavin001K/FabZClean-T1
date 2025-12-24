@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
 import { formatDate } from '@/lib/data-service';
-import type { Customer } from '../../../shared/schema';
+import type { Customer } from '@shared/schema';
 
 interface CustomerTableProps {
   customers: Customer[];

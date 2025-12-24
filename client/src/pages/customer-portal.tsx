@@ -70,7 +70,7 @@ import CustomerNotifications from '@/components/customer-portal/customer-notific
 
 // Import data service and types
 import { ordersApi, customersApi } from '@/lib/data-service';
-// import type { Order, Customer } from '../../shared/schema';
+// import type { Order, Customer } from '@shared/schema';
 
 // Temporary type definitions
 interface Order {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {}
+interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> { }
 
 const Skeleton = React.forwardRef<HTMLDivElement, SkeletonProps>(
   ({ className, ...props }, ref) => {
@@ -122,5 +122,8 @@ export const QuickActionSkeleton: React.FC = () => (
     ))}
   </div>
 );
+
+// Alias for backwards compatibility
+export const CardSkeleton = KpiCardSkeleton;
 
 export default Skeleton;

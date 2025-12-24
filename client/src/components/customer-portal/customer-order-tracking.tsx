@@ -55,7 +55,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useFuzzySearch } from '@/hooks/use-fuzzy-search';
 // import { usePagination } from '@/hooks/use-pagination';
-// import type { Order, Customer } from '../../../shared/schema';
+// import type { Order, Customer } from '@shared/schema';
 
 // Temporary type definitions
 interface Order {

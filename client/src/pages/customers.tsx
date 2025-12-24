@@ -57,7 +57,7 @@ import { customersApi, ordersApi } from '@/lib/data-service';
 import { exportCustomersEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportCustomersToExcel } from '@/lib/excel-exports';
 import { createAddressObject } from '@/lib/address-utils';
-import type { Customer, Order } from '../../../shared/schema';
+import type { Customer, Order } from '@shared/schema';
 
 // Helper functions
 const getInitials = (name: string) => {

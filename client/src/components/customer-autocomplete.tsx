@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, X, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import type { Customer } from '../../../shared/schema';
+import type { Customer } from '@shared/schema';
 
 interface CustomerAutocompleteProps {
     customers: Customer[];

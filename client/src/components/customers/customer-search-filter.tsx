@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { TEST_IDS, getTestId } from '@/lib/test-ids';
 import { useDebouncedSearch } from '@/hooks/use-debounce';
 import { useStableCallback } from '@/hooks/use-memoization';
-import type { Customer } from '../../../shared/schema';
+import type { Customer } from '@shared/schema';
 
 /**
  * Customer search filter component with debounced search and multiple filter options

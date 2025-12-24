@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { Service } from '../../../shared/schema';
+import type { Service } from '@shared/schema';
 import type { FilterType } from '@/components/services/service-search-filter';
 
 export const useServiceFilters = (services: Service[]) => {

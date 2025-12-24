@@ -40,7 +40,7 @@ import {
 } from '@/components/ui/table';
 import { formatDate, formatCurrency } from '@/lib/data-service';
 import { cn } from '@/lib/utils';
-import type { Customer, Order } from '../../../../shared/schema';
+import type { Customer, Order } from '@shared/schema';
 
 // Form validation schemas - with separate address fields
 const customerFormSchema = z.object({

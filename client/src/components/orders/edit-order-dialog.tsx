@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Order } from "../../../../shared/schema";
+import type { Order } from "@shared/schema";
 
 export interface EditOrderDialogProps {
   order: Order | null;

@@ -87,7 +87,7 @@ import { ordersApi, formatCurrency, formatDate } from '@/lib/data-service';
 import { exportOrdersToCSV } from '@/lib/export-utils';
 import { exportOrdersEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportOrdersToExcel } from '@/lib/excel-exports';
-import type { Order } from "../../../shared/schema";
+import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { isElectron } from "@/lib/utils";
 

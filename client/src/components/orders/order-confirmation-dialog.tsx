@@ -13,7 +13,7 @@ import { CheckCircle, Printer, MessageCircle, FileText, Tag, Loader2, CheckCircl
 import JsBarcode from 'jsbarcode';
 // @ts-ignore
 import QRCode from 'qrcode';
-import { Order } from '../../../../shared/schema';
+import { Order } from '@shared/schema';
 import { formatCurrency, customersApi } from '@/lib/data-service';
 import { WhatsAppService, MAX_WHATSAPP_SENDS } from '@/lib/whatsapp-service';
 import { useToast } from '@/hooks/use-toast';

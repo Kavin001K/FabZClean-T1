@@ -53,7 +53,7 @@ import {
 import { formatCurrency, formatNumber, formatPercentage } from "@/lib/data-service";
 import { useToast } from "@/hooks/use-toast";
 import { useRealtime } from "@/contexts/realtime-context";
-import type { Service, Order, Customer } from "../../shared/schema";
+import type { Service, Order, Customer } from "@shared/schema";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { exportAnalyticsDashboard } from '@/lib/analytics-pdf-export';
@@ -105,7 +105,7 @@ export default function Analytics() {
     queryKey: ['analytics-orders'],
     queryFn: ordersApi.getAll,
     staleTime: 2 * 60 * 1000, // 2 minutes
-    cacheTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const {
@@ -116,7 +116,7 @@ export default function Analytics() {
     queryKey: ['analytics-customers'],
     queryFn: customersApi.getAll,
     staleTime: 2 * 60 * 1000,
-    cacheTime: 5 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 
   const {
@@ -127,7 +127,7 @@ export default function Analytics() {
     queryKey: ['analytics-inventory'],
     queryFn: inventoryApi.getAll,
     staleTime: 2 * 60 * 1000,
-    cacheTime: 5 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 
   const isLoading = ordersLoading || customersLoading || inventoryLoading;
@@ -202,7 +202,7 @@ export default function Analytics() {
       // Filter orders by customers in the selected franchise
       const franchiseCustomerIds = filteredCustomers.map(c => c.id);
       filteredOrders = filteredOrders.filter(order =>
-        franchiseCustomerIds.includes(order.customerId)
+        franchiseCustomerIds.includes(order.customerId ?? '')
       );
     }
 
@@ -656,7 +656,7 @@ export default function Analytics() {
                 Failed to load analytics data
               </div>
               <p className="text-sm text-muted-foreground">
-                {ordersError?.message || customersError?.message || inventoryError?.message || 'An unexpected error occurred'}
+                {hasError ? 'Failed to fetch data. Please check your connection and try again.' : 'An unexpected error occurred'}
               </p>
               <Button
                 onClick={() => window.location.reload()}

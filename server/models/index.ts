@@ -1,5 +1,5 @@
 // Centralized model exports and type definitions
-export * from '../shared/schema';
+export * from '../../shared/schema';
 
 // Re-export all schemas for easy access
 export {

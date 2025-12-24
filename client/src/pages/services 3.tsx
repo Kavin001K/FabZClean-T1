@@ -57,7 +57,7 @@ import {
 
 // Import data service and types
 import { servicesApi } from '@/lib/data-service';
-import type { Service } from '../../shared/schema';
+import type { Service } from '@shared/schema';
 import { EnhancedPDFExport, exportServicesEnhanced } from '@/lib/enhanced-pdf-export';
 
 // Service icon mapping

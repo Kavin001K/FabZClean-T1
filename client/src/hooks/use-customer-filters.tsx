@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { Customer } from '../../../shared/schema';
+import type { Customer } from '@shared/schema';
 import type { FilterType } from '@/components/customers/customer-search-filter';
 
 export const useCustomerFilters = (customers: Customer[]) => {

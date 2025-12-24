@@ -1,7 +1,7 @@
 // Excel export functions for all pages
 import { exportToExcelAdvanced, exportSingleSheet, ExcelColumn } from './excel-export-service';
 import { formatCurrency, formatDate } from './data-service';
-import type { Order, Customer, Service } from '../../../shared/schema';
+import type { Order, Customer, Service } from '@shared/schema';
 import type { InventoryItem } from './data-service';
 
 // ==================== ORDERS EXPORT ====================

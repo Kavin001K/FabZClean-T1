@@ -223,19 +223,19 @@ export async function performRFMAnalysis(): Promise<RFMScore[]> {
   const rfmData: RFMScore[] = [];
 
   for (const customer of customers) {
-    const customerOrders = orders.filter(o => o.customerId === customer.id);
+    const customerOrders = orders.filter((o: any) => o.customerId === customer.id);
 
     if (customerOrders.length === 0) continue;
 
     // Recency: Days since last order
-    const lastOrderDate = new Date(Math.max(...customerOrders.map(o => new Date(o.createdAt).getTime())));
+    const lastOrderDate = new Date(Math.max(...customerOrders.map((o: any) => new Date(o.createdAt).getTime())));
     const recency = Math.floor((now.getTime() - lastOrderDate.getTime()) / (1000 * 60 * 60 * 24));
 
     // Frequency: Number of orders
     const frequency = customerOrders.length;
 
     // Monetary: Total spent
-    const monetary = customerOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || '0'), 0);
+    const monetary = customerOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || '0'), 0);
 
     rfmData.push({
       customerId: customer.id,
@@ -327,7 +327,7 @@ export async function performCohortAnalysis(): Promise<CohortData[]> {
   const cohorts: { [cohort: string]: { customerIds: Set<string>; ordersByPeriod: { [period: string]: Set<string> } } } = {};
 
   for (const customer of customers) {
-    const customerOrders = orders.filter(o => o.customerId === customer.id).sort((a, b) =>
+    const customerOrders = orders.filter((o: any) => o.customerId === customer.id).sort((a: any, b: any) =>
       new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
 
@@ -349,7 +349,7 @@ export async function performCohortAnalysis(): Promise<CohortData[]> {
     for (const order of customerOrders) {
       const orderDate = new Date(order.createdAt);
       const monthsFromFirst = (orderDate.getFullYear() - firstOrderDate.getFullYear()) * 12 +
-                             (orderDate.getMonth() - firstOrderDate.getMonth());
+        (orderDate.getMonth() - firstOrderDate.getMonth());
       const periodKey = `Month ${monthsFromFirst}`;
 
       if (!cohorts[cohortKey].ordersByPeriod[periodKey]) {
@@ -435,7 +435,7 @@ export function performABCAnalysis(items: { id: string; name: string; value: num
 // REVENUE FORECASTING
 // ============================================================================
 
-export interface RevenueF forecast {
+export interface RevenueForecast {
   date: string;
   predicted: number;
   confidence: { lower: number; upper: number };
@@ -538,7 +538,7 @@ export async function generateBusinessAnalytics(): Promise<BusinessAnalytics> {
   const services = await storage.listServices();
 
   // Overview metrics
-  const totalRevenue = orders.reduce((sum, o) => sum + parseFloat(o.totalAmount || '0'), 0);
+  const totalRevenue = orders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || '0'), 0);
   const totalOrders = orders.length;
   const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
   const totalCustomers = customers.length;
@@ -549,17 +549,17 @@ export async function generateBusinessAnalytics(): Promise<BusinessAnalytics> {
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 
   const recentRevenue = orders
-    .filter(o => new Date(o.createdAt) >= thirtyDaysAgo)
-    .reduce((sum, o) => sum + parseFloat(o.totalAmount || '0'), 0);
+    .filter((o: any) => new Date(o.createdAt) >= thirtyDaysAgo)
+    .reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || '0'), 0);
 
   const previousRevenue = orders
-    .filter(o => new Date(o.createdAt) >= sixtyDaysAgo && new Date(o.createdAt) < thirtyDaysAgo)
-    .reduce((sum, o) => sum + parseFloat(o.totalAmount || '0'), 0);
+    .filter((o: any) => new Date(o.createdAt) >= sixtyDaysAgo && new Date(o.createdAt) < thirtyDaysAgo)
+    .reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || '0'), 0);
 
   const growthRate = previousRevenue > 0 ? ((recentRevenue - previousRevenue) / previousRevenue) * 100 : 0;
 
   // Statistical analysis
-  const orderValues = orders.map(o => parseFloat(o.totalAmount || '0'));
+  const orderValues = orders.map((o: any) => parseFloat(o.totalAmount || '0'));
   const statistics = {
     mean: calculateMean(orderValues),
     median: calculateMedian(orderValues),
@@ -604,8 +604,8 @@ export async function generateBusinessAnalytics(): Promise<BusinessAnalytics> {
 
   // Top performers
   const topCustomers = customers
-    .map(c => ({ id: c.id, name: c.name, totalSpent: parseFloat(c.totalSpent || '0') }))
-    .sort((a, b) => b.totalSpent - a.totalSpent)
+    .map((c: any) => ({ id: c.id, name: c.name, totalSpent: parseFloat(c.totalSpent || '0') }))
+    .sort((a: { totalSpent: number }, b: { totalSpent: number }) => b.totalSpent - a.totalSpent)
     .slice(0, 10);
 
   const serviceRevenue: { [name: string]: { revenue: number; orders: number } } = {};

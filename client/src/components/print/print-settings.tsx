@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Printer, Settings, Eye, Download } from 'lucide-react';
 import { useInvoicePrint } from '@/hooks/use-invoice-print';
-import type { Order } from '../../shared/schema';
+import type { Order } from '@shared/schema';
 import type { PrintTemplate } from '@/lib/print-driver';
 
 interface PrintSettingsProps {

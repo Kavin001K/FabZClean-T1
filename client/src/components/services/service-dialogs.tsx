@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import type { Service } from '../../../shared/schema';
+import type { Service } from '@shared/schema';
 
 // Form validation schemas
 const serviceFormSchema = z.object({

@@ -6,6 +6,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -59,7 +60,7 @@ export const InventoryToolbar: React.FC<InventoryToolbarProps> = React.memo(({
       const newFilters = activeFilters.includes(filter)
         ? activeFilters.filter(f => f !== filter && f !== 'all')
         : [...activeFilters.filter(f => f !== 'all'), filter];
-      
+
       // If no filters selected, default to 'all'
       onFilterChange(newFilters.length === 0 ? ['all'] : newFilters);
     }
@@ -107,9 +108,9 @@ export const InventoryToolbar: React.FC<InventoryToolbarProps> = React.memo(({
             {activeFilters
               .filter(f => f !== 'all')
               .map((filter) => (
-                <Badge 
-                  key={filter} 
-                  variant="secondary" 
+                <Badge
+                  key={filter}
+                  variant="secondary"
                   className="text-xs cursor-pointer hover:bg-secondary/80"
                   onClick={() => handleFilterToggle(filter)}
                 >

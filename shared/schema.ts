@@ -301,25 +301,41 @@ export const insertUserSchema = createInsertSchema(users);
 
 export const insertProductSchema = createInsertSchema(products);
 
-export const insertOrderSchema = createInsertSchema(orders, {
-  pickupDate: z.coerce.date().optional().nullable(),
-  // Allow string or number for decimal fields
+// Create a base insert schema and extend it with additional fields
+// Using a more permissive approach to avoid drizzle-zod strict key checking
+const baseOrderSchema = createInsertSchema(orders);
+
+export const insertOrderSchema = z.object({
+  id: z.string().optional(),
+  franchiseId: z.string().optional().nullable(),
+  orderNumber: z.string(),
+  customerId: z.string().optional().nullable(),
+  customerName: z.string(),
+  customerEmail: z.string().optional().nullable(),
+  customerPhone: z.string().optional().nullable(),
+  status: z.enum(["pending", "processing", "completed", "cancelled", "assigned", "in_transit", "shipped", "out_for_delivery", "delivered", "in_store", "ready_for_transit", "ready_for_pickup"]),
+  paymentStatus: z.enum(["pending", "paid", "failed", "credit"]).default("pending"),
   totalAmount: z.union([z.string(), z.number()]).transform(val => val.toString()),
+  items: z.any(),
+  shippingAddress: z.any().optional().nullable(),
+  pickupDate: z.coerce.date().optional().nullable(),
   advancePaid: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+  paymentMethod: z.string().optional().default("cash"),
+  discountType: z.string().optional().nullable(),
   discountValue: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+  couponCode: z.string().optional().nullable(),
   extraCharges: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+  gstEnabled: z.coerce.boolean().optional().default(false),
   gstRate: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
   gstAmount: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+  panNumber: z.string().optional().nullable(),
+  gstNumber: z.string().optional().nullable(),
+  specialInstructions: z.string().optional().nullable(),
+  fulfillmentType: z.enum(["pickup", "delivery"]).optional().default("pickup"),
   deliveryCharges: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
-  // Allow any array for items
-  items: z.any(),
-  // Allow any object for jsonb fields
-  shippingAddress: z.any().optional().nullable(),
   deliveryAddress: z.any().optional().nullable(),
-  // Boolean coercion
-  gstEnabled: z.coerce.boolean().optional().default(false),
   isExpressOrder: z.coerce.boolean().optional().default(false),
-  // Timestamps
+  priority: z.enum(["normal", "high", "urgent"]).optional().default("normal"),
   createdAt: z.coerce.date().optional(),
   updatedAt: z.coerce.date().optional(),
 }).passthrough();

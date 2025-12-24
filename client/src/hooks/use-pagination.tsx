@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 export interface PaginationOptions {
@@ -74,7 +74,7 @@ export function useClientPagination<T>(
   const visiblePages = useMemo(() => {
     const pages: number[] = [];
     const halfVisible = Math.floor(maxVisiblePages / 2);
-    
+
     let startPage = Math.max(1, currentPage - halfVisible);
     let endPage = Math.min(pagination.totalPages, currentPage + halfVisible);
 
@@ -377,7 +377,7 @@ export function useInfiniteScroll<T>(
     try {
       const params = new URLSearchParams({
         limit: pageSize.toString(),
-        cursor: allData[allData.length - 1]?.id || '',
+        cursor: (allData[allData.length - 1] as { id?: string })?.id || '',
         ...queryParams
       });
 

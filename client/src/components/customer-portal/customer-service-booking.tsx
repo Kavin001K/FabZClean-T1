@@ -61,7 +61,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-// import type { Customer } from '../../../shared/schema';
+// import type { Customer } from '@shared/schema';
 
 // Temporary type definition
 interface Customer {

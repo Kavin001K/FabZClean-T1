@@ -71,7 +71,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-// import type { Customer } from '../../../shared/schema';
+// import type { Customer } from '@shared/schema';
 
 // Temporary type definition
 interface Customer {

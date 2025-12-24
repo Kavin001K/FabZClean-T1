@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { Service } from '../../../shared/schema';
+import type { Service } from '@shared/schema';
 
 export type FilterType = 'all' | 'active' | 'inactive' | 'high_price' | 'low_price' | 'category';
 

@@ -71,7 +71,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-// import type { Customer } from '../../../shared/schema';
+// import type { Customer } from '@shared/schema';
 
 // Temporary type definition
 interface Customer {

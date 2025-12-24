@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, Package, DollarSign, Clock, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
-import type { Service } from '../../../shared/schema';
+import type { Service } from '@shared/schema';
 
 interface ServiceKpiData {
   totalServices: number;

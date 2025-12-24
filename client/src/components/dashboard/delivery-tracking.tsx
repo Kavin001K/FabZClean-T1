@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Truck } from "lucide-react";
 import { getStatusColor } from "@/lib/data";
 import { format } from "date-fns";
-import type { Delivery } from "../../../shared/schema";
+import type { Delivery } from "@shared/schema";
 
 export default function DeliveryTracking() {
   const { data: deliveries, isLoading } = useQuery<Delivery[]>({
@@ -62,9 +62,9 @@ export default function DeliveryTracking() {
           <CardTitle className="font-display font-semibold text-sm sm:text-lg text-foreground">
             Delivery Tracking
           </CardTitle>
-          <Button 
-            variant="link" 
-            size="sm" 
+          <Button
+            variant="link"
+            size="sm"
             data-testid="view-map"
             className="text-xs sm:text-sm"
             onClick={() => {
@@ -79,8 +79,8 @@ export default function DeliveryTracking() {
       <CardContent>
         <div className="space-y-3 sm:space-y-4">
           {deliveries?.map((delivery) => (
-            <div 
-              key={delivery.id} 
+            <div
+              key={delivery.id}
               className="border border-border rounded-lg p-3 sm:p-4"
               data-testid={`delivery-${delivery.vehicleId}`}
             >
@@ -96,9 +96,9 @@ export default function DeliveryTracking() {
               <p className="text-xs text-muted-foreground mb-2">
                 Driver: {delivery.driverName}
               </p>
-              <Progress 
-                value={getProgressPercentage(delivery.status)} 
-                className="w-full h-1.5 sm:h-2 mb-2" 
+              <Progress
+                value={getProgressPercentage(delivery.status)}
+                className="w-full h-1.5 sm:h-2 mb-2"
               />
               <p className="text-xs text-muted-foreground">
                 {delivery.estimatedDelivery && delivery.status !== "delivered" && (

@@ -19,16 +19,20 @@ export function useSafeQuery<T>(
   const query = useQuery({
     ...options,
     retry: false, // Disable retry to prevent infinite loops
-    onError: (error: Error) => {
-      console.error('Query error:', error);
-      setError(error);
+  });
+
+  // Handle error state changes via useEffect instead of onError/onSuccess callbacks
+  // (removed in React Query v5)
+  useEffect(() => {
+    if (query.isError && query.error) {
+      console.error('Query error:', query.error);
+      setError(query.error);
       setHasError(true);
-    },
-    onSuccess: () => {
+    } else if (query.isSuccess) {
       setHasError(false);
       setError(null);
-    },
-  });
+    }
+  }, [query.isError, query.isSuccess, query.error]);
 
   // Use fallback data if query fails
   const safeData = hasError && fallbackData ? fallbackData : query.data;

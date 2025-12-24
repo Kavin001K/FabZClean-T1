@@ -2,7 +2,7 @@
 // This replaces all dummy data with real database queries
 
 // Import types from shared schema instead of defining them here
-import type { Order, Customer, Service, Product, Delivery, Employee } from "../../../shared/schema";
+import type { Order, Customer, Service, Product, Delivery, Employee } from "@shared/schema";
 
 // Get access token from localStorage (employee-based auth)
 function getAccessToken(): string | null {

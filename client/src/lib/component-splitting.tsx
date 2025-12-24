@@ -26,28 +26,28 @@ export const COMPONENT_PATTERNS = {
     title: 'text-lg font-semibold',
     actions: 'flex items-center gap-2',
   },
-  
+
   // Content patterns
   CONTENT: {
     base: 'space-y-4',
     section: 'space-y-2',
     grid: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4',
   },
-  
+
   // Footer patterns
   FOOTER: {
     base: 'flex items-center justify-between pt-4 border-t',
     actions: 'flex items-center gap-2',
     info: 'text-sm text-muted-foreground',
   },
-  
+
   // List patterns
   LIST: {
     base: 'space-y-2',
     item: 'flex items-center justify-between p-3 border rounded-lg',
     empty: 'text-center py-8 text-muted-foreground',
   },
-  
+
   // Form patterns
   FORM: {
     base: 'space-y-4',
@@ -55,7 +55,7 @@ export const COMPONENT_PATTERNS = {
     group: 'grid grid-cols-1 md:grid-cols-2 gap-4',
     actions: 'flex items-center justify-end gap-2',
   },
-  
+
   // Table patterns
   TABLE: {
     base: 'w-full',
@@ -63,7 +63,7 @@ export const COMPONENT_PATTERNS = {
     row: 'border-b hover:bg-muted/50',
     cell: 'p-4',
   },
-  
+
   // Modal patterns
   MODAL: {
     base: 'fixed inset-0 z-50 bg-black/80 flex items-center justify-center',
@@ -252,7 +252,7 @@ export const SPLITTING_UTILITIES = {
     actions: props.actions,
     onClose: props.onClose,
   }),
-  
+
   // Extract content logic
   extractContent: (props: any) => ({
     children: props.children,
@@ -260,7 +260,7 @@ export const SPLITTING_UTILITIES = {
     isLoading: props.isLoading,
     error: props.error,
   }),
-  
+
   // Extract footer logic
   extractFooter: (props: any) => ({
     actions: props.footerActions,
@@ -268,7 +268,7 @@ export const SPLITTING_UTILITIES = {
     onCancel: props.onCancel,
     onSubmit: props.onSubmit,
   }),
-  
+
   // Extract form logic
   extractForm: (props: any) => ({
     onSubmit: props.onSubmit,
@@ -276,7 +276,7 @@ export const SPLITTING_UTILITIES = {
     isSubmitting: props.isSubmitting,
     errors: props.errors,
   }),
-  
+
   // Extract table logic
   extractTable: (props: any) => ({
     data: props.data,
@@ -296,7 +296,7 @@ export function createComponentSplitter<T extends BaseComponentProps>(
 ) {
   return forwardRef<any, T>((props, ref) => {
     const splitProps = splitter(props);
-    
+
     return (
       <Component
         ref={ref}
@@ -318,21 +318,21 @@ export const SPLITTING_PATTERNS = {
     sidebar: 'PageSidebar',
     footer: 'PageFooter',
   },
-  
+
   // Card component pattern
   CARD: {
     header: 'CardHeader',
     content: 'CardContent',
     footer: 'CardFooter',
   },
-  
+
   // Form component pattern
   FORM: {
     header: 'FormHeader',
     fields: 'FormFields',
     actions: 'FormActions',
   },
-  
+
   // Table component pattern
   TABLE: {
     header: 'TableHeader',
@@ -340,14 +340,14 @@ export const SPLITTING_PATTERNS = {
     footer: 'TableFooter',
     pagination: 'TablePagination',
   },
-  
+
   // Modal component pattern
   MODAL: {
     header: 'ModalHeader',
     content: 'ModalContent',
     footer: 'ModalFooter',
   },
-  
+
   // List component pattern
   LIST: {
     header: 'ListHeader',
@@ -365,21 +365,21 @@ export function createSplitComponent<T extends BaseComponentProps>(
 ) {
   const SplitComponent = forwardRef<any, T>((props, ref) => {
     const { children, ...restProps } = props;
-    
+
     return (
       <div ref={ref} {...restProps}>
         {children}
       </div>
     );
   });
-  
+
   SplitComponent.displayName = name;
-  
+
   // Add parts as static properties
   Object.entries(parts).forEach(([key, Component]) => {
     (SplitComponent as any)[key] = Component;
   });
-  
+
   return SplitComponent;
 }
 
@@ -388,25 +388,25 @@ export function createSplitComponent<T extends BaseComponentProps>(
  */
 export const SPLITTING_HOOKS = {
   // Extract state logic
-  useExtractedState: <T>(props: T, keys: (keyof T)[]) => {
+  useExtractedState: function <T>(props: T, keys: (keyof T)[]): Partial<T> {
     const extracted = {} as Partial<T>;
     keys.forEach(key => {
       extracted[key] = props[key];
     });
     return extracted;
   },
-  
+
   // Extract handlers
-  useExtractedHandlers: <T>(props: T, handlers: (keyof T)[]) => {
+  useExtractedHandlers: function <T>(props: T, handlers: (keyof T)[]): Partial<T> {
     const extracted = {} as Partial<T>;
     handlers.forEach(handler => {
       extracted[handler] = props[handler];
     });
     return extracted;
   },
-  
+
   // Extract data
-  useExtractedData: <T>(props: T, dataKeys: (keyof T)[]) => {
+  useExtractedData: function <T>(props: T, dataKeys: (keyof T)[]): Partial<T> {
     const extracted = {} as Partial<T>;
     dataKeys.forEach(key => {
       extracted[key] = props[key];
@@ -421,19 +421,19 @@ export const SPLITTING_HOOKS = {
 export function createComponentWithParts<T extends BaseComponentProps>(
   name: string,
   parts: { [key: string]: ComponentType<any> },
-  mainComponent: ComponentType<T>
+  MainComponent: ComponentType<T>
 ) {
   const ComponentWithParts = forwardRef<any, T>((props, ref) => {
-    return <mainComponent ref={ref} {...props} />;
+    return <MainComponent ref={ref as any} {...props} />;
   });
-  
+
   ComponentWithParts.displayName = name;
-  
+
   // Add parts as static properties
   Object.entries(parts).forEach(([key, PartComponent]) => {
     (ComponentWithParts as any)[key] = PartComponent;
   });
-  
+
   return ComponentWithParts;
 }
 
@@ -461,7 +461,7 @@ export const SPECIFIC_PATTERNS = {
       info: props.footerInfo,
     }),
   },
-  
+
   // Form splitting
   FORM: {
     extractHeader: (props: any) => ({
@@ -481,7 +481,7 @@ export const SPECIFIC_PATTERNS = {
       isSubmitting: props.isSubmitting,
     }),
   },
-  
+
   // Card splitting
   CARD: {
     extractHeader: (props: any) => ({

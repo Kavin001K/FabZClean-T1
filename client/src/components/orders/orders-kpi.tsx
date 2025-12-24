@@ -9,7 +9,7 @@ import {
   TrendingDown,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/data-service";
-import type { Order } from "../../../shared/schema";
+import type { Order } from "@shared/schema";
 
 export interface OrdersKPIProps {
   orders: Order[];

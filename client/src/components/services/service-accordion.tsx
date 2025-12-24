@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
 import { formatCurrency } from '@/lib/data-service';
-import type { Service } from '../../../shared/schema';
+import type { Service } from '@shared/schema';
 
 interface ServiceAccordionProps {
   services: Service[];
