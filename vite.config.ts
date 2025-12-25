@@ -25,59 +25,53 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false,
     minify: 'esbuild',
-    chunkSizeWarningLimit: 600, // Reduced from 1000
+    chunkSizeWarningLimit: 1500,
     target: 'es2020',
     rollupOptions: {
       output: {
-        // Better code splitting for smaller chunks
+        // Safe chunking - keep React ecosystem together, don't create catch-all vendor
         manualChunks: (id) => {
-          // React core - MUST keep react and react-dom in the SAME chunk
-          // Separating them causes "Cannot read properties of undefined (reading 'exports')" error
-          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
-            return 'react';
+          if (id.includes('node_modules')) {
+            // Keep ALL React-related packages together
+            // This includes react, react-dom, scheduler, react-is, etc.
+            if (
+              id.includes('/react/') ||
+              id.includes('/react-dom/') ||
+              id.includes('/scheduler/') ||
+              id.includes('/react-is/') ||
+              id.includes('react-refresh')
+            ) {
+              return 'react-vendor';
+            }
+            // React Query / TanStack
+            if (id.includes('@tanstack/react-query')) {
+              return 'tanstack';
+            }
+            // Charts - heavy
+            if (id.includes('recharts') || id.includes('d3-')) {
+              return 'charts';
+            }
+            // Date utilities
+            if (id.includes('date-fns')) {
+              return 'date-utils';
+            }
+            // Supabase
+            if (id.includes('@supabase/')) {
+              return 'supabase';
+            }
+            // PDF/Print - heavy
+            if (id.includes('jspdf') || id.includes('html2canvas')) {
+              return 'pdf';
+            }
+            // Animation
+            if (id.includes('framer-motion')) {
+              return 'animation';
+            }
+            // DO NOT add a catch-all vendor chunk - it breaks React
+            // Let Vite handle remaining modules automatically
           }
-          // React Query / TanStack
-          if (id.includes('@tanstack/react-query')) {
-            return 'tanstack';
-          }
-          // UI Components (Radix)
-          if (id.includes('@radix-ui/')) {
-            return 'radix-ui';
-          }
-          // Charts
-          if (id.includes('recharts') || id.includes('d3-')) {
-            return 'charts';
-          }
-          // Date utilities
-          if (id.includes('date-fns') || id.includes('dayjs') || id.includes('luxon')) {
-            return 'date-utils';
-          }
-          // Supabase
-          if (id.includes('@supabase/')) {
-            return 'supabase';
-          }
-          // Form handling
-          if (id.includes('react-hook-form') || id.includes('zod') || id.includes('@hookform/')) {
-            return 'forms';
-          }
-          // Icons
-          if (id.includes('lucide-react')) {
-            return 'icons';
-          }
-          // PDF/Print
-          if (id.includes('jspdf') || id.includes('html2canvas')) {
-            return 'pdf';
-          }
-          // Animation
-          if (id.includes('framer-motion')) {
-            return 'animation';
-          }
-          // Other vendor libraries
-          if (id.includes('node_modules/')) {
-            return 'vendor';
-          }
+          return undefined;
         },
-        // Optimize chunk file names
         chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
@@ -88,7 +82,14 @@ export default defineConfig({
     logOverride: { 'this-is-undefined-in-esm': 'silent' },
     target: 'es2020',
     drop: ['console', 'debugger'],
-    legalComments: 'none', // Remove license comments to reduce size
+    legalComments: 'none',
+  },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'scheduler',
+    ],
   },
   server: {
     fs: {
@@ -98,9 +99,6 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
-    hmr: {
-      // clientPort: 5000, // Removed to allow auto-detection
-    },
+    hmr: {},
   },
 });
-

@@ -1,3 +1,4 @@
+import React from 'react';
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
@@ -17,8 +18,6 @@ window.addEventListener('unhandledrejection', (event) => {
   // Prevent the default error handling
   event.preventDefault();
 });
-
-import React from 'react';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
   constructor(props: any) {

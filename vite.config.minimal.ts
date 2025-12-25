@@ -21,59 +21,57 @@ export default defineConfig({
     outDir: "../dist",
     emptyOutDir: true,
     sourcemap: false,
-    minify: true,
+    minify: 'esbuild',
     target: 'es2020',
+    // Let Vite/Rollup handle chunking automatically - it's smarter about dependencies
+    // Manual chunking with functions can break React's internal module resolution
     rollupOptions: {
       output: {
-        // Aggressive manual chunking for better code splitting
+        // Use a function that keeps React ecosystem packages together and doesn't
+        // separate internal dependencies
         manualChunks: (id) => {
-          // Core React - MUST be in the same chunk to avoid exports undefined error
-          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) return 'react';
-
-          // Charts - heavy library
-          if (id.includes('recharts') || id.includes('d3-')) return 'charts';
-
-          // PDF generation - heavy, lazy load
-          if (id.includes('jspdf') || id.includes('html2canvas')) return 'pdf';
-
-          // Animation library
-          if (id.includes('framer-motion')) return 'framer';
-
-          // UI Components - Radix
-          if (id.includes('@radix-ui')) return 'radix-ui';
-
-          // Tanstack Query
-          if (id.includes('@tanstack')) return 'tanstack';
-
-          // Supabase
-          if (id.includes('@supabase')) return 'supabase';
-
-          // Icons
-          if (id.includes('lucide-react')) return 'icons';
-
-          // Forms
-          if (id.includes('react-hook-form') || id.includes('@hookform')) return 'forms';
-
-          // Date utilities
-          if (id.includes('date-fns')) return 'date-utils';
-
-          // QR/Barcode
-          if (id.includes('qrcode') || id.includes('jsbarcode')) return 'barcodes';
-
-          // Misc vendor
-          if (id.includes('node_modules')) return 'vendor';
+          // Keep ALL React-related packages together (react, react-dom, scheduler, react-is, etc.)
+          if (id.includes('node_modules')) {
+            if (
+              id.includes('/react/') ||
+              id.includes('/react-dom/') ||
+              id.includes('/scheduler/') ||
+              id.includes('/react-is/') ||
+              id.includes('react-refresh')
+            ) {
+              return 'react-vendor';
+            }
+            // Heavy charting library
+            if (id.includes('recharts') || id.includes('d3-')) {
+              return 'charts';
+            }
+            // PDF generation - heavy
+            if (id.includes('jspdf') || id.includes('html2canvas')) {
+              return 'pdf';
+            }
+            // Animation
+            if (id.includes('framer-motion')) {
+              return 'framer';
+            }
+            // Don't create a catch-all vendor chunk - let Vite decide
+          }
+          // Return undefined for everything else - let Vite handle it
+          return undefined;
         },
       },
     },
-    chunkSizeWarningLimit: 500,
+    chunkSizeWarningLimit: 1500,
   },
   esbuild: {
     target: 'es2020',
     logOverride: { 'this-is-undefined-in-esm': 'silent' },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', '@tanstack/react-query'],
-    exclude: ['@types/node'],
+    include: [
+      'react',
+      'react-dom',
+      'scheduler',
+    ],
   },
   server: {
     fs: {
