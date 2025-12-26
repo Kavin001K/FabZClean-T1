@@ -47,8 +47,9 @@ export default defineConfig({
             if (id.includes('@tanstack/react-query')) {
               return 'tanstack';
             }
-            // Charts - heavy
-            if (id.includes('recharts') || id.includes('d3-')) {
+            // Charts - ONLY recharts, let d3 be handled automatically
+            // This prevents circular reference issues in production builds
+            if (id.includes('recharts') && !id.includes('d3-')) {
               return 'charts';
             }
             // Date utilities
@@ -89,6 +90,7 @@ export default defineConfig({
       'react',
       'react-dom',
       'scheduler',
+      'recharts',
     ],
   },
   server: {

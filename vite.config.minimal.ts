@@ -41,8 +41,9 @@ export default defineConfig({
             ) {
               return 'react-vendor';
             }
-            // Heavy charting library
-            if (id.includes('recharts') || id.includes('d3-')) {
+            // Heavy charting library - ONLY recharts, let d3 be handled automatically
+            // This prevents circular reference issues in production builds
+            if (id.includes('recharts') && !id.includes('d3-')) {
               return 'charts';
             }
             // PDF generation - heavy
@@ -71,6 +72,7 @@ export default defineConfig({
       'react',
       'react-dom',
       'scheduler',
+      'recharts',
     ],
   },
   server: {
