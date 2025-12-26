@@ -47,11 +47,8 @@ export default defineConfig({
             if (id.includes('@tanstack/react-query')) {
               return 'tanstack';
             }
-            // Charts - ONLY recharts, let d3 be handled automatically
-            // This prevents circular reference issues in production builds
-            if (id.includes('recharts') && !id.includes('d3-')) {
-              return 'charts';
-            }
+            // DO NOT manually chunk recharts - it has internal circular dependencies
+            // that cause "Cannot access 'X' before initialization" errors in production
             // Date utilities
             if (id.includes('date-fns')) {
               return 'date-utils';

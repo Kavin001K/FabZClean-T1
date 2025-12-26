@@ -41,11 +41,8 @@ export default defineConfig({
             ) {
               return 'react-vendor';
             }
-            // Heavy charting library - ONLY recharts, let d3 be handled automatically
-            // This prevents circular reference issues in production builds
-            if (id.includes('recharts') && !id.includes('d3-')) {
-              return 'charts';
-            }
+            // DO NOT manually chunk recharts - it has internal circular dependencies
+            // that cause "Cannot access 'X' before initialization" errors in production
             // PDF generation - heavy
             if (id.includes('jspdf') || id.includes('html2canvas')) {
               return 'pdf';
