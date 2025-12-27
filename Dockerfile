@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18-slim AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
@@ -12,17 +12,17 @@ RUN apt-get update && apt-get install -y \
 # Copy package files
 COPY package.json package-lock.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (ignore postinstall as we'll run build separately)
+RUN npm ci --ignore-scripts
 
 # Copy source code
 COPY . .
 
-# Build the client
+# Build the client explicitly
 RUN npm run build:client
 
 # Production stage
-FROM node:18-slim
+FROM node:22-slim
 
 WORKDIR /app
 
@@ -35,8 +35,8 @@ RUN apt-get update && apt-get install -y \
 # Copy package files
 COPY package.json package-lock.json ./
 
-# Install production dependencies only
-RUN npm ci --omit=dev
+# Install production dependencies only (ignore scripts - we don't need to build again)
+RUN npm ci --omit=dev --ignore-scripts
 
 # Copy built client from builder stage
 COPY --from=builder /app/dist ./dist
