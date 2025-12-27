@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, TouchEvent } from 'react';
 import { useParams } from 'wouter';
 import {
     Search,
@@ -27,9 +27,11 @@ import {
     Shirt,
     Droplets,
     Wind,
-    ThumbsUp,
     RefreshCw,
-    ExternalLink
+    ExternalLink,
+    X,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,82 +39,153 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-// SEO Meta Tags Hook
+// Mobile detection hook
+const useIsMobile = () => {
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 768 || 'ontouchstart' in window);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    return isMobile;
+};
+
+// SEO and Mobile Meta Tags Hook
 const useTrackingSEO = () => {
     useEffect(() => {
         document.title = "Track Your Order | Fab Clean - Premium Laundry Services";
 
+        // Ensure viewport meta is set for mobile
+        let viewport = document.querySelector('meta[name="viewport"]') as HTMLMetaElement;
+        if (!viewport) {
+            viewport = document.createElement('meta');
+            viewport.name = 'viewport';
+            document.head.appendChild(viewport);
+        }
+        viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+
+        // Add theme color for mobile browsers
+        let themeColor = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement;
+        if (!themeColor) {
+            themeColor = document.createElement('meta');
+            themeColor.name = 'theme-color';
+            document.head.appendChild(themeColor);
+        }
+        themeColor.content = '#10b981';
+
+        // Add apple mobile web app capable
+        let appleMeta = document.querySelector('meta[name="apple-mobile-web-app-capable"]') as HTMLMetaElement;
+        if (!appleMeta) {
+            appleMeta = document.createElement('meta');
+            appleMeta.name = 'apple-mobile-web-app-capable';
+            appleMeta.content = 'yes';
+            document.head.appendChild(appleMeta);
+        }
+
         const style = document.createElement('style');
+        style.id = 'tracking-styles';
         style.textContent = `
             @keyframes shimmer {
                 0% { background-position: -200% 0; }
                 100% { background-position: 200% 0; }
             }
-            @keyframes pulse-ring {
-                0% { transform: scale(1); opacity: 1; }
-                100% { transform: scale(1.5); opacity: 0; }
-            }
             @keyframes float {
                 0%, 100% { transform: translateY(0); }
-                50% { transform: translateY(-10px); }
-            }
-            @keyframes confetti {
-                0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-                100% { transform: translateY(100px) rotate(720deg); opacity: 0; }
+                50% { transform: translateY(-5px); }
             }
             @keyframes slide-up {
                 0% { transform: translateY(20px); opacity: 0; }
                 100% { transform: translateY(0); opacity: 1; }
             }
+            @keyframes slide-up-mobile {
+                0% { transform: translateY(10px); opacity: 0; }
+                100% { transform: translateY(0); opacity: 1; }
+            }
             @keyframes bounce-in {
-                0% { transform: scale(0.3); opacity: 0; }
-                50% { transform: scale(1.05); }
-                70% { transform: scale(0.9); }
+                0% { transform: scale(0.5); opacity: 0; }
+                70% { transform: scale(1.05); }
                 100% { transform: scale(1); opacity: 1; }
             }
             @keyframes gradient-x {
                 0%, 100% { background-position: 0% 50%; }
                 50% { background-position: 100% 50%; }
             }
-            @keyframes ripple {
-                0% { transform: scale(0.8); opacity: 1; }
-                100% { transform: scale(2.4); opacity: 0; }
+            @keyframes pulse-soft {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.7; }
             }
-            @keyframes glow {
-                0%, 100% { box-shadow: 0 0 5px rgba(16, 185, 129, 0.5); }
-                50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.8), 0 0 30px rgba(16, 185, 129, 0.6); }
+            @keyframes confetti {
+                0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+                100% { transform: translateY(80px) rotate(720deg); opacity: 0; }
             }
             .animate-shimmer {
-                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
                 background-size: 200% 100%;
                 animation: shimmer 2s infinite;
             }
             .animate-float { animation: float 3s ease-in-out infinite; }
-            .animate-slide-up { animation: slide-up 0.6s ease-out forwards; }
-            .animate-bounce-in { animation: bounce-in 0.6s ease-out forwards; }
+            .animate-slide-up { animation: slide-up 0.4s ease-out forwards; }
+            .animate-bounce-in { animation: bounce-in 0.4s ease-out forwards; }
             .animate-gradient { 
                 background-size: 200% 200%;
-                animation: gradient-x 3s ease infinite;
+                animation: gradient-x 4s ease infinite;
             }
-            .animate-glow { animation: glow 2s ease-in-out infinite; }
-            .delay-100 { animation-delay: 0.1s; }
-            .delay-200 { animation-delay: 0.2s; }
-            .delay-300 { animation-delay: 0.3s; }
-            .delay-400 { animation-delay: 0.4s; }
-            .delay-500 { animation-delay: 0.5s; }
-            .progress-cursor {
-                cursor: pointer;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            .animate-pulse-soft { animation: pulse-soft 2s ease-in-out infinite; }
+            
+            /* Mobile optimizations */
+            @media (max-width: 767px) {
+                .animate-slide-up { animation: slide-up-mobile 0.3s ease-out forwards; }
+                .animate-float { animation: float 4s ease-in-out infinite; }
             }
-            .progress-cursor:hover {
-                transform: scale(1.05);
+            
+            /* Touch-friendly tap targets */
+            .touch-target {
+                min-height: 44px;
+                min-width: 44px;
+            }
+            
+            /* Safe area padding for notched devices */
+            .safe-area-bottom {
+                padding-bottom: env(safe-area-inset-bottom, 16px);
+            }
+            .safe-area-top {
+                padding-top: env(safe-area-inset-top, 0px);
+            }
+            
+            /* Smooth scrolling */
+            html {
+                scroll-behavior: smooth;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            /* Hide scrollbar on mobile */
+            .hide-scrollbar::-webkit-scrollbar {
+                display: none;
+            }
+            .hide-scrollbar {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            
+            /* Bottom sheet styles */
+            .bottom-sheet {
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .bottom-sheet-backdrop {
+                transition: opacity 0.3s ease;
             }
         `;
         document.head.appendChild(style);
 
         return () => {
             document.title = "Fab Clean - Premium Laundry & Dry Cleaning";
-            style.remove();
+            const existingStyle = document.getElementById('tracking-styles');
+            if (existingStyle) existingStyle.remove();
         };
     }, []);
 };
@@ -139,66 +212,76 @@ interface Order {
     lastWhatsappSentAt?: string;
 }
 
-// Status step configuration with detailed info
+// Status step configuration
 const statusSteps = [
     {
         id: 'pending',
-        label: 'Order Placed',
+        label: 'Placed',
+        fullLabel: 'Order Placed',
         icon: Package,
         emoji: '📦',
         color: 'from-amber-400 to-orange-500',
         bgColor: 'bg-amber-50',
         textColor: 'text-amber-700',
-        description: 'Your order has been received',
-        detailedInfo: 'We have received your order and are preparing to process it. You will be notified once we start working on your items.',
+        borderColor: 'border-amber-200',
+        description: 'Order received',
+        detailedInfo: 'We have received your order and are preparing to process it.',
         estimatedTime: '~30 mins'
     },
     {
         id: 'processing',
-        label: 'In Process',
+        label: 'Process',
+        fullLabel: 'In Process',
         icon: Factory,
         emoji: '🧺',
         color: 'from-blue-400 to-indigo-500',
         bgColor: 'bg-blue-50',
         textColor: 'text-blue-700',
-        description: 'Expert care for your garments',
-        detailedInfo: 'Our cleaning experts are now carefully handling your garments using premium detergents and state-of-the-art equipment.',
-        estimatedTime: '24-48 hours'
+        borderColor: 'border-blue-200',
+        description: 'Cleaning in progress',
+        detailedInfo: 'Our experts are carefully handling your garments with premium care.',
+        estimatedTime: '24-48 hrs'
     },
     {
         id: 'ready_for_pickup',
         label: 'Ready',
+        fullLabel: 'Ready',
         icon: CheckCircle2,
         emoji: '✨',
         color: 'from-emerald-400 to-green-500',
         bgColor: 'bg-emerald-50',
         textColor: 'text-emerald-700',
-        description: 'Ready for collection',
-        detailedInfo: 'Great news! Your freshly cleaned items are ready and waiting for you. Pick them up at your convenience or wait for delivery.',
+        borderColor: 'border-emerald-200',
+        description: 'Ready for pickup',
+        detailedInfo: 'Your freshly cleaned items are ready and waiting for you!',
         estimatedTime: 'Ready now!'
     },
     {
         id: 'out_for_delivery',
-        label: 'On The Way',
+        label: 'On Way',
+        fullLabel: 'On The Way',
         icon: Truck,
         emoji: '🚚',
         color: 'from-purple-400 to-violet-500',
         bgColor: 'bg-purple-50',
         textColor: 'text-purple-700',
+        borderColor: 'border-purple-200',
         description: 'Out for delivery',
-        detailedInfo: 'Your order is on its way! Our delivery partner will reach you shortly. Please keep your phone nearby.',
+        detailedInfo: 'Your order is on its way! Our delivery partner will reach you shortly.',
         estimatedTime: '30-60 mins'
     },
     {
         id: 'completed',
-        label: 'Delivered',
+        label: 'Done',
+        fullLabel: 'Delivered',
         icon: PartyPopper,
         emoji: '🎉',
         color: 'from-green-400 to-emerald-500',
         bgColor: 'bg-green-50',
         textColor: 'text-green-700',
-        description: 'Successfully delivered!',
-        detailedInfo: 'Your order has been delivered successfully. Thank you for choosing Fab Clean! We hope to serve you again soon.',
+        borderColor: 'border-green-200',
+        description: 'Delivered!',
+        detailedInfo: 'Your order has been delivered successfully. Thank you for choosing Fab Clean!',
         estimatedTime: 'Completed'
     },
 ];
@@ -215,130 +298,105 @@ const getStatusIndex = (status: string): number => {
     return statusMap[normalizedStatus] ?? 0;
 };
 
-// Confetti component for completed orders
+// Confetti component
 const Confetti = () => (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-50">
-        {[...Array(30)].map((_, i) => (
+        {[...Array(20)].map((_, i) => (
             <div
                 key={i}
-                className="absolute w-3 h-3 rounded-sm"
+                className="absolute w-2 h-2 md:w-3 md:h-3 rounded-sm"
                 style={{
                     left: `${Math.random() * 100}%`,
-                    top: '-20px',
-                    backgroundColor: ['#10b981', '#f59e0b', '#6366f1', '#ec4899', '#06b6d4', '#8b5cf6'][Math.floor(Math.random() * 6)],
-                    animation: `confetti ${2 + Math.random() * 2}s ease-out forwards`,
-                    animationDelay: `${Math.random() * 0.5}s`,
-                    transform: `rotate(${Math.random() * 360}deg)`,
+                    top: '-10px',
+                    backgroundColor: ['#10b981', '#f59e0b', '#6366f1', '#ec4899', '#06b6d4'][Math.floor(Math.random() * 5)],
+                    animation: `confetti ${1.5 + Math.random() * 1.5}s ease-out forwards`,
+                    animationDelay: `${Math.random() * 0.3}s`,
                 }}
             />
         ))}
     </div>
 );
 
-// Interactive Progress Step Component
-const ProgressStep = ({
+// Mobile Bottom Sheet Component
+const BottomSheet = ({
+    isOpen,
+    onClose,
     step,
-    index,
-    currentIndex,
-    isSelected,
-    onSelect
+    isCurrent
 }: {
-    step: typeof statusSteps[0];
-    index: number;
-    currentIndex: number;
-    isSelected: boolean;
-    onSelect: () => void;
+    isOpen: boolean;
+    onClose: () => void;
+    step: typeof statusSteps[0] | null;
+    isCurrent: boolean;
 }) => {
-    const isCompleted = index <= currentIndex;
-    const isCurrent = index === currentIndex;
-    const isPast = index < currentIndex;
+    if (!step) return null;
+
     const StepIcon = step.icon;
 
     return (
-        <div
-            className="flex flex-col items-center group progress-cursor relative"
-            style={{ width: `${100 / statusSteps.length}%` }}
-            onClick={onSelect}
-        >
-            {/* Ripple effect on click */}
-            {isSelected && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full bg-emerald-400/20 animate-ping" />
-            )}
-
-            {/* Step Circle */}
-            <div className="relative mb-4">
-                {/* Glow effect for current */}
-                {isCurrent && (
-                    <>
-                        <div className="absolute inset-0 rounded-full animate-ping opacity-30"
-                            style={{ background: `linear-gradient(135deg, ${step.color.includes('amber') ? '#f59e0b' : step.color.includes('blue') ? '#3b82f6' : step.color.includes('emerald') ? '#10b981' : step.color.includes('purple') ? '#8b5cf6' : '#10b981'}, transparent)`, transform: 'scale(1.5)' }}
-                        />
-                        <div className="absolute inset-0 rounded-full animate-glow" />
-                    </>
+        <>
+            {/* Backdrop */}
+            <div
+                className={cn(
+                    "fixed inset-0 bg-black/40 z-50 bottom-sheet-backdrop",
+                    isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
                 )}
+                onClick={onClose}
+            />
 
-                {/* Checkmark badge for completed */}
-                {isPast && (
-                    <div className="absolute -top-1 -right-1 w-7 h-7 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg z-10 border-2 border-white animate-bounce-in">
-                        <CheckCircle2 className="w-4 h-4 text-white" />
-                    </div>
+            {/* Sheet */}
+            <div
+                className={cn(
+                    "fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-50 bottom-sheet safe-area-bottom",
+                    isOpen ? "translate-y-0" : "translate-y-full"
                 )}
-
-                {/* Main circle */}
-                <div className={cn(
-                    "relative w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center transition-all duration-500 border-4",
-                    isCompleted
-                        ? `bg-gradient-to-br ${step.color} text-white border-white shadow-xl`
-                        : "bg-white text-slate-300 border-slate-200 shadow-md",
-                    isCurrent && "scale-110 border-emerald-200 animate-glow",
-                    isSelected && "ring-4 ring-emerald-300 ring-offset-2",
-                    "group-hover:scale-110 group-hover:shadow-2xl"
-                )}>
-                    <StepIcon className={cn(
-                        "w-7 h-7 md:w-8 md:h-8 transition-transform duration-300",
-                        "group-hover:scale-110",
-                        isCurrent && "animate-pulse"
-                    )} />
+            >
+                {/* Handle */}
+                <div className="flex justify-center py-3">
+                    <div className="w-12 h-1.5 bg-slate-300 rounded-full" />
                 </div>
 
-                {/* Emoji badge */}
-                {isCompleted && (
-                    <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-xl animate-bounce-in" style={{ animationDelay: '0.2s' }}>
-                        {step.emoji}
-                    </span>
-                )}
+                {/* Content */}
+                <div className="px-6 pb-8">
+                    <div className="flex items-start gap-4">
+                        <div className={cn(
+                            "w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0",
+                            `bg-gradient-to-br ${step.color}`
+                        )}>
+                            <StepIcon className="w-8 h-8 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className={cn("text-xl font-bold", step.textColor)}>
+                                    {step.emoji} {step.fullLabel}
+                                </h3>
+                                {isCurrent && (
+                                    <Badge className="bg-emerald-500 text-white text-xs">Current</Badge>
+                                )}
+                            </div>
+                            <p className="text-slate-600 mt-2 leading-relaxed">{step.detailedInfo}</p>
+                            <div className="flex items-center gap-2 mt-3 text-sm">
+                                <Timer className={cn("w-4 h-4", step.textColor)} />
+                                <span className={step.textColor}>Est. Time: {step.estimatedTime}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <Button
+                        className="w-full mt-6 h-12 bg-slate-100 hover:bg-slate-200 text-slate-700"
+                        onClick={onClose}
+                    >
+                        Close
+                    </Button>
+                </div>
             </div>
-
-            {/* Step Label */}
-            <span className={cn(
-                "text-xs md:text-sm font-bold text-center transition-all duration-300 px-1 mt-2",
-                isCompleted ? "text-slate-800" : "text-slate-400",
-                isSelected && "text-emerald-600",
-                "group-hover:text-emerald-600"
-            )}>
-                {step.label}
-            </span>
-
-            {/* Current/Time badge */}
-            {isCurrent ? (
-                <span className="mt-2 text-xs font-bold text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full animate-pulse">
-                    Current
-                </span>
-            ) : isCompleted ? (
-                <span className="mt-2 text-xs text-slate-500">
-                    ✓ Done
-                </span>
-            ) : (
-                <span className="mt-2 text-xs text-slate-400">
-                    {step.estimatedTime}
-                </span>
-            )}
-        </div>
+        </>
     );
 };
 
 export default function PublicOrderTracking() {
     useTrackingSEO();
+    const isMobile = useIsMobile();
     const params = useParams<{ orderNumber?: string }>();
     const [orderNumber, setOrderNumber] = useState(params.orderNumber || '');
     const [order, setOrder] = useState<Order | null>(null);
@@ -349,6 +407,7 @@ export default function PublicOrderTracking() {
     const [selectedStep, setSelectedStep] = useState<number | null>(null);
     const [showTimeline, setShowTimeline] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
     const progressRef = useRef<HTMLDivElement>(null);
     const currentYear = new Date().getFullYear();
 
@@ -362,11 +421,7 @@ export default function PublicOrderTracking() {
     useEffect(() => {
         if (order && getStatusIndex(order.status) === 4) {
             setShowConfetti(true);
-            setTimeout(() => setShowConfetti(false), 4000);
-        }
-        // Auto-select current step
-        if (order) {
-            setSelectedStep(getStatusIndex(order.status));
+            setTimeout(() => setShowConfetti(false), 3000);
         }
     }, [order]);
 
@@ -406,18 +461,17 @@ export default function PublicOrderTracking() {
         setTimeout(() => setRefreshing(false), 500);
     };
 
+    const handleStepClick = (index: number) => {
+        setSelectedStep(index);
+        if (isMobile) {
+            setBottomSheetOpen(true);
+        }
+    };
+
     const formatDate = (dateString: string) => {
         if (!dateString) return 'N/A';
         return new Date(dateString).toLocaleDateString('en-IN', {
             day: 'numeric', month: 'short', year: 'numeric'
-        });
-    };
-
-    const formatDateTime = (dateString: string) => {
-        if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleString('en-IN', {
-            day: 'numeric', month: 'short', year: 'numeric',
-            hour: '2-digit', minute: '2-digit'
         });
     };
 
@@ -440,74 +494,77 @@ export default function PublicOrderTracking() {
         return styles[status?.toLowerCase()] || 'bg-gradient-to-r from-slate-500 to-slate-600 text-white';
     };
 
-    const getSelectedStepInfo = () => {
-        if (selectedStep === null) return null;
-        return statusSteps[selectedStep];
-    };
-
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50 overflow-x-hidden">
             {showConfetti && <Confetti />}
 
-            {/* Decorative Background */}
+            {/* Mobile Bottom Sheet */}
+            {isMobile && (
+                <BottomSheet
+                    isOpen={bottomSheetOpen}
+                    onClose={() => setBottomSheetOpen(false)}
+                    step={selectedStep !== null ? statusSteps[selectedStep] : null}
+                    isCurrent={selectedStep === getCurrentStepIndex()}
+                />
+            )}
+
+            {/* Decorative Background - Simplified for mobile */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-emerald-200/40 to-teal-200/40 rounded-full blur-3xl animate-pulse" />
-                <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-blue-200/30 to-indigo-200/30 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-br from-purple-100/20 to-pink-100/20 rounded-full blur-3xl" />
+                <div className="absolute -top-20 -right-20 w-48 md:w-96 h-48 md:h-96 bg-gradient-to-br from-emerald-200/30 to-teal-200/30 rounded-full blur-3xl" />
+                <div className="absolute -bottom-20 -left-20 w-48 md:w-96 h-48 md:h-96 bg-gradient-to-br from-blue-200/20 to-indigo-200/20 rounded-full blur-3xl" />
             </div>
 
             {/* Header */}
-            <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/50 sticky top-0 z-50">
-                <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-center">
-                    <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                        <img src="/assets/logo.webp" alt="Fab Clean" className="h-12" />
+            <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/50 sticky top-0 z-40 safe-area-top">
+                <div className="max-w-5xl mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-center">
+                    <a href="/" className="flex items-center gap-2 active:opacity-70 transition-opacity">
+                        <img src="/assets/logo.webp" alt="Fab Clean" className="h-9 md:h-12" />
                     </a>
                 </div>
             </header>
 
-            {/* Hero Section */}
-            <div className="relative bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 animate-gradient text-white py-16 overflow-hidden">
+            {/* Hero Section - Compact on mobile */}
+            <div className="relative bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 animate-gradient text-white py-8 md:py-16 overflow-hidden">
                 <div className="absolute inset-0 opacity-10">
                     <div className="absolute inset-0" style={{
                         backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
-                        backgroundSize: '30px 30px'
+                        backgroundSize: '20px 20px'
                     }} />
                 </div>
 
-                <div className="relative max-w-5xl mx-auto px-6 text-center">
-                    <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5 mb-4">
-                        <Sparkles className="w-4 h-4 animate-pulse" />
-                        <span className="text-sm font-medium">Real-time Order Tracking</span>
+                <div className="relative max-w-5xl mx-auto px-4 md:px-6 text-center">
+                    <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 mb-3">
+                        <Sparkles className="w-3.5 h-3.5 animate-pulse-soft" />
+                        <span className="text-xs md:text-sm font-medium">Real-time Tracking</span>
                     </div>
-                    <h1 className="text-4xl md:text-5xl font-bold mb-4">Track Your Order</h1>
-                    <p className="text-emerald-100 text-lg max-w-xl mx-auto">
-                        Enter your order number to see live status updates
+                    <h1 className="text-2xl md:text-5xl font-bold mb-2 md:mb-4">Track Your Order</h1>
+                    <p className="text-emerald-100 text-sm md:text-lg max-w-xl mx-auto">
+                        Enter your order number for live updates
                     </p>
                 </div>
             </div>
 
             {/* Search Section */}
-            <div className="max-w-2xl mx-auto px-6 -mt-10 relative z-20">
-                <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-md overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-teal-500/5" />
-                    <CardContent className="relative p-6">
-                        <div className="flex gap-3">
+            <div className="max-w-2xl mx-auto px-4 md:px-6 -mt-6 md:-mt-10 relative z-20">
+                <Card className="shadow-xl md:shadow-2xl border-0 bg-white/95 backdrop-blur-md overflow-hidden">
+                    <CardContent className="p-4 md:p-6">
+                        <div className="flex flex-col sm:flex-row gap-3">
                             <div className="relative flex-1">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-                                    <Search className="w-5 h-5 text-emerald-600" />
+                                <div className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-8 md:w-10 h-8 md:h-10 bg-emerald-100 rounded-lg md:rounded-xl flex items-center justify-center">
+                                    <Search className="w-4 md:w-5 h-4 md:h-5 text-emerald-600" />
                                 </div>
                                 <Input
                                     value={orderNumber}
                                     onChange={(e) => setOrderNumber(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                    placeholder="Enter order number (e.g., FZC-2025POL9926A)"
-                                    className="pl-16 h-14 text-lg border-2 border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20 rounded-xl bg-white"
+                                    placeholder="Order number (FZC-2025...)"
+                                    className="pl-12 md:pl-16 h-12 md:h-14 text-base md:text-lg border-2 border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20 rounded-xl bg-white"
                                 />
                             </div>
                             <Button
                                 onClick={() => handleSearch()}
                                 disabled={loading || !orderNumber.trim()}
-                                className="h-14 px-8 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition-all hover:shadow-xl hover:shadow-emerald-500/30 hover:-translate-y-0.5"
+                                className="h-12 md:h-14 px-6 md:px-8 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition-all active:scale-95 touch-target"
                             >
                                 {loading ? (
                                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -524,297 +581,323 @@ export default function PublicOrderTracking() {
             </div>
 
             {/* Main Content */}
-            <main className="relative max-w-5xl mx-auto px-6 py-10">
+            <main className="relative max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-10">
                 {/* Error State */}
                 {error && (
-                    <Card className="border-0 shadow-xl bg-gradient-to-br from-red-50 to-rose-50 mb-8 animate-slide-up overflow-hidden">
-                        <CardContent className="p-8 text-center">
-                            <div className="w-20 h-20 mx-auto bg-gradient-to-br from-red-100 to-rose-100 rounded-2xl flex items-center justify-center mb-4 rotate-3">
-                                <Package className="w-10 h-10 text-red-500" />
+                    <Card className="border-0 shadow-lg bg-gradient-to-br from-red-50 to-rose-50 mb-6 animate-slide-up overflow-hidden">
+                        <CardContent className="p-6 text-center">
+                            <div className="w-16 h-16 mx-auto bg-gradient-to-br from-red-100 to-rose-100 rounded-xl flex items-center justify-center mb-3">
+                                <Package className="w-8 h-8 text-red-500" />
                             </div>
-                            <h3 className="text-2xl font-bold text-red-700 mb-2">Order Not Found</h3>
-                            <p className="text-red-600/80 mb-4">Please check your order number and try again</p>
-                            <div className="flex items-center justify-center gap-2 text-sm text-red-500">
-                                <Info className="w-4 h-4" />
-                                <span>Order numbers look like: FZC-2025POL9926A</span>
-                            </div>
+                            <h3 className="text-xl font-bold text-red-700 mb-1">Order Not Found</h3>
+                            <p className="text-red-600/80 text-sm">Please check your order number</p>
                         </CardContent>
                     </Card>
                 )}
 
                 {/* Order Found */}
                 {order && (
-                    <div className="space-y-6">
+                    <div className="space-y-4 md:space-y-6">
                         {/* Customer Greeting Card */}
-                        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-emerald-50/50 overflow-hidden animate-slide-up">
-                            <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-emerald-200/30 to-teal-200/30 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
-                            <CardContent className="relative p-8">
-                                <div className="flex items-start justify-between flex-wrap gap-4">
+                        <Card className="border-0 shadow-lg md:shadow-xl bg-white overflow-hidden animate-slide-up">
+                            <CardContent className="p-4 md:p-8">
+                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                                     <div>
-                                        <Badge className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0 shadow-lg mb-3 text-sm px-4 py-1">
+                                        <Badge className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0 shadow mb-2 text-xs md:text-sm px-3 py-0.5">
                                             {order.orderNumber}
                                         </Badge>
-                                        <h2 className="text-3xl font-bold text-slate-800 mb-1">
-                                            Hello, {order.customerName?.split(' ')[0] || 'Customer'}!
-                                            <span className="inline-block ml-2 animate-float">{statusSteps[getCurrentStepIndex()]?.emoji || '👋'}</span>
+                                        <h2 className="text-xl md:text-3xl font-bold text-slate-800">
+                                            Hello, {order.customerName?.split(' ')[0] || 'there'}!
+                                            <span className="inline-block ml-2 animate-float text-lg md:text-2xl">{statusSteps[getCurrentStepIndex()]?.emoji || '👋'}</span>
                                         </h2>
-                                        <p className="text-slate-500 text-lg">Track your laundry order status in real-time</p>
+                                        <p className="text-slate-500 text-sm md:text-lg mt-1">Track your order in real-time</p>
                                     </div>
-                                    <div className="flex flex-col items-end gap-2">
-                                        <Badge className={cn('text-base px-5 py-2 font-semibold shadow-lg border-0', getStatusBadgeStyle(order.status))}>
-                                            {statusSteps[getCurrentStepIndex()]?.label || 'Processing'}
+                                    <div className="flex items-center gap-2">
+                                        <Badge className={cn('text-sm md:text-base px-3 md:px-5 py-1.5 md:py-2 font-semibold shadow border-0', getStatusBadgeStyle(order.status))}>
+                                            {statusSteps[getCurrentStepIndex()]?.fullLabel || 'Processing'}
                                         </Badge>
                                         <Button
                                             variant="ghost"
                                             size="sm"
                                             onClick={handleRefresh}
-                                            className="text-slate-500 hover:text-emerald-600"
+                                            className="text-slate-500 hover:text-emerald-600 h-10 w-10 p-0 touch-target"
                                         >
-                                            <RefreshCw className={cn("w-4 h-4 mr-1", refreshing && "animate-spin")} />
-                                            Refresh
+                                            <RefreshCw className={cn("w-4 h-4", refreshing && "animate-spin")} />
                                         </Button>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
 
-                        {/* Interactive Progress Tracker */}
-                        <Card className="border-0 shadow-xl bg-white overflow-hidden animate-slide-up delay-100">
-                            <CardContent className="p-8">
-                                <div className="flex items-center justify-between mb-8">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl flex items-center justify-center shadow-lg">
-                                            <Timer className="w-5 h-5 text-white" />
+                        {/* Progress Tracker - Mobile Optimized */}
+                        <Card className="border-0 shadow-lg md:shadow-xl bg-white overflow-hidden animate-slide-up">
+                            <CardContent className="p-4 md:p-8">
+                                <div className="flex items-center justify-between mb-4 md:mb-6">
+                                    <div className="flex items-center gap-2 md:gap-3">
+                                        <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-lg md:rounded-xl flex items-center justify-center shadow">
+                                            <Timer className="w-4 h-4 md:w-5 md:h-5 text-white" />
                                         </div>
                                         <div>
-                                            <h3 className="text-xl font-bold text-slate-800">Order Progress</h3>
-                                            <p className="text-sm text-slate-500">Click on any step for details</p>
+                                            <h3 className="text-base md:text-xl font-bold text-slate-800">Order Progress</h3>
+                                            <p className="text-xs md:text-sm text-slate-500 hidden md:block">Tap any step for details</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 text-sm text-slate-500">
-                                        <Bell className="w-4 h-4 text-emerald-500" />
-                                        <span>WhatsApp updates enabled</span>
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                        <Bell className="w-3.5 h-3.5 text-emerald-500" />
+                                        <span className="hidden sm:inline">WhatsApp updates</span>
                                     </div>
                                 </div>
 
-                                {/* Progress Bar with Cursor Interaction */}
-                                <div ref={progressRef} className="relative py-8">
-                                    {/* Background Track */}
-                                    <div className="absolute top-1/2 left-0 right-0 h-4 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 rounded-full transform -translate-y-1/2 shadow-inner" />
+                                {/* Mobile-Optimized Progress Steps */}
+                                <div ref={progressRef} className="relative py-4 md:py-8">
+                                    {/* Progress Track */}
+                                    <div className="absolute top-6 md:top-10 left-4 right-4 md:left-0 md:right-0 h-2 md:h-3 bg-slate-100 rounded-full" />
 
-                                    {/* Animated Progress Fill */}
+                                    {/* Progress Fill */}
                                     <div
-                                        className="absolute top-1/2 left-0 h-4 rounded-full transform -translate-y-1/2 transition-all duration-1000 ease-out overflow-hidden shadow-lg"
-                                        style={{ width: `${(getCurrentStepIndex() / (statusSteps.length - 1)) * 100}%` }}
+                                        className="absolute top-6 md:top-10 left-4 md:left-0 h-2 md:h-3 rounded-full transition-all duration-700 ease-out overflow-hidden"
+                                        style={{ width: `calc(${(getCurrentStepIndex() / (statusSteps.length - 1)) * 100}% - 32px)`, marginLeft: '0' }}
                                     >
                                         <div className="h-full w-full bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 relative">
-                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer" />
+                                            <div className="absolute inset-0 animate-shimmer" />
                                         </div>
                                     </div>
 
-                                    {/* Interactive Steps */}
-                                    <div className="relative flex justify-between items-center">
-                                        {statusSteps.map((step, index) => (
-                                            <ProgressStep
-                                                key={step.id}
-                                                step={step}
-                                                index={index}
-                                                currentIndex={getCurrentStepIndex()}
-                                                isSelected={selectedStep === index}
-                                                onSelect={() => setSelectedStep(index)}
-                                            />
-                                        ))}
+                                    {/* Steps */}
+                                    <div className="relative flex justify-between items-start px-0">
+                                        {statusSteps.map((step, index) => {
+                                            const isCompleted = index <= getCurrentStepIndex();
+                                            const isCurrent = index === getCurrentStepIndex();
+                                            const isPast = index < getCurrentStepIndex();
+                                            const StepIcon = step.icon;
+
+                                            return (
+                                                <button
+                                                    key={step.id}
+                                                    className="flex flex-col items-center text-center focus:outline-none touch-target group"
+                                                    style={{ width: `${100 / statusSteps.length}%` }}
+                                                    onClick={() => handleStepClick(index)}
+                                                >
+                                                    {/* Step Circle */}
+                                                    <div className="relative">
+                                                        {isCurrent && (
+                                                            <div className="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping" style={{ transform: 'scale(1.3)' }} />
+                                                        )}
+
+                                                        {isPast && (
+                                                            <div className="absolute -top-0.5 -right-0.5 w-4 h-4 md:w-5 md:h-5 bg-green-500 rounded-full flex items-center justify-center z-10 border-2 border-white">
+                                                                <CheckCircle2 className="w-2.5 h-2.5 md:w-3 md:h-3 text-white" />
+                                                            </div>
+                                                        )}
+
+                                                        <div className={cn(
+                                                            "relative w-10 h-10 md:w-16 md:h-16 rounded-full flex items-center justify-center transition-all duration-300 border-2 md:border-4",
+                                                            isCompleted
+                                                                ? `bg-gradient-to-br ${step.color} text-white border-white shadow-lg`
+                                                                : "bg-white text-slate-300 border-slate-200",
+                                                            isCurrent && "scale-110 ring-2 ring-emerald-200 ring-offset-1",
+                                                            "active:scale-95"
+                                                        )}>
+                                                            <StepIcon className={cn(
+                                                                "w-5 h-5 md:w-7 md:h-7",
+                                                                isCurrent && "animate-pulse-soft"
+                                                            )} />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Label */}
+                                                    <span className={cn(
+                                                        "mt-2 text-[10px] md:text-sm font-semibold transition-colors",
+                                                        isCompleted ? "text-slate-800" : "text-slate-400"
+                                                    )}>
+                                                        {isMobile ? step.label : step.fullLabel}
+                                                    </span>
+
+                                                    {isCurrent && (
+                                                        <span className="mt-1 text-[9px] md:text-xs font-bold text-emerald-600 bg-emerald-100 px-1.5 md:px-2 py-0.5 rounded-full">
+                                                            Now
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
 
-                                {/* Selected Step Details Panel */}
-                                {selectedStep !== null && (
+                                {/* Step Details - Desktop Only */}
+                                {!isMobile && selectedStep !== null && (
                                     <div className={cn(
-                                        "mt-6 p-6 rounded-2xl border-2 transition-all duration-500 animate-slide-up",
+                                        "mt-4 p-4 md:p-5 rounded-xl border-2 transition-all duration-300 animate-slide-up",
                                         statusSteps[selectedStep].bgColor,
-                                        "border-opacity-50"
-                                    )} style={{ borderColor: selectedStep <= getCurrentStepIndex() ? '#10b981' : '#e2e8f0' }}>
+                                        statusSteps[selectedStep].borderColor
+                                    )}>
                                         <div className="flex items-start gap-4">
                                             <div className={cn(
-                                                "w-16 h-16 rounded-2xl flex items-center justify-center shadow-xl flex-shrink-0",
+                                                "w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0",
                                                 `bg-gradient-to-br ${statusSteps[selectedStep].color}`
                                             )}>
                                                 {(() => {
                                                     const StepIcon = statusSteps[selectedStep].icon;
-                                                    return <StepIcon className="w-8 h-8 text-white" />;
+                                                    return <StepIcon className="w-6 h-6 md:w-7 md:h-7 text-white" />;
                                                 })()}
                                             </div>
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <h4 className={cn("text-xl font-bold", statusSteps[selectedStep].textColor)}>
-                                                        {statusSteps[selectedStep].emoji} {statusSteps[selectedStep].label}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h4 className={cn("text-lg font-bold", statusSteps[selectedStep].textColor)}>
+                                                        {statusSteps[selectedStep].emoji} {statusSteps[selectedStep].fullLabel}
                                                     </h4>
                                                     {selectedStep === getCurrentStepIndex() && (
                                                         <Badge className="bg-emerald-500 text-white text-xs">Current</Badge>
                                                     )}
-                                                    {selectedStep < getCurrentStepIndex() && (
-                                                        <Badge variant="outline" className="text-green-600 border-green-300 text-xs">Completed</Badge>
-                                                    )}
                                                 </div>
-                                                <p className="text-slate-600 mb-3">{statusSteps[selectedStep].detailedInfo}</p>
-                                                <div className="flex items-center gap-4 text-sm">
-                                                    <span className={cn("flex items-center gap-1", statusSteps[selectedStep].textColor)}>
-                                                        <Timer className="w-4 h-4" />
-                                                        Est. Time: {statusSteps[selectedStep].estimatedTime}
-                                                    </span>
-                                                    {selectedStep === getCurrentStepIndex() && order.updatedAt && (
-                                                        <span className="text-slate-500 flex items-center gap-1">
-                                                            <Clock className="w-4 h-4" />
-                                                            Updated: {formatDateTime(order.updatedAt)}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                <p className="text-slate-600 mt-1 text-sm">{statusSteps[selectedStep].detailedInfo}</p>
+                                                <p className={cn("text-xs mt-2 flex items-center gap-1", statusSteps[selectedStep].textColor)}>
+                                                    <Timer className="w-3 h-3" />
+                                                    Est: {statusSteps[selectedStep].estimatedTime}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
                                 )}
 
                                 {/* Progress Summary */}
-                                <div className="mt-6 flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-14 h-14 rounded-full bg-white shadow-lg border-4 border-emerald-100 flex items-center justify-center">
-                                            <span className="text-xl font-bold text-emerald-600">
+                                <div className="mt-4 md:mt-6 flex items-center justify-between p-3 md:p-4 bg-slate-50 rounded-xl">
+                                    <div className="flex items-center gap-2 md:gap-3">
+                                        <div className="w-10 h-10 md:w-14 md:h-14 rounded-full bg-white shadow border-2 md:border-4 border-emerald-100 flex items-center justify-center">
+                                            <span className="text-base md:text-xl font-bold text-emerald-600">
                                                 {Math.round((getCurrentStepIndex() / (statusSteps.length - 1)) * 100)}%
                                             </span>
                                         </div>
                                         <div>
-                                            <p className="font-semibold text-slate-800">Progress Complete</p>
-                                            <p className="text-sm text-slate-500">Step {getCurrentStepIndex() + 1} of {statusSteps.length}</p>
+                                            <p className="font-semibold text-slate-800 text-sm md:text-base">Progress</p>
+                                            <p className="text-xs md:text-sm text-slate-500">Step {getCurrentStepIndex() + 1}/{statusSteps.length}</p>
                                         </div>
                                     </div>
                                     <Button
                                         variant="outline"
                                         size="sm"
                                         onClick={() => setShowTimeline(!showTimeline)}
-                                        className="text-slate-600"
+                                        className="text-slate-600 text-xs md:text-sm h-9 touch-target"
                                     >
-                                        {showTimeline ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
-                                        {showTimeline ? 'Hide' : 'Show'} Timeline
+                                        {showTimeline ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                        <span className="ml-1 hidden sm:inline">{showTimeline ? 'Hide' : 'Timeline'}</span>
                                     </Button>
                                 </div>
 
-                                {/* Timeline (Expandable) */}
+                                {/* Timeline */}
                                 {showTimeline && (
-                                    <div className="mt-4 space-y-3 animate-slide-up">
-                                        {statusSteps.slice(0, getCurrentStepIndex() + 1).map((step, index) => (
-                                            <div key={step.id} className="flex items-center gap-4 p-3 bg-white rounded-lg border border-slate-100">
-                                                <div className={cn(
-                                                    "w-10 h-10 rounded-full flex items-center justify-center",
-                                                    `bg-gradient-to-br ${step.color}`
-                                                )}>
-                                                    {(() => {
-                                                        const StepIcon = step.icon;
-                                                        return <StepIcon className="w-5 h-5 text-white" />;
-                                                    })()}
-                                                </div>
-                                                <div className="flex-1">
-                                                    <p className="font-medium text-slate-800">{step.label}</p>
-                                                    <p className="text-sm text-slate-500">{step.description}</p>
-                                                </div>
-                                                <div className="text-right text-sm text-slate-400">
+                                    <div className="mt-3 md:mt-4 space-y-2 animate-slide-up">
+                                        {statusSteps.slice(0, getCurrentStepIndex() + 1).map((step, index) => {
+                                            const StepIcon = step.icon;
+                                            return (
+                                                <div key={step.id} className="flex items-center gap-3 p-2.5 md:p-3 bg-white rounded-lg border border-slate-100">
+                                                    <div className={cn(
+                                                        "w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center flex-shrink-0",
+                                                        `bg-gradient-to-br ${step.color}`
+                                                    )}>
+                                                        <StepIcon className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-medium text-slate-800 text-sm truncate">{step.fullLabel}</p>
+                                                        <p className="text-xs text-slate-500 truncate">{step.description}</p>
+                                                    </div>
                                                     {index === getCurrentStepIndex() ? (
-                                                        <span className="text-emerald-600 font-medium">Now</span>
+                                                        <span className="text-emerald-600 font-medium text-xs flex-shrink-0">Now</span>
                                                     ) : (
-                                                        <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                                        <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
                                                     )}
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </CardContent>
                         </Card>
 
-                        {/* Order Details Grid */}
-                        <div className="grid md:grid-cols-2 gap-6">
+                        {/* Order Details - Stacked on Mobile */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                             {/* Order Info */}
-                            <Card className="border-0 shadow-xl bg-white overflow-hidden animate-slide-up delay-200 group hover:shadow-2xl transition-shadow">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
-                                <CardContent className="p-6">
-                                    <h3 className="text-lg font-bold text-slate-800 mb-5 flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl flex items-center justify-center shadow">
-                                            <Calendar className="w-5 h-5 text-white" />
+                            <Card className="border-0 shadow-lg bg-white overflow-hidden animate-slide-up">
+                                <div className="h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
+                                <CardContent className="p-4 md:p-6">
+                                    <h3 className="text-base md:text-lg font-bold text-slate-800 mb-3 md:mb-5 flex items-center gap-2">
+                                        <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-lg md:rounded-xl flex items-center justify-center shadow">
+                                            <Calendar className="w-4 h-4 md:w-5 md:h-5 text-white" />
                                         </div>
                                         Order Details
                                     </h3>
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
-                                            <span className="text-slate-500 flex items-center gap-2">
-                                                <Calendar className="w-4 h-4" /> Order Date
+                                    <div className="space-y-2.5 md:space-y-4">
+                                        <div className="flex justify-between items-center p-2.5 md:p-3 bg-slate-50 rounded-lg md:rounded-xl">
+                                            <span className="text-slate-500 text-sm flex items-center gap-1.5">
+                                                <Calendar className="w-3.5 h-3.5" /> Order Date
                                             </span>
-                                            <span className="font-semibold text-slate-800">{formatDate(order.createdAt)}</span>
+                                            <span className="font-semibold text-slate-800 text-sm">{formatDate(order.createdAt)}</span>
                                         </div>
-                                        <div className="flex justify-between items-center p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
-                                            <span className="text-slate-500 flex items-center gap-2">
-                                                <CreditCard className="w-4 h-4" /> Total Amount
+                                        <div className="flex justify-between items-center p-3 md:p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg md:rounded-xl border border-emerald-100">
+                                            <span className="text-slate-500 text-sm flex items-center gap-1.5">
+                                                <CreditCard className="w-3.5 h-3.5" /> Total
                                             </span>
-                                            <span className="font-bold text-2xl text-emerald-600">{formatAmount(order.totalAmount)}</span>
+                                            <span className="font-bold text-xl md:text-2xl text-emerald-600">{formatAmount(order.totalAmount)}</span>
                                         </div>
-                                        <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
-                                            <span className="text-slate-500">Payment</span>
-                                            <Badge className={order.paymentStatus === 'paid'
-                                                ? 'bg-green-100 text-green-700 border-green-200'
-                                                : 'bg-amber-100 text-amber-700 border-amber-200'
-                                            }>
+                                        <div className="flex justify-between items-center p-2.5 md:p-3 bg-slate-50 rounded-lg md:rounded-xl">
+                                            <span className="text-slate-500 text-sm">Payment</span>
+                                            <Badge className={cn(
+                                                "text-xs",
+                                                order.paymentStatus === 'paid'
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-amber-100 text-amber-700'
+                                            )}>
                                                 {order.paymentStatus?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                                             </Badge>
                                         </div>
-                                        <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
-                                            <span className="text-slate-500">Fulfillment</span>
-                                            <div className="flex items-center gap-2">
+                                        <div className="flex justify-between items-center p-2.5 md:p-3 bg-slate-50 rounded-lg md:rounded-xl">
+                                            <span className="text-slate-500 text-sm">Delivery</span>
+                                            <span className="font-medium text-slate-800 text-sm flex items-center gap-1.5">
                                                 {order.fulfillmentType === 'delivery' ? (
-                                                    <Truck className="w-4 h-4 text-emerald-600" />
+                                                    <><Truck className="w-3.5 h-3.5 text-emerald-600" /> Home Delivery</>
                                                 ) : (
-                                                    <Home className="w-4 h-4 text-emerald-600" />
+                                                    <><Home className="w-3.5 h-3.5 text-emerald-600" /> Store Pickup</>
                                                 )}
-                                                <span className="font-medium text-slate-800">
-                                                    {order.fulfillmentType === 'delivery' ? 'Home Delivery' : 'Store Pickup'}
-                                                </span>
-                                            </div>
+                                            </span>
                                         </div>
                                     </div>
                                 </CardContent>
                             </Card>
 
                             {/* Items */}
-                            <Card className="border-0 shadow-xl bg-white overflow-hidden animate-slide-up delay-300 group hover:shadow-2xl transition-shadow">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-indigo-500" />
-                                <CardContent className="p-6">
-                                    <h3 className="text-lg font-bold text-slate-800 mb-5 flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center shadow">
-                                            <Package className="w-5 h-5 text-white" />
+                            <Card className="border-0 shadow-lg bg-white overflow-hidden animate-slide-up">
+                                <div className="h-1 bg-gradient-to-r from-blue-400 to-indigo-500" />
+                                <CardContent className="p-4 md:p-6">
+                                    <h3 className="text-base md:text-lg font-bold text-slate-800 mb-3 md:mb-5 flex items-center gap-2">
+                                        <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-lg md:rounded-xl flex items-center justify-center shadow">
+                                            <Package className="w-4 h-4 md:w-5 md:h-5 text-white" />
                                         </div>
-                                        Order Items
-                                        <Badge variant="outline" className="ml-auto">{order.items?.length || 0} items</Badge>
+                                        Items
+                                        <Badge variant="outline" className="ml-auto text-xs">{order.items?.length || 0}</Badge>
                                     </h3>
-                                    <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                                    <div className="space-y-2 max-h-[200px] md:max-h-[300px] overflow-y-auto hide-scrollbar">
                                         {order.items?.length > 0 ? (
                                             order.items.map((item, index) => (
                                                 <div
                                                     key={index}
-                                                    className="flex justify-between items-center p-4 bg-slate-50 rounded-xl hover:bg-blue-50 transition-colors cursor-default group/item"
+                                                    className="flex justify-between items-center p-3 bg-slate-50 rounded-lg"
                                                 >
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm group-hover/item:shadow-md transition-shadow">
-                                                            <Shirt className="w-5 h-5 text-blue-500" />
+                                                    <div className="flex items-center gap-2.5 min-w-0">
+                                                        <div className="w-8 h-8 bg-white rounded flex items-center justify-center shadow-sm flex-shrink-0">
+                                                            <Shirt className="w-4 h-4 text-blue-500" />
                                                         </div>
-                                                        <div>
-                                                            <p className="font-medium text-slate-800">{item.serviceName}</p>
-                                                            <p className="text-sm text-slate-500">Qty: {item.quantity}</p>
+                                                        <div className="min-w-0">
+                                                            <p className="font-medium text-slate-800 text-sm truncate">{item.serviceName}</p>
+                                                            <p className="text-xs text-slate-500">Qty: {item.quantity}</p>
                                                         </div>
                                                     </div>
-                                                    <span className="font-semibold text-slate-700">{formatAmount(item.price)}</span>
+                                                    <span className="font-semibold text-slate-700 text-sm flex-shrink-0">{formatAmount(item.price)}</span>
                                                 </div>
                                             ))
                                         ) : (
-                                            <div className="text-center py-8 text-slate-400">
-                                                <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                                <p>No items to display</p>
+                                            <div className="text-center py-6 text-slate-400">
+                                                <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                                                <p className="text-sm">No items</p>
                                             </div>
                                         )}
                                     </div>
@@ -822,105 +905,61 @@ export default function PublicOrderTracking() {
                             </Card>
                         </div>
 
-                        {/* Service Features */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-slide-up delay-400">
-                            {[
-                                { icon: Droplets, label: 'Premium Wash', desc: 'Eco-friendly detergents', color: 'from-blue-400 to-cyan-500' },
-                                { icon: Wind, label: 'Fresh & Clean', desc: 'Ozone sanitization', color: 'from-emerald-400 to-green-500' },
-                                { icon: Shield, label: 'Care Guarantee', desc: '100% quality assured', color: 'from-purple-400 to-violet-500' },
-                                { icon: Truck, label: 'Free Delivery', desc: 'Doorstep service', color: 'from-amber-400 to-orange-500' },
-                            ].map((feature) => (
-                                <Card key={feature.label} className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all hover:-translate-y-1 cursor-default">
-                                    <CardContent className="p-4 text-center">
-                                        <div className={cn(
-                                            "w-12 h-12 mx-auto rounded-xl flex items-center justify-center shadow-lg mb-3",
-                                            `bg-gradient-to-br ${feature.color}`
-                                        )}>
-                                            <feature.icon className="w-6 h-6 text-white" />
-                                        </div>
-                                        <h4 className="font-semibold text-slate-800 text-sm">{feature.label}</h4>
-                                        <p className="text-xs text-slate-500 mt-1">{feature.desc}</p>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
-
-                        {/* Need Help */}
-                        <Card className="border-0 shadow-2xl bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 animate-gradient text-white overflow-hidden animate-slide-up delay-500">
-                            <div className="absolute inset-0 opacity-20">
-                                <div className="absolute inset-0" style={{
-                                    backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
-                                    backgroundSize: '20px 20px'
-                                }} />
+                        {/* Service Features - Horizontal scroll on mobile */}
+                        <div className="overflow-x-auto hide-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
+                            <div className="flex md:grid md:grid-cols-4 gap-3 md:gap-4 min-w-max md:min-w-0 animate-slide-up">
+                                {[
+                                    { icon: Droplets, label: 'Premium Wash', color: 'from-blue-400 to-cyan-500' },
+                                    { icon: Wind, label: 'Fresh & Clean', color: 'from-emerald-400 to-green-500' },
+                                    { icon: Shield, label: 'Care Guarantee', color: 'from-purple-400 to-violet-500' },
+                                    { icon: Truck, label: 'Free Delivery', color: 'from-amber-400 to-orange-500' },
+                                ].map((feature) => (
+                                    <Card key={feature.label} className="border-0 shadow bg-white/80 w-28 md:w-auto flex-shrink-0">
+                                        <CardContent className="p-3 md:p-4 text-center">
+                                            <div className={cn(
+                                                "w-10 h-10 md:w-12 md:h-12 mx-auto rounded-lg md:rounded-xl flex items-center justify-center shadow mb-2",
+                                                `bg-gradient-to-br ${feature.color}`
+                                            )}>
+                                                <feature.icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                                            </div>
+                                            <h4 className="font-semibold text-slate-800 text-xs md:text-sm">{feature.label}</h4>
+                                        </CardContent>
+                                    </Card>
+                                ))}
                             </div>
-                            <CardContent className="relative p-8">
-                                <div className="flex items-center justify-between flex-wrap gap-6">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Shield className="w-5 h-5" />
-                                            <span className="text-emerald-100">Premium Support</span>
-                                        </div>
-                                        <h3 className="text-2xl font-bold mb-1">Need Help?</h3>
-                                        <p className="text-emerald-100">We're here to assist you 24/7</p>
-                                    </div>
-                                    <div className="flex gap-4">
-                                        <Button
-                                            variant="secondary"
-                                            size="lg"
-                                            className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm shadow-lg"
-                                            onClick={() => window.open('tel:+919363059595')}
-                                        >
-                                            <Phone className="w-5 h-5 mr-2" />
-                                            Call Now
-                                        </Button>
-                                        <Button
-                                            size="lg"
-                                            className="bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/30"
-                                            onClick={() => window.open('https://wa.me/919363059595')}
-                                        >
-                                            <MessageCircle className="w-5 h-5 mr-2" />
-                                            WhatsApp
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        </div>
                     </div>
                 )}
 
                 {/* Initial State */}
                 {!order && !error && !hasSearched && (
-                    <div className="text-center py-16 animate-slide-up">
-                        <div className="max-w-lg mx-auto">
-                            <div className="relative w-28 h-28 mx-auto mb-8">
-                                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-3xl rotate-6 opacity-30" />
-                                <div className="relative w-full h-full bg-gradient-to-br from-emerald-400 to-teal-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-emerald-500/30">
-                                    <Sparkles className="w-14 h-14 text-white animate-float" />
+                    <div className="text-center py-10 md:py-16 animate-slide-up">
+                        <div className="max-w-lg mx-auto px-4">
+                            <div className="relative w-20 h-20 md:w-28 md:h-28 mx-auto mb-6 md:mb-8">
+                                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl md:rounded-3xl rotate-6 opacity-30" />
+                                <div className="relative w-full h-full bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl md:rounded-3xl flex items-center justify-center shadow-xl">
+                                    <Sparkles className="w-10 h-10 md:w-14 md:h-14 text-white animate-float" />
                                 </div>
                             </div>
-                            <h3 className="text-2xl font-bold text-slate-800 mb-3">Track Your Order</h3>
-                            <p className="text-slate-500 text-lg mb-10">
-                                Enter your order number above to see the current status of your laundry
+                            <h3 className="text-xl md:text-2xl font-bold text-slate-800 mb-2">Track Your Order</h3>
+                            <p className="text-slate-500 text-sm md:text-lg mb-8">
+                                Enter your order number above to see real-time status
                             </p>
 
-                            <div className="grid grid-cols-3 gap-6">
+                            <div className="grid grid-cols-3 gap-3 md:gap-6">
                                 {[
-                                    { icon: Zap, label: 'Fast Pickup', desc: 'Free doorstep service', color: 'from-amber-400 to-orange-500' },
-                                    { icon: Star, label: 'Expert Care', desc: 'Professional cleaning', color: 'from-blue-400 to-indigo-500' },
-                                    { icon: Truck, label: 'Quick Delivery', desc: 'On-time guarantee', color: 'from-emerald-400 to-teal-500' },
+                                    { icon: Zap, label: 'Fast Pickup', color: 'from-amber-400 to-orange-500' },
+                                    { icon: Star, label: 'Expert Care', color: 'from-blue-400 to-indigo-500' },
+                                    { icon: Truck, label: 'Quick Delivery', color: 'from-emerald-400 to-teal-500' },
                                 ].map((feature) => (
-                                    <div
-                                        key={feature.label}
-                                        className="group p-6 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1 cursor-default"
-                                    >
+                                    <div key={feature.label} className="p-3 md:p-6 bg-white rounded-xl md:rounded-2xl shadow">
                                         <div className={cn(
-                                            'w-14 h-14 mx-auto rounded-xl flex items-center justify-center mb-4 shadow-lg transition-transform group-hover:scale-110',
+                                            'w-10 h-10 md:w-14 md:h-14 mx-auto rounded-lg md:rounded-xl flex items-center justify-center shadow mb-2 md:mb-4',
                                             `bg-gradient-to-br ${feature.color}`
                                         )}>
-                                            <feature.icon className="w-7 h-7 text-white" />
+                                            <feature.icon className="w-5 h-5 md:w-7 md:h-7 text-white" />
                                         </div>
-                                        <h4 className="font-semibold text-slate-800">{feature.label}</h4>
-                                        <p className="text-sm text-slate-500 mt-1">{feature.desc}</p>
+                                        <h4 className="font-semibold text-slate-800 text-xs md:text-base">{feature.label}</h4>
                                     </div>
                                 ))}
                             </div>
@@ -929,33 +968,97 @@ export default function PublicOrderTracking() {
                 )}
             </main>
 
+            {/* Fixed Bottom CTA - Mobile Only */}
+            {order && isMobile && (
+                <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 p-4 z-40 safe-area-bottom">
+                    <div className="flex gap-3 max-w-lg mx-auto">
+                        <Button
+                            variant="outline"
+                            className="flex-1 h-12 border-slate-200 text-slate-700 touch-target"
+                            onClick={() => window.open('tel:+919363059595')}
+                        >
+                            <Phone className="w-4 h-4 mr-2" />
+                            Call
+                        </Button>
+                        <Button
+                            className="flex-1 h-12 bg-green-500 hover:bg-green-600 text-white touch-target"
+                            onClick={() => window.open('https://wa.me/919363059595')}
+                        >
+                            <MessageCircle className="w-4 h-4 mr-2" />
+                            WhatsApp
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {/* Help Section - Desktop */}
+            {order && !isMobile && (
+                <div className="max-w-5xl mx-auto px-6 pb-10">
+                    <Card className="border-0 shadow-xl bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 animate-gradient text-white overflow-hidden">
+                        <CardContent className="p-8">
+                            <div className="flex items-center justify-between flex-wrap gap-6">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Shield className="w-5 h-5" />
+                                        <span className="text-emerald-100">Premium Support</span>
+                                    </div>
+                                    <h3 className="text-2xl font-bold">Need Help?</h3>
+                                    <p className="text-emerald-100">We're here 24/7</p>
+                                </div>
+                                <div className="flex gap-4">
+                                    <Button
+                                        variant="secondary"
+                                        size="lg"
+                                        className="bg-white/20 hover:bg-white/30 text-white border-0"
+                                        onClick={() => window.open('tel:+919363059595')}
+                                    >
+                                        <Phone className="w-5 h-5 mr-2" />
+                                        Call Now
+                                    </Button>
+                                    <Button
+                                        size="lg"
+                                        className="bg-green-500 hover:bg-green-600 text-white shadow-lg"
+                                        onClick={() => window.open('https://wa.me/919363059595')}
+                                    >
+                                        <MessageCircle className="w-5 h-5 mr-2" />
+                                        WhatsApp
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
             {/* Footer */}
-            <footer className="bg-slate-900 text-white py-14 mt-auto">
-                <div className="max-w-5xl mx-auto px-6">
-                    <div className="grid md:grid-cols-3 gap-10 mb-10">
-                        <div>
-                            <img src="/assets/logo.webp" alt="Fab Clean" className="h-10 mb-4 brightness-0 invert opacity-80" />
-                            <p className="text-slate-400">Premium laundry and dry cleaning services committed to quality and customer satisfaction.</p>
+            <footer className={cn(
+                "bg-slate-900 text-white py-10 md:py-14",
+                order && isMobile && "pb-28" // Extra padding for fixed bottom bar
+            )}>
+                <div className="max-w-5xl mx-auto px-4 md:px-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6 md:gap-10 mb-8">
+                        <div className="col-span-2 md:col-span-1">
+                            <img src="/assets/logo.webp" alt="Fab Clean" className="h-8 md:h-10 mb-3 brightness-0 invert opacity-80" />
+                            <p className="text-slate-400 text-sm">Premium laundry services committed to quality.</p>
                         </div>
                         <div>
-                            <h4 className="font-semibold mb-4 text-lg">Legal</h4>
-                            <ul className="space-y-3 text-slate-400">
-                                <li><a href="/terms" className="hover:text-emerald-400 transition-colors flex items-center gap-2"><ExternalLink className="w-3 h-3" />Terms & Conditions</a></li>
-                                <li><a href="/privacy" className="hover:text-emerald-400 transition-colors flex items-center gap-2"><ExternalLink className="w-3 h-3" />Privacy Policy</a></li>
-                                <li><a href="/refund" className="hover:text-emerald-400 transition-colors flex items-center gap-2"><ExternalLink className="w-3 h-3" />Refund Policy</a></li>
+                            <h4 className="font-semibold mb-3 text-sm md:text-base">Legal</h4>
+                            <ul className="space-y-2 text-xs md:text-sm text-slate-400">
+                                <li><a href="/terms" className="hover:text-emerald-400 flex items-center gap-1"><ExternalLink className="w-3 h-3" />Terms</a></li>
+                                <li><a href="/privacy" className="hover:text-emerald-400 flex items-center gap-1"><ExternalLink className="w-3 h-3" />Privacy</a></li>
+                                <li><a href="/refund" className="hover:text-emerald-400 flex items-center gap-1"><ExternalLink className="w-3 h-3" />Refunds</a></li>
                             </ul>
                         </div>
                         <div>
-                            <h4 className="font-semibold mb-4 text-lg">Contact</h4>
-                            <ul className="space-y-3 text-slate-400">
-                                <li className="flex items-center gap-2"><Phone className="w-4 h-4 text-emerald-400" /> +91 93630 59595</li>
-                                <li className="flex items-center gap-2"><MessageCircle className="w-4 h-4 text-emerald-400" /> support@myfabclean.com</li>
-                                <li className="flex items-center gap-2"><MapPin className="w-4 h-4 text-emerald-400" /> Pollachi, Tamil Nadu</li>
+                            <h4 className="font-semibold mb-3 text-sm md:text-base">Contact</h4>
+                            <ul className="space-y-2 text-xs md:text-sm text-slate-400">
+                                <li className="flex items-center gap-1.5"><Phone className="w-3 h-3 text-emerald-400" /> +91 93630 59595</li>
+                                <li className="flex items-center gap-1.5"><MapPin className="w-3 h-3 text-emerald-400" /> Pollachi, TN</li>
                             </ul>
                         </div>
                     </div>
-                    <div className="border-t border-slate-800 pt-8 text-center">
-                        <p className="text-slate-500">© {currentYear} Fab Clean. All rights reserved. | Premium Laundry Service</p>
+                    <div className="border-t border-slate-800 pt-6 text-center">
+                        <p className="text-slate-500 text-xs md:text-sm">© {currentYear} Fab Clean. All rights reserved.</p>
                     </div>
                 </div>
             </footer>
