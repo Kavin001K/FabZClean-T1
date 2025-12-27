@@ -3,6 +3,12 @@ FROM node:18-slim AS builder
 
 WORKDIR /app
 
+# Install Python and build tools for native modules (better-sqlite3)
+RUN apt-get update && apt-get install -y \
+    python3 \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy package files
 COPY package.json package-lock.json ./
 
@@ -19,6 +25,12 @@ RUN npm run build:client
 FROM node:18-slim
 
 WORKDIR /app
+
+# Install Python and build tools for native modules (better-sqlite3)
+RUN apt-get update && apt-get install -y \
+    python3 \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package.json package-lock.json ./
