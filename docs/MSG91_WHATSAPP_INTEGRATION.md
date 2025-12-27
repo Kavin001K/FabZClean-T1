@@ -37,17 +37,35 @@ MSG91_TEMPLATE_NAME_Invoice=invoice_fabzclean
 
 ### 2. Order Processing Template (`bill`)
 **Trigger:** Automatically when order status changes to `processing`  
-**Parameters:**
-- `{{1}}` = Customer Name
-- `{{2}}` = Order Number
+
+**Components:**
+- **Header:** Processing status image (set via `WHATSAPP_PROCESSING_IMAGE_URL`)
+- **Body:**
+  - `{{1}}` = Customer Name
+  - `{{2}}` = Order Number
+- **Buttons:**
+  - "Track Order" → Link: `https://fabclean.com/track/{{1}}` (where {{1}} = Order Number)
+  - "Terms of Service" → Link: `https://fabclean.com/terms`
 
 **Template Text:**
 ```
-Hi {{1}}! 👋 Great news! Your Order #{{2}} is now In Process at Fab Clean. 🧺 
+[Header Image: Processing status graphic]
+
+Hi {{Name}}! 👋 Great news! Your Order #{{Order ID}} is now In Process at Fab Clean. 🧺 
 Our team is working their magic to make your items fresh and clean again. ✨ 
 We will update you as soon as they are ready!
-Team Fab Clean
+
+Fab Clean Team
+
+[Track Order Button] → https://fabclean.com/track/{OrderNumber}
+[Terms of Service Button] → https://fabclean.com/terms
 ```
+
+**How the Track Button Works:**
+- Template base URL: `https://fabclean.com/track/`
+- Dynamic variable: Order Number is appended
+- Result: `https://fabclean.com/track/FZC-2025POL9926A`
+
 
 ---
 

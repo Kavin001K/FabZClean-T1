@@ -225,7 +225,10 @@ export async function sendOrderCreatedNotification({
 
 /**
  * Send Order Processing notification via WhatsApp
- * Template: "bill" - Hi {{1}}! 👋 Great news! Your Order #{{2}} is now In Process...
+ * Template: "bill" - Includes:
+ *   - Header: Processing image
+ *   - Body: Hi {{1}}! 👋 Great news! Your Order #{{2}} is now In Process...
+ *   - Button: Track Order with link https://fabclean.com/track/{{1}} (order number)
  * 
  * AUTO-TRIGGERED: When order status changes to "processing"
  */
@@ -245,7 +248,14 @@ export async function sendOrderProcessingNotification({
     const template = TEMPLATES.bill;
     const cleanPhone = cleanPhoneNumber(phoneNumber);
 
-    // Template "bill" expects: {{1}} = Customer Name, {{2}} = Order Number
+    // Processing image URL (hosted publicly accessible image)
+    const processingImageUrl = process.env.WHATSAPP_PROCESSING_IMAGE_URL ||
+        'https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/Templates/Screenshot%202025-12-27%20at%2010.32.31%20PM.png';
+
+    // Template "bill" expects:
+    // - Header: Image (processing status image)
+    // - Body: {{1}} = Customer Name, {{2}} = Order Number
+    // - Button: Track Order link with {{1}} = Order Number appended to base URL
     const payload = {
         integrated_number: integratedNumber,
         content_type: "template",
@@ -263,6 +273,12 @@ export async function sendOrderProcessingNotification({
                     {
                         to: [cleanPhone],
                         components: {
+                            // Header image component
+                            header_1: {
+                                type: "image",
+                                value: processingImageUrl,
+                            },
+                            // Body text components
                             body_1: {
                                 type: "text",
                                 value: customerName,
@@ -270,6 +286,13 @@ export async function sendOrderProcessingNotification({
                             body_2: {
                                 type: "text",
                                 value: orderNumber,
+                            },
+                            // Button URL component - appends order number to base URL
+                            // Base URL is set in template: https://fabclean.com/track/
+                            // This adds the order number as the dynamic part
+                            button_1: {
+                                type: "text",
+                                value: orderNumber,  // This gets appended to make: https://fabclean.com/track/FZC-2025POL9926A
                             },
                         },
                     },
@@ -281,7 +304,9 @@ export async function sendOrderProcessingNotification({
     try {
         console.log(`📱 [WhatsApp] Sending Order Processing to ${cleanPhone}`);
         console.log(`📄 [WhatsApp] Template: ${template.name} (bill)`);
+        console.log(`🖼️ [WhatsApp] Image: ${processingImageUrl}`);
         console.log(`🧺 [WhatsApp] Customer: ${customerName}, Order: ${orderNumber}`);
+        console.log(`🔗 [WhatsApp] Track Link: https://fabclean.com/track/${orderNumber}`);
 
         const response = await fetch(
             "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
