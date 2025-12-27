@@ -31,7 +31,9 @@ import {
     ExternalLink,
     X,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Download,
+    FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -208,6 +210,7 @@ interface Order {
     createdAt: string;
     updatedAt: string;
     pickupDate?: string;
+    invoiceUrl?: string;
     lastWhatsappStatus?: string;
     lastWhatsappSentAt?: string;
 }
@@ -860,6 +863,32 @@ export default function PublicOrderTracking() {
                                                 )}
                                             </span>
                                         </div>
+
+                                        {/* Download Invoice Button */}
+                                        {order.invoiceUrl ? (
+                                            // Use saved invoice from server
+                                            <Button
+                                                variant="outline"
+                                                className="w-full h-12 mt-2 border-2 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold rounded-xl transition-all active:scale-95 touch-target"
+                                                onClick={() => window.open(order.invoiceUrl, '_blank')}
+                                            >
+                                                <Download className="w-4 h-4 mr-2" />
+                                                Download Invoice
+                                            </Button>
+                                        ) : (
+                                            // Fallback to generated invoice
+                                            <Button
+                                                variant="outline"
+                                                className="w-full h-12 mt-2 border-2 border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 font-semibold rounded-xl transition-all active:scale-95 touch-target"
+                                                onClick={() => {
+                                                    const invoiceUrl = `/api/public/invoice/${encodeURIComponent(order.orderNumber)}`;
+                                                    window.open(invoiceUrl, '_blank');
+                                                }}
+                                            >
+                                                <FileText className="w-4 h-4 mr-2" />
+                                                View Invoice
+                                            </Button>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>

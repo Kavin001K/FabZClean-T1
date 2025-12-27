@@ -55,6 +55,33 @@ router.get('/track/:orderNumber', async (req, res) => {
 
         console.log(`[Track] Found order: ${order.orderNumber || order.order_number} (${order.id})`);
 
+        // Try to find invoice/bill document for this order
+        let invoiceUrl = order.invoiceUrl || order.invoice_url || order.billUrl || order.bill_url || order.pdfUrl || order.pdf_url;
+
+        if (!invoiceUrl) {
+            try {
+                // Look up document by order number
+                const documents = await storage.listDocuments({
+                    type: 'invoice',
+                    limit: 100
+                });
+
+                const orderNum = order.orderNumber || order.order_number;
+                const orderDoc = documents.find((doc: any) =>
+                    doc.orderNumber === orderNum ||
+                    doc.order_number === orderNum ||
+                    (doc.metadata && (doc.metadata.orderNumber === orderNum || doc.metadata.orderId === order.id))
+                );
+
+                if (orderDoc) {
+                    invoiceUrl = orderDoc.fileUrl || orderDoc.file_url;
+                    console.log(`[Track] Found invoice document: ${invoiceUrl}`);
+                }
+            } catch (docError) {
+                console.log('[Track] Could not lookup documents:', docError);
+            }
+        }
+
         // Return sanitized order data (exclude sensitive info)
         // Handle both camelCase and snake_case field names for Supabase compatibility
         const trackingData = {
@@ -73,6 +100,8 @@ router.get('/track/:orderNumber', async (req, res) => {
             createdAt: order.createdAt || order.created_at,
             updatedAt: order.updatedAt || order.updated_at,
             pickupDate: order.pickupDate || order.pickup_date,
+            // Invoice/Bill URL for download (from order or documents table)
+            invoiceUrl: invoiceUrl || null,
             // WhatsApp notification info
             lastWhatsappStatus: order.lastWhatsappStatus || order.last_whatsapp_status,
             lastWhatsappSentAt: order.lastWhatsappSentAt || order.last_whatsapp_sent_at,

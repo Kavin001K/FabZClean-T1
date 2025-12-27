@@ -26,6 +26,7 @@ import settingsRouter from './settings';
 import franchiseRouter from './franchise';
 import auditLogsRouter from './audit-logs';
 import publicTrackingRouter from './public-tracking';
+import publicInvoiceRouter from './public-invoice';
 import { jwtRequired } from '../middleware/auth';
 import { debugRouter } from './debug';
 import { db as storage } from '../db';
@@ -154,6 +155,9 @@ export function registerAllRoutes(app: Express): void {
 
   // Public routes (no authentication required)
   app.use('/api/public', publicTrackingRouter);
+
+  // Public invoice generation (no authentication required)
+  app.use('/api/public', publicInvoiceRouter);
 
   // Authentication routes (no version prefix)
   app.use('/api/auth', authRouter);
