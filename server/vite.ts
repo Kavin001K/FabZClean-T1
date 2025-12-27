@@ -3,7 +3,6 @@ import fs from "fs";
 import path from "path";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
-import viteConfig from "../vite.config.minimal";
 import { nanoid } from "nanoid";
 import { fileURLToPath } from "url";
 
@@ -23,6 +22,9 @@ export function log(message: string, source = "express") {
 }
 
 export async function setupVite(app: Express, server: Server) {
+  // Dynamic import - only loads in development mode when this function is called
+  const viteConfig = (await import("../vite.config.minimal")).default;
+
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },

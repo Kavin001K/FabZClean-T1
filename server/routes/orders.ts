@@ -20,6 +20,12 @@ import { barcodeService } from "../barcode-service";
 import { OrderService } from "../services/order.service";
 import { AuthService } from "../auth-service";
 import type { UserRole } from "../../shared/supabase";
+import {
+  sendOrderCreatedNotification,
+  handleOrderStatusChange,
+  type OrderStatus,
+  type FulfillmentType,
+} from "../services/whatsapp.service";
 
 const router = Router();
 const orderService = new OrderService();
@@ -359,6 +365,25 @@ router.post(
       // Notify real-time clients
       realtimeServer.triggerUpdate('order', 'created', order);
 
+      // Send WhatsApp notification for order creation (async, don't await)
+      if (order.customerPhone) {
+        const formattedAmount = `Rs.${parseFloat(order.totalAmount || '0').toFixed(0)}`;
+        sendOrderCreatedNotification({
+          phoneNumber: order.customerPhone,
+          customerName: order.customerName,
+          orderNumber: order.orderNumber,
+          amount: formattedAmount,
+        }).then(result => {
+          if (result.success) {
+            console.log(`✅ [WhatsApp] Order created notification sent for ${order.orderNumber}`);
+          } else {
+            console.warn(`⚠️ [WhatsApp] Failed to send order created notification: ${result.error}`);
+          }
+        }).catch(err => {
+          console.error(`❌ [WhatsApp] Error sending order created notification:`, err);
+        });
+      }
+
       const serializedOrder = serializeOrder(order);
       res.status(201).json(createSuccessResponse(serializedOrder, 'Order created successfully'));
     } catch (error) {
@@ -449,6 +474,29 @@ router.put('/:id', requireRole(ORDER_UPDATE_ROLES), async (req, res) => {
     // Notify real-time clients
     realtimeServer.triggerUpdate('order', 'updated', updatedOrder);
 
+    // If status was changed via general update, send WhatsApp notification
+    if (updateData.status && updateData.status !== order.status) {
+      handleOrderStatusChange(
+        {
+          customerPhone: updatedOrder?.customerPhone,
+          customerName: updatedOrder?.customerName || order.customerName,
+          orderNumber: updatedOrder?.orderNumber || order.orderNumber,
+          totalAmount: updatedOrder?.totalAmount || order.totalAmount,
+          status: updateData.status as OrderStatus,
+          fulfillmentType: (updatedOrder?.fulfillmentType || order.fulfillmentType || 'pickup') as FulfillmentType,
+        },
+        order.status as OrderStatus
+      ).then(result => {
+        if (result?.success) {
+          console.log(`✅ [WhatsApp] Status update notification sent for ${order.orderNumber}`);
+        } else if (result) {
+          console.warn(`⚠️ [WhatsApp] Failed to send status notification: ${result.error}`);
+        }
+      }).catch(err => {
+        console.error(`❌ [WhatsApp] Error sending status notification:`, err);
+      });
+    }
+
     const serializedOrder = serializeOrder(updatedOrder);
     res.json(createSuccessResponse(serializedOrder, 'Order updated successfully'));
   } catch (error) {
@@ -511,6 +559,27 @@ router.patch(
         orderId: orderId,
         status: status,
         previousStatus: order.status
+      });
+
+      // Send WhatsApp notification for status change (async, don't await)
+      handleOrderStatusChange(
+        {
+          customerPhone: updatedOrder?.customerPhone,
+          customerName: updatedOrder?.customerName || order.customerName,
+          orderNumber: updatedOrder?.orderNumber || order.orderNumber,
+          totalAmount: updatedOrder?.totalAmount || order.totalAmount,
+          status: status as OrderStatus,
+          fulfillmentType: (updatedOrder?.fulfillmentType || order.fulfillmentType || 'pickup') as FulfillmentType,
+        },
+        order.status as OrderStatus
+      ).then(result => {
+        if (result?.success) {
+          console.log(`✅ [WhatsApp] Status update notification sent for ${order.orderNumber}`);
+        } else if (result) {
+          console.warn(`⚠️ [WhatsApp] Failed to send status notification: ${result.error}`);
+        }
+      }).catch(err => {
+        console.error(`❌ [WhatsApp] Error sending status notification:`, err);
       });
 
       const serializedOrder = serializeOrder(updatedOrder);
