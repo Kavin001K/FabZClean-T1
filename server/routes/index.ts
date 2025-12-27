@@ -25,6 +25,7 @@ import transitSuggestionsRouter from './transit-suggestions';
 import settingsRouter from './settings';
 import franchiseRouter from './franchise';
 import auditLogsRouter from './audit-logs';
+import publicTrackingRouter from './public-tracking';
 import { jwtRequired } from '../middleware/auth';
 import { debugRouter } from './debug';
 import { db as storage } from '../db';
@@ -150,6 +151,9 @@ export function registerAllRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to fetch due date orders" });
     }
   });
+
+  // Public routes (no authentication required)
+  app.use('/api/public', publicTrackingRouter);
 
   // Authentication routes (no version prefix)
   app.use('/api/auth', authRouter);

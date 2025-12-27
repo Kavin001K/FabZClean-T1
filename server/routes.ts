@@ -30,8 +30,12 @@ import franchiseRoutes from "./routes/franchise";
 import auditLogsRouter from "./routes/audit-logs";
 import transitOrdersRouter from "./routes/transit-orders";
 import reportsRouter from "./routes/reports";
+import publicTrackingRouter from "./routes/public-tracking";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Register Public routes (no auth required)
+  app.use("/api/public", publicTrackingRouter);
+
   // Register WhatsApp routes
   app.use("/api/whatsapp", whatsappRoutes);
 

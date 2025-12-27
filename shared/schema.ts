@@ -98,6 +98,10 @@ export const orders = pgTable("orders", {
   // Express Order / Priority
   isExpressOrder: boolean("is_express_order").default(false),
   priority: text("priority", { enum: ["normal", "high", "urgent"] }).default("normal"),
+  // WhatsApp notification tracking
+  lastWhatsappStatus: text("last_whatsapp_status"),
+  lastWhatsappSentAt: timestamp("last_whatsapp_sent_at"),
+  whatsappMessageCount: integer("whatsapp_message_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -336,6 +340,10 @@ export const insertOrderSchema = z.object({
   deliveryAddress: z.any().optional().nullable(),
   isExpressOrder: z.coerce.boolean().optional().default(false),
   priority: z.enum(["normal", "high", "urgent"]).optional().default("normal"),
+  // WhatsApp notification tracking
+  lastWhatsappStatus: z.string().optional().nullable(),
+  lastWhatsappSentAt: z.coerce.date().optional().nullable(),
+  whatsappMessageCount: z.number().optional().default(0),
   createdAt: z.coerce.date().optional(),
   updatedAt: z.coerce.date().optional(),
 }).passthrough();

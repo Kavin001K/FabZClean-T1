@@ -54,6 +54,7 @@ const TermsPage = lazy(() => import("@/pages/terms"));
 const PrivacyPage = lazy(() => import("@/pages/privacy"));
 const RefundPage = lazy(() => import("@/pages/refund"));
 const CookiesPage = lazy(() => import("@/pages/cookies"));
+const PublicOrderTracking = lazy(() => import("@/pages/public-order-tracking"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -76,6 +77,8 @@ function Router() {
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/refund" component={RefundPage} />
       <Route path="/cookies" component={CookiesPage} />
+      <Route path="/trackorder" component={PublicOrderTracking} />
+      <Route path="/trackorder/:orderNumber" component={PublicOrderTracking} />
 
       {/* Protected routes */}
       <Route path="/">

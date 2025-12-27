@@ -5,10 +5,14 @@ import { existsSync } from "fs";
 
 // Determine database path with fallbacks
 const isProduction = process.env.NODE_ENV === "production";
-const isSupabaseConfigured = process.env.USE_SUPABASE === 'true' &&
-  !!process.env.SUPABASE_URL &&
-  !!process.env.SUPABASE_SERVICE_KEY &&
-  !process.env.SUPABASE_URL.includes('placeholder');
+
+// Check for Supabase configuration - use it if URL is provided (service key or anon key)
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const isSupabaseConfigured = (process.env.USE_SUPABASE === 'true' || !!supabaseUrl) &&
+  !!supabaseUrl &&
+  !!supabaseKey &&
+  !supabaseUrl.includes('placeholder');
 
 let dbInstance: any;
 

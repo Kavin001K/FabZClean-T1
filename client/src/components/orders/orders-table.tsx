@@ -36,6 +36,7 @@ import {
   Truck,
   Package,
   Store,
+  MessageCircle,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/data-service";
 import type { Order } from "@shared/schema";
@@ -362,12 +363,33 @@ export default React.memo(function OrdersTable({
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <Badge className={cn("border", getStatusColor(order.status))}>
-                    <span className="flex items-center gap-1">
-                      {getStatusIcon(order.status)}
-                      <span>{formatStatusDisplay(order.status)}</span>
-                    </span>
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge className={cn("border", getStatusColor(order.status))}>
+                      <span className="flex items-center gap-1">
+                        {getStatusIcon(order.status)}
+                        <span>{formatStatusDisplay(order.status)}</span>
+                      </span>
+                    </Badge>
+                    {/* WhatsApp notification indicator */}
+                    {(order as any).lastWhatsappStatus && (
+                      <div
+                        className={cn(
+                          "flex items-center",
+                          (order as any).lastWhatsappStatus?.includes('Sent')
+                            ? "text-green-600"
+                            : (order as any).lastWhatsappStatus?.includes('Failed')
+                              ? "text-red-500"
+                              : "text-gray-400"
+                        )}
+                        title={`WhatsApp: ${(order as any).lastWhatsappStatus}${(order as any).lastWhatsappSentAt ? ` at ${formatDate((order as any).lastWhatsappSentAt)}` : ''}`}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        {(order as any).lastWhatsappStatus?.includes('Sent') && (
+                          <CheckCircle className="h-3 w-3 -ml-1 -mt-2" />
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <div className="text-sm">

@@ -1,18 +1,36 @@
 import { Router, Request, Response } from 'express';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Lazy Supabase client
+let _supabase: SupabaseClient | null = null;
+
+function getSupabase(): SupabaseClient | null {
+    if (_supabase) return _supabase;
+
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+        return null;
+    }
+
+    _supabase = createClient(supabaseUrl, supabaseKey);
+    return _supabase;
+}
 
 router.get('/check-user', async (req: Request, res: Response) => {
     const { username, secret } = req.query;
 
     if (secret !== 'debug123') {
         return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const supabase = getSupabase();
+    if (!supabase) {
+        return res.status(503).json({ error: 'Supabase not configured' });
     }
 
     try {
@@ -54,6 +72,11 @@ router.get('/reset-password', async (req: Request, res: Response) => {
 
     if (secret !== 'debug123') {
         return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const supabase = getSupabase();
+    if (!supabase) {
+        return res.status(503).json({ error: 'Supabase not configured' });
     }
 
     try {

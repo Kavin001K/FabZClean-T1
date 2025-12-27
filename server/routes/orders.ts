@@ -373,11 +373,29 @@ router.post(
           customerName: order.customerName,
           orderNumber: order.orderNumber,
           amount: formattedAmount,
-        }).then(result => {
+        }).then(async (result) => {
           if (result.success) {
             console.log(`✅ [WhatsApp] Order created notification sent for ${order.orderNumber}`);
+            // Update order with WhatsApp status
+            try {
+              await storage.updateOrder(order.id, {
+                lastWhatsappStatus: 'Order Created - Sent',
+                lastWhatsappSentAt: new Date(),
+                whatsappMessageCount: 1,
+              });
+            } catch (updateErr) {
+              console.warn('Failed to update WhatsApp status:', updateErr);
+            }
           } else {
             console.warn(`⚠️ [WhatsApp] Failed to send order created notification: ${result.error}`);
+            // Update order with failed status
+            try {
+              await storage.updateOrder(order.id, {
+                lastWhatsappStatus: `Order Created - Failed: ${result.error}`,
+              });
+            } catch (updateErr) {
+              console.warn('Failed to update WhatsApp status:', updateErr);
+            }
           }
         }).catch(err => {
           console.error(`❌ [WhatsApp] Error sending order created notification:`, err);
@@ -486,11 +504,28 @@ router.put('/:id', requireRole(ORDER_UPDATE_ROLES), async (req, res) => {
           fulfillmentType: (updatedOrder?.fulfillmentType || order.fulfillmentType || 'pickup') as FulfillmentType,
         },
         order.status as OrderStatus
-      ).then(result => {
+      ).then(async (result) => {
         if (result?.success) {
           console.log(`✅ [WhatsApp] Status update notification sent for ${order.orderNumber}`);
+          try {
+            const currentCount = (updatedOrder as any)?.whatsappMessageCount || 0;
+            await storage.updateOrder(orderId, {
+              lastWhatsappStatus: `${updateData.status} - Sent`,
+              lastWhatsappSentAt: new Date(),
+              whatsappMessageCount: currentCount + 1,
+            });
+          } catch (updateErr) {
+            console.warn('Failed to update WhatsApp status:', updateErr);
+          }
         } else if (result) {
           console.warn(`⚠️ [WhatsApp] Failed to send status notification: ${result.error}`);
+          try {
+            await storage.updateOrder(orderId, {
+              lastWhatsappStatus: `${updateData.status} - Failed: ${result.error}`,
+            });
+          } catch (updateErr) {
+            console.warn('Failed to update WhatsApp status:', updateErr);
+          }
         }
       }).catch(err => {
         console.error(`❌ [WhatsApp] Error sending status notification:`, err);
@@ -572,11 +607,29 @@ router.patch(
           fulfillmentType: (updatedOrder?.fulfillmentType || order.fulfillmentType || 'pickup') as FulfillmentType,
         },
         order.status as OrderStatus
-      ).then(result => {
+      ).then(async (result) => {
         if (result?.success) {
           console.log(`✅ [WhatsApp] Status update notification sent for ${order.orderNumber}`);
+          // Update order with WhatsApp status
+          try {
+            const currentCount = (updatedOrder as any)?.whatsappMessageCount || 0;
+            await storage.updateOrder(orderId, {
+              lastWhatsappStatus: `${status} - Sent`,
+              lastWhatsappSentAt: new Date(),
+              whatsappMessageCount: currentCount + 1,
+            });
+          } catch (updateErr) {
+            console.warn('Failed to update WhatsApp status:', updateErr);
+          }
         } else if (result) {
           console.warn(`⚠️ [WhatsApp] Failed to send status notification: ${result.error}`);
+          try {
+            await storage.updateOrder(orderId, {
+              lastWhatsappStatus: `${status} - Failed: ${result.error}`,
+            });
+          } catch (updateErr) {
+            console.warn('Failed to update WhatsApp status:', updateErr);
+          }
         }
       }).catch(err => {
         console.error(`❌ [WhatsApp] Error sending status notification:`, err);

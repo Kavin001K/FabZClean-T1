@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { db } from '../db';
 
 const router = Router();
@@ -20,15 +20,32 @@ const upload = multer({
     },
 });
 
-// Initialize Supabase client
-const supabase = createClient(
-    process.env.SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_KEY || ''
-);
+// Lazy-loaded Supabase client (only initialized when actually needed)
+let _supabase: SupabaseClient | null = null;
+
+function getSupabase(): SupabaseClient | null {
+    if (_supabase) return _supabase;
+
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+        console.warn('⚠️ Supabase not configured - document storage features disabled');
+        return null;
+    }
+
+    _supabase = createClient(supabaseUrl, supabaseKey);
+    return _supabase;
+}
 
 // Upload document
 router.post('/upload', upload.single('file'), async (req, res) => {
     try {
+        const supabase = getSupabase();
+        if (!supabase) {
+            return res.status(503).json({ error: 'Document storage not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_KEY.' });
+        }
+
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
         }
@@ -48,7 +65,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
         if (bucketError) {
             console.error('Error listing buckets:', bucketError);
-        } else if (!buckets.find(b => b.name === 'pdfs')) {
+        } else if (!buckets.find((b: { name: string }) => b.name === 'pdfs')) {
             const { error: createBucketError } = await supabase.storage.createBucket('pdfs', {
                 public: true
             });
@@ -162,6 +179,11 @@ router.get('/:id', async (req, res) => {
 // Download document
 router.get('/:id/download', async (req, res) => {
     try {
+        const supabase = getSupabase();
+        if (!supabase) {
+            return res.status(503).json({ error: 'Document storage not configured.' });
+        }
+
         const document = await db.getDocument(req.params.id);
 
         if (!document) {
@@ -192,19 +214,23 @@ router.get('/:id/download', async (req, res) => {
 // Delete document
 router.delete('/:id', async (req, res) => {
     try {
+        const supabase = getSupabase();
+
         const document = await db.getDocument(req.params.id);
 
         if (!document) {
             return res.status(404).json({ error: 'Document not found' });
         }
 
-        // Delete from Supabase Storage
-        const { error: deleteError } = await supabase.storage
-            .from('pdfs')
-            .remove([document.filepath]);
+        // Delete from Supabase Storage (only if supabase is configured)
+        if (supabase) {
+            const { error: deleteError } = await supabase.storage
+                .from('pdfs')
+                .remove([document.filepath]);
 
-        if (deleteError) {
-            console.error('Storage delete error:', deleteError);
+            if (deleteError) {
+                console.error('Storage delete error:', deleteError);
+            }
         }
 
         // Delete from database
