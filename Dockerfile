@@ -1,36 +1,46 @@
-FROM python:3.11-slim as builder
+# Build stage
+FROM node:18-slim AS builder
 
 WORKDIR /app
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# Copy package files
+COPY package.json package-lock.json ./
 
-COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip install --user -r requirements.txt
+# Install dependencies
+RUN npm ci
 
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Copy Python packages from builder
-COPY --from=builder /root/.local /root/.local
-
-# Copy application code
+# Copy source code
 COPY . .
 
-# Make sure scripts are executable
-RUN chmod +x scripts/*.sh scripts/*.py
+# Build the client
+RUN npm run build:client
 
-# Add local bin to PATH
-ENV PATH=/root/.local/bin:$PATH
+# Production stage
+FROM node:18-slim
 
-# Set Flask app
-ENV FLASK_APP=src.app
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install production dependencies only
+RUN npm ci --omit=dev
+
+# Copy built client from builder stage
+COPY --from=builder /app/dist ./dist
+
+# Copy server and shared code
+COPY server ./server
+COPY shared ./shared
+COPY tsconfig.json ./
+COPY tsconfig.server.json ./
+COPY drizzle.config.ts ./
 
 # Expose port
 EXPOSE 3000
 
-# Default command
-CMD ["bash", "-lc", "flask db upgrade && gunicorn -b 0.0.0.0:3000 -w 3 'src.app:create_app(\"prod\")'"]
+# Set environment
+ENV NODE_ENV=production
 
+# Start the server
+CMD ["npx", "tsx", "server/minimal-server.ts"]

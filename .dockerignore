@@ -1,0 +1,47 @@
+# Dependencies
+node_modules
+
+# Build output (will be rebuilt in container)
+dist
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+.cursor
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+docs/
+
+# Database files
+*.db
+*.sqlite
+
+# Uploads (should use volumes in production)
+uploads/
+
+# Test files
+*.test.*
+*.spec.*
+__tests__/
+
+# Editor directories and files
+.agent/
