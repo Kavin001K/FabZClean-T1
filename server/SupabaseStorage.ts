@@ -272,7 +272,11 @@ export class SupabaseStorage {
             'deliveryAddress': 'delivery_address',
             // Express/Priority mappings
             'isExpressOrder': 'is_express_order',
-            'priority': 'priority'
+            'priority': 'priority',
+            // WhatsApp tracking mappings
+            'lastWhatsappStatus': 'last_whatsapp_status',
+            'lastWhatsappSentAt': 'last_whatsapp_sent_at',
+            'whatsappMessageCount': 'whatsapp_message_count'
         };
 
         // If key exists in mappings, use snake_case. If not, preserve original (e.g. 'status', 'email', 'name')
