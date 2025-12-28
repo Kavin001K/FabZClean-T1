@@ -42,6 +42,9 @@ interface OrderProcessingMessageParams {
     phoneNumber: string;
     customerName: string;
     orderNumber: string;
+    invoiceNumber?: string; // Invoice number for {{2}} placeholder
+    amount?: string; // Amount for {{3}} and {{4}} placeholders (e.g., "1234" or "₹1,234")
+    pdfUrl?: string; // URL to the PDF invoice document for header
 }
 
 interface OrderStatusUpdateMessageParams {
@@ -226,9 +229,11 @@ export async function sendOrderCreatedNotification({
 /**
  * Send Order Processing notification via WhatsApp
  * Template: "bill" - Includes:
- *   - Header: Processing image
- *   - Body: Hi {{1}}! 👋 Great news! Your Order #{{2}} is now In Process...
- *   - Button: Track Order with link https://fabclean.com/track/{{1}} (order number)
+ *   - Header: Document (PDF invoice)
+ *   - Body: Hi {{1}}! 👋 Your order for ₹{{4}} is currently Processing!
+ *          We have generated Invoice {{2}} for {{3}}.
+ *   - Button 1: Track Order with link https://myfabclean.com/trackorder/{{1}} (order number)
+ *   - Button 2: Terms & Conditions with link https://myfabclean.com/{{1}} (terms path)
  * 
  * AUTO-TRIGGERED: When order status changes to "processing"
  */
@@ -236,6 +241,9 @@ export async function sendOrderProcessingNotification({
     phoneNumber,
     customerName,
     orderNumber,
+    invoiceNumber,
+    amount,
+    pdfUrl,
 }: OrderProcessingMessageParams): Promise<SendResult> {
     const authKey = process.env.MSG91_AUTH_KEY;
     const integratedNumber = process.env.MSG91_INTEGRATED_NUMBER || '15558125705';
@@ -248,22 +256,24 @@ export async function sendOrderProcessingNotification({
     const template = TEMPLATES.bill;
     const cleanPhone = cleanPhoneNumber(phoneNumber);
 
-    // Processing image URL (hosted publicly accessible image)
-    const processingImageUrl = process.env.WHATSAPP_PROCESSING_IMAGE_URL ||
-        'https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/Templates/Screenshot%202025-12-27%20at%2010.32.31%20PM.png';
-
-    // Template "bill" expects:
-    // - Header: Image (processing status image)
-    // - Body: {{1}} = Customer Name, {{2}} = Order Number
-    // - Button 1: Track Order link with dynamic URL suffix (order number)
-    // - Button 2: Terms link (static or dynamic)
-    // 
-    // IMPORTANT: For URL buttons, the "value" should be ONLY the dynamic suffix
-    // that gets appended to the base URL defined in the template.
+    // Clean order number for URL (remove # and special characters)
+    // This becomes the dynamic suffix for the Track Order button URL
     // Template base URL: https://myfabclean.com/trackorder/
     // We provide: FZC-2025POL6551A
     // Result: https://myfabclean.com/trackorder/FZC-2025POL6551A
     const cleanOrderNumber = orderNumber.replace(/[#]/g, '').trim();
+
+    // Format amount for display (ensure it's just the number, ₹ symbol is in template)
+    const formattedAmount = amount?.replace(/[₹,\s]/g, '') || '0';
+
+    // Template "bill" expects (based on screenshot):
+    // - Header: Document (PDF with filename)
+    // - Body: {{1}} = Customer Name, {{2}} = Invoice Number, {{3}} = Amount, {{4}} = Amount
+    // - Button 1: Track Order link with dynamic URL suffix (order number)
+    // - Button 2: Terms & Conditions link with dynamic URL suffix
+    // 
+    // IMPORTANT: For URL buttons, the "value" should be ONLY the dynamic suffix
+    // that gets appended to the base URL defined in the template.
 
     const payload = {
         integrated_number: integratedNumber,
@@ -282,35 +292,45 @@ export async function sendOrderProcessingNotification({
                     {
                         to: [cleanPhone],
                         components: {
-                            // Header image component
+                            // Header document component (PDF invoice)
                             header_1: {
-                                type: "image",
-                                value: processingImageUrl,
+                                type: "document",
+                                value: pdfUrl || "",
+                                filename: `Invoice_${invoiceNumber || orderNumber}.pdf`,
                             },
-                            // Body text components
+                            // Body text components matching template placeholders
                             body_1: {
                                 type: "text",
-                                value: customerName,
+                                value: customerName, // {{1}} = Customer Name
                             },
                             body_2: {
                                 type: "text",
-                                value: orderNumber,
+                                value: invoiceNumber || orderNumber, // {{2}} = Invoice Number
+                            },
+                            body_3: {
+                                type: "text",
+                                value: formattedAmount, // {{3}} = Amount
+                            },
+                            body_4: {
+                                type: "text",
+                                value: formattedAmount, // {{4}} = Amount (for ₹{{4}})
                             },
                             // Button 1: Track Order - dynamic URL with order number suffix
                             // Template URL: https://myfabclean.com/trackorder/{{1}}
+                            // Value should be ONLY the order number (the dynamic part)
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                value: cleanOrderNumber,
+                                value: cleanOrderNumber, // Just the order number, e.g., "FZC-2025POL6551A"
                             },
-                            // Button 2: Terms - dynamic URL with suffix
-                            // Template base URL: https://myfabclean.com/
+                            // Button 2: Terms & Conditions - dynamic URL with suffix
+                            // Template base URL: https://myfabclean.com/{{1}}
                             // We provide: terms
                             // Result: https://myfabclean.com/terms
                             button_2: {
                                 subtype: "url",
                                 type: "text",
-                                value: "terms",
+                                value: "terms", // The path suffix for terms page
                             },
                         },
                     },
@@ -322,9 +342,10 @@ export async function sendOrderProcessingNotification({
     try {
         console.log(`📱 [WhatsApp] Sending Order Processing to ${cleanPhone}`);
         console.log(`📄 [WhatsApp] Template: ${template.name} (bill)`);
-        console.log(`🖼️ [WhatsApp] Image: ${processingImageUrl}`);
-        console.log(`🧺 [WhatsApp] Customer: ${customerName}, Order: ${orderNumber}`);
-        console.log(`🔗 [WhatsApp] Track Link: https://fabclean.com/track/${orderNumber}`);
+        console.log(`📎 [WhatsApp] PDF: ${pdfUrl || 'No PDF URL provided'}`);
+        console.log(`🧺 [WhatsApp] Customer: ${customerName}, Order: ${orderNumber}, Invoice: ${invoiceNumber}`);
+        console.log(`💰 [WhatsApp] Amount: ₹${formattedAmount}`);
+        console.log(`🔗 [WhatsApp] Track Link will be: https://myfabclean.com/trackorder/${cleanOrderNumber}`);
 
         const response = await fetch(
             "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
@@ -529,6 +550,8 @@ export async function handleOrderStatusChange(
         status: OrderStatus;
         fulfillmentType?: FulfillmentType | null;
         items?: Array<{ serviceName?: string; name?: string; quantity?: number }>;
+        invoiceUrl?: string | null; // PDF invoice URL for WhatsApp document header
+        invoiceNumber?: string | null; // Invoice number for template placeholder
     },
     previousStatus?: OrderStatus
 ): Promise<SendResult | null> {
@@ -548,13 +571,19 @@ export async function handleOrderStatusChange(
         ? order.items.map(item => item.serviceName || item.name || 'Item').slice(0, 3).join(', ')
         : 'Your items';
 
-    // STATUS: processing - Send "bill" template
+    // STATUS: processing - Send "bill" template with PDF invoice
     if (currentStatus === 'processing' && previousStatus !== 'processing') {
         console.log(`📤 [WhatsApp] Triggering Processing notification for order ${order.orderNumber}`);
+        console.log(`📎 [WhatsApp] Invoice URL: ${order.invoiceUrl || 'Not available'}`);
+        console.log(`🔗 [WhatsApp] Track Order URL will be: https://myfabclean.com/trackorder/${order.orderNumber}`);
+
         return await sendOrderProcessingNotification({
             phoneNumber: order.customerPhone,
             customerName: order.customerName,
             orderNumber: order.orderNumber,
+            invoiceNumber: order.invoiceNumber || order.orderNumber, // Fallback to order number
+            amount: order.totalAmount,
+            pdfUrl: order.invoiceUrl || undefined,
         });
     }
 

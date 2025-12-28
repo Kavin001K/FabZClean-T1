@@ -503,6 +503,8 @@ router.put('/:id', requireRole(ORDER_UPDATE_ROLES), async (req, res) => {
           status: updateData.status as OrderStatus,
           fulfillmentType: (updatedOrder?.fulfillmentType || order.fulfillmentType || 'pickup') as FulfillmentType,
           items: updatedOrder?.items || order.items || [],
+          invoiceUrl: (updatedOrder as any)?.invoiceUrl || (order as any)?.invoiceUrl || null,
+          invoiceNumber: (updatedOrder as any)?.invoiceNumber || order.orderNumber,
         },
         order.status as OrderStatus
       ).then(async (result) => {
@@ -607,6 +609,8 @@ router.patch(
           status: status as OrderStatus,
           fulfillmentType: (updatedOrder?.fulfillmentType || order.fulfillmentType || 'pickup') as FulfillmentType,
           items: updatedOrder?.items || order.items || [],
+          invoiceUrl: (updatedOrder as any)?.invoiceUrl || (order as any)?.invoiceUrl || null,
+          invoiceNumber: (updatedOrder as any)?.invoiceNumber || order.orderNumber,
         },
         order.status as OrderStatus
       ).then(async (result) => {
