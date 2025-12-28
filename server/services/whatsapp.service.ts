@@ -164,10 +164,10 @@ export async function sendOrderCreatedNotification({
                     {
                         to: [cleanPhone],
                         components: {
-                            // MSG91 format: uses "text" field, not "value"
+                            // MSG91 format: uses "value" field
                             body_1: {
                                 type: "text",
-                                text: amount, // Amount like "Rs.123"
+                                value: amount, // Amount like "Rs.123"
                             },
                         },
                     },
@@ -276,8 +276,13 @@ export async function sendOrderProcessingNotification({
     // - Button 1: Track Order link with dynamic URL suffix (order number)
     // - Button 2: Terms & Conditions link with dynamic URL suffix
     // 
-    // MSG91 FORMAT: Uses "text" field for text values, not "value"
-    // Button format: Uses "text" field for the dynamic URL suffix
+    // MSG91 FORMAT (from original cURL):
+    // - Header document: { type, value (URL), filename } - FLAT, not nested
+    // - Body text: { type, value } - uses "value", not "text"
+    // - Button URL: { subtype, type, value } - uses "value"
+
+    // Generate proper filename with extension
+    const pdfFilename = `Invoice_${invoiceNumber || orderNumber}.pdf`;
 
     const payload = {
         integrated_number: integratedNumber,
@@ -297,49 +302,39 @@ export async function sendOrderProcessingNotification({
                         to: [cleanPhone],
                         components: {
                             // Header document component (PDF invoice)
-                            // MSG91 format: nested document object with link and filename
+                            // MSG91 format: FLAT structure with filename, type, value
                             header_1: {
+                                filename: pdfFilename,
                                 type: "document",
-                                document: {
-                                    link: pdfUrl || "",
-                                    filename: `Invoice-${invoiceNumber || orderNumber}.pdf`,
-                                },
+                                value: pdfUrl || "",
                             },
                             // Body text components matching template placeholders
-                            // MSG91 format: uses "text" field, not "value"
+                            // MSG91 format: uses "value" field
                             body_1: {
                                 type: "text",
-                                text: customerName, // {{1}} = Customer Name
+                                value: customerName, // {{1}} = Customer Name
                             },
                             body_2: {
                                 type: "text",
-                                text: invoiceNumber || orderNumber, // {{2}} = Invoice Number
+                                value: invoiceNumber || orderNumber, // {{2}} = Invoice Number
                             },
                             body_3: {
                                 type: "text",
-                                text: formattedAmount, // {{3}} = Amount
+                                value: formattedAmount, // {{3}} = Amount
                             },
                             body_4: {
                                 type: "text",
-                                text: itemName, // {{4}} = Item name (not amount)
+                                value: itemName, // {{4}} = Item name
                             },
                             // Button 1: Track Order - dynamic URL with order number suffix
                             // Template URL: https://myfabclean.com/trackorder/{{1}}
-                            // MSG91 format: uses "text" field for the dynamic suffix
+                            // MSG91 format: uses "value" field for the dynamic suffix
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                text: cleanOrderNumber, // Just the order number, e.g., "FZC-2025POL6551A"
+                                value: cleanOrderNumber, // Just the order number, e.g., "FZC-2025POL6551A"
                             },
-                            // Button 2: Terms & Conditions - dynamic URL with suffix
-                            // Template base URL: https://myfabclean.com/{{1}}
-                            // We provide: terms
-                            // Result: https://myfabclean.com/terms
-                            button_2: {
-                                subtype: "url",
-                                type: "text",
-                                text: "terms", // The path suffix for terms page
-                            },
+                            // Note: button_2 (Terms & Conditions) is static in template, no need to send
                         },
                     },
                 ],
@@ -455,38 +450,36 @@ export async function sendOrderStatusUpdateNotification({
                         to: [cleanPhone],
                         components: {
                             // Header image component (required by template)
-                            // MSG91 format: nested image object with link
+                            // MSG91 format: FLAT structure with type and value
                             header_1: {
                                 type: "image",
-                                image: {
-                                    link: statusImageUrl,
-                                },
+                                value: statusImageUrl,
                             },
-                            // MSG91 format: uses "text" field, not "value"
+                            // MSG91 format: uses "value" field
                             body_1: {
                                 type: "text",
-                                text: customerName,
+                                value: customerName,
                             },
                             body_2: {
                                 type: "text",
-                                text: orderNumber,
+                                value: orderNumber,
                             },
                             body_3: {
                                 type: "text",
-                                text: status,
+                                value: status,
                             },
                             body_4: {
                                 type: "text",
-                                text: additionalInfo,
+                                value: additionalInfo,
                             },
                             // Button URL parameter for Track Order
                             // The template URL is: https://myfabclean.com/trackorder/{{1}}
                             // We pass the order number as {{1}} in the button
-                            // MSG91 format: uses "text" field for the dynamic suffix
+                            // MSG91 format: uses "value" field for the dynamic suffix
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                text: cleanOrderNumber,
+                                value: cleanOrderNumber,
                             },
                         },
                     },
@@ -694,30 +687,28 @@ export async function sendInvoiceWhatsApp({
                     {
                         to: [cleanPhone],
                         components: {
-                            // MSG91 format: nested document object with link and filename
+                            // MSG91 format: FLAT structure with filename, type, value
                             header_1: {
+                                filename: filename,
                                 type: "document",
-                                document: {
-                                    link: pdfUrl,
-                                    filename: filename,
-                                },
+                                value: pdfUrl,
                             },
-                            // MSG91 format: uses "text" field, not "value"
+                            // MSG91 format: uses "value" field
                             body_1: {
                                 type: "text",
-                                text: customerName,
+                                value: customerName,
                             },
                             body_2: {
                                 type: "text",
-                                text: invoiceNumber,
+                                value: invoiceNumber,
                             },
                             body_3: {
                                 type: "text",
-                                text: amount,
+                                value: amount,
                             },
                             body_4: {
                                 type: "text",
-                                text: itemName,
+                                value: itemName,
                             },
                         },
                     },
