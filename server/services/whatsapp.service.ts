@@ -307,7 +307,7 @@ export async function sendOrderProcessingNotification({
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                value: cleanOrderNumber, // e.g., "FZC-2025POL6551A"
+                                value: cleanOrderNumber, // Order number for tracking URL
                             },
                             // Button 2: Terms - dynamic URL suffix (required by template)
                             button_2: {
