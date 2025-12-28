@@ -400,12 +400,14 @@ export async function sendOrderStatusUpdateNotification({
     // Clean order number for URL (remove special chars if any)
     const cleanOrderNumber = orderNumber.replace(/[#]/g, '').trim();
 
+    // Status update image URL (hosted publicly accessible image)
+    const statusImageUrl = process.env.WHATSAPP_STATUS_IMAGE_URL ||
+        'https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/Templates/Screenshot%202025-12-27%20at%2010.32.31%20PM.png';
+
     // Template "invoice_fabzclean" expects:
-    // {{1}} = Customer Name (body_1)
-    // {{2}} = Order Number (body_2)
-    // {{3}} = Status (Ready to Pickup / Out For Delivery) (body_3)
-    // {{4}} = Additional info / items (body_4)
-    // Button URL variable {{1}} = Order Number for tracking link
+    // - Header: Image (status update image)
+    // - Body: {{1}} = Customer Name, {{2}} = Order Number, {{3}} = Status, {{4}} = Additional info
+    // - Button: Track Order URL with {{1}} = Order Number
     const payload = {
         integrated_number: integratedNumber,
         content_type: "template",
@@ -423,6 +425,11 @@ export async function sendOrderStatusUpdateNotification({
                     {
                         to: [cleanPhone],
                         components: {
+                            // Header image component (required by template)
+                            header_1: {
+                                type: "image",
+                                value: statusImageUrl,
+                            },
                             body_1: {
                                 type: "text",
                                 value: customerName,
