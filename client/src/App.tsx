@@ -31,7 +31,7 @@ const Customers = lazy(() => import("@/pages/customers"));
 const Analytics = lazy(() => import("@/pages/analytics"));
 const Inventory = lazy(() => import("@/pages/inventory"));
 const TransitOrders = lazy(() => import("@/pages/transit-orders"));
-const DebugPage = lazy(() => import("@/pages/debug"));
+
 const EmployeeDashboardPage = lazy(() => import("@/pages/employee-dashboard"));
 const FactoryDashboard = lazy(() => import("@/pages/factory-dashboard"));
 const UserManagementPage = lazy(() => import("@/pages/user-management"));
@@ -46,7 +46,7 @@ const InvoiceGenerator = lazy(() => import("@/components/invoice-generator").the
 const CustomerPortal = lazy(() => import("@/pages/customer-portal"));
 const WorkerPortal = lazy(() => import("@/pages/worker-portal"));
 const BillView = lazy(() => import("@/pages/bill-view"));
-const TestInvoice = lazy(() => import("@/pages/test-invoice"));
+
 const AuditLogsPage = lazy(() => import("@/pages/admin/audit-logs"));
 const ReportsPage = lazy(() => import("@/pages/reports"));
 const OrderTracking = lazy(() => import("@/pages/order-tracking"));
@@ -253,13 +253,7 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      <Route path="/debug">
-        <ProtectedRoute allowedRoles={['admin']}>
-          <MainLayout>
-            <DebugPage />
-          </MainLayout>
-        </ProtectedRoute>
-      </Route>
+
 
       <Route path="/invoice-generator">
         <ProtectedRoute allowedRoles={['admin', 'employee', 'franchise_manager']}>
@@ -285,13 +279,7 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      <Route path="/test-invoice">
-        <ProtectedRoute allowedRoles={['admin']}>
-          <MainLayout>
-            <TestInvoice />
-          </MainLayout>
-        </ProtectedRoute>
-      </Route>
+
 
       <Route path="/admin/audit-logs">
         <ProtectedRoute allowedRoles={['admin', 'franchise_manager']}>

@@ -1,21 +1,100 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { ChevronUp, Phone, Mail, Globe, Menu, X, ChevronRight, FileText, Shield, RefreshCw, Cookie } from 'lucide-react';
 
-// SEO Meta Tags
+// Mobile detection hook
+const useIsMobile = () => {
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 768 || 'ontouchstart' in window);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    return isMobile;
+};
+
+// SEO and Mobile Meta Tags Hook
 const useRefundSEO = () => {
     useEffect(() => {
         document.title = "Refund Policy | Fab Clean - Premium Laundry Services";
+
+        // Mobile viewport meta
+        let viewport = document.querySelector('meta[name="viewport"]') as HTMLMetaElement;
+        if (!viewport) {
+            viewport = document.createElement('meta');
+            viewport.name = 'viewport';
+            document.head.appendChild(viewport);
+        }
+        viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover';
+
+        // Theme color
+        let themeColor = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement;
+        if (!themeColor) {
+            themeColor = document.createElement('meta');
+            themeColor.name = 'theme-color';
+            document.head.appendChild(themeColor);
+        }
+        themeColor.content = '#f59e0b';
+
         const metaTags = [
             { name: "description", content: "Fab Clean's Refund Policy explains our cancellation, refund, and compensation procedures for laundry services." },
             { name: "keywords", content: "fab clean refund, laundry refund policy, dry cleaning refund, garment compensation" },
             { property: "og:title", content: "Refund Policy | Fab Clean" },
             { property: "og:description", content: "Learn about Fab Clean's refund, cancellation, and compensation policies." },
+            { property: "og:type", content: "website" },
         ];
+
+        const addedMetas: HTMLMetaElement[] = [];
         metaTags.forEach(tag => {
             const meta = document.createElement('meta');
             Object.entries(tag).forEach(([key, value]) => meta.setAttribute(key, value));
             document.head.appendChild(meta);
+            addedMetas.push(meta);
         });
-        return () => { document.title = "Fab Clean - Premium Laundry & Dry Cleaning"; };
+
+        // Add mobile-friendly styles
+        const style = document.createElement('style');
+        style.id = 'refund-mobile-styles';
+        style.textContent = `
+            html {
+                scroll-behavior: smooth;
+                -webkit-overflow-scrolling: touch;
+            }
+            .safe-area-top {
+                padding-top: env(safe-area-inset-top, 0px);
+            }
+            .safe-area-bottom {
+                padding-bottom: env(safe-area-inset-bottom, 16px);
+            }
+            .touch-target {
+                min-height: 44px;
+                min-width: 44px;
+            }
+            .hide-scrollbar::-webkit-scrollbar { display: none; }
+            .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            @keyframes slide-up {
+                0% { transform: translateY(10px); opacity: 0; }
+                100% { transform: translateY(0); opacity: 1; }
+            }
+            @keyframes fade-in {
+                0% { opacity: 0; }
+                100% { opacity: 1; }
+            }
+            .animate-slide-up { animation: slide-up 0.3s ease-out forwards; }
+            .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
+        `;
+        document.head.appendChild(style);
+
+        return () => {
+            document.title = "Fab Clean - Premium Laundry & Dry Cleaning";
+            addedMetas.forEach(meta => meta.remove());
+            const existingStyle = document.getElementById('refund-mobile-styles');
+            if (existingStyle) existingStyle.remove();
+        };
     }, []);
 };
 
@@ -26,191 +105,86 @@ const refundData = {
         {
             id: 1,
             title: "Overview",
-            content: `At Fab Clean, we are committed to providing exceptional laundry and dry cleaning services. We understand that sometimes situations arise where you may need a refund or compensation. This policy outlines our procedures for handling such requests fairly and transparently.
+            shortTitle: "Overview",
+            content: `At Fab Clean, we are committed to providing exceptional laundry and dry cleaning services. We understand that sometimes situations arise where you may need a refund or compensation.
 
-Our refund policy is designed to balance customer satisfaction with the realities of providing laundry and dry cleaning services. We process thousands of garments daily with the highest care standards, but we also stand behind our work and address valid concerns promptly.
+Our refund policy is designed to balance customer satisfaction with the realities of providing laundry and dry cleaning services. We process thousands of garments daily with the highest care standards.
 
 This policy applies to all services offered by Fab Clean, including regular laundry, dry cleaning, express services, specialty garment care, and home delivery services.`
         },
         {
             id: 2,
             title: "Order Cancellation",
-            content: `BEFORE PICKUP: Orders can be cancelled free of charge any time before our pickup agent arrives at your location. Simply cancel through the app, website, or by calling our customer service.
+            shortTitle: "Cancellation",
+            content: `BEFORE PICKUP: Orders can be cancelled free of charge any time before our pickup agent arrives at your location.
 
-AFTER PICKUP, BEFORE PROCESSING: If you need to cancel after pickup but before processing begins, a nominal handling fee of ₹50 will apply to cover logistics costs. Contact us within 2 hours of pickup.
+AFTER PICKUP, BEFORE PROCESSING: If you need to cancel after pickup but before processing begins, a nominal handling fee of ₹50 will apply.
 
-AFTER PROCESSING BEGINS: Once cleaning or processing has started, cancellation is not possible. The full order amount will be charged as the service has been rendered.
+AFTER PROCESSING BEGINS: Once cleaning or processing has started, cancellation is not possible. The full order amount will be charged.
 
-EXPRESS ORDERS: Express and same-day service orders cannot be cancelled once confirmed due to the priority scheduling involved. Standard cancellation fees apply.
-
-SUBSCRIPTION CANCELLATION: Monthly subscription services can be cancelled with 7 days' notice before the next billing cycle. Unused credits from the current cycle are non-refundable but can be used until the cycle ends.`
+EXPRESS ORDERS: Express and same-day service orders cannot be cancelled once confirmed due to the priority scheduling involved.`
         },
         {
             id: 3,
             title: "Refund Eligibility",
+            shortTitle: "Eligibility",
             content: `You may be eligible for a refund in the following situations:
 
-SERVICE NOT PERFORMED: If we fail to pick up your order as scheduled or are unable to complete the service, you are entitled to a full refund.
+SERVICE NOT PERFORMED: If we fail to pick up your order as scheduled, you are entitled to a full refund.
 
-QUALITY ISSUES: If the cleaning quality does not meet our standards and cannot be remedied through re-cleaning, you may be eligible for a partial or full refund.
+QUALITY ISSUES: If the cleaning quality does not meet our standards, you may be eligible for a partial or full refund.
 
-GARMENT DAMAGE: If your garment is damaged during our care (subject to assessment), compensation will be provided as per our liability policy.
+GARMENT DAMAGE: If your garment is damaged during our care, compensation will be provided as per our liability policy.
 
-BILLING ERRORS: Any overcharges or billing mistakes will be refunded immediately upon verification.
-
-DUPLICATE CHARGES: If you are charged multiple times for the same order, duplicate amounts will be refunded promptly.
-
-NON-DELIVERY: If we fail to deliver your order after processing, a full refund plus compensation for inconvenience will be provided.`
+BILLING ERRORS: Any overcharges or billing mistakes will be refunded immediately upon verification.`
         },
         {
             id: 4,
-            title: "Non-Refundable Situations",
+            title: "Non-Refundable Cases",
+            shortTitle: "Non-Refundable",
             content: `Refunds will NOT be provided in the following circumstances:
 
 NORMAL WEAR & TEAR: Natural aging, fading, or wear of garments that becomes more visible after cleaning.
 
 PRE-EXISTING DAMAGE: Damage, stains, or defects that existed before the garment was given to us.
 
-UNDECLARED ISSUES: Problems with garments that were not disclosed at the time of order, such as hidden stains or fragile areas.
+UNDECLARED ISSUES: Problems with garments that were not disclosed at the time of order.
 
-CUSTOMER-CAUSED DELAYS: Delays or issues arising from incorrect addresses, unavailability during delivery, or failure to provide access.
-
-COLOR BLEEDING: Color bleeding from unstable dyes, especially in new or cheaply made garments.
-
-SHRINKAGE WARNINGS: Shrinkage in garments where care labels warn against washing or dry cleaning.
-
-SUBJECTIVE PREFERENCES: Requests based on personal preferences rather than objective quality issues (e.g., preferred fold style, slightly different scent).
-
-FORCE MAJEURE: Situations beyond our control including natural disasters, strikes, or government restrictions.`
+COLOR BLEEDING: Color bleeding from unstable dyes, especially in new or cheaply made garments.`
         },
         {
             id: 5,
             title: "Refund Process",
-            content: `STEP 1 - REPORT THE ISSUE: Report any issues within 48 hours of receiving your order. You can report via the app, website, email (support@myfabclean.com), or phone (+91 93630 59595).
+            shortTitle: "Process",
+            content: `STEP 1 - REPORT THE ISSUE: Report any issues within 48 hours of receiving your order via app, website, email, or phone.
 
-STEP 2 - DOCUMENTATION: Provide photographs of the issue and retain the garment in its delivered condition. Do not attempt to fix or alter the garment as this may void the refund.
+STEP 2 - DOCUMENTATION: Provide photographs of the issue and retain the garment in its delivered condition.
 
-STEP 3 - ASSESSMENT: Our quality team will assess the issue within 2-3 business days. We may request to inspect the garment in person for significant claims.
+STEP 3 - ASSESSMENT: Our quality team will assess the issue within 2-3 business days.
 
-STEP 4 - RESOLUTION: Once verified, we will offer an appropriate resolution which may include re-cleaning, partial refund, full refund, or compensation.
+STEP 4 - RESOLUTION: Once verified, we will offer an appropriate resolution.
 
-STEP 5 - REFUND PROCESSING: Approved refunds are processed within 5-7 business days. The refund will be credited to your original payment method or as store credit, as per your preference.
-
-ESCALATION: If you are unsatisfied with the resolution, you may escalate to our Customer Experience Manager at escalations@myfabclean.com.`
+STEP 5 - REFUND PROCESSING: Approved refunds are processed within 5-7 business days.`
         },
         {
             id: 6,
-            title: "Refund Methods",
-            content: `ORIGINAL PAYMENT METHOD: Refunds are preferably processed to the original payment method used for the order.
-
-CREDIT/DEBIT CARDS: Refunds to cards may take 5-10 business days to appear on your statement, depending on your bank.
-
-UPI/NET BANKING: Refunds to UPI or bank accounts are typically processed within 3-5 business days.
-
-WALLETS: If paid via any wallet service, refunds will be credited back to the same wallet within 24-48 hours.
-
-STORE CREDIT: You may opt for instant store credit instead of waiting for payment refund. Store credits come with a 10% bonus amount and are valid for 6 months.
-
-CASH PAYMENTS: For cash orders, refunds will be provided as store credit or via bank transfer (NEFT/IMPS) upon providing bank details.`
-        },
-        {
-            id: 7,
-            title: "Garment Damage Compensation",
+            title: "Compensation for Damage",
+            shortTitle: "Compensation",
             content: `If a garment is damaged during our care, we provide fair compensation:
 
-ASSESSMENT: All damage claims are assessed by our quality control team. We consider the garment's age, original cost, condition, and extent of damage.
-
-COMPENSATION CALCULATION: Maximum compensation is calculated as:
+COMPENSATION CALCULATION:
 - Garments less than 1 year old: Up to 80% of original purchase price
 - Garments 1-3 years old: Up to 50% of original purchase price
 - Garments over 3 years old: Up to 25% of original purchase price
 
-MAXIMUM LIABILITY: Our maximum liability per garment is capped at ₹5,000 for regular items and ₹15,000 for premium/designer items (declared at time of order).
+MAXIMUM LIABILITY: Our maximum liability per garment is capped at ₹5,000 for regular items and ₹15,000 for premium/designer items.
 
-PROOF OF VALUE: For claims above ₹2,000, we may request proof of purchase or similar evidence of the garment's value.
-
-SPECIALTY ITEMS: Higher compensation limits apply to wedding garments, heirlooms, and declared high-value items. These must be declared and documented at the time of order with additional insurance opted.
-
-REPAIR OPTION: Where possible, we may offer professional repair or restoration instead of monetary compensation.`
+REPAIR OPTION: Where possible, we may offer professional repair or restoration.`
         },
         {
-            id: 8,
-            title: "Lost Garments",
-            content: `In the rare event that a garment is lost:
-
-SEARCH PERIOD: We conduct a thorough 7-day search of our facilities before confirming a garment as lost.
-
-COMPENSATION: For confirmed lost items, we provide compensation at the greater of: (a) the garment's depreciated value based on age, or (b) 10x the cleaning charge for that item.
-
-MAXIMUM LIMIT: Maximum compensation for lost items is ₹10,000 per garment unless higher value was declared and insured.
-
-BATCH ORDERS: If an entire order is lost, we compensate for each item individually up to a maximum of ₹50,000 per order.
-
-DOCUMENTATION: We require customers to provide a description and, if possible, photos of lost items to support the claim.
-
-INSURANCE: Customers can opt for premium garment insurance at the time of order for higher coverage on valuable items.`
-        },
-        {
-            id: 9,
-            title: "Re-Cleaning Service",
-            content: `If you're not satisfied with the cleaning quality:
-
-FREE RE-CLEAN: We offer free re-cleaning for quality issues reported within 48 hours of delivery.
-
-PICKUP: We will schedule a pickup for the unsatisfactorily cleaned item at no extra cost.
-
-PRIORITY PROCESSING: Re-clean orders receive priority processing and are typically returned within 24-48 hours.
-
-LIMITATIONS: Re-cleaning is offered once per original order. If quality issues persist after re-cleaning, a refund can be requested.
-
-EXCLUSIONS: Re-cleaning does not apply to stains disclosed as "best effort" at the time of order or inherent garment issues.`
-        },
-        {
-            id: 10,
-            title: "Subscription Refunds",
-            content: `For monthly subscription or package holders:
-
-PRO-RATA REFUNDS: Cancelled subscriptions are eligible for pro-rata refunds of unused services at our discretion.
-
-UNUSED CREDITS: Unused pickup/delivery credits expire at the end of each billing cycle and are non-refundable.
-
-PREPAID PACKAGES: Prepaid packages can be refunded with a 15% cancellation fee for the unused portion.
-
-TRIAL PERIODS: If a trial subscription is cancelled within the trial period, you will receive a full refund of any charges.
-
-UPGRADE/DOWNGRADE: You can change your subscription tier at any time. The difference will be prorated.`
-        },
-        {
-            id: 11,
-            title: "Special Circumstances",
-            content: `EXPRESS SERVICE FAILURES: If an express/same-day order is not delivered within the promised timeframe, the express premium charge (difference between express and regular pricing) will be automatically refunded.
-
-WEDDING/EVENT ORDERS: For wedding and special event orders, if we fail to deliver by the confirmed date, a 100% refund plus compensation equal to 50% of the order value will be provided.
-
-RECURRING ISSUES: Customers experiencing repeated quality issues on the same account will be assigned a dedicated quality manager and offered enhanced compensation.
-
-SERVICE OUTAGES: During service disruptions due to unforeseen circumstances, pending orders will be completed at the earliest opportunity. Refunds will be provided upon request for significant delays.
-
-DEATH/EMERGENCY: In cases of customer emergency or bereavement, all pending matters will be handled with sensitivity and full flexibility on refunds and cancellations.`
-        },
-        {
-            id: 12,
-            title: "Dispute Resolution",
-            content: `If you are dissatisfied with our refund decision:
-
-INTERNAL REVIEW: Request a review by our Customer Experience Manager by emailing escalations@myfabclean.com.
-
-MEDIATION: We are open to third-party mediation through recognized consumer dispute resolution forums.
-
-CONSUMER FORUM: You have the right to approach the Consumer Disputes Redressal Forum if the matter cannot be resolved internally.
-
-JURISDICTION: All disputes are subject to the jurisdiction of courts in Pollachi, Tamil Nadu, India.
-
-GOOD FAITH: We commit to resolving all disputes in good faith and in the best interest of maintaining customer relationships.`
-        },
-        {
-            id: 13,
+            id: 7,
             title: "Contact for Refunds",
+            shortTitle: "Contact",
             content: `For all refund-related inquiries:
 
 CUSTOMER SUPPORT:
@@ -221,98 +195,170 @@ Hours: Monday-Saturday, 8:00 AM - 8:00 PM IST
 ESCALATIONS:
 Email: escalations@myfabclean.com
 
-WRITTEN CORRESPONDENCE:
+ADDRESS:
 Fab Clean - Refunds Department
 #16, Venkatramana Round Road
-Opp Naturals/HDFC Bank, Mahalingapuram
-Pollachi - 642002
-Tamil Nadu, India
+Pollachi - 642002, Tamil Nadu, India
 
-Please include your order number, contact details, and a clear description of the issue for fastest resolution.`
+Please include your order number for fastest resolution.`
         }
     ]
 };
 
 export default function RefundPage() {
     useRefundSEO();
+    const isMobile = useIsMobile();
     const currentYear = new Date().getFullYear();
+    const [showBackToTop, setShowBackToTop] = useState(false);
+    const [showMobileToc, setShowMobileToc] = useState(false);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            setShowBackToTop(window.scrollY > 500);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    const scrollToTop = () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
             {/* Header */}
-            <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-                <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-center">
-                    <a href="/" className="flex items-center gap-3">
-                        <img src="/assets/logo.webp" alt="Fab Clean" className="h-10" />
+            <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm safe-area-top">
+                <div className="max-w-5xl mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-center">
+                    <a href="/" className="flex items-center gap-3 touch-target">
+                        <img src="/assets/logo.webp" alt="Fab Clean" className="h-8 md:h-10" />
                     </a>
                 </div>
             </header>
 
             {/* Hero Section */}
-            <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white py-16">
-                <div className="max-w-5xl mx-auto px-6 text-center">
-                    <h1 className="text-4xl md:text-5xl font-bold mb-4">Refund Policy</h1>
-                    <p className="text-amber-100 text-lg max-w-2xl mx-auto">
+            <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white py-10 md:py-16">
+                <div className="max-w-5xl mx-auto px-4 md:px-6 text-center">
+                    <h1 className="text-3xl md:text-5xl font-bold mb-3 md:mb-4">Refund Policy</h1>
+                    <p className="text-amber-100 text-base md:text-lg max-w-2xl mx-auto">
                         Our commitment to fair and transparent refund, cancellation, and compensation procedures.
                     </p>
-                    <div className="mt-6 flex items-center justify-center gap-6 text-sm text-amber-200">
+                    <div className="mt-4 md:mt-6 flex items-center justify-center gap-4 md:gap-6 text-xs md:text-sm text-amber-200">
                         <span>Effective: {refundData.effectiveDate}</span>
                         <span className="w-1 h-1 rounded-full bg-amber-300"></span>
-                        <span>Last Updated: {refundData.lastUpdated}</span>
+                        <span>Updated: {refundData.lastUpdated}</span>
                     </div>
                 </div>
             </div>
 
-            {/* Legal Navigation */}
-            <div className="bg-white border-b border-slate-200 py-4">
-                <div className="max-w-5xl mx-auto px-6">
-                    <div className="flex items-center justify-center gap-4 flex-wrap">
-                        <a href="/terms" className="px-4 py-2 text-sm text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors">Terms & Conditions</a>
-                        <span className="text-slate-300">|</span>
-                        <a href="/privacy" className="px-4 py-2 text-sm text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors">Privacy Policy</a>
-                        <span className="text-slate-300">|</span>
-                        <span className="px-4 py-2 text-sm bg-amber-100 text-amber-700 rounded-full font-medium">Refund Policy</span>
-                        <span className="text-slate-300">|</span>
-                        <a href="/cookies" className="px-4 py-2 text-sm text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-full transition-colors">Cookie Policy</a>
+            {/* Legal Navigation - Mobile Optimized */}
+            <div className="bg-white border-b border-slate-200 py-3 md:py-4">
+                <div className="max-w-5xl mx-auto px-4 md:px-6">
+                    <div className="flex items-center justify-start md:justify-center gap-2 md:gap-4 overflow-x-auto hide-scrollbar">
+                        <a href="/terms" className="flex items-center gap-1.5 px-3 py-2 text-xs md:text-sm text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors whitespace-nowrap touch-target">
+                            <FileText className="w-3 h-3 md:w-4 md:h-4" />
+                            Terms
+                        </a>
+                        <a href="/privacy" className="flex items-center gap-1.5 px-3 py-2 text-xs md:text-sm text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors whitespace-nowrap touch-target">
+                            <Shield className="w-3 h-3 md:w-4 md:h-4" />
+                            Privacy
+                        </a>
+                        <span className="px-3 py-2 text-xs md:text-sm bg-amber-100 text-amber-700 rounded-full font-medium whitespace-nowrap flex items-center gap-1.5">
+                            <RefreshCw className="w-3 h-3 md:w-4 md:h-4" />
+                            Refund
+                        </span>
+                        <a href="/cookies" className="flex items-center gap-1.5 px-3 py-2 text-xs md:text-sm text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-full transition-colors whitespace-nowrap touch-target">
+                            <Cookie className="w-3 h-3 md:w-4 md:h-4" />
+                            Cookies
+                        </a>
                     </div>
                 </div>
             </div>
+
+            {/* Mobile TOC Button */}
+            {isMobile && (
+                <button
+                    onClick={() => setShowMobileToc(true)}
+                    className="fixed bottom-20 right-4 z-40 bg-amber-500 text-white p-3 rounded-full shadow-lg touch-target active:scale-95 transition-transform"
+                >
+                    <Menu className="w-5 h-5" />
+                </button>
+            )}
+
+            {/* Mobile TOC Drawer */}
+            {isMobile && showMobileToc && (
+                <>
+                    <div
+                        className="fixed inset-0 bg-black/50 z-50 animate-fade-in"
+                        onClick={() => setShowMobileToc(false)}
+                    />
+                    <div className="fixed right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white z-50 shadow-xl animate-slide-up overflow-y-auto">
+                        <div className="p-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white">
+                            <h3 className="font-semibold text-slate-800">Quick Jump</h3>
+                            <button onClick={() => setShowMobileToc(false)} className="p-2 touch-target">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-4 space-y-2">
+                            {refundData.sections.map((section) => (
+                                <button
+                                    key={section.id}
+                                    onClick={() => {
+                                        setShowMobileToc(false);
+                                        document.getElementById(`section-${section.id}`)?.scrollIntoView({ behavior: 'smooth' });
+                                    }}
+                                    className="w-full flex items-center gap-3 p-3 bg-slate-50 rounded-lg touch-target active:scale-95 transition-transform text-left"
+                                >
+                                    <span className="w-8 h-8 flex items-center justify-center bg-amber-500 text-white font-semibold rounded-lg text-sm">
+                                        {section.id}
+                                    </span>
+                                    <span className="text-slate-700 text-sm">{section.shortTitle}</span>
+                                    <ChevronRight className="w-4 h-4 text-slate-400 ml-auto" />
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </>
+            )}
 
             {/* Main Content */}
-            <main className="max-w-5xl mx-auto px-6 py-12">
-                {/* Table of Contents */}
-                <div className="bg-slate-50 rounded-xl p-8 mb-12">
-                    <h2 className="text-xl font-bold text-slate-800 mb-6">Table of Contents</h2>
-                    <div className="grid md:grid-cols-2 gap-3">
-                        {refundData.sections.map((section) => (
-                            <button
-                                key={section.id}
-                                onClick={() => document.getElementById(`section-${section.id}`)?.scrollIntoView({ behavior: 'smooth' })}
-                                className="flex items-center gap-3 p-3 bg-white rounded-lg hover:shadow-md transition-shadow text-left group"
-                            >
-                                <span className="w-8 h-8 flex items-center justify-center bg-amber-100 text-amber-700 font-semibold rounded-lg text-sm group-hover:bg-amber-500 group-hover:text-white transition-colors">
-                                    {section.id}
-                                </span>
-                                <span className="text-slate-700 group-hover:text-amber-700 transition-colors">{section.title}</span>
-                            </button>
-                        ))}
+            <main className="max-w-5xl mx-auto px-4 md:px-6 py-8 md:py-12">
+                {/* Table of Contents - Desktop */}
+                {!isMobile && (
+                    <div className="bg-slate-50 rounded-xl p-6 md:p-8 mb-8 md:mb-12">
+                        <h2 className="text-lg md:text-xl font-bold text-slate-800 mb-4 md:mb-6">Table of Contents</h2>
+                        <div className="grid md:grid-cols-2 gap-3">
+                            {refundData.sections.map((section) => (
+                                <button
+                                    key={section.id}
+                                    onClick={() => document.getElementById(`section-${section.id}`)?.scrollIntoView({ behavior: 'smooth' })}
+                                    className="flex items-center gap-3 p-3 bg-white rounded-lg hover:shadow-md transition-shadow text-left group"
+                                >
+                                    <span className="w-8 h-8 flex items-center justify-center bg-amber-100 text-amber-700 font-semibold rounded-lg text-sm group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                                        {section.id}
+                                    </span>
+                                    <span className="text-slate-700 group-hover:text-amber-700 transition-colors">{section.title}</span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Sections */}
-                <div className="space-y-12">
+                <div className="space-y-8 md:space-y-12">
                     {refundData.sections.map((section) => (
                         <section key={section.id} id={`section-${section.id}`} className="scroll-mt-32">
-                            <div className="flex items-start gap-4 mb-6">
-                                <span className="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-amber-500 text-white font-bold rounded-xl text-lg">
+                            <div className="flex items-start gap-3 md:gap-4 mb-4 md:mb-6">
+                                <span className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-amber-500 text-white font-bold rounded-xl text-base md:text-lg">
                                     {section.id}
                                 </span>
-                                <h2 className="text-2xl font-bold text-slate-800 pt-2">{section.title}</h2>
+                                <h2 className="text-xl md:text-2xl font-bold text-slate-800 pt-1 md:pt-2">
+                                    {isMobile ? section.shortTitle : section.title}
+                                </h2>
                             </div>
-                            <div className="pl-16">
+                            <div className="pl-0 md:pl-16">
                                 <div className="prose prose-slate max-w-none">
                                     {section.content.split('\n\n').map((paragraph, idx) => (
-                                        <p key={idx} className="text-slate-600 leading-relaxed mb-4 text-justify">
+                                        <p key={idx} className="text-sm md:text-base text-slate-600 leading-relaxed mb-3 md:mb-4">
                                             {paragraph}
                                         </p>
                                     ))}
@@ -323,16 +369,26 @@ export default function RefundPage() {
                 </div>
             </main>
 
+            {/* Back to Top Button */}
+            {showBackToTop && (
+                <button
+                    onClick={scrollToTop}
+                    className="fixed bottom-4 right-4 z-40 bg-amber-500 text-white p-3 rounded-full shadow-lg touch-target active:scale-95 transition-transform animate-fade-in"
+                >
+                    <ChevronUp className="w-5 h-5" />
+                </button>
+            )}
+
             {/* Footer */}
-            <footer className="bg-slate-900 text-white py-12 mt-16">
-                <div className="max-w-5xl mx-auto px-6">
-                    <div className="grid md:grid-cols-3 gap-8 mb-8">
+            <footer className="bg-slate-900 text-white py-8 md:py-12 mt-12 md:mt-16 safe-area-bottom">
+                <div className="max-w-5xl mx-auto px-4 md:px-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-6 md:mb-8">
                         <div>
-                            <h4 className="font-semibold mb-4">Fab Clean</h4>
+                            <h4 className="font-semibold mb-3 md:mb-4">Fab Clean</h4>
                             <p className="text-slate-400 text-sm">Premium laundry and dry cleaning services committed to quality and customer satisfaction.</p>
                         </div>
                         <div>
-                            <h4 className="font-semibold mb-4">Legal</h4>
+                            <h4 className="font-semibold mb-3 md:mb-4">Legal</h4>
                             <ul className="space-y-2 text-sm text-slate-400">
                                 <li><a href="/terms" className="hover:text-white transition-colors">Terms & Conditions</a></li>
                                 <li><a href="/privacy" className="hover:text-white transition-colors">Privacy Policy</a></li>
@@ -341,15 +397,15 @@ export default function RefundPage() {
                             </ul>
                         </div>
                         <div>
-                            <h4 className="font-semibold mb-4">Contact</h4>
+                            <h4 className="font-semibold mb-3 md:mb-4">Contact</h4>
                             <ul className="space-y-2 text-sm text-slate-400">
-                                <li>📧 support@myfabclean.com</li>
-                                <li>📞 +91 93630 59595</li>
-                                <li>🌐 www.myfabclean.com</li>
+                                <li className="flex items-center gap-2"><Mail className="w-4 h-4" /> support@myfabclean.com</li>
+                                <li className="flex items-center gap-2"><Phone className="w-4 h-4" /> +91 93630 59595</li>
+                                <li className="flex items-center gap-2"><Globe className="w-4 h-4" /> www.myfabclean.com</li>
                             </ul>
                         </div>
                     </div>
-                    <div className="border-t border-slate-800 pt-8 text-center text-slate-500 text-sm">
+                    <div className="border-t border-slate-800 pt-6 md:pt-8 text-center text-slate-500 text-xs md:text-sm">
                         <p>© {currentYear} Fab Clean. All rights reserved.</p>
                     </div>
                 </div>
