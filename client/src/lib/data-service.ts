@@ -188,24 +188,36 @@ export const ordersApi = {
     }
   },
 
-  async create(order: Partial<Order>): Promise<Order | null> {
-    try {
-      const response = await authorizedFetch("/orders", {
-        method: "POST",
-        body: JSON.stringify(order),
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("Order creation failed:", errorData);
-        throw new Error(errorData.message || (errorData.error && typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error)) || "Failed to create order");
+  async create(order: Partial<Order>): Promise<Order> {
+    const response = await authorizedFetch("/orders", {
+      method: "POST",
+      body: JSON.stringify(order),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      console.error("Order creation failed:", errorData);
+
+      // Extract meaningful error message
+      let errorMessage = 'Failed to create order';
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      } else if (errorData.error) {
+        if (typeof errorData.error === 'string') {
+          errorMessage = errorData.error;
+        } else if (errorData.error.message) {
+          errorMessage = errorData.error.message;
+        } else {
+          errorMessage = JSON.stringify(errorData.error);
+        }
       }
-      const result = await response.json();
-      // Handle wrapped response from createSuccessResponse
-      return result.data || result;
-    } catch (error) {
-      console.error("Failed to create order:", error);
-      return null;
+
+      throw new Error(errorMessage);
     }
+
+    const result = await response.json();
+    // Handle wrapped response from createSuccessResponse
+    return result.data || result;
   },
 
   async update(id: string, order: Partial<Order>): Promise<Order | null> {

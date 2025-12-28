@@ -357,6 +357,7 @@ export async function sendOrderProcessingNotification({
 /**
  * Send Order Status Update notification via WhatsApp
  * Template: "invoice_fabzclean" - 👋 Dear {{1}}, Update for Order #{{2}}: Status: {{3}} ✅ {{4}}
+ * Button: Track Order with URL https://myfabclean.com/trackorder/{{1}} (order number)
  * 
  * AUTO-TRIGGERED: When order status changes to ready_for_pickup or out_for_delivery
  */
@@ -378,11 +379,15 @@ export async function sendOrderStatusUpdateNotification({
     const template = TEMPLATES.invoice;
     const cleanPhone = cleanPhoneNumber(phoneNumber);
 
+    // Clean order number for URL (remove special chars if any)
+    const cleanOrderNumber = orderNumber.replace(/[#]/g, '').trim();
+
     // Template "invoice_fabzclean" expects:
-    // {{1}} = Customer Name
-    // {{2}} = Order Number
-    // {{3}} = Status (Ready to Pickup / Out For Delivery)
-    // {{4}} = Additional info
+    // {{1}} = Customer Name (body_1)
+    // {{2}} = Order Number (body_2)
+    // {{3}} = Status (Ready to Pickup / Out For Delivery) (body_3)
+    // {{4}} = Additional info / items (body_4)
+    // Button URL variable {{1}} = Order Number for tracking link
     const payload = {
         integrated_number: integratedNumber,
         content_type: "template",
@@ -416,6 +421,14 @@ export async function sendOrderStatusUpdateNotification({
                                 type: "text",
                                 value: additionalInfo,
                             },
+                            // Button URL parameter for Track Order
+                            // The template URL is: https://myfabclean.com/trackorder/{{1}}
+                            // We pass the order number as {{1}} in the button
+                            button_1: {
+                                subtype: "url",
+                                type: "text",
+                                value: cleanOrderNumber,
+                            },
                         },
                     },
                 ],
@@ -427,6 +440,7 @@ export async function sendOrderStatusUpdateNotification({
         console.log(`📱 [WhatsApp] Sending Status Update to ${cleanPhone}`);
         console.log(`📄 [WhatsApp] Template: ${template.name} (invoice)`);
         console.log(`📋 [WhatsApp] Customer: ${customerName}, Order: ${orderNumber}, Status: ${status}`);
+        console.log(`🔗 [WhatsApp] Track URL: https://myfabclean.com/trackorder/${cleanOrderNumber}`);
 
         const response = await fetch(
             "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
@@ -489,6 +503,7 @@ export async function handleOrderStatusChange(
         totalAmount: string;
         status: OrderStatus;
         fulfillmentType?: FulfillmentType | null;
+        items?: Array<{ serviceName?: string; name?: string; quantity?: number }>;
     },
     previousStatus?: OrderStatus
 ): Promise<SendResult | null> {
@@ -503,6 +518,11 @@ export async function handleOrderStatusChange(
 
     console.log(`🔄 [WhatsApp] Order ${order.orderNumber} status changed: ${previousStatus} -> ${currentStatus}`);
 
+    // Get item names for display in message
+    const itemNames = order.items && order.items.length > 0
+        ? order.items.map(item => item.serviceName || item.name || 'Item').slice(0, 3).join(', ')
+        : 'Your items';
+
     // STATUS: processing - Send "bill" template
     if (currentStatus === 'processing' && previousStatus !== 'processing') {
         console.log(`📤 [WhatsApp] Triggering Processing notification for order ${order.orderNumber}`);
@@ -513,36 +533,42 @@ export async function handleOrderStatusChange(
         });
     }
 
-    // STATUS: ready_for_pickup - Send "invoice" template with "Ready to Pickup"
+    // STATUS: ready_for_pickup - Send "invoice" template with "Ready to Pickup/Out for Delivery"
     if (currentStatus === 'ready_for_pickup' && previousStatus !== 'ready_for_pickup') {
+        // Determine message based on fulfillment type
+        const statusMessage = fulfillmentType === 'delivery' ? 'Ready to Pickup/Out for Delivery' : 'Ready to Pickup/Out for Delivery';
+        const additionalInfo = `${itemNames}\n\nThank you for choosing Fab Clean! 🧺`;
+
         console.log(`📤 [WhatsApp] Triggering Ready for Pickup notification for order ${order.orderNumber}`);
         return await sendOrderStatusUpdateNotification({
             phoneNumber: order.customerPhone,
             customerName: order.customerName,
             orderNumber: order.orderNumber,
-            status: 'Ready to Pickup',
-            additionalInfo: 'Your items are ready! Please visit us to collect your order. 🙏',
+            status: statusMessage,
+            additionalInfo: additionalInfo,
         });
     }
 
     // STATUS: out_for_delivery - Send "invoice" template with "Out For Delivery"
     if (currentStatus === 'out_for_delivery' && previousStatus !== 'out_for_delivery') {
+        const additionalInfo = `${itemNames}\n\nOur delivery partner is on the way! 🚗`;
+
         console.log(`📤 [WhatsApp] Triggering Out for Delivery notification for order ${order.orderNumber}`);
         return await sendOrderStatusUpdateNotification({
             phoneNumber: order.customerPhone,
             customerName: order.customerName,
             orderNumber: order.orderNumber,
             status: 'Out For Delivery',
-            additionalInfo: 'Our delivery partner is on the way! 🚗',
+            additionalInfo: additionalInfo,
         });
     }
 
     // STATUS: completed - Determine based on fulfillment type
     if (currentStatus === 'completed' && previousStatus !== 'completed') {
-        const statusMessage = fulfillmentType === 'pickup' ? 'Ready to Pickup' : 'Out For Delivery';
+        const statusMessage = fulfillmentType === 'pickup' ? 'Completed - Ready to Pickup' : 'Completed - Delivered';
         const additionalInfo = fulfillmentType === 'pickup'
-            ? 'Your items are ready! Please visit us to collect your order. 🙏'
-            : 'Our delivery partner is on the way! 🚗';
+            ? `${itemNames}\n\nYour items are ready! Please visit us to collect. 🙏`
+            : `${itemNames}\n\nYour order has been delivered! Thank you! 🎉`;
 
         console.log(`📤 [WhatsApp] Triggering Completed (${fulfillmentType}) notification for order ${order.orderNumber}`);
         return await sendOrderStatusUpdateNotification({

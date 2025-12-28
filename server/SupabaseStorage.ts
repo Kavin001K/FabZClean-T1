@@ -475,13 +475,34 @@ export class SupabaseStorage {
             data.orderNumber = await this.getNextOrderNumber((data as any).franchiseId);
         }
 
-        const { data: order, error } = await this.supabase
-            .from('orders')
-            .insert(this.toSnakeCase(data))
-            .select('*')
-            .single();
-        if (error) throw error;
-        return this.mapDates(order);
+        try {
+            const snakeCaseData = this.toSnakeCase(data);
+            console.log('[SupabaseStorage] Creating order with data:', JSON.stringify(snakeCaseData, null, 2));
+
+            const { data: order, error } = await this.supabase
+                .from('orders')
+                .insert(snakeCaseData)
+                .select('*')
+                .single();
+
+            if (error) {
+                console.error('[SupabaseStorage] Supabase create order error:', {
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                    code: error.code,
+                });
+                throw new Error(`Database error: ${error.message}${error.hint ? ` (Hint: ${error.hint})` : ''}${error.details ? ` - ${error.details}` : ''}`);
+            }
+
+            return this.mapDates(order);
+        } catch (err) {
+            console.error('[SupabaseStorage] Create order exception:', err);
+            if (err instanceof Error) {
+                throw err;
+            }
+            throw new Error(`Failed to create order: ${JSON.stringify(err)}`);
+        }
     }
 
     async getOrder(id: string): Promise<Order | undefined> {
