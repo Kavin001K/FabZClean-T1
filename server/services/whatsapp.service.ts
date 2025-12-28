@@ -255,7 +255,16 @@ export async function sendOrderProcessingNotification({
     // Template "bill" expects:
     // - Header: Image (processing status image)
     // - Body: {{1}} = Customer Name, {{2}} = Order Number
-    // - Button: Track Order link with {{1}} = Order Number appended to base URL
+    // - Button 1: Track Order link with dynamic URL suffix (order number)
+    // - Button 2: Terms link (static or dynamic)
+    // 
+    // IMPORTANT: For URL buttons, the "value" should be ONLY the dynamic suffix
+    // that gets appended to the base URL defined in the template.
+    // Template base URL: https://myfabclean.com/trackorder/
+    // We provide: FZC-2025POL6551A
+    // Result: https://myfabclean.com/trackorder/FZC-2025POL6551A
+    const cleanOrderNumber = orderNumber.replace(/[#]/g, '').trim();
+
     const payload = {
         integrated_number: integratedNumber,
         content_type: "template",
@@ -287,12 +296,21 @@ export async function sendOrderProcessingNotification({
                                 type: "text",
                                 value: orderNumber,
                             },
-                            // Button URL component - appends order number to base URL
-                            // Base URL is set in template: https://fabclean.com/track/
-                            // This adds the order number as the dynamic part
+                            // Button 1: Track Order - dynamic URL with order number suffix
+                            // Template URL: https://myfabclean.com/trackorder/{{1}}
                             button_1: {
+                                subtype: "url",
                                 type: "text",
-                                value: orderNumber,  // This gets appended to make: https://fabclean.com/track/FZC-2025POL9926A
+                                value: cleanOrderNumber,
+                            },
+                            // Button 2: Terms - dynamic URL with suffix
+                            // Template base URL: https://myfabclean.com/
+                            // We provide: terms
+                            // Result: https://myfabclean.com/terms
+                            button_2: {
+                                subtype: "url",
+                                type: "text",
+                                value: "terms",
                             },
                         },
                     },
