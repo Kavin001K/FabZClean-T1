@@ -125,16 +125,17 @@ router.get('/test-whatsapp', async (req: Request, res: Response) => {
         return res.status(503).json({ error: 'MSG91_AUTH_KEY not configured' });
     }
 
-    // Test data
+    // Test data for "bill" template
     const testData = {
         orderNumber: 'FZC-TEST-12345',
         customerName: 'Test Customer',
-        invoiceNumber: 'INV-TEST-001',
-        amount: '999',
-        itemName: 'Laundry Items',
-        pdfUrl: 'https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/pdfs/test-invoice.pdf',
+        imageUrl: 'https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/Templates/Screenshot%202025-12-27%20at%2010.32.31%20PM.png',
     };
 
+    // "bill" template (ACTUAL MSG91 SPEC):
+    // - header_1: IMAGE
+    // - body_1, body_2: text (only 2 params)
+    // - button_1, button_2: url
     const payload = {
         integrated_number: integratedNumber,
         content_type: "template",
@@ -152,31 +153,31 @@ router.get('/test-whatsapp', async (req: Request, res: Response) => {
                     {
                         to: [String(phone)],
                         components: {
+                            // Header: IMAGE (not document!)
                             header_1: {
-                                filename: `Invoice_${testData.invoiceNumber}.pdf`,
-                                type: "document",
-                                value: testData.pdfUrl,
+                                type: "image",
+                                value: testData.imageUrl,
                             },
+                            // Body: Only 2 params for "bill" template
                             body_1: {
                                 type: "text",
-                                value: testData.customerName,
+                                value: testData.customerName, // {{1}} = Customer Name
                             },
                             body_2: {
                                 type: "text",
-                                value: testData.invoiceNumber,
+                                value: testData.orderNumber, // {{2}} = Order Number
                             },
-                            body_3: {
-                                type: "text",
-                                value: testData.amount,
-                            },
-                            body_4: {
-                                type: "text",
-                                value: testData.itemName,
-                            },
+                            // Button 1: Track Order - dynamic URL suffix
                             button_1: {
                                 subtype: "url",
                                 type: "text",
                                 value: testData.orderNumber,
+                            },
+                            // Button 2: Terms - dynamic URL suffix
+                            button_2: {
+                                subtype: "url",
+                                type: "text",
+                                value: "terms",
                             },
                         },
                     },

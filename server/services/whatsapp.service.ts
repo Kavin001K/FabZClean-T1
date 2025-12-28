@@ -259,30 +259,18 @@ export async function sendOrderProcessingNotification({
 
     // Clean order number for URL (remove # and special characters)
     // This becomes the dynamic suffix for the Track Order button URL
-    // Template base URL: https://myfabclean.com/trackorder/
-    // We provide: FZC-2025POL6551A
-    // Result: https://myfabclean.com/trackorder/FZC-2025POL6551A
     const cleanOrderNumber = orderNumber.replace(/[#]/g, '').trim();
 
-    // Format amount for display (ensure it's just the number, ₹ symbol is in template)
-    const formattedAmount = amount?.replace(/[₹,\s]/g, '') || '0';
+    // Processing image URL (hosted publicly accessible image)
+    const processingImageUrl = process.env.WHATSAPP_PROCESSING_IMAGE_URL ||
+        'https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/Templates/Screenshot%202025-12-27%20at%2010.32.31%20PM.png';
 
-    // Get item name from first item or default (for {{4}} placeholder which is item name, not amount)
-    const itemName = "Laundry Items"; // Default item name for template
-
-    // Template "bill" expects (based on MSG91 format):
-    // - Header: Document (PDF with filename) - uses nested document: {link, filename}
-    // - Body: {{1}} = Customer Name, {{2}} = Order Number, {{3}} = Amount, {{4}} = Item name
-    // - Button 1: Track Order link with dynamic URL suffix (order number)
-    // - Button 2: Terms & Conditions link with dynamic URL suffix
-    // 
-    // MSG91 FORMAT (from original cURL):
-    // - Header document: { type, value (URL), filename } - FLAT, not nested
-    // - Body text: { type, value } - uses "value", not "text"
-    // - Button URL: { subtype, type, value } - uses "value"
-
-    // Generate proper filename with extension
-    const pdfFilename = `Invoice_${invoiceNumber || orderNumber}.pdf`;
+    // Template "bill" (ACTUAL MSG91 SPEC):
+    // - header_1: IMAGE (type: "image", value: "<url>")
+    // - body_1: text ({{1}} = Customer Name)
+    // - body_2: text ({{2}} = Order Number)
+    // - button_1: url (Track Order - dynamic suffix)
+    // - button_2: url (Terms - dynamic suffix)
 
     const payload = {
         integrated_number: integratedNumber,
@@ -301,40 +289,32 @@ export async function sendOrderProcessingNotification({
                     {
                         to: [cleanPhone],
                         components: {
-                            // Header document component (PDF invoice)
-                            // MSG91 format: FLAT structure with filename, type, value
+                            // Header: IMAGE (not document!)
                             header_1: {
-                                filename: pdfFilename,
-                                type: "document",
-                                value: pdfUrl || "",
+                                type: "image",
+                                value: processingImageUrl,
                             },
-                            // Body text components matching template placeholders
-                            // MSG91 format: uses "value" field
+                            // Body: Only 2 params for "bill" template
                             body_1: {
                                 type: "text",
                                 value: customerName, // {{1}} = Customer Name
                             },
                             body_2: {
                                 type: "text",
-                                value: invoiceNumber || orderNumber, // {{2}} = Invoice Number
+                                value: orderNumber, // {{2}} = Order Number
                             },
-                            body_3: {
-                                type: "text",
-                                value: formattedAmount, // {{3}} = Amount
-                            },
-                            body_4: {
-                                type: "text",
-                                value: itemName, // {{4}} = Item name
-                            },
-                            // Button 1: Track Order - dynamic URL with order number suffix
-                            // Template URL: https://myfabclean.com/trackorder/{{1}}
-                            // MSG91 format: uses "value" field for the dynamic suffix
+                            // Button 1: Track Order - dynamic URL suffix
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                value: cleanOrderNumber, // Just the order number, e.g., "FZC-2025POL6551A"
+                                value: cleanOrderNumber, // e.g., "FZC-2025POL6551A"
                             },
-                            // Note: button_2 (Terms & Conditions) is static in template, no need to send
+                            // Button 2: Terms - dynamic URL suffix (required by template)
+                            button_2: {
+                                subtype: "url",
+                                type: "text",
+                                value: "terms", // Path suffix for terms page
+                            },
                         },
                     },
                 ],
@@ -345,9 +325,8 @@ export async function sendOrderProcessingNotification({
     try {
         console.log(`📱 [WhatsApp] Sending Order Processing to ${cleanPhone}`);
         console.log(`📄 [WhatsApp] Template: ${template.name} (bill)`);
-        console.log(`📎 [WhatsApp] PDF: ${pdfUrl || 'No PDF URL provided'}`);
-        console.log(`🧺 [WhatsApp] Customer: ${customerName}, Order: ${orderNumber}, Invoice: ${invoiceNumber}`);
-        console.log(`💰 [WhatsApp] Amount: ₹${formattedAmount}`);
+        console.log(`�️ [WhatsApp] Image: ${processingImageUrl}`);
+        console.log(`🧺 [WhatsApp] Customer: ${customerName}, Order: ${orderNumber}`);
         console.log(`🔗 [WhatsApp] Track Link will be: https://myfabclean.com/trackorder/${cleanOrderNumber}`);
 
         const response = await fetch(
