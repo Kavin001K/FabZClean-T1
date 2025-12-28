@@ -480,7 +480,14 @@ export class SupabaseStorage {
         }
 
         try {
-            const snakeCaseData = this.toSnakeCase(data);
+            // Strip WhatsApp tracking fields - they shouldn't be set during creation
+            // They will be updated after WhatsApp notifications are sent
+            const cleanData = { ...data };
+            delete (cleanData as any).whatsappMessageCount;
+            delete (cleanData as any).lastWhatsappStatus;
+            delete (cleanData as any).lastWhatsappSentAt;
+
+            const snakeCaseData = this.toSnakeCase(cleanData);
             console.log('[SupabaseStorage] Creating order with data:', JSON.stringify(snakeCaseData, null, 2));
 
             const { data: order, error } = await this.supabase
