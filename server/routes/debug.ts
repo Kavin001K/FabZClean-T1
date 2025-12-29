@@ -168,17 +168,13 @@ router.get('/test-whatsapp', async (req: Request, res: Response) => {
                                 value: testData.orderNumber, // {{2}} = Order Number
                             },
                             // Button 1: Track Order - dynamic URL suffix
+                            // Template URL: https://myfabclean.com/trackorder/{{1}}
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                value: testData.orderNumber,
+                                value: testData.orderNumber, // Order ID for tracking
                             },
-                            // Button 2: Terms - dynamic URL suffix
-                            button_2: {
-                                subtype: "url",
-                                type: "text",
-                                value: "terms",
-                            },
+                            // NOTE: button_2 (Terms) is STATIC URL, no dynamic variable needed
                         },
                     },
                 ],

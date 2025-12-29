@@ -304,17 +304,14 @@ export async function sendOrderProcessingNotification({
                                 value: orderNumber, // {{2}} = Order Number
                             },
                             // Button 1: Track Order - dynamic URL suffix
+                            // Template URL: https://myfabclean.com/trackorder/{{1}}
+                            // We send the order number as {{1}}
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                value: cleanOrderNumber, // Order number for tracking URL
+                                value: cleanOrderNumber, // Order ID for tracking URL
                             },
-                            // Button 2: Terms - dynamic URL suffix (required by template)
-                            button_2: {
-                                subtype: "url",
-                                type: "text",
-                                value: "terms", // Path suffix for terms page
-                            },
+                            // NOTE: button_2 (Terms) is STATIC URL, no dynamic variable needed
                         },
                     },
                 ],
