@@ -632,7 +632,11 @@ export async function handleOrderStatusChange(
 
 /**
  * Send Invoice via WhatsApp with PDF attachment using MSG91 Template
- * (Legacy function for PDF invoices)
+ * 
+ * MSG91 FORMAT (IMPORTANT - uses flat structure with 'value' fields):
+ * - header_1: { type: "document", value: url, filename: name } - NOT nested!
+ * - body_N: { type: "text", value: text } - NOT { text: text }
+ * - button_N: { subtype: "url", type: "text", value: dynamic_suffix } - for URL buttons
  */
 export async function sendInvoiceWhatsApp({
     phoneNumber,
@@ -655,6 +659,85 @@ export async function sendInvoiceWhatsApp({
     const template = TEMPLATES[templateType];
     const cleanPhone = cleanPhoneNumber(phoneNumber);
 
+    // Clean order number for URL (remove # and special characters)
+    const cleanOrderNumber = invoiceNumber.replace(/[#]/g, '').trim();
+
+    // Build components based on template type
+    // MSG91 expects FLAT format with 'value' field, NOT nested objects!
+    let components: Record<string, any>;
+
+    if (templateType === 'bill') {
+        // "bill" template: IMAGE header, 2 body params, 1 URL button
+        const processingImageUrl = process.env.WHATSAPP_PROCESSING_IMAGE_URL ||
+            'https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/Templates/Screenshot%202025-12-27%20at%2010.32.31%20PM.png';
+
+        components = {
+            // Header: IMAGE format
+            header_1: {
+                type: "image",
+                value: processingImageUrl,
+            },
+            // Body params
+            body_1: {
+                type: "text",
+                value: customerName, // {{1}} = Customer Name
+            },
+            body_2: {
+                type: "text",
+                value: invoiceNumber, // {{2}} = Order Number
+            },
+            // Button 1: Track Order dynamic URL suffix
+            button_1: {
+                subtype: "url",
+                type: "text",
+                value: cleanOrderNumber,
+            },
+        };
+    } else if (templateType === 'invoice') {
+        // "invoice_fabzclean" template: IMAGE header, 4 body params, 1 URL button
+        const statusImageUrl = process.env.WHATSAPP_STATUS_IMAGE_URL ||
+            'https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/Templates/Screenshot%202025-12-27%20at%2010.32.31%20PM.png';
+
+        components = {
+            // Header: IMAGE format
+            header_1: {
+                type: "image",
+                value: statusImageUrl,
+            },
+            // Body params
+            body_1: {
+                type: "text",
+                value: customerName, // {{1}}
+            },
+            body_2: {
+                type: "text",
+                value: invoiceNumber, // {{2}}
+            },
+            body_3: {
+                type: "text",
+                value: amount, // {{3}}
+            },
+            body_4: {
+                type: "text",
+                value: itemName, // {{4}}
+            },
+            // Button 1: Track Order URL suffix
+            button_1: {
+                subtype: "url",
+                type: "text",
+                value: cleanOrderNumber,
+            },
+        };
+    } else {
+        // "order" template (v): Simple amount-only body, no header/buttons
+        components = {
+            body_1: {
+                type: "text",
+                value: amount, // Amount like "Rs.123"
+            },
+        };
+    }
+
     const payload = {
         integrated_number: integratedNumber,
         content_type: "template",
@@ -671,31 +754,7 @@ export async function sendInvoiceWhatsApp({
                 to_and_components: [
                     {
                         to: [cleanPhone],
-                        components: {
-                            // MSG91 format: FLAT structure with filename, type, value
-                            header_1: {
-                                filename: filename,
-                                type: "document",
-                                value: pdfUrl,
-                            },
-                            // MSG91 format: uses "value" field
-                            body_1: {
-                                type: "text",
-                                value: customerName,
-                            },
-                            body_2: {
-                                type: "text",
-                                value: invoiceNumber,
-                            },
-                            body_3: {
-                                type: "text",
-                                value: amount,
-                            },
-                            body_4: {
-                                type: "text",
-                                value: itemName,
-                            },
-                        },
+                        components: components,
                     },
                 ],
             },
@@ -707,6 +766,7 @@ export async function sendInvoiceWhatsApp({
         console.log(`📄 [WhatsApp] Template: ${template.name} (${templateType})`);
         console.log(`📦 [WhatsApp] Invoice: ${invoiceNumber}, Amount: ${amount}`);
         console.log(`🔗 [WhatsApp] PDF URL: ${pdfUrl}`);
+        console.log(`📋 [WhatsApp] Payload components:`, JSON.stringify(components, null, 2));
 
         const response = await fetch(
             "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
