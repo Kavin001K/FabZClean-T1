@@ -2,12 +2,35 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Plugin to generate version.json on build
+function versionPlugin() {
+  return {
+    name: 'version-plugin',
+    closeBundle() {
+      const version = {
+        version: `2.0.${Date.now()}`,
+        buildTime: new Date().toISOString(),
+      };
+      // Write to dist folder (output directory relative to root)
+      const versionPath = path.resolve(__dirname, 'dist', 'version.json');
+      try {
+        fs.writeFileSync(versionPath, JSON.stringify(version, null, 2));
+        console.log('📄 Generated version.json:', version.version);
+      } catch (err) {
+        console.warn('⚠️ Could not generate version.json:', err);
+      }
+    }
+  };
+}
 
 export default defineConfig({
   plugins: [
     react(),
+    versionPlugin(),
   ],
   define: {
     global: 'globalThis',

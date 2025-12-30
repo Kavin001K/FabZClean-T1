@@ -12,6 +12,8 @@ import ErrorBoundary from "@/components/ui/error-boundary";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Suspense, lazy } from "react";
 import { Loader2 } from "lucide-react";
+import { retryDynamicImport } from "@/lib/dynamic-import";
+import { UpdatePrompt } from "@/components/update-prompt";
 
 // Critical pages - loaded immediately
 import NotFound from "@/pages/not-found";
@@ -21,40 +23,40 @@ import AccountInactivePage from "@/pages/account-inactive";
 import Dashboard from "@/pages/dashboard";
 import { MainLayout } from "@/components/layout/main-layout";
 
-// Lazy loaded pages - loaded on demand
-const Orders = lazy(() => import("@/pages/orders"));
-const OrderDetail = lazy(() => import("@/pages/order-detail"));
-const Services = lazy(() => import("@/pages/services"));
-const CreateOrder = lazy(() => import("@/pages/create-order"));
-const Documents = lazy(() => import("@/pages/documents"));
-const Customers = lazy(() => import("@/pages/customers"));
-const Analytics = lazy(() => import("@/pages/analytics"));
-const Inventory = lazy(() => import("@/pages/inventory"));
-const TransitOrders = lazy(() => import("@/pages/transit-orders"));
+// Lazy loaded pages - loaded on demand with automatic retry/refresh on chunk load failures
+const Orders = lazy(() => retryDynamicImport(() => import("@/pages/orders")));
+const OrderDetail = lazy(() => retryDynamicImport(() => import("@/pages/order-detail")));
+const Services = lazy(() => retryDynamicImport(() => import("@/pages/services")));
+const CreateOrder = lazy(() => retryDynamicImport(() => import("@/pages/create-order")));
+const Documents = lazy(() => retryDynamicImport(() => import("@/pages/documents")));
+const Customers = lazy(() => retryDynamicImport(() => import("@/pages/customers")));
+const Analytics = lazy(() => retryDynamicImport(() => import("@/pages/analytics")));
+const Inventory = lazy(() => retryDynamicImport(() => import("@/pages/inventory")));
+const TransitOrders = lazy(() => retryDynamicImport(() => import("@/pages/transit-orders")));
 
-const EmployeeDashboardPage = lazy(() => import("@/pages/employee-dashboard"));
-const FactoryDashboard = lazy(() => import("@/pages/factory-dashboard"));
-const UserManagementPage = lazy(() => import("@/pages/user-management"));
-const FranchiseDashboard = lazy(() => import("@/pages/franchise-dashboard"));
-const FranchiseManagement = lazy(() => import("@/pages/franchise-management"));
-const Settings = lazy(() => import("@/pages/settings"));
-const ProfilePage = lazy(() => import("@/pages/profile"));
-const DatabaseStatus = lazy(() => import("@/pages/database-status"));
-const PerformanceAnalytics = lazy(() => import("@/components/analytics"));
-const Accounting = lazy(() => import("@/pages/accounting"));
-const InvoiceGenerator = lazy(() => import("@/components/invoice-generator").then(m => ({ default: m.InvoiceGenerator })));
-const CustomerPortal = lazy(() => import("@/pages/customer-portal"));
-const WorkerPortal = lazy(() => import("@/pages/worker-portal"));
-const BillView = lazy(() => import("@/pages/bill-view"));
+const EmployeeDashboardPage = lazy(() => retryDynamicImport(() => import("@/pages/employee-dashboard")));
+const FactoryDashboard = lazy(() => retryDynamicImport(() => import("@/pages/factory-dashboard")));
+const UserManagementPage = lazy(() => retryDynamicImport(() => import("@/pages/user-management")));
+const FranchiseDashboard = lazy(() => retryDynamicImport(() => import("@/pages/franchise-dashboard")));
+const FranchiseManagement = lazy(() => retryDynamicImport(() => import("@/pages/franchise-management")));
+const Settings = lazy(() => retryDynamicImport(() => import("@/pages/settings")));
+const ProfilePage = lazy(() => retryDynamicImport(() => import("@/pages/profile")));
+const DatabaseStatus = lazy(() => retryDynamicImport(() => import("@/pages/database-status")));
+const PerformanceAnalytics = lazy(() => retryDynamicImport(() => import("@/components/analytics")));
+const Accounting = lazy(() => retryDynamicImport(() => import("@/pages/accounting")));
+const InvoiceGenerator = lazy(() => retryDynamicImport(() => import("@/components/invoice-generator").then(m => ({ default: m.InvoiceGenerator }))));
+const CustomerPortal = lazy(() => retryDynamicImport(() => import("@/pages/customer-portal")));
+const WorkerPortal = lazy(() => retryDynamicImport(() => import("@/pages/worker-portal")));
+const BillView = lazy(() => retryDynamicImport(() => import("@/pages/bill-view")));
 
-const AuditLogsPage = lazy(() => import("@/pages/admin/audit-logs"));
-const ReportsPage = lazy(() => import("@/pages/reports"));
-const OrderTracking = lazy(() => import("@/pages/order-tracking"));
-const TermsPage = lazy(() => import("@/pages/terms"));
-const PrivacyPage = lazy(() => import("@/pages/privacy"));
-const RefundPage = lazy(() => import("@/pages/refund"));
-const CookiesPage = lazy(() => import("@/pages/cookies"));
-const PublicOrderTracking = lazy(() => import("@/pages/public-order-tracking"));
+const AuditLogsPage = lazy(() => retryDynamicImport(() => import("@/pages/admin/audit-logs")));
+const ReportsPage = lazy(() => retryDynamicImport(() => import("@/pages/reports")));
+const OrderTracking = lazy(() => retryDynamicImport(() => import("@/pages/order-tracking")));
+const TermsPage = lazy(() => retryDynamicImport(() => import("@/pages/terms")));
+const PrivacyPage = lazy(() => retryDynamicImport(() => import("@/pages/privacy")));
+const RefundPage = lazy(() => retryDynamicImport(() => import("@/pages/refund")));
+const CookiesPage = lazy(() => retryDynamicImport(() => import("@/pages/cookies")));
+const PublicOrderTracking = lazy(() => retryDynamicImport(() => import("@/pages/public-order-tracking")));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -322,6 +324,7 @@ function App() {
                   <TooltipProvider>
                     <NotificationProvider>
                       <Toaster />
+                      <UpdatePrompt />
                       <Suspense fallback={<PageLoader />}>
                         <ErrorBoundary>
                           <Router />

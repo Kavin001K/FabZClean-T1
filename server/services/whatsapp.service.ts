@@ -400,9 +400,18 @@ export async function sendOrderStatusUpdateNotification({
     // Clean order number for URL (remove special chars if any)
     const cleanOrderNumber = orderNumber.replace(/[#]/g, '').trim();
 
-    // Status update image URL (hosted publicly accessible image)
-    const statusImageUrl = process.env.WHATSAPP_STATUS_IMAGE_URL ||
+    // Status update images - Different images for different status types
+    // Completed order image (provided by user)
+    const completedImageUrl = 'https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/Templates/WhatsApp%20Image%202025-12-28%20at%2013.45.08.jpeg';
+
+    // Default status image (for other statuses)
+    const defaultStatusImageUrl = process.env.WHATSAPP_STATUS_IMAGE_URL ||
         'https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/Templates/Screenshot%202025-12-27%20at%2010.32.31%20PM.png';
+
+    // Choose the appropriate image based on status
+    const isCompletedStatus = status.toLowerCase().includes('completed') ||
+        status.toLowerCase().includes('delivered');
+    const statusImageUrl = isCompletedStatus ? completedImageUrl : defaultStatusImageUrl;
 
     // Template "invoice_fabzclean" expects:
     // - Header: Image (status update image)

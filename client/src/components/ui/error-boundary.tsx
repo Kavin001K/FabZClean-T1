@@ -1,5 +1,6 @@
 import React from 'react';
 import { ErrorFallback } from './error-fallback';
+import { isChunkLoadError, handleChunkLoadError } from '@/lib/dynamic-import';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -7,6 +8,7 @@ interface ErrorBoundaryState {
   errorInfo?: React.ErrorInfo;
   errorCount: number;
   lastErrorTime?: number;
+  isChunkError: boolean;
 }
 
 interface ErrorBoundaryProps {
@@ -22,32 +24,49 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { 
-      hasError: false, 
-      errorCount: 0 
+    this.state = {
+      hasError: false,
+      errorCount: 0,
+      isChunkError: false,
     };
   }
 
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
-    return { 
-      hasError: true, 
+    const isChunkError = isChunkLoadError(error);
+    return {
+      hasError: true,
       error,
-      lastErrorTime: Date.now()
+      lastErrorTime: Date.now(),
+      isChunkError,
     };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     const { errorCount } = this.state;
     const newErrorCount = errorCount + 1;
+    const isChunkError = isChunkLoadError(error);
 
     // Log error details
     console.error('Error caught by boundary:', error, errorInfo);
+
+    // If it's a chunk loading error, try to recover automatically
+    if (isChunkError) {
+      console.warn('[ErrorBoundary] Detected chunk loading error, attempting recovery...');
+      try {
+        handleChunkLoadError(error);
+        return; // Page will refresh, no need to continue
+      } catch {
+        // handleChunkLoadError might re-throw if recovery isn't possible
+        console.error('[ErrorBoundary] Could not recover from chunk loading error');
+      }
+    }
 
     // Update state with error info
     this.setState({
       error,
       errorInfo,
-      errorCount: newErrorCount
+      errorCount: newErrorCount,
+      isChunkError,
     });
 
     // Call custom error handler if provided
@@ -82,10 +101,10 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
     // Reset error state when resetKeys change (allowing recovery)
     if (hasError && resetKeys && prevProps.resetKeys) {
-      const hasResetKeyChanged = resetKeys.some((key, index) => 
+      const hasResetKeyChanged = resetKeys.some((key, index) =>
         key !== prevProps.resetKeys?.[index]
       );
-      
+
       if (hasResetKeyChanged) {
         this.resetError();
       }
@@ -120,20 +139,38 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       this.resetTimeoutId = null;
     }
 
-    this.setState({ 
-      hasError: false, 
+    this.setState({
+      hasError: false,
       error: undefined,
       errorInfo: undefined,
+      isChunkError: false,
       // Keep errorCount for tracking, but reset to prevent permanent block
       errorCount: Math.max(0, this.state.errorCount - 1)
     });
   };
 
+  handleRefresh = () => {
+    window.location.reload();
+  };
+
   render() {
-    const { hasError, error, errorCount } = this.state;
+    const { hasError, error, errorCount, isChunkError } = this.state;
     const { fallback, children } = this.props;
 
     if (hasError) {
+      // Special handling for chunk loading errors
+      if (isChunkError) {
+        return (
+          <ErrorFallback
+            error={error}
+            resetError={this.handleRefresh}
+            title="Application Update Required"
+            message="A new version of the application is available. Please refresh the page to continue."
+            showRetry={true}
+          />
+        );
+      }
+
       // If too many errors, show a more serious fallback
       if (errorCount >= 5) {
         return (
