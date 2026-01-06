@@ -156,10 +156,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Use backend API
+      const token = localStorage.getItem('employee_token');
       const apiBase = import.meta.env.VITE_API_URL || '/api';
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const response = await fetch(`${apiBase}/settings/${key}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ value, category }),
       });
       if (!response.ok) {
@@ -206,10 +211,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Use backend API
+      const token = localStorage.getItem('employee_token');
       const apiBase = import.meta.env.VITE_API_URL || '/api';
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const response = await fetch(`${apiBase}/settings`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ settings }),
       });
       if (!response.ok) {
@@ -254,9 +264,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Use backend API
+      const token = localStorage.getItem('employee_token');
       const apiBase = import.meta.env.VITE_API_URL || '/api';
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const response = await fetch(`${apiBase}/settings/reset`, {
         method: 'POST',
+        headers,
       });
       if (!response.ok) throw new Error('Failed to reset settings');
       return response.json();
@@ -297,10 +313,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Use backend API
+      const token = localStorage.getItem('employee_token');
       const apiBase = import.meta.env.VITE_API_URL || '/api';
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const response = await fetch(`${apiBase}/settings/import`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ settings }),
       });
       if (!response.ok) {
