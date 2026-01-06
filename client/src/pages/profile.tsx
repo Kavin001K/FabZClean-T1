@@ -41,10 +41,12 @@ export default function ProfilePage() {
 
     const handleSave = async () => {
         try {
-            const res = await fetch(`/api/employees/${employee?.id}`, {
+            const token = localStorage.getItem('employee_token');
+            const res = await fetch(`/api/auth/update-profile`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({
                     fullName: formData.fullName,
@@ -55,7 +57,7 @@ export default function ProfilePage() {
 
             if (!res.ok) {
                 const error = await res.json();
-                throw new Error(error.message || 'Failed to update profile');
+                throw new Error(error.error || error.message || 'Failed to update profile');
             }
 
             toast({
@@ -66,7 +68,7 @@ export default function ProfilePage() {
         } catch (error: any) {
             toast({
                 title: 'Error',
-                description: error.message || 'Failed to update profile. Please try again.',
+                description: error.message || 'Failed to update profile',
                 variant: 'destructive',
             });
         }
@@ -98,13 +100,14 @@ export default function ProfilePage() {
         }
 
         try {
+            const token = localStorage.getItem('employee_token');
             const res = await fetch('/api/auth/change-password', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({
-                    employeeId: employee?.id,
                     currentPassword,
                     newPassword,
                 }),

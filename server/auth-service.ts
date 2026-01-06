@@ -427,57 +427,142 @@ export class AuthService {
             email: string;
             phone: string;
             franchiseId: string;
+            factoryId: string;
             isActive: boolean;
             position: string;
             department: string;
             salary: number;
+            hireDate: Date;
+            salaryType: string;
+            baseSalary: number;
+            hourlyRate: number;
+            workingHours: number;
+            emergencyContact: string;
+            qualifications: string;
+            notes: string;
+            address: string;
         }>,
         updatedBy: string
     ): Promise<AuthEmployee> {
         const updateData: any = {};
 
+        // Map data to storage format
         if (data.fullName !== undefined) {
             const names = data.fullName.split(' ');
-            updateData.first_name = names[0];
-            updateData.last_name = names.slice(1).join(' ') || '';
+            updateData.firstName = names[0];
+            updateData.lastName = names.slice(1).join(' ') || '';
         }
         if (data.email !== undefined) updateData.email = data.email;
         if (data.phone !== undefined) updateData.phone = data.phone;
-        if (data.franchiseId !== undefined) updateData.franchise_id = data.franchiseId;
+        if (data.franchiseId !== undefined) updateData.franchiseId = data.franchiseId;
+        if (data.factoryId !== undefined) updateData.factoryId = data.factoryId;
         if (data.isActive !== undefined) updateData.status = data.isActive ? 'active' : 'inactive';
         if (data.position !== undefined) updateData.position = data.position;
         if (data.department !== undefined) updateData.department = data.department;
-        if (data.salary !== undefined) updateData.salary = data.salary;
+        if (data.salary !== undefined) updateData.salary = String(data.salary);
+        if (data.hireDate !== undefined) updateData.hireDate = data.hireDate.toISOString();
+        if (data.salaryType !== undefined) updateData.salaryType = data.salaryType;
+        if (data.baseSalary !== undefined) updateData.baseSalary = String(data.baseSalary);
+        if (data.hourlyRate !== undefined) updateData.hourlyRate = String(data.hourlyRate);
+        if (data.workingHours !== undefined) updateData.workingHours = String(data.workingHours);
+        if (data.emergencyContact !== undefined) updateData.emergencyContact = data.emergencyContact;
+        if (data.qualifications !== undefined) updateData.qualifications = data.qualifications;
+        if (data.notes !== undefined) updateData.notes = data.notes;
+        if (data.address !== undefined) {
+            updateData.address = typeof data.address === 'object' ? JSON.stringify(data.address) : data.address;
+        }
 
         if (Object.keys(updateData).length === 0) {
             throw new Error('No fields to update');
         }
 
-        const { data: emp, error } = await supabase
-            .from('employees') // employees table
-            .update(updateData)
-            .eq('employee_id', employeeId)
-            .select()
-            .single();
+        console.log('[AuthService] updateEmployee:', employeeId, updateData);
 
-        if (error || !emp) {
-            throw new Error('Employee not found');
+        // Try local storage first
+        try {
+            const updatedEmployee = await storage.updateEmployee(employeeId, updateData);
+
+            if (!updatedEmployee) {
+                throw new Error('Employee not found');
+            }
+
+            // Log the action
+            try {
+                await this.logAction(
+                    updatedEmployee.id || employeeId,
+                    updatedBy,
+                    'update_employee',
+                    'employee',
+                    employeeId,
+                    data
+                );
+            } catch (logError) {
+                console.warn('[AuthService] Failed to log update action:', logError);
+            }
+
+            return {
+                id: updatedEmployee.id,
+                employeeId: updatedEmployee.employeeId || updatedEmployee.username,
+                username: updatedEmployee.username || updatedEmployee.employeeId,
+                role: updatedEmployee.role as any,
+                franchiseId: updatedEmployee.franchiseId,
+                factoryId: updatedEmployee.factoryId,
+                fullName: updatedEmployee.firstName
+                    ? `${updatedEmployee.firstName} ${updatedEmployee.lastName || ''}`.trim()
+                    : updatedEmployee.fullName,
+                email: updatedEmployee.email,
+                phone: updatedEmployee.phone,
+                isActive: updatedEmployee.status === 'active' || updatedEmployee.status === null,
+                position: updatedEmployee.position,
+                department: updatedEmployee.department,
+            };
+        } catch (localError) {
+            console.error('[AuthService] Local storage update failed:', localError);
+
+            // Fallback to Supabase if available
+            if (supabase) {
+                try {
+                    const supabaseUpdate: any = {};
+                    if (data.fullName !== undefined) {
+                        const names = data.fullName.split(' ');
+                        supabaseUpdate.first_name = names[0];
+                        supabaseUpdate.last_name = names.slice(1).join(' ') || '';
+                    }
+                    if (data.email !== undefined) supabaseUpdate.email = data.email;
+                    if (data.phone !== undefined) supabaseUpdate.phone = data.phone;
+                    if (data.franchiseId !== undefined) supabaseUpdate.franchise_id = data.franchiseId;
+                    if (data.isActive !== undefined) supabaseUpdate.status = data.isActive ? 'active' : 'inactive';
+
+                    const { data: emp, error } = await supabase
+                        .from('employees')
+                        .update(supabaseUpdate)
+                        .eq('employee_id', employeeId)
+                        .select()
+                        .single();
+
+                    if (error || !emp) {
+                        throw new Error('Employee not found in Supabase');
+                    }
+
+                    return {
+                        id: emp.id,
+                        employeeId: emp.employee_id,
+                        username: emp.employee_id,
+                        role: emp.role as any,
+                        franchiseId: emp.franchise_id,
+                        fullName: `${emp.first_name} ${emp.last_name}`.trim(),
+                        email: emp.email,
+                        phone: emp.phone,
+                        isActive: emp.status === 'active',
+                    };
+                } catch (supabaseError) {
+                    console.error('[AuthService] Supabase fallback failed:', supabaseError);
+                    throw localError; // Re-throw the original error
+                }
+            }
+
+            throw localError;
         }
-
-        await this.logAction(updatedBy, updatedBy, 'update_employee', 'employee', employeeId, data);
-
-        return {
-            id: emp.id,
-            employeeId: emp.employee_id,
-            username: emp.employee_id,
-            role: emp.role as any,
-            franchiseId: emp.franchise_id,
-            fullName: `${emp.first_name} ${emp.last_name}`,
-            email: emp.email,
-            phone: emp.phone,
-            isActive: emp.status === 'active',
-            // ... map other fields if needed ...
-        };
     }
 
     /**

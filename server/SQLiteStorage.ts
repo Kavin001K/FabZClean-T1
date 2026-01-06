@@ -2511,6 +2511,15 @@ export class SQLiteStorage implements IStorage {
     return this.getFranchise(id);
   }
 
+  async deleteFranchise(id: string): Promise<boolean> {
+    try {
+      this.deleteRecord("franchises", id);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // ======= TASKS =======
   async createTask(data: any): Promise<any> {
     const id = this.insertRecord("employee_tasks", data);

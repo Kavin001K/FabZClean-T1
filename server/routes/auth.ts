@@ -81,4 +81,33 @@ router.post('/change-password', authMiddleware, auditMiddleware('change_password
   }
 });
 
+/**
+ * PUT /api/auth/update-profile
+ * Update own profile (any authenticated user)
+ */
+router.put('/update-profile', authMiddleware, auditMiddleware('update_profile'), async (req: Request, res: Response) => {
+  try {
+    const { fullName, email, phone, address } = req.body;
+
+    console.log('[Auth] Update profile for:', req.employee?.employeeId, { fullName, email, phone });
+
+    // Update the current user's own profile
+    const updatedEmployee = await AuthService.updateEmployee(
+      req.employee!.id!,
+      { fullName, email, phone, address },
+      req.employee!.employeeId
+    );
+
+    if (!updatedEmployee) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    res.json({ success: true, employee: updatedEmployee });
+  } catch (error: any) {
+    console.error('[Auth] Update profile error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update profile' });
+  }
+});
+
 export default router;
+
