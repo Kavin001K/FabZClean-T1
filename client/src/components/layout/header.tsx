@@ -2,7 +2,8 @@ import { Link, useLocation } from 'wouter';
 import { useEffect, useState } from 'react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import { PanelLeftClose, PanelLeftOpen, RefreshCw } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, RefreshCw, Keyboard } from 'lucide-react';
+import { useShortcuts } from '@/components/shortcuts-provider';
 import { NotificationCenter } from '@/components/notification-center';
 import { GlobalSearch } from '@/components/global-search';
 import { UserMenu } from '@/components/layout/user-menu';
@@ -22,6 +23,7 @@ export function Header({ onToggleSidebar, isSidebarVisible }: HeaderProps) {
   const [location] = useLocation();
   const [paths, setPaths] = useState(['Dashboard']);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { showShortcuts } = useShortcuts();
 
   useEffect(() => {
     const pathSegments = location.split('/').filter(p => p);
@@ -101,10 +103,19 @@ export function Header({ onToggleSidebar, isSidebarVisible }: HeaderProps) {
         <Button
           variant="ghost"
           size="icon"
+          onClick={showShortcuts}
+          className="h-8 w-8"
+          title="Keyboard Shortcuts (F1)"
+        >
+          <Keyboard className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={handleRefresh}
           disabled={isRefreshing}
           className="h-8 w-8"
-          title="Refresh app (⌘R)"
+          title="Refresh app (F5)"
         >
           <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
         </Button>

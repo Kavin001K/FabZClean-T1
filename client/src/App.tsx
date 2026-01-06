@@ -14,6 +14,7 @@ import { Suspense, lazy } from "react";
 import { Loader2 } from "lucide-react";
 import { retryDynamicImport } from "@/lib/dynamic-import";
 import { UpdatePrompt } from "@/components/update-prompt";
+import { ShortcutsProvider } from "@/components/shortcuts-provider";
 
 // Critical pages - loaded immediately
 import NotFound from "@/pages/not-found";
@@ -323,16 +324,18 @@ function App() {
                 <ThemeProvider defaultTheme="light" storageKey="fab-z-ui-theme">
                   <TooltipProvider>
                     <NotificationProvider>
-                      <Toaster />
-                      <UpdatePrompt />
-                      <Suspense fallback={<PageLoader />}>
-                        <ErrorBoundary>
-                          <Router />
-                        </ErrorBoundary>
-                        <ErrorBoundary>
-                          <PerformanceAnalytics />
-                        </ErrorBoundary>
-                      </Suspense>
+                      <ShortcutsProvider>
+                        <Toaster />
+                        <UpdatePrompt />
+                        <Suspense fallback={<PageLoader />}>
+                          <ErrorBoundary>
+                            <Router />
+                          </ErrorBoundary>
+                          <ErrorBoundary>
+                            <PerformanceAnalytics />
+                          </ErrorBoundary>
+                        </Suspense>
+                      </ShortcutsProvider>
                     </NotificationProvider>
                   </TooltipProvider>
                 </ThemeProvider>

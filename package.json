@@ -15,6 +15,8 @@
     "start:client": "vite preview --port 5000",
     "check": "tsc",
     "db:push": "drizzle-kit push",
+    "db:setup": "rm -f fabzclean.db && npx tsx server/local-db-setup.ts",
+    "db:reset": "rm -f fabzclean.db && npx tsx server/local-db-setup.ts",
     "code:cleanup": "node scripts/code-cleanup.js",
     "code:cleanup:fix": "node scripts/code-cleanup.js --fix",
     "code:cleanup:verbose": "node scripts/code-cleanup.js --verbose"
@@ -80,6 +82,7 @@
     "express-session": "^1.18.1",
     "framer-motion": "^11.13.1",
     "html2canvas": "^1.4.1",
+    "idb": "^8.0.3",
     "input-otp": "^1.4.2",
     "jsbarcode": "^3.12.1",
     "jsonwebtoken": "^9.0.2",

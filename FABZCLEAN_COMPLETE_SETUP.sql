@@ -1,21 +1,20 @@
--- ========================================
--- FABZCLEAN COMPLETE DATABASE SCHEMA
--- Consolidated Single-File Setup for Supabase
--- ========================================
--- This file contains ALL tables, indexes, RLS policies, and seed data
--- Run this ONCE in Supabase SQL Editor
--- ========================================
+-- =====================================================================
+-- FABZCLEAN COMPLETE DATABASE SETUP
+-- Single consolidated SQL script - Run ONCE in Supabase SQL Editor
+-- Generated: 2026-01-06
+-- =====================================================================
 
 BEGIN;
 
--- Enable Required Extensions
+-- =====================================================================
+-- PART 1: EXTENSIONS
+-- =====================================================================
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- ========================================
--- PART 1: DROP EXISTING TABLES (Clean Slate)
--- ========================================
-
+-- =====================================================================
+-- PART 2: DROP EXISTING TABLES (Clean Slate)
+-- =====================================================================
 DROP TABLE IF EXISTS "audit_logs" CASCADE;
 DROP TABLE IF EXISTS "documents" CASCADE;
 DROP TABLE IF EXISTS "employee_performance" CASCADE;
@@ -25,11 +24,11 @@ DROP TABLE IF EXISTS "employees" CASCADE;
 DROP TABLE IF EXISTS "barcodes" CASCADE;
 DROP TABLE IF EXISTS "shipments" CASCADE;
 DROP TABLE IF EXISTS "services" CASCADE;
-DROP TABLE IF EXISTS "customers" CASCADE;
 DROP TABLE IF EXISTS "order_transactions" CASCADE;
 DROP TABLE IF EXISTS "posTransactions" CASCADE;
 DROP TABLE IF EXISTS "deliveries" CASCADE;
 DROP TABLE IF EXISTS "orders" CASCADE;
+DROP TABLE IF EXISTS "customers" CASCADE;
 DROP TABLE IF EXISTS "products" CASCADE;
 DROP TABLE IF EXISTS "users" CASCADE;
 DROP TABLE IF EXISTS "franchises" CASCADE;
@@ -39,12 +38,15 @@ DROP TABLE IF EXISTS "drivers" CASCADE;
 DROP TABLE IF EXISTS "transit_status_history" CASCADE;
 DROP TABLE IF EXISTS "transit_order_items" CASCADE;
 DROP TABLE IF EXISTS "transit_orders" CASCADE;
+DROP TABLE IF EXISTS "auth_sessions" CASCADE;
+DROP TABLE IF EXISTS "auth_employees" CASCADE;
+DROP TABLE IF EXISTS "auth_users" CASCADE;
 
--- ========================================
--- PART 2: CREATE CORE TABLES
--- ========================================
+-- =====================================================================
+-- PART 3: CREATE CORE TABLES
+-- =====================================================================
 
--- Franchises Table (Root of all franchise-scoped data)
+-- Franchises Table
 CREATE TABLE "franchises" (
     "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     "name" TEXT NOT NULL,
@@ -64,7 +66,7 @@ CREATE TABLE "franchises" (
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Users Table (Legacy - keeping for compatibility)
+-- Users Table
 CREATE TABLE "users" (
     "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     "username" TEXT NOT NULL UNIQUE,
@@ -102,6 +104,7 @@ CREATE TABLE "customers" (
     "address" JSONB,
     "total_orders" INTEGER DEFAULT 0,
     "total_spent" NUMERIC(10, 2) DEFAULT 0,
+    "credit_balance" NUMERIC(10, 2) DEFAULT 0,
     "last_order" TIMESTAMP WITH TIME ZONE,
     "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -148,6 +151,12 @@ CREATE TABLE "orders" (
     "pan_number" TEXT,
     "gst_number" TEXT,
     "special_instructions" TEXT,
+    "fulfillment_type" TEXT DEFAULT 'pickup',
+    "delivery_charges" NUMERIC(10, 2) DEFAULT 0,
+    "delivery_address" JSONB,
+    "last_whatsapp_status" TEXT,
+    "last_whatsapp_sent_at" TIMESTAMP WITH TIME ZONE,
+    "whatsapp_message_count" INTEGER DEFAULT 0,
     "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     CONSTRAINT "unique_order_number_per_franchise" UNIQUE ("franchise_id", "order_number")
@@ -181,6 +190,17 @@ CREATE TABLE "order_transactions" (
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
+-- POS Transactions Table
+CREATE TABLE "posTransactions" (
+    "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    "transaction_number" TEXT NOT NULL,
+    "items" JSONB,
+    "total_amount" NUMERIC(10, 2),
+    "payment_method" TEXT,
+    "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Shipments Table
 CREATE TABLE "shipments" (
     "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -196,7 +216,7 @@ CREATE TABLE "shipments" (
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Barcodes Table (NOW STORES BARCODE IMAGES)
+-- Barcodes Table
 CREATE TABLE "barcodes" (
     "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     "franchise_id" TEXT REFERENCES "franchises"("id") ON DELETE CASCADE,
@@ -205,17 +225,17 @@ CREATE TABLE "barcodes" (
     "entity_type" TEXT NOT NULL,
     "entity_id" TEXT NOT NULL,
     "data" JSONB,
-    "image_data" TEXT, -- Base64 encoded barcode image
-    "image_url" TEXT, -- Supabase storage URL if using storage bucket
+    "image_data" TEXT,
+    "image_url" TEXT,
     "is_active" BOOLEAN DEFAULT true NOT NULL,
     "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Employees Table (CRITICAL: Franchise Isolation)
+-- Employees Table
 CREATE TABLE "employees" (
     "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    "franchise_id" TEXT REFERENCES "franchises"("id") ON DELETE CASCADE, -- STRICT ISOLATION
+    "franchise_id" TEXT REFERENCES "franchises"("id") ON DELETE CASCADE,
     "employee_id" TEXT NOT NULL UNIQUE,
     "first_name" TEXT NOT NULL,
     "last_name" TEXT NOT NULL,
@@ -233,17 +253,46 @@ CREATE TABLE "employees" (
     "skills" JSONB,
     "performance_rating" NUMERIC(3, 2) DEFAULT 0.00,
     "last_review_date" TIMESTAMP WITH TIME ZONE,
-    "role" TEXT DEFAULT 'staff', -- admin, franchise_manager, factory_manager, staff, driver
-    "password" TEXT, -- Hashed password
+    "role" TEXT DEFAULT 'staff',
+    "password" TEXT,
     "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     CONSTRAINT "check_employee_status" CHECK ("status" IN ('active', 'inactive', 'terminated'))
 );
 
--- Employee Attendance Table (CRITICAL: Franchise Isolation)
+-- Auth Employees Table
+CREATE TABLE "auth_employees" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "employee_id" TEXT NOT NULL UNIQUE,
+    "username" TEXT NOT NULL UNIQUE,
+    "password_hash" TEXT NOT NULL,
+    "role" TEXT NOT NULL,
+    "franchise_id" TEXT REFERENCES "franchises"("id"),
+    "factory_id" TEXT,
+    "full_name" TEXT,
+    "email" TEXT,
+    "phone" TEXT,
+    "is_active" BOOLEAN DEFAULT true,
+    "position" TEXT,
+    "department" TEXT,
+    "hire_date" TIMESTAMP WITH TIME ZONE,
+    "salary_type" TEXT,
+    "base_salary" NUMERIC(10, 2),
+    "hourly_rate" NUMERIC(8, 2),
+    "working_hours" NUMERIC(4, 2),
+    "emergency_contact" TEXT,
+    "qualifications" TEXT,
+    "notes" TEXT,
+    "address" TEXT,
+    "last_login" TIMESTAMP WITH TIME ZONE,
+    "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Employee Attendance Table
 CREATE TABLE "employee_attendance" (
     "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    "franchise_id" TEXT REFERENCES "franchises"("id") ON DELETE CASCADE, -- STRICT ISOLATION
+    "franchise_id" TEXT REFERENCES "franchises"("id") ON DELETE CASCADE,
     "employee_id" TEXT REFERENCES "employees"("id") ON DELETE CASCADE NOT NULL,
     "date" TIMESTAMP WITH TIME ZONE NOT NULL,
     "clock_in" TIMESTAMP WITH TIME ZONE,
@@ -260,10 +309,10 @@ CREATE TABLE "employee_attendance" (
     CONSTRAINT "check_attendance_status" CHECK ("status" IN ('present', 'absent', 'late', 'half_day', 'leave'))
 );
 
--- Employee Tasks Table (CRITICAL: Franchise Isolation)
+-- Employee Tasks Table
 CREATE TABLE "employee_tasks" (
     "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    "franchise_id" TEXT REFERENCES "franchises"("id") ON DELETE CASCADE, -- STRICT ISOLATION
+    "franchise_id" TEXT REFERENCES "franchises"("id") ON DELETE CASCADE,
     "employee_id" TEXT REFERENCES "employees"("id") ON DELETE CASCADE NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT,
@@ -294,15 +343,15 @@ CREATE TABLE "employee_performance" (
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Documents Table (STORES BILLS, INVOICES, QR CODES)
+-- Documents Table
 CREATE TABLE "documents" (
     "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     "franchise_id" TEXT REFERENCES "franchises"("id") ON DELETE CASCADE,
-    "type" TEXT DEFAULT 'invoice' NOT NULL, -- invoice, bill, receipt, qr_code, barcode
+    "type" TEXT DEFAULT 'invoice' NOT NULL,
     "title" TEXT NOT NULL,
     "filename" TEXT NOT NULL,
-    "file_data" TEXT, -- Base64 encoded PDF/image data
-    "file_url" TEXT, -- Supabase storage URL if using storage bucket
+    "file_data" TEXT,
+    "file_url" TEXT,
     "status" TEXT DEFAULT 'draft',
     "amount" NUMERIC(10, 2),
     "customer_name" TEXT,
@@ -313,11 +362,12 @@ CREATE TABLE "documents" (
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Audit Logs Table (CRITICAL: Franchise Isolation for Security)
+-- Audit Logs Table
 CREATE TABLE "audit_logs" (
     "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    "franchise_id" TEXT REFERENCES "franchises"("id") ON DELETE CASCADE, -- STRICT ISOLATION
-    "employee_id" TEXT REFERENCES "employees"("id") ON DELETE SET NULL,
+    "franchise_id" TEXT REFERENCES "franchises"("id") ON DELETE CASCADE,
+    "employee_id" TEXT,
+    "employee_username" TEXT,
     "action" TEXT NOT NULL,
     "entity_type" TEXT,
     "entity_id" TEXT,
@@ -443,14 +493,14 @@ CREATE TABLE "transit_status_history" (
     "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ========================================
--- PART 3: CREATE INDEXES FOR PERFORMANCE
--- ========================================
-
+-- =====================================================================
+-- PART 4: INDEXES
+-- =====================================================================
 CREATE INDEX IF NOT EXISTS "idx_orders_franchise" ON "orders"("franchise_id");
 CREATE INDEX IF NOT EXISTS "idx_orders_customer" ON "orders"("customer_id");
 CREATE INDEX IF NOT EXISTS "idx_orders_status" ON "orders"("status");
 CREATE INDEX IF NOT EXISTS "idx_orders_created_at" ON "orders"("created_at");
+CREATE INDEX IF NOT EXISTS "idx_orders_whatsapp_sent_at" ON "orders"("last_whatsapp_sent_at" DESC) WHERE "last_whatsapp_sent_at" IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS "idx_customers_franchise" ON "customers"("franchise_id");
 CREATE INDEX IF NOT EXISTS "idx_customers_phone" ON "customers"("phone");
@@ -473,7 +523,6 @@ CREATE INDEX IF NOT EXISTS "idx_tasks_employee" ON "employee_tasks"("employee_id
 CREATE INDEX IF NOT EXISTS "idx_tasks_status" ON "employee_tasks"("status");
 
 CREATE INDEX IF NOT EXISTS "idx_audit_logs_franchise" ON "audit_logs"("franchise_id");
-CREATE INDEX IF NOT EXISTS "idx_audit_logs_employee" ON "audit_logs"("employee_id");
 CREATE INDEX IF NOT EXISTS "idx_audit_logs_action" ON "audit_logs"("action");
 CREATE INDEX IF NOT EXISTS "idx_audit_logs_created_at" ON "audit_logs"("created_at");
 
@@ -486,12 +535,11 @@ CREATE INDEX IF NOT EXISTS "idx_barcodes_code" ON "barcodes"("code");
 CREATE INDEX IF NOT EXISTS "idx_barcodes_entity" ON "barcodes"("entity_type", "entity_id");
 
 CREATE INDEX IF NOT EXISTS "idx_transit_orders_status" ON "transit_orders"("status");
+CREATE INDEX IF NOT EXISTS "idx_drivers_status" ON "drivers"("status");
 
--- ========================================
--- PART 4: ROW LEVEL SECURITY (RLS) POLICIES
--- ========================================
-
--- Enable RLS on all tables
+-- =====================================================================
+-- PART 5: ROW LEVEL SECURITY (RLS) - Public Access for Development
+-- =====================================================================
 ALTER TABLE "franchises" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "users" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "products" ENABLE ROW LEVEL SECURITY;
@@ -500,9 +548,11 @@ ALTER TABLE "services" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "orders" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "deliveries" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "order_transactions" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "posTransactions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "shipments" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "barcodes" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "employees" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "auth_employees" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "employee_attendance" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "employee_tasks" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "employee_performance" ENABLE ROW LEVEL SECURITY;
@@ -515,9 +565,7 @@ ALTER TABLE "transit_orders" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "transit_order_items" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "transit_status_history" ENABLE ROW LEVEL SECURITY;
 
--- For development: Allow public access (REMOVE IN PRODUCTION!)
--- In production, implement proper RLS policies based on user roles
-
+-- Create public access policies (for development)
 DROP POLICY IF EXISTS "Allow public access" ON "franchises";
 CREATE POLICY "Allow public access" ON "franchises" FOR ALL USING (true);
 
@@ -542,6 +590,9 @@ CREATE POLICY "Allow public access" ON "deliveries" FOR ALL USING (true);
 DROP POLICY IF EXISTS "Allow public access" ON "order_transactions";
 CREATE POLICY "Allow public access" ON "order_transactions" FOR ALL USING (true);
 
+DROP POLICY IF EXISTS "Allow public access" ON "posTransactions";
+CREATE POLICY "Allow public access" ON "posTransactions" FOR ALL USING (true);
+
 DROP POLICY IF EXISTS "Allow public access" ON "shipments";
 CREATE POLICY "Allow public access" ON "shipments" FOR ALL USING (true);
 
@@ -550,6 +601,9 @@ CREATE POLICY "Allow public access" ON "barcodes" FOR ALL USING (true);
 
 DROP POLICY IF EXISTS "Allow public access" ON "employees";
 CREATE POLICY "Allow public access" ON "employees" FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Allow public access" ON "auth_employees";
+CREATE POLICY "Allow public access" ON "auth_employees" FOR ALL USING (true);
 
 DROP POLICY IF EXISTS "Allow public access" ON "employee_attendance";
 CREATE POLICY "Allow public access" ON "employee_attendance" FOR ALL USING (true);
@@ -584,25 +638,40 @@ CREATE POLICY "Allow public access" ON "transit_order_items" FOR ALL USING (true
 DROP POLICY IF EXISTS "Allow public access" ON "transit_status_history";
 CREATE POLICY "Allow public access" ON "transit_status_history" FOR ALL USING (true);
 
+-- =====================================================================
+-- PART 6: STORAGE SETUP (for PDFs/Bills)
+-- =====================================================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('pdfs', 'pdfs', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Public Access" ON storage.objects;
+CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'pdfs');
+
+DROP POLICY IF EXISTS "Authenticated Uploads" ON storage.objects;
+CREATE POLICY "Authenticated Uploads" ON storage.objects FOR INSERT TO authenticated, service_role WITH CHECK (bucket_id = 'pdfs');
+
+DROP POLICY IF EXISTS "Service Role Full Access" ON storage.objects;
+CREATE POLICY "Service Role Full Access" ON storage.objects TO service_role USING (bucket_id = 'pdfs') WITH CHECK (bucket_id = 'pdfs');
+
 COMMIT;
 
--- ========================================
--- VERIFICATION QUERIES
--- Run these after setup to verify isolation
--- ========================================
+-- =====================================================================
+-- PART 7: SEED DATA (Run separately after tables are created)
+-- =====================================================================
 
--- Verify franchise isolation in employees
--- SELECT franchise_id, COUNT(*) as employee_count FROM employees GROUP BY franchise_id;
+-- Seed Franchises
+INSERT INTO "franchises" ("id", "name", "franchise_id", "owner_name", "email", "phone", "address", "status") VALUES 
+('franchise-pollachi', 'Fab Clean Pollachi', 'FAB-POLLACHI', 'Manager Pollachi', 'pollachi@fabzclean.com', '9363059595', '{"street": "#16, Venkatramana Round Road, Opp: Naturals/HDFC Bank, Mahalingapuram", "city": "Pollachi", "state": "Tamil Nadu", "zip": "642002"}', 'active'),
+('franchise-kinathukadavu', 'Fab Clean Kinathukadavu', 'FAB-KIN', 'Manager Kinathukadavu', 'kinathukadavu@fabzclean.com', '9363719595', '{"street": "#442/11, Opp MlA Office, Krishnasamypuram", "city": "Kinathukadavu", "state": "Tamil Nadu", "zip": "642109"}', 'active')
+ON CONFLICT DO NOTHING;
 
--- Verify attendance isolation
--- SELECT ea.franchise_id, COUNT(*) as attendance_count 
--- FROM employee_attendance ea 
--- GROUP BY ea.franchise_id;
+-- Seed Admin Employee
+INSERT INTO "employees" ("id", "franchise_id", "first_name", "last_name", "role", "email", "password", "employee_id", "phone", "position", "department", "hire_date", "salary", "status") VALUES 
+('admin-user-id', 'franchise-pollachi', 'System', 'Admin', 'admin', 'admin@myfabclean.com', '$2b$10$A7eMtBNk3B8YkTz9LfVRPOII.W815gVpb8DP2W0He8WNzURAoDSxa', 'myfabclean', '9999999999', 'Administrator', 'Management', NOW(), 100000.00, 'active')
+ON CONFLICT DO NOTHING;
 
--- Verify no cross-franchise data leakage
--- SELECT e.franchise_id as emp_franchise, ea.franchise_id as att_franchise, COUNT(*) 
--- FROM employees e 
--- JOIN employee_attendance ea ON e.id = ea.employee_id 
--- WHERE e.franchise_id != ea.franchise_id 
--- GROUP BY e.franchise_id, ea.franchise_id;
--- (Should return 0 rows)
+-- =====================================================================
+-- SETUP COMPLETE! 
+-- Admin Login: employee_id = myfabclean, password = Durai@2025
+-- =====================================================================

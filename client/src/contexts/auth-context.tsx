@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { API_BASE as API_BASE_URL } from '../lib/data-service';
+import { SupabaseAuthService, AuthEmployee, isSupabaseConfigured } from '../lib/supabase-auth';
 
 // Define all valid roles
 export type EmployeeRole = 'admin' | 'franchise_manager' | 'factory_manager' | 'employee' | 'driver' | 'manager' | 'staff';
@@ -8,17 +8,16 @@ interface Employee {
   id: string;
   employeeId: string;
   username: string;
-  role: EmployeeRole | string; // Allow any string role for flexibility
+  role: EmployeeRole | string;
   franchiseId?: string;
   factoryId?: string;
   fullName?: string;
   email?: string;
   phone?: string;
   isActive: boolean;
-  // HR Fields
   position?: string;
   department?: string;
-  hireDate?: string; // ISO string
+  hireDate?: string;
   salaryType?: 'hourly' | 'monthly';
   baseSalary?: number;
   hourlyRate?: number;
@@ -27,7 +26,7 @@ interface Employee {
   qualifications?: string;
   notes?: string;
   address?: string;
-  settings?: any; // JSONB column
+  settings?: any;
 }
 
 interface AuthContextType {
@@ -39,7 +38,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isFranchiseManager: boolean;
   isFactoryManager: boolean;
-  sessionTimeRemaining: number; // seconds remaining in session
+  sessionTimeRemaining: number;
   showSessionWarning: boolean;
   extendSession: () => void;
 }
@@ -49,6 +48,25 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Session configuration
 const SESSION_DURATION = 30 * 60 * 1000; // 30 minutes
 const WARNING_BEFORE_LOGOUT = 5 * 60 * 1000; // Show warning 5 minutes before logout
+
+// Check if we should use direct Supabase auth (no backend available)
+const useDirectSupabase = (): boolean => {
+  // In production on Amplify/Vercel without a backend, use direct Supabase
+  if (typeof window === 'undefined') return false;
+
+  // Check if VITE_API_URL is explicitly set to point to a backend
+  const apiUrl = import.meta.env.VITE_API_URL;
+  if (apiUrl && apiUrl.startsWith('http')) {
+    return false; // Use the backend API
+  }
+
+  // In production mode without explicit API URL, use direct Supabase
+  if (import.meta.env.PROD && isSupabaseConfigured) {
+    return true;
+  }
+
+  return false;
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -61,10 +79,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const warningTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch current employee from API
+  const directSupabase = useDirectSupabase();
+
+  // Fetch current employee from API or Supabase
   const fetchEmployee = async (token: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/me`, {
+      if (directSupabase) {
+        // Use direct Supabase auth
+        const emp = await SupabaseAuthService.verifySession(token);
+        if (emp) {
+          setEmployee(emp as Employee);
+          return true;
+        }
+        return false;
+      }
+
+      // Use backend API
+      const apiBase = import.meta.env.VITE_API_URL || '/api';
+      const response = await fetch(`${apiBase}/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -88,9 +120,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Sign out function
   const signOut = useCallback(async (): Promise<void> => {
     const token = localStorage.getItem('employee_token');
-    if (token) {
+
+    if (token && !directSupabase) {
       try {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
+        const apiBase = import.meta.env.VITE_API_URL || '/api';
+        await fetch(`${apiBase}/auth/logout`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -100,9 +134,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error('Logout error:', error);
       }
-      localStorage.removeItem('employee_token');
-      localStorage.removeItem('session_start');
     }
+
+    localStorage.removeItem('employee_token');
+    localStorage.removeItem('session_start');
 
     // Clear all timers
     if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
@@ -112,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setEmployee(null);
     setShowSessionWarning(false);
     setSessionTimeRemaining(SESSION_DURATION / 1000);
-  }, []);
+  }, [directSupabase]);
 
   // Reset session timers
   const resetSessionTimers = useCallback(() => {
@@ -237,7 +272,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (username: string, password: string): Promise<{ error: string | null; employee?: Employee }> => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      if (directSupabase) {
+        // Use direct Supabase auth
+        const result = await SupabaseAuthService.login(username, password);
+        localStorage.setItem('employee_token', result.token);
+        localStorage.setItem('session_start', Date.now().toString());
+        setEmployee(result.employee as Employee);
+        return { error: null, employee: result.employee as Employee };
+      }
+
+      // Use backend API
+      const apiBase = import.meta.env.VITE_API_URL || '/api';
+      const response = await fetch(`${apiBase}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -256,7 +302,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: data.error || 'Login failed' };
       }
     } catch (error: any) {
-      return { error: error.message || 'Login failed' };
+      console.error('Login error:', error);
+      return { error: error.message || 'Login failed. Please check your connection.' };
     } finally {
       setLoading(false);
     }
