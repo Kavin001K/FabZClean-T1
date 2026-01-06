@@ -104,7 +104,7 @@ export class AuthService {
                             fullName: `${localEmployee.first_name || ''} ${localEmployee.last_name || ''}`.trim() || localEmployee.fullName,
                             email: localEmployee.email,
                             phone: localEmployee.phone,
-                            isActive: localEmployee.status === 'active',
+                            isActive: localEmployee.status === 'active' || !localEmployee.status,
                         };
                         console.log(`✅ Login successful (local) for: ${username}`);
                         return { token, employee };
