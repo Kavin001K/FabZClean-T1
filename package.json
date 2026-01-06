@@ -17,6 +17,7 @@
     "db:push": "drizzle-kit push",
     "db:setup": "rm -f fabzclean.db && npx tsx server/local-db-setup.ts",
     "db:reset": "rm -f fabzclean.db && npx tsx server/local-db-setup.ts",
+    "db:reset-password": "npx tsx server/reset-admin-password.ts",
     "code:cleanup": "node scripts/code-cleanup.js",
     "code:cleanup:fix": "node scripts/code-cleanup.js --fix",
     "code:cleanup:verbose": "node scripts/code-cleanup.js --verbose"

@@ -69,41 +69,55 @@ export class AuthService {
 
         // 1. Try Local Storage (SQLite) first
         try {
+            console.log(`🔍 Searching for user in local DB: ${username}`);
             const localEmployee = await storage.getEmployeeByEmail(username) as any;
-            if (localEmployee && localEmployee.password) {
-                const isValidLocal = await bcrypt.compare(password, localEmployee.password);
-                if (isValidLocal && localEmployee.status === 'active') {
-                    let normalizedRole = localEmployee.role;
-                    if (normalizedRole === 'manager') normalizedRole = 'franchise_manager';
+            console.log(`🔍 Local employee found:`, localEmployee ? `Yes (${localEmployee.employeeId || localEmployee.employee_id})` : 'No');
 
-                    const payload: EmployeeJWTPayload = {
-                        id: localEmployee.id,
-                        employeeId: localEmployee.employee_id || localEmployee.employeeId,
-                        username: localEmployee.email || localEmployee.employee_id,
-                        role: normalizedRole as any,
-                        franchiseId: localEmployee.franchise_id || localEmployee.franchiseId,
-                        factoryId: localEmployee.factory_id || localEmployee.factoryId,
-                    };
-                    const token = jwt.sign(payload, FINAL_SECRET, { expiresIn: JWT_EXPIRY });
+            if (localEmployee) {
+                console.log(`🔍 Employee status: ${localEmployee.status}, has password: ${!!localEmployee.password}`);
 
-                    const employee: AuthEmployee = {
-                        id: localEmployee.id,
-                        employeeId: localEmployee.employee_id || localEmployee.employeeId,
-                        username: localEmployee.employee_id || localEmployee.employeeId,
-                        role: normalizedRole as any,
-                        franchiseId: localEmployee.franchise_id || localEmployee.franchiseId,
-                        factoryId: localEmployee.factory_id || localEmployee.factoryId,
-                        fullName: `${localEmployee.first_name || ''} ${localEmployee.last_name || ''}`.trim() || localEmployee.fullName,
-                        email: localEmployee.email,
-                        phone: localEmployee.phone,
-                        isActive: localEmployee.status === 'active',
-                    };
-                    console.log(`✅ Login successful (local) for: ${username}`);
-                    return { token, employee };
+                if (localEmployee.password) {
+                    const isValidLocal = await bcrypt.compare(password, localEmployee.password);
+                    console.log(`🔍 Password match: ${isValidLocal}`);
+
+                    if (isValidLocal && localEmployee.status === 'active') {
+                        let normalizedRole = localEmployee.role;
+                        if (normalizedRole === 'manager') normalizedRole = 'franchise_manager';
+
+                        const payload: EmployeeJWTPayload = {
+                            id: localEmployee.id,
+                            employeeId: localEmployee.employee_id || localEmployee.employeeId,
+                            username: localEmployee.email || localEmployee.employee_id,
+                            role: normalizedRole as any,
+                            franchiseId: localEmployee.franchise_id || localEmployee.franchiseId,
+                            factoryId: localEmployee.factory_id || localEmployee.factoryId,
+                        };
+                        const token = jwt.sign(payload, FINAL_SECRET, { expiresIn: JWT_EXPIRY });
+
+                        const employee: AuthEmployee = {
+                            id: localEmployee.id,
+                            employeeId: localEmployee.employee_id || localEmployee.employeeId,
+                            username: localEmployee.employee_id || localEmployee.employeeId,
+                            role: normalizedRole as any,
+                            franchiseId: localEmployee.franchise_id || localEmployee.franchiseId,
+                            factoryId: localEmployee.factory_id || localEmployee.factoryId,
+                            fullName: `${localEmployee.first_name || ''} ${localEmployee.last_name || ''}`.trim() || localEmployee.fullName,
+                            email: localEmployee.email,
+                            phone: localEmployee.phone,
+                            isActive: localEmployee.status === 'active',
+                        };
+                        console.log(`✅ Login successful (local) for: ${username}`);
+                        return { token, employee };
+                    } else if (!isValidLocal) {
+                        console.log(`❌ Password mismatch for local user: ${username}`);
+                    } else if (localEmployee.status !== 'active') {
+                        console.log(`❌ User inactive: ${username}, status: ${localEmployee.status}`);
+                    }
                 }
             }
-        } catch (err) {
-            // Ignore local errors, continue to Supabase
+        } catch (err: any) {
+            console.error(`❌ Local DB error:`, err.message);
+            // Continue to Supabase
         }
 
         // 2. Try Supabase 'employees' table
