@@ -43,9 +43,47 @@ export interface FranchiseBranchInfo {
     state: string;
     pincode: string;
     phone: string;
+    whatsappNumber?: string;
     email: string;
+
+    // Legal & Tax
     gstNumber: string; // GSTIN for GST invoices
+    gstEnabled?: boolean;
+    gstRate?: string;
+    sacCode?: string; // Service Accounting Code
+    taxId?: string; // PAN Number
+    legalEntityName?: string;
+
+    // Banking (for invoice bank details)
+    bankName?: string;
+    bankAccountNumber?: string;
+    bankIfsc?: string;
+    bankAccountName?: string;
+    bankBranch?: string;
+
+    // UPI (for QR code payments)
+    upiId?: string;
+    upiDisplayName?: string;
+
+    // Manager
     managerName?: string;
+    managerPhone?: string;
+    managerEmail?: string;
+
+    // Operating Hours
+    openingTime?: string;
+    closingTime?: string;
+
+    // Branding
+    logoUrl?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+
+    // Operational Settings
+    enableDelivery?: boolean;
+    defaultDeliveryCharge?: string;
+    enableExpressService?: boolean;
+    expressServiceMultiplier?: string;
 }
 
 // Default company info (used when no franchise is specified)
@@ -359,18 +397,147 @@ export function getFormattedAddress(franchise: FranchiseBranchInfo): string {
 }
 
 /**
+ * Convert database franchise record to FranchiseBranchInfo
+ */
+export function convertDbFranchiseToInfo(dbFranchise: any): FranchiseBranchInfo {
+    const address = dbFranchise.address || {};
+    return {
+        id: dbFranchise.id,
+        name: dbFranchise.name,
+        branchCode: dbFranchise.branchCode || dbFranchise.franchiseId?.slice(0, 3)?.toUpperCase() || 'FAB',
+        address: address.street || '',
+        city: address.city || '',
+        state: address.state || 'Tamil Nadu',
+        pincode: address.pincode || address.zip || '',
+        phone: dbFranchise.phone || '',
+        whatsappNumber: dbFranchise.whatsappNumber,
+        email: dbFranchise.email || '',
+
+        // Legal & Tax
+        gstNumber: dbFranchise.gstNumber || '',
+        gstEnabled: dbFranchise.gstEnabled ?? true,
+        gstRate: dbFranchise.gstRate || '18.00',
+        sacCode: dbFranchise.sacCode || '9971',
+        taxId: dbFranchise.taxId,
+        legalEntityName: dbFranchise.legalEntityName,
+
+        // Banking
+        bankName: dbFranchise.bankName,
+        bankAccountNumber: dbFranchise.bankAccountNumber,
+        bankIfsc: dbFranchise.bankIfsc,
+        bankAccountName: dbFranchise.bankAccountName,
+        bankBranch: dbFranchise.bankBranch,
+
+        // UPI
+        upiId: dbFranchise.upiId,
+        upiDisplayName: dbFranchise.upiDisplayName,
+
+        // Manager
+        managerName: dbFranchise.managerName,
+        managerPhone: dbFranchise.managerPhone,
+        managerEmail: dbFranchise.managerEmail,
+
+        // Operating Hours
+        openingTime: dbFranchise.openingTime,
+        closingTime: dbFranchise.closingTime,
+
+        // Branding
+        logoUrl: dbFranchise.logoUrl,
+        primaryColor: dbFranchise.primaryColor,
+        secondaryColor: dbFranchise.secondaryColor,
+
+        // Operational
+        enableDelivery: dbFranchise.enableDelivery,
+        defaultDeliveryCharge: dbFranchise.defaultDeliveryCharge,
+        enableExpressService: dbFranchise.enableExpressService,
+        expressServiceMultiplier: dbFranchise.expressServiceMultiplier,
+    };
+}
+
+/**
  * Get invoice company details for a franchise
+ * Now includes banking details for wire transfer and UPI for QR code
  */
 export function getInvoiceCompanyDetails(franchiseId?: string | null, enableGST: boolean = false) {
     const franchise = getFranchiseById(franchiseId);
 
+    // Use franchise UPI or fallback to default
+    const upiId = franchise.upiId || PAYMENT_CONFIG.UPI_ID;
+    const upiDisplayName = franchise.upiDisplayName || PAYMENT_CONFIG.PAYEE_NAME;
+
     return {
+        // Basic Info
         name: 'Fab Clean',
         branchName: franchise.name,
         address: getFormattedAddress(franchise),
         phone: franchise.phone,
+        whatsappNumber: franchise.whatsappNumber,
         email: franchise.email || 'support@myfabclean.com',
+        logo: franchise.logoUrl || '/assets/logo.webp',
+
+        // Tax Info
         taxId: enableGST ? franchise.gstNumber : undefined,
-        logo: '/assets/logo.webp',
+        gstNumber: franchise.gstNumber,
+        gstRate: franchise.gstRate || '18.00',
+        sacCode: franchise.sacCode || '9971',
+        panNumber: franchise.taxId,
+        legalEntityName: franchise.legalEntityName,
+
+        // Banking Details (for wire transfer)
+        bankDetails: franchise.bankName ? {
+            bankName: franchise.bankName,
+            accountNumber: franchise.bankAccountNumber,
+            ifscCode: franchise.bankIfsc,
+            accountName: franchise.bankAccountName,
+            branch: franchise.bankBranch,
+        } : null,
+
+        // UPI Payment
+        upi: {
+            id: upiId,
+            displayName: upiDisplayName,
+        },
+
+        // Manager Contact
+        manager: franchise.managerName ? {
+            name: franchise.managerName,
+            phone: franchise.managerPhone,
+            email: franchise.managerEmail,
+        } : null,
+
+        // Operating Hours
+        operatingHours: {
+            open: franchise.openingTime || '09:00',
+            close: franchise.closingTime || '21:00',
+        },
+
+        // Branding
+        branding: {
+            primaryColor: franchise.primaryColor || '#4CAF50',
+            secondaryColor: franchise.secondaryColor || '#2196F3',
+        },
     };
+}
+
+/**
+ * Generate UPI URL for a specific franchise
+ */
+export function generateFranchiseUPIUrl(
+    franchiseId: string | null | undefined,
+    amount: number,
+    orderId?: string,
+    note?: string
+): string {
+    const franchise = getFranchiseById(franchiseId);
+    const upiId = franchise.upiId || PAYMENT_CONFIG.UPI_ID;
+    const payeeName = franchise.upiDisplayName || PAYMENT_CONFIG.PAYEE_NAME;
+
+    const params = new URLSearchParams();
+    params.set('pa', upiId);
+    params.set('pn', payeeName);
+    params.set('am', amount.toFixed(2));
+    params.set('cu', PAYMENT_CONFIG.CURRENCY);
+    if (orderId) params.set('tr', orderId);
+    if (note) params.set('tn', note);
+    return `upi://pay?${params.toString()}`;
 }

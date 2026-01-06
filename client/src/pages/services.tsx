@@ -17,6 +17,10 @@ import {
   Search,
   Grid3x3,
   List,
+  Upload,
+  FileSpreadsheet,
+  AlertCircle,
+  Check,
   CheckCircle,
   XCircle,
   Sparkles,
@@ -63,6 +67,7 @@ import { servicesApi } from '@/lib/data-service';
 import type { Service } from '@shared/schema';
 import { EnhancedPDFExport, exportServicesEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportServicesToExcel } from '@/lib/excel-exports';
+import { downloadServiceTemplate, parseServiceExcel, convertToServiceData, type ImportResult, type ParsedService } from '@/lib/excel-service-import';
 
 // Service icon mapping
 const getServiceIcon = (category: string) => {
@@ -96,6 +101,12 @@ export default function Services() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
+
+  // Excel Import State
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
 
   // UI State
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -317,6 +328,100 @@ export default function Services() {
     });
   };
 
+  // Handle Excel file upload
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['.xlsx', '.xls', '.csv'];
+    const fileExt = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    if (!validTypes.includes(fileExt)) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please upload an Excel file (.xlsx, .xls) or CSV file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const result = await parseServiceExcel(file);
+      setImportResult(result);
+      setIsImportDialogOpen(true);
+
+      if (!result.success && result.errors.length > 0) {
+        toast({
+          title: "Validation Errors Found",
+          description: `${result.invalidRows} rows have issues. Review before importing.`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error Reading File",
+        description: error instanceof Error ? error.message : "Failed to read Excel file",
+        variant: "destructive",
+      });
+    }
+
+    // Clear the input
+    event.target.value = '';
+  };
+
+  // Handle bulk import
+  const handleBulkImport = async () => {
+    if (!importResult) return;
+
+    const validServices = convertToServiceData(importResult.parsedServices);
+    if (validServices.length === 0) {
+      toast({
+        title: "No Valid Services",
+        description: "No valid services to import. Fix the errors and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsImporting(true);
+    setImportProgress(0);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < validServices.length; i++) {
+      try {
+        // Check if service with same name exists (for update)
+        const existing = services.find(s =>
+          s.name.toLowerCase() === validServices[i].name?.toLowerCase()
+        );
+
+        if (existing) {
+          await servicesApi.update(existing.id, validServices[i]);
+        } else {
+          await servicesApi.create(validServices[i]);
+        }
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to import service ${validServices[i].name}:`, error);
+        failCount++;
+      }
+
+      setImportProgress(Math.round(((i + 1) / validServices.length) * 100));
+    }
+
+    setIsImporting(false);
+    setIsImportDialogOpen(false);
+    setImportResult(null);
+
+    queryClient.invalidateQueries({ queryKey: ['services'] });
+
+    toast({
+      title: "Import Complete",
+      description: `Successfully imported ${successCount} services${failCount > 0 ? `, ${failCount} failed` : ''}.`,
+    });
+  };
+
   const handlePrintPriceList = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -444,6 +549,35 @@ export default function Services() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Import Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => downloadServiceTemplate()}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Download Template
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <label className="flex items-center cursor-pointer">
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload Excel File
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <PlusCircle className="h-4 w-4 mr-2" />
             Add Service
@@ -898,6 +1032,151 @@ export default function Services() {
         }}
         service={selectedService}
       />
+
+      {/* Excel Import Dialog */}
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              Import Services from Excel
+            </DialogTitle>
+            <DialogDescription>
+              Review the parsed data before importing. Services with the same name will be updated.
+            </DialogDescription>
+          </DialogHeader>
+
+          {importResult && (
+            <div className="space-y-4">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-3 gap-4">
+                <Card className="p-4 text-center">
+                  <p className="text-2xl font-bold">{importResult.totalRows}</p>
+                  <p className="text-sm text-muted-foreground">Total Rows</p>
+                </Card>
+                <Card className="p-4 text-center border-green-200 bg-green-50">
+                  <p className="text-2xl font-bold text-green-600">{importResult.validRows}</p>
+                  <p className="text-sm text-muted-foreground">Valid</p>
+                </Card>
+                <Card className="p-4 text-center border-red-200 bg-red-50">
+                  <p className="text-2xl font-bold text-red-600">{importResult.invalidRows}</p>
+                  <p className="text-sm text-muted-foreground">With Errors</p>
+                </Card>
+              </div>
+
+              {/* Errors */}
+              {importResult.errors.length > 0 && (
+                <Card className="border-red-200 bg-red-50/50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm text-red-600 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      Validation Errors ({importResult.errors.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm max-h-32 overflow-y-auto">
+                    <ul className="space-y-1">
+                      {importResult.errors.slice(0, 10).map((error, i) => (
+                        <li key={i} className="text-red-600">{error}</li>
+                      ))}
+                      {importResult.errors.length > 10 && (
+                        <li className="text-red-500 font-medium">...and {importResult.errors.length - 10} more errors</li>
+                      )}
+                    </ul>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Preview Table */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Preview ({importResult.validRows} services will be imported)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="max-h-60 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted sticky top-0">
+                        <tr>
+                          <th className="p-2 text-left">Status</th>
+                          <th className="p-2 text-left">Name</th>
+                          <th className="p-2 text-left">Category</th>
+                          <th className="p-2 text-right">Price</th>
+                          <th className="p-2 text-left">Duration</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importResult.parsedServices.slice(0, 20).map((service, i) => (
+                          <tr key={i} className={service.isValid ? '' : 'bg-red-50'}>
+                            <td className="p-2">
+                              {service.isValid ? (
+                                <Check className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <AlertCircle className="h-4 w-4 text-red-500" />
+                              )}
+                            </td>
+                            <td className="p-2 font-medium">{service.name || '-'}</td>
+                            <td className="p-2">{service.category || '-'}</td>
+                            <td className="p-2 text-right">₹{service.price}</td>
+                            <td className="p-2">{service.duration || '-'}</td>
+                          </tr>
+                        ))}
+                        {importResult.parsedServices.length > 20 && (
+                          <tr>
+                            <td colSpan={5} className="p-2 text-center text-muted-foreground">
+                              ...and {importResult.parsedServices.length - 20} more rows
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Progress */}
+              {isImporting && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Importing services...</span>
+                    <span>{importProgress}%</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-lime-500 transition-all duration-300"
+                      style={{ width: `${importProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsImportDialogOpen(false);
+                setImportResult(null);
+              }}
+              disabled={isImporting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBulkImport}
+              disabled={isImporting || !importResult || importResult.validRows === 0}
+            >
+              {isImporting ? (
+                <>Importing...</>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import {importResult?.validRows || 0} Services
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

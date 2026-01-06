@@ -7,17 +7,63 @@ export const franchises = pgTable("franchises", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   franchiseId: text("franchise_id").notNull().unique(), // Custom ID e.g. FR-001
+  branchCode: text("branch_code"), // Short code for order numbers (e.g., POL, KIN)
   ownerName: text("owner_name").notNull(),
   email: text("email").notNull(),
   phone: text("phone").notNull(),
+  whatsappNumber: text("whatsapp_number"), // For WhatsApp notifications
   address: jsonb("address").notNull(),
+
+  // Legal & Tax Information
   legalEntityName: text("legal_entity_name"),
-  taxId: text("tax_id"),
-  status: text("status", { enum: ["active", "inactive", "pending"] }).default("active"),
+  taxId: text("tax_id"), // PAN Number
+  gstNumber: text("gst_number"), // GSTIN
+  gstEnabled: boolean("gst_enabled").default(true),
+  gstRate: decimal("gst_rate", { precision: 5, scale: 2 }).default("18.00"),
+  sacCode: text("sac_code").default("9971"), // Service Accounting Code
+
+  // Banking Information (for invoices)
+  bankName: text("bank_name"),
+  bankAccountNumber: text("bank_account_number"),
+  bankIfsc: text("bank_ifsc"),
+  bankAccountName: text("bank_account_name"),
+  bankBranch: text("bank_branch"),
+
+  // UPI Payment
+  upiId: text("upi_id"), // For QR code payments
+  upiDisplayName: text("upi_display_name"),
+
+  // Operating Hours
+  openingTime: text("opening_time").default("09:00"),
+  closingTime: text("closing_time").default("21:00"),
+  workingDays: jsonb("working_days").default(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]),
+
+  // Branding
+  logoUrl: text("logo_url"),
+  primaryColor: text("primary_color").default("#4CAF50"),
+  secondaryColor: text("secondary_color").default("#2196F3"),
+
+  // Contact Persons
+  managerName: text("manager_name"),
+  managerPhone: text("manager_phone"),
+  managerEmail: text("manager_email"),
+
+  // Franchise Agreement
+  status: text("status", { enum: ["active", "inactive", "pending", "suspended"] }).default("active"),
   documents: jsonb("documents"), // Array of document URLs/metadata
   agreementStartDate: timestamp("agreement_start_date"),
   agreementEndDate: timestamp("agreement_end_date"),
   royaltyPercentage: decimal("royalty_percentage", { precision: 5, scale: 2 }).default("0"),
+
+  // Operational Settings
+  autoGenerateOrderNumber: boolean("auto_generate_order_number").default(true),
+  orderNumberPrefix: text("order_number_prefix"), // Override default prefix
+  enableDelivery: boolean("enable_delivery").default(true),
+  defaultDeliveryCharge: decimal("default_delivery_charge", { precision: 10, scale: 2 }).default("0"),
+  enableExpressService: boolean("enable_express_service").default(true),
+  expressServiceMultiplier: decimal("express_service_multiplier", { precision: 3, scale: 2 }).default("1.50"),
+
+  // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -14,13 +14,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
     DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -33,15 +41,77 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Building2, FileText, Info, Loader2, Edit, Trash2, AlertTriangle } from "lucide-react";
-import { insertFranchiseSchema } from "@shared/schema";
+import {
+    Plus, Building2, FileText, CreditCard, Settings, Users, Clock, Palette,
+    Loader2, Edit, Trash2, AlertTriangle, MapPin, Phone, Mail, Globe
+} from "lucide-react";
 
-// Extend schema for file upload handling in form
-const franchiseFormSchema = insertFranchiseSchema.extend({
-    documents: z.any().optional(), // FileList or array of files
-    agreementStartDate: z.coerce.date().optional().nullable(),
-    agreementEndDate: z.coerce.date().optional().nullable(),
-    royaltyPercentage: z.coerce.string().optional().default("0"), // Handle string/number mismatch
+// Enhanced form schema with all new fields
+const franchiseFormSchema = z.object({
+    // Basic Info
+    name: z.string().min(1, "Franchise name is required"),
+    franchiseId: z.string().optional(),
+    branchCode: z.string().max(5, "Max 5 characters").optional(),
+    ownerName: z.string().min(1, "Owner name is required"),
+    email: z.string().email("Invalid email"),
+    phone: z.string().min(10, "Invalid phone"),
+    whatsappNumber: z.string().optional(),
+
+    // Address fields (flattened for easier form handling)
+    street: z.string().min(1, "Street address is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(1, "State is required"),
+    pincode: z.string().min(5, "Invalid pincode"),
+
+    // Legal & Tax
+    legalEntityName: z.string().optional(),
+    taxId: z.string().optional(), // PAN
+    gstNumber: z.string().optional(),
+    gstEnabled: z.boolean().default(true),
+    gstRate: z.string().default("18.00"),
+    sacCode: z.string().default("9971"),
+
+    // Banking
+    bankName: z.string().optional(),
+    bankAccountNumber: z.string().optional(),
+    bankIfsc: z.string().optional(),
+    bankAccountName: z.string().optional(),
+    bankBranch: z.string().optional(),
+
+    // UPI
+    upiId: z.string().optional(),
+    upiDisplayName: z.string().optional(),
+
+    // Manager
+    managerName: z.string().optional(),
+    managerPhone: z.string().optional(),
+    managerEmail: z.string().optional(),
+
+    // Operating Hours
+    openingTime: z.string().default("09:00"),
+    closingTime: z.string().default("21:00"),
+
+    // Branding
+    logoUrl: z.string().optional(),
+    primaryColor: z.string().default("#4CAF50"),
+    secondaryColor: z.string().default("#2196F3"),
+
+    // Operations
+    status: z.enum(["active", "inactive", "pending", "suspended"]).default("active"),
+    enableDelivery: z.boolean().default(true),
+    defaultDeliveryCharge: z.string().default("0"),
+    enableExpressService: z.boolean().default(true),
+    expressServiceMultiplier: z.string().default("1.50"),
+    autoGenerateOrderNumber: z.boolean().default(true),
+    orderNumberPrefix: z.string().optional(),
+
+    // Agreement
+    agreementStartDate: z.string().optional(),
+    agreementEndDate: z.string().optional(),
+    royaltyPercentage: z.string().default("0"),
+
+    // Documents
+    documents: z.any().optional(),
 });
 
 type FranchiseFormValues = z.infer<typeof franchiseFormSchema>;
@@ -68,32 +138,63 @@ export default function FranchiseManagement() {
         resolver: zodResolver(franchiseFormSchema),
         defaultValues: {
             name: "",
+            branchCode: "",
             ownerName: "",
             email: "",
             phone: "",
-            address: {},
+            whatsappNumber: "",
+            street: "",
+            city: "",
+            state: "Tamil Nadu",
+            pincode: "",
             legalEntityName: "",
             taxId: "",
+            gstNumber: "",
+            gstEnabled: true,
+            gstRate: "18.00",
+            sacCode: "9971",
+            bankName: "",
+            bankAccountNumber: "",
+            bankIfsc: "",
+            bankAccountName: "",
+            bankBranch: "",
+            upiId: "",
+            upiDisplayName: "",
+            managerName: "",
+            managerPhone: "",
+            managerEmail: "",
+            openingTime: "09:00",
+            closingTime: "21:00",
+            primaryColor: "#4CAF50",
+            secondaryColor: "#2196F3",
             status: "active",
+            enableDelivery: true,
+            defaultDeliveryCharge: "0",
+            enableExpressService: true,
+            expressServiceMultiplier: "1.50",
+            autoGenerateOrderNumber: true,
+            orderNumberPrefix: "",
             royaltyPercentage: "0",
-            agreementStartDate: null,
-            agreementEndDate: null,
         },
     });
 
     const createFranchiseMutation = useMutation({
         mutationFn: async (data: FranchiseFormValues) => {
-            const formData = new FormData();
-            const { documents, ...rest } = data;
-            formData.append("data", JSON.stringify(rest));
-            if (documents && documents.length > 0) {
-                for (let i = 0; i < documents.length; i++) {
-                    formData.append("documents", documents[i]);
-                }
-            }
+            // Transform form data to API format
+            const payload = {
+                ...data,
+                address: {
+                    street: data.street,
+                    city: data.city,
+                    state: data.state,
+                    pincode: data.pincode,
+                },
+            };
+
             const res = await fetch("/api/franchises", {
                 method: "POST",
-                body: formData,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
             });
             if (!res.ok) {
                 const error = await res.json();
@@ -114,17 +215,20 @@ export default function FranchiseManagement() {
 
     const updateFranchiseMutation = useMutation({
         mutationFn: async (data: FranchiseFormValues) => {
-            const formData = new FormData();
-            const { documents, ...rest } = data;
-            formData.append("data", JSON.stringify(rest));
-            if (documents && documents.length > 0) {
-                for (let i = 0; i < documents.length; i++) {
-                    formData.append("documents", documents[i]);
-                }
-            }
+            const payload = {
+                ...data,
+                address: {
+                    street: data.street,
+                    city: data.city,
+                    state: data.state,
+                    pincode: data.pincode,
+                },
+            };
+
             const res = await fetch(`/api/franchises/${editingFranchise.id}`, {
                 method: "PUT",
-                body: formData,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
             });
             if (!res.ok) {
                 const error = await res.json();
@@ -146,9 +250,7 @@ export default function FranchiseManagement() {
 
     const deleteFranchiseMutation = useMutation({
         mutationFn: async (id: string) => {
-            const res = await fetch(`/api/franchises/${id}`, {
-                method: "DELETE",
-            });
+            const res = await fetch(`/api/franchises/${id}`, { method: "DELETE" });
             if (!res.ok) {
                 const error = await res.json();
                 throw new Error(error.message || "Failed to delete franchise");
@@ -175,251 +277,557 @@ export default function FranchiseManagement() {
 
     const handleEdit = (franchise: any) => {
         setEditingFranchise(franchise);
+        const address = franchise.address || {};
         form.reset({
-            name: franchise.name,
-            ownerName: franchise.ownerName,
-            email: franchise.email,
-            phone: franchise.phone,
-            address: franchise.address,
+            name: franchise.name || "",
+            branchCode: franchise.branchCode || "",
+            ownerName: franchise.ownerName || "",
+            email: franchise.email || "",
+            phone: franchise.phone || "",
+            whatsappNumber: franchise.whatsappNumber || "",
+            street: address.street || "",
+            city: address.city || "",
+            state: address.state || "Tamil Nadu",
+            pincode: address.pincode || address.zip || "",
             legalEntityName: franchise.legalEntityName || "",
             taxId: franchise.taxId || "",
-            status: franchise.status as any,
-            royaltyPercentage: franchise.royaltyPercentage?.toString() || "0",
+            gstNumber: franchise.gstNumber || "",
+            gstEnabled: franchise.gstEnabled ?? true,
+            gstRate: franchise.gstRate || "18.00",
+            sacCode: franchise.sacCode || "9971",
+            bankName: franchise.bankName || "",
+            bankAccountNumber: franchise.bankAccountNumber || "",
+            bankIfsc: franchise.bankIfsc || "",
+            bankAccountName: franchise.bankAccountName || "",
+            bankBranch: franchise.bankBranch || "",
+            upiId: franchise.upiId || "",
+            upiDisplayName: franchise.upiDisplayName || "",
+            managerName: franchise.managerName || "",
+            managerPhone: franchise.managerPhone || "",
+            managerEmail: franchise.managerEmail || "",
+            openingTime: franchise.openingTime || "09:00",
+            closingTime: franchise.closingTime || "21:00",
+            primaryColor: franchise.primaryColor || "#4CAF50",
+            secondaryColor: franchise.secondaryColor || "#2196F3",
+            status: franchise.status || "active",
+            enableDelivery: franchise.enableDelivery ?? true,
+            defaultDeliveryCharge: franchise.defaultDeliveryCharge || "0",
+            enableExpressService: franchise.enableExpressService ?? true,
+            expressServiceMultiplier: franchise.expressServiceMultiplier || "1.50",
+            autoGenerateOrderNumber: franchise.autoGenerateOrderNumber ?? true,
+            orderNumberPrefix: franchise.orderNumberPrefix || "",
             agreementStartDate: franchise.agreementStartDate ? new Date(franchise.agreementStartDate).toISOString().split('T')[0] : "",
             agreementEndDate: franchise.agreementEndDate ? new Date(franchise.agreementEndDate).toISOString().split('T')[0] : "",
-        } as any);
+            royaltyPercentage: franchise.royaltyPercentage || "0",
+        });
+        setActiveTab("basic");
         setIsDialogOpen(true);
-    };
-
-    const handleDelete = (id: string) => {
-        setFranchiseToDelete(id);
-        setDeleteConfirmOpen(true);
     };
 
     const openCreateDialog = () => {
         setEditingFranchise(null);
-        form.reset({
-            name: "",
-            ownerName: "",
-            email: "",
-            phone: "",
-            address: {},
-            legalEntityName: "",
-            taxId: "",
-            status: "active",
-            royaltyPercentage: "0",
-            agreementStartDate: null,
-            agreementEndDate: null,
-        });
+        form.reset();
+        setActiveTab("basic");
         setIsDialogOpen(true);
     };
 
     return (
-        <div className="container mx-auto py-10 space-y-8">
+        <div className="container mx-auto py-6 space-y-6">
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Franchise Management</h1>
                     <p className="text-muted-foreground">
-                        Manage your franchises, legal documents, and configurations.
+                        Manage franchises, billing details, and operational settings
                     </p>
                 </div>
-                <Button onClick={openCreateDialog}>
-                    <Plus className="mr-2 h-4 w-4" /> Add Franchise
+                <Button onClick={openCreateDialog} size="lg">
+                    <Plus className="mr-2 h-5 w-5" /> Add Franchise
                 </Button>
             </div>
 
+            {/* Enhanced Dialog with Tabs */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>{editingFranchise ? "Edit Franchise" : "Add New Franchise"}</DialogTitle>
+                        <DialogTitle className="text-xl">
+                            {editingFranchise ? "Edit Franchise" : "Add New Franchise"}
+                        </DialogTitle>
                         <DialogDescription>
-                            {editingFranchise ? "Update franchise details." : "Enter the details for the new franchise."}
+                            Complete all sections to properly set up the franchise for billing and operations.
                         </DialogDescription>
                     </DialogHeader>
 
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                            <TabsList className="grid w-full grid-cols-3">
-                                <TabsTrigger value="basic">
-                                    <Building2 className="mr-2 h-4 w-4" /> Basic Info
+                        <Tabs value={activeTab} onValueChange={setActiveTab}>
+                            <TabsList className="grid w-full grid-cols-6 gap-1">
+                                <TabsTrigger value="basic" className="text-xs">
+                                    <Building2 className="h-4 w-4 mr-1" /> Basic
                                 </TabsTrigger>
-                                <TabsTrigger value="legal">
-                                    <FileText className="mr-2 h-4 w-4" /> Legal & Docs
+                                <TabsTrigger value="address" className="text-xs">
+                                    <MapPin className="h-4 w-4 mr-1" /> Address
                                 </TabsTrigger>
-                                <TabsTrigger value="details">
-                                    <Info className="mr-2 h-4 w-4" /> More Details
+                                <TabsTrigger value="legal" className="text-xs">
+                                    <FileText className="h-4 w-4 mr-1" /> Legal/Tax
+                                </TabsTrigger>
+                                <TabsTrigger value="banking" className="text-xs">
+                                    <CreditCard className="h-4 w-4 mr-1" /> Banking
+                                </TabsTrigger>
+                                <TabsTrigger value="manager" className="text-xs">
+                                    <Users className="h-4 w-4 mr-1" /> Manager
+                                </TabsTrigger>
+                                <TabsTrigger value="settings" className="text-xs">
+                                    <Settings className="h-4 w-4 mr-1" /> Settings
                                 </TabsTrigger>
                             </TabsList>
 
+                            {/* Basic Info Tab */}
                             <TabsContent value="basic" className="space-y-4 pt-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="name">Franchise Name</Label>
-                                        <Input id="name" {...form.register("name")} placeholder="e.g. FabZClean Downtown" />
+                                        <Label htmlFor="name">Franchise Name *</Label>
+                                        <Input {...form.register("name")} placeholder="e.g. FabZClean Pollachi" />
                                         {form.formState.errors.name && (
                                             <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
                                         )}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="ownerName">Owner Name</Label>
-                                        <Input id="ownerName" {...form.register("ownerName")} placeholder="Full Name" />
+                                        <Label htmlFor="branchCode">Branch Code</Label>
+                                        <Input {...form.register("branchCode")} placeholder="POL" maxLength={5} />
+                                        <p className="text-xs text-muted-foreground">Used in order numbers (e.g., FZC-2025POL0001)</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="ownerName">Owner Name *</Label>
+                                        <Input {...form.register("ownerName")} placeholder="Full Name" />
                                         {form.formState.errors.ownerName && (
                                             <p className="text-sm text-red-500">{form.formState.errors.ownerName.message}</p>
                                         )}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="email">Email</Label>
-                                        <Input id="email" type="email" {...form.register("email")} placeholder="owner@example.com" />
+                                        <Label htmlFor="email">Email *</Label>
+                                        <Input {...form.register("email")} type="email" placeholder="franchise@example.com" />
                                         {form.formState.errors.email && (
                                             <p className="text-sm text-red-500">{form.formState.errors.email.message}</p>
                                         )}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="phone">Phone</Label>
-                                        <Input id="phone" {...form.register("phone")} placeholder="+1 234 567 890" />
+                                        <Label htmlFor="phone">Phone *</Label>
+                                        <Input {...form.register("phone")} placeholder="+91 98765 43210" />
                                         {form.formState.errors.phone && (
                                             <p className="text-sm text-red-500">{form.formState.errors.phone.message}</p>
                                         )}
                                     </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="whatsappNumber">WhatsApp Number</Label>
+                                        <Input {...form.register("whatsappNumber")} placeholder="+91 98765 43210" />
+                                        <p className="text-xs text-muted-foreground">For customer notifications</p>
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="address">Address (JSON for now)</Label>
-                                    <Input
-                                        id="address"
-                                        placeholder='{"street": "123 Main St", "city": "City"}'
-                                        {...form.register("address", {
-                                            setValueAs: (v) => {
-                                                try { return typeof v === 'string' ? JSON.parse(v) : v } catch (e) { return v }
-                                            }
-                                        })}
-                                        defaultValue={editingFranchise ? JSON.stringify(editingFranchise.address) : ""}
-                                    />
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="openingTime">Opening Time</Label>
+                                        <Input {...form.register("openingTime")} type="time" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="closingTime">Closing Time</Label>
+                                        <Input {...form.register("closingTime")} type="time" />
+                                    </div>
                                 </div>
                             </TabsContent>
 
+                            {/* Address Tab */}
+                            <TabsContent value="address" className="space-y-4 pt-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="street">Street Address *</Label>
+                                    <Textarea {...form.register("street")} placeholder="Complete street address" rows={2} />
+                                    {form.formState.errors.street && (
+                                        <p className="text-sm text-red-500">{form.formState.errors.street.message}</p>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="city">City *</Label>
+                                        <Input {...form.register("city")} placeholder="City" />
+                                        {form.formState.errors.city && (
+                                            <p className="text-sm text-red-500">{form.formState.errors.city.message}</p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="state">State *</Label>
+                                        <Input {...form.register("state")} placeholder="State" />
+                                        {form.formState.errors.state && (
+                                            <p className="text-sm text-red-500">{form.formState.errors.state.message}</p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="pincode">Pincode *</Label>
+                                        <Input {...form.register("pincode")} placeholder="642002" />
+                                        {form.formState.errors.pincode && (
+                                            <p className="text-sm text-red-500">{form.formState.errors.pincode.message}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </TabsContent>
+
+                            {/* Legal & Tax Tab */}
                             <TabsContent value="legal" className="space-y-4 pt-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="legalEntityName">Legal Entity Name</Label>
-                                        <Input id="legalEntityName" {...form.register("legalEntityName")} placeholder="LLC Name" />
+                                        <Input {...form.register("legalEntityName")} placeholder="Registered business name" />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="taxId">Tax ID / GSTIN</Label>
-                                        <Input id="taxId" {...form.register("taxId")} placeholder="Tax ID" />
+                                        <Label htmlFor="taxId">PAN Number</Label>
+                                        <Input {...form.register("taxId")} placeholder="AAAAA0000A" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="gstNumber">GST Number (GSTIN)</Label>
+                                        <Input {...form.register("gstNumber")} placeholder="33AAAAA0000A1Z5" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="sacCode">SAC Code</Label>
+                                        <Input {...form.register("sacCode")} placeholder="9971" />
+                                        <p className="text-xs text-muted-foreground">Service Accounting Code for GST</p>
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="documents">Upload Legal Documents</Label>
-                                    <Input
-                                        id="documents"
-                                        type="file"
-                                        multiple
-                                        onChange={(e) => {
-                                            form.setValue("documents", e.target.files);
-                                        }}
-                                    />
-                                    <p className="text-xs text-muted-foreground">Upload agreements, licenses, etc.</p>
-                                </div>
-                            </TabsContent>
 
-                            <TabsContent value="details" className="space-y-4 pt-4">
+                                <div className="border rounded-lg p-4 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <Label htmlFor="gstEnabled">Enable GST on Invoices</Label>
+                                            <p className="text-xs text-muted-foreground">GST will be calculated and shown on all bills</p>
+                                        </div>
+                                        <Switch
+                                            checked={form.watch("gstEnabled")}
+                                            onCheckedChange={(v) => form.setValue("gstEnabled", v)}
+                                        />
+                                    </div>
+                                    {form.watch("gstEnabled") && (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="gstRate">GST Rate (%)</Label>
+                                            <Input {...form.register("gstRate")} type="number" step="0.01" className="w-32" />
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="agreementStartDate">Agreement Start Date</Label>
-                                        <Input id="agreementStartDate" type="date" {...form.register("agreementStartDate")} />
+                                        <Input {...form.register("agreementStartDate")} type="date" />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="agreementEndDate">Agreement End Date</Label>
-                                        <Input id="agreementEndDate" type="date" {...form.register("agreementEndDate")} />
+                                        <Input {...form.register("agreementEndDate")} type="date" />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="royaltyPercentage">Royalty Percentage (%)</Label>
-                                        <Input id="royaltyPercentage" type="number" step="0.01" {...form.register("royaltyPercentage")} />
+                                        <Label htmlFor="royaltyPercentage">Royalty Percentage</Label>
+                                        <Input {...form.register("royaltyPercentage")} type="number" step="0.01" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="status">Status</Label>
+                                        <Select value={form.watch("status")} onValueChange={(v: any) => form.setValue("status", v)}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select status" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="active">Active</SelectItem>
+                                                <SelectItem value="inactive">Inactive</SelectItem>
+                                                <SelectItem value="pending">Pending</SelectItem>
+                                                <SelectItem value="suspended">Suspended</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                            </TabsContent>
+
+                            {/* Banking Tab */}
+                            <TabsContent value="banking" className="space-y-4 pt-4">
+                                <div className="border rounded-lg p-4 space-y-4">
+                                    <h3 className="font-medium flex items-center gap-2">
+                                        <CreditCard className="h-4 w-4" /> Bank Account Details
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground">These details will appear on invoices for bank transfers</p>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="bankName">Bank Name</Label>
+                                            <Input {...form.register("bankName")} placeholder="e.g. State Bank of India" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="bankBranch">Branch</Label>
+                                            <Input {...form.register("bankBranch")} placeholder="Branch name" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="bankAccountName">Account Holder Name</Label>
+                                            <Input {...form.register("bankAccountName")} placeholder="Name as per bank" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="bankAccountNumber">Account Number</Label>
+                                            <Input {...form.register("bankAccountNumber")} placeholder="Account number" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="bankIfsc">IFSC Code</Label>
+                                            <Input {...form.register("bankIfsc")} placeholder="SBIN0001234" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border rounded-lg p-4 space-y-4">
+                                    <h3 className="font-medium flex items-center gap-2">
+                                        <Globe className="h-4 w-4" /> UPI Payment
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground">UPI details for QR code on invoices</p>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="upiId">UPI ID</Label>
+                                            <Input {...form.register("upiId")} placeholder="yourname@upi" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="upiDisplayName">Display Name</Label>
+                                            <Input {...form.register("upiDisplayName")} placeholder="Name shown in payment apps" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </TabsContent>
+
+                            {/* Manager Tab */}
+                            <TabsContent value="manager" className="space-y-4 pt-4">
+                                <div className="border rounded-lg p-4 space-y-4">
+                                    <h3 className="font-medium flex items-center gap-2">
+                                        <Users className="h-4 w-4" /> Store Manager Details
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground">Primary contact person for this franchise</p>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="managerName">Manager Name</Label>
+                                            <Input {...form.register("managerName")} placeholder="Full name" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="managerPhone">Manager Phone</Label>
+                                            <Input {...form.register("managerPhone")} placeholder="+91 98765 43210" />
+                                        </div>
+                                        <div className="space-y-2 col-span-2">
+                                            <Label htmlFor="managerEmail">Manager Email</Label>
+                                            <Input {...form.register("managerEmail")} type="email" placeholder="manager@example.com" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </TabsContent>
+
+                            {/* Settings Tab */}
+                            <TabsContent value="settings" className="space-y-4 pt-4">
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between border rounded-lg p-4">
+                                        <div>
+                                            <Label>Auto-Generate Order Numbers</Label>
+                                            <p className="text-xs text-muted-foreground">Automatically generate unique order numbers</p>
+                                        </div>
+                                        <Switch
+                                            checked={form.watch("autoGenerateOrderNumber")}
+                                            onCheckedChange={(v) => form.setValue("autoGenerateOrderNumber", v)}
+                                        />
+                                    </div>
+
+                                    {form.watch("autoGenerateOrderNumber") && (
+                                        <div className="space-y-2 pl-4">
+                                            <Label htmlFor="orderNumberPrefix">Order Number Prefix (Optional)</Label>
+                                            <Input {...form.register("orderNumberPrefix")} placeholder="Leave empty for default (FZC)" className="w-48" />
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-center justify-between border rounded-lg p-4">
+                                        <div>
+                                            <Label>Enable Delivery Service</Label>
+                                            <p className="text-xs text-muted-foreground">Allow home delivery for orders</p>
+                                        </div>
+                                        <Switch
+                                            checked={form.watch("enableDelivery")}
+                                            onCheckedChange={(v) => form.setValue("enableDelivery", v)}
+                                        />
+                                    </div>
+
+                                    {form.watch("enableDelivery") && (
+                                        <div className="space-y-2 pl-4">
+                                            <Label htmlFor="defaultDeliveryCharge">Default Delivery Charge (₹)</Label>
+                                            <Input {...form.register("defaultDeliveryCharge")} type="number" step="0.01" className="w-32" />
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-center justify-between border rounded-lg p-4">
+                                        <div>
+                                            <Label>Enable Express Service</Label>
+                                            <p className="text-xs text-muted-foreground">Offer faster processing at premium rates</p>
+                                        </div>
+                                        <Switch
+                                            checked={form.watch("enableExpressService")}
+                                            onCheckedChange={(v) => form.setValue("enableExpressService", v)}
+                                        />
+                                    </div>
+
+                                    {form.watch("enableExpressService") && (
+                                        <div className="space-y-2 pl-4">
+                                            <Label htmlFor="expressServiceMultiplier">Express Price Multiplier</Label>
+                                            <Input {...form.register("expressServiceMultiplier")} type="number" step="0.1" className="w-32" />
+                                            <p className="text-xs text-muted-foreground">e.g., 1.5 = 50% extra charge</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="border rounded-lg p-4 space-y-4">
+                                    <h3 className="font-medium flex items-center gap-2">
+                                        <Palette className="h-4 w-4" /> Branding
+                                    </h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="primaryColor">Primary Color</Label>
+                                            <div className="flex gap-2">
+                                                <Input {...form.register("primaryColor")} type="color" className="w-16 h-10" />
+                                                <Input {...form.register("primaryColor")} placeholder="#4CAF50" />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="secondaryColor">Secondary Color</Label>
+                                            <div className="flex gap-2">
+                                                <Input {...form.register("secondaryColor")} type="color" className="w-16 h-10" />
+                                                <Input {...form.register("secondaryColor")} placeholder="#2196F3" />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </TabsContent>
                         </Tabs>
 
-                        <div className="flex justify-end space-x-2">
-                            <Button variant="outline" type="button" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                        <DialogFooter>
+                            <Button variant="outline" type="button" onClick={() => setIsDialogOpen(false)}>
+                                Cancel
+                            </Button>
                             <Button type="submit" disabled={createFranchiseMutation.isPending || updateFranchiseMutation.isPending}>
-                                {(createFranchiseMutation.isPending || updateFranchiseMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {(createFranchiseMutation.isPending || updateFranchiseMutation.isPending) && (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                )}
                                 {editingFranchise ? "Update Franchise" : "Create Franchise"}
                             </Button>
-                        </div>
+                        </DialogFooter>
                     </form>
                 </DialogContent>
             </Dialog>
 
+            {/* Delete Confirmation */}
             <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Confirm Deletion</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-red-500" />
+                            Confirm Deletion
+                        </DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to delete this franchise? This action cannot be undone.
+                            Are you sure you want to delete this franchise? This action cannot be undone and will affect all associated data.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-                        <Button variant="destructive" onClick={() => franchiseToDelete && deleteFranchiseMutation.mutate(franchiseToDelete)} disabled={deleteFranchiseMutation.isPending}>
+                        <Button
+                            variant="destructive"
+                            onClick={() => franchiseToDelete && deleteFranchiseMutation.mutate(franchiseToDelete)}
+                            disabled={deleteFranchiseMutation.isPending}
+                        >
                             {deleteFranchiseMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Delete
+                            Delete Franchise
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
+            {/* Franchises Table */}
             <Card>
                 <CardHeader>
                     <CardTitle>All Franchises</CardTitle>
-                    <CardDescription>A list of all registered franchises.</CardDescription>
+                    <CardDescription>Manage and view all registered franchises</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Franchise ID</TableHead>
+                                <TableHead>Branch</TableHead>
                                 <TableHead>Name</TableHead>
-                                <TableHead>Owner</TableHead>
+                                <TableHead>Contact</TableHead>
                                 <TableHead>Location</TableHead>
+                                <TableHead>GST</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead>Created At</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="text-center py-4">Loading...</TableCell>
+                                    <TableCell colSpan={7} className="text-center py-8">
+                                        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                                    </TableCell>
                                 </TableRow>
                             ) : franchises?.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="text-center py-4">No franchises found.</TableCell>
+                                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                        No franchises found. Click "Add Franchise" to create one.
+                                    </TableCell>
                                 </TableRow>
                             ) : (
                                 franchises?.map((franchise: any) => (
                                     <TableRow key={franchise.id}>
-                                        <TableCell className="font-medium">{franchise.franchiseId}</TableCell>
-                                        <TableCell>{franchise.name}</TableCell>
                                         <TableCell>
-                                            <div className="flex flex-col">
-                                                <span>{franchise.ownerName}</span>
-                                                <span className="text-xs text-muted-foreground">{franchise.email}</span>
+                                            <div className="font-mono text-sm bg-muted px-2 py-1 rounded w-fit">
+                                                {franchise.branchCode || franchise.franchiseId?.slice(0, 5) || "—"}
                                             </div>
                                         </TableCell>
-                                        <TableCell>{franchise.address?.city || "N/A"}</TableCell>
+                                        <TableCell>
+                                            <div className="font-medium">{franchise.name}</div>
+                                            <div className="text-xs text-muted-foreground">{franchise.ownerName}</div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col gap-1 text-sm">
+                                                <span className="flex items-center gap-1">
+                                                    <Phone className="h-3 w-3" /> {franchise.phone}
+                                                </span>
+                                                <span className="flex items-center gap-1 text-muted-foreground">
+                                                    <Mail className="h-3 w-3" /> {franchise.email}
+                                                </span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-1">
+                                                <MapPin className="h-3 w-3" />
+                                                {franchise.address?.city || "N/A"}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {franchise.gstNumber ? (
+                                                <Badge variant="outline" className="text-green-600">
+                                                    {franchise.gstNumber.slice(0, 10)}...
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-muted-foreground text-xs">Not Set</span>
+                                            )}
+                                        </TableCell>
                                         <TableCell>
                                             <Badge variant={franchise.status === "active" ? "default" : "secondary"}>
                                                 {franchise.status}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell>{new Date(franchise.createdAt).toLocaleDateString()}</TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
+                                            <div className="flex justify-end gap-1">
                                                 <Button variant="ghost" size="icon" onClick={() => handleEdit(franchise)}>
                                                     <Edit className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => handleDelete(franchise.id)}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-red-500 hover:text-red-600"
+                                                    onClick={() => {
+                                                        setFranchiseToDelete(franchise.id);
+                                                        setDeleteConfirmOpen(true);
+                                                    }}
+                                                >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>

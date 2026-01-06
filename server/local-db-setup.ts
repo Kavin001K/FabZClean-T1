@@ -21,7 +21,7 @@ const DB_PATH = "./fabzclean.db";
 // Ensure directory exists
 const dir = dirname(DB_PATH);
 if (dir !== "." && !existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
+  mkdirSync(dir, { recursive: true });
 }
 
 console.log("🗄️  Setting up local FabZClean database...\n");
@@ -512,46 +512,135 @@ console.log("🏢 Creating franchises...");
 
 const now = new Date().toISOString();
 const franchises = [
-    {
-        id: "franchise-pollachi",
-        name: "Fab Clean Pollachi",
-        franchiseId: "FAB-POLLACHI",
-        ownerName: "Manager Pollachi",
-        email: "pollachi@fabzclean.com",
-        phone: "9363059595",
-        address: JSON.stringify({
-            street: "#16, Venkatramana Round Road, Opp: Naturals/HDFC Bank, Mahalingapuram",
-            city: "Pollachi",
-            state: "Tamil Nadu",
-            zip: "642002"
-        }),
-        status: "active"
-    },
-    {
-        id: "franchise-kinathukadavu",
-        name: "Fab Clean Kinathukadavu",
-        franchiseId: "FAB-KIN",
-        ownerName: "Manager Kinathukadavu",
-        email: "kinathukadavu@fabzclean.com",
-        phone: "9363719595",
-        address: JSON.stringify({
-            street: "#442/11, Opp MlA Office, Krishnasamypuram",
-            city: "Kinathukadavu",
-            state: "Tamil Nadu",
-            zip: "642109"
-        }),
-        status: "active"
-    }
+  {
+    id: "franchise-pollachi",
+    name: "Fab Clean Pollachi",
+    franchiseId: "FAB-POLLACHI",
+    branchCode: "POL",
+    ownerName: "Manager Pollachi",
+    email: "pollachi@fabzclean.com",
+    phone: "9363059595",
+    whatsappNumber: "919363059595",
+    address: JSON.stringify({
+      street: "#16, Venkatramana Round Road, Opp: Naturals/HDFC Bank, Mahalingapuram",
+      city: "Pollachi",
+      state: "Tamil Nadu",
+      pincode: "642002"
+    }),
+    // Legal & Tax
+    legalEntityName: "Fab Clean Laundry Services",
+    taxId: "AITPD3522F",
+    gstNumber: "33AITPD3522F1ZK",
+    gstEnabled: 1,
+    gstRate: "18.00",
+    sacCode: "9971",
+    // Banking
+    bankName: "State Bank of India",
+    bankAccountNumber: "39876543210",
+    bankIfsc: "SBIN0001234",
+    bankAccountName: "Fab Clean Laundry Services",
+    bankBranch: "Pollachi Branch",
+    // UPI
+    upiId: "9886788858@pz",
+    upiDisplayName: "Fab Clean Pollachi",
+    // Operating Hours
+    openingTime: "09:00",
+    closingTime: "21:00",
+    workingDays: JSON.stringify(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]),
+    // Branding
+    primaryColor: "#4CAF50",
+    secondaryColor: "#2196F3",
+    // Manager
+    managerName: "Senthil Kumar",
+    managerPhone: "9876543210",
+    managerEmail: "manager.pollachi@fabzclean.com",
+    // Operational
+    status: "active",
+    autoGenerateOrderNumber: 1,
+    enableDelivery: 1,
+    defaultDeliveryCharge: "50.00",
+    enableExpressService: 1,
+    expressServiceMultiplier: "1.50"
+  },
+  {
+    id: "franchise-kinathukadavu",
+    name: "Fab Clean Kinathukadavu",
+    franchiseId: "FAB-KIN",
+    branchCode: "KIN",
+    ownerName: "Manager Kinathukadavu",
+    email: "kinathukadavu@fabzclean.com",
+    phone: "9363719595",
+    whatsappNumber: "919363719595",
+    address: JSON.stringify({
+      street: "#442/11, Opp MLA Office, Krishnasamypuram",
+      city: "Kinathukadavu",
+      state: "Tamil Nadu",
+      pincode: "642109"
+    }),
+    // Legal & Tax
+    legalEntityName: "Fab Clean Laundry Services",
+    taxId: "AITPD3522F",
+    gstNumber: "33AITPD3522F1ZK",
+    gstEnabled: 1,
+    gstRate: "18.00",
+    sacCode: "9971",
+    // Banking
+    bankName: "State Bank of India",
+    bankAccountNumber: "39876543210",
+    bankIfsc: "SBIN0001234",
+    bankAccountName: "Fab Clean Laundry Services",
+    bankBranch: "Kinathukadavu Branch",
+    // UPI
+    upiId: "9886788858@pz",
+    upiDisplayName: "Fab Clean Kinathukadavu",
+    // Operating Hours
+    openingTime: "09:00",
+    closingTime: "21:00",
+    workingDays: JSON.stringify(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]),
+    // Branding
+    primaryColor: "#4CAF50",
+    secondaryColor: "#2196F3",
+    // Manager
+    managerName: "Rajesh Kannan",
+    managerPhone: "9876543220",
+    managerEmail: "manager.kin@fabzclean.com",
+    // Operational
+    status: "active",
+    autoGenerateOrderNumber: 1,
+    enableDelivery: 1,
+    defaultDeliveryCharge: "50.00",
+    enableExpressService: 1,
+    expressServiceMultiplier: "1.50"
+  }
 ];
 
 const insertFranchise = db.prepare(`
-  INSERT OR REPLACE INTO franchises (id, name, franchiseId, ownerName, email, phone, address, status, createdAt, updatedAt)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT OR REPLACE INTO franchises (
+    id, name, franchiseId, branchCode, ownerName, email, phone, whatsappNumber, address,
+    legalEntityName, taxId, gstNumber, gstEnabled, gstRate, sacCode,
+    bankName, bankAccountNumber, bankIfsc, bankAccountName, bankBranch,
+    upiId, upiDisplayName,
+    openingTime, closingTime, workingDays,
+    primaryColor, secondaryColor,
+    managerName, managerPhone, managerEmail,
+    status, autoGenerateOrderNumber, enableDelivery, defaultDeliveryCharge, enableExpressService, expressServiceMultiplier,
+    createdAt, updatedAt
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 for (const f of franchises) {
-    insertFranchise.run(f.id, f.name, f.franchiseId, f.ownerName, f.email, f.phone, f.address, f.status, now, now);
-    console.log(`  ✓ Created franchise: ${f.name}`);
+  insertFranchise.run(
+    f.id, f.name, f.franchiseId, f.branchCode, f.ownerName, f.email, f.phone, f.whatsappNumber, f.address,
+    f.legalEntityName, f.taxId, f.gstNumber, f.gstEnabled, f.gstRate, f.sacCode,
+    f.bankName, f.bankAccountNumber, f.bankIfsc, f.bankAccountName, f.bankBranch,
+    f.upiId, f.upiDisplayName,
+    f.openingTime, f.closingTime, f.workingDays,
+    f.primaryColor, f.secondaryColor,
+    f.managerName, f.managerPhone, f.managerEmail,
+    f.status, f.autoGenerateOrderNumber, f.enableDelivery, f.defaultDeliveryCharge, f.enableExpressService, f.expressServiceMultiplier,
+    now, now
+  );
+  console.log(`  ✓ Created franchise: ${f.name} (${f.branchCode})`);
 }
 
 // ============================================
@@ -564,118 +653,118 @@ const adminPasswordHash = bcrypt.hashSync("Durai@2025", 10);
 const defaultPasswordHash = bcrypt.hashSync("password123", 10);
 
 const employees = [
-    // System Admin (has access to ALL franchises)
-    {
-        id: "admin-user-id",
-        franchiseId: null, // Admin sees all
-        employeeId: "myfabclean",
-        firstName: "System",
-        lastName: "Admin",
-        email: "admin@myfabclean.com",
-        phone: "9999999999",
-        position: "Administrator",
-        department: "Management",
-        salary: "100000.00",
-        role: "admin",
-        password: adminPasswordHash,
-        status: "active"
-    },
-    // Pollachi Franchise Manager
-    {
-        id: randomUUID(),
-        franchiseId: "franchise-pollachi",
-        employeeId: "mgr-pollachi",
-        firstName: "Senthil",
-        lastName: "Kumar",
-        email: "manager.pollachi@fabzclean.com",
-        phone: "9876543210",
-        position: "Store Manager",
-        department: "Operations",
-        salary: "25000.00",
-        role: "franchise_manager",
-        password: defaultPasswordHash,
-        status: "active"
-    },
-    // Pollachi Staff
-    {
-        id: randomUUID(),
-        franchiseId: "franchise-pollachi",
-        employeeId: "staff-pol-01",
-        firstName: "Priya",
-        lastName: "Devi",
-        email: "staff1.pollachi@fabzclean.com",
-        phone: "9876543211",
-        position: "Counter Staff",
-        department: "Operations",
-        salary: "18000.00",
-        role: "staff",
-        password: defaultPasswordHash,
-        status: "active"
-    },
-    // Pollachi Driver
-    {
-        id: randomUUID(),
-        franchiseId: "franchise-pollachi",
-        employeeId: "drv-pol-01",
-        firstName: "Ramesh",
-        lastName: "Kumar",
-        email: "driver1.pollachi@fabzclean.com",
-        phone: "9876543212",
-        position: "Delivery Driver",
-        department: "Logistics",
-        salary: "15000.00",
-        role: "driver",
-        password: defaultPasswordHash,
-        status: "active"
-    },
-    // Kinathukadavu Franchise Manager
-    {
-        id: randomUUID(),
-        franchiseId: "franchise-kinathukadavu",
-        employeeId: "mgr-kin",
-        firstName: "Rajesh",
-        lastName: "Kannan",
-        email: "manager.kin@fabzclean.com",
-        phone: "9876543220",
-        position: "Store Manager",
-        department: "Operations",
-        salary: "25000.00",
-        role: "franchise_manager",
-        password: defaultPasswordHash,
-        status: "active"
-    },
-    // Kinathukadavu Staff
-    {
-        id: randomUUID(),
-        franchiseId: "franchise-kinathukadavu",
-        employeeId: "staff-kin-01",
-        firstName: "Karthik",
-        lastName: "Raja",
-        email: "staff1.kin@fabzclean.com",
-        phone: "9876543221",
-        position: "Counter Staff",
-        department: "Operations",
-        salary: "18000.00",
-        role: "staff",
-        password: defaultPasswordHash,
-        status: "active"
-    },
-    // Kinathukadavu Driver
-    {
-        id: randomUUID(),
-        franchiseId: "franchise-kinathukadavu",
-        employeeId: "drv-kin-01",
-        firstName: "Suresh",
-        lastName: "Babu",
-        email: "driver1.kin@fabzclean.com",
-        phone: "9876543222",
-        position: "Delivery Driver",
-        department: "Logistics",
-        salary: "15000.00",
-        role: "driver",
-        password: defaultPasswordHash,
-        status: "active"
-    }
+  // System Admin (has access to ALL franchises)
+  {
+    id: "admin-user-id",
+    franchiseId: null, // Admin sees all
+    employeeId: "myfabclean",
+    firstName: "System",
+    lastName: "Admin",
+    email: "admin@myfabclean.com",
+    phone: "9999999999",
+    position: "Administrator",
+    department: "Management",
+    salary: "100000.00",
+    role: "admin",
+    password: adminPasswordHash,
+    status: "active"
+  },
+  // Pollachi Franchise Manager
+  {
+    id: randomUUID(),
+    franchiseId: "franchise-pollachi",
+    employeeId: "mgr-pollachi",
+    firstName: "Senthil",
+    lastName: "Kumar",
+    email: "manager.pollachi@fabzclean.com",
+    phone: "9876543210",
+    position: "Store Manager",
+    department: "Operations",
+    salary: "25000.00",
+    role: "franchise_manager",
+    password: defaultPasswordHash,
+    status: "active"
+  },
+  // Pollachi Staff
+  {
+    id: randomUUID(),
+    franchiseId: "franchise-pollachi",
+    employeeId: "staff-pol-01",
+    firstName: "Priya",
+    lastName: "Devi",
+    email: "staff1.pollachi@fabzclean.com",
+    phone: "9876543211",
+    position: "Counter Staff",
+    department: "Operations",
+    salary: "18000.00",
+    role: "staff",
+    password: defaultPasswordHash,
+    status: "active"
+  },
+  // Pollachi Driver
+  {
+    id: randomUUID(),
+    franchiseId: "franchise-pollachi",
+    employeeId: "drv-pol-01",
+    firstName: "Ramesh",
+    lastName: "Kumar",
+    email: "driver1.pollachi@fabzclean.com",
+    phone: "9876543212",
+    position: "Delivery Driver",
+    department: "Logistics",
+    salary: "15000.00",
+    role: "driver",
+    password: defaultPasswordHash,
+    status: "active"
+  },
+  // Kinathukadavu Franchise Manager
+  {
+    id: randomUUID(),
+    franchiseId: "franchise-kinathukadavu",
+    employeeId: "mgr-kin",
+    firstName: "Rajesh",
+    lastName: "Kannan",
+    email: "manager.kin@fabzclean.com",
+    phone: "9876543220",
+    position: "Store Manager",
+    department: "Operations",
+    salary: "25000.00",
+    role: "franchise_manager",
+    password: defaultPasswordHash,
+    status: "active"
+  },
+  // Kinathukadavu Staff
+  {
+    id: randomUUID(),
+    franchiseId: "franchise-kinathukadavu",
+    employeeId: "staff-kin-01",
+    firstName: "Karthik",
+    lastName: "Raja",
+    email: "staff1.kin@fabzclean.com",
+    phone: "9876543221",
+    position: "Counter Staff",
+    department: "Operations",
+    salary: "18000.00",
+    role: "staff",
+    password: defaultPasswordHash,
+    status: "active"
+  },
+  // Kinathukadavu Driver
+  {
+    id: randomUUID(),
+    franchiseId: "franchise-kinathukadavu",
+    employeeId: "drv-kin-01",
+    firstName: "Suresh",
+    lastName: "Babu",
+    email: "driver1.kin@fabzclean.com",
+    phone: "9876543222",
+    position: "Delivery Driver",
+    department: "Logistics",
+    salary: "15000.00",
+    role: "driver",
+    password: defaultPasswordHash,
+    status: "active"
+  }
 ];
 
 const insertEmployee = db.prepare(`
@@ -685,12 +774,12 @@ const insertEmployee = db.prepare(`
 `);
 
 for (const e of employees) {
-    insertEmployee.run(
-        e.id, e.franchiseId, e.employeeId, e.firstName, e.lastName,
-        e.email, e.phone, e.position, e.department, e.salary,
-        e.role, e.password, e.status, now, now, now
-    );
-    console.log(`  ✓ Created employee: ${e.firstName} ${e.lastName} (${e.role}) - Login: ${e.employeeId}`);
+  insertEmployee.run(
+    e.id, e.franchiseId, e.employeeId, e.firstName, e.lastName,
+    e.email, e.phone, e.position, e.department, e.salary,
+    e.role, e.password, e.status, now, now, now
+  );
+  console.log(`  ✓ Created employee: ${e.firstName} ${e.lastName} (${e.role}) - Login: ${e.employeeId}`);
 }
 
 // ============================================
@@ -699,37 +788,37 @@ for (const e of employees) {
 console.log("\n🧹 Creating services...");
 
 const servicesList = [
-    // Ironing Services
-    { name: "Shirt", category: "Ironing", price: "20.00", duration: "24 hours" },
-    { name: "T-Shirt", category: "Ironing", price: "20.00", duration: "24 hours" },
-    { name: "Pant", category: "Ironing", price: "20.00", duration: "24 hours" },
-    { name: "Jeans", category: "Ironing", price: "20.00", duration: "24 hours" },
-    { name: "Shorts", category: "Ironing", price: "15.00", duration: "24 hours" },
-    { name: "Dhoti", category: "Ironing", price: "40.00", duration: "24 hours" },
-    { name: "Saree (Cotton)", category: "Ironing", price: "50.00", duration: "24 hours" },
-    { name: "Saree (Silk)", category: "Ironing", price: "80.00", duration: "24 hours" },
-    { name: "Coat", category: "Ironing", price: "60.00", duration: "24 hours" },
-    // Laundry Services
-    { name: "Shirt", category: "Laundry", price: "30.00", duration: "48 hours" },
-    { name: "T-Shirt", category: "Laundry", price: "30.00", duration: "48 hours" },
-    { name: "Pant", category: "Laundry", price: "30.00", duration: "48 hours" },
-    { name: "Jeans", category: "Laundry", price: "40.00", duration: "48 hours" },
-    { name: "Shorts", category: "Laundry", price: "25.00", duration: "48 hours" },
-    { name: "Towel", category: "Laundry", price: "30.00", duration: "48 hours" },
-    { name: "Bed Sheet (Single)", category: "Laundry", price: "80.00", duration: "48 hours" },
-    { name: "Bed Sheet (Double)", category: "Laundry", price: "100.00", duration: "48 hours" },
-    { name: "Blanket (Single)", category: "Laundry", price: "150.00", duration: "48 hours" },
-    { name: "Blanket (Double)", category: "Laundry", price: "200.00", duration: "48 hours" },
-    // Dry Cleaning Services
-    { name: "Shirt", category: "Dry Cleaning", price: "60.00", duration: "72 hours" },
-    { name: "Pant", category: "Dry Cleaning", price: "70.00", duration: "72 hours" },
-    { name: "Jeans", category: "Dry Cleaning", price: "80.00", duration: "72 hours" },
-    { name: "Coat", category: "Dry Cleaning", price: "200.00", duration: "72 hours" },
-    { name: "Saree (Cotton)", category: "Dry Cleaning", price: "250.00", duration: "72 hours" },
-    { name: "Saree (Silk)", category: "Dry Cleaning", price: "250.00", duration: "72 hours" },
-    { name: "Carpet (Small)", category: "Dry Cleaning", price: "150.00", duration: "72 hours" },
-    { name: "Carpet (Medium)", category: "Dry Cleaning", price: "250.00", duration: "72 hours" },
-    { name: "Carpet (Big)", category: "Dry Cleaning", price: "350.00", duration: "72 hours" },
+  // Ironing Services
+  { name: "Shirt", category: "Ironing", price: "20.00", duration: "24 hours" },
+  { name: "T-Shirt", category: "Ironing", price: "20.00", duration: "24 hours" },
+  { name: "Pant", category: "Ironing", price: "20.00", duration: "24 hours" },
+  { name: "Jeans", category: "Ironing", price: "20.00", duration: "24 hours" },
+  { name: "Shorts", category: "Ironing", price: "15.00", duration: "24 hours" },
+  { name: "Dhoti", category: "Ironing", price: "40.00", duration: "24 hours" },
+  { name: "Saree (Cotton)", category: "Ironing", price: "50.00", duration: "24 hours" },
+  { name: "Saree (Silk)", category: "Ironing", price: "80.00", duration: "24 hours" },
+  { name: "Coat", category: "Ironing", price: "60.00", duration: "24 hours" },
+  // Laundry Services
+  { name: "Shirt", category: "Laundry", price: "30.00", duration: "48 hours" },
+  { name: "T-Shirt", category: "Laundry", price: "30.00", duration: "48 hours" },
+  { name: "Pant", category: "Laundry", price: "30.00", duration: "48 hours" },
+  { name: "Jeans", category: "Laundry", price: "40.00", duration: "48 hours" },
+  { name: "Shorts", category: "Laundry", price: "25.00", duration: "48 hours" },
+  { name: "Towel", category: "Laundry", price: "30.00", duration: "48 hours" },
+  { name: "Bed Sheet (Single)", category: "Laundry", price: "80.00", duration: "48 hours" },
+  { name: "Bed Sheet (Double)", category: "Laundry", price: "100.00", duration: "48 hours" },
+  { name: "Blanket (Single)", category: "Laundry", price: "150.00", duration: "48 hours" },
+  { name: "Blanket (Double)", category: "Laundry", price: "200.00", duration: "48 hours" },
+  // Dry Cleaning Services
+  { name: "Shirt", category: "Dry Cleaning", price: "60.00", duration: "72 hours" },
+  { name: "Pant", category: "Dry Cleaning", price: "70.00", duration: "72 hours" },
+  { name: "Jeans", category: "Dry Cleaning", price: "80.00", duration: "72 hours" },
+  { name: "Coat", category: "Dry Cleaning", price: "200.00", duration: "72 hours" },
+  { name: "Saree (Cotton)", category: "Dry Cleaning", price: "250.00", duration: "72 hours" },
+  { name: "Saree (Silk)", category: "Dry Cleaning", price: "250.00", duration: "72 hours" },
+  { name: "Carpet (Small)", category: "Dry Cleaning", price: "150.00", duration: "72 hours" },
+  { name: "Carpet (Medium)", category: "Dry Cleaning", price: "250.00", duration: "72 hours" },
+  { name: "Carpet (Big)", category: "Dry Cleaning", price: "350.00", duration: "72 hours" },
 ];
 
 const insertService = db.prepare(`
@@ -739,21 +828,21 @@ const insertService = db.prepare(`
 
 let serviceCount = 0;
 for (const franchise of franchises) {
-    for (const svc of servicesList) {
-        insertService.run(
-            randomUUID(),
-            franchise.id,
-            svc.name,
-            svc.category,
-            `${svc.category} for ${svc.name}`,
-            svc.price,
-            svc.duration,
-            "Active",
-            now,
-            now
-        );
-        serviceCount++;
-    }
+  for (const svc of servicesList) {
+    insertService.run(
+      randomUUID(),
+      franchise.id,
+      svc.name,
+      svc.category,
+      `${svc.category} for ${svc.name}`,
+      svc.price,
+      svc.duration,
+      "Active",
+      now,
+      now
+    );
+    serviceCount++;
+  }
 }
 console.log(`  ✓ Created ${serviceCount} services across ${franchises.length} franchises`);
 
@@ -763,16 +852,16 @@ console.log(`  ✓ Created ${serviceCount} services across ${franchises.length} 
 console.log("\n⚙️ Creating default settings...");
 
 const settings = [
-    { key: "company_name", value: "FabZ Clean", category: "general" },
-    { key: "company_phone", value: "9363059595", category: "general" },
-    { key: "company_email", value: "info@fabzclean.com", category: "general" },
-    { key: "gst_enabled", value: "true", category: "billing" },
-    { key: "gst_rate", value: "18", category: "billing" },
-    { key: "currency", value: "INR", category: "billing" },
-    { key: "whatsapp_enabled", value: "true", category: "notifications" },
-    { key: "sms_enabled", value: "false", category: "notifications" },
-    { key: "order_prefix", value: "FZC", category: "orders" },
-    { key: "transit_prefix", value: "TRN", category: "transit" },
+  { key: "company_name", value: "FabZ Clean", category: "general" },
+  { key: "company_phone", value: "9363059595", category: "general" },
+  { key: "company_email", value: "info@fabzclean.com", category: "general" },
+  { key: "gst_enabled", value: "true", category: "billing" },
+  { key: "gst_rate", value: "18", category: "billing" },
+  { key: "currency", value: "INR", category: "billing" },
+  { key: "whatsapp_enabled", value: "true", category: "notifications" },
+  { key: "sms_enabled", value: "false", category: "notifications" },
+  { key: "order_prefix", value: "FZC", category: "orders" },
+  { key: "transit_prefix", value: "TRN", category: "transit" },
 ];
 
 const insertSetting = db.prepare(`
@@ -781,7 +870,7 @@ const insertSetting = db.prepare(`
 `);
 
 for (const s of settings) {
-    insertSetting.run(randomUUID(), s.key, s.value, s.category, now);
+  insertSetting.run(randomUUID(), s.key, s.value, s.category, now);
 }
 console.log(`  ✓ Created ${settings.length} default settings`);
 
@@ -791,28 +880,28 @@ console.log(`  ✓ Created ${settings.length} default settings`);
 console.log("\n🚗 Creating sample drivers...");
 
 const drivers = [
-    {
-        id: randomUUID(),
-        franchiseId: "franchise-pollachi",
-        name: "Ramesh Kumar",
-        phone: "9876543212",
-        email: "driver1.pollachi@fabzclean.com",
-        licenseNumber: "TN01-2020-0012345",
-        vehicleNumber: "TN-39-AB-1234",
-        vehicleType: "bike",
-        status: "available"
-    },
-    {
-        id: randomUUID(),
-        franchiseId: "franchise-kinathukadavu",
-        name: "Suresh Babu",
-        phone: "9876543222",
-        email: "driver1.kin@fabzclean.com",
-        licenseNumber: "TN01-2019-0054321",
-        vehicleNumber: "TN-39-CD-5678",
-        vehicleType: "bike",
-        status: "available"
-    }
+  {
+    id: randomUUID(),
+    franchiseId: "franchise-pollachi",
+    name: "Ramesh Kumar",
+    phone: "9876543212",
+    email: "driver1.pollachi@fabzclean.com",
+    licenseNumber: "TN01-2020-0012345",
+    vehicleNumber: "TN-39-AB-1234",
+    vehicleType: "bike",
+    status: "available"
+  },
+  {
+    id: randomUUID(),
+    franchiseId: "franchise-kinathukadavu",
+    name: "Suresh Babu",
+    phone: "9876543222",
+    email: "driver1.kin@fabzclean.com",
+    licenseNumber: "TN01-2019-0054321",
+    vehicleNumber: "TN-39-CD-5678",
+    vehicleType: "bike",
+    status: "available"
+  }
 ];
 
 const insertDriver = db.prepare(`
@@ -821,8 +910,8 @@ const insertDriver = db.prepare(`
 `);
 
 for (const d of drivers) {
-    insertDriver.run(d.id, d.franchiseId, d.name, d.phone, d.email, d.licenseNumber, d.vehicleNumber, d.vehicleType, d.status, now, now);
-    console.log(`  ✓ Created driver: ${d.name} (${d.vehicleNumber})`);
+  insertDriver.run(d.id, d.franchiseId, d.name, d.phone, d.email, d.licenseNumber, d.vehicleNumber, d.vehicleType, d.status, now, now);
+  console.log(`  ✓ Created driver: ${d.name} (${d.vehicleNumber})`);
 }
 
 // ============================================
@@ -831,38 +920,38 @@ for (const d of drivers) {
 console.log("\n👤 Creating sample customers...");
 
 const customers = [
-    {
-        id: randomUUID(),
-        franchiseId: "franchise-pollachi",
-        name: "Walk-in Customer",
-        email: "walkin@example.com",
-        phone: "0000000000",
-        address: JSON.stringify({ street: "Local", city: "Pollachi" })
-    },
-    {
-        id: randomUUID(),
-        franchiseId: "franchise-pollachi",
-        name: "Arun Kumar",
-        email: "arun.kumar@gmail.com",
-        phone: "9876012345",
-        address: JSON.stringify({ street: "123, Main Road", city: "Pollachi", state: "Tamil Nadu" })
-    },
-    {
-        id: randomUUID(),
-        franchiseId: "franchise-kinathukadavu",
-        name: "Walk-in Customer",
-        email: "walkin.kin@example.com",
-        phone: "0000000001",
-        address: JSON.stringify({ street: "Local", city: "Kinathukadavu" })
-    },
-    {
-        id: randomUUID(),
-        franchiseId: "franchise-kinathukadavu",
-        name: "Lakshmi Devi",
-        email: "lakshmi.devi@gmail.com",
-        phone: "9876054321",
-        address: JSON.stringify({ street: "456, Temple Street", city: "Kinathukadavu", state: "Tamil Nadu" })
-    }
+  {
+    id: randomUUID(),
+    franchiseId: "franchise-pollachi",
+    name: "Walk-in Customer",
+    email: "walkin@example.com",
+    phone: "0000000000",
+    address: JSON.stringify({ street: "Local", city: "Pollachi" })
+  },
+  {
+    id: randomUUID(),
+    franchiseId: "franchise-pollachi",
+    name: "Arun Kumar",
+    email: "arun.kumar@gmail.com",
+    phone: "9876012345",
+    address: JSON.stringify({ street: "123, Main Road", city: "Pollachi", state: "Tamil Nadu" })
+  },
+  {
+    id: randomUUID(),
+    franchiseId: "franchise-kinathukadavu",
+    name: "Walk-in Customer",
+    email: "walkin.kin@example.com",
+    phone: "0000000001",
+    address: JSON.stringify({ street: "Local", city: "Kinathukadavu" })
+  },
+  {
+    id: randomUUID(),
+    franchiseId: "franchise-kinathukadavu",
+    name: "Lakshmi Devi",
+    email: "lakshmi.devi@gmail.com",
+    phone: "9876054321",
+    address: JSON.stringify({ street: "456, Temple Street", city: "Kinathukadavu", state: "Tamil Nadu" })
+  }
 ];
 
 const insertCustomer = db.prepare(`
@@ -871,8 +960,8 @@ const insertCustomer = db.prepare(`
 `);
 
 for (const c of customers) {
-    insertCustomer.run(c.id, c.franchiseId, c.name, c.email, c.phone, c.address, now, now);
-    console.log(`  ✓ Created customer: ${c.name} (${c.franchiseId.replace('franchise-', '')})`);
+  insertCustomer.run(c.id, c.franchiseId, c.name, c.email, c.phone, c.address, now, now);
+  console.log(`  ✓ Created customer: ${c.name} (${c.franchiseId.replace('franchise-', '')})`);
 }
 
 // ============================================

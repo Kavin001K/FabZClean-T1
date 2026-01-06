@@ -94,17 +94,63 @@ export class SQLiteStorage implements IStorage {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         franchiseId TEXT UNIQUE NOT NULL,
+        branchCode TEXT,
         ownerName TEXT NOT NULL,
         email TEXT NOT NULL,
         phone TEXT NOT NULL,
+        whatsappNumber TEXT,
         address TEXT NOT NULL,
+        
+        -- Legal & Tax
         legalEntityName TEXT,
         taxId TEXT,
+        gstNumber TEXT,
+        gstEnabled INTEGER DEFAULT 1,
+        gstRate TEXT DEFAULT '18.00',
+        sacCode TEXT DEFAULT '9971',
+        
+        -- Banking
+        bankName TEXT,
+        bankAccountNumber TEXT,
+        bankIfsc TEXT,
+        bankAccountName TEXT,
+        bankBranch TEXT,
+        
+        -- UPI
+        upiId TEXT,
+        upiDisplayName TEXT,
+        
+        -- Operating Hours
+        openingTime TEXT DEFAULT '09:00',
+        closingTime TEXT DEFAULT '21:00',
+        workingDays TEXT,
+        
+        -- Branding
+        logoUrl TEXT,
+        primaryColor TEXT DEFAULT '#4CAF50',
+        secondaryColor TEXT DEFAULT '#2196F3',
+        
+        -- Manager
+        managerName TEXT,
+        managerPhone TEXT,
+        managerEmail TEXT,
+        
+        -- Status & Agreement
         status TEXT DEFAULT 'active',
         documents TEXT,
         agreementStartDate TEXT,
         agreementEndDate TEXT,
         royaltyPercentage TEXT DEFAULT '0',
+        
+        -- Operational Settings
+        autoGenerateOrderNumber INTEGER DEFAULT 1,
+        orderNumberPrefix TEXT,
+        enableDelivery INTEGER DEFAULT 1,
+        defaultDeliveryCharge TEXT DEFAULT '0',
+        enableExpressService INTEGER DEFAULT 1,
+        expressServiceMultiplier TEXT DEFAULT '1.50',
+        
+        -- Timestamps
         createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
         updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
       );
@@ -875,6 +921,18 @@ export class SQLiteStorage implements IStorage {
           console.warn("Failed to parse franchise documents:", e);
         }
       }
+      if (row.workingDays && typeof row.workingDays === "string") {
+        try {
+          row.workingDays = JSON.parse(row.workingDays);
+        } catch (e) {
+          console.warn("Failed to parse franchise workingDays:", e);
+        }
+      }
+      // Convert SQLite integers to booleans
+      if (row.gstEnabled !== undefined) row.gstEnabled = !!row.gstEnabled;
+      if (row.autoGenerateOrderNumber !== undefined) row.autoGenerateOrderNumber = !!row.autoGenerateOrderNumber;
+      if (row.enableDelivery !== undefined) row.enableDelivery = !!row.enableDelivery;
+      if (row.enableExpressService !== undefined) row.enableExpressService = !!row.enableExpressService;
     }
 
     return row as T;
