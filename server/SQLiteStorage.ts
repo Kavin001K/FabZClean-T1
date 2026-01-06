@@ -1585,9 +1585,10 @@ export class SQLiteStorage implements IStorage {
   }
 
   async getEmployeeByEmail(email: string): Promise<Employee | undefined> {
+    // Search by email OR employeeId so users can log in with either
     const row = this.db
-      .prepare("SELECT * FROM employees WHERE email = ?")
-      .get(email) as any;
+      .prepare("SELECT * FROM employees WHERE email = ? OR employeeId = ?")
+      .get(email, email) as any;
 
     return row
       ? {
