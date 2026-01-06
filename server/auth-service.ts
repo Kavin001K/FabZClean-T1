@@ -80,7 +80,7 @@ export class AuthService {
                     const isValidLocal = await bcrypt.compare(password, localEmployee.password);
                     console.log(`🔍 Password match: ${isValidLocal}`);
 
-                    if (isValidLocal && localEmployee.status === 'active') {
+                    if (isValidLocal && (localEmployee.status === 'active' || !localEmployee.status)) {
                         let normalizedRole = localEmployee.role;
                         if (normalizedRole === 'manager') normalizedRole = 'franchise_manager';
 
