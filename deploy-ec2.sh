@@ -9,8 +9,10 @@ echo "⏹️  Stopping PM2..."
 pm2 stop all 2>/dev/null
 
 # Delete old database to recreate with new schema
-echo "🗑️  Removing old database..."
+# Production database is stored in /home/ubuntu/fabzclean_data/, not in project folder!
+echo "🗑️  Removing old database (both locations)..."
 rm -f fabzclean.db fabzclean.db-shm fabzclean.db-wal
+rm -f /home/ubuntu/fabzclean_data/fabzclean.db /home/ubuntu/fabzclean_data/fabzclean.db-shm /home/ubuntu/fabzclean_data/fabzclean.db-wal
 
 # Pull latest code
 echo "📥 Pulling latest code..."
