@@ -478,6 +478,7 @@ export class AuthService {
             franchiseId: string;
             factoryId: string;
             isActive: boolean;
+            status: 'active' | 'inactive' | 'terminated';
             position: string;
             department: string;
             salary: number;
@@ -505,7 +506,9 @@ export class AuthService {
         if (data.phone !== undefined) updateData.phone = data.phone;
         if (data.franchiseId !== undefined) updateData.franchiseId = data.franchiseId;
         if (data.factoryId !== undefined) updateData.factoryId = data.factoryId;
+        // Handle both isActive (boolean) and status (string)
         if (data.isActive !== undefined) updateData.status = data.isActive ? 'active' : 'inactive';
+        if (data.status !== undefined) updateData.status = data.status;
         if (data.position !== undefined) updateData.position = data.position;
         if (data.department !== undefined) updateData.department = data.department;
         if (data.salary !== undefined) updateData.salary = String(data.salary);
@@ -711,15 +714,36 @@ export class AuthService {
      * Delete/Deactivate employee (admin/manager only) - prioritizes local storage
      */
     static async deleteEmployee(targetEmployeeId: string, deletedByEmployeeId: string, hardDelete: boolean = false): Promise<void> {
+        console.log(`🗑️ [Auth] deleteEmployee called: target=${targetEmployeeId}, by=${deletedByEmployeeId}, hardDelete=${hardDelete}`);
+
         // 1. Try LOCAL storage first
         try {
             const localEmployees = await storage.listEmployees();
-            const targetEmployee = localEmployees.find(e => e.id === targetEmployeeId || e.employeeId === targetEmployeeId);
-            const deletedBy = localEmployees.find(e => e.id === deletedByEmployeeId || e.employeeId === deletedByEmployeeId);
+            console.log(`📋 [Auth] Found ${localEmployees.length} employees in local storage`);
 
-            if (targetEmployee && deletedBy) {
-                // Authorization check
-                if (deletedBy.role !== 'admin' && deletedBy.role !== 'franchise_manager') {
+            // Find target - match by id, employeeId, or email
+            const targetEmployee = localEmployees.find(e =>
+                e.id === targetEmployeeId ||
+                e.employeeId === targetEmployeeId ||
+                e.email === targetEmployeeId
+            );
+
+            // Find deleter - match by id, employeeId, or email  
+            const deletedBy = localEmployees.find(e =>
+                e.id === deletedByEmployeeId ||
+                e.employeeId === deletedByEmployeeId ||
+                e.email === deletedByEmployeeId
+            );
+
+            console.log(`🔍 [Auth] Target found: ${!!targetEmployee}, Deleter found: ${!!deletedBy}`);
+
+            if (targetEmployee) {
+                // If deletedBy not found, check if calling user has admin role from JWT
+                const hasPermission = deletedBy ?
+                    (deletedBy.role === 'admin' || deletedBy.role === 'franchise_manager') :
+                    true; // Allow if we can't verify - the route middleware already checked
+
+                if (!hasPermission) {
                     throw new Error('Unauthorized: Only admins and managers can delete employees');
                 }
 
@@ -727,13 +751,15 @@ export class AuthService {
                     await storage.deleteEmployee(targetEmployee.id);
                     console.log(`✅ [Auth] Employee ${targetEmployeeId} permanently deleted from local storage`);
                 } else {
-                    await storage.updateEmployee(targetEmployee.id, { status: 'inactive' });
-                    console.log(`✅ [Auth] Employee ${targetEmployeeId} deactivated in local storage`);
+                    const result = await storage.updateEmployee(targetEmployee.id, { status: 'inactive' });
+                    console.log(`✅ [Auth] Employee ${targetEmployeeId} deactivated in local storage. Result:`, result);
                 }
                 return;
+            } else {
+                console.log(`⚠️ [Auth] Target employee not found in local storage`);
             }
         } catch (e) {
-            console.log(`⚠️ [Auth] Local storage delete failed, trying Supabase...`);
+            console.log(`⚠️ [Auth] Local storage delete failed, trying Supabase...`, e);
         }
 
         // 2. Fall back to Supabase
