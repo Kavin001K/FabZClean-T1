@@ -311,7 +311,14 @@ export async function sendOrderProcessingNotification({
                                 type: "text",
                                 value: cleanOrderNumber, // Order ID for tracking URL
                             },
-                            // NOTE: button_2 (Terms) is STATIC URL, no dynamic variable needed
+                            // Button 2: Terms & Conditions - dynamic URL suffix
+                            // Template URL: https://myfabclean.com/{{2}}
+                            // We send "terms" as {{2}}
+                            button_2: {
+                                subtype: "url",
+                                type: "text",
+                                value: "terms", // Terms page path
+                            },
                         },
                     },
                 ],
@@ -465,6 +472,12 @@ export async function sendOrderStatusUpdateNotification({
                                 subtype: "url",
                                 type: "text",
                                 value: cleanOrderNumber,
+                            },
+                            // Button 2: Terms & Conditions URL suffix
+                            button_2: {
+                                subtype: "url",
+                                type: "text",
+                                value: "terms",
                             },
                         },
                     },
@@ -692,6 +705,12 @@ export async function sendInvoiceWhatsApp({
                 type: "text",
                 value: cleanOrderNumber,
             },
+            // Button 2: Terms & Conditions dynamic URL suffix
+            button_2: {
+                subtype: "url",
+                type: "text",
+                value: "terms",
+            },
         };
     } else if (templateType === 'invoice') {
         // "invoice_fabzclean" template: IMAGE header, 4 body params, 1 URL button
@@ -726,6 +745,12 @@ export async function sendInvoiceWhatsApp({
                 subtype: "url",
                 type: "text",
                 value: cleanOrderNumber,
+            },
+            // Button 2: Terms & Conditions URL suffix
+            button_2: {
+                subtype: "url",
+                type: "text",
+                value: "terms",
             },
         };
     } else {
