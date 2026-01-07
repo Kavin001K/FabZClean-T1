@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { SupabaseAuthService, AuthEmployee, isSupabaseConfigured } from '../lib/supabase-auth';
+import { isSupabaseConfigured, SupabaseAuthService, AuthEmployee } from '../lib/supabase-auth';
 
 // Define all valid roles
 export type EmployeeRole = 'admin' | 'franchise_manager' | 'factory_manager' | 'employee' | 'driver' | 'manager' | 'staff';
@@ -49,18 +49,24 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const SESSION_DURATION = 30 * 60 * 1000; // 30 minutes
 const WARNING_BEFORE_LOGOUT = 5 * 60 * 1000; // Show warning 5 minutes before logout
 
-// Check if we should use direct Supabase auth (no backend available)
-const useDirectSupabase = (): boolean => {
-  // In production on Amplify/Vercel without a backend, use direct Supabase
-  if (typeof window === 'undefined') return false;
-
-  // Check if VITE_API_URL is explicitly set to point to a backend
+// Get API base URL - always use backend when available
+const getApiBase = (): string => {
   const apiUrl = import.meta.env.VITE_API_URL;
   if (apiUrl && apiUrl.startsWith('http')) {
-    return false; // Use the backend API
+    return apiUrl;
   }
+  return '/api';
+};
 
-  // In production mode without explicit API URL, use direct Supabase
+// Check if we should use direct Supabase (only in production without backend)
+const shouldUseDirectSupabase = (): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  // If VITE_API_URL is set, always use backend
+  const apiUrl = import.meta.env.VITE_API_URL;
+  if (apiUrl) return false;
+
+  // Only use Supabase in production mode when it's configured
   if (import.meta.env.PROD && isSupabaseConfigured) {
     return true;
   }
@@ -79,13 +85,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const warningTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const directSupabase = useDirectSupabase();
+  const useDirectSupabase = shouldUseDirectSupabase();
+  const apiBase = getApiBase();
 
-  // Fetch current employee from API or Supabase
-  const fetchEmployee = async (token: string): Promise<boolean> => {
+  // Fetch current employee from API
+  const fetchEmployee = useCallback(async (token: string): Promise<boolean> => {
     try {
-      if (directSupabase) {
-        // Use direct Supabase auth
+      if (useDirectSupabase) {
+        // Use direct Supabase auth (only in production without backend)
         const emp = await SupabaseAuthService.verifySession(token);
         if (emp) {
           setEmployee(emp as Employee);
@@ -94,8 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      // Use backend API
-      const apiBase = import.meta.env.VITE_API_URL || '/api';
+      // Use backend API (default for local development)
       const response = await fetch(`${apiBase}/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -115,15 +121,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error fetching employee:', error);
       return false;
     }
-  };
+  }, [useDirectSupabase, apiBase]);
 
   // Sign out function
   const signOut = useCallback(async (): Promise<void> => {
     const token = localStorage.getItem('employee_token');
 
-    if (token && !directSupabase) {
+    if (token && !useDirectSupabase) {
       try {
-        const apiBase = import.meta.env.VITE_API_URL || '/api';
         await fetch(`${apiBase}/auth/logout`, {
           method: 'POST',
           headers: {
@@ -132,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         });
       } catch (error) {
-        console.error('Logout error:', error);
+        // Ignore logout errors
       }
     }
 
@@ -147,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setEmployee(null);
     setShowSessionWarning(false);
     setSessionTimeRemaining(SESSION_DURATION / 1000);
-  }, [directSupabase]);
+  }, [useDirectSupabase, apiBase]);
 
   // Reset session timers
   const resetSessionTimers = useCallback(() => {
@@ -206,7 +211,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     // Events to track activity
-    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
+    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart'];
 
     // Debounced activity handler
     let activityTimeout: NodeJS.Timeout | null = null;
@@ -266,14 +271,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     initializeAuth();
-  }, []);
+  }, [fetchEmployee]);
 
   // Sign in with username and password
   const signIn = async (username: string, password: string): Promise<{ error: string | null; employee?: Employee }> => {
     setLoading(true);
     try {
-      if (directSupabase) {
-        // Use direct Supabase auth
+      if (useDirectSupabase) {
+        // Use direct Supabase auth (only in production without backend)
         const result = await SupabaseAuthService.login(username, password);
         localStorage.setItem('employee_token', result.token);
         localStorage.setItem('session_start', Date.now().toString());
@@ -281,8 +286,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: null, employee: result.employee as Employee };
       }
 
-      // Use backend API
-      const apiBase = import.meta.env.VITE_API_URL || '/api';
+      // Use backend API (default)
       const response = await fetch(`${apiBase}/auth/login`, {
         method: 'POST',
         headers: {

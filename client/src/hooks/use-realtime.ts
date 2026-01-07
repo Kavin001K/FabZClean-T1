@@ -48,12 +48,7 @@ export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeRe
       if (!enabled || !isSupabaseConfigured) {
         if (isMounted) {
           setIsLoading(false);
-          if (!enabled) {
-            // Just reset data if disabled
-            setData([]);
-          } else {
-            console.warn(`⚠️ Supabase not configured, skipping realtime fetch for ${tableName}`);
-          }
+          setData([]);
         }
         return;
       }

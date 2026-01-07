@@ -562,6 +562,58 @@ router.patch(
       }
 
       /**
+       * STATUS FLOW VALIDATION:
+       * Order statuses follow a strict progression. Once an order moves forward,
+       * it CANNOT go back to a previous status (irreversible).
+       * 
+       * Flow: pending -> processing -> ready -> out_for_delivery -> delivered/completed
+       * 
+       * Special cases:
+       * - 'cancelled' can only be set from 'pending' or 'processing'
+       * - 'refunded' can only be set after 'completed' or 'delivered'
+       */
+      const STATUS_ORDER: Record<string, number> = {
+        'pending': 1,
+        'processing': 2,
+        'ready': 3,
+        'out_for_delivery': 4,
+        'delivered': 5,
+        'completed': 5,  // Same level as delivered
+        'cancelled': 99, // Special status
+        'refunded': 100, // Special status
+      };
+
+      const currentStatusLevel = STATUS_ORDER[order.status] || 0;
+      const newStatusLevel = STATUS_ORDER[status] || 0;
+
+      // Validate status transition
+      if (status !== 'cancelled' && status !== 'refunded') {
+        // Normal flow: can only go forward, not backward
+        if (newStatusLevel < currentStatusLevel) {
+          return res.status(400).json(createErrorResponse(
+            `Cannot change status from '${order.status}' to '${status}'. Order status changes are irreversible.`,
+            400
+          ));
+        }
+      } else if (status === 'cancelled') {
+        // Can only cancel orders that are pending or processing
+        if (!['pending', 'processing'].includes(order.status)) {
+          return res.status(400).json(createErrorResponse(
+            `Cannot cancel an order with status '${order.status}'. Orders can only be cancelled when pending or processing.`,
+            400
+          ));
+        }
+      } else if (status === 'refunded') {
+        // Can only refund completed or delivered orders
+        if (!['completed', 'delivered'].includes(order.status)) {
+          return res.status(400).json(createErrorResponse(
+            `Cannot refund an order with status '${order.status}'. Only completed or delivered orders can be refunded.`,
+            400
+          ));
+        }
+      }
+
+      /**
        * PAYMENT VALIDATION:
        * Orders cannot be marked as 'completed' or 'delivered' unless payment is 'paid'
        * This ensures no order is handed over without payment being collected

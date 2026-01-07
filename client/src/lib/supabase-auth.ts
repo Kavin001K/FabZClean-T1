@@ -1,27 +1,45 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 
 // Get Supabase credentials from environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('⚠️ Supabase credentials not found. Authentication will not work.');
+// Check if Supabase is properly configured (not placeholder values)
+export const isSupabaseConfigured = Boolean(
+    supabaseUrl &&
+    supabaseAnonKey &&
+    !supabaseUrl.includes('placeholder') &&
+    supabaseUrl.startsWith('https://')
+);
+
+// Create Supabase client only if configured
+let supabase: SupabaseClient;
+
+if (isSupabaseConfigured) {
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        realtime: {
+            params: {
+                eventsPerSecond: 10,
+            },
+        },
+    });
+} else {
+    // Create a placeholder client that won't be used
+    supabase = createClient(
+        'https://placeholder.supabase.co',
+        'placeholder-key',
+        {
+            auth: {
+                autoRefreshToken: false,
+                persistSession: false,
+                detectSessionInUrl: false,
+            },
+        }
+    );
 }
 
-// Create Supabase client
-const validSupabaseUrl = supabaseUrl || 'https://placeholder.supabase.co';
-const validSupabaseKey = supabaseAnonKey || 'placeholder';
-
-export const isSupabaseConfigured = !validSupabaseUrl.includes('placeholder');
-
-export const supabase = createClient(validSupabaseUrl, validSupabaseKey, {
-    realtime: {
-        params: {
-            eventsPerSecond: 10,
-        },
-    },
-});
+export { supabase };
 
 // Employee types
 export interface AuthEmployee {
@@ -76,22 +94,23 @@ function parseSessionToken(token: string): SessionPayload | null {
 
 /**
  * Direct Supabase Authentication Service
- * This bypasses the need for a backend /api/auth endpoint
+ * This is ONLY used when Supabase is configured and no backend is available
+ * In most cases, the local backend API should be used instead
  */
 export const SupabaseAuthService = {
     /**
      * Login with username/email and password
+     * NOTE: This should only be called if isSupabaseConfigured is true
      */
     async login(username: string, password: string): Promise<{ token: string; employee: AuthEmployee }> {
         if (!isSupabaseConfigured) {
-            throw new Error('Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+            throw new Error('Supabase is not configured. Use the backend API instead.');
         }
 
         console.log(`🔐 Attempting direct Supabase login for: ${username}`);
 
         // Try 'employees' table first
-        let employee: any = null;
-        let normalizedRole: string;
+        let employee: AuthEmployee | null = null;
 
         const { data: employees, error: empError } = await supabase
             .from('employees')
@@ -115,13 +134,13 @@ export const SupabaseAuthService = {
                 throw new Error('Invalid username or password');
             }
 
-            normalizedRole = emp.role === 'manager' ? 'franchise_manager' : emp.role;
+            const normalizedRole = emp.role === 'manager' ? 'franchise_manager' : emp.role;
 
             employee = {
                 id: emp.id,
                 employeeId: emp.employee_id,
                 username: emp.employee_id,
-                role: normalizedRole,
+                role: normalizedRole as AuthEmployee['role'],
                 franchiseId: emp.franchise_id,
                 factoryId: emp.factory_id,
                 fullName: `${emp.first_name || ''} ${emp.last_name || ''}`.trim(),
@@ -133,49 +152,6 @@ export const SupabaseAuthService = {
                 hireDate: emp.hire_date,
                 baseSalary: emp.salary ? parseFloat(emp.salary) : undefined,
             };
-        }
-
-        // If not found in 'employees', try 'auth_employees' table
-        if (!employee) {
-            const { data: authEmployees, error: authError } = await supabase
-                .from('auth_employees')
-                .select('*')
-                .or(`employee_id.eq."${username}",email.eq."${username}",username.eq."${username}"`);
-
-            if (!authError && authEmployees && authEmployees.length > 0) {
-                const authEmp = authEmployees[0];
-
-                if (authEmp.is_active !== true) {
-                    throw new Error('Account is inactive. Please contact your administrator.');
-                }
-
-                const passwordHash = authEmp.password_hash || authEmp.password;
-                if (!passwordHash) {
-                    throw new Error('Password not set. Please contact your administrator.');
-                }
-
-                const isValidPassword = await bcrypt.compare(password, passwordHash);
-                if (!isValidPassword) {
-                    throw new Error('Invalid username or password');
-                }
-
-                employee = {
-                    id: authEmp.id,
-                    employeeId: authEmp.employee_id,
-                    username: authEmp.username || authEmp.employee_id,
-                    role: authEmp.role,
-                    franchiseId: authEmp.franchise_id,
-                    factoryId: authEmp.factory_id,
-                    fullName: authEmp.full_name || authEmp.username,
-                    email: authEmp.email,
-                    phone: authEmp.phone,
-                    isActive: authEmp.is_active === true,
-                    position: authEmp.position,
-                    department: authEmp.department,
-                    hireDate: authEmp.hire_date,
-                    baseSalary: authEmp.base_salary ? parseFloat(authEmp.base_salary) : undefined,
-                };
-            }
         }
 
         if (!employee) {
@@ -200,6 +176,10 @@ export const SupabaseAuthService = {
      * Verify session token and get current employee
      */
     async verifySession(token: string): Promise<AuthEmployee | null> {
+        if (!isSupabaseConfigured) {
+            return null;
+        }
+
         const payload = parseSessionToken(token);
         if (!payload) {
             return null;
@@ -218,7 +198,7 @@ export const SupabaseAuthService = {
                 id: emp.id,
                 employeeId: emp.employee_id,
                 username: emp.employee_id,
-                role: normalizedRole as any,
+                role: normalizedRole as AuthEmployee['role'],
                 franchiseId: emp.franchise_id,
                 factoryId: emp.factory_id,
                 fullName: `${emp.first_name || ''} ${emp.last_name || ''}`.trim(),
@@ -232,32 +212,6 @@ export const SupabaseAuthService = {
             };
         }
 
-        // Try auth_employees table
-        const { data: authEmp, error: authError } = await supabase
-            .from('auth_employees')
-            .select('*')
-            .eq('employee_id', payload.employeeId)
-            .single();
-
-        if (!authError && authEmp && authEmp.is_active === true) {
-            return {
-                id: authEmp.id,
-                employeeId: authEmp.employee_id,
-                username: authEmp.username || authEmp.employee_id,
-                role: authEmp.role as any,
-                franchiseId: authEmp.franchise_id,
-                factoryId: authEmp.factory_id,
-                fullName: authEmp.full_name || authEmp.username,
-                email: authEmp.email,
-                phone: authEmp.phone,
-                isActive: authEmp.is_active === true,
-                position: authEmp.position,
-                department: authEmp.department,
-                hireDate: authEmp.hire_date,
-                baseSalary: authEmp.base_salary ? parseFloat(authEmp.base_salary) : undefined,
-            };
-        }
-
         return null;
     },
 
@@ -266,7 +220,6 @@ export const SupabaseAuthService = {
      */
     logout(): void {
         // Nothing to do server-side, token is just deleted client-side
-        console.log('🔓 Logged out');
     },
 };
 
