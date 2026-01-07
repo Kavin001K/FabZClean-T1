@@ -925,6 +925,27 @@ export class MemStorage implements IStorage {
     return this.sqliteStorage.updateDriverLocation(id, latitude, longitude);
   }
 
+  // ======= EMPLOYEE METHODS =======
+  async listEmployees(): Promise<any[]> {
+    return this.sqliteStorage.listEmployees();
+  }
+
+  async getEmployee(id: string): Promise<any | undefined> {
+    return this.sqliteStorage.getEmployee(id);
+  }
+
+  async createEmployee(data: any): Promise<any> {
+    return this.sqliteStorage.createEmployee(data);
+  }
+
+  async updateEmployee(id: string, data: any): Promise<any | undefined> {
+    return this.sqliteStorage.updateEmployee(id, data);
+  }
+
+  async deleteEmployee(id: string): Promise<boolean> {
+    return this.sqliteStorage.deleteEmployee(id);
+  }
+
   // Close database connection
   close() {
     this.sqliteStorage.close();
