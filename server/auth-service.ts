@@ -317,7 +317,7 @@ export class AuthService {
     }
 
     /**
-     * Create a new employee (admin/manager only)
+     * Create a new employee (admin/manager only) - prioritizes local storage
      */
     static async createEmployee(
         data: {
@@ -356,9 +356,47 @@ export class AuthService {
             'employee': 'ST',
             'driver': 'DR'
         };
-
         const roleCode = roleCodeMap[data.role] || 'XX';
 
+        // 1. Try LOCAL storage FIRST (for local development with SQLite)
+        try {
+            // Count existing employees for sequence
+            const localEmployees = await storage.listEmployees();
+            const sameRoleCount = localEmployees.filter(e => e.role === data.role).length;
+            const sequenceNum = String(sameRoleCount + 1).padStart(2, '0');
+            const generatedEmployeeId = `FZC01${roleCode}${sequenceNum}`;
+
+            const newEmployee = await storage.createEmployee({
+                name: data.fullName || `${firstName} ${lastName}`,
+                email: data.email || `${data.username.toLowerCase()}@fabzclean.com`,
+                phone: data.phone,
+                employeeId: generatedEmployeeId,
+                password: passwordHash,
+                role: data.role,
+                franchiseId: data.franchiseId,
+                factoryId: data.factoryId,
+                status: 'active',
+            });
+
+            if (newEmployee) {
+                console.log(`✅ [Auth] Created employee ${generatedEmployeeId} in local storage`);
+                return {
+                    id: newEmployee.id,
+                    employeeId: generatedEmployeeId,
+                    username: generatedEmployeeId,
+                    role: data.role as any,
+                    franchiseId: data.franchiseId,
+                    fullName: data.fullName || `${firstName} ${lastName}`,
+                    email: newEmployee.email,
+                    phone: newEmployee.phone,
+                    isActive: true,
+                };
+            }
+        } catch (localError) {
+            console.log(`⚠️ [Auth] Local storage create failed, trying Supabase...`, localError);
+        }
+
+        // 2. Fall back to Supabase
         // Get franchise code from franchiseId (e.g., 'franchise-pollachi' -> '01')
         let franchiseNum = '01';
         if (data.franchiseId) {
@@ -670,10 +708,36 @@ export class AuthService {
     }
 
     /**
-     * Delete/Deactivate employee (admin/manager only)
+     * Delete/Deactivate employee (admin/manager only) - prioritizes local storage
      */
     static async deleteEmployee(targetEmployeeId: string, deletedByEmployeeId: string, hardDelete: boolean = false): Promise<void> {
-        // 1. Get the employee who is deleting
+        // 1. Try LOCAL storage first
+        try {
+            const localEmployees = await storage.listEmployees();
+            const targetEmployee = localEmployees.find(e => e.id === targetEmployeeId || e.employeeId === targetEmployeeId);
+            const deletedBy = localEmployees.find(e => e.id === deletedByEmployeeId || e.employeeId === deletedByEmployeeId);
+
+            if (targetEmployee && deletedBy) {
+                // Authorization check
+                if (deletedBy.role !== 'admin' && deletedBy.role !== 'franchise_manager') {
+                    throw new Error('Unauthorized: Only admins and managers can delete employees');
+                }
+
+                if (hardDelete) {
+                    await storage.deleteEmployee(targetEmployee.id);
+                    console.log(`✅ [Auth] Employee ${targetEmployeeId} permanently deleted from local storage`);
+                } else {
+                    await storage.updateEmployee(targetEmployee.id, { status: 'inactive' });
+                    console.log(`✅ [Auth] Employee ${targetEmployeeId} deactivated in local storage`);
+                }
+                return;
+            }
+        } catch (e) {
+            console.log(`⚠️ [Auth] Local storage delete failed, trying Supabase...`);
+        }
+
+        // 2. Fall back to Supabase
+        // Get the employee who is deleting
         const { data: deletedBy, error: deletedByError } = await supabase
             .from('employees')
             .select('*')
@@ -682,7 +746,7 @@ export class AuthService {
 
         if (deletedByError || !deletedBy) throw new Error('Unauthorized: Deleter not found');
 
-        // 2. Get the target employee
+        // Get the target employee
         const { data: targetEmp, error: targetError } = await supabase
             .from('employees')
             .select('*')
@@ -861,9 +925,41 @@ export class AuthService {
     }
 
     /**
-     * List employees
+     * List employees - prioritizes local SQLite storage, falls back to Supabase
      */
     static async listEmployees(requesterRole: string, franchiseId?: string, factoryId?: string): Promise<AuthEmployee[]> {
+        // 1. Try LOCAL storage FIRST (for local development with SQLite)
+        try {
+            const localEmployees = await storage.listEmployees();
+            if (localEmployees && localEmployees.length > 0) {
+                console.log(`✅ [Auth] Listed ${localEmployees.length} employees from local storage`);
+
+                // Filter by franchise if needed
+                let filteredEmployees = localEmployees;
+                if (requesterRole === 'franchise_manager' && franchiseId) {
+                    filteredEmployees = localEmployees.filter(emp => emp.franchiseId === franchiseId);
+                }
+
+                return filteredEmployees.map(emp => ({
+                    id: emp.id,
+                    employeeId: emp.employeeId || emp.email || emp.id,
+                    username: emp.employeeId || emp.email || emp.name,
+                    role: emp.role as any,
+                    franchiseId: emp.franchiseId,
+                    fullName: emp.name || 'Unknown',
+                    email: emp.email,
+                    phone: emp.phone,
+                    isActive: emp.status === 'active' || emp.status === null || emp.status === undefined,
+                    position: emp.role,
+                    department: undefined,
+                    hireDate: emp.createdAt ? new Date(emp.createdAt) : undefined,
+                }));
+            }
+        } catch (e) {
+            console.log(`⚠️ [Auth] Local storage list failed, trying Supabase...`);
+        }
+
+        // 2. Fall back to Supabase
         let query = supabase
             .from('employees') // employees table
             .select('*')
