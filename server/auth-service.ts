@@ -244,7 +244,26 @@ export class AuthService {
         try {
             const payload = jwt.verify(token, FINAL_SECRET) as EmployeeJWTPayload;
 
-            // 1. Try Supabase 'employees' table first
+            // 1. Try LOCAL storage FIRST (for local development with SQLite)
+            try {
+                // Use getEmployeeByEmail as it searches by both email AND employeeId field
+                const local = await storage.getEmployeeByEmail(payload.employeeId);
+                if (local && (local.status === 'active' || local.status === null || local.status === undefined)) {
+                    console.log(`✅ [Auth] Token verified via local storage for: ${payload.employeeId}`);
+                    return {
+                        ...payload,
+                        id: local.id,
+                        franchiseId: local.franchiseId || (local as any).franchise_id || undefined,
+                        factoryId: local.factoryId || (local as any).factory_id || undefined,
+                        role: local.role as any
+                    };
+                }
+            } catch (e) {
+                // Local storage failed, try Supabase
+                console.log(`⚠️ [Auth] Local storage check failed, trying Supabase...`);
+            }
+
+            // 2. Try Supabase 'employees' table (for production with Supabase)
             try {
                 const { data: emp, error } = await supabase
                     .from('employees')
@@ -256,6 +275,7 @@ export class AuthService {
                     let normalizedRole = emp.role;
                     if (emp.role === 'manager') normalizedRole = 'franchise_manager';
 
+                    console.log(`✅ [Auth] Token verified via Supabase for: ${payload.employeeId}`);
                     return {
                         ...payload,
                         id: emp.id,
@@ -268,7 +288,7 @@ export class AuthService {
                 // Continue to auth_employees
             }
 
-            // 2. Try Supabase 'auth_employees' table
+            // 3. Try Supabase 'auth_employees' table
             try {
                 const { data: authEmp, error } = await supabase
                     .from('auth_employees')
@@ -277,6 +297,7 @@ export class AuthService {
                     .single();
 
                 if (!error && authEmp && authEmp.is_active === true) {
+                    console.log(`✅ [Auth] Token verified via Supabase auth_employees for: ${payload.employeeId}`);
                     return {
                         ...payload,
                         id: authEmp.id,
@@ -284,16 +305,6 @@ export class AuthService {
                         factoryId: authEmp.factory_id || undefined,
                         role: authEmp.role as any
                     };
-                }
-            } catch (e) {
-                // Continue to local check
-            }
-
-            // 3. Try local storage as final fallback
-            try {
-                const local = await storage.getEmployee(payload.employeeId);
-                if (local && local.status === 'active') {
-                    return payload;
                 }
             } catch (e) {
                 // All checks failed
@@ -751,10 +762,36 @@ export class AuthService {
 
     /**
      * Get employee by ID
-     * Checks both 'employees' and 'auth_employees' tables
+     * Checks local storage first, then Supabase as fallback
      */
     static async getEmployee(employeeId: string): Promise<AuthEmployee | null> {
-        // 1. Try Supabase 'employees' table first
+        // 1. Try LOCAL storage FIRST (for local development with SQLite)
+        try {
+            // Use getEmployeeByEmail as it searches by both email AND employeeId field
+            const localEmployee = await storage.getEmployeeByEmail(employeeId) as any;
+            if (localEmployee && (localEmployee.status === 'active' || localEmployee.status === null || localEmployee.status === undefined)) {
+                let normalizedRole = localEmployee.role;
+                if (normalizedRole === 'manager') normalizedRole = 'franchise_manager';
+
+                console.log(`✅ [Auth] Employee fetched from local storage: ${employeeId}`);
+                return {
+                    id: localEmployee.id,
+                    employeeId: localEmployee.employee_id || localEmployee.employeeId,
+                    username: localEmployee.employee_id || localEmployee.employeeId,
+                    role: normalizedRole as any,
+                    franchiseId: localEmployee.franchise_id || localEmployee.franchiseId,
+                    factoryId: localEmployee.factory_id || localEmployee.factoryId,
+                    fullName: `${localEmployee.first_name || localEmployee.firstName || ''} ${localEmployee.last_name || localEmployee.lastName || ''}`.trim() || localEmployee.fullName,
+                    email: localEmployee.email,
+                    phone: localEmployee.phone,
+                    isActive: localEmployee.status === 'active' || localEmployee.status === null || localEmployee.status === undefined,
+                };
+            }
+        } catch (e) {
+            console.log(`⚠️ [Auth] Local storage check failed for ${employeeId}, trying Supabase...`);
+        }
+
+        // 2. Try Supabase 'employees' table (for production)
         try {
             const { data: emp, error } = await supabase
                 .from('employees')
@@ -766,6 +803,7 @@ export class AuthService {
                 let normalizedRole = emp.role;
                 if (emp.role === 'manager') normalizedRole = 'franchise_manager';
 
+                console.log(`✅ [Auth] Employee fetched from Supabase: ${employeeId}`);
                 return {
                     id: emp.id,
                     employeeId: emp.employee_id,
@@ -788,7 +826,7 @@ export class AuthService {
             // Continue to auth_employees
         }
 
-        // 2. Try Supabase 'auth_employees' table
+        // 3. Try Supabase 'auth_employees' table
         try {
             const { data: authEmp, error } = await supabase
                 .from('auth_employees')
@@ -797,6 +835,7 @@ export class AuthService {
                 .single();
 
             if (!error && authEmp && authEmp.is_active === true) {
+                console.log(`✅ [Auth] Employee fetched from Supabase auth_employees: ${employeeId}`);
                 return {
                     id: authEmp.id,
                     employeeId: authEmp.employee_id,
@@ -812,30 +851,6 @@ export class AuthService {
                     department: authEmp.department,
                     hireDate: authEmp.hire_date ? new Date(authEmp.hire_date) : undefined,
                     baseSalary: authEmp.base_salary ? parseFloat(authEmp.base_salary) : 0,
-                };
-            }
-        } catch (e) {
-            // Continue to local storage
-        }
-
-        // 3. Try local storage as fallback
-        try {
-            const localEmployee = await storage.getEmployee(employeeId) as any;
-            if (localEmployee && localEmployee.status === 'active') {
-                let normalizedRole = localEmployee.role;
-                if (normalizedRole === 'manager') normalizedRole = 'franchise_manager';
-
-                return {
-                    id: localEmployee.id,
-                    employeeId: localEmployee.employee_id || localEmployee.employeeId,
-                    username: localEmployee.employee_id || localEmployee.employeeId,
-                    role: normalizedRole as any,
-                    franchiseId: localEmployee.franchise_id || localEmployee.franchiseId,
-                    factoryId: localEmployee.factory_id || localEmployee.factoryId,
-                    fullName: `${localEmployee.first_name || ''} ${localEmployee.last_name || ''}`.trim() || localEmployee.fullName,
-                    email: localEmployee.email,
-                    phone: localEmployee.phone,
-                    isActive: localEmployee.status === 'active',
                 };
             }
         } catch (e) {
