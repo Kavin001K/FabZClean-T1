@@ -217,14 +217,14 @@ export class SQLiteStorage implements IStorage {
         id TEXT PRIMARY KEY,
         franchiseId TEXT,
         customerId TEXT,
-        status TEXT,
+        status TEXT DEFAULT 'pending',
         totalAmount TEXT,
         items TEXT,
         orderNumber TEXT,
         customerName TEXT,
         customerEmail TEXT,
         customerPhone TEXT,
-        paymentStatus TEXT,
+        paymentStatus TEXT DEFAULT 'pending',
         shippingAddress TEXT,
         pickupDate TEXT,
         baseAmount TEXT,
@@ -236,18 +236,39 @@ export class SQLiteStorage implements IStorage {
         isInterState INTEGER DEFAULT 0,
         invoiceNumber TEXT,
         invoiceDate TEXT,
-        advancePaid TEXT,
-        paymentMethod TEXT,
+        advancePaid TEXT DEFAULT '0',
+        paymentMethod TEXT DEFAULT 'cash',
         discountType TEXT,
         discountValue TEXT,
         couponCode TEXT,
         extraCharges TEXT,
-
         gstEnabled INTEGER DEFAULT 0,
         gstRate TEXT DEFAULT '18.00',
         gstAmount TEXT DEFAULT '0.00',
         panNumber TEXT,
         specialInstructions TEXT,
+        
+        -- Fulfillment and delivery fields
+        fulfillmentType TEXT DEFAULT 'pickup',
+        deliveryCharges TEXT DEFAULT '0',
+        deliveryAddress TEXT,
+        
+        -- Service fields
+        service TEXT,
+        serviceId TEXT,
+        
+        -- Express and priority
+        isExpressOrder INTEGER DEFAULT 0,
+        expressService INTEGER DEFAULT 0,
+        priority TEXT DEFAULT 'normal',
+        expectedDeliveryDate TEXT,
+        notes TEXT,
+        
+        -- WhatsApp notification tracking
+        lastWhatsappStatus TEXT,
+        lastWhatsappSentAt TEXT,
+        whatsappMessageCount INTEGER DEFAULT 0,
+        
         createdAt TEXT,
         updatedAt TEXT,
         FOREIGN KEY (customerId) REFERENCES customers(id),
@@ -1151,6 +1172,19 @@ export class SQLiteStorage implements IStorage {
 
   // ======= ORDERS =======
   async createOrder(data: InsertOrder): Promise<Order> {
+    // Auto-generate orderNumber if not provided
+    if (!data.orderNumber) {
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+      const timeStr = now.getTime().toString().slice(-6);
+      data.orderNumber = `ORD-${dateStr}-${timeStr}`;
+    }
+
+    // Ensure status has a default
+    if (!data.status) {
+      data.status = 'pending';
+    }
+
     const id = this.insertRecord("orders", data);
     return this.getRecord<Order>("orders", id)!;
   }

@@ -194,8 +194,8 @@ export const UniversalAuthService = {
      * Supabase direct authentication
      */
     async loginSupabase(username: string, password: string): Promise<{ token: string; employee: AuthEmployee }> {
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        // Import the shared Supabase client to avoid multiple instances
+        const { supabase } = await import('./supabase');
 
         // Try employees table
         const { data: employees, error } = await supabase

@@ -1,45 +1,9 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+// Import the shared Supabase client to avoid creating multiple GoTrueClient instances
+import { supabase, isSupabaseConfigured } from './supabase';
 import bcrypt from 'bcryptjs';
 
-// Get Supabase credentials from environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-// Check if Supabase is properly configured (not placeholder values)
-export const isSupabaseConfigured = Boolean(
-    supabaseUrl &&
-    supabaseAnonKey &&
-    !supabaseUrl.includes('placeholder') &&
-    supabaseUrl.startsWith('https://')
-);
-
-// Create Supabase client only if configured
-let supabase: SupabaseClient;
-
-if (isSupabaseConfigured) {
-    supabase = createClient(supabaseUrl, supabaseAnonKey, {
-        realtime: {
-            params: {
-                eventsPerSecond: 10,
-            },
-        },
-    });
-} else {
-    // Create a placeholder client that won't be used
-    supabase = createClient(
-        'https://placeholder.supabase.co',
-        'placeholder-key',
-        {
-            auth: {
-                autoRefreshToken: false,
-                persistSession: false,
-                detectSessionInUrl: false,
-            },
-        }
-    );
-}
-
-export { supabase };
+// Re-export for backwards compatibility
+export { supabase, isSupabaseConfigured };
 
 // Employee types
 export interface AuthEmployee {

@@ -774,10 +774,18 @@ export default function CreateOrder() {
     setDeliveryZip('');
   };
 
-  // Validate phone number
+  // Validate phone number - flexible to accept various international formats
   const validatePhoneNumber = (phone: string): boolean => {
-    const phoneRegex = /^[0-9]{10,15}$/;
-    return phoneRegex.test(phone);
+    if (!phone || phone.trim().length === 0) return false;
+
+    // Remove all non-digit characters (spaces, dashes, parentheses, plus, dots)
+    const digitsOnly = phone.replace(/[^\d]/g, '');
+
+    // Accept 7-15 digits to support:
+    // - Local numbers without country code (10 digits in India, 7-10 in other countries)
+    // - International numbers with country code (1-4 digit code + 7-12 digit number)
+    // Examples: +1-555-0128 (8 digits), 9876543210 (10 digits), +91 9876543210 (12 digits)
+    return digitsOnly.length >= 7 && digitsOnly.length <= 15;
   };
 
   // Handle create order
@@ -795,7 +803,7 @@ export default function CreateOrder() {
     if (!validatePhoneNumber(customerPhone)) {
       toast({
         title: "Validation Error",
-        description: "Please enter a valid phone number (10-15 digits)",
+        description: "Please enter a valid phone number (7-15 digits, any format)",
         variant: "destructive",
       });
       return;
