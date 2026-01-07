@@ -931,7 +931,9 @@ export class AuthService {
         // 1. Try LOCAL storage FIRST (for local development with SQLite)
         try {
             const localEmployees = await storage.listEmployees();
-            if (localEmployees && localEmployees.length > 0) {
+            // IMPORTANT: Return even if empty - don't fall through to Supabase!
+            // Array.isArray check ensures we got a valid result, not an error
+            if (Array.isArray(localEmployees)) {
                 console.log(`✅ [Auth] Listed ${localEmployees.length} employees from local storage`);
 
                 // Filter by franchise if needed
@@ -956,7 +958,7 @@ export class AuthService {
                 }));
             }
         } catch (e) {
-            console.log(`⚠️ [Auth] Local storage list failed, trying Supabase...`);
+            console.log(`⚠️ [Auth] Local storage list failed, trying Supabase...`, e);
         }
 
         // 2. Fall back to Supabase
