@@ -978,6 +978,7 @@ export class AuthService {
                     email: emp.email,
                     phone: emp.phone,
                     isActive: emp.status === 'active' || emp.status === null || emp.status === undefined,
+                    status: emp.status || 'active', // Include status for frontend display
                     position: emp.role,
                     department: undefined,
                     hireDate: emp.createdAt ? new Date(emp.createdAt) : undefined,
