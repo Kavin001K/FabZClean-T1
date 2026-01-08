@@ -53,6 +53,59 @@ const ADMIN_ONLY: UserRole[] = ["admin"];
 router.use(rateLimit(60000, 100)); // 100 requests per minute
 router.use(jwtRequired);
 
+// Get next order number preview (for display on order creation form)
+router.get('/next-order-number', async (req, res) => {
+  try {
+    const employee = req.employee;
+    const franchiseId = employee?.franchiseId || null;
+
+    // Generate next order number preview
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+
+    // Get prefix from franchise settings or use default
+    let prefix = 'FZC';
+    if (franchiseId) {
+      try {
+        const franchises = await storage.listFranchises();
+        const franchise = franchises.find((f: any) => f.id === franchiseId);
+        if (franchise?.orderNumberPrefix) {
+          prefix = franchise.orderNumberPrefix;
+        }
+      } catch (err) {
+        // Use default prefix
+      }
+    }
+
+    // Count today's orders
+    const allOrders = await storage.listOrders(franchiseId);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const todayOrders = allOrders.filter((order: Order) => {
+      if (!order.orderNumber?.startsWith(`${prefix}-${dateStr}`)) return false;
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= todayStart;
+    });
+
+    const nextSequence = todayOrders.length + 1;
+    const paddedSequence = String(nextSequence).padStart(4, '0');
+    const nextOrderNumber = `${prefix}-${dateStr}-${paddedSequence}`;
+
+    res.json({
+      success: true,
+      nextOrderNumber,
+      prefix,
+      date: dateStr,
+      sequence: nextSequence,
+      todayOrderCount: todayOrders.length
+    });
+  } catch (error: any) {
+    console.error('Get next order number error:', error);
+    res.status(500).json({ error: 'Failed to get next order number' });
+  }
+});
+
 // Search orders by query (order number, barcode, customer name, etc.)
 router.get('/search', async (req, res) => {
   try {

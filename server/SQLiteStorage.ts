@@ -1216,14 +1216,52 @@ export class SQLiteStorage implements IStorage {
     return this.listCustomers();
   }
 
+  // ======= ORDER NUMBER GENERATION =======
+  /**
+   * Generate next sequential order number
+   * Format: PREFIX-YYYYMMDD-####
+   * e.g., FZC-20260108-0001, FZC-20260108-0002
+   * Resets sequence daily
+   */
+  private getNextOrderNumber(franchiseId?: string | null): string {
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
+
+    // Get prefix from franchise settings or use default
+    let prefix = 'FZC';
+    if (franchiseId) {
+      try {
+        const franchise = this.db.prepare(
+          'SELECT orderNumberPrefix FROM franchises WHERE id = ?'
+        ).get(franchiseId) as any;
+        if (franchise?.orderNumberPrefix) {
+          prefix = franchise.orderNumberPrefix;
+        }
+      } catch (err) {
+        // Use default prefix if franchise not found
+      }
+    }
+
+    // Count orders created today with the same prefix to get the next sequence
+    const todayStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    const existingOrders = this.db.prepare(`
+      SELECT COUNT(*) as count FROM orders 
+      WHERE orderNumber LIKE ? 
+      AND DATE(createdAt) = DATE(?)
+    `).get(`${prefix}-${dateStr}-%`, todayStart) as any;
+
+    const sequenceNumber = (existingOrders?.count || 0) + 1;
+    const paddedSequence = String(sequenceNumber).padStart(4, '0');
+
+    return `${prefix}-${dateStr}-${paddedSequence}`;
+  }
+
   // ======= ORDERS =======
   async createOrder(data: InsertOrder): Promise<Order> {
     // Auto-generate orderNumber if not provided
     if (!data.orderNumber) {
-      const now = new Date();
-      const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-      const timeStr = now.getTime().toString().slice(-6);
-      data.orderNumber = `ORD-${dateStr}-${timeStr}`;
+      data.orderNumber = this.getNextOrderNumber((data as any).franchiseId);
     }
 
     // Ensure status has a default
