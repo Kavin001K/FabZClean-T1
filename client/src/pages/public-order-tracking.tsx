@@ -428,7 +428,20 @@ export default function PublicOrderTracking() {
         }
     }, [order]);
 
+    const [honeypot, setHoneypot] = useState('');
+
     const handleSearch = async (searchNumber?: string) => {
+        // Honeypot check - Trap bots silently
+        if (honeypot) {
+            // Simulate network delay to keep them waiting
+            setLoading(true);
+            setTimeout(() => {
+                setLoading(false);
+                setError('Order not found');
+            }, 2000);
+            return;
+        }
+
         const numToSearch = searchNumber || orderNumber;
         if (!numToSearch.trim()) return;
 
@@ -556,6 +569,16 @@ export default function PublicOrderTracking() {
                                 <div className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-8 md:w-10 h-8 md:h-10 bg-emerald-100 rounded-lg md:rounded-xl flex items-center justify-center">
                                     <Search className="w-4 md:w-5 h-4 md:h-5 text-emerald-600" />
                                 </div>
+                                {/* Honeypot Field - Traps bots */}
+                                <input
+                                    type="text"
+                                    name="website_url"
+                                    value={honeypot}
+                                    onChange={(e) => setHoneypot(e.target.value)}
+                                    style={{ display: 'none' }}
+                                    autoComplete="off"
+                                    tabIndex={-1}
+                                />
                                 <Input
                                     value={orderNumber}
                                     onChange={(e) => setOrderNumber(e.target.value)}

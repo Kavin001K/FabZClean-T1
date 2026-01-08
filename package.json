@@ -21,7 +21,8 @@
     "db:fix-admin": "npx tsx server/fix-admin.ts",
     "code:cleanup": "node scripts/code-cleanup.js",
     "code:cleanup:fix": "node scripts/code-cleanup.js --fix",
-    "code:cleanup:verbose": "node scripts/code-cleanup.js --verbose"
+    "code:cleanup:verbose": "node scripts/code-cleanup.js --verbose",
+    "audit:security": "npm audit --audit-level=high"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

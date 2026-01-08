@@ -16,6 +16,43 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
+// Helper to mask sensitive PII and secrets in logs
+function maskSensitiveData(data: any): any {
+  if (!data) return data;
+  if (typeof data !== 'object') return data;
+
+  const masked = Array.isArray(data) ? [...data] : { ...data };
+
+  // Fields to completely redact
+  const sensitiveFields = ['password', 'token', 'access_token', 'refreshToken', 'card', 'cvc', 'secret', 'auth'];
+  // Fields to mask as PII
+  const piiFields = ['email', 'phone', 'phoneNumber', 'mobile', 'address'];
+
+  for (const key in masked) {
+    if (sensitiveFields.some(field => key.toLowerCase().includes(field))) {
+      masked[key] = '***MASKED_SECRET***';
+    } else if (piiFields.some(field => key.toLowerCase().includes(field))) {
+      masked[key] = '***MASKED_PII***';
+    } else if (typeof masked[key] === 'object') {
+      masked[key] = maskSensitiveData(masked[key]);
+    }
+  }
+  return masked;
+}
+
+// Security Headers Middleware (Strict CSP)
+app.use((req, res, next) => {
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://*.googleapis.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://* blob:; frame-src 'self';"
+  );
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  next();
+});
+
+// Logging & Data Masking Middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -32,11 +69,13 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        // Apply strict masking before logging
+        const safeLogData = maskSensitiveData(capturedJsonResponse);
+        logLine += ` :: ${JSON.stringify(safeLogData)}`;
       }
 
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
+      if (logLine.length > 200) {
+        logLine = logLine.slice(0, 199) + "…";
       }
 
       log(logLine);
@@ -47,9 +86,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-          // Register all routes
-          registerAllRoutes(app);
-  
+  // Register all routes
+  registerAllRoutes(app);
+
   // Create HTTP server
   const server = realtimeServer.createServer(app);
 
@@ -60,7 +99,7 @@ app.use((req, res, next) => {
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
   const isProduction = process.env.NODE_ENV === "production";
-  
+
   if (!isProduction) {
     await setupVite(app, server);
   } else {
