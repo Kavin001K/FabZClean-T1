@@ -1,9 +1,14 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
+import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
+import { playwright } from '@vitest/browser-playwright';
+const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
+// More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Plugin to generate version.json on build
@@ -13,7 +18,7 @@ function versionPlugin() {
     closeBundle() {
       const version = {
         version: `2.0.${Date.now()}`,
-        buildTime: new Date().toISOString(),
+        buildTime: new Date().toISOString()
       };
       // Write to dist folder (output directory relative to root)
       const versionPath = path.resolve(__dirname, 'dist', 'version.json');
@@ -26,21 +31,17 @@ function versionPlugin() {
     }
   };
 }
-
 export default defineConfig({
-  plugins: [
-    react(),
-    versionPlugin(),
-  ],
+  plugins: [react(), versionPlugin()],
   define: {
-    global: 'globalThis',
+    global: 'globalThis'
   },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "client", "src"),
       "@shared": path.resolve(__dirname, "shared"),
-      "@assets": path.resolve(__dirname, "attached_assets"),
-    },
+      "@assets": path.resolve(__dirname, "attached_assets")
+    }
   },
   root: "client",
   build: {
@@ -53,17 +54,11 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // Safe chunking - keep React ecosystem together, don't create catch-all vendor
-        manualChunks: (id) => {
+        manualChunks: id => {
           if (id.includes('node_modules')) {
             // Keep ALL React-related packages together
             // This includes react, react-dom, scheduler, react-is, etc.
-            if (
-              id.includes('/react/') ||
-              id.includes('/react-dom/') ||
-              id.includes('/scheduler/') ||
-              id.includes('/react-is/') ||
-              id.includes('react-refresh')
-            ) {
+            if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/') || id.includes('/react-is/') || id.includes('react-refresh')) {
               return 'react-vendor';
             }
             // React Query / TanStack
@@ -95,32 +90,52 @@ export default defineConfig({
         },
         chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     }
   },
   esbuild: {
-    logOverride: { 'this-is-undefined-in-esm': 'silent' },
+    logOverride: {
+      'this-is-undefined-in-esm': 'silent'
+    },
     target: 'es2020',
     drop: ['console', 'debugger'],
-    legalComments: 'none',
+    legalComments: 'none'
   },
   optimizeDeps: {
-    include: [
-      'react',
-      'react-dom',
-      'scheduler',
-      'recharts',
-    ],
+    include: ['react', 'react-dom', 'scheduler', 'recharts']
   },
   server: {
     fs: {
-      strict: false,
+      strict: false
     },
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Opener-Policy': 'same-origin'
     },
-    hmr: {},
+    hmr: {}
   },
+  test: {
+    projects: [{
+      extends: true,
+      plugins: [
+      // The plugin will run tests for the stories defined in your Storybook config
+      // See options at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon#storybooktest
+      storybookTest({
+        configDir: path.join(dirname, '.storybook')
+      })],
+      test: {
+        name: 'storybook',
+        browser: {
+          enabled: true,
+          headless: true,
+          provider: playwright({}),
+          instances: [{
+            browser: 'chromium'
+          }]
+        },
+        setupFiles: ['.storybook/vitest.setup.ts']
+      }
+    }]
+  }
 });

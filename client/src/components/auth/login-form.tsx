@@ -7,6 +7,7 @@ import { Label } from '../ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Loader2, User, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { BiometricAuthButton } from '../biometric-auth-button';
 
 export const LoginForm: React.FC = () => {
   const [, setLocation] = useLocation();
@@ -136,6 +137,19 @@ export const LoginForm: React.FC = () => {
                 'Sign in'
               )}
             </Button>
+
+            <div className="relative w-full">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+
+            <BiometricAuthButton onSuccess={() => setLocation('/')} />
             <p className="text-sm text-center text-gray-500 dark:text-gray-400">
               Contact your administrator to create an employee account
             </p>

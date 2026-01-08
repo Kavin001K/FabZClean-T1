@@ -75,10 +75,6 @@ export class MemStorage implements IStorage {
   async listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]> { return []; }
   async updateAttendance(id: string, data: any): Promise<any> { return null; }
 
-  // Employee methods
-  async getEmployee(id: string): Promise<any | undefined> { return this.sqliteStorage.getEmployee(id); }
-  async getEmployeeByEmail(email: string): Promise<any | undefined> { return this.sqliteStorage.getEmployeeByEmail(email); }
-
   // Transit methods
   async createTransitOrder(data: any): Promise<any> { return null; }
   async getNextTransitId(franchiseId?: string, type?: string): Promise<string> { return `TRN-${Date.now()}`; }
@@ -839,30 +835,6 @@ export class MemStorage implements IStorage {
     return this.sqliteStorage.deleteService(id);
   }
 
-  async getEmployees() {
-    return this.sqliteStorage.getEmployees();
-  }
-
-  async getEmployee(id: string) {
-    return this.sqliteStorage.getEmployee(id);
-  }
-
-  async createEmployee(insertEmployee: any) {
-    return this.sqliteStorage.createEmployee(insertEmployee);
-  }
-
-  async updateEmployee(id: string, updates: any) {
-    return this.sqliteStorage.updateEmployee(id, updates);
-  }
-
-  async deleteEmployee(id: string) {
-    return this.sqliteStorage.deleteEmployee(id);
-  }
-
-  async getEmployeeByEmail(email: string) {
-    return this.sqliteStorage.getEmployeeByEmail(email);
-  }
-
   async getBarcodes() {
     return this.sqliteStorage.getBarcodes();
   }
@@ -951,6 +923,10 @@ export class MemStorage implements IStorage {
 
   async deleteEmployee(id: string): Promise<boolean> {
     return this.sqliteStorage.deleteEmployee(id);
+  }
+
+  async getEmployeeByEmail(email: string): Promise<any | undefined> {
+    return this.sqliteStorage.getEmployeeByEmail(email);
   }
 
   // Close database connection

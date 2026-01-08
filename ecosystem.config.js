@@ -2,9 +2,8 @@ module.exports = {
     apps: [
         {
             name: "fabzclean-app",
-            script: "server/minimal-server.ts",
+            script: "dist-server/server.js",
             interpreter: "node",
-            interpreter_args: "--import tsx",
             instances: 1,
             autorestart: true,
             watch: false,

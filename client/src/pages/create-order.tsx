@@ -28,6 +28,7 @@ import OrderDetailsDialog from "@/components/orders/order-details-dialog";
 import { useAuth } from "@/contexts/auth-context";
 import { generateOrderNumberSync } from "@/lib/franchise-config";
 import { createAddressObject, parseAndFormatAddress, parseAddress } from "@/lib/address-utils";
+import { formatCurrencyWithSettings, roundInvoiceAmount } from "@/lib/settings-utils";
 
 interface ServiceItem {
   service: Service;
@@ -39,6 +40,8 @@ interface ServiceItem {
   customName: string;
   // Note to print on the tag for this service
   tagNote: string;
+  // Unique barcode for tracking lifecycle
+  garmentBarcode?: string;
 }
 
 export default function CreateOrder() {
@@ -59,6 +62,43 @@ export default function CreateOrder() {
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
 
+  // Services state (must be before useEffect that references it)
+  const [selectedServices, setSelectedServices] = useState<ServiceItem[]>([]);
+
+  // Order details (must be before useEffect that references it)
+  const [specialInstructions, setSpecialInstructions] = useState('');
+
+  // Abandoned Cart Recovery
+  const ABANDONED_CART_KEY = "fabzclean_cart_draft_v1";
+
+  // Load draft on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(ABANDONED_CART_KEY);
+    if (saved) {
+      try {
+        const draft = JSON.parse(saved);
+        if (draft.phoneNumber) setPhoneNumber(draft.phoneNumber);
+        if (draft.customerName) setCustomerName(draft.customerName);
+        if (draft.customerPhone) setCustomerPhone(draft.customerPhone);
+        if (draft.foundCustomer) setFoundCustomer(draft.foundCustomer);
+        if (draft.selectedServices) setSelectedServices(draft.selectedServices);
+        if (draft.specialInstructions) setSpecialInstructions(draft.specialInstructions);
+
+        toast({ title: "Draft Restored", description: "Taking you back to where you left off." });
+      } catch (e) {
+        console.error("Failed to restore draft", e);
+      }
+    }
+  }, []);
+
+  // Save draft on change
+  useEffect(() => {
+    const draft = {
+      phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer
+    };
+    localStorage.setItem(ABANDONED_CART_KEY, JSON.stringify(draft));
+  }, [phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer]);
+
   // Customer creation popup
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
@@ -70,9 +110,6 @@ export default function CreateOrder() {
   const [newCustomerPincode, setNewCustomerPincode] = useState('');
   const [newCustomerNotes, setNewCustomerNotes] = useState('');
 
-  // Services state
-  const [selectedServices, setSelectedServices] = useState<ServiceItem[]>([]);
-
   // Payment state
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed' | 'none'>('none');
   const [discountValue, setDiscountValue] = useState(0);
@@ -82,7 +119,6 @@ export default function CreateOrder() {
 
   // Order details
   const [pickupDate, setPickupDate] = useState<Date>();
-  const [specialInstructions, setSpecialInstructions] = useState('');
   const [advancePayment, setAdvancePayment] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paymentStatus, setPaymentStatus] = useState('pending');
@@ -525,8 +561,8 @@ export default function CreateOrder() {
       calculatedTotal += gstAmount;
     }
 
-    // Ensure total is not negative
-    setTotalAmount(Math.max(0, calculatedTotal));
+    // Ensure total is not negative and Apply Rounding
+    setTotalAmount(roundInvoiceAmount(Math.max(0, calculatedTotal), 'nearest_1'));
   }, [subtotal, discountAmount, extraCharges, enableGST, fulfillmentType, deliveryCharges, gstAmount]);
 
   // Create order mutation
@@ -591,6 +627,7 @@ export default function CreateOrder() {
               serviceName: item.serviceName || item.service_name || item.productName || formItem?.service?.name || 'Unknown',
               customName: item.customName || item.custom_name || formItem?.customName,
               tagNote: item.tagNote || item.tag_note || formItem?.tagNote || '',
+              garmentBarcode: item.garmentBarcode || item.garment_barcode || formItem?.garmentBarcode,
             };
           });
         }
@@ -744,6 +781,7 @@ export default function CreateOrder() {
 
   // Reset form
   const resetForm = () => {
+    localStorage.removeItem(ABANDONED_CART_KEY);
     setPhoneNumber('');
     setFoundCustomer(null);
     setCustomerName('');
@@ -885,7 +923,10 @@ export default function CreateOrder() {
         quantity: item.quantity,
         // Use the overridden price for this order only
         price: item.priceOverride.toString(),
-        subtotal: (item.quantity * item.priceOverride).toString()
+        subtotal: (item.quantity * item.priceOverride).toString(),
+        customName: item.customName,
+        tagNote: item.tagNote,
+        garmentBarcode: item.garmentBarcode
       })),
       pickupDate: pickupDate ? new Date(pickupDate).toISOString() : undefined,
       specialInstructions: specialInstructions,
@@ -1225,7 +1266,7 @@ export default function CreateOrder() {
                                   </Button>
                                 </TableCell>
                               </motion.tr>
-                              {/* Tag Note Row */}
+                              {/* Tag Note & Barcode Row */}
                               <motion.tr
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -1233,19 +1274,47 @@ export default function CreateOrder() {
                                 className="border-b bg-muted/30"
                               >
                                 <TableCell colSpan={5} className="py-2 px-4">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs text-muted-foreground whitespace-nowrap">Tag Note:</span>
-                                    <Input
-                                      value={item.tagNote}
-                                      onChange={(e) => {
-                                        const updated = selectedServices.map(s =>
-                                          s.service.id === item.service.id ? { ...s, tagNote: e.target.value } : s
-                                        );
-                                        setSelectedServices(updated);
-                                      }}
-                                      className="h-8 text-sm flex-1"
-                                      placeholder="e.g., Delicate fabric, No bleach, Special care..."
-                                    />
+                                  <div className="flex flex-col md:flex-row gap-4">
+                                    <div className="flex items-center gap-2 flex-1">
+                                      <span className="text-xs text-muted-foreground whitespace-nowrap">Tag Note:</span>
+                                      <Input
+                                        value={item.tagNote}
+                                        onChange={(e) => {
+                                          const updated = selectedServices.map(s =>
+                                            s.service.id === item.service.id ? { ...s, tagNote: e.target.value } : s
+                                          );
+                                          setSelectedServices(updated);
+                                        }}
+                                        className="h-8 text-sm flex-1"
+                                        placeholder="e.g., Delicate fabric, No bleach"
+                                      />
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-1">
+                                      <span className="text-xs text-muted-foreground whitespace-nowrap">Barcode:</span>
+                                      <Input
+                                        value={item.garmentBarcode || ''}
+                                        onChange={(e) => {
+                                          const updated = selectedServices.map(s =>
+                                            s.service.id === item.service.id ? { ...s, garmentBarcode: e.target.value } : s
+                                          );
+                                          setSelectedServices(updated);
+
+                                          // Mock Check for History (Garment Lifecycle)
+                                          if (e.target.value.length > 5) {
+                                            // In real app, query API. Here we mock warning.
+                                            if (e.target.value.endsWith('50')) { // Test condition
+                                              toast({
+                                                title: "Garment Lifecycle Warning",
+                                                description: "This garment has been washed 50 times! Inspect for wear and tear.",
+                                                variant: "destructive"
+                                              });
+                                            }
+                                          }
+                                        }}
+                                        className="h-8 text-sm flex-1"
+                                        placeholder="Scan permanent tag..."
+                                      />
+                                    </div>
                                   </div>
                                 </TableCell>
                               </motion.tr>
@@ -1985,10 +2054,10 @@ export default function CreateOrder() {
             )}
           </AnimatePresence>
         </div>
-      </div>
+      </div >
 
       {/* Customer Creation Dialog */}
-      <Dialog open={showCustomerDialog} onOpenChange={setShowCustomerDialog}>
+      < Dialog open={showCustomerDialog} onOpenChange={setShowCustomerDialog} >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Customer</DialogTitle>
@@ -2098,17 +2167,18 @@ export default function CreateOrder() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Success Modal */}
-      <OrderConfirmationDialog
+      < OrderConfirmationDialog
         open={isModalOpen}
         onOpenChange={setIsModalOpen}
         order={createdOrder}
         enableGST={enableGST}
         onClose={() => {
           setIsModalOpen(false);
-        }}
+        }
+        }
       />
 
       {/* History Order Details Dialog */}
@@ -2121,6 +2191,6 @@ export default function CreateOrder() {
         onNextStep={() => { }}
         onPrintInvoice={() => { }}
       />
-    </div>
+    </div >
   );
 }

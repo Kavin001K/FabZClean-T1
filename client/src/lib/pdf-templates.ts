@@ -1,587 +1,241 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { format } from 'date-fns';
 
-// Company branding colors
-const COLORS = {
-    primary: '#0088FE',
-    secondary: '#00C49F',
-    accent: '#FFBB28',
-    danger: '#FF8042',
-    success: '#00C49F',
-    warning: '#FFBB28',
-    dark: '#1a1a1a',
-    light: '#f5f5f5',
-    gray: '#666666',
+// Define types for jsPDF with autoTable
+interface jsPDFWithAutoTable extends jsPDF {
+    lastAutoTable: { finalY: number };
+}
+
+const COMPANY_INFO = {
+    name: "FabZClean Services",
+    address: "Premium Laundry & Dry Cleaning",
+    website: "www.fabzclean.com",
+    contact: "support@fabzclean.com"
 };
 
-// Helper function to add header
-const addHeader = (doc: jsPDF, title: string, subtitle?: string) => {
-    const pageWidth = doc.internal.pageSize.getWidth();
+const THEME_COLORS = {
+    primary: [41, 128, 185], // #2980b9
+    secondary: [52, 73, 94], // #34495e
+    accent: [231, 76, 60],   // #e74c3c
+    header: [236, 240, 241]  // #ecf0f1
+};
 
-    // Add logo/company name
-    doc.setFontSize(24);
-    doc.setTextColor(COLORS.primary);
+/**
+ * Base Helper to setup PDF Header/Footer
+ */
+const setupPdfDocument = (title: string, orientation: 'p' | 'l' = 'p'): jsPDFWithAutoTable => {
+    const doc = new jsPDF(orientation, 'mm', 'a4') as jsPDFWithAutoTable;
+
+    // Header
+    doc.setFillColor(THEME_COLORS.primary[0], THEME_COLORS.primary[1], THEME_COLORS.primary[2]);
+    doc.rect(0, 0, doc.internal.pageSize.width, 20, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('FabZClean', 20, 20);
+    doc.text(COMPANY_INFO.name, 14, 13);
 
-    // Add tagline
     doc.setFontSize(10);
-    doc.setTextColor(COLORS.gray);
     doc.setFont('helvetica', 'normal');
-    doc.text('Professional Laundry & Dry Cleaning Services', 20, 27);
+    const dateStr = format(new Date(), 'PPP p');
+    doc.text(`Generated: ${dateStr}`, doc.internal.pageSize.width - 14, 13, { align: 'right' });
 
-    // Add horizontal line
-    doc.setDrawColor(COLORS.primary);
-    doc.setLineWidth(0.5);
-    doc.line(20, 32, pageWidth - 20, 32);
-
-    // Add report title
+    // Title Section
+    doc.setTextColor(THEME_COLORS.secondary[0], THEME_COLORS.secondary[1], THEME_COLORS.secondary[2]);
     doc.setFontSize(18);
-    doc.setTextColor(COLORS.dark);
     doc.setFont('helvetica', 'bold');
-    doc.text(title, 20, 45);
+    doc.text(title, 14, 35);
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(THEME_COLORS.primary[0], THEME_COLORS.primary[1], THEME_COLORS.primary[2]);
+    doc.line(14, 38, doc.internal.pageSize.width - 14, 38);
 
-    // Add subtitle if provided
-    if (subtitle) {
-        doc.setFontSize(12);
-        doc.setTextColor(COLORS.gray);
-        doc.setFont('helvetica', 'normal');
-        doc.text(subtitle, 20, 52);
+    return doc;
+};
+
+/**
+ * Add Footer with Page Numbers
+ */
+const addFooter = (doc: jsPDFWithAutoTable) => {
+    const pageCount = doc.getNumberOfPages();
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.text(
+            `Page ${i} of ${pageCount} - ${COMPANY_INFO.website} - Confidential`,
+            doc.internal.pageSize.width / 2,
+            doc.internal.pageSize.height - 10,
+            { align: 'center' }
+        );
     }
-
-    return 60; // Return Y position for content start
 };
 
-// Helper function to add footer
-const addFooter = (doc: jsPDF, pageNumber: number, totalPages: number) => {
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-
-    // Add horizontal line
-    doc.setDrawColor(COLORS.gray);
-    doc.setLineWidth(0.3);
-    doc.line(20, pageHeight - 25, pageWidth - 20, pageHeight - 25);
-
-    // Add page number
-    doc.setFontSize(9);
-    doc.setTextColor(COLORS.gray);
-    doc.setFont('helvetica', 'normal');
-    doc.text(
-        `Page ${pageNumber} of ${totalPages}`,
-        pageWidth / 2,
-        pageHeight - 15,
-        { align: 'center' }
-    );
-
-    // Add generation date
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-IN', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-    doc.text(`Generated on ${dateStr}`, 20, pageHeight - 15);
-
-    // Add company info
-    doc.text('www.fabzclean.com', pageWidth - 20, pageHeight - 15, { align: 'right' });
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0
+    }).format(amount);
 };
 
-// Helper function to add summary box
-const addSummaryBox = (
-    doc: jsPDF,
-    y: number,
-    items: Array<{ label: string; value: string; color?: string }>
-) => {
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const boxWidth = (pageWidth - 60) / items.length;
+// ==========================================
+// REPORT GENERATORS
+// ==========================================
 
-    items.forEach((item, index) => {
-        const x = 20 + (index * boxWidth) + (index * 10);
-
-        // Draw box
-        doc.setFillColor(item.color || COLORS.light);
-        doc.roundedRect(x, y, boxWidth, 30, 3, 3, 'F');
-
-        // Add label
-        doc.setFontSize(9);
-        doc.setTextColor(COLORS.gray);
-        doc.setFont('helvetica', 'normal');
-        doc.text(item.label, x + 5, y + 10);
-
-        // Add value
-        doc.setFontSize(16);
-        doc.setTextColor(COLORS.dark);
-        doc.setFont('helvetica', 'bold');
-        doc.text(item.value, x + 5, y + 23);
-    });
-
-    return y + 40;
-};
-
-// ============================================
-// FRANCHISE PERFORMANCE REPORT
-// ============================================
 export const generateFranchisePerformanceReport = (data: any[]) => {
-    const doc = new jsPDF();
+    const doc = setupPdfDocument('Franchise Performance Report', 'l'); // Landscape for more columns
 
-    // Add header
-    let yPos = addHeader(
-        doc,
-        'Franchise Performance Report',
-        `Comprehensive analysis of all franchise operations`
-    );
-
-    // Calculate totals
-    const totals = data.reduce((acc, f) => ({
-        orders: acc.orders + (f.total_orders || 0),
-        revenue: acc.revenue + (f.total_revenue || 0),
-        customers: acc.customers + (f.total_customers || 0),
-        employees: acc.employees + (f.total_employees || 0),
-    }), { orders: 0, revenue: 0, customers: 0, employees: 0 });
-
-    // Add summary boxes
-    yPos = addSummaryBox(doc, yPos, [
-        {
-            label: 'Total Franchises',
-            value: data.length.toString(),
-            color: '#E3F2FD'
-        },
-        {
-            label: 'Total Revenue',
-            value: `₹${(totals.revenue / 1000).toFixed(0)}K`,
-            color: '#E8F5E9'
-        },
-        {
-            label: 'Total Orders',
-            value: totals.orders.toLocaleString(),
-            color: '#FFF3E0'
-        },
-        {
-            label: 'Total Customers',
-            value: totals.customers.toLocaleString(),
-            color: '#FCE4EC'
-        }
+    const tableData = data.map(item => [
+        item.franchise_code,
+        item.franchise_name,
+        item.total_orders?.toLocaleString() || '0',
+        formatCurrency(item.total_revenue || 0),
+        item.total_customers?.toLocaleString() || '0',
+        item.total_employees?.toString() || '0',
+        formatCurrency(item.avg_order_value || 0),
+        `${item.performance_score || '-'} / 100` // Assuming you add scoring later
     ]);
 
-    yPos += 10;
-
-    // Add table
     autoTable(doc, {
-        startY: yPos,
-        head: [[
-            'Code',
-            'Franchise Name',
-            'Orders',
-            'Revenue',
-            'Customers',
-            'Employees',
-            'Avg Order'
-        ]],
-        body: data.map(f => [
-            f.franchise_code,
-            f.franchise_name,
-            f.total_orders?.toLocaleString() || '0',
-            `₹${(f.total_revenue || 0).toLocaleString()}`,
-            f.total_customers?.toLocaleString() || '0',
-            f.total_employees || '0',
-            `₹${(f.avg_order_value || 0).toLocaleString()}`
-        ]),
-        headStyles: {
-            fillColor: COLORS.primary,
-            textColor: '#ffffff',
-            fontStyle: 'bold',
-            fontSize: 10
-        },
-        bodyStyles: {
-            fontSize: 9
-        },
-        alternateRowStyles: {
-            fillColor: COLORS.light
-        },
-        margin: { left: 20, right: 20 }
-    });
-
-    // Add footer
-    addFooter(doc, 1, 1);
-
-    // Save
-    doc.save(`franchise-performance-${new Date().toISOString().split('T')[0]}.pdf`);
-};
-
-// ============================================
-// EMPLOYEE DIRECTORY REPORT
-// ============================================
-export const generateEmployeeDirectoryReport = (data: any[], franchiseCode?: string) => {
-    const doc = new jsPDF();
-
-    const title = franchiseCode
-        ? `Employee Directory - ${franchiseCode}`
-        : 'Complete Employee Directory';
-
-    let yPos = addHeader(doc, title, `Total Employees: ${data.length}`);
-
-    // Group by franchise
-    const grouped = data.reduce((acc: any, emp) => {
-        const code = emp.franchise_code || 'Unassigned';
-        if (!acc[code]) acc[code] = [];
-        acc[code].push(emp);
-        return acc;
-    }, {});
-
-    // Add each franchise section
-    Object.keys(grouped).sort().forEach((code, index) => {
-        const employees = grouped[code];
-
-        if (index > 0) yPos += 15;
-
-        // Franchise header
-        doc.setFontSize(14);
-        doc.setTextColor(COLORS.primary);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${code} - ${employees.length} Employees`, 20, yPos);
-
-        yPos += 10;
-
-        // Employee table
-        autoTable(doc, {
-            startY: yPos,
-            head: [['Code', 'Name', 'Role', 'Position']],
-            body: employees.map((emp: any) => [
-                emp.employee_code,
-                emp.employee_name,
-                emp.role?.replace('_', ' ').toUpperCase(),
-                emp.position
-            ]),
-            headStyles: {
-                fillColor: COLORS.secondary,
-                textColor: '#ffffff',
-                fontStyle: 'bold',
-                fontSize: 9
-            },
-            bodyStyles: {
-                fontSize: 8
-            },
-            alternateRowStyles: {
-                fillColor: COLORS.light
-            },
-            margin: { left: 20, right: 20 }
-        });
-
-        yPos = (doc as any).lastAutoTable.finalY + 5;
-    });
-
-    addFooter(doc, 1, 1);
-    doc.save(`employee-directory-${new Date().toISOString().split('T')[0]}.pdf`);
-};
-
-// ============================================
-// DAILY SUMMARY REPORT
-// ============================================
-export const generateDailySummaryReport = (data: any[], franchiseCode?: string) => {
-    const doc = new jsPDF();
-
-    const title = franchiseCode
-        ? `Daily Summary - ${franchiseCode}`
-        : 'Daily Summary - All Franchises';
-
-    let yPos = addHeader(doc, title, `Last ${data.length} days`);
-
-    // Calculate totals
-    const totals = data.reduce((acc, day) => ({
-        orders: acc.orders + (day.total_orders || 0),
-        revenue: acc.revenue + (day.total_revenue || 0),
-        customers: acc.customers + (day.unique_customers || 0),
-    }), { orders: 0, revenue: 0, customers: 0 });
-
-    // Add summary
-    yPos = addSummaryBox(doc, yPos, [
-        {
-            label: 'Total Orders',
-            value: totals.orders.toLocaleString(),
-            color: '#E3F2FD'
-        },
-        {
-            label: 'Total Revenue',
-            value: `₹${(totals.revenue / 1000).toFixed(0)}K`,
-            color: '#E8F5E9'
-        },
-        {
-            label: 'Avg Daily Orders',
-            value: Math.round(totals.orders / data.length).toString(),
-            color: '#FFF3E0'
+        startY: 45,
+        head: [['Code', 'Franchise Name', 'Orders', 'Revenue', 'Customers', 'Staff', 'Avg Order', 'Score']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        columnStyles: {
+            3: { halign: 'right' }, // Revenue
+            6: { halign: 'right' }, // Avg Order
         }
+    });
+
+    // Summary Section
+    const totalRevenue = data.reduce((acc, curr) => acc + (curr.total_revenue || 0), 0);
+    const totalOrders = data.reduce((acc, curr) => acc + (curr.total_orders || 0), 0);
+
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.setTextColor(THEME_COLORS.secondary[0], THEME_COLORS.secondary[1], THEME_COLORS.secondary[2]);
+    doc.text(`Total System Revenue: ${formatCurrency(totalRevenue)}`, 14, finalY);
+    doc.text(`Total System Orders: ${totalOrders.toLocaleString()}`, 14, finalY + 6);
+
+    addFooter(doc);
+    doc.save(`Franchise_Performance_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+};
+
+export const generateEmployeeDirectoryReport = (data: any[]) => {
+    const doc = setupPdfDocument('Employee Performance Directory');
+
+    const tableData = data.map(item => [
+        item.employee_code,
+        item.employee_name,
+        item.role?.replace('_', ' ').toUpperCase(),
+        item.franchise_code,
+        formatCurrency(item.revenue_generated || 0),
+        item.orders_processed || '0'
     ]);
 
-    yPos += 10;
-
-    // Add table
     autoTable(doc, {
-        startY: yPos,
-        head: [['Date', 'Franchise', 'Orders', 'Revenue', 'Avg Order', 'Customers']],
-        body: data.slice(0, 30).map(day => [
-            new Date(day.date).toLocaleDateString('en-IN', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-            }),
-            day.franchise_code,
-            day.total_orders?.toLocaleString() || '0',
-            `₹${(day.total_revenue || 0).toLocaleString()}`,
-            `₹${(day.avg_order_value || 0).toLocaleString()}`,
-            day.unique_customers?.toLocaleString() || '0'
-        ]),
-        headStyles: {
-            fillColor: COLORS.accent,
-            textColor: '#000000',
-            fontStyle: 'bold',
-            fontSize: 9
-        },
-        bodyStyles: {
-            fontSize: 8
-        },
-        alternateRowStyles: {
-            fillColor: COLORS.light
-        },
-        margin: { left: 20, right: 20 }
+        startY: 45,
+        head: [['ID', 'Name', 'Role', 'Franchise', 'Revenue Gen.', 'Orders']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [52, 73, 94] },
     });
 
-    addFooter(doc, 1, 1);
-    doc.save(`daily-summary-${new Date().toISOString().split('T')[0]}.pdf`);
+    addFooter(doc);
+    doc.save(`Employee_Report_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
 };
 
-// ============================================
-// MONTHLY PERFORMANCE REPORT
-// ============================================
+export const generateDailySummaryReport = (data: any[]) => {
+    const doc = setupPdfDocument('Daily Operational Summary');
+
+    const tableData = data.map(item => [
+        format(new Date(item.date), 'dd MMM yyyy'),
+        item.franchise_code || 'All',
+        item.total_orders,
+        formatCurrency(item.total_revenue),
+        item.active_drivers || '-',
+        item.completed_deliveries || '-'
+    ]);
+
+    autoTable(doc, {
+        startY: 45,
+        head: [['Date', 'Franchise', 'Orders', 'Revenue', 'Active Drivers', 'Deliveries']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [46, 204, 113] }, // Green header
+    });
+
+    addFooter(doc);
+    doc.save(`Daily_Summary_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+};
+
 export const generateMonthlyReport = (
     franchiseData: any[],
     employeeData: any[],
     dailyData: any[]
 ) => {
-    const doc = new jsPDF();
+    const doc = setupPdfDocument('Comprehensive Monthly Business Report');
 
-    const currentMonth = new Date().toLocaleDateString('en-IN', {
-        month: 'long',
-        year: 'numeric'
-    });
+    let currentY = 45;
 
-    let yPos = addHeader(
-        doc,
-        'Monthly Performance Report',
-        currentMonth
-    );
-
-    // Executive Summary
-    const totals = franchiseData.reduce((acc, f) => ({
-        orders: acc.orders + (f.orders_last_30_days || 0),
-        revenue: acc.revenue + (f.revenue_last_30_days || 0),
-    }), { orders: 0, revenue: 0 });
-
-    yPos = addSummaryBox(doc, yPos, [
-        {
-            label: 'Monthly Revenue',
-            value: `₹${(totals.revenue / 1000).toFixed(0)}K`,
-            color: '#E8F5E9'
-        },
-        {
-            label: 'Monthly Orders',
-            value: totals.orders.toLocaleString(),
-            color: '#E3F2FD'
-        },
-        {
-            label: 'Active Franchises',
-            value: franchiseData.length.toString(),
-            color: '#FFF3E0'
-        },
-        {
-            label: 'Total Employees',
-            value: employeeData.length.toString(),
-            color: '#FCE4EC'
-        }
-    ]);
-
-    yPos += 15;
-
-    // Franchise Performance Section
+    // 1. Executive Summary
     doc.setFontSize(14);
-    doc.setTextColor(COLORS.primary);
     doc.setFont('helvetica', 'bold');
-    doc.text('Franchise Performance', 20, yPos);
+    doc.text('1. Executive Summary', 14, currentY);
+    currentY += 10;
 
-    yPos += 5;
+    const totalRev = franchiseData.reduce((acc, curr) => acc + (curr.total_revenue || 0), 0);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text([
+        `Total Revenue Generated: ${formatCurrency(totalRev)}`,
+        `Active Franchises: ${franchiseData.length}`,
+        `Total Staff: ${employeeData.length}`
+    ], 14, currentY);
 
-    autoTable(doc, {
-        startY: yPos,
-        head: [['Franchise', 'Orders (30d)', 'Revenue (30d)', 'Growth']],
-        body: franchiseData.map(f => [
-            `${f.franchise_code} - ${f.franchise_name}`,
-            f.orders_last_30_days?.toLocaleString() || '0',
-            `₹${(f.revenue_last_30_days || 0).toLocaleString()}`,
-            `${((f.orders_last_30_days / (f.total_orders || 1)) * 100).toFixed(1)}%`
-        ]),
-        headStyles: {
-            fillColor: COLORS.primary,
-            textColor: '#ffffff',
-            fontStyle: 'bold'
-        },
-        alternateRowStyles: {
-            fillColor: COLORS.light
-        },
-        margin: { left: 20, right: 20 }
-    });
+    currentY += 20;
 
-    // Add new page for trends
-    doc.addPage();
-    yPos = addHeader(doc, 'Daily Trends', 'Last 30 Days');
+    // 2. Franchise Table
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('2. Top Performing Franchises', 14, currentY);
+    currentY += 5;
 
     autoTable(doc, {
-        startY: yPos,
-        head: [['Date', 'Orders', 'Revenue', 'Avg Order']],
-        body: dailyData.slice(0, 30).map(day => [
-            new Date(day.date).toLocaleDateString('en-IN', {
-                day: '2-digit',
-                month: 'short'
-            }),
-            day.total_orders?.toLocaleString() || '0',
-            `₹${(day.total_revenue || 0).toLocaleString()}`,
-            `₹${(day.avg_order_value || 0).toLocaleString()}`
+        startY: currentY,
+        head: [['Franchise', 'Revenue', 'Orders']],
+        body: franchiseData.slice(0, 5).map(f => [
+            f.franchise_name,
+            formatCurrency(f.total_revenue),
+            f.total_orders
         ]),
-        headStyles: {
-            fillColor: COLORS.secondary,
-            textColor: '#ffffff',
-            fontStyle: 'bold'
-        },
-        alternateRowStyles: {
-            fillColor: COLORS.light
-        },
-        margin: { left: 20, right: 20 }
+        theme: 'plain',
+        tableWidth: 'wrap'
     });
 
-    addFooter(doc, 2, 2);
-    doc.save(`monthly-report-${new Date().toISOString().split('T')[0]}.pdf`);
-};
+    currentY = doc.lastAutoTable.finalY + 20;
 
-// ============================================
-// ATTENDANCE REPORT
-// ============================================
-export const generateAttendanceReport = (
-    data: any[],
-    startDate: string,
-    endDate: string,
-    franchiseCode?: string
-) => {
-    const doc = new jsPDF();
+    // 3. Daily Trends (Last 7 Days)
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('3. Last 7 Days Trend', 14, currentY);
+    currentY += 5;
 
-    const title = franchiseCode
-        ? `Attendance Report - ${franchiseCode}`
-        : 'Attendance Report - All Franchises';
-
-    let yPos = addHeader(
-        doc,
-        title,
-        `${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}`
-    );
-
-    // Calculate statistics
-    const stats = data.reduce((acc, record) => {
-        acc.total++;
-        if (record.status === 'present') acc.present++;
-        if (record.status === 'late') acc.late++;
-        if (record.status === 'absent') acc.absent++;
-        return acc;
-    }, { total: 0, present: 0, late: 0, absent: 0 });
-
-    const attendanceRate = stats.total > 0
-        ? ((stats.present + stats.late) / stats.total * 100).toFixed(1)
-        : '0';
-
-    // Add summary
-    yPos = addSummaryBox(doc, yPos, [
-        {
-            label: 'Total Records',
-            value: stats.total.toString(),
-            color: '#E3F2FD'
-        },
-        {
-            label: 'Present',
-            value: stats.present.toString(),
-            color: '#E8F5E9'
-        },
-        {
-            label: 'Late',
-            value: stats.late.toString(),
-            color: '#FFF3E0'
-        },
-        {
-            label: 'Attendance Rate',
-            value: `${attendanceRate}%`,
-            color: '#FCE4EC'
-        }
-    ]);
-
-    yPos += 10;
-
-    // Add table
+    const recentDays = dailyData.slice(0, 7);
     autoTable(doc, {
-        startY: yPos,
-        head: [['Date', 'Employee', 'Code', 'Status', 'Clock In', 'Clock Out', 'Hours']],
-        body: data.map(record => [
-            new Date(record.date).toLocaleDateString('en-IN'),
-            record.employee_name,
-            record.employee_code,
-            record.status.toUpperCase(),
-            record.clock_in ? new Date(record.clock_in).toLocaleTimeString('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit'
-            }) : '-',
-            record.clock_out ? new Date(record.clock_out).toLocaleTimeString('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit'
-            }) : '-',
-            record.total_hours ? `${record.total_hours.toFixed(1)}h` : '-'
+        startY: currentY,
+        head: [['Date', 'Daily Revenue', 'Daily Orders']],
+        body: recentDays.map(d => [
+            format(new Date(d.date), 'dd MMM'),
+            formatCurrency(d.total_revenue),
+            d.total_orders
         ]),
-        headStyles: {
-            fillColor: COLORS.primary,
-            textColor: '#ffffff',
-            fontStyle: 'bold',
-            fontSize: 9
-        },
-        bodyStyles: {
-            fontSize: 8
-        },
-        alternateRowStyles: {
-            fillColor: COLORS.light
-        },
-        columnStyles: {
-            3: {
-                cellWidth: 20,
-                fontStyle: 'bold'
-            }
-        },
-        didParseCell: (data) => {
-            if (data.column.index === 3 && data.section === 'body') {
-                const status = data.cell.raw as string;
-                if (status === 'PRESENT') {
-                    data.cell.styles.textColor = COLORS.success;
-                } else if (status === 'LATE') {
-                    data.cell.styles.textColor = COLORS.warning;
-                } else if (status === 'ABSENT') {
-                    data.cell.styles.textColor = COLORS.danger;
-                }
-            }
-        },
-        margin: { left: 20, right: 20 }
     });
 
-    addFooter(doc, 1, 1);
-    doc.save(`attendance-report-${new Date().toISOString().split('T')[0]}.pdf`);
-};
-
-export default {
-    generateFranchisePerformanceReport,
-    generateEmployeeDirectoryReport,
-    generateDailySummaryReport,
-    generateMonthlyReport,
-    generateAttendanceReport
+    addFooter(doc);
+    doc.save(`Monthly_Report_FULL_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
 };

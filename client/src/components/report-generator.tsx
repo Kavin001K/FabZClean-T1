@@ -8,12 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  FileText, 
-  Download, 
-  Eye, 
-  Calendar, 
-  BarChart3, 
+import {
+  FileText,
+  Download,
+  Eye,
+  Calendar,
+  BarChart3,
   TrendingUp,
   Users,
   ShoppingCart,
@@ -30,7 +30,15 @@ interface ReportTable {
   rows: string[][];
 }
 
-export const ReportGenerator: React.FC = () => {
+interface ReportGeneratorProps {
+  initialData?: {
+    franchises: any[];
+    employees: any[];
+    daily: any[];
+  }
+}
+
+export const ReportGenerator: React.FC<ReportGeneratorProps> = ({ initialData }) => {
   const [reportData, setReportData] = useState<ReportData>({
     title: 'Monthly Business Report',
     subtitle: 'Performance Analysis and Insights',
@@ -62,28 +70,25 @@ export const ReportGenerator: React.FC = () => {
 
   const { toast } = useToast();
 
-  // Simulate fetching data from API
+  // Update data when props change
   useEffect(() => {
-    // In a real app, this would fetch from your analytics API
-    const mockData = {
-      totalOrders: 156,
-      totalRevenue: 23450,
-      totalCustomers: 89,
-      averageOrderValue: 150.32,
-      topServices: [
-        { name: 'Basic Cleaning', count: 45, revenue: 6750 },
-        { name: 'Deep Cleaning', count: 32, revenue: 9600 },
-        { name: 'Window Cleaning', count: 28, revenue: 4200 },
-        { name: 'Carpet Cleaning', count: 25, revenue: 3750 },
-        { name: 'Upholstery Cleaning', count: 26, revenue: 3150 }
-      ]
-    };
+    if (initialData) {
+      // Calculate summary from real data
+      const totalRev = initialData.franchises.reduce((acc, f) => acc + (f.total_revenue || 0), 0);
+      const totalOrd = initialData.franchises.reduce((acc, f) => acc + (f.total_orders || 0), 0);
 
-    setReportData(prev => ({
-      ...prev,
-      summary: mockData
-    }));
-  }, []);
+      setReportData(prev => ({
+        ...prev,
+        summary: {
+          totalOrders: totalOrd,
+          totalRevenue: totalRev,
+          totalCustomers: initialData.franchises.reduce((acc, f) => acc + (f.total_customers || 0), 0),
+          averageOrderValue: totalOrd > 0 ? totalRev / totalOrd : 0,
+          topServices: [] // Service data not passed in initialData for now
+        }
+      }));
+    }
+  }, [initialData]);
 
   const addTable = () => {
     if (!newTable.title.trim()) {
@@ -126,7 +131,7 @@ export const ReportGenerator: React.FC = () => {
 
     const updatedTables = [...reportData.tables];
     updatedTables[tableIndex].rows.push([...newRow]);
-    
+
     setReportData(prev => ({
       ...prev,
       tables: updatedTables
@@ -138,7 +143,7 @@ export const ReportGenerator: React.FC = () => {
   const removeRowFromTable = (tableIndex: number, rowIndex: number) => {
     const updatedTables = [...reportData.tables];
     updatedTables[tableIndex].rows.splice(rowIndex, 1);
-    
+
     setReportData(prev => ({
       ...prev,
       tables: updatedTables
@@ -148,7 +153,7 @@ export const ReportGenerator: React.FC = () => {
   const updateTableHeader = (tableIndex: number, headerIndex: number, value: string) => {
     const updatedTables = [...reportData.tables];
     updatedTables[tableIndex].headers[headerIndex] = value;
-    
+
     setReportData(prev => ({
       ...prev,
       tables: updatedTables
@@ -158,7 +163,7 @@ export const ReportGenerator: React.FC = () => {
   const updateTableCell = (tableIndex: number, rowIndex: number, cellIndex: number, value: string) => {
     const updatedTables = [...reportData.tables];
     updatedTables[tableIndex].rows[rowIndex][cellIndex] = value;
-    
+
     setReportData(prev => ({
       ...prev,
       tables: updatedTables
@@ -217,7 +222,7 @@ export const ReportGenerator: React.FC = () => {
                       onChange={(e) => setReportData({ ...reportData, title: e.target.value })}
                     />
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="subtitle">Subtitle</Label>
                     <Input
@@ -227,7 +232,7 @@ export const ReportGenerator: React.FC = () => {
                       placeholder="Optional subtitle"
                     />
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="reportDate">Report Date</Label>
                     <Input
@@ -248,7 +253,7 @@ export const ReportGenerator: React.FC = () => {
                       onChange={(e) => setReportData({ ...reportData, generatedBy: e.target.value })}
                     />
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="companyName">Company Name</Label>
                     <Input
@@ -260,7 +265,7 @@ export const ReportGenerator: React.FC = () => {
                       })}
                     />
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="companyAddress">Company Address</Label>
                     <Textarea
@@ -273,7 +278,7 @@ export const ReportGenerator: React.FC = () => {
                       rows={3}
                     />
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="footer">Footer Text</Label>
                     <Textarea
@@ -299,7 +304,7 @@ export const ReportGenerator: React.FC = () => {
                     <div className="text-2xl font-bold">{reportData.summary.totalOrders}</div>
                   </CardContent>
                 </Card>
-                
+
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-2">
@@ -309,7 +314,7 @@ export const ReportGenerator: React.FC = () => {
                     <div className="text-2xl font-bold">₹{reportData.summary.totalRevenue.toLocaleString()}</div>
                   </CardContent>
                 </Card>
-                
+
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-2">
@@ -319,7 +324,7 @@ export const ReportGenerator: React.FC = () => {
                     <div className="text-2xl font-bold">{reportData.summary.totalCustomers}</div>
                   </CardContent>
                 </Card>
-                
+
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-2">
@@ -458,7 +463,7 @@ export const ReportGenerator: React.FC = () => {
                           placeholder="Enter table title"
                         />
                       </div>
-                      
+
                       <div>
                         <Label>Number of Columns</Label>
                         <Select
@@ -480,7 +485,7 @@ export const ReportGenerator: React.FC = () => {
                           </SelectContent>
                         </Select>
                       </div>
-                      
+
                       <Button onClick={addTable} className="w-full">
                         <Plus className="h-4 w-4 mr-2" />
                         Add Table
@@ -508,7 +513,7 @@ export const ReportGenerator: React.FC = () => {
                         Generated on {reportData.reportDate} by {reportData.generatedBy}
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="text-center p-4 bg-blue-50 rounded-lg">
                         <div className="text-2xl font-bold text-blue-600">{reportData.summary.totalOrders}</div>
@@ -527,7 +532,7 @@ export const ReportGenerator: React.FC = () => {
                         <div className="text-sm text-gray-600">Avg Order</div>
                       </div>
                     </div>
-                    
+
                     {reportData.tables.length > 0 && (
                       <div className="space-y-4">
                         <h4 className="font-semibold">Tables ({reportData.tables.length})</h4>

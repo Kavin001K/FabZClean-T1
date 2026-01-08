@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { VirtualScroll } from "@/components/ui/virtual-scroll";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -157,6 +158,31 @@ function OrdersComponent() {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
+  // Deep Link Handling for Order Edit
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get('edit');
+
+    if (editId && orders.length > 0) {
+      const targetOrder = orders.find(o => o.orderNumber === editId || o.id === editId);
+
+      if (targetOrder) {
+        setEditingOrder(targetOrder);
+        setIsEditDialogOpen(true);
+
+        toast({
+          title: "Order Found",
+          description: `Opening editor for ${targetOrder.orderNumber}`
+        });
+
+        // Clean up URL
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [orders]);
+
+
   // Filtered and Sorted Orders
   const filteredOrders = useMemo(() => {
     // Pre-compute filter values once
@@ -268,19 +294,41 @@ function OrdersComponent() {
   const updateOrderMutation = useMutation({
     mutationFn: ({ orderId, updates }: { orderId: string; updates: Partial<Order> }) =>
       ordersApi.update(orderId, updates),
+    onMutate: async ({ orderId, updates }) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: ['orders'] });
+
+      // Snapshot the previous value
+      const previousOrders = queryClient.getQueryData<Order[]>(['orders']);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData<Order[]>(['orders'], (old) => {
+        if (!old) return [];
+        return old.map((order) =>
+          order.id === orderId ? { ...order, ...updates } : order
+        );
+      });
+
+      // Close dialog immediately for "zero latency" feel
+      setIsEditDialogOpen(false);
+      setEditingOrder(null);
+
+      // Return a context object with the snapshotted value
+      return { previousOrders };
+    },
     onSuccess: (updatedOrder, { orderId }) => {
       if (updatedOrder) {
-        queryClient.invalidateQueries({ queryKey: ['orders'] });
-        setIsEditDialogOpen(false);
-        setEditingOrder(null);
-
         toast({
           title: "Order Updated",
           description: `Order ${orderId} has been updated successfully`,
         });
       }
     },
-    onError: (error) => {
+    onError: (error, _variables, context) => {
+      // Rollback to the previous value
+      if (context?.previousOrders) {
+        queryClient.setQueryData(['orders'], context.previousOrders);
+      }
       console.error('Failed to update order:', error);
       toast({
         title: "Error",
@@ -288,15 +336,30 @@ function OrdersComponent() {
         variant: "destructive",
       });
     },
+    onSettled: () => {
+      // Always refetch after error or success
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
   });
 
   const updateOrderStatusMutation = useMutation({
     mutationFn: ({ orderId, newStatus }: { orderId: string; newStatus: string }) =>
       ordersApi.update(orderId, { status: newStatus as any }),
+    onMutate: async ({ orderId, newStatus }) => {
+      await queryClient.cancelQueries({ queryKey: ['orders'] });
+      const previousOrders = queryClient.getQueryData<Order[]>(['orders']);
+
+      queryClient.setQueryData<Order[]>(['orders'], (old) => {
+        if (!old) return [];
+        return old.map((order) =>
+          order.id === orderId ? { ...order, status: newStatus as any } : order
+        );
+      });
+
+      return { previousOrders };
+    },
     onSuccess: (updatedOrder, { orderId, newStatus }) => {
       if (updatedOrder) {
-        queryClient.invalidateQueries({ queryKey: ['orders'] });
-
         addNotification({
           type: 'info',
           title: 'Order Status Updated',
@@ -311,13 +374,19 @@ function OrdersComponent() {
         });
       }
     },
-    onError: (error) => {
+    onError: (error, _variables, context) => {
+      if (context?.previousOrders) {
+        queryClient.setQueryData(['orders'], context.previousOrders);
+      }
       console.error('Failed to update order status:', error);
       toast({
         title: "Error",
         description: "Failed to update order status. Please try again.",
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
   });
 
@@ -928,6 +997,92 @@ function OrdersComponent() {
       filters.amountMin ||
       filters.amountMax;
   }, [filters]);
+
+  const renderOrderRow = useCallback((order: Order, index: number) => {
+    return (
+      <div
+        key={order.id}
+        className={cn(
+          "grid grid-cols-[48px_140px_minmax(0,1fr)_120px_140px_120px_100px_120px_120px_80px] gap-4 items-center px-4 h-full border-b hover:bg-muted/50 transition-colors text-sm w-full",
+          selectedOrders.includes(order.id) && "bg-muted"
+        )}
+        onClick={() => handleViewOrder(order)}
+      >
+        <div onClick={(e) => e.stopPropagation()}>
+          <Checkbox checked={selectedOrders.includes(order.id)} onCheckedChange={() => handleSelectOrder(order.id)} />
+        </div>
+        <div className="font-mono font-medium flex items-center gap-2">
+          {order.orderNumber}
+          {((order as any).isExpressOrder) && (
+            <Badge className="bg-orange-500 text-white text-[9px] px-1.5 py-0 h-5">EXPRESS</Badge>
+          )}
+        </div>
+        <div className="truncate font-medium">{order.customerName}</div>
+        <div className="truncate text-muted-foreground">{(order as any).service || 'Dry Cleaning'}</div>
+        <div onClick={(e) => e.stopPropagation()}>
+          <Badge className={cn("border gap-1.5 w-fit", getStatusColor(order.status))}>
+            {getStatusIcon(order.status)} <span className="capitalize">{order.status}</span>
+          </Badge>
+        </div>
+        <div onClick={(e) => e.stopPropagation()}>
+          <Badge className={cn("border w-fit", getPaymentStatusColor((order as any).paymentStatus || 'pending'))}>
+            {(order as any).paymentStatus || 'Pending'}
+          </Badge>
+        </div>
+        <div className="text-right font-semibold">
+          {formatCurrency(parseFloat(order.totalAmount || "0"))}
+        </div>
+        <div className="text-muted-foreground truncate">{formatDate((order.createdAt || new Date()).toString())}</div>
+        <div className="truncate">{(order as any).pickupDate ? formatDate(new Date((order as any).pickupDate).toString()) : 'N/A'}</div>
+        <div onClick={(e) => e.stopPropagation()} className="flex justify-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleViewOrder(order)}>
+                <Eye className="mr-2 h-4 w-4" /> View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleEditOrder(order)}>
+                <Edit className="mr-2 h-4 w-4" /> Edit Order
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handlePrintInvoice(order)}>
+                <Printer className="mr-2 h-4 w-4" /> Print Invoice
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {order.status === 'pending' && <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'processing')}>Mark as Processing</DropdownMenuItem>}
+              {order.paymentStatus !== 'paid' && <DropdownMenuItem onClick={() => handleMarkAsPaid(order.id)}>Mark as Paid</DropdownMenuItem>}
+              {order.status === 'processing' && <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>Mark as Completed</DropdownMenuItem>}
+              {order.status !== 'completed' && order.status !== 'cancelled' && (
+                <DropdownMenuItem onClick={() => handleCancelOrder(order)} className="text-red-600 focus:text-red-600">
+                  <X className="mr-2 h-4 w-4" /> Cancel Order
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    );
+  }, [selectedOrders, getStatusColor, getStatusIcon, getPaymentStatusColor, handleSelectOrder, handleViewOrder, handleEditOrder, handlePrintInvoice, handleUpdateStatus, handleMarkAsPaid, handleCancelOrder]);
+
+  const OrderHeaders = (
+    <div className="grid grid-cols-[48px_140px_minmax(0,1fr)_120px_140px_120px_100px_120px_120px_80px] gap-4 items-center px-4 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase select-none sticky top-0 z-10 w-full">
+      <div><Checkbox checked={filteredOrders.length > 0 && selectedOrders.length === filteredOrders.length} onCheckedChange={handleSelectAll} /></div>
+      <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('orderNumber')}>Order # <ArrowUpDown className="h-3 w-3" /></div>
+      <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('customerName')}>Customer <ArrowUpDown className="h-3 w-3" /></div>
+      <div>Service</div>
+      <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('status')}>Status <ArrowUpDown className="h-3 w-3" /></div>
+      <div>Payment</div>
+      <div className="cursor-pointer hover:text-foreground justify-end flex items-center gap-1" onClick={() => handleSort('totalAmount')}>Amount <ArrowUpDown className="h-3 w-3" /></div>
+      <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('createdAt')}>Date <ArrowUpDown className="h-3 w-3" /></div>
+      <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('pickupDate')}>Due Date <ArrowUpDown className="h-3 w-3" /></div>
+      <div className="text-center">Actions</div>
+    </div>
+  );
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -1546,239 +1701,18 @@ function OrdersComponent() {
                       </div>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/50">
-                            <TableHead className="w-12">
-                              <Checkbox
-                                checked={paginatedOrders.length > 0 && selectedOrders.length === paginatedOrders.length}
-                                onCheckedChange={handleSelectAll}
-                                aria-label="Select all orders on this page"
-                              />
-                            </TableHead>
-                            <TableHead
-                              className="cursor-pointer hover:bg-muted/70 select-none"
-                              onClick={() => handleSort('orderNumber')}
-                            >
-                              <div className="flex items-center gap-2">
-                                Order #
-                                {sortField === 'orderNumber' ? (
-                                  sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                                ) : (
-                                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                                )}
-                              </div>
-                            </TableHead>
-                            <TableHead
-                              className="cursor-pointer hover:bg-muted/70 select-none"
-                              onClick={() => handleSort('customerName')}
-                            >
-                              <div className="flex items-center gap-2">
-                                Customer
-                                {sortField === 'customerName' ? (
-                                  sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                                ) : (
-                                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                                )}
-                              </div>
-                            </TableHead>
-                            <TableHead>Service</TableHead>
-                            <TableHead
-                              className="cursor-pointer hover:bg-muted/70 select-none"
-                              onClick={() => handleSort('status')}
-                            >
-                              <div className="flex items-center gap-2">
-                                Status
-                                {sortField === 'status' ? (
-                                  sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                                ) : (
-                                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                                )}
-                              </div>
-                            </TableHead>
-                            <TableHead>Payment</TableHead>
-                            <TableHead
-                              className="cursor-pointer hover:bg-muted/70 select-none text-right"
-                              onClick={() => handleSort('totalAmount')}
-                            >
-                              <div className="flex items-center justify-end gap-2">
-                                Amount
-                                {sortField === 'totalAmount' ? (
-                                  sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                                ) : (
-                                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                                )}
-                              </div>
-                            </TableHead>
-                            <TableHead
-                              className="cursor-pointer hover:bg-muted/70 select-none"
-                              onClick={() => handleSort('createdAt')}
-                            >
-                              <div className="flex items-center gap-2">
-                                Date
-                                {sortField === 'createdAt' ? (
-                                  sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                                ) : (
-                                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                                )}
-                              </div>
-                            </TableHead>
-                            <TableHead
-                              className="cursor-pointer hover:bg-muted/70 select-none"
-                              onClick={() => handleSort('pickupDate')}
-                            >
-                              <div className="flex items-center gap-2">
-                                Due Date
-                                {sortField === 'pickupDate' ? (
-                                  sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
-                                ) : (
-                                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                                )}
-                              </div>
-                            </TableHead>
-                            <TableHead className="text-center">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          <AnimatePresence mode="popLayout">
-                            {paginatedOrders.map((order, index) => (
-                              <motion.tr
-                                key={order.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                transition={{ duration: 0.15, delay: Math.min(index * 0.02, 0.3) }}
-                                className="hover:bg-muted/50 cursor-pointer transition-colors"
-                                onClick={() => handleViewOrder(order)}
-                              >
-                                <TableCell onClick={(e) => e.stopPropagation()}>
-                                  <Checkbox
-                                    checked={selectedOrders.includes(order.id)}
-                                    onCheckedChange={() => handleSelectOrder(order.id)}
-                                    aria-label={`Select order ${order.orderNumber}`}
-                                  />
-                                </TableCell>
-                                <TableCell className="font-mono font-medium">
-                                  <div className="flex items-center gap-2">
-                                    {order.orderNumber}
-                                    {/* EXPRESS Badge */}
-                                    {((order as any).isExpressOrder || (order as any).is_express_order) && (
-                                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white text-[9px] px-1.5 py-0 flex items-center gap-0.5 h-5">
-                                        <Zap className="h-3 w-3" />
-                                        EXPRESS
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div>
-                                    <div className="font-medium">{order.customerName || (order as any).customers?.name || "N/A"}</div>
-                                    <div className="text-sm text-muted-foreground">
-                                      {order.orderNumber || order.id.substring(0, 8).toUpperCase()}
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-sm">
-                                    {(order as any).service || 'Dry Cleaning'}
-                                  </span>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className={cn("border gap-1.5", getStatusColor(order.status))}>
-                                    {getStatusIcon(order.status)}
-                                    <span className="capitalize">{order.status}</span>
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className={cn("border", getPaymentStatusColor((order as any).paymentStatus || 'pending'))}>
-                                    <span className="capitalize">
-                                      {(order as any).paymentStatus || 'Pending'}
-                                    </span>
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-right font-semibold">
-                                  {formatCurrency((() => {
-                                    const total = parseFloat(order.totalAmount || "0");
-                                    if (total > 0) return total;
-                                    // Fallback calculation
-                                    if (Array.isArray((order as any).items)) {
-                                      return (order as any).items.reduce((sum: number, item: any) => {
-                                        return sum + (parseFloat(item.price || item.unitPrice || 0) * parseFloat(item.quantity || 1));
-                                      }, 0);
-                                    }
-                                    return 0;
-                                  })())}
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">
-                                  {formatDate((order.createdAt || new Date()).toString())}
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                  {(order as any).pickupDate ? formatDate(new Date((order as any).pickupDate).toString()) : 'N/A'}
-                                </TableCell>
-                                <TableCell onClick={(e) => e.stopPropagation()}>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0"
-                                        aria-label={`Actions for order ${order.orderNumber}`}
-                                      >
-                                        <MoreHorizontal className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem onClick={() => handleViewOrder(order)}>
-                                        <Eye className="mr-2 h-4 w-4" />
-                                        View Details
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={() => handleEditOrder(order)}>
-                                        <Edit className="mr-2 h-4 w-4" />
-                                        Edit Order
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={() => handlePrintInvoice(order)}>
-                                        <Printer className="mr-2 h-4 w-4" />
-                                        Print Invoice
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      {order.status === 'pending' && (
-                                        <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'processing')}>
-                                          <Clock className="mr-2 h-4 w-4" />
-                                          Mark as Processing
-                                        </DropdownMenuItem>
-                                      )}
-                                      {order.paymentStatus !== 'paid' && (
-                                        <DropdownMenuItem onClick={() => handleMarkAsPaid(order.id)}>
-                                          <DollarSign className="mr-2 h-4 w-4" />
-                                          Mark as Paid
-                                        </DropdownMenuItem>
-                                      )}
-                                      {order.status === 'processing' && (
-                                        <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>
-                                          <CheckCircle className="mr-2 h-4 w-4" />
-                                          Mark as Completed
-                                        </DropdownMenuItem>
-                                      )}
-                                      {order.status !== 'completed' && order.status !== 'cancelled' && (
-                                        <DropdownMenuItem
-                                          onClick={() => handleCancelOrder(order)}
-                                          className="text-red-600 focus:text-red-600"
-                                        >
-                                          <X className="mr-2 h-4 w-4" />
-                                          Cancel Order
-                                        </DropdownMenuItem>
-                                      )}
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </TableCell>
-                              </motion.tr>
-                            ))}
-                          </AnimatePresence>
-                        </TableBody>
-                      </Table>
+                    <div className="rounded-lg border bg-background overflow-hidden h-[600px] flex flex-col">
+                      {OrderHeaders}
+                      <div className="flex-1">
+                        <VirtualScroll
+                          items={filteredOrders}
+                          itemHeight={60}
+                          containerHeight={600}
+                          renderItem={renderOrderRow}
+                          emptyMessage="No orders found matching your criteria"
+                          className="scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2015,77 +1949,7 @@ function OrdersComponent() {
               )}
 
               {/* Pagination */}
-              {filteredOrders.length > 0 && !isLoading && (
-                <div className="flex items-center justify-between pt-4 border-t">
-                  <div className="flex items-center gap-4">
-                    <p className="text-sm text-muted-foreground">
-                      Showing{' '}
-                      <strong>{((pagination.currentPage - 1) * pagination.pageSize) + 1}</strong>
-                      {' '}-{' '}
-                      <strong>{Math.min(pagination.currentPage * pagination.pageSize, filteredOrders.length)}</strong>
-                      {' '}of{' '}
-                      <strong>{filteredOrders.length}</strong> orders
-                    </p>
-                    <Select
-                      value={pagination.pageSize.toString()}
-                      onValueChange={(value) => setPagination(prev => ({ ...prev, pageSize: parseInt(value), currentPage: 1 }))}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="10">10 per page</SelectItem>
-                        <SelectItem value="25">25 per page</SelectItem>
-                        <SelectItem value="50">50 per page</SelectItem>
-                        <SelectItem value="100">100 per page</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))}
-                      disabled={pagination.currentPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                        let pageNum;
-                        if (pagination.totalPages <= 5) {
-                          pageNum = i + 1;
-                        } else if (pagination.currentPage <= 3) {
-                          pageNum = i + 1;
-                        } else if (pagination.currentPage >= pagination.totalPages - 2) {
-                          pageNum = pagination.totalPages - 4 + i;
-                        } else {
-                          pageNum = pagination.currentPage - 2 + i;
-                        }
-                        return (
-                          <Button
-                            key={pageNum}
-                            variant={pagination.currentPage === pageNum ? 'default' : 'outline'}
-                            size="sm"
-                            className="w-10"
-                            onClick={() => setPagination(prev => ({ ...prev, currentPage: pageNum }))}
-                          >
-                            {pageNum}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))}
-                      disabled={pagination.currentPage >= pagination.totalPages}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              )}
+              {/* Pagination Removed - Virtual Scroll Active */}
             </CardContent>
           </Card>
         </motion.div>

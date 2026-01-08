@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, TrendingUp, Users, DollarSign, Package, Award, Download, FileText } from 'lucide-react';
+import { BarChart3, TrendingUp, Users, DollarSign, Package, Award, Download, FileText, BrainCircuit } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import {
     generateFranchisePerformanceReport,
@@ -12,6 +12,8 @@ import {
     generateDailySummaryReport,
     generateMonthlyReport
 } from '@/lib/pdf-templates';
+import { ReportGenerator } from '@/components/report-generator';
+import { SmartAnalyticsView } from '@/components/smart-analytics-view';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
@@ -109,6 +111,11 @@ export default function ReportsPage() {
                 </div>
             </div>
 
+            {/* Smart Analytics Section (New) */}
+            {!loadingDaily && !loadingFranchise && (
+                <SmartAnalyticsView dailyData={dailySummary} franchiseData={franchisePerformance} />
+            )}
+
             {/* KPI Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
@@ -170,6 +177,10 @@ export default function ReportsPage() {
                     <TabsTrigger value="franchises">Franchise Performance</TabsTrigger>
                     <TabsTrigger value="employees">Employee Performance</TabsTrigger>
                     <TabsTrigger value="trends">Trends</TabsTrigger>
+                    <TabsTrigger value="custom">
+                        <BrainCircuit className="w-4 h-4 mr-2" />
+                        Custom Report
+                    </TabsTrigger>
                 </TabsList>
 
                 {/* Franchise Performance Tab */}
@@ -430,7 +441,18 @@ export default function ReportsPage() {
                         </CardContent>
                     </Card>
                 </TabsContent>
+
+                {/* New Custom Report Generator Tab */}
+                <TabsContent value="custom" className="space-y-4">
+                    <ReportGenerator
+                        initialData={{
+                            franchises: franchisePerformance,
+                            employees: employeePerformance,
+                            daily: dailySummary
+                        }}
+                    />
+                </TabsContent>
             </Tabs>
-        </div>
+        </div >
     );
 }

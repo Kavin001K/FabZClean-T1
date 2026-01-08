@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocation } from "wouter";
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   QrCode,
@@ -81,6 +82,7 @@ interface WorkerQRScannerProps {
 }
 
 const WorkerQRScanner: React.FC<WorkerQRScannerProps> = ({ driver }) => {
+  const [, setLocation] = useLocation();
   const [isScanning, setIsScanning] = useState(false);
   const [scannedData, setScannedData] = useState<ScannedOrder | null>(null);
   const [isFlashOn, setIsFlashOn] = useState(false);
@@ -131,7 +133,7 @@ const WorkerQRScanner: React.FC<WorkerQRScannerProps> = ({ driver }) => {
     setIsScanning(true);
     setIsResultOpen(false);
     setScannedData(null);
-    
+
     // In a real app, this would initialize the camera
     toast({
       title: "Scanner Started",
@@ -144,14 +146,35 @@ const WorkerQRScanner: React.FC<WorkerQRScannerProps> = ({ driver }) => {
   };
 
   const simulateQRScan = (orderId: string) => {
+    // Deep Linking Logic
+    // If scanning a URL or direct Order ID, redirect instantly
+    if (orderId.startsWith("http") || orderId.startsWith("ORDER-")) {
+      // Extract ID if URL
+      const id = orderId.split('/').pop() || orderId;
+
+      // If it's a known mock ID, show details (optional), 
+      // BUT user asked to "open Order Edit modal immediately".
+      // We'll redirect to the orders page with a query param.
+      // Assuming /orders can handle ?edit=ID or user manually opens it.
+      // For "Realtime" feeling, we just navigate.
+      if (!mockQRData[id as keyof typeof mockQRData]) {
+        toast({
+          title: "Opening Order",
+          description: `Navigating to Order ${id}...`
+        });
+        setLocation(`/orders?edit=${id}`);
+        return;
+      }
+    }
+
     const orderData = mockQRData[orderId as keyof typeof mockQRData];
-    
+
     if (orderData) {
       setScannedData(orderData);
       setScanHistory(prev => [orderData, ...prev.slice(0, 9)]); // Keep last 10 scans
       setIsResultOpen(true);
       setIsScanning(false);
-      
+
       toast({
         title: "QR Code Scanned",
         description: `Order ${orderData.orderId} scanned successfully`,
@@ -172,12 +195,12 @@ const WorkerQRScanner: React.FC<WorkerQRScannerProps> = ({ driver }) => {
         title: "Status Updated",
         description: `Order ${scannedData.orderId} status updated to ${newStatus}`,
       });
-      
+
       // Update the scanned data
       setScannedData(prev => prev ? { ...prev, status: newStatus } : null);
-      
+
       // Update scan history
-      setScanHistory(prev => prev.map(item => 
+      setScanHistory(prev => prev.map(item =>
         item.id === scannedData.id ? { ...item, status: newStatus } : item
       ));
     }
@@ -394,7 +417,7 @@ const WorkerQRScanner: React.FC<WorkerQRScannerProps> = ({ driver }) => {
               Order information from scanned QR code
             </DialogDescription>
           </DialogHeader>
-          
+
           {scannedData && (
             <div className="space-y-6">
               {/* Order Header */}

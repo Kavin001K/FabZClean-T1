@@ -40,6 +40,18 @@ export function formatCurrencyWithSettings(
 }
 
 /**
+ * Round invoice amount based on settings
+ */
+export function roundInvoiceAmount(
+  amount: number,
+  strategy: 'none' | 'nearest_1' | 'nearest_5' = 'nearest_1'
+): number {
+  if (strategy === 'none') return amount;
+  if (strategy === 'nearest_5') return Math.round(amount / 5) * 5;
+  return Math.round(amount);
+}
+
+/**
  * Format date based on settings
  */
 export function formatDateWithSettings(
@@ -197,10 +209,10 @@ export function getThemeCSSVariables(primaryColor: string): Record<string, strin
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result
       ? {
-          r: parseInt(result[1], 16),
-          g: parseInt(result[2], 16),
-          b: parseInt(result[3], 16),
-        }
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16),
+      }
       : { r: 59, g: 130, b: 246 }; // default blue
   };
 

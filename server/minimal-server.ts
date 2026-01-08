@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import express from "express";
 import cors from "cors";
+import compression from "compression";
+import helmet from "helmet";
 import { createServer } from "http";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./db-utils";
@@ -9,11 +11,19 @@ import { registerAllRoutes } from "./routes/index";
 import { db as storage } from "./db";
 import { realtimeServer } from "./websocket-server";
 import { performanceMiddleware, getPerformanceStats } from "./performance-optimizer";
+import { connectToMongo } from "./mongo-db";
 
 const app = express();
 
 // Enable CORS
 app.use(cors(corsOptions));
+
+// Security & Optimization
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+app.use(compression());
 
 // Performance monitoring middleware
 app.use(performanceMiddleware());
@@ -88,6 +98,15 @@ app.get('/api/performance', (req, res) => {
     // Don't exit - allow app to start even if DB init fails
     log("⚠️  Continuing without database initialization...");
   }
+
+  // Initialize MongoDB (Non-blocking, optional)
+  connectToMongo().then((connected) => {
+    if (connected) {
+      log("✅ MongoDB ready for flexible logging");
+    } else {
+      log("⚠️  MongoDB unavailable - using SQL-only mode");
+    }
+  });
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
