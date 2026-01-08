@@ -59,12 +59,13 @@ export const queryClient = new QueryClient({
       retry: (failureCount, error) => {
         // Retry on network errors but not on 4xx client errors
         if (error instanceof Error) {
+          const msg = error.message || '';
           // Don't retry on auth errors (401, 403)
-          if (error.message.startsWith('401') || error.message.startsWith('403')) {
+          if (msg.startsWith('401') || msg.startsWith('403')) {
             return false;
           }
           // Don't retry on client errors (4xx)
-          if (error.message.match(/^4\d\d/)) {
+          if (msg.match(/^4\d\d/)) {
             return false;
           }
         }

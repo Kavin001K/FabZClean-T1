@@ -29,7 +29,10 @@ export interface IStorage {
   listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]>;
   updateAttendance(id: string, data: any): Promise<any>;
 
-  // Order methods
+  // Employee methods
+  getEmployee(id: string): Promise<any | undefined>;
+  getEmployeeByEmail(email: string): Promise<any | undefined>;
+
   // Order methods
   listOrders(): Promise<any[]>;
   getActiveOrders(): Promise<any[]>;
@@ -71,6 +74,10 @@ export class MemStorage implements IStorage {
   async createAttendance(data: any): Promise<any> { return null; }
   async listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]> { return []; }
   async updateAttendance(id: string, data: any): Promise<any> { return null; }
+
+  // Employee methods
+  async getEmployee(id: string): Promise<any | undefined> { return this.sqliteStorage.getEmployee(id); }
+  async getEmployeeByEmail(email: string): Promise<any | undefined> { return this.sqliteStorage.getEmployeeByEmail(email); }
 
   // Transit methods
   async createTransitOrder(data: any): Promise<any> { return null; }

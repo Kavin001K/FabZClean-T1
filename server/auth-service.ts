@@ -852,33 +852,53 @@ export class AuthService {
 
     /**
      * Get employee by ID
-     * Checks local storage first, then Supabase as fallback
+     * Checks local storage first (UUID then Email/EmpID), then Supabase as fallback
      */
     static async getEmployee(employeeId: string): Promise<AuthEmployee | null> {
         // 1. Try LOCAL storage FIRST (for local development with SQLite)
         try {
-            // Use getEmployeeByEmail as it searches by both email AND employeeId field
-            const localEmployee = await storage.getEmployeeByEmail(employeeId) as any;
+            // A: Try finding by UUID (id) first - generic for updates/fetches by ID
+            let localEmployee = await storage.getEmployee(employeeId) as any;
+
+            // B: If not found, try by Email/EmployeeID String (for login/lookup by code)
+            if (!localEmployee) {
+                localEmployee = await storage.getEmployeeByEmail(employeeId) as any;
+            }
+
             if (localEmployee && (localEmployee.status === 'active' || localEmployee.status === null || localEmployee.status === undefined)) {
                 let normalizedRole = localEmployee.role;
                 if (normalizedRole === 'manager') normalizedRole = 'franchise_manager';
 
-                console.log(`✅ [Auth] Employee fetched from local storage: ${employeeId}`);
+                console.log(`✅ [Auth] Employee fetched from local storage: ${localEmployee.id} (${localEmployee.name})`);
                 return {
                     id: localEmployee.id,
-                    employeeId: localEmployee.employee_id || localEmployee.employeeId,
-                    username: localEmployee.employee_id || localEmployee.employeeId,
+                    employeeId: localEmployee.employeeId || localEmployee.employee_id || localEmployee.email, // Ensure fallback
+                    username: localEmployee.employeeId || localEmployee.employee_id || localEmployee.email || localEmployee.name,
                     role: normalizedRole as any,
-                    franchiseId: localEmployee.franchise_id || localEmployee.franchiseId,
-                    factoryId: localEmployee.factory_id || localEmployee.factoryId,
-                    fullName: `${localEmployee.first_name || localEmployee.firstName || ''} ${localEmployee.last_name || localEmployee.lastName || ''}`.trim() || localEmployee.fullName,
+                    franchiseId: localEmployee.franchiseId || localEmployee.franchise_id,
+                    factoryId: localEmployee.factoryId || localEmployee.factory_id,
+                    fullName: `${localEmployee.firstName || localEmployee.first_name || ''} ${localEmployee.lastName || localEmployee.last_name || ''}`.trim() || localEmployee.name || localEmployee.fullName,
                     email: localEmployee.email,
                     phone: localEmployee.phone,
                     isActive: localEmployee.status === 'active' || localEmployee.status === null || localEmployee.status === undefined,
+                    position: localEmployee.position,
+                    department: localEmployee.department,
+                    hireDate: localEmployee.hireDate ? new Date(localEmployee.hireDate) : undefined,
+                    baseSalary: localEmployee.baseSalary ? parseFloat(localEmployee.baseSalary) : (localEmployee.salary ? parseFloat(localEmployee.salary) : 0),
+                    hourlyRate: localEmployee.hourlyRate ? parseFloat(localEmployee.hourlyRate) : undefined,
+                    status: localEmployee.status,
+                    // return other fields needed for edit form
+                    address: localEmployee.address,
+                    emergencyContact: localEmployee.emergencyContact,
+                    qualifications: localEmployee.qualifications,
+                    notes: localEmployee.notes,
+                    salaryType: localEmployee.salaryType,
+                    workingHours: localEmployee.workingHours
                 };
             }
         } catch (e) {
             console.log(`⚠️ [Auth] Local storage check failed for ${employeeId}, trying Supabase...`);
+            // console.error(e); // Optional debugging
         }
 
         // 2. Try Supabase 'employees' table (for production)
@@ -886,30 +906,41 @@ export class AuthService {
             const { data: emp, error } = await supabase
                 .from('employees')
                 .select('*')
-                .eq('employee_id', employeeId)
+                .eq('id', employeeId) // Try UUID match first
                 .single();
 
-            if (!error && emp) {
-                let normalizedRole = emp.role;
-                if (emp.role === 'manager') normalizedRole = 'franchise_manager';
+            // If not found by UUID, try employee_id
+            let targetEmp = emp;
+            if (error || !emp) {
+                const { data: empByCode, error: error2 } = await supabase
+                    .from('employees')
+                    .select('*')
+                    .eq('employee_id', employeeId)
+                    .single();
+                targetEmp = empByCode;
+            }
 
-                console.log(`✅ [Auth] Employee fetched from Supabase: ${employeeId}`);
+            if (targetEmp) {
+                let normalizedRole = targetEmp.role;
+                if (targetEmp.role === 'manager') normalizedRole = 'franchise_manager';
+
+                console.log(`✅ [Auth] Employee fetched from Supabase: ${targetEmp.id}`);
                 return {
-                    id: emp.id,
-                    employeeId: emp.employee_id,
-                    username: emp.employee_id,
+                    id: targetEmp.id,
+                    employeeId: targetEmp.employee_id,
+                    username: targetEmp.employee_id,
                     role: normalizedRole as any,
-                    franchiseId: emp.franchise_id,
-                    factoryId: emp.factory_id,
-                    fullName: `${emp.first_name} ${emp.last_name}`,
-                    email: emp.email,
-                    phone: emp.phone,
-                    isActive: emp.status === 'active',
-                    position: emp.position,
-                    department: emp.department,
-                    hireDate: emp.hire_date ? new Date(emp.hire_date) : undefined,
-                    baseSalary: emp.salary ? parseFloat(emp.salary) : 0,
-                    address: emp.address ? JSON.stringify(emp.address) : undefined,
+                    franchiseId: targetEmp.franchise_id,
+                    factoryId: targetEmp.factory_id,
+                    fullName: `${targetEmp.first_name} ${targetEmp.last_name}`,
+                    email: targetEmp.email,
+                    phone: targetEmp.phone,
+                    isActive: targetEmp.status === 'active',
+                    position: targetEmp.position,
+                    department: targetEmp.department,
+                    hireDate: targetEmp.hire_date ? new Date(targetEmp.hire_date) : undefined,
+                    baseSalary: targetEmp.salary ? parseFloat(targetEmp.salary) : 0,
+                    address: targetEmp.address ? (typeof targetEmp.address === 'string' ? targetEmp.address : JSON.stringify(targetEmp.address)) : undefined,
                 };
             }
         } catch (e) {

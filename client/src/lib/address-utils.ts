@@ -87,7 +87,7 @@ export function parseAddress(address: unknown): AddressParts {
         const trimmed = address.trim();
 
         // Check if it's JSON
-        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        if (trimmed && (trimmed.startsWith('{') || trimmed.startsWith('['))) {
             try {
                 const parsed = JSON.parse(trimmed);
 
