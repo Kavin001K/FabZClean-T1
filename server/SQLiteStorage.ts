@@ -1291,53 +1291,21 @@ export class SQLiteStorage implements IStorage {
       }
     }
 
-    // Get employee letter code (A-Z) - use stored orderLetter for consistent isolation
-    let employeeCode = 'X'; // Default for unknown employee
-    if (employeeId) {
-      try {
-        const employee = this.db.prepare(
-          'SELECT id, employeeId, name, fullName, orderLetter FROM employees WHERE id = ? OR employeeId = ?'
-        ).get(employeeId, employeeId) as any;
+    // Generate the base pattern for this year: PREFIX + YEAR + FRANCHISE
+    // Format: FZC26POL (without employee letter for cleaner numbers)
+    const basePattern = `${prefix}${yearStr}${franchiseCode}`;
 
-        if (employee) {
-          // Use the stored orderLetter (auto-assigned unique per franchise)
-          if (employee.orderLetter) {
-            employeeCode = employee.orderLetter.toUpperCase();
-          } else {
-            // Fallback: use first letter of name
-            const name = employee.fullName || employee.name || employee.employeeId || '';
-            employeeCode = name.charAt(0).toUpperCase() || 'X';
-
-            // If still no valid letter, use a hash-based letter
-            if (!/[A-Z]/.test(employeeCode)) {
-              const hash = (employee.id || employee.employeeId || '').split('')
-                .reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-              employeeCode = String.fromCharCode(65 + (hash % 26)); // A-Z
-            }
-          }
-        }
-      } catch (err) {
-        // Use default
-      }
-    }
-
-    // Generate the base pattern to search for today's orders
-    // Pattern: PREFIX + YEAR + FRANCHISE + EMPLOYEE (first part of order number)
-    const basePattern = `${prefix}${yearStr}${franchiseCode}${employeeCode}`;
-
-    // Count existing orders with this pattern today
-    const todayStart = now.toISOString().slice(0, 10); // YYYY-MM-DD
-
+    // Count existing orders with this pattern for the entire year
+    const yearStart = `${now.getFullYear()}-01-01`;
     const existingOrders = this.db.prepare(`
       SELECT COUNT(*) as count FROM orders
       WHERE orderNumber LIKE ?
-      AND DATE(createdAt) = DATE(?)
-    `).get(`${basePattern}%`, todayStart) as any;
+    `).get(`${basePattern}%`) as any;
 
     const sequenceNumber = (existingOrders?.count || 0) + 1;
     const paddedSequence = String(sequenceNumber).padStart(4, '0');
 
-    // Final format: FZC26POLA0001
+    // Final format: FZC26POL0001
     return `${basePattern}${paddedSequence}`;
   }
 

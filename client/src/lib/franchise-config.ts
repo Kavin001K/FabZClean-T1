@@ -281,19 +281,15 @@ export async function generateOrderNumber(franchiseId?: string | null, storage?:
 
 /**
  * Synchronous version for cases where async is not possible
- * Uses timestamp-based fallback
+ * Format: FZC26POL0001 (Prefix + 2-digit Year + Franchise Code + 4-digit Sequence)
+ * 
+ * NOTE: The server generates the actual order number - this is just a placeholder.
+ * Pass empty orderNumber to let the server generate the correct sequential number.
  */
 export function generateOrderNumberSync(franchiseId?: string | null): string {
-    const franchise = getFranchiseById(franchiseId);
-    const branchCode = franchise.branchCode;
-    const currentYear = new Date().getFullYear();
-
-    // Use timestamp for uniqueness
-    const timestamp = Date.now();
-    const sequence = (timestamp % 9999) + 1;
-    const paddedSequence = String(sequence).padStart(4, '0');
-
-    return `FZC-${currentYear}${branchCode}${paddedSequence}A`;
+    // Return empty string to let server generate the proper sequential order number
+    // The server's getNextOrderNumber() function handles proper sequencing
+    return '';
 }
 
 /**
