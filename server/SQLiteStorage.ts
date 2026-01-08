@@ -1373,9 +1373,15 @@ export class SQLiteStorage implements IStorage {
       query += ' AND employeeId = ?';
       queryParams.push(params.employeeId);
     }
+    if (params.franchiseId) {
+      // Filter by franchise if provided
+      query += ' AND franchiseId = ?';
+      queryParams.push(params.franchiseId);
+    }
     if (params.action) {
-      query += ' AND action = ?';
-      queryParams.push(params.action);
+      // Support partial matching for action categories (e.g., 'order' matches 'create_order', 'update_order')
+      query += ' AND action LIKE ?';
+      queryParams.push(`%${params.action}%`);
     }
     if (params.entityType) {
       query += ' AND entityType = ?';
@@ -1398,9 +1404,10 @@ export class SQLiteStorage implements IStorage {
     const sortOrder = params.sortOrder === 'asc' ? 'ASC' : 'DESC';
     query += ` ORDER BY ${sortBy} ${sortOrder}`;
 
-    // Pagination
+    // Pagination - calculate offset from page number
     const limit = params.limit || 20;
-    const offset = params.offset || 0;
+    const page = params.page || 1;
+    const offset = (page - 1) * limit;
     query += ' LIMIT ? OFFSET ?';
     queryParams.push(limit, offset);
 
@@ -1408,8 +1415,8 @@ export class SQLiteStorage implements IStorage {
 
     const data = rows.map(row => ({
       ...row,
-      createdAt: new Date(row.createdAt),
-      details: row.details ? JSON.parse(row.details) : null
+      createdAt: row.createdAt,
+      details: row.details ? this.safeJsonParse(row.details) : null
     }));
 
     return {

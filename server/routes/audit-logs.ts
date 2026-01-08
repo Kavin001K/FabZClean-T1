@@ -12,7 +12,7 @@ const router = Router();
 
 const AUDIT_VIEW_ROLES: UserRole[] = ["admin", "franchise_manager"];
 
-// Get audit logs with pagination and filtering
+// Get audit logs with pagination, filtering, and role-based isolation
 router.get('/', jwtRequired, requireRole(AUDIT_VIEW_ROLES), async (req, res) => {
     try {
         const {
@@ -22,17 +22,36 @@ router.get('/', jwtRequired, requireRole(AUDIT_VIEW_ROLES), async (req, res) => 
             action,
             startDate,
             endDate,
-            entityType
+            entityType,
+            franchiseId
         } = req.query;
 
         const pageNum = parseInt(page as string) || 1;
         const limitNum = parseInt(limit as string) || 20;
         const offset = (pageNum - 1) * limitNum;
 
+        // Apply role-based filtering
+        let actualFranchiseId = franchiseId as string | undefined;
+        let actualEmployeeId = employeeId as string | undefined;
+
+        // Get requesting user's role and franchise from JWT
+        const requestingUser = (req as any).user;
+        if (requestingUser && requestingUser.role !== 'admin') {
+            // Franchise managers can only see their franchise's logs
+            if (requestingUser.role === 'franchise_manager' && requestingUser.franchiseId) {
+                actualFranchiseId = requestingUser.franchiseId;
+            }
+            // Other roles can only see their own logs
+            else if (requestingUser.role !== 'franchise_manager') {
+                actualEmployeeId = requestingUser.employeeId;
+            }
+        }
+
         const { data, count } = await storage.getAuditLogs({
             page: pageNum,
             limit: limitNum,
-            employeeId,
+            employeeId: actualEmployeeId,
+            franchiseId: actualFranchiseId,
             action,
             startDate,
             endDate,
