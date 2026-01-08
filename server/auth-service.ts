@@ -413,73 +413,88 @@ export class AuthService {
         }
 
         // 2. Fall back to Supabase
-        // Get franchise code from franchiseId (e.g., 'franchise-pollachi' -> '01')
-        let franchiseNum = '01';
-        if (data.franchiseId) {
-            // Count franchises or extract from ID
-            const { data: franchises } = await supabase
-                .from('franchises')
-                .select('id')
-                .order('created_at', { ascending: true });
-            if (franchises) {
-                const idx = franchises.findIndex(f => f.id === data.franchiseId);
-                franchiseNum = String(idx + 1).padStart(2, '0');
+        try {
+            // Check if supabase client is valid
+            // @ts-ignore
+            if (!supabase || !supabase.supabaseUrl) {
+                // If local storage failed and Supabase is not configured, we can't do anything
+                throw new Error("Local storage failed and Supabase is not configured.");
             }
+
+            // Get franchise code from franchiseId (e.g., 'franchise-pollachi' -> '01')
+            let franchiseNum = '01';
+            if (data.franchiseId) {
+                // Count franchises or extract from ID
+                const { data: franchises } = await supabase
+                    .from('franchises')
+                    .select('id')
+                    .order('created_at', { ascending: true });
+                if (franchises) {
+                    const idx = franchises.findIndex(f => f.id === data.franchiseId);
+                    franchiseNum = String(idx + 1).padStart(2, '0');
+                }
+            }
+
+            // Count existing employees with same role in same franchise for sequence
+            const { count } = await supabase
+                .from('employees')
+                .select('*', { count: 'exact', head: true })
+                .eq('role', data.role)
+                .eq('franchise_id', data.franchiseId || '');
+
+            const sequenceNum = String((count || 0) + 1).padStart(2, '0');
+            const generatedEmployeeId = `FZC${franchiseNum}${roleCode}${sequenceNum}`;
+
+            // Insert employee
+            const { data: emp, error } = await supabase
+                .from('employees')
+                .insert({
+                    employee_id: generatedEmployeeId,
+                    first_name: firstName,
+                    last_name: lastName,
+                    email: data.email,
+                    phone: data.phone,
+                    password: passwordHash,
+                    role: data.role,
+                    franchise_id: data.franchiseId || null,
+                    status: 'active',
+                    position: data.position || 'Staff',
+                    department: data.department || 'Operations',
+                    hire_date: data.hireDate ? data.hireDate.toISOString() : new Date().toISOString(),
+                    salary: data.baseSalary || 0,
+                })
+                .select()
+                .single();
+
+            if (error || !emp) {
+                console.error("❌ Create Employee DB Error:", error);
+                throw new Error(`Failed to create employee: ${error?.message}`);
+            }
+
+            // Log creation
+            await this.logAction(createdByEmployeeId, createdByEmployeeId, 'create_employee', 'employee', emp.employee_id, {
+                username: emp.employee_id,
+                role: emp.role
+            });
+
+            return {
+                id: emp.id,
+                employeeId: emp.employee_id,
+                username: emp.employee_id,
+                role: emp.role as any,
+                franchiseId: emp.franchise_id,
+                factoryId: emp.factory_id,
+                fullName: `${emp.first_name} ${emp.last_name}`,
+                email: emp.email,
+                phone: emp.phone,
+                isActive: emp.status === 'active',
+            };
+        } catch (supabaseError: any) {
+            console.error("❌ Supabase/Fallback create failed:", supabaseError);
+            throw new Error(supabaseError.message || "Failed to create employee in both Local and Cloud storage");
         }
 
-        // Count existing employees with same role in same franchise for sequence
-        const { count } = await supabase
-            .from('employees')
-            .select('*', { count: 'exact', head: true })
-            .eq('role', data.role)
-            .eq('franchise_id', data.franchiseId || '');
 
-        const sequenceNum = String((count || 0) + 1).padStart(2, '0');
-        const generatedEmployeeId = `FZC${franchiseNum}${roleCode}${sequenceNum}`;
-
-        // Insert employee
-        const { data: emp, error } = await supabase
-            .from('employees')
-            .insert({
-                employee_id: generatedEmployeeId,
-                first_name: firstName,
-                last_name: lastName,
-                email: data.email,
-                phone: data.phone,
-                password: passwordHash,
-                role: data.role,
-                franchise_id: data.franchiseId || null,
-                status: 'active',
-                position: data.position || 'Staff',
-                department: data.department || 'Operations',
-                hire_date: data.hireDate ? data.hireDate.toISOString() : new Date().toISOString(),
-                salary: data.baseSalary || 0,
-            })
-            .select()
-            .single();
-
-        if (error || !emp) {
-            console.error("❌ Create Employee DB Error:", error);
-            throw new Error(`Failed to create employee: ${error?.message}`);
-        }
-
-        // Log creation
-        await this.logAction(createdByEmployeeId, createdByEmployeeId, 'create_employee', 'employee', emp.employee_id, {
-            username: emp.employee_id,
-            role: emp.role
-        });
-
-        return {
-            id: emp.id,
-            employeeId: emp.employee_id,
-            username: emp.employee_id,
-            role: emp.role as any,
-            franchiseId: emp.franchise_id,
-            fullName: `${emp.first_name} ${emp.last_name}`,
-            email: emp.email,
-            phone: emp.phone,
-            isActive: emp.status === 'active',
-        };
     }
 
     /**
