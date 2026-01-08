@@ -145,6 +145,7 @@ export async function sendOrderCreatedNotification({
 
     const template = TEMPLATES.order;
     const cleanPhone = cleanPhoneNumber(phoneNumber);
+    const cleanOrderNumber = orderNumber.replace(/[#]/g, '').trim();
 
     // Template "v" expects amount parameter
     const payload = {
@@ -164,10 +165,43 @@ export async function sendOrderCreatedNotification({
                     {
                         to: [cleanPhone],
                         components: {
-                            // MSG91 format: uses "value" field
+                            // Header: Document (Required by template 'v')
+                            header_1: {
+                                type: "document",
+                                value: pdfUrl || process.env.DEFAULT_INVOICE_URL || "https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/pdfs/bill-1766141946654-106714533.pdf",
+                                filename: "Order-Confirmation.pdf",
+                            },
+                            // Body 1: Customer Name
                             body_1: {
                                 type: "text",
-                                value: amount, // Amount like "Rs.123"
+                                value: customerName,
+                            },
+                            // Body 2: Item/Description (e.g. "Laundry Order")
+                            body_2: {
+                                type: "text",
+                                value: "Laundry Order",
+                            },
+                            // Body 3: Order Number
+                            body_3: {
+                                type: "text",
+                                value: orderNumber,
+                            },
+                            // Body 4: Amount
+                            body_4: {
+                                type: "text",
+                                value: amount,
+                            },
+                            // Button 1: Track Order - dynamic URL suffix
+                            button_1: {
+                                subtype: "url",
+                                type: "text",
+                                value: `https://myfabclean.com/trackorder/${cleanOrderNumber}`,
+                            },
+                            // Button 2: Terms & Conditions - dynamic URL suffix
+                            button_2: {
+                                subtype: "url",
+                                type: "text",
+                                value: "https://myfabclean.com/terms",
                             },
                         },
                     },
@@ -754,11 +788,47 @@ export async function sendInvoiceWhatsApp({
             },
         };
     } else {
-        // "order" template (v): Simple amount-only body, no header/buttons
+        // "order" template (v): The user has indicated this is a full Invoice template
+        // Includes: Document Header, 4 Body Params, 2 URL Buttons
+        // Mapping as per successful test:
+        // {{1}} = Customer Name
+        // {{2}} = Item Name
+        // {{3}} = Order Number
+        // {{4}} = Amount
         components = {
+            // Header: Document format (PDF)
+            header_1: {
+                type: "document",
+                value: pdfUrl,
+                filename: filename,
+            },
             body_1: {
                 type: "text",
-                value: amount, // Amount like "Rs.123"
+                value: customerName,
+            },
+            body_2: {
+                type: "text",
+                value: itemName || "Laundry Services",
+            },
+            body_3: {
+                type: "text",
+                value: invoiceNumber,
+            },
+            body_4: {
+                type: "text",
+                value: amount,
+            },
+            // Button 1: Track Order - Full URL
+            button_1: {
+                subtype: "url",
+                type: "text",
+                value: `https://myfabclean.com/trackorder/${cleanOrderNumber}`,
+            },
+            // Button 2: Terms & Conditions - Full URL
+            button_2: {
+                subtype: "url",
+                type: "text",
+                value: "https://myfabclean.com/terms",
             },
         };
     }
