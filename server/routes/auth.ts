@@ -87,14 +87,14 @@ router.post('/change-password', authMiddleware, auditMiddleware('change_password
  */
 router.put('/update-profile', authMiddleware, auditMiddleware('update_profile'), async (req: Request, res: Response) => {
   try {
-    const { fullName, email, phone, address } = req.body;
+    const { fullName, email, phone, address, profileImage } = req.body;
 
-    console.log('[Auth] Update profile for:', req.employee?.employeeId, { fullName, email, phone });
+    console.log('[Auth] Update profile for:', req.employee?.employeeId, { fullName, email, phone, hasImage: !!profileImage });
 
     // Update the current user's own profile
     const updatedEmployee = await AuthService.updateEmployee(
       req.employee!.id!,
-      { fullName, email, phone, address },
+      { fullName, email, phone, address, profileImage },
       req.employee!.employeeId
     );
 
@@ -109,5 +109,51 @@ router.put('/update-profile', authMiddleware, auditMiddleware('update_profile'),
   }
 });
 
-export default router;
+/**
+ * POST /api/auth/upload-profile-image
+ * Upload profile image (base64)
+ */
+router.post('/upload-profile-image', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { imageData } = req.body;
 
+    if (!imageData) {
+      return res.status(400).json({ error: 'Image data is required' });
+    }
+
+    // Validate image data format (should be base64 or data URL)
+    if (!imageData.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Invalid image format. Please provide a valid image.' });
+    }
+
+    // Check image size (max 500KB after base64 encoding)
+    const sizeInBytes = Buffer.from(imageData.split(',')[1] || '', 'base64').length;
+    if (sizeInBytes > 500 * 1024) {
+      return res.status(400).json({ error: 'Image too large. Maximum size is 500KB.' });
+    }
+
+    console.log(`[Auth] Uploading profile image for ${req.employee?.employeeId}, size: ${Math.round(sizeInBytes / 1024)}KB`);
+
+    // Update employee with profile image
+    const updatedEmployee = await AuthService.updateEmployee(
+      req.employee!.id!,
+      { profileImage: imageData },
+      req.employee!.employeeId
+    );
+
+    if (!updatedEmployee) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Profile image uploaded successfully',
+      profileImage: imageData
+    });
+  } catch (error: any) {
+    console.error('[Auth] Upload profile image error:', error);
+    res.status(500).json({ error: error.message || 'Failed to upload profile image' });
+  }
+});
+
+export default router;

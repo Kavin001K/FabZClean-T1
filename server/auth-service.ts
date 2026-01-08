@@ -686,7 +686,40 @@ export class AuthService {
      * Change password (user changes their own password)
      */
     static async changePassword(employeeId: string, currentPassword: string, newPassword: string): Promise<void> {
-        // 1. Get employee
+        // 1. Try LOCAL storage first
+        try {
+            // Get employee from local storage
+            const employees = await storage.listEmployees();
+            const localEmp = employees.find((e: any) =>
+                e.employeeId === employeeId ||
+                e.employee_id === employeeId ||
+                e.email === employeeId ||
+                e.username === employeeId
+            );
+
+            if (localEmp && localEmp.password) {
+                // Verify current password
+                const isValid = await bcrypt.compare(currentPassword, localEmp.password);
+                if (!isValid) {
+                    throw new Error('Invalid current password');
+                }
+
+                // Hash new password and update
+                const hash = await bcrypt.hash(newPassword, 10);
+                await storage.updateEmployee(localEmp.id, { password: hash });
+
+                console.log(`✅ [Auth] Password changed for ${employeeId} (local storage)`);
+                await this.logAction(localEmp.id, employeeId, 'change_password', 'employee', employeeId, {}, undefined, undefined, localEmp.franchiseId);
+                return;
+            }
+        } catch (localError: any) {
+            if (localError.message === 'Invalid current password') {
+                throw localError; // Re-throw auth errors
+            }
+            console.log('⚠️ [Auth] Local password change failed, trying Supabase...', localError.message);
+        }
+
+        // 2. Fallback to Supabase
         const { data: emp, error } = await supabase
             .from('employees')
             .select('*')
@@ -695,15 +728,15 @@ export class AuthService {
 
         if (error || !emp) throw new Error('Employee not found');
 
-        // 2. Verify current
+        // Verify current password
         const isValid = await bcrypt.compare(currentPassword, emp.password);
         if (!isValid) throw new Error('Invalid current password');
 
-        // 3. Update
+        // Update password
         const hash = await bcrypt.hash(newPassword, 10);
         const { error: upError } = await supabase
             .from('employees')
-            .update({ password: hash }) // Column is 'password'
+            .update({ password: hash })
             .eq('employee_id', employeeId);
 
         if (upError) throw new Error('Failed to update password');

@@ -736,6 +736,7 @@ export class SQLiteStorage implements IStorage {
           { name: 'bankName', type: 'TEXT' },
           { name: 'panNumber', type: 'TEXT' },
           { name: 'aadharNumber', type: 'TEXT' },
+          { name: 'profileImage', type: 'TEXT' }, // Base64 or URL for profile photo
         ];
 
         for (const col of employeeColumns) {

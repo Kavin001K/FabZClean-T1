@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,14 +8,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { User, Mail, Phone, MapPin, Lock, Shield, Calendar, LogOut } from 'lucide-react';
+import { User, Mail, Phone, Lock, Shield, LogOut, Camera, Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 
 export default function ProfilePage() {
-    const { employee, signOut } = useAuth();
+    const { employee, signOut, refreshEmployee } = useAuth();
     const { toast } = useToast();
     const [, setLocation] = useLocation();
     const [isEditing, setIsEditing] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const [isChangingPassword, setIsChangingPassword] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     const [formData, setFormData] = useState({
         fullName: employee?.fullName || '',
         email: employee?.email || '',
@@ -65,6 +69,11 @@ export default function ProfilePage() {
                 description: 'Your profile has been updated successfully.',
             });
             setIsEditing(false);
+
+            // Refresh employee data
+            if (refreshEmployee) {
+                await refreshEmployee();
+            }
         } catch (error: any) {
             toast({
                 title: 'Error',
@@ -74,12 +83,87 @@ export default function ProfilePage() {
         }
     };
 
+    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            toast({
+                title: 'Invalid File',
+                description: 'Please select an image file (JPG, PNG, etc.)',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        // Validate file size (max 500KB)
+        if (file.size > 500 * 1024) {
+            toast({
+                title: 'File Too Large',
+                description: 'Please select an image smaller than 500KB',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        setIsUploading(true);
+
+        try {
+            // Convert to base64
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64Data = reader.result as string;
+
+                const token = localStorage.getItem('employee_token');
+                const res = await fetch('/api/auth/upload-profile-image', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ imageData: base64Data }),
+                });
+
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.error || 'Failed to upload image');
+                }
+
+                toast({
+                    title: 'Photo Updated',
+                    description: 'Your profile photo has been updated successfully.',
+                });
+
+                // Refresh employee data to get the new image
+                if (refreshEmployee) {
+                    await refreshEmployee();
+                }
+
+                setIsUploading(false);
+            };
+
+            reader.onerror = () => {
+                throw new Error('Failed to read image file');
+            };
+
+            reader.readAsDataURL(file);
+        } catch (error: any) {
+            toast({
+                title: 'Upload Failed',
+                description: error.message || 'Failed to upload profile photo',
+                variant: 'destructive',
+            });
+            setIsUploading(false);
+        }
+    };
+
     const handlePasswordChange = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const formData = new FormData(e.currentTarget);
-        const currentPassword = formData.get('currentPassword') as string;
-        const newPassword = formData.get('newPassword') as string;
-        const confirmPassword = formData.get('confirmPassword') as string;
+        const formDataObj = new FormData(e.currentTarget);
+        const currentPassword = formDataObj.get('currentPassword') as string;
+        const newPassword = formDataObj.get('newPassword') as string;
+        const confirmPassword = formDataObj.get('confirmPassword') as string;
 
         if (newPassword !== confirmPassword) {
             toast({
@@ -99,6 +183,8 @@ export default function ProfilePage() {
             return;
         }
 
+        setIsChangingPassword(true);
+
         try {
             const token = localStorage.getItem('employee_token');
             const res = await fetch('/api/auth/change-password', {
@@ -113,9 +199,10 @@ export default function ProfilePage() {
                 }),
             });
 
+            const data = await res.json();
+
             if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.message || 'Failed to change password');
+                throw new Error(data.error || data.message || 'Failed to change password');
             }
 
             toast({
@@ -126,9 +213,11 @@ export default function ProfilePage() {
         } catch (error: any) {
             toast({
                 title: 'Error',
-                description: error.message || 'Failed to change password. Please try again.',
+                description: error.message || 'Failed to change password. Please check your current password.',
                 variant: 'destructive',
             });
+        } finally {
+            setIsChangingPassword(false);
         }
     };
 
@@ -152,6 +241,21 @@ export default function ProfilePage() {
         return colors[role] || 'bg-gray-500';
     };
 
+    const getRoleDisplayName = (role: string) => {
+        const names: Record<string, string> = {
+            admin: 'Administrator',
+            franchise_manager: 'Franchise Manager',
+            factory_manager: 'Factory Manager',
+            employee: 'Staff',
+            driver: 'Driver',
+            staff: 'Staff',
+        };
+        return names[role] || role?.replace('_', ' ').toUpperCase();
+    };
+
+    // Get profile image from employee data
+    const profileImage = (employee as any)?.profileImage;
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -171,25 +275,55 @@ export default function ProfilePage() {
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="flex flex-col items-center space-y-4">
-                            <Avatar className="h-24 w-24">
-                                <AvatarImage src="" />
-                                <AvatarFallback className="text-2xl">
-                                    {getInitials(employee?.fullName || employee?.username || 'U')}
-                                </AvatarFallback>
-                            </Avatar>
+                            {/* Profile Image with Upload */}
+                            <div className="relative group">
+                                <Avatar className="h-24 w-24 ring-4 ring-background shadow-lg">
+                                    <AvatarImage src={profileImage || ''} alt={employee?.fullName} />
+                                    <AvatarFallback className="text-2xl bg-primary/10 text-primary">
+                                        {getInitials(employee?.fullName || employee?.username || 'U')}
+                                    </AvatarFallback>
+                                </Avatar>
+
+                                {/* Upload overlay */}
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isUploading}
+                                    className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                >
+                                    {isUploading ? (
+                                        <Loader2 className="h-6 w-6 text-white animate-spin" />
+                                    ) : (
+                                        <Camera className="h-6 w-6 text-white" />
+                                    )}
+                                </button>
+
+                                {/* Hidden file input */}
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageUpload}
+                                    className="hidden"
+                                />
+                            </div>
+
+                            <p className="text-xs text-muted-foreground">
+                                Click to upload photo (max 500KB)
+                            </p>
+
                             <div className="text-center">
                                 <h3 className="text-xl font-semibold">{employee?.fullName || employee?.username}</h3>
-                                <p className="text-sm text-muted-foreground">@{employee?.username}</p>
+                                <p className="text-sm text-muted-foreground">@{employee?.username || employee?.employeeId}</p>
                             </div>
-                            <Badge className={getRoleBadgeColor(employee?.role || '')}>
-                                {employee?.role?.replace('_', ' ').toUpperCase()}
+                            <Badge className={`${getRoleBadgeColor(employee?.role || '')} text-white`}>
+                                {getRoleDisplayName(employee?.role || '')}
                             </Badge>
                         </div>
 
                         <div className="space-y-3">
                             <div className="flex items-center gap-2 text-sm">
                                 <Mail className="h-4 w-4 text-muted-foreground" />
-                                <span>{employee?.email || 'No email set'}</span>
+                                <span className="truncate">{employee?.email || 'No email set'}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm">
                                 <Phone className="h-4 w-4 text-muted-foreground" />
@@ -252,7 +386,10 @@ export default function ProfilePage() {
 
                                     <div className="flex gap-2">
                                         {!isEditing ? (
-                                            <Button onClick={() => setIsEditing(true)}>Edit Profile</Button>
+                                            <Button onClick={() => setIsEditing(true)}>
+                                                <User className="mr-2 h-4 w-4" />
+                                                Edit Profile
+                                            </Button>
                                         ) : (
                                             <>
                                                 <Button onClick={handleSave}>Save Changes</Button>
@@ -274,6 +411,7 @@ export default function ProfilePage() {
                                             name="currentPassword"
                                             type="password"
                                             required
+                                            placeholder="Enter current password"
                                         />
                                     </div>
 
@@ -285,6 +423,7 @@ export default function ProfilePage() {
                                             type="password"
                                             required
                                             minLength={8}
+                                            placeholder="Enter new password (min 8 characters)"
                                         />
                                     </div>
 
@@ -296,11 +435,16 @@ export default function ProfilePage() {
                                             type="password"
                                             required
                                             minLength={8}
+                                            placeholder="Confirm new password"
                                         />
                                     </div>
 
-                                    <Button type="submit">
-                                        <Lock className="mr-2 h-4 w-4" />
+                                    <Button type="submit" disabled={isChangingPassword}>
+                                        {isChangingPassword ? (
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Lock className="mr-2 h-4 w-4" />
+                                        )}
                                         Change Password
                                     </Button>
                                 </form>

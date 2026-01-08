@@ -27,6 +27,7 @@ interface Employee {
   notes?: string;
   address?: string;
   settings?: any;
+  profileImage?: string;
 }
 
 interface AuthContextType {
@@ -34,6 +35,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: (username: string, password: string) => Promise<{ error: string | null; employee?: Employee }>;
   signOut: () => Promise<void>;
+  refreshEmployee: () => Promise<void>;
   hasRole: (roles: string | string[]) => boolean;
   isAdmin: boolean;
   isFranchiseManager: boolean;
@@ -325,11 +327,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isFranchiseManager = employee?.role === 'franchise_manager';
   const isFactoryManager = employee?.role === 'factory_manager';
 
+  // Refresh employee data (for profile updates)
+  const refreshEmployee = useCallback(async (): Promise<void> => {
+    const token = localStorage.getItem('employee_token');
+    if (token) {
+      await fetchEmployee(token);
+    }
+  }, [fetchEmployee]);
+
   const value: AuthContextType = {
     employee,
     loading,
     signIn,
     signOut,
+    refreshEmployee,
     hasRole,
     isAdmin,
     isFranchiseManager,
