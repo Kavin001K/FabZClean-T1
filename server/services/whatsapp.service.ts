@@ -168,7 +168,7 @@ export async function sendOrderCreatedNotification({
                             // Header: Document (Required by template 'v')
                             header_1: {
                                 type: "document",
-                                value: pdfUrl || process.env.DEFAULT_INVOICE_URL || "https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/pdfs/bill-1766141946654-106714533.pdf",
+                                value: process.env.DEFAULT_INVOICE_URL || "https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/pdfs/bill-1766141946654-106714533.pdf",
                                 filename: "Order-Confirmation.pdf",
                             },
                             // Body 1: Customer Name

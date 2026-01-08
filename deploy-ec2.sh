@@ -1,53 +1,68 @@
 #!/bin/bash
 # EC2 Deployment Script for FabZClean
-# Run this on your EC2 instance
+# Usage: ./deploy-ec2.sh [reset-db]
 
 echo "🚀 Starting FabZClean Deployment..."
 
-# Stop PM2
-echo "⏹️  Stopping PM2..."
-pm2 stop all 2>/dev/null
+# Check if we should reset the DB
+RESET_DB=false
+if [ "$1" == "reset-db" ]; then
+    RESET_DB=true
+    echo "⚠️  WARNING: Database reset requested. Existing data will be wiped."
+fi
 
-# Delete old database to recreate with new schema
-# Production database is stored in /home/ubuntu/fabzclean_data/, not in project folder!
-echo "🗑️  Removing old database (both locations)..."
-rm -f fabzclean.db fabzclean.db-shm fabzclean.db-wal
-rm -f /home/ubuntu/fabzclean_data/fabzclean.db /home/ubuntu/fabzclean_data/fabzclean.db-shm /home/ubuntu/fabzclean_data/fabzclean.db-wal
+# Ensure log directory exists
+mkdir -p logs
 
 # Pull latest code
 echo "📥 Pulling latest code..."
 git pull origin main
 
-# Install dependencies (skip dev dependencies for production)
+# Install dependencies
+# Using npm install to ensure we have ecosystem updates handled correctly
+# In CI/CD we might use npm ci --production, but here we want to ensure tsx works
 echo "📦 Installing dependencies..."
-npm ci --production 2>/dev/null || npm install --production
+npm install
 
-# Increase Node memory and build
-echo "🔨 Building application (with increased memory)..."
-export NODE_OPTIONS="--max-old-space-size=1024"
-npm run build:client
+# Stop PM2
+echo "⏹️  Stopping PM2..."
+pm2 stop ecosystem.config.js 2>/dev/null
 
-# Check if build succeeded
-if [ $? -eq 0 ]; then
-    echo "✅ Build successful!"
-else
-    echo "❌ Build failed. Trying with even more memory..."
-    export NODE_OPTIONS="--max-old-space-size=2048"
-    npm run build:client
+# Database Management
+if [ "$RESET_DB" = true ]; then
+    echo "🗑️  Removing old database (both locations)..."
+    rm -f fabzclean.db fabzclean.db-shm fabzclean.db-wal
+    rm -f /home/ubuntu/fabzclean_data/fabzclean.db /home/ubuntu/fabzclean_data/fabzclean.db-shm /home/ubuntu/fabzclean_data/fabzclean.db-wal
     
-    if [ $? -ne 0 ]; then
-        echo "❌ Build failed again. Please build locally and copy dist folder."
-        exit 1
-    fi
+    # Run setup script to create fresh DB
+    echo "🆕 Setting up fresh database..."
+    npm run db:setup
+else
+    echo "💾 Preserving existing database..."
 fi
 
-# Restart PM2
-echo "🔄 Restarting PM2..."
-pm2 restart all
+# Build Application
+# Increase memory limit for build process on small EC2 instances
+echo "🔨 Building application..."
+export NODE_OPTIONS="--max-old-space-size=2048"
+npm run build:client
 
-# Show status
+if [ $? -ne 0 ]; then
+    echo "❌ Build failed. Please check logs."
+    exit 1
+fi
+
+# Start/Restart Application with PM2
+echo "🚀 Starting application via PM2..."
+# Using --update-env to ensure new env vars from ecosystem.config.js are applied
+pm2 start ecosystem.config.js --env production --update-env
+
+# Save PM2 list so it restarts on reboot
+pm2 save
+
 echo ""
 echo "✅ Deployment complete!"
 pm2 status
 echo ""
-echo "🌐 Your app should be available at: http://13.201.55.242:5000"
+echo "🌐 Your app is running on port 5000"
+echo "📜 Logs available in ./logs/out.log and ./logs/err.log"

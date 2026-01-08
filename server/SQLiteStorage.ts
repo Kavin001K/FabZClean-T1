@@ -356,6 +356,7 @@ export class SQLiteStorage implements IStorage {
       CREATE TABLE IF NOT EXISTS employees (
         id TEXT PRIMARY KEY,
         franchiseId TEXT,
+        factoryId TEXT,
         name TEXT,
         role TEXT,
         email TEXT,
@@ -699,6 +700,18 @@ export class SQLiteStorage implements IStorage {
         if (!columnNames.includes('creditBalance')) {
           console.log('🔄 Migrating customers table: Adding column creditBalance');
           this.db.exec("ALTER TABLE customers ADD COLUMN creditBalance TEXT DEFAULT '0'");
+        }
+      }
+
+      // Check employees table migration for factoryId
+      const employeesTableExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='employees'").get();
+      if (employeesTableExists) {
+        const columns = this.db.prepare("PRAGMA table_info(employees)").all() as any[];
+        const columnNames = columns.map(c => c.name);
+
+        if (!columnNames.includes('factoryId')) {
+          console.log('🔄 Migrating employees table: Adding column factoryId');
+          this.db.exec("ALTER TABLE employees ADD COLUMN factoryId TEXT");
         }
       }
 
