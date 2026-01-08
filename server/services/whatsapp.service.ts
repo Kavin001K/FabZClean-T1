@@ -176,15 +176,15 @@ export async function sendOrderCreatedNotification({
                                 type: "text",
                                 value: customerName,
                             },
-                            // Body 2: Item/Description (e.g. "Laundry Order")
+                            // Body 2: Order Number
                             body_2: {
                                 type: "text",
-                                value: "Laundry Order",
+                                value: orderNumber,
                             },
-                            // Body 3: Order Number
+                            // Body 3: Item/Description (e.g. "Laundry Order")
                             body_3: {
                                 type: "text",
-                                value: orderNumber,
+                                value: "Laundry Order",
                             },
                             // Body 4: Amount
                             body_4: {
@@ -329,29 +329,27 @@ export async function sendOrderProcessingNotification({
                                 value: processingImageUrl,
                             },
                             // Body: Only 2 params for "bill" template
+                            // {{1}} = Customer Name
+                            // {{2}} = Order Number
                             body_1: {
                                 type: "text",
-                                value: customerName, // {{1}} = Customer Name
+                                value: customerName,
                             },
                             body_2: {
                                 type: "text",
-                                value: orderNumber, // {{2}} = Order Number
+                                value: orderNumber,
                             },
-                            // Button 1: Track Order - dynamic URL suffix
-                            // Template URL: https://myfabclean.com/trackorder/{{1}}
-                            // We send the order number as {{1}}
+                            // Button 1: Track Order - Full URL
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                value: cleanOrderNumber, // Order ID for tracking URL
+                                value: `https://myfabclean.com/trackorder/${cleanOrderNumber}`,
                             },
-                            // Button 2: Terms & Conditions - dynamic URL suffix
-                            // Template URL: https://myfabclean.com/{{2}}
-                            // We send "terms" as {{2}}
+                            // Button 2: Terms & Conditions - Full URL
                             button_2: {
                                 subtype: "url",
                                 type: "text",
-                                value: "terms", // Terms page path
+                                value: "https://myfabclean.com/terms",
                             },
                         },
                     },
@@ -481,7 +479,11 @@ export async function sendOrderStatusUpdateNotification({
                                 type: "image",
                                 value: statusImageUrl,
                             },
-                            // MSG91 format: uses "value" field
+                            // Body Variables Mapping:
+                            // {{1}} = Customer Name
+                            // {{2}} = Order Number
+                            // {{3}} = Status
+                            // {{4}} = Additional Info
                             body_1: {
                                 type: "text",
                                 value: customerName,
@@ -498,20 +500,17 @@ export async function sendOrderStatusUpdateNotification({
                                 type: "text",
                                 value: additionalInfo,
                             },
-                            // Button URL parameter for Track Order
-                            // The template URL is: https://myfabclean.com/trackorder/{{1}}
-                            // We pass the order number as {{1}} in the button
-                            // MSG91 format: uses "value" field for the dynamic suffix
+                            // Button 1: Track Order - Full URL
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                value: cleanOrderNumber,
+                                value: `https://myfabclean.com/trackorder/${cleanOrderNumber}`,
                             },
-                            // Button 2: Terms & Conditions URL suffix
+                            // Button 2: Terms & Conditions - Full URL
                             button_2: {
                                 subtype: "url",
                                 type: "text",
-                                value: "terms",
+                                value: "https://myfabclean.com/terms",
                             },
                         },
                     },
@@ -714,7 +713,7 @@ export async function sendInvoiceWhatsApp({
     let components: Record<string, any>;
 
     if (templateType === 'bill') {
-        // "bill" template: IMAGE header, 2 body params, 1 URL button
+        // "bill" template: IMAGE header, 2 body params, 2 URL buttons
         const processingImageUrl = process.env.WHATSAPP_PROCESSING_IMAGE_URL ||
             'https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/Templates/Screenshot%202025-12-27%20at%2010.32.31%20PM.png';
 
@@ -725,29 +724,31 @@ export async function sendInvoiceWhatsApp({
                 value: processingImageUrl,
             },
             // Body params
+            // {{1}} = Customer Name
+            // {{2}} = Order/Invoice Number
             body_1: {
                 type: "text",
-                value: customerName, // {{1}} = Customer Name
+                value: customerName,
             },
             body_2: {
                 type: "text",
-                value: invoiceNumber, // {{2}} = Order Number
+                value: invoiceNumber,
             },
-            // Button 1: Track Order dynamic URL suffix
+            // Button 1: Track Order - Full URL
             button_1: {
                 subtype: "url",
                 type: "text",
-                value: cleanOrderNumber,
+                value: `https://myfabclean.com/trackorder/${cleanOrderNumber}`,
             },
-            // Button 2: Terms & Conditions dynamic URL suffix
+            // Button 2: Terms & Conditions - Full URL
             button_2: {
                 subtype: "url",
                 type: "text",
-                value: "terms",
+                value: "https://myfabclean.com/terms",
             },
         };
     } else if (templateType === 'invoice') {
-        // "invoice_fabzclean" template: IMAGE header, 4 body params, 1 URL button
+        // "invoice_fabzclean" template: IMAGE header, 4 body params, 2 URL buttons
         const statusImageUrl = process.env.WHATSAPP_STATUS_IMAGE_URL ||
             'https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/Templates/Screenshot%202025-12-27%20at%2010.32.31%20PM.png';
 
@@ -760,40 +761,40 @@ export async function sendInvoiceWhatsApp({
             // Body params
             body_1: {
                 type: "text",
-                value: customerName, // {{1}}
+                value: customerName,
             },
             body_2: {
                 type: "text",
-                value: invoiceNumber, // {{2}}
+                value: invoiceNumber,
             },
             body_3: {
                 type: "text",
-                value: amount, // {{3}}
+                value: amount,
             },
             body_4: {
                 type: "text",
-                value: itemName, // {{4}}
+                value: itemName,
             },
-            // Button 1: Track Order URL suffix
+            // Button 1: Track Order - Full URL
             button_1: {
                 subtype: "url",
                 type: "text",
-                value: cleanOrderNumber,
+                value: `https://myfabclean.com/trackorder/${cleanOrderNumber}`,
             },
-            // Button 2: Terms & Conditions URL suffix
+            // Button 2: Terms & Conditions - Full URL
             button_2: {
                 subtype: "url",
                 type: "text",
-                value: "terms",
+                value: "https://myfabclean.com/terms",
             },
         };
     } else {
         // "order" template (v): The user has indicated this is a full Invoice template
         // Includes: Document Header, 4 Body Params, 2 URL Buttons
-        // Mapping as per successful test:
+        // Mapping corrected as per user request:
         // {{1}} = Customer Name
-        // {{2}} = Item Name
-        // {{3}} = Order Number
+        // {{2}} = Order/Invoice Number
+        // {{3}} = Item Name
         // {{4}} = Amount
         components = {
             // Header: Document format (PDF)
@@ -808,11 +809,11 @@ export async function sendInvoiceWhatsApp({
             },
             body_2: {
                 type: "text",
-                value: itemName || "Laundry Services",
+                value: invoiceNumber,
             },
             body_3: {
                 type: "text",
-                value: invoiceNumber,
+                value: itemName || "Laundry Services",
             },
             body_4: {
                 type: "text",
