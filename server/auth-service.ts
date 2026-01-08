@@ -367,30 +367,49 @@ export class AuthService {
             const generatedEmployeeId = `FZC01${roleCode}${sequenceNum}`;
 
             const newEmployee = await storage.createEmployee({
+                // Basic Info
                 name: data.fullName || `${firstName} ${lastName}`,
                 email: data.email || `${data.username.toLowerCase()}@fabzclean.com`,
                 phone: data.phone,
                 employeeId: generatedEmployeeId,
                 password: passwordHash,
                 role: data.role,
-                franchiseId: data.franchiseId || null,
-                factoryId: data.factoryId || null,
                 status: 'active',
                 firstName: firstName,
                 lastName: lastName,
+                // Work Details
+                franchiseId: data.franchiseId || null,
+                factoryId: data.factoryId || null,
                 position: data.position,
                 department: data.department,
+                hireDate: data.hireDate ? data.hireDate.toISOString() : undefined,
+                managerId: null,
+                // Personal Details
                 address: typeof data.address === 'object' ? JSON.stringify(data.address) : data.address,
+                emergencyContact: data.emergencyContact,
+                dateOfBirth: data.dateOfBirth,
+                gender: data.gender,
+                bloodGroup: data.bloodGroup,
+                // Compensation
+                salaryType: data.salaryType || 'monthly',
                 salary: data.baseSalary ? String(data.baseSalary) : (data.salary ? String(data.salary) : undefined),
                 hourlyRate: data.hourlyRate ? String(data.hourlyRate) : undefined,
-                hireDate: data.hireDate ? data.hireDate.toISOString() : undefined,
-                emergencyContact: data.emergencyContact,
-                managerId: null,
+                workingHours: data.workingHours ? String(data.workingHours) : '8',
+                // Banking & ID
+                bankName: data.bankName,
+                bankAccountNumber: data.bankAccountNumber,
+                bankIfsc: data.bankIfsc,
+                panNumber: data.panNumber,
+                aadharNumber: data.aadharNumber,
+                // Additional
                 skills: data.qualifications,
+                qualifications: data.qualifications,
+                notes: data.notes,
             });
 
             if (newEmployee) {
                 console.log(`✅ [Auth] Created employee ${generatedEmployeeId} in local storage`);
+                const emp = newEmployee as any;
                 return {
                     id: newEmployee.id,
                     employeeId: generatedEmployeeId,
@@ -404,8 +423,23 @@ export class AuthService {
                     isActive: true,
                     position: newEmployee.position,
                     department: newEmployee.department,
-                    salary: newEmployee.salary ? parseFloat(newEmployee.salary) : 0,
-                    hireDate: newEmployee.hireDate ? new Date(newEmployee.hireDate) : undefined,
+                    salary: emp.salary ? parseFloat(emp.salary) : 0,
+                    salaryType: emp.salaryType || 'monthly',
+                    hourlyRate: emp.hourlyRate ? parseFloat(emp.hourlyRate) : undefined,
+                    workingHours: emp.workingHours ? parseInt(emp.workingHours) : 8,
+                    hireDate: emp.hireDate ? new Date(emp.hireDate) : undefined,
+                    address: emp.address,
+                    emergencyContact: emp.emergencyContact,
+                    dateOfBirth: emp.dateOfBirth,
+                    gender: emp.gender,
+                    bloodGroup: emp.bloodGroup,
+                    bankName: emp.bankName,
+                    bankAccountNumber: emp.bankAccountNumber,
+                    bankIfsc: emp.bankIfsc,
+                    panNumber: emp.panNumber,
+                    aadharNumber: emp.aadharNumber,
+                    qualifications: emp.qualifications,
+                    notes: emp.notes,
                 };
             }
         } catch (localError) {

@@ -369,12 +369,24 @@ export class SQLiteStorage implements IStorage {
         department TEXT,
         hireDate TEXT,
         salary TEXT,
+        salaryType TEXT DEFAULT 'monthly',
         hourlyRate TEXT,
+        workingHours TEXT DEFAULT '8',
         status TEXT,
         managerId TEXT,
         address TEXT,
         emergencyContact TEXT,
         skills TEXT,
+        qualifications TEXT,
+        notes TEXT,
+        dateOfBirth TEXT,
+        gender TEXT,
+        bloodGroup TEXT,
+        bankAccountNumber TEXT,
+        bankIfsc TEXT,
+        bankName TEXT,
+        panNumber TEXT,
+        aadharNumber TEXT,
         performanceRating TEXT,
         lastReviewDate TEXT,
         createdAt TEXT,
@@ -703,15 +715,34 @@ export class SQLiteStorage implements IStorage {
         }
       }
 
-      // Check employees table migration for factoryId
+      // Check employees table migration for all required columns
       const employeesTableExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='employees'").get();
       if (employeesTableExists) {
         const columns = this.db.prepare("PRAGMA table_info(employees)").all() as any[];
         const columnNames = columns.map(c => c.name);
 
-        if (!columnNames.includes('factoryId')) {
-          console.log('🔄 Migrating employees table: Adding column factoryId');
-          this.db.exec("ALTER TABLE employees ADD COLUMN factoryId TEXT");
+        // Define all columns that should exist
+        const employeeColumns = [
+          { name: 'factoryId', type: 'TEXT' },
+          { name: 'salaryType', type: "TEXT DEFAULT 'monthly'" },
+          { name: 'workingHours', type: "TEXT DEFAULT '8'" },
+          { name: 'qualifications', type: 'TEXT' },
+          { name: 'notes', type: 'TEXT' },
+          { name: 'dateOfBirth', type: 'TEXT' },
+          { name: 'gender', type: 'TEXT' },
+          { name: 'bloodGroup', type: 'TEXT' },
+          { name: 'bankAccountNumber', type: 'TEXT' },
+          { name: 'bankIfsc', type: 'TEXT' },
+          { name: 'bankName', type: 'TEXT' },
+          { name: 'panNumber', type: 'TEXT' },
+          { name: 'aadharNumber', type: 'TEXT' },
+        ];
+
+        for (const col of employeeColumns) {
+          if (!columnNames.includes(col.name)) {
+            console.log(`🔄 Migrating employees table: Adding column ${col.name}`);
+            this.db.exec(`ALTER TABLE employees ADD COLUMN ${col.name} ${col.type}`);
+          }
         }
       }
 

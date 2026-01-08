@@ -74,26 +74,41 @@ export default function EmployeeManagement() {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("personal");
 
-  // Form state
+  // Form state - Comprehensive employee data
   const [employeeForm, setEmployeeForm] = useState({
+    // Personal Information
     fullName: '',
     email: '',
     phone: '',
     address: '',
+    dateOfBirth: '',
+    gender: '',
+    bloodGroup: '',
+    emergencyContact: '',
+    // Work Details
     position: '',
     department: '',
     hireDate: '',
+    role: 'employee',
+    franchiseId: '',
+    factoryId: '',
+    // Compensation
     salaryType: 'monthly' as 'hourly' | 'monthly',
     baseSalary: '',
     hourlyRate: '',
     workingHours: '8',
-    emergencyContact: '',
+    // Banking & ID
+    bankName: '',
+    bankAccountNumber: '',
+    bankIfsc: '',
+    panNumber: '',
+    aadharNumber: '',
+    // Additional Info
     qualifications: '',
     notes: '',
+    // Security
     password: '',
     confirmPassword: '',
-    role: 'employee',
-    franchiseId: ''
   });
 
   // Fetch franchises (Admin only)
@@ -229,10 +244,20 @@ export default function EmployeeManagement() {
 
   const resetForm = () => {
     setEmployeeForm({
-      fullName: '', email: '', phone: '', address: '', position: '', department: '',
-      hireDate: '', salaryType: 'monthly', baseSalary: '', hourlyRate: '',
-      workingHours: '8', emergencyContact: '', qualifications: '', notes: '',
-      password: '', confirmPassword: '', role: 'employee', franchiseId: ''
+      // Personal Information
+      fullName: '', email: '', phone: '', address: '',
+      dateOfBirth: '', gender: '', bloodGroup: '', emergencyContact: '',
+      // Work Details
+      position: '', department: '', hireDate: '',
+      role: 'employee', franchiseId: '', factoryId: '',
+      // Compensation
+      salaryType: 'monthly', baseSalary: '', hourlyRate: '', workingHours: '8',
+      // Banking & ID
+      bankName: '', bankAccountNumber: '', bankIfsc: '', panNumber: '', aadharNumber: '',
+      // Additional Info
+      qualifications: '', notes: '',
+      // Security
+      password: '', confirmPassword: ''
     });
     setIsCreateDialogOpen(false);
     setIsEditDialogOpen(false);
@@ -280,49 +305,80 @@ export default function EmployeeManagement() {
     }
 
     createEmployeeMutation.mutate({
+      // Authentication
       username: employeeForm.email, // Use email as username
+      password: employeeForm.password,
+      // Personal Information
       fullName: employeeForm.fullName,
       email: employeeForm.email,
       phone: employeeForm.phone,
       address: employeeForm.address,
+      dateOfBirth: employeeForm.dateOfBirth || undefined,
+      gender: employeeForm.gender || undefined,
+      bloodGroup: employeeForm.bloodGroup || undefined,
+      emergencyContact: employeeForm.emergencyContact || undefined,
+      // Work Details
       position: employeeForm.position,
       department: employeeForm.department,
       hireDate: new Date(employeeForm.hireDate),
+      role: employeeForm.role,
+      franchiseId: employeeForm.franchiseId || null,
+      factoryId: employeeForm.factoryId || null,
+      status: 'active',
+      // Compensation
       salaryType: employeeForm.salaryType,
-      salary: employeeForm.salaryType === 'monthly' ? parseFloat(employeeForm.baseSalary) : 0, // Map to 'salary' column
+      baseSalary: employeeForm.salaryType === 'monthly' ? parseFloat(employeeForm.baseSalary) : 0,
       hourlyRate: employeeForm.salaryType === 'hourly' ? parseFloat(employeeForm.hourlyRate) : undefined,
       workingHours: parseInt(employeeForm.workingHours),
-      status: 'active',
-      emergencyContact: employeeForm.emergencyContact,
-      qualifications: employeeForm.qualifications,
-      notes: employeeForm.notes,
-      role: employeeForm.role,
-      password: employeeForm.password,
-      franchiseId: employeeForm.franchiseId || null
+      // Banking & ID
+      bankName: employeeForm.bankName || undefined,
+      bankAccountNumber: employeeForm.bankAccountNumber || undefined,
+      bankIfsc: employeeForm.bankIfsc || undefined,
+      panNumber: employeeForm.panNumber || undefined,
+      aadharNumber: employeeForm.aadharNumber || undefined,
+      // Additional Info
+      qualifications: employeeForm.qualifications || undefined,
+      notes: employeeForm.notes || undefined,
     } as any);
   };
 
   const handleEditEmployee = (employee: Employee) => {
     setSelectedEmployee(employee);
+    const emp = employee as any;
     setEmployeeForm({
-      fullName: employee.fullName,
-      email: employee.email,
-      phone: employee.phone,
-      address: employee.address,
-      position: employee.position,
-      department: employee.department,
+      // Personal Information
+      fullName: employee.fullName || '',
+      email: employee.email || '',
+      phone: employee.phone || '',
+      address: employee.address || '',
+      dateOfBirth: emp.dateOfBirth ? new Date(emp.dateOfBirth).toISOString().split('T')[0] : '',
+      gender: emp.gender || '',
+      bloodGroup: emp.bloodGroup || '',
+      emergencyContact: employee.emergencyContact || '',
+      // Work Details
+      position: employee.position || '',
+      department: employee.department || '',
       hireDate: employee.hireDate ? new Date(employee.hireDate).toISOString().split('T')[0] : '',
-      salaryType: employee.salaryType,
-      baseSalary: (employee as any).salary?.toString() || employee.baseSalary?.toString() || '', // Handle both salary and baseSalary
+      role: employee.role || 'employee',
+      franchiseId: emp.franchiseId || '',
+      factoryId: emp.factoryId || '',
+      // Compensation
+      salaryType: emp.salaryType || 'monthly',
+      baseSalary: emp.salary?.toString() || emp.baseSalary?.toString() || '',
       hourlyRate: employee.hourlyRate?.toString() || '',
       workingHours: employee.workingHours?.toString() || '8',
-      emergencyContact: employee.emergencyContact,
-      qualifications: employee.qualifications,
-      notes: employee.notes,
+      // Banking & ID
+      bankName: emp.bankName || '',
+      bankAccountNumber: emp.bankAccountNumber || '',
+      bankIfsc: emp.bankIfsc || '',
+      panNumber: emp.panNumber || '',
+      aadharNumber: emp.aadharNumber || '',
+      // Additional Info
+      qualifications: employee.qualifications || '',
+      notes: employee.notes || '',
+      // Security (don't pre-fill passwords)
       password: '',
       confirmPassword: '',
-      role: employee.role,
-      franchiseId: (employee as any).franchiseId || ''
     });
     setIsEditDialogOpen(true);
   };
@@ -333,22 +389,36 @@ export default function EmployeeManagement() {
     updateEmployeeMutation.mutate({
       id: selectedEmployee.id,
       data: {
+        // Personal Information
         fullName: employeeForm.fullName,
         email: employeeForm.email,
         phone: employeeForm.phone,
         address: employeeForm.address,
+        dateOfBirth: employeeForm.dateOfBirth || undefined,
+        gender: employeeForm.gender || undefined,
+        bloodGroup: employeeForm.bloodGroup || undefined,
+        emergencyContact: employeeForm.emergencyContact || undefined,
+        // Work Details
         position: employeeForm.position,
         department: employeeForm.department,
         hireDate: new Date(employeeForm.hireDate),
+        role: employeeForm.role,
+        franchiseId: employeeForm.franchiseId || null,
+        factoryId: employeeForm.factoryId || null,
+        // Compensation
         salaryType: employeeForm.salaryType,
-        salary: employeeForm.salaryType === 'monthly' ? parseFloat(employeeForm.baseSalary) : 0, // Map to 'salary' column
+        baseSalary: employeeForm.salaryType === 'monthly' ? parseFloat(employeeForm.baseSalary) : 0,
         hourlyRate: employeeForm.salaryType === 'hourly' ? parseFloat(employeeForm.hourlyRate) : undefined,
         workingHours: parseInt(employeeForm.workingHours),
-        emergencyContact: employeeForm.emergencyContact,
-        qualifications: employeeForm.qualifications,
-        notes: employeeForm.notes,
-        role: employeeForm.role,
-        franchiseId: employeeForm.franchiseId || null
+        // Banking & ID
+        bankName: employeeForm.bankName || undefined,
+        bankAccountNumber: employeeForm.bankAccountNumber || undefined,
+        bankIfsc: employeeForm.bankIfsc || undefined,
+        panNumber: employeeForm.panNumber || undefined,
+        aadharNumber: employeeForm.aadharNumber || undefined,
+        // Additional Info
+        qualifications: employeeForm.qualifications || undefined,
+        notes: employeeForm.notes || undefined,
       }
     });
   };
@@ -434,10 +504,11 @@ export default function EmployeeManagement() {
               </DialogHeader>
 
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="personal">Personal Info</TabsTrigger>
-                  <TabsTrigger value="work">Work Details</TabsTrigger>
-                  <TabsTrigger value="compensation">Compensation</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-5">
+                  <TabsTrigger value="personal">Personal</TabsTrigger>
+                  <TabsTrigger value="work">Work</TabsTrigger>
+                  <TabsTrigger value="compensation">Pay</TabsTrigger>
+                  <TabsTrigger value="banking">Banking</TabsTrigger>
                   <TabsTrigger value="security">Security</TabsTrigger>
                 </TabsList>
 
@@ -476,10 +547,53 @@ export default function EmployeeManagement() {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                      <Input
+                        id="dateOfBirth"
+                        type="date"
+                        value={employeeForm.dateOfBirth}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, dateOfBirth: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="gender">Gender</Label>
+                      <Select value={employeeForm.gender} onValueChange={(value) => setEmployeeForm({ ...employeeForm, gender: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select gender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bloodGroup">Blood Group</Label>
+                      <Select value={employeeForm.bloodGroup} onValueChange={(value) => setEmployeeForm({ ...employeeForm, bloodGroup: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select blood group" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="A+">A+</SelectItem>
+                          <SelectItem value="A-">A-</SelectItem>
+                          <SelectItem value="B+">B+</SelectItem>
+                          <SelectItem value="B-">B-</SelectItem>
+                          <SelectItem value="AB+">AB+</SelectItem>
+                          <SelectItem value="AB-">AB-</SelectItem>
+                          <SelectItem value="O+">O+</SelectItem>
+                          <SelectItem value="O-">O-</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="emergencyContact">Emergency Contact</Label>
                       <Input
                         id="emergencyContact"
-                        placeholder="Name and phone number"
+                        placeholder="Name & phone"
                         value={employeeForm.emergencyContact}
                         onChange={(e) => setEmployeeForm({ ...employeeForm, emergencyContact: e.target.value })}
                       />
@@ -615,6 +729,80 @@ export default function EmployeeManagement() {
                       />
                     </div>
                   )}
+                </TabsContent>
+
+                {/* Banking & ID Tab */}
+                <TabsContent value="banking" className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="bankName">Bank Name</Label>
+                      <Input
+                        id="bankName"
+                        placeholder="Enter bank name"
+                        value={employeeForm.bankName}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, bankName: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bankAccountNumber">Account Number</Label>
+                      <Input
+                        id="bankAccountNumber"
+                        placeholder="Enter account number"
+                        value={employeeForm.bankAccountNumber}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, bankAccountNumber: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="bankIfsc">IFSC Code</Label>
+                      <Input
+                        id="bankIfsc"
+                        placeholder="Enter IFSC code"
+                        value={employeeForm.bankIfsc}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, bankIfsc: e.target.value.toUpperCase() })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="panNumber">PAN Number</Label>
+                      <Input
+                        id="panNumber"
+                        placeholder="Enter PAN number"
+                        value={employeeForm.panNumber}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, panNumber: e.target.value.toUpperCase() })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="aadharNumber">Aadhar Number</Label>
+                      <Input
+                        id="aadharNumber"
+                        placeholder="Enter 12-digit Aadhar"
+                        value={employeeForm.aadharNumber}
+                        onChange={(e) => setEmployeeForm({ ...employeeForm, aadharNumber: e.target.value.replace(/\D/g, '').slice(0, 12) })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="qualifications">Qualifications / Skills</Label>
+                    <Textarea
+                      id="qualifications"
+                      placeholder="Enter qualifications, certifications, skills..."
+                      value={employeeForm.qualifications}
+                      onChange={(e) => setEmployeeForm({ ...employeeForm, qualifications: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="notes">Additional Notes</Label>
+                    <Textarea
+                      id="notes"
+                      placeholder="Any additional notes about the employee..."
+                      value={employeeForm.notes}
+                      onChange={(e) => setEmployeeForm({ ...employeeForm, notes: e.target.value })}
+                    />
+                  </div>
                 </TabsContent>
 
                 {/* Security Tab */}
