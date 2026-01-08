@@ -401,4 +401,41 @@ router.get('/segments/list', async (req, res) => {
 });
 
 
+// ======= CREDIT ROUTES =======
+
+// Add credit/debit to customer
+router.post('/:id/credit', requireRole(CUSTOMER_EDITOR_ROLES), async (req, res) => {
+  try {
+    const customerId = req.params.id;
+    const { amount, type, description, referenceId } = req.body;
+    const createdBy = (req as any).user?.employeeId || 'system';
+
+    if (amount === undefined || isNaN(amount)) {
+      return res.status(400).json(createErrorResponse('Valid amount is required', 400));
+    }
+    if (!['deposit', 'usage', 'adjustment', 'refund'].includes(type)) {
+      return res.status(400).json(createErrorResponse('Invalid credit type', 400));
+    }
+
+    const transaction = await storage.addCustomerCredit(customerId, parseFloat(amount), type, description, referenceId, createdBy);
+
+    res.json(createSuccessResponse(transaction, 'Credit updated successfully'));
+  } catch (error: any) {
+    console.error('Update credit error:', error);
+    res.status(500).json(createErrorResponse(error.message || 'Failed to update credit', 500));
+  }
+});
+
+// Get credit history
+router.get('/:id/credit-history', async (req, res) => {
+  try {
+    const customerId = req.params.id;
+    const history = await storage.getCustomerCreditHistory(customerId);
+    res.json(createSuccessResponse(history));
+  } catch (error: any) {
+    console.error('Get credit history error:', error);
+    res.status(500).json(createErrorResponse(error.message || 'Failed to fetch credit history', 500));
+  }
+});
+
 export default router;

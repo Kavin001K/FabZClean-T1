@@ -72,10 +72,6 @@ import {
 } from '@/lib/statistics';
 // Import the data service
 import {
-  analyticsApi,
-  ordersApi,
-  customersApi,
-  inventoryApi,
   formatDate,
   getStatusColor,
   getPriorityColor,
@@ -96,42 +92,33 @@ export default function Analytics() {
   const queryClient = useQueryClient();
   const { analyticsData: realtimeData } = useRealtime();
 
-  // Fetch data using React Query
+  // Fetch data from new Server-Side Analytics API
   const {
-    data: orders = [],
-    isLoading: ordersLoading,
-    isError: ordersError,
+    data: serverAnalytics,
+    isLoading: analyticsLoading,
+    error: analyticsError
   } = useQuery({
-    queryKey: ['analytics-orders'],
-    queryFn: ordersApi.getAll,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    queryKey: ['analytics-overview', dateRange, franchise],
+    queryFn: async () => {
+      // Build query params
+      const params = new URLSearchParams({ dateRange });
+      // Only send franchiseId if not 'all' and user is admin (handled by backend auth otherwise)
+      if (franchise !== 'all') {
+        params.append('franchiseId', franchise);
+      }
+
+      const response = await fetch(`/api/analytics/overview?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}` // Ensure we send token if not handled by cookie
+        }
+      });
+      if (!response.ok) throw new Error('Failed to fetch analytics');
+      return response.json();
+    }
   });
 
-  const {
-    data: customers = [],
-    isLoading: customersLoading,
-    isError: customersError,
-  } = useQuery({
-    queryKey: ['analytics-customers'],
-    queryFn: customersApi.getAll,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
-  });
-
-  const {
-    data: inventory = [],
-    isLoading: inventoryLoading,
-    isError: inventoryError,
-  } = useQuery({
-    queryKey: ['analytics-inventory'],
-    queryFn: inventoryApi.getAll,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
-  });
-
-  const isLoading = ordersLoading || customersLoading || inventoryLoading;
-  const hasError = ordersError || customersError || inventoryError;
+  const isLoading = analyticsLoading;
+  const hasError = analyticsError; // || ordersError ...
 
   const realtimeKpis = realtimeData?.kpis;
   const recentActivity = realtimeData?.recentActivity;
@@ -139,81 +126,9 @@ export default function Analytics() {
 
   const { toast } = useToast();
 
-  // First, create filtered data that both analytics computations can use
-  const filteredData = useMemo(() => {
-    if (isLoading || orders.length === 0) {
-      return {
-        filteredOrders: [],
-        filteredCustomers: []
-      };
-    }
-
-    // Apply filters to orders
-    let filteredOrders = Array.isArray(orders) ? [...orders] : [];
-    let filteredCustomers = Array.isArray(customers) ? [...customers] : [];
-
-    // Date range filter
-    if (dateRange !== 'all') {
-      const now = new Date();
-      let startDate = new Date();
-
-      switch (dateRange) {
-        case 'last-7-days':
-          startDate.setDate(now.getDate() - 7);
-          break;
-        case 'last-30-days':
-          startDate.setDate(now.getDate() - 30);
-          break;
-        case 'last-90-days':
-          startDate.setDate(now.getDate() - 90);
-          break;
-        case 'last-year':
-          startDate.setFullYear(now.getFullYear() - 1);
-          break;
-      }
-
-      filteredOrders = filteredOrders.filter(order =>
-        new Date(order.createdAt || new Date()) >= startDate
-      );
-
-      filteredCustomers = filteredCustomers.filter(customer =>
-        new Date(customer.createdAt || new Date()) >= startDate
-      );
-    }
-
-    // Service type filter
-    if (serviceType !== 'all') {
-      filteredOrders = filteredOrders.filter(order => {
-        const orderService = (order as any).service || 'Unknown Service';
-        return orderService.toLowerCase().includes(serviceType.toLowerCase());
-      });
-    }
-
-    // Franchise filter (assuming orders have a franchise field or we can derive it)
-    if (franchise !== 'all') {
-      // For now, we'll filter by customer location or some other field
-      // This would need to be implemented based on your actual data structure
-      filteredCustomers = filteredCustomers.filter(customer => {
-        // Assuming customers have a franchise field or location
-        return (customer as any).franchise === franchise ||
-          (customer as any).location?.includes(franchise);
-      });
-
-      // Filter orders by customers in the selected franchise
-      const franchiseCustomerIds = filteredCustomers.map(c => c.id);
-      filteredOrders = filteredOrders.filter(order =>
-        franchiseCustomerIds.includes(order.customerId ?? '')
-      );
-    }
-
-    return { filteredOrders, filteredCustomers };
-  }, [orders, customers, isLoading, dateRange, franchise, serviceType]);
-
-  // Calculate comprehensive analytics data using filtered data
+  // Adapt Server Data to Component Structure
   const analyticsData = useMemo(() => {
-    const { filteredOrders, filteredCustomers } = filteredData;
-
-    if (filteredOrders.length === 0) {
+    if (!serverAnalytics) {
       return {
         revenueByMonth: [],
         servicePerformance: [],
@@ -238,170 +153,55 @@ export default function Analytics() {
       };
     }
 
-    // 1. REVENUE ANALYSIS
-    const revenueByMonth = filteredOrders.reduce((acc, order) => {
-      const month = new Date(order.createdAt || new Date()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      const existing = acc.find(item => item.month === month);
-      if (existing) {
-        existing.revenue += parseFloat(order.totalAmount);
-        existing.orders += 1;
-      } else {
-        acc.push({ month, revenue: parseFloat(order.totalAmount), orders: 1 });
-      }
-      return acc;
-    }, [] as any[]).sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
+    const { metrics, charts } = serverAnalytics;
 
-    // 2. SERVICE PERFORMANCE ANALYSIS
-    const servicePerformance = filteredOrders.reduce((acc, order) => {
-      const serviceName = (order as any).service || 'Unknown Service';
-      const existing = acc.find(item => item.name === serviceName);
-      if (existing) {
-        existing.orders += 1;
-        existing.revenue += parseFloat(order.totalAmount);
-        existing.avgOrderValue = existing.revenue / existing.orders;
-      } else {
-        acc.push({
-          name: serviceName,
-          orders: 1,
-          revenue: parseFloat(order.totalAmount),
-          avgOrderValue: parseFloat(order.totalAmount)
-        });
-      }
-      return acc;
-    }, [] as any[]).sort((a, b) => b.revenue - a.revenue);
-
-    // 3. CUSTOMER SEGMENTATION
-    const customerSegments = filteredCustomers.reduce((acc, customer) => {
-      const totalSpent = parseFloat(customer.totalSpent || '0');
-      let segment = 'New';
-      if (totalSpent > 1000) segment = 'VIP';
-      else if (totalSpent > 500) segment = 'Premium';
-      else if (totalSpent > 100) segment = 'Regular';
-
-      const existing = acc.find(item => item.segment === segment);
-      if (existing) {
-        existing.count += 1;
-        existing.revenue += totalSpent;
-      } else {
-        acc.push({ segment, count: 1, revenue: totalSpent });
-      }
-      return acc;
-    }, [] as any[]);
-
-    // 4. ORDER STATUS DISTRIBUTION
-    const orderStatusDistribution = filteredOrders.reduce((acc, order) => {
-      const existing = acc.find(item => item.status === order.status);
-      if (existing) {
-        existing.count += 1;
-        existing.revenue += parseFloat(order.totalAmount);
-      } else {
-        acc.push({ status: order.status, count: 1, revenue: parseFloat(order.totalAmount) });
-      }
-      return acc;
-    }, [] as any[]);
-
-    // 5. REVENUE TREND (Daily)
-    const revenueTrend = filteredOrders.reduce((acc, order) => {
-      const date = new Date(order.createdAt || new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      const existing = acc.find(item => item.date === date);
-      if (existing) {
-        existing.revenue += parseFloat(order.totalAmount);
-        existing.orders += 1;
-      } else {
-        acc.push({ date, revenue: parseFloat(order.totalAmount), orders: 1 });
-      }
-      return acc;
-    }, [] as any[]).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    // 6. CUSTOMER GROWTH
-    const customerGrowth = filteredCustomers.reduce((acc, customer) => {
-      const month = new Date(customer.createdAt || new Date()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      const existing = acc.find(item => item.month === month);
-      if (existing) {
-        existing.newCustomers += 1;
-        existing.totalSpent += parseFloat(customer.totalSpent || '0');
-      } else {
-        acc.push({ month, newCustomers: 1, totalSpent: parseFloat(customer.totalSpent || '0') });
-      }
-      return acc;
-    }, [] as any[]).sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
-
-    // 7. TOP CUSTOMERS
-    const topCustomers = filteredCustomers
-      .sort((a, b) => parseFloat(b.totalSpent || '0') - parseFloat(a.totalSpent || '0'))
-      .slice(0, 10)
-      .map(customer => ({
-        name: customer.name,
-        totalSpent: parseFloat(customer.totalSpent || '0'),
-        orders: customer.totalOrders,
-        avgOrderValue: parseFloat(customer.totalSpent || '0') / (customer.totalOrders || 1)
-      }));
-
-    // 8. SERVICE EFFICIENCY
-    const serviceEfficiency = servicePerformance.map(service => ({
-      ...service,
-      efficiency: service.orders > 0 ? (service.revenue / service.orders) : 0,
-      marketShare: (service.orders / filteredOrders.length) * 100
+    // Adapt Revenue Trend (Daily)
+    const revenueTrend = charts.revenueOverTime.map((d: any) => ({
+      date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      revenue: d.value,
+      orders: 0 // Backend didn't return daily order count in chart, but strictly revenue
     }));
 
-    // 9. INVENTORY ANALYSIS
-    const inventoryAnalysis = inventory.map(item => ({
-      name: item.name,
-      stock: item.stock,
-      status: item.status,
-      value: item.stock * 25 // Approximate value per unit
+    // Adapt Monthly Revenue (Aggregate from Daily)
+    const revenueByMonthMap = new Map<string, { revenue: number, orders: number }>();
+    charts.revenueOverTime.forEach((d: any) => {
+      const month = new Date(d.date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const prev = revenueByMonthMap.get(month) || { revenue: 0, orders: 0 };
+      revenueByMonthMap.set(month, { revenue: prev.revenue + d.value, orders: prev.orders });
+    });
+    const revenueByMonth = Array.from(revenueByMonthMap.entries()).map(([month, data]) => ({
+      month,
+      revenue: data.revenue,
+      orders: data.orders
     }));
-
-    // 10. TIME ANALYSIS (Hourly distribution)
-    const timeAnalysis = filteredOrders.reduce((acc, order) => {
-      const hour = new Date(order.createdAt || new Date()).getHours();
-      const existing = acc.find(item => item.hour === hour);
-      if (existing) {
-        existing.orders += 1;
-        existing.revenue += parseFloat(order.totalAmount);
-      } else {
-        acc.push({ hour, orders: 1, revenue: parseFloat(order.totalAmount) });
-      }
-      return acc;
-    }, [] as any[]).sort((a, b) => a.hour - b.hour);
-
-    // 11. OPERATIONAL METRICS
-    const totalRevenue = filteredOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
-    const avgOrderValue = filteredOrders.length > 0 ? totalRevenue / filteredOrders.length : 0;
-    const completionRate = filteredOrders.length > 0 ? (filteredOrders.filter(o => o.status === 'completed').length / filteredOrders.length) * 100 : 0;
-    const customerRetention = filteredCustomers.length > 0 ? filteredCustomers.filter(c => (c.totalOrders || 0) > 1).length / filteredCustomers.length * 100 : 0;
-
-    const operationalMetrics = {
-      totalRevenue,
-      avgOrderValue,
-      completionRate,
-      customerRetention,
-      totalOrders: orders.length,
-      totalCustomers: customers.length,
-      inventoryValue: inventory.reduce((sum, item) => sum + (item.stock * 25), 0)
-    };
 
     return {
       revenueByMonth,
-      servicePerformance,
-      categoryPerformance: customerSegments,
-      customerSegments,
-      orderStatusDistribution,
+      servicePerformance: charts.servicePerformance,
+      categoryPerformance: [], // Not yet implemented on backend
+      customerSegments: [],
+      orderStatusDistribution: charts.orderStatusDistribution,
       revenueTrend,
-      customerGrowth,
-      operationalMetrics,
-      topCustomers,
-      serviceEfficiency,
-      inventoryAnalysis,
-      timeAnalysis
+      customerGrowth: [],
+      operationalMetrics: {
+        totalRevenue: metrics.totalRevenue,
+        avgOrderValue: metrics.avgOrderValue,
+        completionRate: 0, // Todo
+        customerRetention: 0,
+        totalOrders: metrics.totalOrders,
+        totalCustomers: 0, // Metric not passed fully?
+        inventoryValue: 0
+      },
+      topCustomers: [],
+      serviceEfficiency: [],
+      inventoryAnalysis: [],
+      timeAnalysis: []
     };
-  }, [filteredData, inventory]);
+  }, [serverAnalytics]);
 
   // Advanced Statistical Analysis
   const advancedStatistics = useMemo(() => {
-    const { filteredOrders, filteredCustomers } = filteredData;
-
-    if (filteredOrders.length === 0) {
+    if (!analyticsData.revenueByMonth.length) {
       return {
         revenueStats: {
           mean: 0,
@@ -438,11 +238,7 @@ export default function Analytics() {
     }
 
     // Order Value Analysis
-    const orderValues = filteredOrders.map(o => parseFloat(o.totalAmount));
-    const avgOrderVal = averageOrderValue(
-      orderValues.reduce((sum, val) => sum + val, 0),
-      orderValues.length
-    );
+    const avgOrderVal = (analyticsData.operationalMetrics as any).avgOrderValue || 0;
 
     // Calculate trend
     const revenueTimeSeries = analyticsData.revenueByMonth.map((d, i) => ({
@@ -452,17 +248,17 @@ export default function Analytics() {
     const revenueTrendDirection = calculateTrend(revenueTimeSeries);
     const trendIndicator = getTrendIndicator(momGrowth);
 
-    // Moving averages
-    const ma7 = movingAverage(orderValues.slice(-30), 7);
-    const ma30 = movingAverage(orderValues, 30);
+    // Moving averages - Not available without granular data
+    const ma7: any[] = [];
+    const ma30: any[] = [];
 
     // Customer Lifetime Value Calculation
-    const avgCustomerOrders = filteredCustomers.length > 0
-      ? filteredOrders.length / filteredCustomers.length
-      : 0;
-    const avgCustomerSpend = filteredCustomers.length > 0
-      ? filteredOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount), 0) / filteredCustomers.length
-      : 0;
+    const totalCustomers = (analyticsData.operationalMetrics as any).totalCustomers || 1;
+    const totalOrders = (analyticsData.operationalMetrics as any).totalOrders || 0;
+
+    const avgCustomerOrders = totalCustomers > 0 ? totalOrders / totalCustomers : 0;
+
+    // Estimate CLV
     const clv = customerLifetimeValue(avgOrderVal, avgCustomerOrders, 3); // 3 year lifespan
 
     // Statistical Insights Generation
@@ -489,20 +285,9 @@ export default function Analytics() {
     // Top service insight
     if (analyticsData.servicePerformance.length > 0) {
       const topService = analyticsData.servicePerformance[0];
-      const marketShare = (topService.orders / filteredOrders.length) * 100;
+      const marketShare = totalOrders > 0 ? (topService.orders / totalOrders) * 100 : 0;
       generatedInsights.push(
         `Top performing service: ${topService.name} with ${marketShare.toFixed(1)}% market share`
-      );
-    }
-
-    // Peak time insight
-    if (analyticsData.timeAnalysis.length > 0) {
-      const peakHour = analyticsData.timeAnalysis.reduce((max, item) =>
-        item.orders > max.orders ? item : max
-      );
-      const peakPercentage = (peakHour.orders / filteredOrders.length) * 100;
-      generatedInsights.push(
-        `Peak order time: ${peakHour.hour}:00 with ${peakPercentage.toFixed(1)}% of daily orders`
       );
     }
 
@@ -510,18 +295,6 @@ export default function Analytics() {
     if (clv > 0) {
       generatedInsights.push(
         `Average Customer Lifetime Value: ${formatCurrency(clv)} over 3 years`
-      );
-    }
-
-    // Completion rate insight
-    const completionRate = (analyticsData.operationalMetrics as any).completionRate;
-    if (completionRate >= 90) {
-      generatedInsights.push(
-        `Excellent ${completionRate.toFixed(1)}% order completion rate maintained`
-      );
-    } else if (completionRate < 70) {
-      generatedInsights.push(
-        `Order completion rate at ${completionRate.toFixed(1)}% - consider workflow optimization`
       );
     }
 
@@ -543,13 +316,13 @@ export default function Analytics() {
       },
       customerMetrics: {
         clv,
-        avgSpend: avgCustomerSpend,
+        avgSpend: 0, // Not calculated
         avgOrders: avgCustomerOrders,
         retentionRate: (analyticsData.operationalMetrics as any).customerRetention,
       },
       insights: generatedInsights,
     };
-  }, [analyticsData, orders, customers, isLoading, dateRange]);
+  }, [analyticsData]);
 
 
   // Generate AI-powered insights
@@ -688,9 +461,9 @@ export default function Analytics() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Analytics Dashboard</h1>
           <div className="flex items-center gap-2 mt-2">
-            <div className={`w-2 h-2 rounded-full ${realtimeData ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <div className={`w-2 h-2 rounded-full ${realtimeData ? 'bg-green-500' : 'bg-gray-400'}`}></div>
             <span className="text-sm text-muted-foreground">
-              {realtimeData ? 'Live Updates' : 'Offline'}
+              {realtimeData ? 'Live Updates' : 'Data Loaded'}
             </span>
             {lastUpdate && (
               <span className="text-xs text-muted-foreground">

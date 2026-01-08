@@ -197,7 +197,20 @@ export class SQLiteStorage implements IStorage {
         FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
 
-      CREATE TABLE IF NOT EXISTS customers (
+      CREATE TABLE IF NOT EXISTS customer_credit_history (
+        id TEXT PRIMARY KEY,
+        customerId TEXT NOT NULL,
+        amount TEXT NOT NULL, -- Stored as string to avoid precision issues
+        type TEXT CHECK(type IN ('deposit', 'usage', 'adjustment', 'refund')) NOT NULL,
+        referenceId TEXT,
+        description TEXT,
+        balanceAfter TEXT,
+        createdBy TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (customerId) REFERENCES customers(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS orders (
         id TEXT PRIMARY KEY,
         franchiseId TEXT,
         name TEXT,
@@ -1244,6 +1257,35 @@ export class SQLiteStorage implements IStorage {
     return this.listCustomers();
   }
 
+  // ======= CUSTOMER CREDIT =======
+  async addCustomerCredit(customerId: string, amount: number, type: string, description: string, referenceId?: string, createdBy?: string): Promise<any> {
+    const customer = await this.getCustomer(customerId);
+    if (!customer) throw new Error("Customer not found");
+
+    const currentBalance = parseFloat(customer.creditBalance || '0');
+    const newBalance = currentBalance + amount;
+
+    // Update customer balance
+    this.updateCustomer(customerId, { creditBalance: String(newBalance) });
+
+    // Record transaction
+    const transaction = {
+      customerId,
+      amount: String(amount),
+      type,
+      description,
+      referenceId,
+      balanceAfter: String(newBalance),
+      createdBy
+    };
+
+    return this.insertRecord("customer_credit_history", transaction);
+  }
+
+  async getCustomerCreditHistory(customerId: string): Promise<any[]> {
+    return this.db.prepare('SELECT * FROM customer_credit_history WHERE customerId = ? ORDER BY createdAt DESC').all(customerId) as any[];
+  }
+
   // ======= ORDER NUMBER GENERATION =======
   /**
    * Generate next sequential order number
@@ -1325,6 +1367,28 @@ export class SQLiteStorage implements IStorage {
     }
 
     const id = this.insertRecord("orders", data);
+
+    // Check for Credit Payment
+    // If paymentMethod is credit, we deduct the unpaid amount from customer balance (creating debt)
+    if ((data as any).paymentMethod === 'credit' && data.customerId && data.totalAmount) {
+      const total = parseFloat(String(data.totalAmount));
+      const advance = parseFloat(String((data as any).advancePaid || 0));
+      const creditAmount = total - advance;
+
+      if (creditAmount > 0) {
+        const createdBy = (data as any).employeeId || (data as any).createdBy || 'system';
+        // Record usage (Debit -> Negative amount)
+        this.addCustomerCredit(
+          data.customerId,
+          -creditAmount,
+          'usage',
+          `Order ${data.orderNumber} (Credit)`,
+          id, // referenceId is order ID
+          createdBy
+        ).catch(e => console.error("Failed to record credit transaction:", e));
+      }
+    }
+
     return this.getRecord<Order>("orders", id)!;
   }
 

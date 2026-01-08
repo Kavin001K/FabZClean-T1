@@ -749,6 +749,14 @@ export default function Customers() {
                             )}
                           </div>
 
+                          {/* Credit Balance */}
+                          <div className="flex items-center justify-between text-sm py-2 px-3 bg-muted/50 rounded-md">
+                            <span className="text-muted-foreground">Store Credit</span>
+                            <span className={`font-bold ${parseFloat(customer.creditBalance || '0') < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              ₹{customer.creditBalance || '0.00'}
+                            </span>
+                          </div>
+
                           {/* Stats */}
                           <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                             <div>

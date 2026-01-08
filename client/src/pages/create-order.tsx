@@ -637,6 +637,7 @@ export default function CreateOrder() {
         setCreatedOrder(newOrder);
         setIsModalOpen(true);
         queryClient.invalidateQueries({ queryKey: ["orders"] });
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
 
         // Save new delivery address to customer if it's a delivery order with a new address

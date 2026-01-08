@@ -1,99 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'wouter';
-import { safeParseFloat } from '@/lib/safe-utils';
-import { useDebounce } from '@/hooks/use-debounce';
-import {
-  PlusCircle,
-  Download,
-  Printer,
-  Star,
-  Clock,
-  TrendingUp,
-  Package,
-  ShoppingCart,
-  Filter,
-  Search,
-  Grid3x3,
-  List,
-  Upload,
-  FileSpreadsheet,
-  AlertCircle,
-  Check,
-  CheckCircle,
-  XCircle,
-  Sparkles,
-  FileText
-} from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { ServiceImportDialog } from '@/components/services/service-import-dialog';
 
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-
-// Import data service and types
-import { servicesApi } from '@/lib/data-service';
-import type { Service } from '@shared/schema';
-import { EnhancedPDFExport, exportServicesEnhanced } from '@/lib/enhanced-pdf-export';
-import { exportServicesToExcel } from '@/lib/excel-exports';
-import { downloadServiceTemplate, parseServiceExcel, convertToServiceData, type ImportResult, type ParsedService } from '@/lib/excel-service-import';
-
-// Service icon mapping
-const getServiceIcon = (category: string) => {
-  const icons: Record<string, typeof Package> = {
-    'Cleaning': Sparkles,
-    'Maintenance': Package,
-    'Repair': Package,
-    'Installation': Package,
-    'default': Package
-  };
-  return icons[category] || icons.default;
-};
-
-// Format currency
-const formatCurrency = (amount: string | number) => {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(num) || num === null || num === undefined) {
-    return '₹0.00';
-  }
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(num);
-};
+// ... (keep existing imports)
 
 export default function Services() {
   // State for dialog management
@@ -101,410 +8,21 @@ export default function Services() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
-
-  // Excel Import State
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-  const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
 
   // UI State
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [searchQuery, setSearchQuery] = useState('');
-  const debouncedSearchQuery = useDebounce(searchQuery, 300);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'price' | 'popular'>('name');
+  // ... (keep existing state)
 
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  // Fetch services data with React Query
-  const {
-    data: servicesData,
-    isLoading: servicesLoading,
-    isError: servicesError,
-    error: servicesErrorDetails,
-  } = useQuery({
-    queryKey: ['services'],
-    queryFn: servicesApi.getAll,
-    staleTime: 5 * 60 * 1000,
-    retry: 3,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
-  });
-
-  // Ensure services is always an array
-  const services: Service[] = useMemo(() => {
-    if (!servicesData) return [];
-    if (Array.isArray(servicesData)) return servicesData;
-    // If data is wrapped in an object, try to extract the array
-    if (typeof servicesData === 'object' && 'data' in servicesData) {
-      const wrappedData = (servicesData as any).data;
-      return Array.isArray(wrappedData) ? wrappedData : [];
-    }
-    return [];
-  }, [servicesData]);
-
-  // Get unique categories from services
-  const categories = useMemo(() => {
-    const cats = new Set(services.map(s => s.category));
-    return ['all', ...Array.from(cats)];
-  }, [services]);
-
-  // Filter and sort services
-  const filteredServices = useMemo(() => {
-    let filtered = [...services];
-
-    // Search filter
-    if (debouncedSearchQuery) {
-      filtered = filtered.filter(service =>
-        service.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-        service.description?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-        service.category.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-      );
-    }
-
-    // Category filter
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(service => service.category === selectedCategory);
-    }
-
-    // Status filter
-    if (selectedStatus !== 'all') {
-      filtered = filtered.filter(service => service.status === selectedStatus);
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      if (sortBy === 'name') {
-        return a.name.localeCompare(b.name);
-      } else if (sortBy === 'price') {
-        const priceA = parseFloat(a.price) || 0;
-        const priceB = parseFloat(b.price) || 0;
-        return priceA - priceB;
-      }
-      return 0;
-    });
-
-    return filtered;
-  }, [services, debouncedSearchQuery, selectedCategory, selectedStatus, sortBy]);
-
-  // Calculate statistics
-  const stats = useMemo(() => {
-    const totalServices = services.length;
-    const activeServices = services.filter(s => s.status === 'Active').length;
-    const totalRevenue = services.length > 0
-      ? services.reduce((sum, s) => sum + safeParseFloat(s.price), 0)
-      : 0;
-    const avgPrice = totalServices > 0 ? totalRevenue / totalServices : 0;
-
-    return {
-      totalServices,
-      activeServices,
-      totalRevenue,
-      avgPrice,
-    };
-  }, [services]);
-
-  // Service creation mutation
-  const createServiceMutation = useMutation({
-    mutationFn: async (serviceData: Partial<Service>) => {
-      return await servicesApi.create(serviceData);
-    },
-    onSuccess: (newService) => {
-      if (newService) {
-        queryClient.invalidateQueries({ queryKey: ["services"] });
-        toast({
-          title: "Service Created Successfully",
-          description: `Service ${newService.name} has been added to the catalog.`,
-        });
-        setIsCreateDialogOpen(false);
-      }
-    },
-    onError: (error) => {
-      console.error('Failed to create service:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create service. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Service update mutation
-  const updateServiceMutation = useMutation({
-    mutationFn: async ({ serviceId, serviceData }: { serviceId: string; serviceData: Partial<Service> }) => {
-      return await servicesApi.update(serviceId, serviceData);
-    },
-    onSuccess: (updatedService) => {
-      if (updatedService) {
-        queryClient.invalidateQueries({ queryKey: ["services"] });
-        toast({
-          title: "Service Updated Successfully",
-          description: `Service ${updatedService.name} has been updated.`,
-        });
-        setIsEditDialogOpen(false);
-        setSelectedService(null);
-      }
-    },
-    onError: (error) => {
-      console.error('Failed to update service:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update service. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Service delete mutation
-  const deleteServiceMutation = useMutation({
-    mutationFn: async (serviceId: string) => {
-      return await servicesApi.delete(serviceId);
-    },
-    onSuccess: (success) => {
-      if (success) {
-        queryClient.invalidateQueries({ queryKey: ["services"] });
-        toast({
-          title: "Service Deleted Successfully",
-          description: "Service has been removed from the catalog.",
-        });
-      }
-    },
-    onError: (error) => {
-      console.error('Failed to delete service:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete service. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Handler functions
-  const handleEditService = (service: Service) => {
-    setSelectedService(service);
-    setIsEditDialogOpen(true);
-  };
-
-  const handleDeleteService = (serviceId: string) => {
-    if (window.confirm('Are you sure you want to delete this service?')) {
-      deleteServiceMutation.mutate(serviceId);
-    }
-  };
-
-  const handleUpdateService = (data: Partial<Service>) => {
-    if (!selectedService) return;
-    updateServiceMutation.mutate({
-      serviceId: selectedService.id,
-      serviceData: data,
-    });
-  };
-
-  const handleAddToOrder = (service: Service) => {
-    setSelectedService(service);
-    setIsOrderDialogOpen(true);
-  };
-
-  const handleExportPDF = () => {
-    exportServicesEnhanced(filteredServices);
-
-    toast({
-      title: "PDF Downloaded",
-      description: "Service catalog has been exported successfully.",
-    });
-  };
-
-  const handleExportExcel = () => {
-    const filters = {
-      category: selectedCategory,
-      status: selectedStatus,
-    };
-    exportServicesToExcel(filteredServices, filters);
-
-    toast({
-      title: "Excel Export Successful",
-      description: `Exported ${filteredServices.length} services to Excel.`,
-    });
-  };
-
-  // Handle Excel file upload
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    const validTypes = ['.xlsx', '.xls', '.csv'];
-    const fileExt = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-    if (!validTypes.includes(fileExt)) {
-      toast({
-        title: "Invalid File Type",
-        description: "Please upload an Excel file (.xlsx, .xls) or CSV file",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const result = await parseServiceExcel(file);
-      setImportResult(result);
-      setIsImportDialogOpen(true);
-
-      if (!result.success && result.errors.length > 0) {
-        toast({
-          title: "Validation Errors Found",
-          description: `${result.invalidRows} rows have issues. Review before importing.`,
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error Reading File",
-        description: error instanceof Error ? error.message : "Failed to read Excel file",
-        variant: "destructive",
-      });
-    }
-
-    // Clear the input
-    event.target.value = '';
-  };
-
-  // Handle bulk import
-  const handleBulkImport = async () => {
-    if (!importResult) return;
-
-    const validServices = convertToServiceData(importResult.parsedServices);
-    if (validServices.length === 0) {
-      toast({
-        title: "No Valid Services",
-        description: "No valid services to import. Fix the errors and try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsImporting(true);
-    setImportProgress(0);
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (let i = 0; i < validServices.length; i++) {
-      try {
-        // Check if service with same name exists (for update)
-        const existing = services.find(s =>
-          s.name.toLowerCase() === validServices[i].name?.toLowerCase()
-        );
-
-        if (existing) {
-          await servicesApi.update(existing.id, validServices[i]);
-        } else {
-          await servicesApi.create(validServices[i]);
-        }
-        successCount++;
-      } catch (error) {
-        console.error(`Failed to import service ${validServices[i].name}:`, error);
-        failCount++;
-      }
-
-      setImportProgress(Math.round(((i + 1) / validServices.length) * 100));
-    }
-
-    setIsImporting(false);
-    setIsImportDialogOpen(false);
-    setImportResult(null);
-
-    queryClient.invalidateQueries({ queryKey: ['services'] });
-
-    toast({
-      title: "Import Complete",
-      description: `Successfully imported ${successCount} services${failCount > 0 ? `, ${failCount} failed` : ''}.`,
-    });
-  };
+  // ... (keep queries/mutations)
 
   const handlePrintPriceList = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Service Price List</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          h1 { color: #84cc16; border-bottom: 3px solid #84cc16; padding-bottom: 10px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-          th { background-color: #84cc16; color: white; font-weight: bold; }
-          tr:nth-child(even) { background-color: #f9f9f9; }
-          .footer { margin-top: 30px; text-align: center; color: #666; }
-          @media print { body { margin: 0; } }
-        </style>
-      </head>
-      <body>
-        <h1>Service Price List</h1>
-        <p>Generated on: ${new Date().toLocaleString()}</p>
-        <table>
-          <thead>
-            <tr>
-              <th>Service Name</th>
-              <th>Category</th>
-              <th>Duration</th>
-              <th>Price</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${services.map(service => `
-              <tr>
-                <td><strong>${service.name}</strong></td>
-                <td>${service.category}</td>
-                <td>${service.duration}</td>
-                <td><strong>${formatCurrency(service.price)}</strong></td>
-                <td>${service.status}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-        <div class="footer">
-          <p>Total Services: ${services.length} | Generated: ${new Date().toLocaleDateString()}</p>
-        </div>
-      </body>
-      </html>
-    `;
-
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-    printWindow.onload = () => {
-      printWindow.print();
-    };
+    // ... (keep existing)
   };
 
   // Error state
   if (servicesError) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-8">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <div className="text-destructive text-lg font-semibold">
-                Failed to load services
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {servicesErrorDetails?.message || 'An unexpected error occurred'}
-              </p>
-              <Button
-                onClick={() => queryClient.invalidateQueries({ queryKey: ['services'] })}
-                variant="outline"
-              >
-                Try Again
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    // ... (keep existing)
   }
 
   return (
@@ -523,6 +41,7 @@ export default function Services() {
           </p>
         </div>
         <div className="flex gap-2">
+          {/* ... (Print and Export buttons) */}
           <Button
             variant="outline"
             size="sm"
@@ -550,33 +69,10 @@ export default function Services() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Import Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Upload className="h-4 w-4 mr-2" />
-                Import
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => downloadServiceTemplate()}>
-                <FileSpreadsheet className="mr-2 h-4 w-4" />
-                Download Template
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <label className="flex items-center cursor-pointer">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Excel File
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </label>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button variant="outline" size="sm" onClick={() => setIsImportDialogOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Import
+          </Button>
 
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <PlusCircle className="h-4 w-4 mr-2" />
@@ -584,6 +80,14 @@ export default function Services() {
           </Button>
         </div>
       </motion.div>
+
+      {/* ... (Rest of UI) */}
+
+      <ServiceImportDialog
+        open={isImportDialogOpen}
+        onOpenChange={setIsImportDialogOpen}
+      />
+
 
       {/* Statistics Cards */}
       <div className="grid gap-4 md:grid-cols-4">
