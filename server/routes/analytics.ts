@@ -23,7 +23,11 @@ router.get("/overview", authMiddleware, async (req, res) => {
         const dateRange = req.query.dateRange as string || 'last-30-days';
 
         // 1. Fetch Orders
-        const allOrders = await storage.listOrders(franchiseId);
+        // 1. Fetch Orders (Filter manually as storage.listOrders returns all)
+        const allOrdersRaw = await storage.listOrders();
+        const allOrders = franchiseId
+            ? allOrdersRaw.filter(o => o.franchiseId === franchiseId)
+            : allOrdersRaw;
 
         // 2. Filter by Date
         const now = new Date();
@@ -38,10 +42,21 @@ router.get("/overview", authMiddleware, async (req, res) => {
 
         const filteredOrders = allOrders.filter(o => new Date(o.createdAt || 0) >= startDate);
 
+        // Fetch customers for the franchise to get total count
+        const allCustomersRaw = await storage.listCustomers();
+        const allCustomers = franchiseId
+            ? allCustomersRaw.filter(c => c.franchiseId === franchiseId)
+            : allCustomersRaw;
+        const totalCustomers = allCustomers.length;
+
         // 3. Calculate Metrics
         const totalRevenue = filteredOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || '0'), 0);
         const totalOrders = filteredOrders.length;
         const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+        // Calculate basic retention (customers with > 1 order)
+        const repeatCustomers = allCustomers.filter(c => (c.totalOrders || 0) > 1).length;
+        const customerRetention = totalCustomers > 0 ? (repeatCustomers / totalCustomers) * 100 : 0;
 
         // Revenue by Date (Chart)
         const revenueMap = new Map<string, number>();
@@ -79,7 +94,9 @@ router.get("/overview", authMiddleware, async (req, res) => {
             metrics: {
                 totalRevenue,
                 totalOrders,
-                avgOrderValue
+                avgOrderValue,
+                totalCustomers,
+                customerRetention
             },
             charts: {
                 revenueOverTime: revenueChart,

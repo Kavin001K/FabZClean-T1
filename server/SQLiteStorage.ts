@@ -1809,7 +1809,7 @@ export class SQLiteStorage implements IStorage {
       query += ' AND franchiseId = ?';
       params.push(franchiseId);
     } else {
-      query += ' AND (franchiseId IS NULL OR franchiseId = "")';
+      query += " AND (franchiseId IS NULL OR franchiseId = '')";
     }
 
     const rows = this.db.prepare(query).all(...params) as any[];
