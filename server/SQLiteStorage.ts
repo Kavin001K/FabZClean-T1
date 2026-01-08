@@ -715,6 +715,18 @@ export class SQLiteStorage implements IStorage {
         }
       }
 
+      // Check franchises table migration for code column
+      const franchisesTableExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='franchises'").get();
+      if (franchisesTableExists) {
+        const columns = this.db.prepare("PRAGMA table_info(franchises)").all() as any[];
+        const columnNames = columns.map(c => c.name);
+
+        if (!columnNames.includes('code')) {
+          console.log('🔄 Migrating franchises table: Adding column code (3-letter franchise code)');
+          this.db.exec("ALTER TABLE franchises ADD COLUMN code TEXT");
+        }
+      }
+
       // Check employees table migration for all required columns
       const employeesTableExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='employees'").get();
       if (employeesTableExists) {
@@ -1219,49 +1231,104 @@ export class SQLiteStorage implements IStorage {
   // ======= ORDER NUMBER GENERATION =======
   /**
    * Generate next sequential order number
-   * Format: PREFIX-YYYYMMDD-####
-   * e.g., FZC-20260108-0001, FZC-20260108-0002
-   * Resets sequence daily
+   * Format: PREFIXYYFRCESEQ
+   * Example: FZC26POLA0001
+   * - FZC = Company/Franchise prefix (3 chars)
+   * - 26 = Year (last 2 digits)
+   * - POL = Franchise location code (3 chars)
+   * - A = Employee code (single letter based on employee)
+   * - 0001 = Daily sequence number (4 digits)
+   *
+   * This format enables efficient isolation:
+   * - By franchise: Filter by FZC26POL*
+   * - By employee: Filter by FZC26POL[A]*
+   * - By date: Check sequence + createdAt
    */
-  private getNextOrderNumber(franchiseId?: string | null): string {
+  getNextOrderNumber(franchiseId?: string | null, employeeId?: string | null): string {
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
+    const yearStr = String(now.getFullYear()).slice(-2); // Last 2 digits of year (26 from 2026)
 
-    // Get prefix from franchise settings or use default
+    // Get prefix and franchise code from franchise settings
     let prefix = 'FZC';
+    let franchiseCode = 'HQ'; // Default for headquarters/no franchise
+
     if (franchiseId) {
       try {
         const franchise = this.db.prepare(
-          'SELECT orderNumberPrefix FROM franchises WHERE id = ?'
+          'SELECT orderNumberPrefix, code, name FROM franchises WHERE id = ?'
         ).get(franchiseId) as any;
-        if (franchise?.orderNumberPrefix) {
-          prefix = franchise.orderNumberPrefix;
+
+        if (franchise) {
+          if (franchise.orderNumberPrefix) {
+            prefix = franchise.orderNumberPrefix.slice(0, 3).toUpperCase();
+          }
+          // Use franchise code if available, otherwise generate from name
+          if (franchise.code) {
+            franchiseCode = franchise.code.slice(0, 3).toUpperCase();
+          } else if (franchise.name) {
+            // Generate 3-letter code from franchise name
+            franchiseCode = franchise.name.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'FRC';
+          }
         }
       } catch (err) {
-        // Use default prefix if franchise not found
+        // Use defaults if franchise not found
       }
     }
 
-    // Count orders created today with the same prefix to get the next sequence
-    const todayStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    // Get employee letter code (A-Z based on employee)
+    let employeeCode = 'X'; // Default for unknown employee
+    if (employeeId) {
+      try {
+        const employee = this.db.prepare(
+          'SELECT id, employeeId, name, fullName FROM employees WHERE id = ? OR employeeId = ?'
+        ).get(employeeId, employeeId) as any;
+
+        if (employee) {
+          // Use first letter of name, or generate from employeeId
+          const name = employee.fullName || employee.name || employee.employeeId || '';
+          employeeCode = name.charAt(0).toUpperCase() || 'X';
+
+          // If still no valid letter, use a hash-based letter
+          if (!/[A-Z]/.test(employeeCode)) {
+            // Generate letter from employeeId hash
+            const hash = (employee.id || employee.employeeId || '').split('')
+              .reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+            employeeCode = String.fromCharCode(65 + (hash % 26)); // A-Z
+          }
+        }
+      } catch (err) {
+        // Use default
+      }
+    }
+
+    // Generate the base pattern to search for today's orders
+    // Pattern: PREFIX + YEAR + FRANCHISE + EMPLOYEE (first part of order number)
+    const basePattern = `${prefix}${yearStr}${franchiseCode}${employeeCode}`;
+
+    // Count existing orders with this pattern today
+    const todayStart = now.toISOString().slice(0, 10); // YYYY-MM-DD
 
     const existingOrders = this.db.prepare(`
-      SELECT COUNT(*) as count FROM orders 
-      WHERE orderNumber LIKE ? 
+      SELECT COUNT(*) as count FROM orders
+      WHERE orderNumber LIKE ?
       AND DATE(createdAt) = DATE(?)
-    `).get(`${prefix}-${dateStr}-%`, todayStart) as any;
+    `).get(`${basePattern}%`, todayStart) as any;
 
     const sequenceNumber = (existingOrders?.count || 0) + 1;
     const paddedSequence = String(sequenceNumber).padStart(4, '0');
 
-    return `${prefix}-${dateStr}-${paddedSequence}`;
+    // Final format: FZC26POLA0001
+    return `${basePattern}${paddedSequence}`;
   }
 
   // ======= ORDERS =======
   async createOrder(data: InsertOrder): Promise<Order> {
     // Auto-generate orderNumber if not provided
     if (!data.orderNumber) {
-      data.orderNumber = this.getNextOrderNumber((data as any).franchiseId);
+      data.orderNumber = this.getNextOrderNumber(
+        (data as any).franchiseId,
+        (data as any).createdBy || (data as any).employeeId
+      );
     }
 
     // Ensure status has a default

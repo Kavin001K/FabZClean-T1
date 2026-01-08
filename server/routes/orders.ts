@@ -54,51 +54,57 @@ router.use(rateLimit(60000, 100)); // 100 requests per minute
 router.use(jwtRequired);
 
 // Get next order number preview (for display on order creation form)
+// Format: FZC26POLA0001 (Prefix + Year + FranchiseCode + EmployeeLetter + Sequence)
 router.get('/next-order-number', async (req, res) => {
   try {
     const employee = req.employee;
     const franchiseId = employee?.franchiseId || null;
+    const employeeId = employee?.id || employee?.employeeId || null;
 
-    // Generate next order number preview
+    // Use storage method to get next order number
+    const nextOrderNumber = (storage as any).getNextOrderNumber(franchiseId, employeeId);
+
+    // Parse the components for response
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const yearStr = String(now.getFullYear()).slice(-2);
 
-    // Get prefix from franchise settings or use default
-    let prefix = 'FZC';
+    // Get employee letter
+    let employeeLetter = 'X';
+    if (employee?.fullName) {
+      employeeLetter = employee.fullName.charAt(0).toUpperCase();
+    } else if (employee?.username) {
+      employeeLetter = employee.username.charAt(0).toUpperCase();
+    }
+    if (!/[A-Z]/.test(employeeLetter)) employeeLetter = 'X';
+
+    // Get franchise code
+    let franchiseCode = 'HQ';
     if (franchiseId) {
       try {
         const franchises = await storage.listFranchises();
         const franchise = franchises.find((f: any) => f.id === franchiseId);
-        if (franchise?.orderNumberPrefix) {
-          prefix = franchise.orderNumberPrefix;
+        if (franchise?.code) {
+          franchiseCode = franchise.code.slice(0, 3).toUpperCase();
+        } else if (franchise?.name) {
+          franchiseCode = franchise.name.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'FRC';
         }
       } catch (err) {
-        // Use default prefix
+        // Use default
       }
     }
-
-    // Count today's orders
-    const allOrders = await storage.listOrders(franchiseId);
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-
-    const todayOrders = allOrders.filter((order: Order) => {
-      if (!order.orderNumber?.startsWith(`${prefix}-${dateStr}`)) return false;
-      const orderDate = new Date(order.createdAt);
-      return orderDate >= todayStart;
-    });
-
-    const nextSequence = todayOrders.length + 1;
-    const paddedSequence = String(nextSequence).padStart(4, '0');
-    const nextOrderNumber = `${prefix}-${dateStr}-${paddedSequence}`;
 
     res.json({
       success: true,
       nextOrderNumber,
-      prefix,
-      date: dateStr,
-      sequence: nextSequence,
-      todayOrderCount: todayOrders.length
+      format: 'PREFIX + YY + FRANCHISE_CODE + EMPLOYEE_LETTER + SEQUENCE',
+      example: `FZC${yearStr}${franchiseCode}${employeeLetter}0001`,
+      components: {
+        prefix: 'FZC',
+        year: yearStr,
+        franchiseCode,
+        employeeLetter,
+        sequence: nextOrderNumber.slice(-4)
+      }
     });
   } catch (error: any) {
     console.error('Get next order number error:', error);
@@ -372,6 +378,12 @@ router.post(
       } else if (!orderData.franchiseId) {
         // Admins should ideally provide a franchiseId
         console.warn('[CREATE ORDER] Admin creating order without franchiseId');
+      }
+
+      // Add employee ID for order number generation (FZC26POLA0001 format)
+      if (employee) {
+        orderData.createdBy = employee.id || employee.employeeId;
+        orderData.employeeId = employee.employeeId;
       }
 
       // Use OrderService to create order (includes external validation and enrichment)
