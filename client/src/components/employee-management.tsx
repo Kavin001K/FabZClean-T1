@@ -886,6 +886,11 @@ export default function EmployeeManagement() {
                             <Shield className="w-3 h-3 mr-1" />
                             {employee.role}
                           </Badge>
+                          {employee.orderLetter && (
+                            <Badge variant="secondary" className="font-mono bg-blue-100 text-blue-800 border-blue-200" title="Order Isolation Letter">
+                              Code: {employee.orderLetter}
+                            </Badge>
+                          )}
                           <Badge className={getStatusColor(employee.status)}>
                             {employee.status === 'active' ? 'Active' : employee.status === 'inactive' ? 'Revoked' : employee.status}
                           </Badge>

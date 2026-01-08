@@ -254,6 +254,8 @@ export const employees = pgTable("employees", {
   skills: jsonb("skills"), // Array of skills
   performanceRating: decimal("performance_rating", { precision: 3, scale: 2 }).default("0.00"),
   lastReviewDate: timestamp("last_review_date"),
+  profileImage: text("profile_image"),
+  orderLetter: text("order_letter"), // Unique letter (A-Z) for order isolation
   settings: jsonb("settings"), // User preferences
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

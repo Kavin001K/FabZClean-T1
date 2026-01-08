@@ -749,6 +749,7 @@ export class SQLiteStorage implements IStorage {
           { name: 'panNumber', type: 'TEXT' },
           { name: 'aadharNumber', type: 'TEXT' },
           { name: 'profileImage', type: 'TEXT' }, // Base64 or URL for profile photo
+          { name: 'orderLetter', type: 'TEXT' }, // Unique letter (A-Z) for order numbers within franchise
         ];
 
         for (const col of employeeColumns) {
@@ -756,6 +757,21 @@ export class SQLiteStorage implements IStorage {
             console.log(`🔄 Migrating employees table: Adding column ${col.name}`);
             this.db.exec(`ALTER TABLE employees ADD COLUMN ${col.name} ${col.type}`);
           }
+        }
+
+        // Backfill order letters for existing employees
+        try {
+          const employeesWithoutLetter = this.db.prepare("SELECT * FROM employees WHERE orderLetter IS NULL OR orderLetter = ''").all() as any[];
+          if (employeesWithoutLetter.length > 0) {
+            console.log(`🔄 Backfilling order letters for ${employeesWithoutLetter.length} employees...`);
+            for (const emp of employeesWithoutLetter) {
+              const letter = this.getNextOrderLetter(emp.franchiseId);
+              this.db.prepare("UPDATE employees SET orderLetter = ? WHERE id = ?").run(letter, emp.id);
+              console.log(`  - Assigned letter '${letter}' to ${emp.name} (${emp.franchiseId || 'HQ'})`);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to backfill order letters:', err);
         }
       }
 
@@ -1275,25 +1291,29 @@ export class SQLiteStorage implements IStorage {
       }
     }
 
-    // Get employee letter code (A-Z based on employee)
+    // Get employee letter code (A-Z) - use stored orderLetter for consistent isolation
     let employeeCode = 'X'; // Default for unknown employee
     if (employeeId) {
       try {
         const employee = this.db.prepare(
-          'SELECT id, employeeId, name, fullName FROM employees WHERE id = ? OR employeeId = ?'
+          'SELECT id, employeeId, name, fullName, orderLetter FROM employees WHERE id = ? OR employeeId = ?'
         ).get(employeeId, employeeId) as any;
 
         if (employee) {
-          // Use first letter of name, or generate from employeeId
-          const name = employee.fullName || employee.name || employee.employeeId || '';
-          employeeCode = name.charAt(0).toUpperCase() || 'X';
+          // Use the stored orderLetter (auto-assigned unique per franchise)
+          if (employee.orderLetter) {
+            employeeCode = employee.orderLetter.toUpperCase();
+          } else {
+            // Fallback: use first letter of name
+            const name = employee.fullName || employee.name || employee.employeeId || '';
+            employeeCode = name.charAt(0).toUpperCase() || 'X';
 
-          // If still no valid letter, use a hash-based letter
-          if (!/[A-Z]/.test(employeeCode)) {
-            // Generate letter from employeeId hash
-            const hash = (employee.id || employee.employeeId || '').split('')
-              .reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-            employeeCode = String.fromCharCode(65 + (hash % 26)); // A-Z
+            // If still no valid letter, use a hash-based letter
+            if (!/[A-Z]/.test(employeeCode)) {
+              const hash = (employee.id || employee.employeeId || '').split('')
+                .reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+              employeeCode = String.fromCharCode(65 + (hash % 26)); // A-Z
+            }
           }
         }
       } catch (err) {
@@ -1741,7 +1761,49 @@ export class SQLiteStorage implements IStorage {
   }
 
   // ======= EMPLOYEES =======
+
+  /**
+   * Get the next available order letter (A-Z) for a franchise
+   * Each franchise can have up to 26 employees with unique letters
+   */
+  getNextOrderLetter(franchiseId: string | null | undefined): string {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+    // Get all employees in this franchise with assigned letters
+    let query = 'SELECT orderLetter FROM employees WHERE orderLetter IS NOT NULL';
+    const params: any[] = [];
+
+    if (franchiseId) {
+      query += ' AND franchiseId = ?';
+      params.push(franchiseId);
+    } else {
+      query += ' AND (franchiseId IS NULL OR franchiseId = "")';
+    }
+
+    const rows = this.db.prepare(query).all(...params) as any[];
+    const usedLetters = new Set(rows.map(r => r.orderLetter?.toUpperCase()));
+
+    // Find the first unused letter
+    for (const letter of letters) {
+      if (!usedLetters.has(letter)) {
+        return letter;
+      }
+    }
+
+    // If all 26 letters are used, generate a two-character code (AA, AB, etc.)
+    // This supports up to 676 employees per franchise
+    const usedCount = usedLetters.size;
+    const firstChar = letters[Math.floor(usedCount / 26) % 26];
+    const secondChar = letters[usedCount % 26];
+    return `${firstChar}${secondChar}`;
+  }
+
   async createEmployee(data: InsertEmployee): Promise<Employee> {
+    // Auto-assign order letter if not provided
+    if (!(data as any).orderLetter) {
+      (data as any).orderLetter = this.getNextOrderLetter((data as any).franchiseId);
+    }
+
     const id = this.insertRecord("employees", data);
     return this.getRecord<Employee>("employees", id)!;
   }
@@ -1754,6 +1816,15 @@ export class SQLiteStorage implements IStorage {
     id: string,
     data: Partial<InsertEmployee>,
   ): Promise<Employee | undefined> {
+    // If changing franchiseId, may need to reassign order letter
+    if ((data as any).franchiseId !== undefined) {
+      const existing = await this.getEmployee(id);
+      if (existing && (existing as any).franchiseId !== (data as any).franchiseId) {
+        // Assign a new letter for the new franchise
+        (data as any).orderLetter = this.getNextOrderLetter((data as any).franchiseId);
+      }
+    }
+
     this.updateRecord("employees", id, data);
     return this.getEmployee(id);
   }
