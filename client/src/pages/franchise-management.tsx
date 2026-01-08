@@ -51,6 +51,7 @@ const franchiseFormSchema = z.object({
     // Basic Info
     name: z.string().min(1, "Franchise name is required"),
     franchiseId: z.string().optional(),
+    code: z.string().min(2, "Code must be 2-3 characters").max(3, "Max 3 characters").optional(), // e.g., POL, MUM - for order numbers
     branchCode: z.string().max(5, "Max 5 characters").optional(),
     ownerName: z.string().min(1, "Owner name is required"),
     email: z.string().email("Invalid email"),
@@ -128,7 +129,10 @@ export default function FranchiseManagement() {
     const { data: franchises, isLoading } = useQuery({
         queryKey: ["franchises"],
         queryFn: async () => {
-            const res = await fetch("/api/franchises");
+            const token = localStorage.getItem('employee_token');
+            const res = await fetch("/api/franchises", {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
             if (!res.ok) throw new Error("Failed to fetch franchises");
             return res.json();
         },
@@ -138,6 +142,7 @@ export default function FranchiseManagement() {
         resolver: zodResolver(franchiseFormSchema),
         defaultValues: {
             name: "",
+            code: "", // 3-letter code for order numbers
             branchCode: "",
             ownerName: "",
             email: "",
@@ -191,9 +196,13 @@ export default function FranchiseManagement() {
                 },
             };
 
+            const token = localStorage.getItem('employee_token');
             const res = await fetch("/api/franchises", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify(payload),
             });
             if (!res.ok) {
@@ -225,9 +234,13 @@ export default function FranchiseManagement() {
                 },
             };
 
+            const token = localStorage.getItem('employee_token');
             const res = await fetch(`/api/franchises/${editingFranchise.id}`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify(payload),
             });
             if (!res.ok) {
@@ -250,7 +263,11 @@ export default function FranchiseManagement() {
 
     const deleteFranchiseMutation = useMutation({
         mutationFn: async (id: string) => {
-            const res = await fetch(`/api/franchises/${id}`, { method: "DELETE" });
+            const token = localStorage.getItem('employee_token');
+            const res = await fetch(`/api/franchises/${id}`, {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
             if (!res.ok) {
                 const error = await res.json();
                 throw new Error(error.message || "Failed to delete franchise");
@@ -280,6 +297,7 @@ export default function FranchiseManagement() {
         const address = franchise.address || {};
         form.reset({
             name: franchise.name || "",
+            code: franchise.code || "", // 3-letter code
             branchCode: franchise.branchCode || "",
             ownerName: franchise.ownerName || "",
             email: franchise.email || "",
@@ -391,9 +409,20 @@ export default function FranchiseManagement() {
                                         )}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="branchCode">Branch Code</Label>
-                                        <Input {...form.register("branchCode")} placeholder="POL" maxLength={5} />
-                                        <p className="text-xs text-muted-foreground">Used in order numbers (e.g., FZC-2025POL0001)</p>
+                                        <Label htmlFor="code">Location Code (3 letters) *</Label>
+                                        <Input
+                                            {...form.register("code")}
+                                            placeholder="POL"
+                                            maxLength={3}
+                                            className="uppercase font-mono"
+                                            onChange={(e) => form.setValue("code", e.target.value.toUpperCase())}
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            Used in order numbers: FZC26<strong>POL</strong>A0001
+                                        </p>
+                                        {form.formState.errors.code && (
+                                            <p className="text-sm text-red-500">{form.formState.errors.code.message}</p>
+                                        )}
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="ownerName">Owner Name *</Label>
@@ -750,7 +779,7 @@ export default function FranchiseManagement() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Branch</TableHead>
+                                <TableHead>Code</TableHead>
                                 <TableHead>Name</TableHead>
                                 <TableHead>Contact</TableHead>
                                 <TableHead>Location</TableHead>
@@ -776,8 +805,8 @@ export default function FranchiseManagement() {
                                 franchises?.map((franchise: any) => (
                                     <TableRow key={franchise.id}>
                                         <TableCell>
-                                            <div className="font-mono text-sm bg-muted px-2 py-1 rounded w-fit">
-                                                {franchise.branchCode || franchise.franchiseId?.slice(0, 5) || "—"}
+                                            <div className="font-mono text-sm bg-primary/10 text-primary px-2 py-1 rounded w-fit font-bold">
+                                                {franchise.code || franchise.branchCode || franchise.franchiseId?.slice(0, 3) || "—"}
                                             </div>
                                         </TableCell>
                                         <TableCell>
