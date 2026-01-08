@@ -163,8 +163,8 @@ const SimpleInvoiceTemplate: React.FC<{ data: InvoiceData }> = ({ data }) => {
                         <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
                             <td style={{ padding: '10px' }}>{item.description}</td>
                             <td style={{ textAlign: 'center', padding: '10px' }}>{item.quantity}</td>
-                            <td style={{ textAlign: 'right', padding: '10px' }}>{item.unitPrice.toFixed(2)}</td>
-                            <td style={{ textAlign: 'right', padding: '10px', fontWeight: 'bold' }}>{item.total.toFixed(2)}</td>
+                            <td style={{ textAlign: 'right', padding: '10px' }}>{parseFloat(String(item.unitPrice || 0)).toFixed(2)}</td>
+                            <td style={{ textAlign: 'right', padding: '10px', fontWeight: 'bold' }}>{parseFloat(String(item.total || 0)).toFixed(2)}</td>
                         </tr>
                     ))}
                 </tbody>
