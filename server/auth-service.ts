@@ -373,9 +373,20 @@ export class AuthService {
                 employeeId: generatedEmployeeId,
                 password: passwordHash,
                 role: data.role,
-                franchiseId: data.franchiseId,
-                factoryId: data.factoryId,
+                franchiseId: data.franchiseId || null,
+                factoryId: data.factoryId || null,
                 status: 'active',
+                firstName: firstName,
+                lastName: lastName,
+                position: data.position,
+                department: data.department,
+                address: typeof data.address === 'object' ? JSON.stringify(data.address) : data.address,
+                salary: data.baseSalary ? String(data.baseSalary) : (data.salary ? String(data.salary) : undefined),
+                hourlyRate: data.hourlyRate ? String(data.hourlyRate) : undefined,
+                hireDate: data.hireDate ? data.hireDate.toISOString() : undefined,
+                emergencyContact: data.emergencyContact,
+                managerId: null,
+                skills: data.qualifications,
             });
 
             if (newEmployee) {
@@ -386,10 +397,15 @@ export class AuthService {
                     username: generatedEmployeeId,
                     role: data.role as any,
                     franchiseId: data.franchiseId,
+                    factoryId: data.factoryId,
                     fullName: data.fullName || `${firstName} ${lastName}`,
                     email: newEmployee.email,
                     phone: newEmployee.phone,
                     isActive: true,
+                    position: newEmployee.position,
+                    department: newEmployee.department,
+                    salary: newEmployee.salary ? parseFloat(newEmployee.salary) : 0,
+                    hireDate: newEmployee.hireDate ? new Date(newEmployee.hireDate) : undefined,
                 };
             }
         } catch (localError) {
