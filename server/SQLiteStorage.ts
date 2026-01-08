@@ -863,6 +863,7 @@ export class SQLiteStorage implements IStorage {
 
     const keys = Object.keys(dataWithTimestamps);
     const values = Object.values(dataWithTimestamps).map(value => {
+      if (value === undefined) return null;
       if (value instanceof Date) return value.toISOString();
       if (typeof value === 'boolean') return value ? 1 : 0;
       return value;
@@ -1036,7 +1037,7 @@ export class SQLiteStorage implements IStorage {
       Object.keys(processedData)
         .map((k) => `${k} = ?`)
         .join(", ") + ", updatedAt = ?";
-    const values = [...Object.values(processedData), now, id];
+    const values = [...Object.values(processedData).map(v => v === undefined ? null : v), now, id];
 
     this.db
       .prepare(`UPDATE ${table} SET ${setStmt} WHERE id = ?`)
