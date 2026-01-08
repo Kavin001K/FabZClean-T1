@@ -15,11 +15,11 @@ declare global {
  */
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
     try {
-        // Skip authentication in development mode - DISABLED to allow real auth testing
-        /*
-        if (process.env.NODE_ENV !== 'production') {
+        // Skip authentication in development mode for local testing
+        if (process.env.NODE_ENV !== 'production' && process.env.API_DEBUG === 'true') {
             // Create a mock employee for development
             req.employee = {
+                id: 'dev-admin-id',
                 employeeId: 'dev-admin',
                 username: 'System Admin',
                 role: 'admin',
@@ -28,7 +28,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
             };
             return next();
         }
-        */
 
         // Get token from Authorization header
         const authHeader = req.headers.authorization;
