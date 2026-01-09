@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "npx tsx watch server/minimal-server.ts",
     "build": "npm run build:client && npm run build:server",
+    "build:ec2": "NODE_OPTIONS='--max-old-space-size=4096' npm run build",
     "build:client": "vite build --config vite.config.minimal.ts",
     "build:server": "esbuild server/minimal-server.ts --bundle --platform=node --target=node18 --outfile=dist-server/server.js --format=esm --packages=external",
     "postinstall": "npm run build:client",
