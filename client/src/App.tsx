@@ -45,6 +45,7 @@ const ProfilePage = lazy(() => retryDynamicImport(() => import("@/pages/profile"
 const DatabaseStatus = lazy(() => retryDynamicImport(() => import("@/pages/database-status")));
 const PerformanceAnalytics = lazy(() => retryDynamicImport(() => import("@/components/analytics")));
 const Accounting = lazy(() => retryDynamicImport(() => import("@/pages/accounting")));
+const Credits = lazy(() => retryDynamicImport(() => import("@/pages/credits")));
 const InvoiceGenerator = lazy(() => retryDynamicImport(() => import("@/components/invoice-generator").then(m => ({ default: m.InvoiceGenerator }))));
 const CustomerPortal = lazy(() => retryDynamicImport(() => import("@/pages/customer-portal")));
 const WorkerPortal = lazy(() => retryDynamicImport(() => import("@/pages/worker-portal")));
@@ -178,6 +179,14 @@ function Router() {
         <ProtectedRoute allowedRoles={['admin', 'franchise_manager']}>
           <MainLayout>
             <Accounting />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/credits">
+        <ProtectedRoute allowedRoles={['admin', 'factory_manager', 'franchise_manager']}>
+          <MainLayout>
+            <Credits />
           </MainLayout>
         </ProtectedRoute>
       </Route>

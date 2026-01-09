@@ -16,6 +16,7 @@ import {
   Shield,
   Building2,
   BarChart3,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -100,6 +101,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Accounting",
     icon: Calculator,
     roles: ["admin", "franchise_manager", "manager"],
+  },
+  {
+    to: "/credits",
+    label: "Credits",
+    icon: CreditCard,
+    roles: ["admin", "factory_manager", "franchise_manager", "manager"],
   },
   {
     to: "/reports",
