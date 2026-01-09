@@ -17,6 +17,10 @@ const TEMPLATES = {
     },
 };
 
+// App base URL for tracking links and terms pages
+// Configure via environment variable: APP_BASE_URL=https://acedigital.myfabclean.com
+const APP_BASE_URL = process.env.APP_BASE_URL || 'https://acedigital.myfabclean.com';
+
 // Max number of resends allowed per order
 export const MAX_RESENDS = 3;
 
@@ -195,13 +199,13 @@ export async function sendOrderCreatedNotification({
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                value: `https://myfabclean.com/trackorder/${cleanOrderNumber}`,
+                                value: `${APP_BASE_URL}/trackorder/${cleanOrderNumber}`,
                             },
                             // Button 2: Terms & Conditions - dynamic URL suffix
                             button_2: {
                                 subtype: "url",
                                 type: "text",
-                                value: "https://myfabclean.com/terms",
+                                value: `${APP_BASE_URL}/terms`,
                             },
                         },
                     },
@@ -267,7 +271,7 @@ export async function sendOrderCreatedNotification({
  *   - Header: Document (PDF invoice)
  *   - Body: Hi {{1}}! 👋 Your order for ₹{{4}} is currently Processing!
  *          We have generated Invoice {{2}} for {{3}}.
- *   - Button 1: Track Order with link https://myfabclean.com/trackorder/{{1}} (order number)
+ *   - Button 1: Track Order with link ${APP_BASE_URL}/trackorder/{{1}} (order number)
  *   - Button 2: Terms & Conditions with link https://myfabclean.com/{{1}} (terms path)
  * 
  * AUTO-TRIGGERED: When order status changes to "processing"
@@ -343,13 +347,13 @@ export async function sendOrderProcessingNotification({
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                value: `https://myfabclean.com/trackorder/${cleanOrderNumber}`,
+                                value: `${APP_BASE_URL}/trackorder/${cleanOrderNumber}`,
                             },
                             // Button 2: Terms & Conditions - Full URL
                             button_2: {
                                 subtype: "url",
                                 type: "text",
-                                value: "https://myfabclean.com/terms",
+                                value: `${APP_BASE_URL}/terms`,
                             },
                         },
                     },
@@ -363,7 +367,7 @@ export async function sendOrderProcessingNotification({
         console.log(`📄 [WhatsApp] Template: ${template.name} (bill)`);
         console.log(`�️ [WhatsApp] Image: ${processingImageUrl}`);
         console.log(`🧺 [WhatsApp] Customer: ${customerName}, Order: ${orderNumber}`);
-        console.log(`🔗 [WhatsApp] Track Link will be: https://myfabclean.com/trackorder/${cleanOrderNumber}`);
+        console.log(`🔗 [WhatsApp] Track Link will be: ${APP_BASE_URL}/trackorder/${cleanOrderNumber}`);
 
         const response = await fetch(
             "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
@@ -414,7 +418,7 @@ export async function sendOrderProcessingNotification({
 /**
  * Send Order Status Update notification via WhatsApp
  * Template: "invoice_fabzclean" - 👋 Dear {{1}}, Update for Order #{{2}}: Status: {{3}} ✅ {{4}}
- * Button: Track Order with URL https://myfabclean.com/trackorder/{{1}} (order number)
+ * Button: Track Order with URL ${APP_BASE_URL}/trackorder/{{1}} (order number)
  * 
  * AUTO-TRIGGERED: When order status changes to ready_for_pickup or out_for_delivery
  */
@@ -504,13 +508,13 @@ export async function sendOrderStatusUpdateNotification({
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                value: `https://myfabclean.com/trackorder/${cleanOrderNumber}`,
+                                value: `${APP_BASE_URL}/trackorder/${cleanOrderNumber}`,
                             },
                             // Button 2: Terms & Conditions - Full URL
                             button_2: {
                                 subtype: "url",
                                 type: "text",
-                                value: "https://myfabclean.com/terms",
+                                value: `${APP_BASE_URL}/terms`,
                             },
                         },
                     },
@@ -523,7 +527,7 @@ export async function sendOrderStatusUpdateNotification({
         console.log(`📱 [WhatsApp] Sending Status Update to ${cleanPhone}`);
         console.log(`📄 [WhatsApp] Template: ${template.name} (invoice)`);
         console.log(`📋 [WhatsApp] Customer: ${customerName}, Order: ${orderNumber}, Status: ${status}`);
-        console.log(`🔗 [WhatsApp] Track URL: https://myfabclean.com/trackorder/${cleanOrderNumber}`);
+        console.log(`🔗 [WhatsApp] Track URL: ${APP_BASE_URL}/trackorder/${cleanOrderNumber}`);
 
         const response = await fetch(
             "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
@@ -612,7 +616,7 @@ export async function handleOrderStatusChange(
     if (currentStatus === 'processing' && previousStatus !== 'processing') {
         console.log(`📤 [WhatsApp] Triggering Processing notification for order ${order.orderNumber}`);
         console.log(`📎 [WhatsApp] Invoice URL: ${order.invoiceUrl || 'Not available'}`);
-        console.log(`🔗 [WhatsApp] Track Order URL will be: https://myfabclean.com/trackorder/${order.orderNumber}`);
+        console.log(`🔗 [WhatsApp] Track Order URL will be: ${APP_BASE_URL}/trackorder/${order.orderNumber}`);
 
         return await sendOrderProcessingNotification({
             phoneNumber: order.customerPhone,
@@ -738,13 +742,13 @@ export async function sendInvoiceWhatsApp({
             button_1: {
                 subtype: "url",
                 type: "text",
-                value: `https://myfabclean.com/trackorder/${cleanOrderNumber}`,
+                value: `${APP_BASE_URL}/trackorder/${cleanOrderNumber}`,
             },
             // Button 2: Terms & Conditions - Full URL
             button_2: {
                 subtype: "url",
                 type: "text",
-                value: "https://myfabclean.com/terms",
+                value: `${APP_BASE_URL}/terms`,
             },
         };
     } else if (templateType === 'invoice') {
@@ -779,13 +783,13 @@ export async function sendInvoiceWhatsApp({
             button_1: {
                 subtype: "url",
                 type: "text",
-                value: `https://myfabclean.com/trackorder/${cleanOrderNumber}`,
+                value: `${APP_BASE_URL}/trackorder/${cleanOrderNumber}`,
             },
             // Button 2: Terms & Conditions - Full URL
             button_2: {
                 subtype: "url",
                 type: "text",
-                value: "https://myfabclean.com/terms",
+                value: `${APP_BASE_URL}/terms`,
             },
         };
     } else {
@@ -823,13 +827,13 @@ export async function sendInvoiceWhatsApp({
             button_1: {
                 subtype: "url",
                 type: "text",
-                value: `https://myfabclean.com/trackorder/${cleanOrderNumber}`,
+                value: `${APP_BASE_URL}/trackorder/${cleanOrderNumber}`,
             },
             // Button 2: Terms & Conditions - Full URL
             button_2: {
                 subtype: "url",
                 type: "text",
-                value: "https://myfabclean.com/terms",
+                value: `${APP_BASE_URL}/terms`,
             },
         };
     }

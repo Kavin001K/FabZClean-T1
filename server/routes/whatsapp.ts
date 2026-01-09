@@ -121,7 +121,8 @@ router.post("/send-bill", async (req, res) => {
                 ? `This includes your ${itemSummary}.`
                 : "";
 
-            const message = `Hi ${customerName}! 👋 Your laundry order is Processing! 🧺\n\nWe have generated Invoice ${orderId} for ₹${amount || '0.00'}.${itemText ? ` ${itemText}` : ''}\n\nPayment Options: Scan the QR in the invoice or use UPI / Google Pay / PhonePe.\n📄 Terms: https://myfabclean.com/terms\n\nThanks for choosing Fab Clean!`;
+            const appBaseUrl = process.env.APP_BASE_URL || 'https://acedigital.myfabclean.com';
+            const message = `Hi ${customerName}! 👋 Your laundry order is Processing! 🧺\n\nWe have generated Invoice ${orderId} for ₹${amount || '0.00'}.${itemText ? ` ${itemText}` : ''}\n\nPayment Options: Scan the QR in the invoice or use UPI / Google Pay / PhonePe.\n📄 Terms: ${appBaseUrl}/terms\n\nThanks for choosing Fab Clean!`;
 
             const textResult = await sendTextWhatsApp({
                 phoneNumber: customerPhone,
