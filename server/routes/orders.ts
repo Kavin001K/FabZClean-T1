@@ -735,12 +735,14 @@ router.patch(
 
       /**
        * PAYMENT VALIDATION:
-       * Orders cannot be marked as 'completed' or 'delivered' unless payment is 'paid'
-       * This ensures no order is handed over without payment being collected
+       * Orders cannot be marked as 'completed' or 'delivered' unless:
+       * 1. Payment status is 'paid', OR
+       * 2. Payment status is 'credit' (amount is tracked as customer debt)
+       * This ensures no order is handed over without payment being collected or credit being recorded
        */
-      if ((status === 'completed' || status === 'delivered') && order.paymentStatus !== 'paid') {
+      if ((status === 'completed' || status === 'delivered') && order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit') {
         return res.status(400).json(createErrorResponse(
-          'Payment must be marked as paid before completing or delivering the order',
+          'Payment must be marked as paid or credit before completing or delivering the order',
           400
         ));
       }
