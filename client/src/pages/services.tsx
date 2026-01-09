@@ -1,6 +1,94 @@
-import { ServiceImportDialog } from '@/components/services/service-import-dialog';
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
+import { safeParseFloat } from '@/lib/safe-utils';
+import { useDebounce } from '@/hooks/use-debounce';
+import {
+  PlusCircle,
+  Download,
+  Printer,
+  Star,
+  Clock,
+  TrendingUp,
+  Package,
+  ShoppingCart,
+  Filter,
+  Search,
+  Grid3x3,
+  List,
+  CheckCircle,
+  XCircle,
+  Sparkles,
+  FileText
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
-// ... (keep existing imports)
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+// Import data service and types
+import { servicesApi } from '@/lib/data-service';
+import type { Service } from '@shared/schema';
+import { EnhancedPDFExport, exportServicesEnhanced } from '@/lib/enhanced-pdf-export';
+import { exportServicesToExcel } from '@/lib/excel-exports';
+
+// Service icon mapping
+const getServiceIcon = (category: string) => {
+  const icons: Record<string, typeof Package> = {
+    'Cleaning': Sparkles,
+    'Maintenance': Package,
+    'Repair': Package,
+    'Installation': Package,
+    'default': Package
+  };
+  return icons[category] || icons.default;
+};
+
+// Format currency
+const formatCurrency = (amount: string | number) => {
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(num) || num === null || num === undefined) {
+    return '₹0.00';
+  }
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(num);
+};
 
 export default function Services() {
   // State for dialog management
@@ -8,21 +96,310 @@ export default function Services() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
-  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   // UI State
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  // ... (keep existing state)
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'price' | 'popular'>('name');
 
-  // ... (keep queries/mutations)
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch services data with React Query
+  const {
+    data: servicesData,
+    isLoading: servicesLoading,
+    isError: servicesError,
+    error: servicesErrorDetails,
+  } = useQuery({
+    queryKey: ['services'],
+    queryFn: servicesApi.getAll,
+    staleTime: 5 * 60 * 1000,
+    retry: 3,
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
+
+  // Ensure services is always an array
+  const services: Service[] = useMemo(() => {
+    if (!servicesData) return [];
+    if (Array.isArray(servicesData)) return servicesData;
+    // If data is wrapped in an object, try to extract the array
+    if (typeof servicesData === 'object' && 'data' in servicesData) {
+      const wrappedData = (servicesData as any).data;
+      return Array.isArray(wrappedData) ? wrappedData : [];
+    }
+    return [];
+  }, [servicesData]);
+
+  // Get unique categories from services
+  const categories = useMemo(() => {
+    const cats = new Set(services.map(s => s.category));
+    return ['all', ...Array.from(cats)];
+  }, [services]);
+
+  // Filter and sort services
+  const filteredServices = useMemo(() => {
+    let filtered = [...services];
+
+    // Search filter
+    if (debouncedSearchQuery) {
+      filtered = filtered.filter(service =>
+        service.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        service.description?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        service.category.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+      );
+    }
+
+    // Category filter
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(service => service.category === selectedCategory);
+    }
+
+    // Status filter
+    if (selectedStatus !== 'all') {
+      filtered = filtered.filter(service => service.status === selectedStatus);
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      if (sortBy === 'name') {
+        return a.name.localeCompare(b.name);
+      } else if (sortBy === 'price') {
+        const priceA = parseFloat(a.price) || 0;
+        const priceB = parseFloat(b.price) || 0;
+        return priceA - priceB;
+      }
+      return 0;
+    });
+
+    return filtered;
+  }, [services, debouncedSearchQuery, selectedCategory, selectedStatus, sortBy]);
+
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const totalServices = services.length;
+    const activeServices = services.filter(s => s.status === 'Active').length;
+    const totalRevenue = services.length > 0
+      ? services.reduce((sum, s) => sum + safeParseFloat(s.price), 0)
+      : 0;
+    const avgPrice = totalServices > 0 ? totalRevenue / totalServices : 0;
+
+    return {
+      totalServices,
+      activeServices,
+      totalRevenue,
+      avgPrice,
+    };
+  }, [services]);
+
+  // Service creation mutation
+  const createServiceMutation = useMutation({
+    mutationFn: async (serviceData: Partial<Service>) => {
+      return await servicesApi.create(serviceData);
+    },
+    onSuccess: (newService) => {
+      if (newService) {
+        queryClient.invalidateQueries({ queryKey: ["services"] });
+        toast({
+          title: "Service Created Successfully",
+          description: `Service ${newService.name} has been added to the catalog.`,
+        });
+        setIsCreateDialogOpen(false);
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to create service:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create service. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Service update mutation
+  const updateServiceMutation = useMutation({
+    mutationFn: async ({ serviceId, serviceData }: { serviceId: string; serviceData: Partial<Service> }) => {
+      return await servicesApi.update(serviceId, serviceData);
+    },
+    onSuccess: (updatedService) => {
+      if (updatedService) {
+        queryClient.invalidateQueries({ queryKey: ["services"] });
+        toast({
+          title: "Service Updated Successfully",
+          description: `Service ${updatedService.name} has been updated.`,
+        });
+        setIsEditDialogOpen(false);
+        setSelectedService(null);
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to update service:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update service. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Service delete mutation
+  const deleteServiceMutation = useMutation({
+    mutationFn: async (serviceId: string) => {
+      return await servicesApi.delete(serviceId);
+    },
+    onSuccess: (success) => {
+      if (success) {
+        queryClient.invalidateQueries({ queryKey: ["services"] });
+        toast({
+          title: "Service Deleted Successfully",
+          description: "Service has been removed from the catalog.",
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to delete service:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete service. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handler functions
+  const handleEditService = (service: Service) => {
+    setSelectedService(service);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteService = (serviceId: string) => {
+    if (window.confirm('Are you sure you want to delete this service?')) {
+      deleteServiceMutation.mutate(serviceId);
+    }
+  };
+
+  const handleUpdateService = (data: Partial<Service>) => {
+    if (!selectedService) return;
+    updateServiceMutation.mutate({
+      serviceId: selectedService.id,
+      serviceData: data,
+    });
+  };
+
+  const handleAddToOrder = (service: Service) => {
+    setSelectedService(service);
+    setIsOrderDialogOpen(true);
+  };
+
+  const handleExportPDF = () => {
+    exportServicesEnhanced(filteredServices);
+
+    toast({
+      title: "PDF Downloaded",
+      description: "Service catalog has been exported successfully.",
+    });
+  };
+
+  const handleExportExcel = () => {
+    const filters = {
+      category: selectedCategory,
+      status: selectedStatus,
+    };
+    exportServicesToExcel(filteredServices, filters);
+
+    toast({
+      title: "Excel Export Successful",
+      description: `Exported ${filteredServices.length} services to Excel.`,
+    });
+  };
 
   const handlePrintPriceList = () => {
-    // ... (keep existing)
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Service Price List</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #84cc16; border-bottom: 3px solid #84cc16; padding-bottom: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+          th { background-color: #84cc16; color: white; font-weight: bold; }
+          tr:nth-child(even) { background-color: #f9f9f9; }
+          .footer { margin-top: 30px; text-align: center; color: #666; }
+          @media print { body { margin: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>Service Price List</h1>
+        <p>Generated on: ${new Date().toLocaleString()}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Service Name</th>
+              <th>Category</th>
+              <th>Duration</th>
+              <th>Price</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${services.map(service => `
+              <tr>
+                <td><strong>${service.name}</strong></td>
+                <td>${service.category}</td>
+                <td>${service.duration}</td>
+                <td><strong>${formatCurrency(service.price)}</strong></td>
+                <td>${service.status}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="footer">
+          <p>Total Services: ${services.length} | Generated: ${new Date().toLocaleDateString()}</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
   };
 
   // Error state
   if (servicesError) {
-    // ... (keep existing)
+    return (
+      <div className="flex flex-1 items-center justify-center p-8">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <div className="text-destructive text-lg font-semibold">
+                Failed to load services
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {servicesErrorDetails?.message || 'An unexpected error occurred'}
+              </p>
+              <Button
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['services'] })}
+                variant="outline"
+              >
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -41,7 +418,6 @@ export default function Services() {
           </p>
         </div>
         <div className="flex gap-2">
-          {/* ... (Print and Export buttons) */}
           <Button
             variant="outline"
             size="sm"
@@ -68,26 +444,12 @@ export default function Services() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          <Button variant="outline" size="sm" onClick={() => setIsImportDialogOpen(true)}>
-            <Upload className="h-4 w-4 mr-2" />
-            Import
-          </Button>
-
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <PlusCircle className="h-4 w-4 mr-2" />
             Add Service
           </Button>
         </div>
       </motion.div>
-
-      {/* ... (Rest of UI) */}
-
-      <ServiceImportDialog
-        open={isImportDialogOpen}
-        onOpenChange={setIsImportDialogOpen}
-      />
-
 
       {/* Statistics Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -536,151 +898,6 @@ export default function Services() {
         }}
         service={selectedService}
       />
-
-      {/* Excel Import Dialog */}
-      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5" />
-              Import Services from Excel
-            </DialogTitle>
-            <DialogDescription>
-              Review the parsed data before importing. Services with the same name will be updated.
-            </DialogDescription>
-          </DialogHeader>
-
-          {importResult && (
-            <div className="space-y-4">
-              {/* Summary Stats */}
-              <div className="grid grid-cols-3 gap-4">
-                <Card className="p-4 text-center">
-                  <p className="text-2xl font-bold">{importResult.totalRows}</p>
-                  <p className="text-sm text-muted-foreground">Total Rows</p>
-                </Card>
-                <Card className="p-4 text-center border-green-200 bg-green-50">
-                  <p className="text-2xl font-bold text-green-600">{importResult.validRows}</p>
-                  <p className="text-sm text-muted-foreground">Valid</p>
-                </Card>
-                <Card className="p-4 text-center border-red-200 bg-red-50">
-                  <p className="text-2xl font-bold text-red-600">{importResult.invalidRows}</p>
-                  <p className="text-sm text-muted-foreground">With Errors</p>
-                </Card>
-              </div>
-
-              {/* Errors */}
-              {importResult.errors.length > 0 && (
-                <Card className="border-red-200 bg-red-50/50">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-red-600 flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4" />
-                      Validation Errors ({importResult.errors.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-sm max-h-32 overflow-y-auto">
-                    <ul className="space-y-1">
-                      {importResult.errors.slice(0, 10).map((error, i) => (
-                        <li key={i} className="text-red-600">{error}</li>
-                      ))}
-                      {importResult.errors.length > 10 && (
-                        <li className="text-red-500 font-medium">...and {importResult.errors.length - 10} more errors</li>
-                      )}
-                    </ul>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Preview Table */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Preview ({importResult.validRows} services will be imported)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="max-h-60 overflow-y-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted sticky top-0">
-                        <tr>
-                          <th className="p-2 text-left">Status</th>
-                          <th className="p-2 text-left">Name</th>
-                          <th className="p-2 text-left">Category</th>
-                          <th className="p-2 text-right">Price</th>
-                          <th className="p-2 text-left">Duration</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {importResult.parsedServices.slice(0, 20).map((service, i) => (
-                          <tr key={i} className={service.isValid ? '' : 'bg-red-50'}>
-                            <td className="p-2">
-                              {service.isValid ? (
-                                <Check className="h-4 w-4 text-green-500" />
-                              ) : (
-                                <AlertCircle className="h-4 w-4 text-red-500" />
-                              )}
-                            </td>
-                            <td className="p-2 font-medium">{service.name || '-'}</td>
-                            <td className="p-2">{service.category || '-'}</td>
-                            <td className="p-2 text-right">₹{service.price}</td>
-                            <td className="p-2">{service.duration || '-'}</td>
-                          </tr>
-                        ))}
-                        {importResult.parsedServices.length > 20 && (
-                          <tr>
-                            <td colSpan={5} className="p-2 text-center text-muted-foreground">
-                              ...and {importResult.parsedServices.length - 20} more rows
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Progress */}
-              {isImporting && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Importing services...</span>
-                    <span>{importProgress}%</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-lime-500 transition-all duration-300"
-                      style={{ width: `${importProgress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsImportDialogOpen(false);
-                setImportResult(null);
-              }}
-              disabled={isImporting}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleBulkImport}
-              disabled={isImporting || !importResult || importResult.validRows === 0}
-            >
-              {isImporting ? (
-                <>Importing...</>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Import {importResult?.validRows || 0} Services
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
