@@ -18,8 +18,8 @@ import type { UserRole } from '../../shared/supabase';
 const router = Router();
 
 // Roles that can manage credits
-const CREDIT_VIEW_ROLES: UserRole[] = ['admin', 'factory_manager', 'franchise_manager', 'employee'];
-const CREDIT_MANAGE_ROLES: UserRole[] = ['admin', 'factory_manager', 'franchise_manager'];
+const CREDIT_VIEW_ROLES: UserRole[] = ['admin', 'franchise_manager', 'employee'];
+const CREDIT_MANAGE_ROLES: UserRole[] = ['admin', 'franchise_manager'];
 const ADMIN_ONLY: UserRole[] = ['admin'];
 
 // Apply JWT authentication to all routes
@@ -287,13 +287,14 @@ router.post('/:customerId/adjust', requireRole(ADMIN_ONLY), async (req, res) => 
  * GET /credits/report/outstanding
  * Get all customers with outstanding credit balances
  */
-router.get('/report/outstanding', requireRole(CREDIT_MANAGE_ROLES), async (req, res) => {
+router.get('/report/outstanding', requireRole(CREDIT_VIEW_ROLES), async (req, res) => {
     try {
         const employee = req.employee;
         let franchiseId: string | undefined = undefined;
 
         // Apply franchise isolation for non-admin users
-        if (employee && employee.role !== 'admin' && employee.role !== 'factory_manager') {
+        // Note: factory_manager is excluded because they don't have access to this route
+        if (employee && employee.role !== 'admin') {
             franchiseId = employee.franchiseId;
         }
 
