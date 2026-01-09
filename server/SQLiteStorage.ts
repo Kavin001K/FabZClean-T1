@@ -698,7 +698,24 @@ export class SQLiteStorage implements IStorage {
           { name: 'gstNumber', type: 'TEXT' },
           { name: 'specialInstructions', type: 'TEXT' },
           { name: 'createdBy', type: 'TEXT' },
-          { name: 'employeeId', type: 'TEXT' }
+          { name: 'employeeId', type: 'TEXT' },
+          // Fulfillment and delivery columns
+          { name: 'fulfillmentType', type: 'TEXT DEFAULT "pickup"' },
+          { name: 'deliveryCharges', type: 'TEXT DEFAULT "0"' },
+          { name: 'deliveryAddress', type: 'TEXT' },
+          // Express and priority columns
+          { name: 'isExpressOrder', type: 'INTEGER DEFAULT 0' },
+          { name: 'expressService', type: 'INTEGER DEFAULT 0' },
+          { name: 'priority', type: 'TEXT DEFAULT "normal"' },
+          { name: 'expectedDeliveryDate', type: 'TEXT' },
+          { name: 'notes', type: 'TEXT' },
+          // WhatsApp notification tracking
+          { name: 'lastWhatsappStatus', type: 'TEXT' },
+          { name: 'lastWhatsappSentAt', type: 'TEXT' },
+          { name: 'whatsappMessageCount', type: 'INTEGER DEFAULT 0' },
+          // Service fields
+          { name: 'service', type: 'TEXT' },
+          { name: 'serviceId', type: 'TEXT' },
         ];
 
         for (const col of newColumns) {
@@ -908,6 +925,12 @@ export class SQLiteStorage implements IStorage {
           ? anyData.shippingAddress
           : JSON.stringify(anyData.shippingAddress);
     }
+    if (table === "orders" && anyData.deliveryAddress) {
+      anyData.deliveryAddress =
+        typeof anyData.deliveryAddress === "string"
+          ? anyData.deliveryAddress
+          : JSON.stringify(anyData.deliveryAddress);
+    }
     if (table === "deliveries" && anyData.location) {
       anyData.location =
         typeof anyData.location === "string"
@@ -1092,6 +1115,12 @@ export class SQLiteStorage implements IStorage {
         typeof processedData.shippingAddress === "string"
           ? processedData.shippingAddress
           : JSON.stringify(processedData.shippingAddress);
+    }
+    if (table === "orders" && processedData.deliveryAddress) {
+      processedData.deliveryAddress =
+        typeof processedData.deliveryAddress === "string"
+          ? processedData.deliveryAddress
+          : JSON.stringify(processedData.deliveryAddress);
     }
     if (table === "deliveries" && processedData.location) {
       processedData.location =

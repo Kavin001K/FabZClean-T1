@@ -154,6 +154,8 @@ CREATE TABLE "orders" (
     "fulfillment_type" TEXT DEFAULT 'pickup',
     "delivery_charges" NUMERIC(10, 2) DEFAULT 0,
     "delivery_address" JSONB,
+    "is_express_order" BOOLEAN DEFAULT false,
+    "priority" TEXT DEFAULT 'normal',
     "last_whatsapp_status" TEXT,
     "last_whatsapp_sent_at" TIMESTAMP WITH TIME ZONE,
     "whatsapp_message_count" INTEGER DEFAULT 0,
@@ -639,7 +641,94 @@ DROP POLICY IF EXISTS "Allow public access" ON "transit_status_history";
 CREATE POLICY "Allow public access" ON "transit_status_history" FOR ALL USING (true);
 
 -- =====================================================================
--- PART 6: STORAGE SETUP (for PDFs/Bills)
+-- PART 6: ORDER SEQUENCES TABLE (for atomic order number generation)
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS "order_sequences" (
+    "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    "branch_code" TEXT NOT NULL UNIQUE,
+    "year" INTEGER NOT NULL,
+    "current_sequence" INTEGER NOT NULL DEFAULT 0,
+    "letter_suffix" CHAR(1) NOT NULL DEFAULT 'A',
+    "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE "order_sequences" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public access" ON "order_sequences";
+CREATE POLICY "Allow public access" ON "order_sequences" FOR ALL USING (true);
+
+CREATE INDEX IF NOT EXISTS "idx_order_sequences_branch_year" ON "order_sequences"("branch_code", "year");
+
+-- =====================================================================
+-- PART 7: RPC FUNCTIONS (for atomic sequence generation)
+-- =====================================================================
+
+-- Function to generate next order number atomically
+CREATE OR REPLACE FUNCTION get_next_order_number(p_branch_code TEXT)
+RETURNS TEXT AS $$
+DECLARE
+    v_year INTEGER;
+    v_sequence INTEGER;
+    v_letter CHAR(1);
+    v_order_number TEXT;
+    v_row_exists BOOLEAN;
+BEGIN
+    v_year := EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER;
+    
+    SELECT EXISTS(
+        SELECT 1 FROM order_sequences 
+        WHERE branch_code = p_branch_code AND year = v_year
+        FOR UPDATE
+    ) INTO v_row_exists;
+    
+    IF v_row_exists THEN
+        UPDATE order_sequences 
+        SET current_sequence = current_sequence + 1, updated_at = NOW()
+        WHERE branch_code = p_branch_code AND year = v_year
+        RETURNING current_sequence, letter_suffix INTO v_sequence, v_letter;
+        
+        IF v_sequence > 9999 THEN
+            UPDATE order_sequences 
+            SET current_sequence = 1, letter_suffix = CHR(ASCII(letter_suffix) + 1), updated_at = NOW()
+            WHERE branch_code = p_branch_code AND year = v_year
+            RETURNING current_sequence, letter_suffix INTO v_sequence, v_letter;
+        END IF;
+    ELSE
+        INSERT INTO order_sequences (branch_code, year, current_sequence, letter_suffix)
+        VALUES (p_branch_code, v_year, 1, 'A')
+        RETURNING current_sequence, letter_suffix INTO v_sequence, v_letter;
+    END IF;
+    
+    v_order_number := 'FZC-' || v_year::TEXT || p_branch_code || LPAD(v_sequence::TEXT, 4, '0') || v_letter;
+    RETURN v_order_number;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to generate next transit number
+CREATE OR REPLACE FUNCTION get_next_transit_number(p_branch_code TEXT)
+RETURNS TEXT AS $$
+DECLARE
+    v_year INTEGER;
+    v_count INTEGER;
+BEGIN
+    v_year := EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER;
+    SELECT COUNT(*) + 1 INTO v_count FROM transit_orders 
+    WHERE transit_id LIKE 'TRN-' || v_year::TEXT || p_branch_code || '%';
+    RETURN v_year::TEXT || p_branch_code || LPAD(v_count::TEXT, 3, '0') || 'A';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================================
+-- PART 8: PERFORMANCE INDEXES
+-- =====================================================================
+
+CREATE INDEX IF NOT EXISTS "idx_orders_express" ON "orders"("is_express_order") WHERE "is_express_order" = true;
+CREATE INDEX IF NOT EXISTS "idx_orders_priority" ON "orders"("priority");
+CREATE INDEX IF NOT EXISTS "idx_orders_status_priority" ON "orders"("status", "priority", "created_at" DESC);
+
+-- =====================================================================
+-- PART 9: STORAGE SETUP (for PDFs/Bills)
 -- =====================================================================
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('pdfs', 'pdfs', true)
