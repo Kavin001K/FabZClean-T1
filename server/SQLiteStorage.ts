@@ -299,6 +299,7 @@ export class SQLiteStorage implements IStorage {
         lastWhatsappSentAt TEXT,
         whatsappMessageCount INTEGER DEFAULT 0,
         
+        createdBy TEXT,
         createdAt TEXT,
         updatedAt TEXT,
         FOREIGN KEY (customerId) REFERENCES customers(id),
@@ -694,7 +695,8 @@ export class SQLiteStorage implements IStorage {
           { name: 'gstAmount', type: 'TEXT DEFAULT "0.00"' },
           { name: 'panNumber', type: 'TEXT' },
           { name: 'gstNumber', type: 'TEXT' },
-          { name: 'specialInstructions', type: 'TEXT' }
+          { name: 'specialInstructions', type: 'TEXT' },
+          { name: 'createdBy', type: 'TEXT' }
         ];
 
         for (const col of newColumns) {
