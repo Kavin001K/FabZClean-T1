@@ -89,6 +89,23 @@ export class SQLiteStorage implements IStorage {
   }
 
   private createTables() {
+    // Self-healing: Check if 'orders' table exists but is missing 'customerId' (corrupt from previous bad schema)
+    try {
+      const checkOrders = this.db.prepare("PRAGMA table_info(orders)").all() as any[];
+      if (checkOrders.length > 0) {
+        const hasCustomerId = checkOrders.some((col: any) => col.name === 'customerId');
+        // Also check if it has customer-like fields incorrectly (like 'creditBalance')
+        const hasCreditBalance = checkOrders.some((col: any) => col.name === 'creditBalance');
+
+        if (!hasCustomerId && hasCreditBalance) {
+          console.warn("⚠️  Corrupt 'orders' table detected (bad schema). Dropping table to allow recreation...");
+          this.db.exec("DROP TABLE IF EXISTS orders");
+        }
+      }
+    } catch (err) {
+      console.warn("⚠️  Error checking table schema:", err);
+    }
+
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS franchises (
         id TEXT PRIMARY KEY,
