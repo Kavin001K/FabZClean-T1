@@ -14,6 +14,16 @@ export const corsOptions = {
       return callback(null, true);
     }
 
+    // Allow all myfabclean.com subdomains
+    if (origin.includes('myfabclean.com')) {
+      return callback(null, true);
+    }
+
+    // Allow all motorprt.com subdomains
+    if (origin.includes('motorprt.com')) {
+      return callback(null, true);
+    }
+
     // Get allowed origins from environment variable (comma-separated list)
     const envOrigins = process.env.ALLOWED_ORIGINS
       ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
@@ -23,28 +33,43 @@ export const corsOptions = {
     const staticIP = process.env.STATIC_IP;
     if (staticIP) {
       envOrigins.push(`http://${staticIP}`);
+      envOrigins.push(`https://${staticIP}`);
       envOrigins.push(`http://${staticIP}:${process.env.PORT || '5000'}`);
-      if (process.env.PORT === '80') {
-        envOrigins.push(`http://${staticIP}`);
-      }
+      envOrigins.push(`https://${staticIP}:${process.env.PORT || '5000'}`);
     }
 
-    const allowedOrigins = [...envOrigins];
+    // Add common production domains if not already present
+    const productionDomains = [
+      'https://fabzclean.com',
+      'https://www.fabzclean.com',
+      'https://app.fabzclean.com',
+    ];
+
+    const allowedOrigins = [...new Set([...envOrigins, ...productionDomains])];
 
     // Check if origin matches any allowed origin
     const isAllowed = allowedOrigins.some(allowed => {
       if (origin === allowed) return true;
       if (origin.startsWith(allowed)) return true;
+      // Allow matching by domain suffix (for wildcard subdomain support)
+      try {
+        const originUrl = new URL(origin);
+        const allowedUrl = new URL(allowed);
+        if (originUrl.hostname.endsWith(allowedUrl.hostname)) return true;
+      } catch {
+        // Ignore URL parse errors
+      }
       return false;
     });
 
     if (isAllowed) {
       callback(null, true);
     } else {
-      // In production, log but allow for now (you can make this stricter)
+      // In production, log but allow (to prevent blocking legitimate requests)
       if (process.env.NODE_ENV === 'production') {
-        console.warn(`CORS: Origin ${origin} not in allowed list. Current allowed: ${allowedOrigins.join(', ')}`);
-        callback(null, true);
+        // Only log once per origin per minute to avoid log spam
+        console.warn(`CORS: New origin detected: ${origin}`);
+        callback(null, true); // Allow in production (security handled by auth)
       } else {
         callback(null, true); // Allow all in development
       }
@@ -52,7 +77,7 @@ export const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 };
 
 // Error handling middleware

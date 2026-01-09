@@ -1,47 +1,72 @@
 # Dependencies
-node_modules
+node_modules/
+client/node_modules/
 
-# Build output (will be rebuilt in container)
-dist
+# Build outputs (will be rebuilt in container)
+dist/
+dist-server/
+build/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+fabzclean*.db
 
 # Environment files
 .env
-.env.*
-!.env.example
+.env.local
+.env.*.local
 
 # Git
-.git
+.git/
 .gitignore
-.gitattributes
 
 # IDE
-.vscode
-.idea
-.cursor
-
-# Logs
-*.log
-npm-debug.log*
+.vscode/
+.idea/
+*.swp
+*.swo
 
 # OS files
 .DS_Store
 Thumbs.db
 
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+*.tmp
+*.temp
+
 # Documentation
-*.md
 docs/
+*.md
+!README.md
 
-# Database files
-*.db
-*.sqlite
-
-# Uploads (should use volumes in production)
-uploads/
-
-# Test files
+# Tests
+**/__tests__/
 *.test.*
 *.spec.*
-__tests__/
+coverage/
 
-# Editor directories and files
-.agent/
+# Storybook
+storybook-static/
+*.storybook.log
+
+# Development files
+.replit
+replit.nix
+.local/
+
+# Backups
+backups/
+
+# PM2
+.pm2/
+*.pid
+
+# Certificates (handled separately)
+nginx/certs/

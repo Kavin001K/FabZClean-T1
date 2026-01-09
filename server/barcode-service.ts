@@ -59,7 +59,7 @@ export class BarcodeService {
    */
   private async generateQRCode(data: string, options: { size?: number; margin?: number } = {}): Promise<string> {
     const { size = 200, margin = 2 } = options;
-    
+
     try {
       const qrDataURL = await QRCode.toDataURL(data, {
         width: size,
@@ -79,17 +79,17 @@ export class BarcodeService {
   /**
    * Generate Barcode (Code128)
    */
-  private generateBarcode(data: string, options: { width?: number; height?: number } = {}): string {
+  private generateLinearBarcode(data: string, options: { width?: number; height?: number } = {}): string {
     const { width = 200, height = 100 } = options;
-    
+
     // For now, we'll use a simple text-based barcode representation
     // In production, you might want to use a library like bwip-js for actual barcode generation
     const canvas = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
       <rect width="${width}" height="${height}" fill="white"/>
-      <text x="10" y="${height/2}" font-family="monospace" font-size="12" fill="black">${data}</text>
-      <text x="10" y="${height/2 + 20}" font-family="monospace" font-size="8" fill="black">BARCODE: ${data}</text>
+      <text x="10" y="${height / 2}" font-family="monospace" font-size="12" fill="black">${data}</text>
+      <text x="10" y="${height / 2 + 20}" font-family="monospace" font-size="8" fill="black">BARCODE: ${data}</text>
     </svg>`;
-    
+
     return `data:image/svg+xml;base64,${Buffer.from(canvas).toString('base64')}`;
   }
 
@@ -99,7 +99,7 @@ export class BarcodeService {
   private saveImageToFile(imageData: string, filename: string): string {
     const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
     const filePath = join(this.barcodesDir, filename);
-    
+
     try {
       writeFileSync(filePath, base64Data, 'base64');
       return `/barcodes/${filename}`;
@@ -113,10 +113,10 @@ export class BarcodeService {
    */
   public async generateBarcode(options: BarcodeOptions): Promise<GeneratedBarcode> {
     const { type, entityType, entityId, data, size = 200, margin = 2 } = options;
-    
+
     // Generate unique code
     const code = this.generateUniqueCode(entityType, entityId);
-    
+
     // Prepare data to encode
     const encodedData = {
       code,
@@ -125,12 +125,12 @@ export class BarcodeService {
       timestamp: new Date().toISOString(),
       ...data
     };
-    
+
     const dataString = JSON.stringify(encodedData);
-    
+
     let imageData: string;
     let filename: string;
-    
+
     // Generate image based on type
     switch (type) {
       case 'qr':
@@ -139,24 +139,24 @@ export class BarcodeService {
         break;
       case 'barcode':
       case 'code128':
-        imageData = this.generateBarcode(code, { width: size * 2, height: size });
+        imageData = this.generateLinearBarcode(code, { width: size * 2, height: size });
         filename = `barcode_${code}.svg`;
         break;
       case 'ean13':
         // For EAN13, we'd typically use a specialized library
-        imageData = this.generateBarcode(code, { width: size * 2, height: size });
+        imageData = this.generateLinearBarcode(code, { width: size * 2, height: size });
         filename = `ean13_${code}.svg`;
         break;
       default:
         throw new Error(`Unsupported barcode type: ${type}`);
     }
-    
+
     // Save image to file system
     const imagePath = this.saveImageToFile(imageData, filename);
-    
+
     // Generate unique ID
     const id = randomUUID();
-    
+
     return {
       id,
       code,
@@ -231,7 +231,7 @@ export class BarcodeService {
     items: Array<{ entityType: 'order' | 'shipment' | 'product'; entityId: string; data?: any }>
   ): Promise<GeneratedBarcode[]> {
     const results: GeneratedBarcode[] = [];
-    
+
     for (const item of items) {
       try {
         const barcode = await this.generateBarcode({
@@ -245,7 +245,7 @@ export class BarcodeService {
         console.error(`Failed to generate barcode for ${item.entityType}:${item.entityId}`, error);
       }
     }
-    
+
     return results;
   }
 }

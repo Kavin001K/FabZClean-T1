@@ -40,19 +40,19 @@ export class DatabaseQueryOptimizer {
    */
   analyzeQuery(query: string, executionTime: number): QueryPlan {
     const normalizedQuery = this.normalizeQuery(query);
-    
+
     // Update metrics
     this.updateMetrics(normalizedQuery, executionTime);
-    
+
     // Analyze query structure
     const analysis = this.analyzeQueryStructure(normalizedQuery);
-    
+
     // Generate optimization suggestions
     const optimizations = this.generateOptimizations(normalizedQuery, analysis);
-    
+
     // Recommend indexes
     const indexes = this.recommendIndexes(normalizedQuery, analysis);
-    
+
     return {
       query: normalizedQuery,
       estimatedCost: this.estimateCost(analysis),
@@ -76,7 +76,7 @@ export class DatabaseQueryOptimizer {
     const slowQueries = allMetrics.reduce((sum, m) => sum + m.slowQueries, 0);
     const totalTime = allMetrics.reduce((sum, m) => sum + m.totalTime, 0);
     const averageTime = totalQueries > 0 ? totalTime / totalQueries : 0;
-    
+
     const topSlowQueries = allMetrics
       .filter(m => m.averageTime > this.slowQueryThreshold)
       .sort((a, b) => b.averageTime - a.averageTime)
@@ -96,13 +96,13 @@ export class DatabaseQueryOptimizer {
   getIndexRecommendations(): IndexRecommendation[] {
     const recommendations: IndexRecommendation[] = [];
     const frequentQueries = this.getFrequentQueries();
-    
+
     for (const query of frequentQueries) {
       const analysis = this.analyzeQueryStructure(query);
       const queryRecommendations = this.recommendIndexes(query, analysis);
       recommendations.push(...queryRecommendations);
     }
-    
+
     return this.prioritizeRecommendations(recommendations);
   }
 
@@ -127,19 +127,19 @@ export class DatabaseQueryOptimizer {
       orderColumns: this.extractOrderColumns(query),
       groupColumns: this.extractGroupColumns(query)
     };
-    
+
     return analysis;
   }
 
   private extractWhereConditions(query: string): string[] {
     const whereMatch = query.match(/where\s+(.+?)(?:\s+order|\s+group|\s+limit|$)/i);
     if (!whereMatch) return [];
-    
+
     const conditions = whereMatch[1]
       .split(/\s+(?:and|or)\s+/i)
       .map(condition => condition.trim().split(/\s+/)[0])
       .filter(column => column && !['=', '<', '>', '<=', '>=', 'like', 'in'].includes(column));
-    
+
     return conditions;
   }
 
@@ -151,7 +151,7 @@ export class DatabaseQueryOptimizer {
   private extractOrderColumns(query: string): string[] {
     const orderMatch = query.match(/order\s+by\s+(.+?)(?:\s+limit|$)/i);
     if (!orderMatch) return [];
-    
+
     return orderMatch[1]
       .split(',')
       .map(col => col.trim().split(/\s+/)[0]);
@@ -160,7 +160,7 @@ export class DatabaseQueryOptimizer {
   private extractGroupColumns(query: string): string[] {
     const groupMatch = query.match(/group\s+by\s+(.+?)(?:\s+having|\s+order|\s+limit|$)/i);
     if (!groupMatch) return [];
-    
+
     return groupMatch[1]
       .split(',')
       .map(col => col.trim());
@@ -168,38 +168,38 @@ export class DatabaseQueryOptimizer {
 
   private generateOptimizations(query: string, analysis: any): string[] {
     const optimizations: string[] = [];
-    
+
     // Add LIMIT if missing and query might return many rows
     if (!analysis.hasLimit && !analysis.hasGroupBy) {
       optimizations.push('Consider adding LIMIT clause to prevent large result sets');
     }
-    
+
     // Suggest specific columns instead of SELECT *
     if (query.includes('select *')) {
       optimizations.push('Use specific column names instead of SELECT *');
     }
-    
+
     // Optimize WHERE clauses
     if (analysis.whereConditions.length > 1) {
       optimizations.push('Consider creating composite indexes for multiple WHERE conditions');
     }
-    
+
     // Optimize JOINs
     if (analysis.hasJoin && analysis.joinTables.length > 2) {
       optimizations.push('Consider query decomposition for complex JOINs');
     }
-    
+
     // Optimize ORDER BY
     if (analysis.hasOrderBy && !analysis.hasLimit) {
       optimizations.push('Consider adding LIMIT with ORDER BY for better performance');
     }
-    
+
     return optimizations;
   }
 
   private recommendIndexes(query: string, analysis: any): IndexRecommendation[] {
     const recommendations: IndexRecommendation[] = [];
-    
+
     // WHERE clause indexes
     if (analysis.hasWhere) {
       for (const condition of analysis.whereConditions) {
@@ -212,7 +212,7 @@ export class DatabaseQueryOptimizer {
         });
       }
     }
-    
+
     // ORDER BY indexes
     if (analysis.hasOrderBy) {
       for (const column of analysis.orderColumns) {
@@ -225,7 +225,7 @@ export class DatabaseQueryOptimizer {
         });
       }
     }
-    
+
     // Composite indexes for WHERE + ORDER BY
     if (analysis.hasWhere && analysis.hasOrderBy) {
       const compositeColumns = [...analysis.whereConditions, ...analysis.orderColumns];
@@ -239,7 +239,7 @@ export class DatabaseQueryOptimizer {
         });
       }
     }
-    
+
     return recommendations;
   }
 
@@ -250,35 +250,35 @@ export class DatabaseQueryOptimizer {
 
   private estimateCost(analysis: any): number {
     let cost = 100; // Base cost
-    
+
     if (analysis.hasJoin) {
       cost += analysis.joinTables.length * 50;
     }
-    
+
     if (analysis.hasWhere) {
       cost -= analysis.whereConditions.length * 20; // WHERE clauses reduce cost
     }
-    
+
     if (analysis.hasOrderBy && !analysis.hasLimit) {
       cost += 100; // Sorting without limit is expensive
     }
-    
+
     if (analysis.hasGroupBy) {
       cost += 150;
     }
-    
+
     return Math.max(cost, 10);
   }
 
   private updateMetrics(query: string, executionTime: number): void {
     const existing = this.queryMetrics.get(query);
-    
+
     if (existing) {
       existing.executionCount++;
       existing.totalTime += executionTime;
       existing.averageTime = existing.totalTime / existing.executionCount;
       existing.lastExecuted = new Date();
-      
+
       if (executionTime > this.slowQueryThreshold) {
         existing.slowQueries++;
       }
@@ -305,16 +305,16 @@ export class DatabaseQueryOptimizer {
   private prioritizeRecommendations(recommendations: IndexRecommendation[]): IndexRecommendation[] {
     // Remove duplicates and prioritize
     const uniqueRecommendations = new Map<string, IndexRecommendation>();
-    
+
     for (const rec of recommendations) {
       const key = `${rec.table}:${rec.columns.join(',')}`;
-      
-      if (!uniqueRecommendations.has(key) || 
-          (rec.priority === 'high' && uniqueRecommendations.get(key)!.priority !== 'high')) {
+
+      if (!uniqueRecommendations.has(key) ||
+        (rec.priority === 'high' && uniqueRecommendations.get(key)!.priority !== 'high')) {
         uniqueRecommendations.set(key, rec);
       }
     }
-    
+
     return Array.from(uniqueRecommendations.values())
       .sort((a, b) => {
         const priorityOrder = { high: 3, medium: 2, low: 1 };
@@ -332,8 +332,8 @@ export class OptimizedQueryBuilder {
   private table: string = '';
   private joins: string[] = [];
   private whereConditions: string[] = [];
-  private orderBy: string[] = [];
-  private groupBy: string[] = [];
+  private orderByColumns: string[] = [];
+  private groupByColumns: string[] = [];
   private havingConditions: string[] = [];
   private limitValue?: number;
   private offsetValue?: number;
@@ -361,12 +361,12 @@ export class OptimizedQueryBuilder {
   }
 
   orderBy(column: string, direction: 'ASC' | 'DESC' = 'ASC'): this {
-    this.orderBy.push(`${column} ${direction}`);
+    this.orderByColumns.push(`${column} ${direction}`);
     return this;
   }
 
   groupBy(columns: string[]): this {
-    this.groupBy.push(...columns);
+    this.groupByColumns.push(...columns);
     return this;
   }
 
@@ -388,42 +388,42 @@ export class OptimizedQueryBuilder {
 
   build(): { query: string; parameters: any[] } {
     let finalQuery = this.query;
-    
+
     // Add JOINs
     if (this.joins.length > 0) {
       finalQuery += ' ' + this.joins.join(' ');
     }
-    
+
     // Add WHERE clause
     if (this.whereConditions.length > 0) {
       finalQuery += ` WHERE ${this.whereConditions.join(' AND ')}`;
     }
-    
+
     // Add GROUP BY
-    if (this.groupBy.length > 0) {
-      finalQuery += ` GROUP BY ${this.groupBy.join(', ')}`;
+    if (this.groupByColumns.length > 0) {
+      finalQuery += ` GROUP BY ${this.groupByColumns.join(', ')}`;
     }
-    
+
     // Add HAVING
     if (this.havingConditions.length > 0) {
       finalQuery += ` HAVING ${this.havingConditions.join(' AND ')}`;
     }
-    
+
     // Add ORDER BY
-    if (this.orderBy.length > 0) {
-      finalQuery += ` ORDER BY ${this.orderBy.join(', ')}`;
+    if (this.orderByColumns.length > 0) {
+      finalQuery += ` ORDER BY ${this.orderByColumns.join(', ')}`;
     }
-    
+
     // Add LIMIT
     if (this.limitValue !== undefined) {
       finalQuery += ` LIMIT ${this.limitValue}`;
     }
-    
+
     // Add OFFSET
     if (this.offsetValue !== undefined) {
       finalQuery += ` OFFSET ${this.offsetValue}`;
     }
-    
+
     return {
       query: finalQuery,
       parameters: [...this.parameters]
@@ -456,41 +456,41 @@ export class FabZCleanDatabaseOptimizer {
     sortDirection?: 'ASC' | 'DESC';
   } = {}): { query: string; parameters: any[] } {
     const builder = new OptimizedQueryBuilder();
-    
+
     builder
       .select(['id', 'orderNumber', 'customerName', 'status', 'totalAmount', 'createdAt'])
       .from('orders');
-    
+
     // Apply filters
     if (filters.status) {
       builder.where('status = ?', filters.status);
     }
-    
+
     if (filters.customerId) {
       builder.where('customerId = ?', filters.customerId);
     }
-    
+
     if (filters.dateRange) {
       builder.where('createdAt >= ?', filters.dateRange.start.toISOString());
       builder.where('createdAt <= ?', filters.dateRange.end.toISOString());
     }
-    
+
     // Apply sorting
     if (filters.sortBy) {
       builder.orderBy(filters.sortBy, filters.sortDirection || 'DESC');
     } else {
       builder.orderBy('createdAt', 'DESC'); // Default sort
     }
-    
+
     // Apply pagination
     if (filters.limit) {
       builder.limit(filters.limit);
     }
-    
+
     if (filters.offset) {
       builder.offset(filters.offset);
     }
-    
+
     return builder.build();
   }
 
@@ -504,33 +504,33 @@ export class FabZCleanDatabaseOptimizer {
     offset?: number;
   } = {}): { query: string; parameters: any[] } {
     const builder = new OptimizedQueryBuilder();
-    
+
     builder
       .select(['id', 'name', 'email', 'phone', 'totalOrders', 'totalSpent', 'lastOrder'])
       .from('customers');
-    
+
     // Apply search filter
     if (filters.search) {
       builder.where('name LIKE ?', `%${filters.search}%`);
     }
-    
+
     // Apply minimum spent filter
     if (filters.minSpent) {
       builder.where('totalSpent >= ?', filters.minSpent);
     }
-    
+
     // Default sorting by total spent
     builder.orderBy('totalSpent', 'DESC');
-    
+
     // Apply pagination
     if (filters.limit) {
       builder.limit(filters.limit);
     }
-    
+
     if (filters.offset) {
       builder.offset(filters.offset);
     }
-    
+
     return builder.build();
   }
 
@@ -545,36 +545,36 @@ export class FabZCleanDatabaseOptimizer {
     offset?: number;
   } = {}): { query: string; parameters: any[] } {
     const builder = new OptimizedQueryBuilder();
-    
+
     builder
       .select(['id', 'name', 'sku', 'category', 'price', 'stockQuantity', 'supplier'])
       .from('products');
-    
+
     // Apply filters
     if (filters.category) {
       builder.where('category = ?', filters.category);
     }
-    
+
     if (filters.inStock) {
       builder.where('stockQuantity > ?', 0);
     }
-    
+
     if (filters.search) {
       builder.where('name LIKE ?', `%${filters.search}%`);
     }
-    
+
     // Default sorting by name
     builder.orderBy('name', 'ASC');
-    
+
     // Apply pagination
     if (filters.limit) {
       builder.limit(filters.limit);
     }
-    
+
     if (filters.offset) {
       builder.offset(filters.offset);
     }
-    
+
     return builder.build();
   }
 
@@ -609,7 +609,7 @@ export class FabZCleanDatabaseOptimizer {
   } {
     const performanceStats = this.getPerformanceStats();
     const indexRecommendations = this.getIndexRecommendations();
-    
+
     const queryOptimizations = [
       'Use specific column names instead of SELECT *',
       'Add appropriate indexes for frequently queried columns',
@@ -619,7 +619,7 @@ export class FabZCleanDatabaseOptimizer {
       'Use prepared statements to prevent SQL injection and improve performance',
       'Monitor and analyze slow queries regularly'
     ];
-    
+
     return {
       performanceStats,
       indexRecommendations,
