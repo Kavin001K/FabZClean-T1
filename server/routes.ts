@@ -31,6 +31,7 @@ import auditLogsRouter from "./routes/audit-logs";
 import transitOrdersRouter from "./routes/transit-orders";
 import reportsRouter from "./routes/reports";
 import publicTrackingRouter from "./routes/public-tracking";
+import creditsRouter from "./routes/credits";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register Public routes (no auth required)
@@ -56,6 +57,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Reports routes
   app.use("/api/reports", reportsRouter);
+
+  // Register Credits routes (Customer credit management)
+  app.use("/api/credits", creditsRouter);
 
   // Dashboard metrics
   app.get("/api/dashboard/metrics", async (req, res) => {

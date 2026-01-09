@@ -1033,3 +1033,163 @@ export const logisticsApi = {
     }
   },
 };
+
+// Customer Credits API
+export interface CreditTransaction {
+  id: string;
+  customerId: string;
+  orderId?: string;
+  type: 'credit' | 'payment' | 'adjustment' | 'refund' | 'deposit' | 'usage';
+  amount: string;
+  balanceAfter: string;
+  description?: string;
+  referenceId?: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface CustomerCreditDetails {
+  customer: {
+    id: string;
+    name: string;
+    phone?: string;
+    email?: string;
+  };
+  creditBalance: number;
+  summary: {
+    totalCredited: number;
+    totalPaid: number;
+    pendingBalance: number;
+  };
+  history: CreditTransaction[];
+}
+
+export interface OutstandingCreditReport {
+  totalCustomers: number;
+  totalOutstanding: number;
+  customers: {
+    id: string;
+    name: string;
+    phone?: string;
+    email?: string;
+    creditBalance: number;
+    totalOrders: number;
+    lastOrder?: string;
+  }[];
+}
+
+export const creditsApi = {
+  /**
+   * Get customer credit details including balance and history
+   */
+  async getCustomerCredit(customerId: string): Promise<CustomerCreditDetails | null> {
+    try {
+      const response = await fetchData<{ data: CustomerCreditDetails }>(`/credits/${customerId}`);
+      return response.data || null;
+    } catch (error) {
+      console.error(`Failed to fetch credit for customer ${customerId}:`, error);
+      return null;
+    }
+  },
+
+  /**
+   * Add credit to customer (for credit orders)
+   */
+  async addCredit(customerId: string, data: {
+    amount: number;
+    orderId?: string;
+    orderNumber?: string;
+    reason?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; newBalance?: number; error?: string }> {
+    try {
+      const response = await authorizedFetch(`/credits/${customerId}/add`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to add credit');
+      }
+
+      const result = await response.json();
+      return { success: true, newBalance: result.data?.newBalance };
+    } catch (error: any) {
+      console.error('Failed to add credit:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Record a credit payment (customer settling their dues)
+   */
+  async recordPayment(customerId: string, data: {
+    amount: number;
+    paymentMethod?: string;
+    referenceNumber?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; previousBalance?: number; newBalance?: number; error?: string }> {
+    try {
+      const response = await authorizedFetch(`/credits/${customerId}/payment`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to record payment');
+      }
+
+      const result = await response.json();
+      return {
+        success: true,
+        previousBalance: result.data?.previousBalance,
+        newBalance: result.data?.newBalance
+      };
+    } catch (error: any) {
+      console.error('Failed to record payment:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Adjust credit balance (admin only)
+   */
+  async adjustCredit(customerId: string, data: {
+    amount: number;
+    reason: string;
+    notes?: string;
+  }): Promise<{ success: boolean; newBalance?: number; error?: string }> {
+    try {
+      const response = await authorizedFetch(`/credits/${customerId}/adjust`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to adjust credit');
+      }
+
+      const result = await response.json();
+      return { success: true, newBalance: result.data?.newBalance };
+    } catch (error: any) {
+      console.error('Failed to adjust credit:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Get all customers with outstanding credit balances
+   */
+  async getOutstandingReport(): Promise<OutstandingCreditReport | null> {
+    try {
+      const response = await fetchData<{ data: OutstandingCreditReport }>('/credits/report/outstanding');
+      return response.data || null;
+    } catch (error) {
+      console.error('Failed to fetch outstanding credit report:', error);
+      return null;
+    }
+  },
+};

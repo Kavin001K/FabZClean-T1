@@ -538,3 +538,46 @@ export type TransitOrderItem = typeof transitOrderItems.$inferSelect;
 
 export type InsertTransitStatusHistory = z.infer<typeof insertTransitStatusHistorySchema>;
 export type TransitStatusHistory = typeof transitStatusHistory.$inferSelect;
+
+// ============================================================
+// CUSTOMER CREDIT SYSTEM
+// Tracks credit transactions - debits (orders on credit) and payments
+// ============================================================
+
+export const creditTransactions = pgTable("credit_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
+  customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  orderId: varchar("order_id").references(() => orders.id), // Link to order if credit was from an order
+
+  // Transaction type
+  type: text("type", { enum: ["credit", "payment", "adjustment", "refund"] }).notNull(),
+
+  // Amount (positive for credit given, negative for payment received)
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+
+  // Running balance after this transaction
+  balanceAfter: decimal("balance_after", { precision: 10, scale: 2 }).notNull(),
+
+  // Payment method (for payments/settlements)
+  paymentMethod: text("payment_method"), // cash, card, upi, bank_transfer
+
+  // Reference numbers
+  referenceNumber: text("reference_number"), // UPI ref, cheque number, etc.
+
+  // Notes and reason
+  notes: text("notes"),
+  reason: text("reason"), // e.g., "Order placed on credit", "Monthly settlement"
+
+  // Who recorded this
+  recordedBy: varchar("recorded_by"), // Employee ID
+  recordedByName: text("recorded_by_name"),
+
+  // Timestamps
+  transactionDate: timestamp("transaction_date").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCreditTransactionSchema = createInsertSchema(creditTransactions);
+export type InsertCreditTransaction = z.infer<typeof insertCreditTransactionSchema>;
+export type CreditTransaction = typeof creditTransactions.$inferSelect;

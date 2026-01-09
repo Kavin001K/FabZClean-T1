@@ -417,6 +417,25 @@ router.post(
         } catch (loyaltyError) {
           console.warn('Failed to process loyalty rewards:', loyaltyError);
         }
+
+        // Handle credit payment - add to customer's credit balance
+        if (order.paymentStatus === 'credit') {
+          try {
+            const orderAmount = parseFloat(order.totalAmount || "0");
+            await storage.addCustomerCredit(
+              order.customerId,
+              orderAmount,
+              'credit',
+              `Order ${order.orderNumber} placed on credit`,
+              order.id,
+              req.employee?.employeeId
+            );
+            console.log(`💳 [Credit] Added ₹${orderAmount} to customer ${order.customerId} credit for order ${order.orderNumber}`);
+          } catch (creditError) {
+            console.warn('Failed to add customer credit:', creditError);
+            // Don't fail the order creation if credit update fails
+          }
+        }
       }
 
       // Generate QR code
@@ -535,6 +554,42 @@ router.put('/:id', requireRole(ORDER_UPDATE_ROLES), async (req, res) => {
             req.ip || req.connection.remoteAddress,
             req.get('user-agent')
           );
+
+          // If order was on credit and now paid, reduce customer credit balance
+          if (order.paymentStatus === 'credit' && order.customerId) {
+            try {
+              const orderAmount = parseFloat(order.totalAmount || "0");
+              await storage.addCustomerCredit(
+                order.customerId,
+                -orderAmount, // Negative to reduce balance
+                'payment',
+                `Payment received for order ${order.orderNumber}`,
+                orderId,
+                req.employee?.employeeId
+              );
+              console.log(`💳 [Credit] Reduced ₹${orderAmount} from customer ${order.customerId} credit - order ${order.orderNumber} paid`);
+            } catch (creditError) {
+              console.warn('Failed to reduce customer credit:', creditError);
+            }
+          }
+        }
+
+        // If changed to credit, add to customer credit balance
+        if (updateData.paymentStatus === 'credit' && order.paymentStatus !== 'credit' && order.customerId) {
+          try {
+            const orderAmount = parseFloat(order.totalAmount || "0");
+            await storage.addCustomerCredit(
+              order.customerId,
+              orderAmount,
+              'credit',
+              `Order ${order.orderNumber} marked as credit`,
+              orderId,
+              req.employee?.employeeId
+            );
+            console.log(`💳 [Credit] Added ₹${orderAmount} to customer ${order.customerId} credit for order ${order.orderNumber}`);
+          } catch (creditError) {
+            console.warn('Failed to add customer credit:', creditError);
+          }
         }
       }
 
