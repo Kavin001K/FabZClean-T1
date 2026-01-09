@@ -320,10 +320,31 @@ export default React.memo(function OrderDetailsDialog({
                 <div className="mt-3 pt-3 border-t">
                   <p className="text-sm text-muted-foreground">Delivery Address</p>
                   <p className="font-medium mt-1">
-                    {typeof (order as any).deliveryAddress === 'object'
-                      ? `${(order as any).deliveryAddress.street || ''}${(order as any).deliveryAddress.city ? `, ${(order as any).deliveryAddress.city}` : ''}${(order as any).deliveryAddress.zip ? ` - ${(order as any).deliveryAddress.zip}` : ''}`
-                      : (order as any).deliveryAddress
-                    }
+                    {(() => {
+                      const addr = (order as any).deliveryAddress;
+                      // Handle JSON string format
+                      let addressObj = addr;
+                      if (typeof addr === 'string') {
+                        try {
+                          addressObj = JSON.parse(addr);
+                        } catch {
+                          // Not JSON, use as-is
+                          return addr;
+                        }
+                      }
+                      // Format object to readable address
+                      if (typeof addressObj === 'object' && addressObj !== null) {
+                        const parts = [];
+                        if (addressObj.street) parts.push(addressObj.street);
+                        if (addressObj.landmark) parts.push(addressObj.landmark);
+                        if (addressObj.city) parts.push(addressObj.city);
+                        if (addressObj.state) parts.push(addressObj.state);
+                        if (addressObj.zip || addressObj.pincode) parts.push(`- ${addressObj.zip || addressObj.pincode}`);
+                        if (addressObj.country && addressObj.country !== 'India') parts.push(addressObj.country);
+                        return parts.join(', ').replace(', -', ' -') || 'Address not available';
+                      }
+                      return String(addr);
+                    })()}
                   </p>
                 </div>
               )}

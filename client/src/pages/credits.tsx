@@ -78,8 +78,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { PageTransition } from "@/components/page-transition";
-import { authorizedFetch } from "@/lib/api";
+import { PageTransition } from "@/components/ui/page-transition";
+import { authorizedFetch } from "@/lib/data-service";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 

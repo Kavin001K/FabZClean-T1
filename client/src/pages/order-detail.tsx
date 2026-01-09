@@ -364,10 +364,36 @@ export default function OrderDetailPage() {
                   <div className="md:col-span-2">
                     <p className="text-sm font-medium text-muted-foreground">Shipping Address</p>
                     <p className="text-lg font-semibold">
-                      {typeof (order as any).shippingAddress === 'string'
-                        ? (order as any).shippingAddress
-                        : JSON.stringify((order as any).shippingAddress)
-                      }
+                      {(() => {
+                        const addr = (order as any).shippingAddress;
+                        // Parse JSON string if needed
+                        let addressObj = addr;
+                        if (typeof addr === 'string') {
+                          try {
+                            addressObj = JSON.parse(addr);
+                          } catch {
+                            return addr; // Return as-is if not valid JSON
+                          }
+                        }
+                        // Format object to readable address
+                        if (typeof addressObj === 'object' && addressObj !== null) {
+                          const parts = [];
+                          if (addressObj.street || addressObj.line1 || addressObj.address) {
+                            parts.push(addressObj.street || addressObj.line1 || addressObj.address);
+                          }
+                          if (addressObj.landmark) parts.push(addressObj.landmark);
+                          if (addressObj.city) parts.push(addressObj.city);
+                          if (addressObj.state) parts.push(addressObj.state);
+                          if (addressObj.zip || addressObj.pincode || addressObj.zipCode) {
+                            parts.push(`- ${addressObj.zip || addressObj.pincode || addressObj.zipCode}`);
+                          }
+                          if (addressObj.country && addressObj.country !== 'India') {
+                            parts.push(addressObj.country);
+                          }
+                          return parts.join(', ').replace(', -', ' -') || 'Address not available';
+                        }
+                        return String(addr);
+                      })()}
                     </p>
                   </div>
                 )}

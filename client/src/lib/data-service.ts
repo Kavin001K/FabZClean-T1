@@ -107,7 +107,7 @@ function withAuth(init: RequestInit = {}): RequestInit {
   };
 }
 
-async function authorizedFetch(endpoint: string, init: RequestInit = {}) {
+export async function authorizedFetch(endpoint: string, init: RequestInit = {}) {
   return fetch(`${API_BASE}${endpoint}`, withAuth(init));
 }
 
