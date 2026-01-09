@@ -90,8 +90,52 @@ export class MemStorage implements IStorage {
       return;
     }
 
+    // Check for SKIP_SAMPLE_DATA environment variable
+    // If true, only create admin user (for production)
+    if (process.env.SKIP_SAMPLE_DATA === 'true') {
+      console.log("🚀 SKIP_SAMPLE_DATA is set - Creating only admin user...");
+      await this.createAdminOnly();
+      return;
+    }
+
     console.log("Initializing database with sample data...");
     await this.seedSampleData();
+  }
+
+  /**
+   * Create only the admin user (for production use)
+   */
+  private async createAdminOnly() {
+    try {
+      // Check if admin already exists
+      const existingAdmin = await this.sqliteStorage.getEmployeeByEmail("admin@myfabclean.com");
+      if (existingAdmin) {
+        console.log("✅ Admin user already exists");
+        return;
+      }
+
+      // Create admin user with Durai@2025 password
+      const adminPasswordHash = bcrypt.hashSync("Durai@2025", 10);
+      await this.sqliteStorage.createEmployee({
+        name: "System Admin",
+        firstName: "System",
+        lastName: "Admin",
+        role: "admin",
+        email: "admin@myfabclean.com",
+        employeeId: "myfabclean",
+        password: adminPasswordHash,
+        status: "active",
+        phone: "9999999999",
+        position: "Administrator",
+        department: "Management"
+      });
+
+      console.log("✅ Admin user created successfully");
+      console.log("   Email: admin@myfabclean.com");
+      console.log("   Password: Durai@2025");
+    } catch (error) {
+      console.error("Error creating admin:", error);
+    }
   }
 
   private async seedSampleData() {
