@@ -509,6 +509,29 @@ function OrdersComponent() {
     });
   }, [updateOrderMutation]);
 
+  const handleMarkAsCredit = useCallback((orderId: string, order: Order) => {
+    // Confirm credit action with user
+    const customerName = order.customerName || 'Customer';
+    const amount = parseFloat(order.totalAmount || '0').toLocaleString('en-IN', { maximumFractionDigits: 2 });
+
+    if (window.confirm(`Mark order as Credit?\n\n₹${amount} will be added to ${customerName}'s credit balance.\n\nThe customer will need to pay this amount later.`)) {
+      updateOrderMutation.mutate({
+        orderId,
+        updates: {
+          paymentStatus: 'credit',
+          paymentMethod: 'credit'
+        }
+      }, {
+        onSuccess: () => {
+          toast({
+            title: "Order Marked as Credit",
+            description: `₹${amount} added to ${customerName}'s credit balance`,
+          });
+        }
+      });
+    }
+  }, [updateOrderMutation, toast]);
+
   const handleBulkStatusUpdate = useCallback(async (newStatus: string) => {
     if (selectedOrders.length === 0) {
       toast({
@@ -983,6 +1006,7 @@ function OrdersComponent() {
     switch (status) {
       case 'paid': return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-200';
       case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'credit': return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900 dark:text-orange-200';
       case 'failed': return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900 dark:text-red-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-200';
     }
@@ -1055,7 +1079,17 @@ function OrdersComponent() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {order.status === 'pending' && <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'processing')}>Mark as Processing</DropdownMenuItem>}
-              {order.paymentStatus !== 'paid' && <DropdownMenuItem onClick={() => handleMarkAsPaid(order.id)}>Mark as Paid</DropdownMenuItem>}
+              {order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit' && <DropdownMenuItem onClick={() => handleMarkAsPaid(order.id)}>Mark as Paid</DropdownMenuItem>}
+              {order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit' && (
+                <DropdownMenuItem onClick={() => handleMarkAsCredit(order.id, order)} className="text-orange-600 focus:text-orange-600">
+                  💳 Mark as Credit
+                </DropdownMenuItem>
+              )}
+              {order.paymentStatus === 'credit' && (
+                <DropdownMenuItem onClick={() => handleMarkAsPaid(order.id)} className="text-green-600 focus:text-green-600">
+                  ✅ Clear Credit (Mark Paid)
+                </DropdownMenuItem>
+              )}
               {order.status === 'processing' && <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>Mark as Completed</DropdownMenuItem>}
               {order.status !== 'completed' && order.status !== 'cancelled' && (
                 <DropdownMenuItem onClick={() => handleCancelOrder(order)} className="text-red-600 focus:text-red-600">
@@ -1067,7 +1101,7 @@ function OrdersComponent() {
         </div>
       </div>
     );
-  }, [selectedOrders, getStatusColor, getStatusIcon, getPaymentStatusColor, handleSelectOrder, handleViewOrder, handleEditOrder, handlePrintInvoice, handleUpdateStatus, handleMarkAsPaid, handleCancelOrder]);
+  }, [selectedOrders, getStatusColor, getStatusIcon, getPaymentStatusColor, handleSelectOrder, handleViewOrder, handleEditOrder, handlePrintInvoice, handleUpdateStatus, handleMarkAsPaid, handleMarkAsCredit, handleCancelOrder]);
 
   const OrderHeaders = (
     <div className="grid grid-cols-[48px_140px_minmax(0,1fr)_120px_140px_120px_100px_120px_120px_80px] gap-4 items-center px-4 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase select-none sticky top-0 z-10 w-full">
@@ -1352,7 +1386,7 @@ function OrdersComponent() {
                         <div className="space-y-3">
                           <label className="text-sm font-medium">Payment Status</label>
                           <div className="grid grid-cols-2 gap-2">
-                            {['paid', 'pending', 'failed'].map((status) => (
+                            {['paid', 'pending', 'credit', 'failed'].map((status) => (
                               <div key={status} className="flex items-center space-x-2">
                                 <Checkbox
                                   id={`payment-${status}`}
