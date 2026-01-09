@@ -20,7 +20,9 @@ import {
   CheckCircle,
   XCircle,
   Sparkles,
-  FileText
+  FileText,
+  Upload,
+  Trash
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -63,6 +65,7 @@ import { servicesApi } from '@/lib/data-service';
 import type { Service } from '@shared/schema';
 import { EnhancedPDFExport, exportServicesEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportServicesToExcel } from '@/lib/excel-exports';
+import { ServiceImportDialog } from '@/components/services/service-import-dialog';
 
 // Service icon mapping
 const getServiceIcon = (category: string) => {
@@ -96,6 +99,7 @@ export default function Services() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   // UI State
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -444,6 +448,14 @@ export default function Services() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsImportDialogOpen(true)}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Import Service
+          </Button>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <PlusCircle className="h-4 w-4 mr-2" />
             Add Service
@@ -749,6 +761,17 @@ export default function Services() {
                             Edit
                           </Button>
                           <Button
+                            variant="destructive"
+                            size="sm"
+                            className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteService(service.id);
+                            }}
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                          <Button
                             className="flex-1 group-hover:bg-lime-600"
                             size="sm"
                             onClick={() => handleAddToOrder(service)}
@@ -851,6 +874,16 @@ export default function Services() {
                             Edit
                           </Button>
                           <Button
+                            variant="destructive"
+                            className="bg-red-50 text-red-600 hover:bg-red-100 border-red-200 whitespace-nowrap"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteService(service.id);
+                            }}
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                          <Button
                             onClick={() => handleAddToOrder(service)}
                             disabled={service.status !== 'Active'}
                             className="whitespace-nowrap"
@@ -887,6 +920,12 @@ export default function Services() {
         onClose={() => setIsCreateDialogOpen(false)}
         onSubmit={(data) => createServiceMutation.mutate(data)}
         isLoading={createServiceMutation.isPending}
+      />
+
+      {/* Import Service Dialog */}
+      <ServiceImportDialog
+        open={isImportDialogOpen}
+        onOpenChange={setIsImportDialogOpen}
       />
 
       {/* Add to Order Dialog */}
