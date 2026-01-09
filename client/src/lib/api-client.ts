@@ -1,11 +1,9 @@
 /**
  * API Client for FabZClean
- * 
- * This module provides a unified way to make API calls that works in both:
+ * * This module provides a unified way to make API calls that works in both:
  * 1. Development mode (with backend server)
  * 2. Production mode on static hosting (direct Supabase)
- * 
- * Usage:
+ * * Usage:
  * Instead of: fetch('/api/orders')
  * Use: apiClient.get('/orders')
  */
@@ -235,6 +233,45 @@ export const apiClient = {
     },
 
     /**
+     * PATCH request
+     */
+    async patch<T = any>(endpoint: string, data?: any): Promise<T> {
+        const useSupabase = shouldUseDirectSupabase();
+
+        if (useSupabase) {
+            const parsed = parseEndpoint(endpoint);
+            if (parsed && parsed.id && data) {
+                const { data: result, error } = await supabase
+                    .from(parsed.table)
+                    .update(data)
+                    .eq('id', parsed.id)
+                    .select()
+                    .single();
+
+                if (error) throw new Error(error.message);
+                return result as T;
+            }
+
+            console.warn(`PATCH to ${endpoint} not supported in direct Supabase mode`);
+            throw new Error('Operation not supported in offline mode');
+        }
+
+        // Use backend API
+        const response = await fetch(`${getApiBase()}${endpoint}`, {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: data ? JSON.stringify(data) : undefined,
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
+        }
+
+        return response.json();
+    },
+
+    /**
      * DELETE request
      */
     async delete<T = any>(endpoint: string): Promise<T> {
@@ -286,3 +323,17 @@ export const apiClient = {
 };
 
 export default apiClient;
+
+/**
+ * Compatibility shim for code expecting apiRequest
+ * This provides backwards compatibility with code that uses the legacy apiRequest function
+ */
+export const apiRequest = async <T = any>(method: string, path: string, body?: any): Promise<T> => {
+    const lowerMethod = method.toLowerCase();
+    if (lowerMethod === 'get') return apiClient.get<T>(path);
+    if (lowerMethod === 'post') return apiClient.post<T>(path, body);
+    if (lowerMethod === 'put') return apiClient.put<T>(path, body);
+    if (lowerMethod === 'patch') return apiClient.patch<T>(path, body);
+    if (lowerMethod === 'delete') return apiClient.delete<T>(path);
+    throw new Error(`Unsupported method: ${method}`);
+};
