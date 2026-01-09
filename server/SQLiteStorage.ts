@@ -197,20 +197,7 @@ export class SQLiteStorage implements IStorage {
         FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
 
-      CREATE TABLE IF NOT EXISTS customer_credit_history (
-        id TEXT PRIMARY KEY,
-        customerId TEXT NOT NULL,
-        amount TEXT NOT NULL, -- Stored as string to avoid precision issues
-        type TEXT CHECK(type IN ('deposit', 'usage', 'adjustment', 'refund')) NOT NULL,
-        referenceId TEXT,
-        description TEXT,
-        balanceAfter TEXT,
-        createdBy TEXT,
-        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (customerId) REFERENCES customers(id)
-      );
-
-      CREATE TABLE IF NOT EXISTS orders (
+      CREATE TABLE IF NOT EXISTS customers (
         id TEXT PRIMARY KEY,
         franchiseId TEXT,
         name TEXT,
@@ -224,6 +211,19 @@ export class SQLiteStorage implements IStorage {
         createdAt TEXT,
         updatedAt TEXT,
         FOREIGN KEY (franchiseId) REFERENCES franchises(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS customer_credit_history (
+        id TEXT PRIMARY KEY,
+        customerId TEXT NOT NULL,
+        amount TEXT NOT NULL, -- Stored as string to avoid precision issues
+        type TEXT CHECK(type IN ('deposit', 'usage', 'adjustment', 'refund')) NOT NULL,
+        referenceId TEXT,
+        description TEXT,
+        balanceAfter TEXT,
+        createdBy TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (customerId) REFERENCES customers(id)
       );
 
       CREATE TABLE IF NOT EXISTS orders (
