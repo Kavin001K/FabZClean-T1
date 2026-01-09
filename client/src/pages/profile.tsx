@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { User, Mail, Phone, Lock, Shield, LogOut, Camera, Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
+import { ImageCropperDialog } from '@/components/image-cropper-dialog';
 
 export default function ProfilePage() {
     const { employee, signOut, refreshEmployee } = useAuth();
@@ -18,6 +19,8 @@ export default function ProfilePage() {
     const [isEditing, setIsEditing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [isChangingPassword, setIsChangingPassword] = useState(false);
+    const [isCropperOpen, setIsCropperOpen] = useState(false);
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [formData, setFormData] = useState({
@@ -97,63 +100,74 @@ export default function ProfilePage() {
             return;
         }
 
-        // Validate file size (max 500KB)
-        if (file.size > 500 * 1024) {
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
             toast({
                 title: 'File Too Large',
-                description: 'Please select an image smaller than 500KB',
+                description: 'Please select an image smaller than 5MB',
                 variant: 'destructive',
             });
             return;
         }
 
+        // Read file and open cropper
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setSelectedImage(reader.result as string);
+            setIsCropperOpen(true);
+        };
+        reader.onerror = () => {
+            toast({
+                title: 'Error',
+                description: 'Failed to read image file',
+                variant: 'destructive',
+            });
+        };
+        reader.readAsDataURL(file);
+
+        // Reset file input so same file can be selected again
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const handleCroppedImageUpload = async (croppedImageBase64: string) => {
         setIsUploading(true);
 
         try {
-            // Convert to base64
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const base64Data = reader.result as string;
+            const token = localStorage.getItem('employee_token');
+            const res = await fetch('/api/auth/upload-profile-image', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({ imageData: croppedImageBase64 }),
+            });
 
-                const token = localStorage.getItem('employee_token');
-                const res = await fetch('/api/auth/upload-profile-image', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({ imageData: base64Data }),
-                });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || 'Failed to upload image');
+            }
 
-                if (!res.ok) {
-                    const error = await res.json();
-                    throw new Error(error.error || 'Failed to upload image');
-                }
+            toast({
+                title: 'Photo Updated',
+                description: 'Your profile photo has been updated successfully.',
+            });
 
-                toast({
-                    title: 'Photo Updated',
-                    description: 'Your profile photo has been updated successfully.',
-                });
+            // Refresh employee data to get the new image
+            if (refreshEmployee) {
+                await refreshEmployee();
+            }
 
-                // Refresh employee data to get the new image
-                if (refreshEmployee) {
-                    await refreshEmployee();
-                }
-
-                setIsUploading(false);
-            };
-
-            reader.onerror = () => {
-                throw new Error('Failed to read image file');
-            };
-
-            reader.readAsDataURL(file);
+            setSelectedImage(null);
         } catch (error: any) {
             toast({
                 title: 'Upload Failed',
                 description: error.message || 'Failed to upload profile photo',
                 variant: 'destructive',
             });
+        } finally {
             setIsUploading(false);
         }
     };
@@ -308,7 +322,7 @@ export default function ProfilePage() {
                             </div>
 
                             <p className="text-xs text-muted-foreground">
-                                Click to upload photo (max 500KB)
+                                Click to upload photo (max 5MB)
                             </p>
 
                             <div className="text-center">
@@ -453,6 +467,22 @@ export default function ProfilePage() {
                     </Tabs>
                 </Card>
             </div>
+            {/* Image Cropper Dialog */}
+            {selectedImage && (
+                <ImageCropperDialog
+                    open={isCropperOpen}
+                    onOpenChange={(open) => {
+                        setIsCropperOpen(open);
+                        if (!open) setSelectedImage(null);
+                    }}
+                    imageSrc={selectedImage}
+                    onCropComplete={handleCroppedImageUpload}
+                    aspectRatio={1}
+                    circularCrop={true}
+                    title="Crop Profile Photo"
+                    description="Drag to adjust and crop your profile photo"
+                />
+            )}
         </div>
     );
 }

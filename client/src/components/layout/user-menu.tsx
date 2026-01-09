@@ -8,13 +8,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '../ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { User, Settings, LogOut, Shield, Briefcase } from 'lucide-react';
 import { useLocation } from 'wouter';
 
 export const UserMenu = () => {
-  const { employee, signOut } = useAuth();
+  const { employee } = useAuth();
   const [, setLocation] = useLocation();
+  const { signOut } = useAuth();
 
   if (!employee) {
     return (
@@ -60,11 +61,15 @@ export const UserMenu = () => {
     return labels[role] || role;
   };
 
+  // Get profile image from employee data
+  const profileImage = (employee as any)?.profileImage;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
           <Avatar>
+            <AvatarImage src={profileImage || ''} alt={employee.fullName} />
             <AvatarFallback className="bg-primary text-white">
               {getInitials(employee.fullName)}
             </AvatarFallback>
