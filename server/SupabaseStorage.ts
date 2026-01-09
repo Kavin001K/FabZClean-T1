@@ -1171,5 +1171,98 @@ export class SupabaseStorage {
         return this.mapDates(attendance);
     }
 
+    // ======= CUSTOMER CREDIT SYSTEM =======
+    async addCustomerCredit(
+        customerId: string,
+        amount: number,
+        type: string,
+        description: string,
+        referenceId?: string,
+        employeeId?: string
+    ): Promise<any> {
+        const { data: customer, error: custError } = await this.supabase
+            .from('customers')
+            .select('id, credit_balance, franchise_id')
+            .eq('id', customerId)
+            .single();
+
+        if (custError) {
+            console.error('Add Credit: Customer fetch failed', custError);
+            throw new Error('Customer not found');
+        }
+
+        const currentBalance = parseFloat(customer.credit_balance || '0');
+        const newBalance = currentBalance + amount;
+
+        // Determine if referenceId is an orderId or payment reference
+        // For 'credit' type coming from orders, it's an orderId
+        let orderId = null;
+        let referenceNumber = null;
+
+        if (type === 'credit' && referenceId) {
+            orderId = referenceId;
+        } else {
+            referenceNumber = referenceId;
+        }
+
+        // Insert transaction
+        const transactionData = {
+            customer_id: customerId,
+            franchise_id: customer.franchise_id,
+            type,
+            amount,
+            balance_after: newBalance,
+            notes: description,
+            reason: description,
+            order_id: orderId,
+            reference_number: referenceNumber,
+            recorded_by: employeeId
+        };
+
+        const snakeCaseData = this.toSnakeCase(transactionData);
+
+        const { data: transaction, error: txError } = await this.supabase
+            .from('credit_transactions')
+            .insert(snakeCaseData)
+            .select()
+            .single();
+
+        if (txError) {
+            console.error('Add Credit: Transaction insert failed', txError);
+            throw txError;
+        }
+
+        // Update customer balance
+        const { error: updateError } = await this.supabase
+            .from('customers')
+            .update({ credit_balance: newBalance })
+            .eq('id', customerId);
+
+        if (updateError) {
+            console.error('Add Credit: Balance update failed', updateError);
+            throw updateError;
+        }
+
+        return {
+            ...this.mapDates(transaction),
+            previousBalance: currentBalance,
+            newBalance: newBalance
+        };
+    }
+
+    async getCustomerCreditHistory(customerId: string): Promise<any[]> {
+        const { data, error } = await this.supabase
+            .from('credit_transactions')
+            .select('*')
+            .eq('customer_id', customerId)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Get Credit History failed', error);
+            return [];
+        }
+        return data.map(item => this.mapDates(item));
+    }
+
     close() { }
 }

@@ -20,6 +20,13 @@ import {
   Navigation,
   Package,
   Store,
+  CreditCard,
+  Wallet,
+  Phone,
+  MapPin,
+  Calendar,
+  User,
+  DollarSign
 } from "lucide-react";
 import { formatCurrency, formatDate, getNextStatus } from "@/lib/data-service";
 import type { Order } from "@shared/schema";
@@ -34,9 +41,10 @@ export interface OrderDetailsDialogProps {
   onCancel: (order: Order) => void;
   onNextStep: (order: Order) => void;
   onPrintInvoice: (order: Order) => void;
+  onUpdatePaymentStatus: (order: Order, status: 'paid' | 'credit') => void;
 }
 
-// Format status for display - converts snake_case to Human Readable
+// Format status for display
 const formatStatusDisplay = (status: string) => {
   const statusLabels: Record<string, string> = {
     'pending': 'Pending',
@@ -73,16 +81,16 @@ const getStatusIcon = (status: Order['status']) => {
 
 const getStatusColor = (status: Order['status']) => {
   switch (status) {
-    case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-    case 'delivered': return 'bg-green-100 text-green-800 border-green-200';
-    case 'processing': return 'bg-blue-100 text-blue-800 border-blue-200';
-    case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
-    case 'in_transit': return 'bg-purple-100 text-purple-800 border-purple-200';
-    case 'ready_for_transit': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-    case 'ready_for_pickup': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-    case 'out_for_delivery': return 'bg-orange-100 text-orange-800 border-orange-200';
-    case 'in_store': return 'bg-teal-100 text-teal-800 border-teal-200';
+    case 'completed': return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800';
+    case 'delivered': return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800';
+    case 'processing': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800';
+    case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800';
+    case 'cancelled': return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800';
+    case 'in_transit': return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800';
+    case 'ready_for_transit': return 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800';
+    case 'ready_for_pickup': return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800';
+    case 'out_for_delivery': return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800';
+    case 'in_store': return 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-800';
     default: return 'bg-gray-100 text-gray-800 border-gray-200';
   }
 };
@@ -104,10 +112,10 @@ export default React.memo(function OrderDetailsDialog({
   onCancel,
   onNextStep,
   onPrintInvoice,
+  onUpdatePaymentStatus
 }: OrderDetailsDialogProps) {
   const { printInvoice } = useInvoicePrint({
     onSuccess: (invoiceData) => {
-      console.log('Invoice printed successfully:', invoiceData);
       // Call the original onPrintInvoice callback if provided
       if (order) onPrintInvoice(order);
     },
@@ -133,14 +141,37 @@ export default React.memo(function OrderDetailsDialog({
   if (!order) return null;
 
   const nextStatus = getNextStatus(order.status);
+  const anyOrder = order as any; // Helper casting for dynamic fields
+
+  // Parse Address Helper
+  const formatAddress = (addr: any) => {
+    let addressObj = addr;
+    if (typeof addr === 'string') {
+      try {
+        addressObj = JSON.parse(addr);
+      } catch {
+        return addr;
+      }
+    }
+    if (typeof addressObj === 'object' && addressObj !== null) {
+      const parts = [];
+      if (addressObj.street || addressObj.address) parts.push(addressObj.street || addressObj.address);
+      if (addressObj.landmark) parts.push(addressObj.landmark);
+      if (addressObj.city) parts.push(addressObj.city);
+      if (addressObj.state) parts.push(addressObj.state);
+      if (addressObj.zip || addressObj.pincode) parts.push(`- ${addressObj.zip || addressObj.pincode}`);
+      return parts.join(', ').replace(', -', ' -') || 'Address not available';
+    }
+    return String(addr || '');
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            Order Details: {order.id}
-            <Badge className={cn("border", getStatusColor(order.status))}>
+            Order Details: {order.id.substring(0, 8).toUpperCase()}
+            <Badge className={cn("border ml-2", getStatusColor(order.status))}>
               <span className="flex items-center gap-1">
                 {getStatusIcon(order.status)}
                 <span>{formatStatusDisplay(order.status)}</span>
@@ -148,305 +179,243 @@ export default React.memo(function OrderDetailsDialog({
             </Badge>
           </DialogTitle>
           <DialogDescription>
-            View detailed information about the order.
+            Created on {formatDate(order.createdAt?.toString() || new Date().toISOString())}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-6 py-4 pr-2">
-          {/* Order Information Grid */}
-          <div className="grid grid-cols-2 gap-6">
+          {/* Top Info Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Customer Column */}
             <div className="space-y-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Customer Information</p>
-                <div className="mt-2 space-y-1">
-                  <p className="text-lg font-semibold">{order.customerName || (order as any).customers?.name || "N/A"}</p>
-                  <p className="text-sm text-muted-foreground">Order #{order.orderNumber || order.id.substring(0, 8).toUpperCase()}</p>
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                  <User className="h-4 w-4" />
                 </div>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Priority</p>
-                <div className="mt-2">
-                  <Badge className={getPriorityColor((order as any).priority || 'Normal')}>
-                    {(order as any).priority || 'Normal'}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Order Date</p>
-                <p className="text-lg font-semibold">
-                  {formatDate(order.createdAt ? order.createdAt.toString() : new Date().toString())}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Due Date</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <p className="text-lg font-semibold">
-                    {formatDate((order as any).pickupDate ? new Date((order as any).pickupDate).toString() : (order.createdAt ? order.createdAt.toString() : new Date().toString()))}
-                  </p>
-                  {(order as any).pickupDate && (
-                    <Badge variant="outline" className={cn(
-                      "text-xs",
-                      new Date((order as any).pickupDate) < new Date() && order.status !== 'completed' && order.status !== 'delivered' ? "bg-red-100 text-red-800 border-red-200" :
-                        new Date((order as any).pickupDate).toDateString() === new Date().toDateString() && order.status !== 'completed' && order.status !== 'delivered' ? "bg-orange-100 text-orange-800 border-orange-200" :
-                          "bg-gray-100 text-gray-800 border-gray-200"
-                    )}>
-                      {new Date((order as any).pickupDate) < new Date() && order.status !== 'completed' && order.status !== 'delivered' ? "Overdue" :
-                        new Date((order as any).pickupDate).toDateString() === new Date().toDateString() && order.status !== 'completed' && order.status !== 'delivered' ? "Due Today" :
-                          "Scheduled"}
-                    </Badge>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Customer</p>
+                  <p className="font-semibold text-lg">{order.customerName || anyOrder.customers?.name || "Guest Customer"}</p>
+                  {(anyOrder.customers?.phone || anyOrder.phone) && (
+                    <div className="flex items-center text-sm text-muted-foreground mt-1">
+                      <Phone className="h-3 w-3 mr-1" />
+                      {anyOrder.customers?.phone || anyOrder.phone}
+                    </div>
                   )}
                 </div>
               </div>
 
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
-                <p className="text-2xl font-bold text-primary">
-                  {formatCurrency((() => {
-                    const total = parseFloat(order.totalAmount || "0");
-                    if (total > 0) return total;
-                    if (Array.isArray((order as any).items)) {
-                      return (order as any).items.reduce((sum: number, item: any) => {
-                        return sum + (parseFloat(item.price || item.unitPrice || 0) * parseFloat(item.quantity || 1));
-                      }, 0);
-                    }
-                    return 0;
-                  })())}
-                </p>
+                <p className="text-sm font-medium text-muted-foreground mb-1">Priority</p>
+                <Badge className={getPriorityColor(anyOrder.priority || 'Normal')}>
+                  {anyOrder.priority || 'Normal'}
+                </Badge>
+              </div>
+            </div>
+
+            {/* Dates Column */}
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                  <Calendar className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Due Date</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-lg">
+                      {anyOrder.pickupDate ? formatDate(anyOrder.pickupDate) : 'Not Scheduled'}
+                    </p>
+                  </div>
+                  {anyOrder.pickupDate && (
+                    <Badge variant="outline" className={cn(
+                      "text-xs mt-1",
+                      new Date(anyOrder.pickupDate) < new Date() && !['completed', 'delivered', 'cancelled'].includes(order.status)
+                        ? "bg-red-100 text-red-800 border-red-200"
+                        : "bg-gray-100 text-gray-800 border-gray-200"
+                    )}>
+                      {new Date(anyOrder.pickupDate) < new Date() && !['completed', 'delivered', 'cancelled'].includes(order.status)
+                        ? "Overdue"
+                        : "Scheduled"}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Order Items */}
+          {/* Items Section */}
           <div>
-            <p className="text-sm font-medium text-muted-foreground mb-2">Order Items</p>
-            {(order as any).items && Array.isArray((order as any).items) && (order as any).items.length > 0 ? (
-              <div className="border rounded-lg divide-y">
-                {(order as any).items.map((item: any, index: number) => (
-                  <div key={index} className="p-3 flex justify-between items-center bg-muted/20">
-                    <div>
-                      <p className="font-medium">{item.name || item.serviceName || `Item ${index + 1}`}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {item.description && <span className="mr-2">{item.description}</span>}
-                        Qty: {item.quantity || 1}
-                      </p>
+            <p className="text-sm font-medium text-muted-foreground mb-3">Order Items</p>
+            <div className="rounded-lg border bg-card">
+              {anyOrder.items && Array.isArray(anyOrder.items) && anyOrder.items.length > 0 ? (
+                <div className="divide-y">
+                  {anyOrder.items.map((item: any, idx: number) => (
+                    <div key={idx} className="p-3 flex justify-between items-center hover:bg-muted/50 transition-colors">
+                      <div className="flex gap-3">
+                        <div className="h-8 w-8 rounded bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{item.name || item.serviceName || "Service Item"}</p>
+                          {item.description && <p className="text-xs text-muted-foreground">{item.description}</p>}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium text-sm">{formatCurrency(item.price || item.unitPrice || 0)}</div>
+                        {item.quantity > 1 && (
+                          <div className="text-xs text-muted-foreground">x {item.quantity}</div>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium">{formatCurrency(item.price || item.unitPrice || 0)}</p>
-                      {(item.quantity || 1) > 1 && (
-                        <p className="text-xs text-muted-foreground">
-                          Total: {formatCurrency((parseFloat(item.price || item.unitPrice || 0)) * (item.quantity || 1))}
-                        </p>
-                      )}
-                    </div>
+                  ))}
+                  {/* Summary Row inside table */}
+                  <div className="p-3 bg-muted/20 flex justify-between items-center font-medium">
+                    <span>Subtotal</span>
+                    <span>{formatCurrency(parseFloat(order.totalAmount || "0"))}</span>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-3 bg-muted/20 rounded-lg">
-                <p className="font-medium">
-                  {(order as any).service || 'Dry Cleaning'}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Quantity: {(order as any).quantity || 1}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Payment Information */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">Payment Information</p>
-            <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
-              <div>
-                <p className="text-sm text-muted-foreground">Payment Status</p>
-                <p className="font-medium">
-                  {(order as any).paymentStatus || 'Pending'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Payment Method</p>
-                <p className="font-medium">
-                  {(order as any).paymentMethod || 'Cash'}
-                </p>
-              </div>
-              {(order as any).advancePaid && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Advance Paid</p>
-                  <p className="font-medium text-green-600">
-                    {formatCurrency((order as any).advancePaid)}
-                  </p>
                 </div>
-              )}
-              {(order as any).advancePaid && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Balance Due</p>
-                  <p className="font-medium text-orange-600">
-                    {formatCurrency(parseFloat(order.totalAmount || "0") - ((order as any).advancePaid || 0))}
-                  </p>
+              ) : (
+                <div className="p-4 text-center text-muted-foreground">
+                  <p>{anyOrder.service || "Dry Cleaning"}</p>
+                  <p className="text-xs">Approx quantity: {anyOrder.quantity || 1}</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Fulfillment Type & Delivery Info */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">Fulfillment Details</p>
-            <div className="p-4 bg-muted/50 rounded-lg">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Fulfillment Type</p>
-                  <Badge className={cn(
-                    "mt-1",
-                    (order as any).fulfillmentType === 'delivery'
-                      ? "bg-blue-100 text-blue-800 border-blue-200"
-                      : "bg-green-100 text-green-800 border-green-200"
-                  )}>
-                    {(order as any).fulfillmentType === 'delivery' ? '🚚 Home Delivery' : '🏪 Self Pickup'}
-                  </Badge>
-                </div>
-                {(order as any).deliveryCharges && parseFloat((order as any).deliveryCharges) > 0 && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Delivery Charges</p>
-                    <p className="font-medium">{formatCurrency((order as any).deliveryCharges)}</p>
-                  </div>
-                )}
+          {/* Payment & Charges */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-4 rounded-lg bg-muted/30 space-y-3">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <p className="font-medium text-sm">Payment Details</p>
               </div>
-              {(order as any).fulfillmentType === 'delivery' && (order as any).deliveryAddress && (
-                <div className="mt-3 pt-3 border-t">
-                  <p className="text-sm text-muted-foreground">Delivery Address</p>
-                  <p className="font-medium mt-1">
-                    {(() => {
-                      const addr = (order as any).deliveryAddress;
-                      // Handle JSON string format
-                      let addressObj = addr;
-                      if (typeof addr === 'string') {
-                        try {
-                          addressObj = JSON.parse(addr);
-                        } catch {
-                          // Not JSON, use as-is
-                          return addr;
-                        }
-                      }
-                      // Format object to readable address
-                      if (typeof addressObj === 'object' && addressObj !== null) {
-                        const parts = [];
-                        if (addressObj.street) parts.push(addressObj.street);
-                        if (addressObj.landmark) parts.push(addressObj.landmark);
-                        if (addressObj.city) parts.push(addressObj.city);
-                        if (addressObj.state) parts.push(addressObj.state);
-                        if (addressObj.zip || addressObj.pincode) parts.push(`- ${addressObj.zip || addressObj.pincode}`);
-                        if (addressObj.country && addressObj.country !== 'India') parts.push(addressObj.country);
-                        return parts.join(', ').replace(', -', ' -') || 'Address not available';
-                      }
-                      return String(addr);
-                    })()}
-                  </p>
+
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Status</span>
+                <Badge variant={anyOrder.paymentStatus === 'paid' ? 'default' : anyOrder.paymentStatus === 'credit' ? 'secondary' : 'destructive'}
+                  className={anyOrder.paymentStatus === 'credit' ? 'bg-orange-100 text-orange-800 hover:bg-orange-200' : ''}>
+                  {anyOrder.paymentStatus ? anyOrder.paymentStatus.toUpperCase() : 'PENDING'}
+                </Badge>
+              </div>
+
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Method</span>
+                <span className="font-medium">{anyOrder.paymentMethod || 'Cash'}</span>
+              </div>
+
+              {anyOrder.advancePaid && (
+                <div className="flex justify-between text-sm pt-2 border-t">
+                  <span className="text-muted-foreground">Advance Paid</span>
+                  <span className="text-green-600 font-medium">{formatCurrency(anyOrder.advancePaid)}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between text-base font-bold pt-2 border-t">
+                <span>Total Amount</span>
+                <span className="text-primary">{formatCurrency(parseFloat(order.totalAmount || "0"))}</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-lg bg-muted/30 space-y-3">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <p className="font-medium text-sm">Fulfillment</p>
+              </div>
+
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Type</span>
+                <span className="font-medium flex items-center gap-1">
+                  {anyOrder.fulfillmentType === 'delivery' ? '🚚 Delivery' : '🏪 Pickup'}
+                </span>
+              </div>
+
+              {anyOrder.fulfillmentType === 'delivery' && (
+                <div className="text-sm pt-2 border-t mt-2">
+                  <p className="text-muted-foreground text-xs mb-1">Delivery Address</p>
+                  <p className="leading-snug">{formatAddress(anyOrder.deliveryAddress)}</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* Notes */}
-          {(order as any).notes && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Notes</p>
-              <div className="p-3 bg-muted/50 rounded-lg">
-                <p className="text-sm">{(order as any).notes}</p>
-              </div>
+          {anyOrder.notes && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/10 p-3 rounded-lg border border-yellow-100 dark:border-yellow-900/20">
+              <p className="text-xs font-bold text-yellow-800 dark:text-yellow-500 mb-1">ORDER NOTES</p>
+              <p className="text-sm text-yellow-900 dark:text-yellow-200">{anyOrder.notes}</p>
             </div>
           )}
+        </div>
 
-          {/* Transit Information */}
-          {['processing', 'shipped', 'out_for_delivery', 'in_transit'].includes(order.status) && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Transit Status</p>
-              <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg dark:bg-blue-900/20 dark:border-blue-900/50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 text-blue-600 rounded-full dark:bg-blue-900 dark:text-blue-400">
-                      <Navigation className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-blue-900 dark:text-blue-100">In Transit</p>
-                      <p className="text-xs text-blue-700 dark:text-blue-300">
-                        Order is currently being processed or is on its way.
-                      </p>
+        {/* Footer Actions */}
+        <div className="flex flex-col gap-4 pt-4 border-t mt-2">
+          {/* WARNING: UNPAID COMPLETION */}
+          {(order.status === 'ready_for_pickup' || order.status === 'out_for_delivery') &&
+            anyOrder.paymentStatus !== 'paid' && anyOrder.paymentStatus !== 'credit' && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-900/20 dark:border-amber-800">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                    <AlertCircle className="h-4 w-4" />
+                    <span className="font-bold text-sm">Payment Required to Complete</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3 items-center justify-between ml-6">
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      Settle payment to complete this order.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="h-7 bg-green-600 hover:bg-green-700 text-white border-0"
+                        onClick={() => onUpdatePaymentStatus(order, 'paid')}
+                      >
+                        Mark Paid
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 border-amber-300 text-amber-800 hover:bg-amber-100"
+                        onClick={() => onUpdatePaymentStatus(order, 'credit')}
+                      >
+                        Mark Credit
+                      </Button>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" className="gap-2" onClick={() => window.open(`/tracking/${order.id}`, '_blank')}>
-                    Track Order
-                  </Button>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap gap-2 pt-4 border-t">
-            {/* Payment Warning for completion */}
-            {(order.status === 'ready_for_pickup' || order.status === 'out_for_delivery') &&
-              (order as any).paymentStatus !== 'paid' && (order as any).paymentStatus !== 'credit' && (
-                <div className="w-full p-3 bg-amber-50 border border-amber-200 rounded-lg mb-2 dark:bg-amber-900/20 dark:border-amber-800">
-                  <p className="text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
-                    <strong>Payment Required:</strong> Order must be marked as "Paid" before it can be completed or delivered.
-                  </p>
-                </div>
-              )}
-
-            {/* Next Step Button with context-aware label */}
-            {nextStatus && (
-              <Button
-                onClick={() => onNextStep(order)}
-                className="gap-2"
-                disabled={
-                  (nextStatus === 'completed' || nextStatus === 'delivered') &&
-                  (order as any).paymentStatus !== 'paid' && (order as any).paymentStatus !== 'credit'
-                }
-              >
-                <PlusCircle className="h-4 w-4" />
-                {order.status === 'ready_for_pickup' && (order as any).fulfillmentType === 'delivery'
-                  ? 'Start Delivery'
-                  : order.status === 'ready_for_pickup'
-                    ? 'Hand Over to Customer'
-                    : order.status === 'out_for_delivery'
-                      ? 'Mark as Delivered'
-                      : `Move to ${nextStatus.replace(/_/g, ' ')}`
-                }
+          <div className="flex justify-end gap-2 flex-wrap">
+            {order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'delivered' && (
+              <Button variant="ghost" onClick={() => onCancel(order)} className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                <XCircle className="h-4 w-4 mr-2" /> Cancel
               </Button>
             )}
 
-            <Button
-              variant="outline"
-              onClick={() => onEdit(order)}
-              className="gap-2"
-            >
-              <Edit className="h-4 w-4" />
-              Edit Order
+            <Button variant="outline" onClick={() => onEdit(order)}>
+              <Edit className="h-4 w-4 mr-2" /> Edit
             </Button>
 
-            <Button
-              variant="outline"
-              onClick={handlePrintInvoice}
-              className="gap-2"
-            >
-              <Printer className="h-4 w-4" />
-              Print Invoice
+            <Button variant="outline" onClick={handlePrintInvoice}>
+              <Printer className="h-4 w-4 mr-2" /> Invoice
             </Button>
 
-            {order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'delivered' && (
+            {nextStatus && (
               <Button
-                variant="outline"
-                onClick={() => onCancel(order)}
-                className="gap-2 text-red-600 hover:text-red-700"
+                onClick={() => onNextStep(order)}
+                disabled={
+                  (nextStatus === 'completed' || nextStatus === 'delivered') &&
+                  anyOrder.paymentStatus !== 'paid' && anyOrder.paymentStatus !== 'credit'
+                }
               >
-                <X className="h-4 w-4" />
-                Cancel Order
+                <PlusCircle className="h-4 w-4 mr-2" />
+                {order.status === 'ready_for_pickup' && anyOrder.fulfillmentType === 'delivery'
+                  ? 'Start Delivery'
+                  : order.status === 'ready_for_pickup'
+                    ? 'Hand Over'
+                    : order.status === 'out_for_delivery'
+                      ? 'Mark Delivered'
+                      : `Move to ${formatStatusDisplay(nextStatus)}`
+                }
               </Button>
             )}
           </div>

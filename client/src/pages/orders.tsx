@@ -491,10 +491,10 @@ function OrdersComponent() {
 
   const handleUpdateStatus = useCallback((orderId: string, newStatus: string) => {
     const order = orders.find(o => o.id === orderId);
-    if (newStatus === 'completed' && order && order.paymentStatus !== 'paid') {
+    if ((newStatus === 'completed' || newStatus === 'delivered') && order && order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit') {
       toast({
         title: "Cannot Complete Order",
-        description: "Order must be marked as Paid before it can be completed.",
+        description: "Order must be marked as Paid or Credit before it can be completed.",
         variant: "destructive",
       });
       return;
@@ -2019,6 +2019,13 @@ function OrdersComponent() {
         onCancel={handleCancelOrder}
         onNextStep={handleNextStep}
         onPrintInvoice={handlePrintInvoice}
+        onUpdatePaymentStatus={(order, status) => {
+          if (status === 'paid') {
+            handleMarkAsPaid(order.id);
+          } else {
+            handleMarkAsCredit(order.id, order);
+          }
+        }}
       />
 
       <EditOrderDialog
