@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Edit2, Upload, AlertCircle, FileSpreadsheet, Check } from 'lucide-react';
+import { Trash2, Edit2, Upload, AlertCircle, FileSpreadsheet, Check, FileDown } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api-client';
@@ -40,6 +41,19 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
     const [fileName, setFileName] = useState<string>('');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState<Partial<ImportedService>>({});
+
+    const handleDownloadTemplate = () => {
+        const rows = [
+            { name: 'Dry Cleaning - Shirt', category: 'Dry Cleaning', description: 'Professional dry cleaning for dress shirts', price: 15.00, duration: '48 hours', status: 'active' },
+            { name: 'Alteration - Hemming', category: 'Alterations', description: 'Standard hemming for trousers', price: 10.00, duration: '24 hours', status: 'active' },
+            { name: 'Laundry - Duvet', category: 'Laundry', description: 'Heavy duty washing for duvets', price: 25.00, duration: '72 hours', status: 'active' },
+        ];
+
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Services Template");
+        XLSX.writeFile(workbook, "service_import_template.xlsx");
+    };
 
     const processFile = async (file: File) => {
         try {
@@ -80,8 +94,25 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
                         price: item.price || '0',
                         status: item.status?.includes('inactive') ? 'inactive' : 'active',
                         duration: item.duration || '24 hrs'
+
                     };
                 });
+            } else if (file.name.match(/\.xlsx?$/)) {
+                const arrayBuffer = await file.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+                parsedData = json.map((item, index) => ({
+                    id: `temp-${index}`,
+                    name: item.name || item.Name || `Service ${index + 1}`,
+                    category: item.category || item.Category || 'General',
+                    description: item.description || item.Description || '',
+                    price: String(item.price || item.Price || '0'),
+                    status: (item.status || item.Status || 'active').toLowerCase() === 'inactive' ? 'inactive' : 'active',
+                    duration: item.duration || item.Duration || '24 hrs'
+                }));
             }
 
             if (parsedData.length === 0) {
@@ -166,9 +197,15 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
             <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle>Import Services</DialogTitle>
-                    <DialogDescription>
-                        Upload a CSV or JSON file to import services in bulk. Review and edit before saving.
-                    </DialogDescription>
+                    <div className="flex justify-between items-start">
+                        <DialogDescription>
+                            Upload a Excel, CSV or JSON file to import services in bulk.
+                        </DialogDescription>
+                        <Button variant="outline" size="sm" onClick={handleDownloadTemplate} className="gap-2">
+                            <FileDown className="h-4 w-4" />
+                            Download Template
+                        </Button>
+                    </div>
                 </DialogHeader>
 
                 <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
@@ -177,11 +214,11 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
                             onClick={() => fileInputRef.current?.click()}>
                             <FileSpreadsheet className="h-12 w-12 text-muted-foreground mb-4" />
                             <p className="text-lg font-medium">Click to upload file</p>
-                            <p className="text-sm text-muted-foreground">Supports CSV and JSON</p>
+                            <p className="text-sm text-muted-foreground">Supports Excel, CSV and JSON</p>
                             <Input
                                 ref={fileInputRef}
                                 type="file"
-                                accept=".csv,.json"
+                                accept=".csv,.json,.xlsx,.xls"
                                 className="hidden"
                                 onChange={handleFileUpload}
                             />
