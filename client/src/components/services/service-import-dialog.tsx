@@ -14,7 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trash2, Edit2, Upload, AlertCircle, FileSpreadsheet, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/api-request';
+import { apiRequest } from '@/lib/queryClient';
 import { Loader2 } from 'lucide-react';
 
 interface ImportedService {

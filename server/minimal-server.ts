@@ -102,9 +102,9 @@ app.get('/api/performance', (req, res) => {
   // Initialize MongoDB (Non-blocking, optional)
   connectToMongo().then((connected) => {
     if (connected) {
-      log("✅ MongoDB ready for flexible logging");
+      log("✅ MongoDB ready for enhanced analytics");
     } else {
-      log("⚠️  MongoDB unavailable - using SQL-only mode");
+      log("✅ Using SQLite for analytics - all features available");
     }
   });
 

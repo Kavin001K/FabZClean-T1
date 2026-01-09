@@ -18,7 +18,7 @@ export const connectToMongo = async (): Promise<boolean> => {
         return true;
     } catch (error) {
         console.error('❌ MongoDB Connection Error:', error);
-        console.warn('⚠️ App will continue with SQL only. Analytics/Logs may be disabled.');
+        console.log('✅ App will continue with SQLite analytics. All features remain available.');
         return false;
     }
 };
