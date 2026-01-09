@@ -98,7 +98,7 @@ export default function Services() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
+
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   // UI State
@@ -294,10 +294,7 @@ export default function Services() {
     });
   };
 
-  const handleAddToOrder = (service: Service) => {
-    setSelectedService(service);
-    setIsOrderDialogOpen(true);
-  };
+
 
   const handleExportPDF = () => {
     exportServicesEnhanced(filteredServices);
@@ -771,15 +768,7 @@ export default function Services() {
                           >
                             <Trash className="h-4 w-4" />
                           </Button>
-                          <Button
-                            className="flex-1 group-hover:bg-lime-600"
-                            size="sm"
-                            onClick={() => handleAddToOrder(service)}
-                            disabled={service.status !== 'Active'}
-                          >
-                            <ShoppingCart className="h-4 w-4 mr-2" />
-                            Add to Order
-                          </Button>
+
                         </div>
                       </div>
                     </CardContent>
@@ -883,14 +872,7 @@ export default function Services() {
                           >
                             <Trash className="h-4 w-4" />
                           </Button>
-                          <Button
-                            onClick={() => handleAddToOrder(service)}
-                            disabled={service.status !== 'Active'}
-                            className="whitespace-nowrap"
-                          >
-                            <ShoppingCart className="h-4 w-4 mr-2" />
-                            Add to Order
-                          </Button>
+
                         </div>
                       </div>
                     </CardContent>
@@ -926,16 +908,6 @@ export default function Services() {
       <ServiceImportDialog
         open={isImportDialogOpen}
         onOpenChange={setIsImportDialogOpen}
-      />
-
-      {/* Add to Order Dialog */}
-      <AddToOrderDialog
-        open={isOrderDialogOpen}
-        onClose={() => {
-          setIsOrderDialogOpen(false);
-          setSelectedService(null);
-        }}
-        service={selectedService}
       />
     </div>
   );
@@ -1244,79 +1216,6 @@ function CreateServiceDialog({
               </Button>
             </DialogFooter>
           </form>
-        </motion.div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// Add to Order Dialog Component
-function AddToOrderDialog({
-  open,
-  onClose,
-  service
-}: {
-  open: boolean;
-  onClose: () => void;
-  service: Service | null;
-}) {
-  const { toast } = useToast();
-  const [, setLocation] = useLocation();
-
-  if (!service) return null;
-
-  const handleAddToOrder = () => {
-    onClose();
-    setLocation(`/create-order?serviceId=${service.id}`);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent>
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-        >
-          <DialogHeader>
-            <DialogTitle>Add Service to Order</DialogTitle>
-            <DialogDescription>
-              Review service details before adding to order
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <h3 className="font-semibold text-lg">{service.name}</h3>
-              <Badge variant="outline" className="mt-1">{service.category}</Badge>
-            </div>
-
-            {service.description && (
-              <p className="text-sm text-muted-foreground">{service.description}</p>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Duration</p>
-                <p className="font-medium">{service.duration}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Price</p>
-                <p className="text-xl font-bold text-lime-600">
-                  {formatCurrency(service.price)}
-                </p>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddToOrder}>
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              Confirm & Add
-            </Button>
-          </DialogFooter>
         </motion.div>
       </DialogContent>
     </Dialog>

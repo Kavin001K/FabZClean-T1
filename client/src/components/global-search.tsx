@@ -1,154 +1,152 @@
-import { useState, useRef, useEffect } from 'react';
-import { Search, X, Package, Users, ShoppingBag, Loader2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { useState, useEffect } from 'react';
+import { Search, Calculator, Calendar, CreditCard, Settings, User, ShoppingCart, Package, Users, ShoppingBag, Truck, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useGlobalSearch } from '@/hooks/use-global-search';
+import { useGlobalSearch, SearchResult } from '@/hooks/use-global-search';
 import { useLocation } from 'wouter';
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
+} from "@/components/ui/command";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 export function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
   const { searchQuery, setSearchQuery, searchResults, isSearching, clearSearch } = useGlobalSearch();
   const [, setLocation] = useLocation();
-
-  // Focus input when opened
-  useEffect(() => {
-    if (isOpen && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isOpen]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
         event.preventDefault();
-        setIsOpen(true);
-      }
-      if (event.key === 'Escape') {
-        setIsOpen(false);
-        clearSearch();
+        setIsOpen((open) => !open);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [clearSearch]);
+  }, []);
+
+  const handleSelect = (result: SearchResult) => {
+    setIsOpen(false);
+    clearSearch();
+    setLocation(result.url);
+  };
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'order':
-        return <ShoppingBag className="h-4 w-4 text-blue-500" />;
-      case 'customer':
-        return <Users className="h-4 w-4 text-green-500" />;
-      case 'inventory':
-        return <Package className="h-4 w-4 text-orange-500" />;
-      default:
-        return <Search className="h-4 w-4 text-gray-500" />;
+      case 'order': return <ShoppingBag className="mr-2 h-4 w-4" />;
+      case 'customer': return <Users className="mr-2 h-4 w-4" />;
+      case 'product': return <Package className="mr-2 h-4 w-4" />;
+      case 'service': return <Settings className="mr-2 h-4 w-4" />;
+      default: return <Search className="mr-2 h-4 w-4" />;
     }
   };
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'order':
-        return 'bg-blue-100 text-blue-800';
-      case 'customer':
-        return 'bg-green-100 text-green-800';
-      case 'inventory':
-        return 'bg-orange-100 text-orange-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const handleResultClick = (result: any) => {
-    setLocation(result.url);
-    setIsOpen(false);
-    clearSearch();
-  };
+  const groupedResults = searchResults.reduce((acc, result) => {
+    const type = result.type;
+    if (!acc[type]) acc[type] = [];
+    acc[type].push(result);
+    return acc;
+  }, {} as Record<string, SearchResult[]>);
 
   return (
-    <div className="relative">
-      <div className="relative">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          ref={inputRef}
-          type="search"
-          placeholder="Search orders, customers, inventory... (⌘K)"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onFocus={() => setIsOpen(true)}
-          className="w-full rounded-lg bg-background pl-8 pr-8"
-        />
-        {searchQuery && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearSearch}
-            className="absolute right-1 top-1 h-6 w-6 p-0"
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        )}
-      </div>
+    <>
+      <Button
+        variant="outline"
+        className="relative h-9 w-full justify-start rounded-[0.5rem] bg-background text-sm font-normal text-muted-foreground shadow-none sm:pr-12 md:w-64 lg:w-80 xl:w-96 hover:bg-accent/50 transition-colors"
+        onClick={() => setIsOpen(true)}
+      >
+        <Search className="mr-2 h-4 w-4 opacity-50" />
+        <span className="inline-flex">Search orders, customers...</span>
+        <kbd className="pointer-events-none absolute right-[0.3rem] top-[0.3rem] hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+          <span className="text-xs">⌘</span>K
+        </kbd>
+      </Button>
 
-      {isOpen && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-2">
-          <Card className="shadow-lg border">
-            <CardContent className="p-0">
-              {isSearching ? (
-                <div className="p-6 text-center">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">Searching...</p>
-                </div>
-              ) : searchResults.length > 0 ? (
-                <div className="max-h-80 overflow-y-auto">
-                  {searchResults.map((result) => (
-                    <div
-                      key={result.id}
-                      onClick={() => handleResultClick(result)}
-                      className="p-3 hover:bg-muted/50 cursor-pointer border-b last:border-b-0 transition-colors"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 mt-0.5">
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="overflow-hidden p-0 shadow-2xl max-w-2xl">
+          <Command shouldFilter={false} className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+            <CommandInput
+              placeholder="Type to search..."
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+            />
+            <CommandList>
+              <CommandEmpty className="py-6 text-center text-sm">
+                {isSearching ? (
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <p className="text-muted-foreground">Searching...</p>
+                  </div>
+                ) : (
+                  "No results found."
+                )}
+              </CommandEmpty>
+
+              {!isSearching && (
+                <>
+                  {Object.entries(groupedResults).map(([type, results]) => (
+                    <CommandGroup key={type} heading={type.charAt(0).toUpperCase() + type.slice(1) + 's'}>
+                      {results.map((result) => (
+                        <CommandItem
+                          key={result.id}
+                          value={result.id} // value is used for key, but not filtering since shouldFilter=false
+                          onSelect={() => handleSelect(result)}
+                          className="cursor-pointer"
+                        >
                           {getIcon(result.type)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="text-sm font-medium text-foreground truncate">
-                              {result.title}
-                            </p>
-                            <Badge className={`text-xs ${getTypeColor(result.type)}`}>
-                              {result.type}
-                            </Badge>
+                          <div className="flex flex-col flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium truncate">{result.title}</span>
+                              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal capitalize">
+                                {result.type}
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground truncate">{result.subtitle} • {result.description}</span>
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            {result.subtitle}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
                   ))}
-                </div>
-              ) : searchQuery ? (
-                <div className="p-6 text-center text-muted-foreground">
-                  <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No results found for "{searchQuery}"</p>
-                  <p className="text-xs mt-1">Try searching for orders, customers, or inventory items</p>
-                </div>
-              ) : (
-                <div className="p-6 text-center text-muted-foreground">
-                  <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Start typing to search...</p>
-                  <p className="text-xs mt-1">Press ⌘K to focus search</p>
-                </div>
+
+                  <CommandSeparator />
+
+                  {!searchQuery && (
+                    <CommandGroup heading="Quick Links">
+                      <CommandItem onSelect={() => { setLocation('/orders/new'); setIsOpen(false); }}>
+                        <ShoppingCart className="mr-2 h-4 w-4" />
+                        <span>New Order</span>
+                        <CommandShortcut>⌘N</CommandShortcut>
+                      </CommandItem>
+                      <CommandItem onSelect={() => { setLocation('/customers'); setIsOpen(false); }}>
+                        <Users className="mr-2 h-4 w-4" />
+                        <span>Customers</span>
+                      </CommandItem>
+                      <CommandItem onSelect={() => { setLocation('/inventory'); setIsOpen(false); }}>
+                        <Package className="mr-2 h-4 w-4" />
+                        <span>Inventory</span>
+                      </CommandItem>
+                      <CommandItem onSelect={() => { setLocation('/services'); setIsOpen(false); }}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        <span>Services Catalog</span>
+                      </CommandItem>
+                    </CommandGroup>
+                  )}
+                </>
               )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-    </div>
+            </CommandList>
+          </Command>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
