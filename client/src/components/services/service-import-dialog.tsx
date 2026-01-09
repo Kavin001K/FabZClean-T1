@@ -174,7 +174,7 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
                 duration: service.duration
             }));
 
-            return apiRequest('POST', '/api/services/bulk', payload);
+            return apiRequest('POST', '/services/bulk', payload);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -230,15 +230,15 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
                                 <Button variant="outline" size="sm" onClick={() => setData([])}>Clear</Button>
                             </div>
 
-                            <ScrollArea className="flex-1 border rounded-md">
+                            <div className="flex-1 overflow-auto border rounded-md relative">
                                 <Table>
-                                    <TableHeader>
+                                    <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                                         <TableRow>
-                                            <TableHead>Category</TableHead>
-                                            <TableHead>Name</TableHead>
-                                            <TableHead>Price</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead className="w-[100px]">Actions</TableHead>
+                                            <TableHead className="bg-background">Category</TableHead>
+                                            <TableHead className="bg-background">Name</TableHead>
+                                            <TableHead className="bg-background">Price</TableHead>
+                                            <TableHead className="bg-background">Status</TableHead>
+                                            <TableHead className="w-[100px] bg-background">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -287,7 +287,8 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
                                         ))}
                                     </TableBody>
                                 </Table>
-                            </ScrollArea>
+
+                            </div>
                         </>
                     )}
                 </div>
@@ -303,7 +304,7 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
                         Import {data.length > 0 ? `${data.length} Services` : ''}
                     </Button>
                 </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            </DialogContent >
+        </Dialog >
     );
 }
