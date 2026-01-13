@@ -1,48 +1,47 @@
+/**
+ * Database Configuration - Secure Local Storage
+ * 
+ * This module configures the application to use ONLY local SQLite storage
+ * with enhanced security measures.
+ * 
+ * Security Features:
+ * - Secure data folder with restricted permissions
+ * - No cloud dependencies
+ * - Complete local control
+ */
+
 import { SQLiteStorage } from "./SQLiteStorage";
-import { SupabaseStorage } from "./SupabaseStorage";
 import path from "path";
-import { existsSync } from "fs";
+import { existsSync, mkdirSync, chmodSync } from "fs";
 
-// Determine database path with fallbacks
-const isProduction = process.env.NODE_ENV === "production";
+// 1. Define Secure Folder Path
+const SECURE_DATA_PATH = path.join(process.cwd(), "server", "secure_data");
+const BACKUPS_PATH = path.join(SECURE_DATA_PATH, "backups");
+const LOGS_PATH = path.join(SECURE_DATA_PATH, "logs");
 
-// Check for Supabase configuration - use it if URL is provided (service key or anon key)
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-const isSupabaseConfigured = (process.env.USE_SUPABASE === 'true' || !!supabaseUrl) &&
-  !!supabaseUrl &&
-  !!supabaseKey &&
-  !supabaseUrl.includes('placeholder');
-
-let dbInstance: any;
-
-if (isSupabaseConfigured) {
-  console.log("🗄️  Using Supabase storage");
-  dbInstance = new SupabaseStorage();
-} else {
-  let dbPath: string;
-
-  if (isProduction) {
-    // Try Render disk path first
-    const renderDiskPath = process.env.RENDER_DISK_PATH || "/opt/render/project/src/data";
-
-    // If the render disk path directory exists, use it
-    // Otherwise fall back to a writable location
-    if (existsSync(renderDiskPath)) {
-      dbPath = path.join(renderDiskPath, "fabzclean.db");
-    } else {
-      // Fallback to /tmp which is always writable on Render
-      console.warn(`⚠️  Render disk path ${renderDiskPath} not found, using /tmp`);
-      dbPath = "/tmp/fabzclean.db";
+// 2. Ensure secure directories exist with restricted permissions
+function ensureSecureDirectory(dirPath: string) {
+  if (!existsSync(dirPath)) {
+    mkdirSync(dirPath, { recursive: true });
+    // Set permissions to 700 (owner read/write/execute only)
+    try {
+      chmodSync(dirPath, 0o700);
+    } catch (err) {
+      console.warn(`⚠️  Could not set permissions on ${dirPath}:`, err);
     }
-  } else {
-    dbPath = "./fabzclean.db";
   }
-
-  console.log(`🗄️  Database path: ${dbPath}`);
-  // Use SQLite as the primary database
-  dbInstance = new SQLiteStorage(dbPath);
 }
+
+ensureSecureDirectory(SECURE_DATA_PATH);
+ensureSecureDirectory(BACKUPS_PATH);
+ensureSecureDirectory(LOGS_PATH);
+
+// 3. Database path within secure folder
+const DB_PATH = path.join(SECURE_DATA_PATH, "fabzclean.db");
+
+// 4. Initialize ONLY SQLite
+console.log(`🔒 Initializing Secure Local Database at: ${DB_PATH}`);
+const dbInstance = new SQLiteStorage(DB_PATH);
 
 export const db = dbInstance;
 
@@ -51,3 +50,11 @@ export { db as storage };
 
 // Export type for better TypeScript support
 export type Database = typeof db;
+
+// Export paths for maintenance scripts
+export const PATHS = {
+  SECURE_DATA: SECURE_DATA_PATH,
+  BACKUPS: BACKUPS_PATH,
+  LOGS: LOGS_PATH,
+  DATABASE: DB_PATH,
+};

@@ -97,6 +97,19 @@ export const DEFAULT_SETTINGS: SettingsUpdate[] = [
   { key: "data.retention", value: 365, category: "data" },
   { key: "data.exportFormat", value: "csv", category: "data" },
   { key: "data.autoBackup", value: true, category: "data" },
+
+  // Surveillance & Logging Settings
+  { key: "security.strictMode", value: true, category: "security" }, // Enforce RLS strictly
+  { key: "logs.trackReadOperations", value: true, category: "logging" }, // Track who VIEWED data
+  { key: "logs.retentionDays", value: 365, category: "logging" }, // How long to keep logs
+  { key: "logs.trackAPIRequests", value: true, category: "logging" }, // Log all API requests
+  { key: "logs.trackSensitiveOperations", value: true, category: "logging" }, // Extra logging for financials
+
+  // Maintenance Settings
+  { key: "maintenance.autoVacuum", value: true, category: "system" },
+  { key: "maintenance.autoBackup", value: true, category: "system" },
+  { key: "maintenance.backupRetentionCount", value: 30, category: "system" },
+  { key: "maintenance.scheduleTime", value: "03:00", category: "system" },
 ];
 
 class SettingsService {

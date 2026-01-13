@@ -42,6 +42,9 @@ yarn-error.log*
 fabzclean.db
 fabzclean*.db
 
+# Secure Data Folder (contains database, backups, logs)
+server/secure_data/
+
 # Generated files
 *.map
 *.tsbuildinfo

@@ -831,6 +831,172 @@ export class SQLiteStorage implements IStorage {
     }
   }
 
+  // ======= AUDIT LOGGING & SURVEILLANCE =======
+
+  /**
+   * Valid action types for audit logging
+   * Categorized for analysis and filtering
+   */
+  static readonly ACTION_TYPES = {
+    // Authentication
+    LOGIN_SUCCESS: 'login_success',
+    LOGIN_FAILED: 'login_failed',
+    LOGOUT: 'logout',
+    PASSWORD_CHANGE: 'password_change',
+    PROFILE_UPDATE: 'profile_update',
+
+    // Orders
+    ORDER_CREATE: 'order_create',
+    ORDER_VIEW: 'order_view',
+    ORDER_UPDATE: 'order_update',
+    ORDER_DELETE: 'order_delete',
+    ORDER_STATUS_CHANGE: 'status_change',
+    ORDER_LIST_VIEW: 'order_list_view',
+
+    // Financials
+    PAYMENT_COLLECTED: 'payment_collected',
+    REFUND_PROCESSED: 'refund_processed',
+    DISCOUNT_APPLIED: 'discount_applied',
+    CREDIT_ADDED: 'credit_added',
+    CREDIT_PAYMENT: 'credit_payment',
+    INVOICE_PRINTED: 'invoice_printed',
+
+    // Inventory
+    STOCK_ADJUSTMENT: 'stock_adjustment',
+    PRODUCT_CREATE: 'product_create',
+    PRODUCT_UPDATE: 'product_update',
+    PRODUCT_DELETE: 'product_delete',
+
+    // Workforce
+    EMPLOYEE_CREATE: 'employee_create',
+    EMPLOYEE_UPDATE: 'employee_update',
+    EMPLOYEE_TERMINATED: 'employee_terminated',
+    ATTENDANCE_MODIFIED: 'attendance_modified',
+    TASK_ASSIGNED: 'task_assigned',
+
+    // System
+    SETTINGS_CHANGE: 'settings_change',
+    DB_BACKUP: 'db_backup',
+    DB_OPTIMIZE: 'db_optimize',
+    EXPORT_DATA: 'export_data',
+
+    // HTTP Actions (auto-logged by surveillance middleware)
+    HTTP_GET: 'HTTP_GET',
+    HTTP_POST: 'HTTP_POST',
+    HTTP_PUT: 'HTTP_PUT',
+    HTTP_PATCH: 'HTTP_PATCH',
+    HTTP_DELETE: 'HTTP_DELETE',
+  } as const;
+
+  /**
+   * Log an action for complete audit trail
+   * This is the core surveillance method that tracks ALL operations
+   * 
+   * @param actorId - The ID of the user performing the action
+   * @param action - The type of action being performed
+   * @param entityType - The type of entity being acted upon (order, customer, etc.)
+   * @param entityId - The ID of the specific entity
+   * @param details - Additional context about the action
+   * @param ip - The IP address of the request
+   * @param userAgent - The user agent string
+   */
+  async logAction(
+    actorId: string,
+    action: string,
+    entityType: string,
+    entityId: string,
+    details: any,
+    ip?: string,
+    userAgent?: string
+  ): Promise<void> {
+    try {
+      const stmt = this.db.prepare(`
+        INSERT INTO audit_logs (
+          id, franchiseId, employeeId, action, entityType, entityId, details, ipAddress, userAgent, createdAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      // Fetch franchiseId for the actor to ensure the log is scoped
+      let franchiseId = 'SYSTEM';
+      try {
+        const actor = await this.getEmployee(actorId);
+        if (actor?.franchiseId) {
+          franchiseId = actor.franchiseId;
+        }
+      } catch {
+        // Actor not found, use SYSTEM
+      }
+
+      stmt.run(
+        randomUUID(),
+        franchiseId,
+        actorId || 'ANONYMOUS',
+        action,
+        entityType,
+        entityId,
+        JSON.stringify(details),
+        ip || 'LOCALHOST',
+        userAgent || 'UNKNOWN',
+        new Date().toISOString()
+      );
+    } catch (error) {
+      // Log to console but don't throw - logging should never break the app
+      console.error('[AUDIT LOG ERROR]', error);
+    }
+  }
+
+  /**
+   * Convenience method to log with requesting user context
+   * Includes automatic RLS validation logging
+   */
+  async logWithContext(
+    requestingUser: { id: string; role: string; franchiseId?: string },
+    action: string,
+    entityType: string,
+    entityId: string,
+    details: any,
+    ip?: string
+  ): Promise<void> {
+    await this.logAction(
+      requestingUser.id,
+      action,
+      entityType,
+      entityId,
+      {
+        ...details,
+        _context: {
+          role: requestingUser.role,
+          franchiseId: requestingUser.franchiseId || 'NONE',
+        }
+      },
+      ip
+    );
+  }
+
+  /**
+   * Check if a user has access to a specific franchise's data
+   * This is the core RLS enforcement logic
+   */
+  private hasAccessToFranchise(
+    requestingUser: { role: string; franchiseId?: string } | undefined,
+    targetFranchiseId: string | null | undefined
+  ): boolean {
+    // No user context = system operation, allow
+    if (!requestingUser) return true;
+
+    // Admin can access everything
+    if (requestingUser.role === 'admin') return true;
+
+    // Factory manager can access all franchises (for processing)
+    if (requestingUser.role === 'factory_manager') return true;
+
+    // If target has no franchise, allow (global data)
+    if (!targetFranchiseId) return true;
+
+    // Otherwise, must match requesting user's franchise
+    return requestingUser.franchiseId === targetFranchiseId;
+  }
+
   // ======= USERS =======
   async createUser(data: InsertUser): Promise<User> {
     const id = randomUUID();
@@ -1298,8 +1464,21 @@ export class SQLiteStorage implements IStorage {
     }
   }
 
-  async listCustomers(): Promise<Customer[]> {
+  async listCustomers(franchiseId?: string): Promise<Customer[]> {
+    if (franchiseId) {
+      return this.db.prepare("SELECT * FROM customers WHERE franchiseId = ?").all(franchiseId) as Customer[];
+    }
     return this.listAllRecords<Customer>("customers");
+  }
+
+  async getCustomersWithOutstandingCredit(franchiseId?: string): Promise<Customer[]> {
+    let sql = "SELECT * FROM customers WHERE CAST(creditBalance AS REAL) > 0";
+    const params: any[] = [];
+    if (franchiseId) {
+      sql += " AND franchiseId = ?";
+      params.push(franchiseId);
+    }
+    return this.db.prepare(sql).all(params) as Customer[];
   }
 
   // Alias for compatibility with existing routes

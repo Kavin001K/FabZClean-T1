@@ -1,9 +1,0 @@
-# Netlify/Amplify SPA redirects
-# This handles client-side routing for Single Page Applications
-
-# Rewrite API calls to the backend server (if deployed separately)
-# Uncomment and update the URL when you deploy your backend
-# /api/*  https://your-backend-url.com/:splat  200
-
-# Handle SPA routing - all other routes serve index.html
-/*    /index.html   200

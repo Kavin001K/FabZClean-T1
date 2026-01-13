@@ -1,11 +1,13 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
+import cron from "node-cron";
 import { registerAllRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./db-utils";
 import { realtimeServer } from "./websocket-server";
 import { driverTrackingService } from "./driver-tracking";
 import { corsOptions, errorHandler } from "./middleware/auth";
+import { surveillanceMiddleware } from "./middleware/surveillance";
 
 const app = express();
 
@@ -85,6 +87,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// Surveillance Middleware - logs all authenticated API requests to audit_logs
+app.use(surveillanceMiddleware);
+
 (async () => {
   // Register all routes
   registerAllRoutes(app);
@@ -131,4 +136,17 @@ app.use((req, res, next) => {
     }
     log(`📊 Health check: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/api/health`);
   });
+
+  // Schedule daily maintenance at 3 AM
+  cron.schedule('0 3 * * *', async () => {
+    log('🔧 Running scheduled daily maintenance...');
+    try {
+      const { optimizeSystem } = await import('./scripts/daily-maintenance');
+      await optimizeSystem();
+      log('✅ Daily maintenance completed successfully');
+    } catch (error: any) {
+      log('❌ Daily maintenance failed:', error.message);
+    }
+  });
+  log('📅 Daily maintenance scheduled for 3:00 AM');
 })();
