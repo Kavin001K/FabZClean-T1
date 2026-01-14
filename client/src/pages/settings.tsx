@@ -12,14 +12,15 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Moon, Sun, Printer, Bell, Database, Laptop, Zap, Gauge,
   ScanLine, LayoutDashboard, Plus, Search, Receipt, Truck,
-  FileText, Vibrate, Volume2, Image, Sparkles, Info, RotateCcw
+  FileText, Vibrate, Volume2, Image, Sparkles, Info, RotateCcw,
+  Users, Calculator
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 // Icon map for quick actions
 const ICON_MAP: Record<string, React.ElementType> = {
-  Plus, ScanLine, Receipt, Search, Truck, FileText
+  Plus, ScanLine, Receipt, Search, Truck, FileText, Users, Calculator
 };
 
 export default function SettingsPage() {

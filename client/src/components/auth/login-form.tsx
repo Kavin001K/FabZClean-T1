@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '../../contexts/auth-context';
+import { useSettings } from '../../contexts/settings-context';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -12,15 +13,17 @@ import { BiometricAuthButton } from '../biometric-auth-button';
 export const LoginForm: React.FC = () => {
   const [, setLocation] = useLocation();
   const { signIn } = useAuth();
+  const { settings } = useSettings();
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Get redirect URL from query params
+  // Get redirect URL from query params to respect deep links if needed, though settings takes priority for default flows
   const searchParams = new URLSearchParams(window.location.search);
-  const redirectTo = searchParams.get('redirect') || '/dashboard';
+  const redirectTo = searchParams.get('redirect');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,22 +36,16 @@ export const LoginForm: React.FC = () => {
       if (error) {
         setError(error);
       } else {
-        // Redirect based on role
-        if (employee) {
-          if (employee.role === 'admin') {
-            setLocation('/');
-          } else if (employee.role === 'franchise_manager') {
-            setLocation('/franchise-dashboard');
-          } else if (employee.role === 'factory_manager') {
-            setLocation('/factory-dashboard');
-          } else if (employee.role === 'employee' || employee.role === 'driver' || employee.role === 'staff') {
-            setLocation('/employee-dashboard');
-          } else {
-            setLocation('/');
-          }
-        } else {
-          setLocation('/');
+        // 1. If there's an explicit redirect param, use it (highest priority)
+        if (redirectTo) {
+          setLocation(redirectTo);
+          return;
         }
+
+        // 2. Otherwise use the settings-defined landing page
+        const targetPage = settings.defaultLandingPage || '/dashboard';
+        console.log("Redirecting to preference:", targetPage, "User role:", employee?.role);
+        setLocation(targetPage);
       }
     } catch (err) {
       console.error(err);
@@ -159,4 +156,3 @@ export const LoginForm: React.FC = () => {
     </div>
   );
 };
-

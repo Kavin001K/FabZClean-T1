@@ -10,9 +10,12 @@ export type LandingPage = '/dashboard' | '/orders' | '/create-order' | '/transit
 export const AVAILABLE_QUICK_ACTIONS = [
   { id: 'new-order', label: 'New Order', icon: 'Plus' },
   { id: 'scan-qr', label: 'Scan QR', icon: 'ScanLine' },
-  { id: 'add-expense', label: 'Add Expense', icon: 'Receipt' },
   { id: 'customer-search', label: 'Find Customer', icon: 'Search' },
+  { id: 'transit', label: 'Transit', icon: 'Truck' },
   { id: 'transit-batch', label: 'Transit Batch', icon: 'Truck' },
+  { id: 'expenses', label: 'Expenses', icon: 'Calculator' },
+  { id: 'add-expense', label: 'Add Expense', icon: 'Receipt' },
+  { id: 'staff', label: 'Staff', icon: 'Users' },
   { id: 'daily-report', label: 'Daily Report', icon: 'FileText' },
 ] as const;
 
