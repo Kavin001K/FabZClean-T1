@@ -1,16 +1,21 @@
 // ========================================
-// REPORTING API: Franchise Analytics
+// REPORTING API: Franchise Analytics (Local SQLite Version)
 // File: server/routes/reports.ts
 // ========================================
 
 import { Router } from "express";
-import { storage } from "../SupabaseStorage";
-import { authMiddleware, roleMiddleware } from "../middleware/auth";
+import { db as storage } from "../db";
+import { jwtRequired, requireRole } from "../middleware/auth";
 
 const router = Router();
 
 // Apply auth middleware to all routes
-router.use(authMiddleware);
+router.use(jwtRequired);
+
+// Helper to calculate date difference
+const getDaysDiff = (date1: Date, date2: Date) => {
+    return Math.floor((date1.getTime() - date2.getTime()) / (1000 * 3600 * 24));
+};
 
 // ========================================
 // FRANCHISE PERFORMANCE REPORTS
@@ -21,18 +26,38 @@ router.use(authMiddleware);
  * Get performance metrics for all franchises
  * Access: Admin only
  */
-router.get("/franchise-performance", roleMiddleware(['admin']), async (req, res) => {
+router.get("/franchise-performance", requireRole(['admin']), async (req, res) => {
     try {
-        const { data, error } = await storage.supabase
-            .from('vw_franchise_performance')
-            .select('*')
-            .order('total_revenue', { ascending: false });
+        const franchises = await storage.listFranchises();
+        const orders = await storage.listOrders();
+        const employees = await storage.listEmployees();
+        const customers = await storage.getCustomers(); // Assuming getCustomers exists
 
-        if (error) throw error;
+        const performanceData = franchises.map(franchise => {
+            const franchiseOrders = orders.filter(o => o.franchiseId === franchise.id);
+            const franchiseEmployees = employees.filter(e => e.franchiseId === franchise.id);
+            const franchiseCustomers = customers.filter(c => c.franchiseId === franchise.id);
+
+            const totalRevenue = franchiseOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount || "0") || 0), 0);
+
+            return {
+                franchise_id: franchise.id,
+                franchise_name: franchise.name,
+                franchise_code: franchise.code || franchise.franchiseId, // Fallback
+                total_revenue: totalRevenue,
+                total_orders: franchiseOrders.length,
+                total_customers: franchiseCustomers.length,
+                total_employees: franchiseEmployees.length,
+                average_order_value: franchiseOrders.length > 0 ? totalRevenue / franchiseOrders.length : 0
+            };
+        });
+
+        // Sort by revenue desc
+        performanceData.sort((a, b) => b.total_revenue - a.total_revenue);
 
         res.json({
             success: true,
-            data: data || [],
+            data: performanceData,
             timestamp: new Date().toISOString()
         });
     } catch (error: any) {
@@ -53,19 +78,36 @@ router.get("/franchise-performance", roleMiddleware(['admin']), async (req, res)
 router.get("/franchise-performance/:franchiseCode", async (req, res) => {
     try {
         const { franchiseCode } = req.params;
-        const { startDate, endDate } = req.query;
+        const franchiseId = (req as any).employee?.franchiseId;
 
-        const { data, error } = await storage.supabase
-            .from('vw_franchise_performance')
-            .select('*')
-            .eq('franchise_code', franchiseCode)
-            .single();
+        // Security check: if not admin, ensure accessing own franchise
+        // Note: franchiseCode here refers to the code/ID. If it's code, we need to map it.
+        // For simplicity, we'll try to match by ID or Code.
 
-        if (error) throw error;
+        const franchises = await storage.listFranchises();
+        const targetFranchise = franchises.find(f => f.franchiseId === franchiseCode || f.code === franchiseCode || f.id === franchiseCode);
+
+        if (!targetFranchise) {
+            return res.status(404).json({ success: false, message: "Franchise not found" });
+        }
+
+        const orders = await storage.listOrders();
+        const franchiseOrders = orders.filter(o => o.franchiseId === targetFranchise.id);
+
+        const totalRevenue = franchiseOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount || "0") || 0), 0);
+
+        const data = {
+            franchise_id: targetFranchise.id,
+            franchise_name: targetFranchise.name,
+            franchise_code: targetFranchise.code || targetFranchise.franchiseId,
+            total_revenue: totalRevenue,
+            total_orders: franchiseOrders.length,
+            // Add other metrics as needed
+        };
 
         res.json({
             success: true,
-            data: data || null,
+            data: data,
             timestamp: new Date().toISOString()
         });
     } catch (error: any) {
@@ -90,34 +132,52 @@ router.get("/franchise-performance/:franchiseCode", async (req, res) => {
 router.get("/employee-performance", async (req, res) => {
     try {
         const { franchiseCode } = req.query;
-        const user = (req as any).user;
+        const employee = (req as any).employee;
 
-        let query = storage.supabase
-            .from('vw_employee_performance')
-            .select('*');
+        let targetFranchiseId: string | undefined = undefined;
 
-        // If franchise manager, filter by their franchise
-        if (user.role === 'franchise_manager' && user.franchiseId) {
-            const { data: franchise } = await storage.supabase
-                .from('franchises')
-                .select('franchise_code')
-                .eq('id', user.franchiseId)
-                .single();
-
-            if (franchise) {
-                query = query.eq('franchise_code', franchise.franchise_code);
-            }
+        if (employee.role === 'franchise_manager') {
+            targetFranchiseId = employee.franchiseId;
         } else if (franchiseCode) {
-            query = query.eq('franchise_code', franchiseCode);
+            // Find franchise by code
+            const franchises = await storage.listFranchises();
+            const f = franchises.find(fr => fr.code === franchiseCode || fr.franchiseId === franchiseCode);
+            if (f) targetFranchiseId = f.id;
         }
 
-        const { data, error } = await query.order('revenue_generated', { ascending: false });
+        const allEmployees = await storage.listEmployees();
+        const allOrders = await storage.listOrders();
 
-        if (error) throw error;
+        let filteredEmployees = allEmployees;
+        if (targetFranchiseId) {
+            filteredEmployees = allEmployees.filter(e => e.franchiseId === targetFranchiseId);
+        }
+
+        const employeePerformance = filteredEmployees.map(emp => {
+            // Match orders by employeeId or createdBy
+            const empOrders = allOrders.filter(o => o.employeeId === emp.employeeId || o.createdBy === emp.employeeId);
+            const revenue = empOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount || "0") || 0), 0);
+
+            return {
+                employee_id: emp.id,
+                employee_code: emp.employeeId,
+                name: emp.name || `${emp.firstName} ${emp.lastName}`,
+                role: emp.role,
+                franchise_id: emp.franchiseId,
+                total_orders: empOrders.length,
+                revenue_generated: revenue,
+                // Mock goals for now
+                target_revenue: 10000,
+                achievement_rate: (revenue / 10000) * 100
+            };
+        });
+
+        // Sort by revenue
+        employeePerformance.sort((a, b) => b.revenue_generated - a.revenue_generated);
 
         res.json({
             success: true,
-            data: data || [],
+            data: employeePerformance,
             timestamp: new Date().toISOString()
         });
     } catch (error: any) {
@@ -125,105 +185,6 @@ router.get("/employee-performance", async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Failed to generate employee performance report",
-            error: error.message
-        });
-    }
-});
-
-/**
- * GET /api/reports/employee-performance/:employeeCode
- * Get performance metrics for specific employee
- */
-router.get("/employee-performance/:employeeCode", async (req, res) => {
-    try {
-        const { employeeCode } = req.params;
-
-        const { data, error } = await storage.supabase
-            .from('vw_employee_performance')
-            .select('*')
-            .eq('employee_code', employeeCode)
-            .single();
-
-        if (error) throw error;
-
-        res.json({
-            success: true,
-            data: data || null,
-            timestamp: new Date().toISOString()
-        });
-    } catch (error: any) {
-        console.error("Employee performance report error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to generate employee performance report",
-            error: error.message
-        });
-    }
-});
-
-// ========================================
-// ORDER ANALYTICS
-// ========================================
-
-/**
- * GET /api/reports/order-analytics
- * Get detailed order analytics
- */
-router.get("/order-analytics", async (req, res) => {
-    try {
-        const { franchiseCode, startDate, endDate, groupBy } = req.query;
-        const user = (req as any).user;
-
-        let query = storage.supabase
-            .from('vw_order_analytics')
-            .select('*');
-
-        // Filter by franchise if manager
-        if (user.role === 'franchise_manager' && user.franchiseId) {
-            const { data: franchise } = await storage.supabase
-                .from('franchises')
-                .select('franchise_code')
-                .eq('id', user.franchiseId)
-                .single();
-
-            if (franchise) {
-                query = query.eq('franchise_code', franchise.franchise_code);
-            }
-        } else if (franchiseCode) {
-            query = query.eq('franchise_code', franchiseCode);
-        }
-
-        // Date range filter
-        if (startDate) {
-            query = query.gte('created_at', startDate);
-        }
-        if (endDate) {
-            query = query.lte('created_at', endDate);
-        }
-
-        const { data, error } = await query
-            .order('created_at', { ascending: false })
-            .limit(1000);
-
-        if (error) throw error;
-
-        // Group data if requested
-        let result = data || [];
-        if (groupBy && data) {
-            result = groupOrderData(data, groupBy as string);
-        }
-
-        res.json({
-            success: true,
-            data: result,
-            count: result.length,
-            timestamp: new Date().toISOString()
-        });
-    } catch (error: any) {
-        console.error("Order analytics report error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to generate order analytics report",
             error: error.message
         });
     }
@@ -239,41 +200,57 @@ router.get("/order-analytics", async (req, res) => {
  */
 router.get("/daily-summary", async (req, res) => {
     try {
-        const { franchiseCode, days = 30 } = req.query;
-        const user = (req as any).user;
+        const { franchiseCode, days = "30" } = req.query;
+        const employee = (req as any).employee; // Corrected from user to employee
 
-        let query = storage.supabase
-            .from('vw_daily_summary')
-            .select('*');
+        const numDays = parseInt(days as string);
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - numDays);
 
-        // Filter by franchise if manager
-        if (user.role === 'franchise_manager' && user.franchiseId) {
-            const { data: franchise } = await storage.supabase
-                .from('franchises')
-                .select('franchise_code')
-                .eq('id', user.franchiseId)
-                .single();
+        let targetFranchiseId: string | undefined = undefined;
 
-            if (franchise) {
-                query = query.eq('franchise_code', franchise.franchise_code);
-            }
+        if (employee.role === 'franchise_manager') {
+            targetFranchiseId = employee.franchiseId;
         } else if (franchiseCode) {
-            query = query.eq('franchise_code', franchiseCode);
+            const franchises = await storage.listFranchises();
+            const f = franchises.find(fr => fr.code === franchiseCode || fr.franchiseId === franchiseCode);
+            if (f) targetFranchiseId = f.id;
         }
 
-        // Get last N days
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - parseInt(days as string));
+        const allOrders = await storage.listOrders();
 
-        const { data, error } = await query
-            .gte('date', startDate.toISOString().split('T')[0])
-            .order('date', { ascending: false });
+        let filteredOrders = allOrders.filter(o => new Date(o.createdAt) >= startDate);
+        if (targetFranchiseId) {
+            filteredOrders = filteredOrders.filter(o => o.franchiseId === targetFranchiseId);
+        }
 
-        if (error) throw error;
+        // Group by Date
+        const dailyMap = new Map();
+
+        filteredOrders.forEach(order => {
+            const dateStr = new Date(order.createdAt).toISOString().split('T')[0];
+            if (!dailyMap.has(dateStr)) {
+                dailyMap.set(dateStr, {
+                    date: dateStr,
+                    total_revenue: 0,
+                    total_orders: 0,
+                    completed_orders: 0
+                });
+            }
+
+            const dayStats = dailyMap.get(dateStr);
+            dayStats.total_revenue += (parseFloat(order.totalAmount || "0") || 0);
+            dayStats.total_orders += 1;
+            if (order.status === 'completed' || order.status === 'delivered') {
+                dayStats.completed_orders += 1;
+            }
+        });
+
+        const dailyData = Array.from(dailyMap.values()).sort((a, b) => b.date.localeCompare(a.date));
 
         res.json({
             success: true,
-            data: data || [],
+            data: dailyData,
             timestamp: new Date().toISOString()
         });
     } catch (error: any) {
@@ -285,105 +262,5 @@ router.get("/daily-summary", async (req, res) => {
         });
     }
 });
-
-// ========================================
-// COMPARISON REPORTS
-// ========================================
-
-/**
- * GET /api/reports/franchise-comparison
- * Compare performance across franchises
- * Access: Admin only
- */
-router.get("/franchise-comparison", roleMiddleware(['admin']), async (req, res) => {
-    try {
-        const { metric = 'revenue', period = '30' } = req.query;
-
-        const { data, error } = await storage.supabase
-            .from('vw_franchise_performance')
-            .select('*')
-            .order('total_revenue', { ascending: false });
-
-        if (error) throw error;
-
-        // Calculate rankings
-        const ranked = (data || []).map((franchise, index) => ({
-            ...franchise,
-            rank: index + 1,
-            performance_score: calculatePerformanceScore(franchise)
-        }));
-
-        res.json({
-            success: true,
-            data: ranked,
-            timestamp: new Date().toISOString()
-        });
-    } catch (error: any) {
-        console.error("Franchise comparison report error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to generate franchise comparison report",
-            error: error.message
-        });
-    }
-});
-
-// ========================================
-// HELPER FUNCTIONS
-// ========================================
-
-function groupOrderData(data: any[], groupBy: string): any[] {
-    const grouped: Record<string, any> = {};
-
-    data.forEach(order => {
-        let key: string;
-        switch (groupBy) {
-            case 'franchise':
-                key = order.franchise_code;
-                break;
-            case 'employee':
-                key = order.employee_code;
-                break;
-            case 'month':
-                key = order.year_month;
-                break;
-            case 'day':
-                key = order.created_at.split('T')[0];
-                break;
-            default:
-                key = 'all';
-        }
-
-        if (!grouped[key]) {
-            grouped[key] = {
-                group: key,
-                count: 0,
-                total_amount: 0,
-                orders: []
-            };
-        }
-
-        grouped[key].count++;
-        grouped[key].total_amount += parseFloat(order.total_amount || 0);
-        grouped[key].orders.push(order);
-    });
-
-    return Object.values(grouped);
-}
-
-function calculatePerformanceScore(franchise: any): number {
-    // Weighted score based on multiple metrics
-    const revenueScore = (franchise.total_revenue || 0) / 1000; // Normalize
-    const orderScore = (franchise.total_orders || 0) * 10;
-    const customerScore = (franchise.total_customers || 0) * 5;
-    const employeeScore = (franchise.total_employees || 0) * 20;
-
-    return Math.round(
-        (revenueScore * 0.4) +
-        (orderScore * 0.3) +
-        (customerScore * 0.2) +
-        (employeeScore * 0.1)
-    );
-}
 
 export default router;

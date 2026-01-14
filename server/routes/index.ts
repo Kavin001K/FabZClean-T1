@@ -26,6 +26,8 @@ import settingsRouter from './settings';
 import franchiseRouter from './franchise';
 import auditLogsRouter from './audit-logs';
 import analyticsRouter from './analytics';
+import creditsRouter from './credits';
+import reportsRouter from './reports';
 import publicTrackingRouter from './public-tracking';
 import publicInvoiceRouter from './public-invoice';
 import { jwtRequired } from '../middleware/auth';
@@ -177,6 +179,8 @@ export function registerAllRoutes(app: Express): void {
   // Use audit logs router (new)
   app.use('/api/audit-logs', auditLogsRouter);
   app.use('/api/analytics', analyticsRouter);
+  app.use('/api/credits', creditsRouter);
+  app.use('/api/reports', reportsRouter);
 
   app.use('/api/v1/transit', transitRouter);
   app.use('/api/v1/deliveries', deliveriesRouter);

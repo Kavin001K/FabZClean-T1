@@ -234,6 +234,7 @@ export async function seedDatabase() {
         hireDate: new Date(),
         salary: "100000.00",
         password: "$2b$10$A7eMtBNk3B8YkTz9LfVRPOII.W815gVpb8DP2W0He8WNzURAoDSxa", // Durai@2025
+        role: "admin",
       },
       {
         firstName: "Mike",
@@ -245,6 +246,7 @@ export async function seedDatabase() {
         hireDate: new Date(),
         salary: "30000.00",
         password: "$2a$10$abcdefghijklmnopqrstuvwxyz123456",
+        role: "staff",
       },
       {
         firstName: "Lisa",
@@ -256,6 +258,7 @@ export async function seedDatabase() {
         hireDate: new Date(),
         salary: "35000.00",
         password: "$2a$10$abcdefghijklmnopqrstuvwxyz123456",
+        role: "driver",
       },
     ];
 

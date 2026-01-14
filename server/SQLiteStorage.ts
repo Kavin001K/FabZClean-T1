@@ -88,6 +88,16 @@ export class SQLiteStorage implements IStorage {
     this.migrateTables();
   }
 
+  private safeJsonParse(data: string | null): any {
+    if (!data) return null;
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      // If it's not valid JSON, return original string or null
+      return data;
+    }
+  }
+
   private createTables() {
     // Self-healing: Check if 'orders' table exists but is missing 'customerId' (corrupt from previous bad schema)
     try {

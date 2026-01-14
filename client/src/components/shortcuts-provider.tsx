@@ -42,7 +42,7 @@ export function ShortcutsProvider({ children }: ShortcutsProviderProps) {
             target.isContentEditable;
 
         // Allow F-keys and Escape to work even when in inputs
-        if (isInput && !e.key.startsWith('F') && e.key !== 'Escape') {
+        if (isInput && e.key && !e.key.startsWith('F') && e.key !== 'Escape') {
             return;
         }
 

@@ -977,6 +977,28 @@ export class MemStorage implements IStorage {
   close() {
     this.sqliteStorage.close();
   }
+
+  // Alias for logAction used by AuthService
+  async logAction(
+    employeeId: string,
+    action: string,
+    entityType: string,
+    entityId: string,
+    details: any,
+    ipAddress?: string,
+    userAgent?: string
+  ) {
+    return this.createAuditLog({
+      franchiseId: details.franchiseId || null,
+      employeeId,
+      action,
+      entityType,
+      entityId,
+      details: JSON.stringify(details),
+      ipAddress,
+      userAgent
+    });
+  }
 }
 
 // Export the storage instance - Force local MemStorage (which wraps SQLite)

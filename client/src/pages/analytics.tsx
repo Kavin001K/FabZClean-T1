@@ -109,7 +109,7 @@ export default function Analytics() {
 
       const response = await fetch(`/api/analytics/overview?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}` // Ensure we send token if not handled by cookie
+          'Authorization': `Bearer ${localStorage.getItem('employee_token')}` // Ensure we send token if not handled by cookie
         }
       });
       if (!response.ok) throw new Error('Failed to fetch analytics');

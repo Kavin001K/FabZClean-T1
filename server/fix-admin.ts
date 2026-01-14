@@ -8,13 +8,13 @@ import bcrypt from 'bcryptjs';
 import path from 'path';
 import fs from 'fs';
 
-const DB_PATH = path.resolve(__dirname, 'fabzclean.db');
+const DB_PATH = path.join(process.cwd(), 'server', 'secure_data', 'fabzclean.db');
 
 console.log('🔧 Fixing Admin Account...\n');
 
 if (!fs.existsSync(DB_PATH)) {
-    console.log('❌ Database not found. Run: npm run db:setup');
-    process.exit(1);
+  console.log('❌ Database not found. Run: npm run db:setup');
+  process.exit(1);
 }
 
 const db = new Database(DB_PATH);
@@ -31,22 +31,22 @@ db.prepare(`
     position, department, salary, role, password, status, hireDate, createdAt, updatedAt
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `).run(
-    'admin-user-id',
-    null,  // Admin sees ALL franchises
-    'admin@myfabclean.com',  // This is both the employeeId AND email
-    'System',
-    'Admin',
-    'admin@myfabclean.com',
-    '9999999999',
-    'Administrator',
-    'Management',
-    '100000.00',
-    'admin',
-    passwordHash,
-    'active',  // EXPLICITLY set to active
-    now,
-    now,
-    now
+  'admin-user-id',
+  null,  // Admin sees ALL franchises
+  'admin@myfabclean.com',  // This is both the employeeId AND email
+  'System',
+  'Admin',
+  'admin@myfabclean.com',
+  '9999999999',
+  'Administrator',
+  'Management',
+  '100000.00',
+  'admin',
+  passwordHash,
+  'active',  // EXPLICITLY set to active
+  now,
+  now,
+  now
 );
 
 console.log('✅ Admin account created!\n');
@@ -62,13 +62,13 @@ console.log('='.repeat(50));
 // Verify
 const admin = db.prepare("SELECT * FROM employees WHERE email = 'admin@myfabclean.com'").get() as any;
 if (admin) {
-    console.log('\n✅ Verified admin exists:');
-    console.log(`   ID: ${admin.id}`);
-    console.log(`   EmployeeId: ${admin.employeeId}`);
-    console.log(`   Email: ${admin.email}`);
-    console.log(`   Role: ${admin.role}`);
-    console.log(`   Status: ${admin.status}`);
-    console.log(`   Has Password: ${!!admin.password}`);
+  console.log('\n✅ Verified admin exists:');
+  console.log(`   ID: ${admin.id}`);
+  console.log(`   EmployeeId: ${admin.employeeId}`);
+  console.log(`   Email: ${admin.email}`);
+  console.log(`   Role: ${admin.role}`);
+  console.log(`   Status: ${admin.status}`);
+  console.log(`   Has Password: ${!!admin.password}`);
 }
 
 db.close();

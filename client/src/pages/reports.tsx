@@ -18,11 +18,23 @@ import { SmartAnalyticsView } from '@/components/smart-analytics-view';
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
 export default function ReportsPage() {
+    // Helper to get auth headers
+    const getAuthHeaders = () => {
+        const token = localStorage.getItem('employee_token');
+        return {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+        };
+    };
+
     // Fetch franchise performance
     const { data: franchisePerformance, isLoading: loadingFranchise } = useQuery({
         queryKey: ['franchise-performance'],
         queryFn: async () => {
-            const res = await fetch('/api/reports/franchise-performance');
+            const res = await fetch('/api/reports/franchise-performance', {
+                headers: getAuthHeaders()
+            });
+            if (!res.ok) throw new Error('Network response was not ok');
             const json = await res.json();
             return json.data || [];
         }
@@ -32,7 +44,10 @@ export default function ReportsPage() {
     const { data: employeePerformance, isLoading: loadingEmployees } = useQuery({
         queryKey: ['employee-performance'],
         queryFn: async () => {
-            const res = await fetch('/api/reports/employee-performance');
+            const res = await fetch('/api/reports/employee-performance', {
+                headers: getAuthHeaders()
+            });
+            if (!res.ok) throw new Error('Network response was not ok');
             const json = await res.json();
             return json.data || [];
         }
@@ -42,7 +57,10 @@ export default function ReportsPage() {
     const { data: dailySummary, isLoading: loadingDaily } = useQuery({
         queryKey: ['daily-summary'],
         queryFn: async () => {
-            const res = await fetch('/api/reports/daily-summary?days=30');
+            const res = await fetch('/api/reports/daily-summary?days=30', {
+                headers: getAuthHeaders()
+            });
+            if (!res.ok) throw new Error('Network response was not ok');
             const json = await res.json();
             return json.data || [];
         }

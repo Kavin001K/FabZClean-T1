@@ -35,7 +35,7 @@ router.get('/', jwtRequired, requireRole(AUDIT_VIEW_ROLES), async (req, res) => 
         let actualEmployeeId = employeeId as string | undefined;
 
         // Get requesting user's role and franchise from JWT
-        const requestingUser = (req as any).user;
+        const requestingUser = (req as any).employee;
         if (requestingUser && requestingUser.role !== 'admin') {
             // Franchise managers can only see their franchise's logs
             if (requestingUser.role === 'franchise_manager' && requestingUser.franchiseId) {
@@ -43,7 +43,7 @@ router.get('/', jwtRequired, requireRole(AUDIT_VIEW_ROLES), async (req, res) => 
             }
             // Other roles can only see their own logs
             else if (requestingUser.role !== 'franchise_manager') {
-                actualEmployeeId = requestingUser.employeeId;
+                actualEmployeeId = requestingUser.id || requestingUser.employeeId;
             }
         }
 
@@ -56,7 +56,7 @@ router.get('/', jwtRequired, requireRole(AUDIT_VIEW_ROLES), async (req, res) => 
             startDate,
             endDate,
             entityType,
-            sortBy: req.query.sortBy === 'createdAt' ? 'created_at' : req.query.sortBy as string,
+            sortBy: req.query.sortBy === 'createdAt' ? 'createdAt' : req.query.sortBy as string,
             sortOrder: req.query.sortOrder as string
         });
 
