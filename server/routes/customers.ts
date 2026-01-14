@@ -15,6 +15,7 @@ import {
   createSuccessResponse,
 } from "../services/serialization";
 import { realtimeServer } from "../websocket-server";
+import { AuthService } from "../auth-service";
 import type { UserRole } from "../../shared/supabase";
 
 const router = Router();
@@ -164,6 +165,23 @@ router.post(
       // Notify real-time clients
       realtimeServer.triggerUpdate('customer', 'created', customer);
 
+      // Log action
+      if ((req as any).employee) {
+        await AuthService.logAction(
+          (req as any).employee.employeeId,
+          (req as any).employee.username,
+          'create_customer',
+          'customer',
+          customer.id,
+          {
+            name: customer.name,
+            phone: customer.phone
+          },
+          req.ip || req.connection.remoteAddress,
+          req.get('user-agent')
+        );
+      }
+
       const serializedCustomer = serializeCustomer(customer);
       res.status(201).json(createSuccessResponse(serializedCustomer, 'Customer created successfully'));
     } catch (error: any) {
@@ -191,6 +209,22 @@ router.put('/:id', requireRole(CUSTOMER_EDITOR_ROLES), async (req, res) => {
     // Notify real-time clients
     realtimeServer.triggerUpdate('customer', 'updated', updatedCustomer);
 
+    // Log action
+    if ((req as any).employee) {
+      await AuthService.logAction(
+        (req as any).employee.employeeId,
+        (req as any).employee.username,
+        'update_customer',
+        'customer',
+        customerId,
+        {
+          updateData
+        },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
+
     const serializedCustomer = serializeCustomer(updatedCustomer);
     res.json(createSuccessResponse(serializedCustomer, 'Customer updated successfully'));
   } catch (error) {
@@ -217,6 +251,20 @@ router.delete('/:id', requireRole(CUSTOMER_ADMIN_ROLES), async (req, res) => {
 
     // Notify real-time clients
     realtimeServer.triggerUpdate('customer', 'deleted', { customerId });
+
+    // Log action
+    if ((req as any).employee) {
+      await AuthService.logAction(
+        (req as any).employee.employeeId,
+        (req as any).employee.username,
+        'delete_customer',
+        'customer',
+        customerId,
+        {},
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
 
     res.json(createSuccessResponse(null, 'Customer deleted successfully'));
   } catch (error) {

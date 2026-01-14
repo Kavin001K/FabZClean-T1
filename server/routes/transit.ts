@@ -13,6 +13,7 @@ import {
   createSuccessResponse
 } from '../services/serialization';
 import { realtimeServer } from '../websocket-server';
+import { AuthService } from '../auth-service';
 
 const router = Router();
 
@@ -172,6 +173,25 @@ router.post('/batches', adminLoginRequired, validateInput(transitBatchSchema), a
     // Notify real-time clients
     realtimeServer.triggerUpdate('transit_batches', 'created', batch);
 
+    // Log action
+    if ((req as any).employee) {
+      await AuthService.logAction(
+        (req as any).employee.employeeId,
+        (req as any).employee.username,
+        'create_transit_batch',
+        'transit_batch',
+        batch.id,
+        {
+          type,
+          orderCount: orderIds.length,
+          orderIds: orderIds,
+          notes
+        },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
+
     res.status(201).json(createSuccessResponse(batch, 'Transit batch created successfully'));
   } catch (error) {
     console.error('Create transit batch error:', error);
@@ -212,6 +232,23 @@ router.put('/batches/:id/initiate', adminLoginRequired, async (req, res) => {
       batchId,
       status: 'IN_TRANSIT'
     });
+
+    // Log action
+    if ((req as any).employee) {
+      await AuthService.logAction(
+        (req as any).employee.employeeId,
+        (req as any).employee.username,
+        'initiate_transit_batch',
+        'transit_batch',
+        batchId,
+        {
+          status: 'IN_TRANSIT',
+          initiatedAt: updatedBatch.initiatedAt
+        },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
 
     res.json(createSuccessResponse(updatedBatch, 'Transit batch initiated successfully'));
   } catch (error) {
@@ -261,6 +298,24 @@ router.put('/batches/:id/complete', adminLoginRequired, async (req, res) => {
       newOrderStatus
     });
 
+    // Log action
+    if ((req as any).employee) {
+      await AuthService.logAction(
+        (req as any).employee.employeeId,
+        (req as any).employee.username,
+        'complete_transit_batch',
+        'transit_batch',
+        batchId,
+        {
+          status: 'COMPLETED',
+          completedAt: updatedBatch.completedAt,
+          newOrderStatus
+        },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
+
     res.json(createSuccessResponse(updatedBatch, 'Transit batch completed successfully'));
   } catch (error) {
     console.error('Complete transit batch error:', error);
@@ -306,6 +361,22 @@ router.delete('/batches/:id', adminLoginRequired, async (req, res) => {
 
     // Notify real-time clients
     realtimeServer.triggerUpdate('transit_batches', 'deleted', { batchId });
+
+    // Log action
+    if ((req as any).employee) {
+      await AuthService.logAction(
+        (req as any).employee.employeeId,
+        (req as any).employee.username,
+        'delete_transit_batch',
+        'transit_batch',
+        batchId,
+        {
+          status: batch.status
+        },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
 
     res.json(createSuccessResponse(null, 'Transit batch deleted successfully'));
   } catch (error) {

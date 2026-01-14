@@ -200,6 +200,24 @@ router.get('/search', async (req, res) => {
       }
     }
 
+    // LOGGING: Log search query and results
+    if (req.employee && query.length >= 3) {
+      await AuthService.logAction(
+        req.employee.employeeId,
+        req.employee.username,
+        'search_orders',
+        'order',
+        'search',
+        {
+          query: query,
+          resultsCount: serializedOrders.length,
+          franchiseId: franchiseId || 'all'
+        },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
+
     res.json(serializedOrders);
   } catch (error) {
     console.error('Search orders error:', error);

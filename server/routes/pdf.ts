@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { AuthService } from '../auth-service';
+import { jwtRequired } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -46,7 +48,7 @@ const upload = multer({
  * POST /api/upload-pdf
  * Upload a PDF file and return public URL
  */
-router.post('/upload-pdf', upload.single('pdf'), async (req: Request, res: Response) => {
+router.post('/upload-pdf', jwtRequired, upload.single('pdf'), async (req: Request, res: Response) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No PDF file uploaded' });
@@ -65,6 +67,24 @@ router.post('/upload-pdf', upload.single('pdf'), async (req: Request, res: Respo
                 console.log('🗑️ Deleted temporary PDF:', filename);
             }
         }, 24 * 60 * 60 * 1000);
+
+        // LOGGING: Log PDF upload (typically invoice generation)
+        if ((req as any).employee) {
+            await AuthService.logAction(
+                (req as any).employee.employeeId,
+                (req as any).employee.username,
+                'generate_invoice_pdf',
+                'document',
+                filename,
+                {
+                    filename,
+                    sizeBytes: req.file.size,
+                    sizeKB: Math.round(req.file.size / 1024)
+                },
+                req.ip || req.connection.remoteAddress,
+                req.get('user-agent')
+            );
+        }
 
         res.json({
             success: true,

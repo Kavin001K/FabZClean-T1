@@ -19,6 +19,22 @@ router.post('/login', async (req: Request, res: Response) => {
     const ipAddress = req.ip || req.connection.remoteAddress;
     const result = await AuthService.login(username, password, ipAddress);
 
+    // LOGGING: Explicitly log login success with role context
+    await AuthService.logAction(
+      result.employee.id!,
+      result.employee.username,
+      'login_success',
+      'session',
+      'active',
+      {
+        role: result.employee.role,
+        franchiseId: result.employee.franchiseId,
+        loginMethod: 'password'
+      },
+      ipAddress,
+      req.get('user-agent')
+    );
+
     res.json({
       success: true,
       token: result.token,
@@ -144,6 +160,18 @@ router.post('/upload-profile-image', authMiddleware, async (req: Request, res: R
     if (!updatedEmployee) {
       return res.status(404).json({ error: 'Employee not found' });
     }
+
+    // LOGGING: Log image upload with size
+    await AuthService.logAction(
+      req.employee!.employeeId,
+      req.employee!.username,
+      'upload_profile_image',
+      'user_profile',
+      req.employee!.employeeId,
+      { sizeBytes: sizeInBytes, sizeKB: Math.round(sizeInBytes / 1024) },
+      req.ip || req.connection.remoteAddress,
+      req.get('user-agent')
+    );
 
     res.json({
       success: true,

@@ -1,9 +1,14 @@
 import express, { Request, Response } from 'express';
 import { settingsService } from '../services/settings-service';
+import { AuthService } from '../auth-service';
+import { jwtRequired, requireRole } from '../middleware/auth';
 
 const router = express.Router();
 
-// Get all settings
+// Apply auth middleware to all routes
+router.use(jwtRequired);
+
+// Get all settings (accessible to all authenticated users)
 router.get('/', async (req: Request, res: Response) => {
     try {
         const settings = await settingsService.getAllSettings();
@@ -26,7 +31,7 @@ router.get('/category/:category', async (req: Request, res: Response) => {
 });
 
 // Update a single setting
-router.put('/:key', async (req: Request, res: Response) => {
+router.put('/:key', requireRole(['admin']), async (req: Request, res: Response) => {
     try {
         const { key } = req.params;
         const { value, category } = req.body;
@@ -36,6 +41,21 @@ router.put('/:key', async (req: Request, res: Response) => {
         }
 
         const setting = await settingsService.updateSetting(key, value, category);
+
+        // Log action
+        if ((req as any).employee) {
+            await AuthService.logAction(
+                (req as any).employee.employeeId,
+                (req as any).employee.username,
+                'update_setting',
+                'setting',
+                key,
+                { value, category },
+                req.ip || req.connection.remoteAddress,
+                req.get('user-agent')
+            );
+        }
+
         res.json(setting);
     } catch (error: any) {
         console.error(`Error updating setting ${req.params.key}:`, error);
@@ -44,7 +64,7 @@ router.put('/:key', async (req: Request, res: Response) => {
 });
 
 // Bulk update settings
-router.put('/', async (req: Request, res: Response) => {
+router.put('/', requireRole(['admin']), async (req: Request, res: Response) => {
     try {
         const { settings } = req.body;
 
@@ -53,6 +73,21 @@ router.put('/', async (req: Request, res: Response) => {
         }
 
         const updatedSettings = await settingsService.updateSettings(settings);
+
+        // Log action
+        if ((req as any).employee) {
+            await AuthService.logAction(
+                (req as any).employee.employeeId,
+                (req as any).employee.username,
+                'bulk_update_settings',
+                'setting',
+                'bulk',
+                { count: settings.length },
+                req.ip || req.connection.remoteAddress,
+                req.get('user-agent')
+            );
+        }
+
         res.json(updatedSettings);
     } catch (error: any) {
         console.error('Error updating settings:', error);
@@ -61,9 +96,24 @@ router.put('/', async (req: Request, res: Response) => {
 });
 
 // Reset settings to defaults
-router.post('/reset', async (req: Request, res: Response) => {
+router.post('/reset', requireRole(['admin']), async (req: Request, res: Response) => {
     try {
         const settings = await settingsService.resetToDefaults();
+
+        // Log action
+        if ((req as any).employee) {
+            await AuthService.logAction(
+                (req as any).employee.employeeId,
+                (req as any).employee.username,
+                'reset_settings',
+                'setting',
+                'all',
+                {},
+                req.ip || req.connection.remoteAddress,
+                req.get('user-agent')
+            );
+        }
+
         res.json(settings);
     } catch (error) {
         console.error('Error resetting settings:', error);
@@ -77,6 +127,20 @@ router.get('/export/json', async (req: Request, res: Response) => {
         const data = await settingsService.exportSettings();
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Content-Disposition', `attachment; filename=settings-${Date.now()}.json`);
+        // Log action
+        if ((req as any).employee) {
+            await AuthService.logAction(
+                (req as any).employee.employeeId,
+                (req as any).employee.username,
+                'export_data',
+                'setting',
+                'all',
+                { type: 'json_export' },
+                req.ip || req.connection.remoteAddress,
+                req.get('user-agent')
+            );
+        }
+
         res.json(data);
     } catch (error) {
         console.error('Error exporting settings:', error);
@@ -85,7 +149,7 @@ router.get('/export/json', async (req: Request, res: Response) => {
 });
 
 // Import settings
-router.post('/import', async (req: Request, res: Response) => {
+router.post('/import', requireRole(['admin']), async (req: Request, res: Response) => {
     try {
         const { settings } = req.body;
 
@@ -94,6 +158,21 @@ router.post('/import', async (req: Request, res: Response) => {
         }
 
         const importedSettings = await settingsService.importSettings(settings);
+
+        // Log action
+        if ((req as any).employee) {
+            await AuthService.logAction(
+                (req as any).employee.employeeId,
+                (req as any).employee.username,
+                'import_settings',
+                'setting',
+                'bulk',
+                { count: settings.length },
+                req.ip || req.connection.remoteAddress,
+                req.get('user-agent')
+            );
+        }
+
         res.json(importedSettings);
     } catch (error: any) {
         console.error('Error importing settings:', error);

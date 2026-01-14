@@ -6,6 +6,7 @@
 import { Router } from "express";
 import { db as storage } from "../db";
 import { jwtRequired, requireRole } from "../middleware/auth";
+import { AuthService } from "../auth-service";
 
 const router = Router();
 
@@ -15,6 +16,25 @@ router.use(jwtRequired);
 // Helper to calculate date difference
 const getDaysDiff = (date1: Date, date2: Date) => {
     return Math.floor((date1.getTime() - date2.getTime()) / (1000 * 3600 * 24));
+};
+
+// Helper to log report access consistently
+const logReportAccess = async (req: any, reportName: string, filters: any) => {
+    if (req.employee) {
+        await AuthService.logAction(
+            req.employee.employeeId,
+            req.employee.username,
+            'generate_report',
+            'report',
+            reportName,
+            {
+                filters,
+                timestamp: new Date().toISOString()
+            },
+            req.ip || req.connection.remoteAddress,
+            req.get('user-agent')
+        );
+    }
 };
 
 // ========================================
@@ -54,6 +74,23 @@ router.get("/franchise-performance", requireRole(['admin']), async (req, res) =>
 
         // Sort by revenue desc
         performanceData.sort((a, b) => b.total_revenue - a.total_revenue);
+
+        // Log action
+        if ((req as any).employee) {
+            await AuthService.logAction(
+                (req as any).employee.employeeId,
+                (req as any).employee.username,
+                'generate_report',
+                'report',
+                'franchise_performance',
+                {
+                    reportType: 'franchise_performance_overview',
+                    timestamp: new Date().toISOString()
+                },
+                req.ip || req.connection.remoteAddress,
+                req.get('user-agent')
+            );
+        }
 
         res.json({
             success: true,
@@ -104,6 +141,24 @@ router.get("/franchise-performance/:franchiseCode", async (req, res) => {
             total_orders: franchiseOrders.length,
             // Add other metrics as needed
         };
+
+        // Log action
+        if ((req as any).employee) {
+            await AuthService.logAction(
+                (req as any).employee.employeeId,
+                (req as any).employee.username,
+                'generate_report',
+                'report',
+                `franchise_performance_${franchiseCode}`,
+                {
+                    reportType: 'franchise_performance_detail',
+                    franchiseCode,
+                    timestamp: new Date().toISOString()
+                },
+                req.ip || req.connection.remoteAddress,
+                req.get('user-agent')
+            );
+        }
 
         res.json({
             success: true,
@@ -174,6 +229,24 @@ router.get("/employee-performance", async (req, res) => {
 
         // Sort by revenue
         employeePerformance.sort((a, b) => b.revenue_generated - a.revenue_generated);
+
+        // Log action
+        if ((req as any).employee) {
+            await AuthService.logAction(
+                (req as any).employee.employeeId,
+                (req as any).employee.username,
+                'generate_report',
+                'report',
+                'employee_performance',
+                {
+                    reportType: 'employee_performance',
+                    franchiseFilter: franchiseCode,
+                    timestamp: new Date().toISOString()
+                },
+                req.ip || req.connection.remoteAddress,
+                req.get('user-agent')
+            );
+        }
 
         res.json({
             success: true,
@@ -247,6 +320,25 @@ router.get("/daily-summary", async (req, res) => {
         });
 
         const dailyData = Array.from(dailyMap.values()).sort((a, b) => b.date.localeCompare(a.date));
+
+        // Log action
+        if ((req as any).employee) {
+            await AuthService.logAction(
+                (req as any).employee.employeeId,
+                (req as any).employee.username,
+                'generate_report',
+                'report',
+                'daily_summary',
+                {
+                    reportType: 'daily_summary',
+                    days: req.query.days || 30,
+                    franchiseFilter: franchiseCode,
+                    timestamp: new Date().toISOString()
+                },
+                req.ip || req.connection.remoteAddress,
+                req.get('user-agent')
+            );
+        }
 
         res.json({
             success: true,
