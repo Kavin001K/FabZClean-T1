@@ -12,6 +12,8 @@ import { db as storage } from "./db";
 import { realtimeServer } from "./websocket-server";
 import { performanceMiddleware, getPerformanceStats } from "./performance-optimizer";
 import { connectToMongo } from "./mongo-db";
+import { LocalStorage } from "./services/local-storage";
+import path from 'path';
 
 const app = express();
 
@@ -31,6 +33,12 @@ app.use(performanceMiddleware());
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// Serve uploaded files statically
+// Uses process.cwd() for consistent path resolution
+const uploadsPath = path.join(process.cwd(), 'server', 'uploads');
+app.use('/uploads', express.static(uploadsPath));
+log(`📁 Serving static uploads from: ${uploadsPath}`);
 
 // Simple health check route
 app.get('/api/health', (req, res) => {

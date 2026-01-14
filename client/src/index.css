@@ -453,3 +453,100 @@ html {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ========================
+   PERFORMANCE MODE STYLES
+   ======================== */
+
+/* Low Data Mode: Reduce bandwidth by hiding heavy assets */
+body.low-data-mode img:not([data-essential="true"]),
+body.low-data-mode .avatar-image,
+body.low-data-mode video,
+body.low-data-mode iframe {
+  opacity: 0.3;
+  filter: grayscale(100%);
+}
+
+body.low-data-mode .avatar-fallback {
+  display: flex !important;
+}
+
+body.low-data-mode .low-data-hide {
+  display: none !important;
+}
+
+body.low-data-mode .gradient-mesh,
+body.low-data-mode .gradient-primary,
+body.low-data-mode .gradient-accent {
+  background: rgb(var(--muted)) !important;
+}
+
+/* Reduce Motion: Disable animations for accessibility and performance */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+html.reduce-motion .animate-in,
+html.reduce-motion .animate-out,
+html.reduce-motion .animate-fade-in {
+  animation: none !important;
+}
+
+html.reduce-motion .hover-lift:hover,
+html.reduce-motion .hover-scale:hover,
+html.reduce-motion .interactive:hover {
+  transform: none !important;
+}
+
+/* Compact Density Mode */
+html.density-compact .card {
+  padding: 0.75rem;
+}
+
+html.density-compact .btn {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+html.density-compact table td,
+html.density-compact table th {
+  padding: 0.5rem 0.75rem;
+}
+
+html.density-compact .space-y-4 > * + * {
+  margin-top: 0.75rem;
+}
+
+html.density-compact .space-y-6 > * + * {
+  margin-top: 1rem;
+}
+
+html.density-compact .gap-4 {
+  gap: 0.75rem;
+}
+
+html.density-compact .gap-6 {
+  gap: 1rem;
+}
+
+html.density-compact .py-8 {
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+html.density-compact h1 {
+  font-size: 1.5rem;
+}
+
+html.density-compact h2 {
+  font-size: 1.25rem;
+}
+
+html.density-compact h3 {
+  font-size: 1rem;
+}

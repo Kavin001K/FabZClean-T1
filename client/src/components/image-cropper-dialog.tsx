@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import {
@@ -71,73 +71,87 @@ export function ImageCropperDialog({
         [aspectRatio]
     );
 
-    const getCroppedImage = useCallback(async (): Promise<string> => {
+    // Draw preview on canvas whenever crop changes
+    useEffect(() => {
         const image = imgRef.current;
         const canvas = canvasRef.current;
 
-        if (!image || !canvas || !completedCrop) {
-            throw new Error('Crop data not available');
-        }
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-            throw new Error('Failed to get canvas context');
+        if (!completedCrop || !image || !canvas) {
+            return;
         }
 
         const scaleX = image.naturalWidth / image.width;
         const scaleY = image.naturalHeight / image.height;
 
-        // Set canvas size to the desired output size (e.g., 400x400 for profile)
-        const outputSize = 400;
-        canvas.width = outputSize;
-        canvas.height = outputSize;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
 
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const pixelRatio = window.devicePixelRatio;
 
-        // Apply circular mask if needed
+        // Set canvas size to match the displayed size for sharp rendering
+        // or a fixed size for the preview
+        const outputSize = 200; // Preview size
+
+        canvas.width = outputSize * pixelRatio;
+        canvas.height = outputSize * pixelRatio;
+
+        ctx.scale(pixelRatio, pixelRatio);
+        ctx.imageSmoothingQuality = 'high';
+
+        const cropX = completedCrop.x * scaleX;
+        const cropY = completedCrop.y * scaleY;
+        const cropWidth = completedCrop.width * scaleX;
+        const cropHeight = completedCrop.height * scaleY;
+
+        const centerX = outputSize / 2;
+        const centerY = outputSize / 2;
+
+        ctx.save();
+
+        // Clear entire canvas
+        ctx.clearRect(0, 0, outputSize, outputSize);
+
+        // Circular clipping
         if (circularCrop) {
             ctx.beginPath();
-            ctx.arc(outputSize / 2, outputSize / 2, outputSize / 2, 0, Math.PI * 2);
-            ctx.closePath();
+            ctx.arc(centerX, centerY, outputSize / 2, 0, 2 * Math.PI);
             ctx.clip();
         }
 
-        // Calculate source and destination dimensions
-        const sourceX = completedCrop.x * scaleX;
-        const sourceY = completedCrop.y * scaleY;
-        const sourceWidth = completedCrop.width * scaleX;
-        const sourceHeight = completedCrop.height * scaleY;
+        // Handle rotation around center
+        ctx.translate(centerX, centerY);
+        ctx.rotate((rotate * Math.PI) / 180);
+        ctx.scale(scale, scale);
+        ctx.translate(-centerX, -centerY);
 
-        // Save context state
-        ctx.save();
+        // Calculate draw position to center the crop
+        // We want the center of the crop to be at the center of the canvas
+        // The drawImage takes the *source* coordinates (cropX, cropY, cropWidth, cropHeight)
+        // And draws them to *destination* coordinates (dx, dy, dWidth, dHeight)
 
-        // Apply rotation if needed
-        if (rotate !== 0) {
-            ctx.translate(outputSize / 2, outputSize / 2);
-            ctx.rotate((rotate * Math.PI) / 180);
-            ctx.translate(-outputSize / 2, -outputSize / 2);
-        }
-
-        // Draw the cropped image
         ctx.drawImage(
             image,
-            sourceX,
-            sourceY,
-            sourceWidth,
-            sourceHeight,
+            cropX,
+            cropY,
+            cropWidth,
+            cropHeight,
             0,
             0,
             outputSize,
             outputSize
         );
 
-        // Restore context state
         ctx.restore();
 
-        // Convert canvas to base64
-        return canvas.toDataURL('image/jpeg', 0.9);
-    }, [completedCrop, circularCrop, rotate]);
+    }, [completedCrop, rotate, scale, circularCrop]);
+
+    const getCroppedImage = useCallback(async (): Promise<string> => {
+        if (!completedCrop || !canvasRef.current) {
+            throw new Error('Crop data not available');
+        }
+        // Return the current canvas content as high quality JPEG
+        return canvasRef.current.toDataURL('image/jpeg', 0.95);
+    }, [completedCrop]);
 
     const handleCropComplete = async () => {
         setIsProcessing(true);

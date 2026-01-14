@@ -4,34 +4,13 @@ import path from 'path';
 import fs from 'fs';
 import { AuthService } from '../auth-service';
 import { jwtRequired } from '../middleware/auth';
+import { LocalStorage } from '../services/local-storage';
 
 const router = express.Router();
 
-// Create uploads directory if it doesn't exist
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, '../uploads/pdfs');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Configure storage - Local only
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadsDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'bill-' + uniqueSuffix + '.pdf');
-    }
-});
-
+// Configure multer with memory storage for processing
 const upload = multer({
-    storage: storage,
+    storage: multer.memoryStorage(),
     limits: {
         fileSize: 50 * 1024 * 1024, // 50MB limit
     },
@@ -54,19 +33,13 @@ router.post('/upload-pdf', jwtRequired, upload.single('pdf'), async (req: Reques
             return res.status(400).json({ error: 'No PDF file uploaded' });
         }
 
-        const filename = req.file.filename;
-        const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
-        const publicUrl = `${baseUrl}/uploads/pdfs/${filename}`;
-        console.log('✅ PDF uploaded locally:', publicUrl);
+        // Extract order ID from filename or generate one
+        const orderId = req.body.orderId || `temp-${Date.now()}`;
 
-        // Schedule deletion after 24 hours
-        setTimeout(() => {
-            const filePath = path.join(uploadsDir, filename);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-                console.log('🗑️ Deleted temporary PDF:', filename);
-            }
-        }, 24 * 60 * 60 * 1000);
+        // Save using LocalStorage service
+        const publicUrl = await LocalStorage.saveInvoicePdf(orderId, req.file.buffer);
+
+        console.log('✅ PDF saved:', publicUrl);
 
         // LOGGING: Log PDF upload (typically invoice generation)
         if ((req as any).employee) {
@@ -75,9 +48,9 @@ router.post('/upload-pdf', jwtRequired, upload.single('pdf'), async (req: Reques
                 (req as any).employee.username,
                 'generate_invoice_pdf',
                 'document',
-                filename,
+                orderId,
                 {
-                    filename,
+                    path: publicUrl,
                     sizeBytes: req.file.size,
                     sizeKB: Math.round(req.file.size / 1024)
                 },
@@ -89,7 +62,7 @@ router.post('/upload-pdf', jwtRequired, upload.single('pdf'), async (req: Reques
         res.json({
             success: true,
             url: publicUrl,
-            filename: filename,
+            orderId: orderId,
             size: req.file.size
         });
     } catch (error: any) {
@@ -99,59 +72,144 @@ router.post('/upload-pdf', jwtRequired, upload.single('pdf'), async (req: Reques
 });
 
 /**
- * GET /uploads/pdfs/:filename
- * Serve uploaded PDF files
+ * POST /api/pdf/generate-invoice/:orderId
+ * Generate and save an invoice PDF
  */
-router.get('/uploads/pdfs/:filename', (req: Request, res: Response) => {
+router.post('/generate-invoice/:orderId', jwtRequired, async (req: Request, res: Response) => {
     try {
-        const filename = req.params.filename;
-        const filePath = path.join(uploadsDir, filename);
+        const { orderId } = req.params;
+        const { pdfBuffer } = req.body;
 
-        // Security: prevent directory traversal
-        if (!filePath.startsWith(uploadsDir)) {
-            return res.status(403).json({ error: 'Access denied' });
+        if (!pdfBuffer) {
+            return res.status(400).json({ error: 'PDF buffer is required' });
         }
 
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({ error: 'PDF not found' });
+        // Convert base64 to buffer if needed
+        const buffer = Buffer.isBuffer(pdfBuffer)
+            ? pdfBuffer
+            : Buffer.from(pdfBuffer, 'base64');
+
+        // Save using LocalStorage service
+        const publicUrl = await LocalStorage.saveInvoicePdf(orderId, buffer);
+
+        console.log(`✅ Invoice PDF generated for order ${orderId}: ${publicUrl}`);
+
+        // Log the action
+        if ((req as any).employee) {
+            await AuthService.logAction(
+                (req as any).employee.employeeId,
+                (req as any).employee.username,
+                'generate_invoice_pdf',
+                'invoice',
+                orderId,
+                { path: publicUrl, sizeBytes: buffer.length },
+                req.ip || req.connection.remoteAddress,
+                req.get('user-agent')
+            );
         }
 
-        // Set headers for PDF
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-
-        // Stream the file
-        const fileStream = fs.createReadStream(filePath);
-        fileStream.pipe(res);
+        res.json({
+            success: true,
+            url: publicUrl,
+            orderId: orderId
+        });
     } catch (error: any) {
-        console.error('PDF serve error:', error);
-        res.status(500).json({ error: error.message || 'Failed to serve PDF' });
+        console.error('Invoice PDF generation error:', error);
+        res.status(500).json({ error: error.message || 'Failed to generate invoice PDF' });
     }
 });
 
 /**
- * DELETE /api/pdf/:filename
- * Delete a PDF file (for cleanup)
+ * POST /api/pdf/save-report
+ * Save a generated report document
  */
-router.delete('/pdf/:filename', (req: Request, res: Response) => {
+router.post('/save-report', jwtRequired, async (req: Request, res: Response) => {
     try {
-        const filename = req.params.filename;
-        const filePath = path.join(uploadsDir, filename);
+        const { reportName, pdfBuffer, extension } = req.body;
 
-        // Security check
-        if (!filePath.startsWith(uploadsDir)) {
-            return res.status(403).json({ error: 'Access denied' });
+        if (!reportName || !pdfBuffer) {
+            return res.status(400).json({ error: 'Report name and PDF buffer are required' });
         }
 
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-            res.json({ success: true, message: 'PDF deleted' });
+        const buffer = Buffer.isBuffer(pdfBuffer)
+            ? pdfBuffer
+            : Buffer.from(pdfBuffer, 'base64');
+
+        const publicUrl = await LocalStorage.saveReport(reportName, buffer, extension || '.pdf');
+
+        console.log(`✅ Report saved: ${publicUrl}`);
+
+        if ((req as any).employee) {
+            await AuthService.logAction(
+                (req as any).employee.employeeId,
+                (req as any).employee.username,
+                'generate_report',
+                'report',
+                reportName,
+                { path: publicUrl, sizeBytes: buffer.length },
+                req.ip || req.connection.remoteAddress,
+                req.get('user-agent')
+            );
+        }
+
+        res.json({
+            success: true,
+            url: publicUrl,
+            reportName: reportName
+        });
+    } catch (error: any) {
+        console.error('Report save error:', error);
+        res.status(500).json({ error: error.message || 'Failed to save report' });
+    }
+});
+
+/**
+ * DELETE /api/pdf/file
+ * Delete a file from storage
+ */
+router.delete('/file', jwtRequired, async (req: Request, res: Response) => {
+    try {
+        const { url } = req.body;
+
+        if (!url) {
+            return res.status(400).json({ error: 'File URL is required' });
+        }
+
+        const deleted = await LocalStorage.deleteFile(url);
+
+        if (deleted) {
+            res.json({ success: true, message: 'File deleted' });
         } else {
-            res.status(404).json({ error: 'PDF not found' });
+            res.status(404).json({ error: 'File not found' });
         }
     } catch (error: any) {
-        console.error('PDF delete error:', error);
-        res.status(500).json({ error: error.message || 'Failed to delete PDF' });
+        console.error('File delete error:', error);
+        res.status(500).json({ error: error.message || 'Failed to delete file' });
+    }
+});
+
+/**
+ * GET /api/pdf/check/:orderId
+ * Check if an invoice PDF exists for an order
+ */
+router.get('/check/:orderId', async (req: Request, res: Response) => {
+    try {
+        const { orderId } = req.params;
+
+        // Check current month first, then previous months
+        const now = new Date();
+        const year = now.getFullYear().toString();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+
+        const possibleUrl = `/uploads/documents/invoices/${year}/${month}/invoice-${orderId}.pdf`;
+        const exists = LocalStorage.fileExists(possibleUrl);
+
+        res.json({
+            exists,
+            url: exists ? possibleUrl : null
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
     }
 });
 

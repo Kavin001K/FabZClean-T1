@@ -1,8 +1,23 @@
-import express, { Request, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { AuthService } from '../auth-service';
-import { authMiddleware, roleMiddleware, auditMiddleware } from '../middleware/employee-auth';
+import { authMiddleware, auditMiddleware } from '../middleware/employee-auth';
+import { LocalStorage } from '../services/local-storage';
+import multer from 'multer';
 
-const router = express.Router();
+const router = Router();
+
+// Configure Multer to use memory storage for processing
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only images are allowed'));
+    }
+  }
+});
 
 /**
  * POST /api/auth/login
@@ -127,56 +142,61 @@ router.put('/update-profile', authMiddleware, auditMiddleware('update_profile'),
 
 /**
  * POST /api/auth/upload-profile-image
- * Upload profile image (base64)
+ * Upload profile image with optimization via LocalStorage service
  */
-router.post('/upload-profile-image', authMiddleware, async (req: Request, res: Response) => {
+router.post('/upload-profile-image', authMiddleware, upload.single('image'), async (req: Request, res: Response) => {
   try {
-    const { imageData } = req.body;
-
-    if (!imageData) {
-      return res.status(400).json({ error: 'Image data is required' });
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
     }
 
-    // Validate image data format (should be base64 or data URL)
-    if (!imageData.startsWith('data:image/')) {
-      return res.status(400).json({ error: 'Invalid image format. Please provide a valid image.' });
-    }
+    const employeeId = req.employee!.id!;
+    const originalSize = req.file.size;
 
-    // Check image size (max 500KB after base64 encoding)
-    const sizeInBytes = Buffer.from(imageData.split(',')[1] || '', 'base64').length;
-    if (sizeInBytes > 500 * 1024) {
-      return res.status(400).json({ error: 'Image too large. Maximum size is 500KB.' });
-    }
+    console.log(`[Auth] Uploading profile image for ${req.employee?.employeeId}, size: ${Math.round(originalSize / 1024)}KB`);
 
-    console.log(`[Auth] Uploading profile image for ${req.employee?.employeeId}, size: ${Math.round(sizeInBytes / 1024)}KB`);
+    // 1. Save to Local Storage with optimization
+    const imageUrl = await LocalStorage.saveProfileImage(
+      employeeId,
+      req.file.buffer,
+      req.file.originalname
+    );
 
-    // Update employee with profile image
+    // 2. Update employee record with new URL
     const updatedEmployee = await AuthService.updateEmployee(
-      req.employee!.id!,
-      { profileImage: imageData },
+      employeeId,
+      { profileImage: imageUrl },
       req.employee!.employeeId
     );
 
     if (!updatedEmployee) {
+      // Clean up the saved file if DB update fails
+      await LocalStorage.deleteFile(imageUrl);
       return res.status(404).json({ error: 'Employee not found' });
     }
 
-    // LOGGING: Log image upload with size
+    // 3. Log the action
     await AuthService.logAction(
       req.employee!.employeeId,
       req.employee!.username,
       'upload_profile_image',
       'user_profile',
       req.employee!.employeeId,
-      { sizeBytes: sizeInBytes, sizeKB: Math.round(sizeInBytes / 1024) },
+      {
+        originalSizeKB: Math.round(originalSize / 1024),
+        path: imageUrl
+      },
       req.ip || req.connection.remoteAddress,
-      req.get('user-agent')
+      req.get('user-agent'),
+      req.employee!.franchiseId
     );
+
+    console.log(`✅ Profile image saved for ${req.employee?.employeeId}: ${imageUrl}`);
 
     res.json({
       success: true,
       message: 'Profile image uploaded successfully',
-      profileImage: imageData
+      profileImage: imageUrl
     });
   } catch (error: any) {
     console.error('[Auth] Upload profile image error:', error);

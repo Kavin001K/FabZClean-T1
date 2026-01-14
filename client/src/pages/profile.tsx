@@ -136,13 +136,20 @@ export default function ProfilePage() {
 
         try {
             const token = localStorage.getItem('employee_token');
+            // Convert Base64 to Blob/File
+            const response = await fetch(croppedImageBase64);
+            const blob = await response.blob();
+            const file = new File([blob], "profile.jpg", { type: "image/jpeg" });
+
+            const formData = new FormData();
+            formData.append('image', file);
+
             const res = await fetch('/api/auth/upload-profile-image', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
-                body: JSON.stringify({ imageData: croppedImageBase64 }),
+                body: formData,
             });
 
             if (!res.ok) {

@@ -349,6 +349,7 @@ export class AuthService {
             qualifications: string;
             notes: string;
             address: string;
+            profileImage: string;
         }>,
         updatedBy: string
     ): Promise<AuthEmployee> {
@@ -362,6 +363,7 @@ export class AuthService {
         }
         if (data.email !== undefined) updateData.email = data.email;
         if (data.phone !== undefined) updateData.phone = data.phone;
+        if (data.profileImage !== undefined) updateData.profileImage = data.profileImage;
         if (data.franchiseId !== undefined) updateData.franchiseId = data.franchiseId;
         if (data.factoryId !== undefined) updateData.factoryId = data.factoryId;
         // Handle both isActive (boolean) and status (string)
