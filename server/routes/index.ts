@@ -30,6 +30,7 @@ import creditsRouter from './credits';
 import reportsRouter from './reports';
 import publicTrackingRouter from './public-tracking';
 import publicInvoiceRouter from './public-invoice';
+import businessSettingsRouter from './business-settings';
 import { jwtRequired } from '../middleware/auth';
 import { debugRouter } from './debug';
 import { db as storage } from '../db';
@@ -197,6 +198,7 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/accounting', accountingRouter);
   app.use('/api/settings', settingsRouter);
+  app.use('/api/business-settings', businessSettingsRouter);
 
   // Health and Database routes
   app.use('/api/health', healthRouter);

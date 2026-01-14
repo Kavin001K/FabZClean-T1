@@ -76,6 +76,7 @@ import { employeesApi, ordersApi } from "@/lib/data-service";
 import { DashboardDueToday } from "@/components/dashboard/components/dashboard-due-today";
 import { DashboardRecentOrders } from "@/components/dashboard/components/dashboard-recent-orders";
 import { DashboardReadyOrders } from "@/components/dashboard/components/dashboard-ready-orders";
+import { DashboardQuickActions } from "@/components/dashboard/components/dashboard-quick-actions";
 
 import { useAuth } from "@/contexts/auth-context";
 import { franchisesApi } from "@/lib/data-service";
@@ -414,6 +415,9 @@ export default function FranchiseDashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Quick Actions - Settings Controlled */}
+      <DashboardQuickActions />
 
       {/* Due Today & Recent Orders */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

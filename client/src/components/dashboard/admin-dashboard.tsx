@@ -15,6 +15,7 @@ import { formatCurrency } from "@/lib/data";
 import { ordersApi, franchisesApi } from "@/lib/data-service";
 import { DashboardDueToday } from "./components/dashboard-due-today";
 import { DashboardRecentOrders } from "./components/dashboard-recent-orders";
+import { DashboardQuickActions } from "./components/dashboard-quick-actions";
 import { useQuery } from "@tanstack/react-query";
 import {
     Select,
@@ -181,6 +182,9 @@ export default function AdminDashboard() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Quick Actions - Settings Controlled */}
+            <DashboardQuickActions />
 
             {/* Due Today & Recent Orders */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

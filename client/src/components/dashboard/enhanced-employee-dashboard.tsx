@@ -71,6 +71,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { DashboardDueToday } from "./components/dashboard-due-today";
 import { DashboardRecentOrders } from "./components/dashboard-recent-orders";
 import { DashboardReadyOrders } from "./components/dashboard-ready-orders";
+import { DashboardQuickActions } from "./components/dashboard-quick-actions";
 
 interface DashboardOrder {
   id: string;
@@ -466,6 +467,9 @@ export default function EnhancedEmployeeDashboard() {
               isLoading={ordersLoading}
             />
           </div>
+
+          {/* Quick Actions - Settings Controlled */}
+          <DashboardQuickActions />
 
           {/* Ready for Pickup/Delivery */}
           <DashboardReadyOrders />

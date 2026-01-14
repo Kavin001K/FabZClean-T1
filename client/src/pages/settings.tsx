@@ -1,4 +1,5 @@
-import { useSettings, Theme, LandingPage, AVAILABLE_QUICK_ACTIONS, QuickActionId } from '@/contexts/settings-context';
+import { useSettings, Theme, LandingPage, AVAILABLE_QUICK_ACTIONS, QuickActionId, BusinessRules } from '@/contexts/settings-context';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -13,7 +14,7 @@ import {
   Moon, Sun, Printer, Bell, Database, Laptop, Zap, Gauge,
   ScanLine, LayoutDashboard, Plus, Search, Receipt, Truck,
   FileText, Vibrate, Volume2, Image, Sparkles, Info, RotateCcw,
-  Users, Calculator
+  Users, Calculator, DollarSign, Clock, Package, Save, Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -24,8 +25,26 @@ const ICON_MAP: Record<string, React.ElementType> = {
 };
 
 export default function SettingsPage() {
-  const { settings, updateSetting, resetSettings, toggleQuickAction } = useSettings();
+  const { settings, updateSetting, resetSettings, toggleQuickAction, businessRules, isLoadingBusinessRules, updateBusinessRules, isUpdatingBusinessRules } = useSettings();
   const { toast } = useToast();
+
+  // Local state for business rules form (to avoid jittery inputs)
+  const [formRules, setFormRules] = useState<Partial<BusinessRules>>({});
+
+  // Sync form when data loads
+  useEffect(() => {
+    if (businessRules) {
+      setFormRules(businessRules);
+    }
+  }, [businessRules]);
+
+  const handleSaveBusinessRules = async () => {
+    try {
+      await updateBusinessRules(formRules);
+    } catch (error) {
+      // Error handling is done in context
+    }
+  };
 
   const handleReset = () => {
     if (confirm('Are you sure you want to reset all settings to default? This cannot be undone.')) {
@@ -55,7 +74,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 lg:w-[600px]">
+        <TabsList className="grid w-full grid-cols-6 lg:w-[700px]">
           <TabsTrigger value="general" className="gap-1">
             <Laptop className="h-4 w-4 hidden sm:block" />
             General
@@ -71,6 +90,10 @@ export default function SettingsPage() {
           <TabsTrigger value="performance" className="gap-1">
             <Gauge className="h-4 w-4 hidden sm:block" />
             Speed
+          </TabsTrigger>
+          <TabsTrigger value="business" className="gap-1">
+            <DollarSign className="h-4 w-4 hidden sm:block" />
+            Business
           </TabsTrigger>
           <TabsTrigger value="system" className="gap-1">
             <Database className="h-4 w-4 hidden sm:block" />
@@ -472,6 +495,122 @@ export default function SettingsPage() {
               They do not sync across devices.
             </AlertDescription>
           </Alert>
+        </TabsContent>
+
+        {/* === BUSINESS LOGIC TAB === */}
+        <TabsContent value="business" className="space-y-4 mt-6">
+          <Alert>
+            <DollarSign className="h-4 w-4" />
+            <AlertDescription>
+              These settings affect <strong>all users</strong> and control core business operations like tax calculation and order processing times.
+            </AlertDescription>
+          </Alert>
+
+          {isLoadingBusinessRules ? (
+            <Card>
+              <CardContent className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" /> Global Operational Rules
+                </CardTitle>
+                <CardDescription>Changes here affect ALL users immediately.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {/* Tax Rate */}
+                  <div className="space-y-2">
+                    <Label>Tax Rate (%)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={formRules.taxRate ?? 0}
+                      onChange={(e) => setFormRules({ ...formRules, taxRate: parseFloat(e.target.value) || 0 })}
+                      placeholder="e.g., 18 for 18% GST"
+                    />
+                    <p className="text-xs text-muted-foreground">Applied to order subtotal.</p>
+                  </div>
+
+                  {/* Minimum Order Value */}
+                  <div className="space-y-2">
+                    <Label>Min. Order Value ({businessRules.currencySymbol})</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formRules.minimumOrderValue ?? 0}
+                      onChange={(e) => setFormRules({ ...formRules, minimumOrderValue: parseFloat(e.target.value) || 0 })}
+                      placeholder="0 for no minimum"
+                    />
+                    <p className="text-xs text-muted-foreground">Orders below this amount will be blocked.</p>
+                  </div>
+
+                  {/* Default Turnaround */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" /> Standard Turnaround (Hours)
+                    </Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={formRules.defaultTurnaroundHours ?? 48}
+                      onChange={(e) => setFormRules({ ...formRules, defaultTurnaroundHours: parseInt(e.target.value) || 48 })}
+                      placeholder="48"
+                    />
+                    <p className="text-xs text-muted-foreground">Default due date for new orders.</p>
+                  </div>
+
+                  {/* Express Surcharge */}
+                  <div className="space-y-2">
+                    <Label>Express Surcharge (%)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={formRules.expressSurchargePercent ?? 50}
+                      onChange={(e) => setFormRules({ ...formRules, expressSurchargePercent: parseFloat(e.target.value) || 0 })}
+                      placeholder="50"
+                    />
+                    <p className="text-xs text-muted-foreground">Extra charge for express orders.</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Receipt Footer */}
+                <div className="space-y-2">
+                  <Label>Invoice Footer Text</Label>
+                  <Input
+                    value={formRules.receiptFooter ?? ''}
+                    onChange={(e) => setFormRules({ ...formRules, receiptFooter: e.target.value })}
+                    placeholder="Thank you for choosing us!"
+                  />
+                  <p className="text-xs text-muted-foreground">Shown at the bottom of invoices.</p>
+                </div>
+
+                {/* Save Button */}
+                <div className="flex justify-end pt-4">
+                  <Button onClick={handleSaveBusinessRules} disabled={isUpdatingBusinessRules}>
+                    {isUpdatingBusinessRules ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Business Rules
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

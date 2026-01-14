@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
 
-// --- Types ---
+// --- Types: Local Preferences ---
 export type Theme = 'light' | 'dark' | 'system';
 export type Density = 'compact' | 'comfortable';
 export type PrinterType = 'thermal' | 'a4';
@@ -21,6 +23,7 @@ export const AVAILABLE_QUICK_ACTIONS = [
 
 export type QuickActionId = typeof AVAILABLE_QUICK_ACTIONS[number]['id'];
 
+// Local UI Preferences (stored in localStorage)
 export interface AppSettings {
   // Appearance
   theme: Theme;
@@ -46,8 +49,6 @@ export interface AppSettings {
   offlineMode: boolean;
   debugMode: boolean;
 
-  // === POWER USER FEATURES ===
-
   // Workflow Automation
   autoSubmitOnScan: boolean;
   defaultLandingPage: LandingPage;
@@ -61,49 +62,68 @@ export interface AppSettings {
   hapticFeedback: boolean;
 }
 
+// --- Types: Business Rules (stored in database) ---
+export interface BusinessRules {
+  taxRate: number;           // e.g., 18.00 for 18% GST
+  currencySymbol: string;    // e.g., "₹"
+  minimumOrderValue: number; // Minimum order amount required
+  defaultTurnaroundHours: number;  // Default processing time
+  expressSurchargePercent: number; // Extra charge for express orders
+  enableStockAlerts: boolean;
+  lowStockThreshold: number;
+  receiptHeader: string;
+  receiptFooter: string;
+}
+
+// --- Defaults ---
 const DEFAULT_SETTINGS: AppSettings = {
-  // Appearance
   theme: 'system',
   density: 'comfortable',
-
-  // Localization
   currency: 'INR',
   dateFormat: 'dd/MM/yyyy',
-
-  // Printing
   defaultPrinterType: 'thermal',
   autoPrintInvoice: false,
   showPrintPreview: true,
   shopAddress: '',
   shopPhone: '',
-
-  // Notifications
   enableWhatsApp: true,
   enableEmailNotifications: false,
   soundEnabled: true,
-
-  // System
   offlineMode: false,
   debugMode: false,
-
-  // Workflow
   autoSubmitOnScan: false,
   defaultLandingPage: '/dashboard',
   quickActionSlots: ['new-order', 'scan-qr', 'customer-search'],
-
-  // Performance
   lowDataMode: false,
   reduceMotion: false,
-
-  // Feedback
   hapticFeedback: true,
 };
 
+const DEFAULT_BUSINESS_RULES: BusinessRules = {
+  taxRate: 0,
+  currencySymbol: '₹',
+  minimumOrderValue: 0,
+  defaultTurnaroundHours: 48,
+  expressSurchargePercent: 50,
+  enableStockAlerts: true,
+  lowStockThreshold: 10,
+  receiptHeader: 'FabZClean Laundry',
+  receiptFooter: 'Thank you for choosing us!',
+};
+
+// --- Context Type ---
 interface SettingsContextType {
+  // Local Preferences
   settings: AppSettings;
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   resetSettings: () => void;
   toggleQuickAction: (actionId: QuickActionId) => void;
+
+  // Business Rules (from server)
+  businessRules: BusinessRules;
+  isLoadingBusinessRules: boolean;
+  updateBusinessRules: (rules: Partial<BusinessRules>) => Promise<void>;
+  isUpdatingBusinessRules: boolean;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -111,7 +131,10 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 const STORAGE_KEY = 'fabzclean_settings_v2';
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  // 1. Initialize from LocalStorage or Defaults
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // ========== LOCAL PREFERENCES ==========
   const [settings, setSettings] = useState<AppSettings>(() => {
     if (typeof window === 'undefined') return DEFAULT_SETTINGS;
     try {
@@ -123,7 +146,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  // 2. Persist to LocalStorage on Change
+  // Persist to LocalStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -132,7 +155,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [settings]);
 
-  // 3. Deep Integration: Apply Theme Immediately
+  // Deep Integration: Apply Theme
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
@@ -144,7 +167,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       root.classList.add(settings.theme);
     }
 
-    // Listen for system theme changes when in system mode
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
       if (settings.theme === 'system') {
@@ -156,7 +178,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [settings.theme]);
 
-  // 4. Deep Integration: Apply Density
+  // Deep Integration: Apply Density
   useEffect(() => {
     const root = window.document.documentElement;
     if (settings.density === 'compact') {
@@ -168,7 +190,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [settings.density]);
 
-  // 5. Deep Integration: Apply Low Data Mode
+  // Deep Integration: Apply Low Data Mode
   useEffect(() => {
     const body = window.document.body;
     if (settings.lowDataMode) {
@@ -178,7 +200,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [settings.lowDataMode]);
 
-  // 6. Deep Integration: Apply Reduce Motion
+  // Deep Integration: Apply Reduce Motion
   useEffect(() => {
     const root = window.document.documentElement;
     if (settings.reduceMotion) {
@@ -198,24 +220,106 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setSettings(DEFAULT_SETTINGS);
   }, []);
 
-  // Toggle a quick action in/out of the slots (max 4)
   const toggleQuickAction = useCallback((actionId: QuickActionId) => {
     setSettings((prev) => {
       const currentSlots = prev.quickActionSlots;
       if (currentSlots.includes(actionId)) {
-        // Remove it
         return { ...prev, quickActionSlots: currentSlots.filter(id => id !== actionId) };
       } else if (currentSlots.length < 4) {
-        // Add it (max 4)
         return { ...prev, quickActionSlots: [...currentSlots, actionId] };
       }
-      // Already at max, don't add
       return prev;
     });
   }, []);
 
+  // ========== BUSINESS RULES (SERVER) ==========
+  const { data: serverBusinessRules, isLoading: isLoadingBusinessRules } = useQuery({
+    queryKey: ['business-settings'],
+    queryFn: async () => {
+      const token = localStorage.getItem('employee_token');
+      if (!token) return DEFAULT_BUSINESS_RULES;
+
+      try {
+        const res = await fetch('/api/business-settings', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!res.ok) {
+          console.warn('[BusinessSettings] Failed to fetch, using defaults');
+          return DEFAULT_BUSINESS_RULES;
+        }
+
+        const data = await res.json();
+        if (data.success && data.settings) {
+          return data.settings as BusinessRules;
+        }
+        return DEFAULT_BUSINESS_RULES;
+      } catch (error) {
+        console.error('[BusinessSettings] Fetch error:', error);
+        return DEFAULT_BUSINESS_RULES;
+      }
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    retry: 1,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (newRules: Partial<BusinessRules>) => {
+      const token = localStorage.getItem('employee_token');
+      if (!token) throw new Error('Not authenticated');
+
+      const res = await fetch('/api/business-settings', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newRules),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to update business settings');
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['business-settings'] });
+      toast({
+        title: "Settings Saved",
+        description: "Business rules updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to save settings.",
+      });
+    },
+  });
+
+  const updateBusinessRules = useCallback(async (rules: Partial<BusinessRules>) => {
+    await updateMutation.mutateAsync(rules);
+  }, [updateMutation]);
+
   return (
-    <SettingsContext.Provider value={{ settings, updateSetting, resetSettings, toggleQuickAction }}>
+    <SettingsContext.Provider value={{
+      // Local preferences
+      settings,
+      updateSetting,
+      resetSettings,
+      toggleQuickAction,
+      // Business rules
+      businessRules: serverBusinessRules || DEFAULT_BUSINESS_RULES,
+      isLoadingBusinessRules,
+      updateBusinessRules,
+      isUpdatingBusinessRules: updateMutation.isPending,
+    }}>
       {children}
     </SettingsContext.Provider>
   );
@@ -225,4 +329,10 @@ export const useSettings = () => {
   const context = useContext(SettingsContext);
   if (!context) throw new Error('useSettings must be used within a SettingsProvider');
   return context;
+};
+
+// Convenience hook for just business rules
+export const useBusinessRules = () => {
+  const { businessRules, isLoadingBusinessRules, updateBusinessRules, isUpdatingBusinessRules } = useSettings();
+  return { businessRules, isLoading: isLoadingBusinessRules, updateBusinessRules, isUpdating: isUpdatingBusinessRules };
 };
