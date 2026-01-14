@@ -65,7 +65,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       if (skipBackendWS) return;
 
       console.log('Realtime update:', message);
-      const { type, data } = message;
+      const { type, data } = message || {};
+
+      // Guard against undefined or null type
+      if (!type) {
+        console.warn('Received WebSocket message without type:', message);
+        return;
+      }
 
       if (type === 'analytics_update') {
         setAnalyticsData(data);

@@ -1,3 +1,10 @@
-import { useTheme as useThemeProvider } from "@/components/ui/theme-provider"
+import { useSettings } from "@/contexts/settings-context";
 
-export const useTheme = useThemeProvider
+export function useTheme() {
+    const { settings, updateSetting } = useSettings();
+
+    return {
+        theme: settings.theme,
+        setTheme: (theme: 'light' | 'dark' | 'system') => updateSetting('theme', theme),
+    };
+}
