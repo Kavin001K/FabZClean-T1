@@ -1,13 +1,37 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import path from 'path';
+import fs from 'fs';
 import { db } from '../db';
+// @ts-ignore
+import { fileURLToPath } from 'url';
 
 const router = Router();
 
-// Configure multer for file uploads
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Ensure documents directory exists
+const documentsDir = path.join(__dirname, '../uploads/documents');
+if (!fs.existsSync(documentsDir)) {
+    fs.mkdirSync(documentsDir, { recursive: true });
+}
+
+// Configure multer for local disk storage
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, documentsDir);
+    },
+    filename: (req, file, cb) => {
+        // Sanitize filename and add timestamp
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const originalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+        cb(null, `${uniqueSuffix}-${originalName}`);
+    }
+});
+
 const upload = multer({
-    storage: multer.memoryStorage(),
+    storage: storage,
     limits: {
         fileSize: 50 * 1024 * 1024, // 50MB limit
     },
@@ -20,32 +44,9 @@ const upload = multer({
     },
 });
 
-// Lazy-loaded Supabase client (only initialized when actually needed)
-let _supabase: SupabaseClient | null = null;
-
-function getSupabase(): SupabaseClient | null {
-    if (_supabase) return _supabase;
-
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-        console.warn('⚠️ Supabase not configured - document storage features disabled');
-        return null;
-    }
-
-    _supabase = createClient(supabaseUrl, supabaseKey);
-    return _supabase;
-}
-
 // Upload document
 router.post('/upload', upload.single('file'), async (req, res) => {
     try {
-        const supabase = getSupabase();
-        if (!supabase) {
-            return res.status(503).json({ error: 'Document storage not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_KEY.' });
-        }
-
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
         }
@@ -58,51 +59,19 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             console.warn('Failed to parse metadata JSON:', e);
         }
 
-        const filename = req.file.originalname;
-        const filepath = `documents/${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`; // Sanitize filename
-
-        // Ensure bucket exists
-        const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
-        if (bucketError) {
-            console.error('Error listing buckets:', bucketError);
-        } else if (!buckets.find((b: { name: string }) => b.name === 'pdfs')) {
-            const { error: createBucketError } = await supabase.storage.createBucket('pdfs', {
-                public: true
-            });
-            if (createBucketError) {
-                console.error('Error creating bucket:', createBucketError);
-                return res.status(500).json({ error: 'Failed to configure storage bucket' });
-            }
-        }
-
-        // Upload to Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('pdfs')
-            .upload(filepath, req.file.buffer, {
-                contentType: 'application/pdf',
-                upsert: false,
-            });
-
-        if (uploadError) {
-            console.error('Supabase upload error:', uploadError);
-            return res.status(500).json({ error: 'Failed to upload file to storage', details: uploadError.message });
-        }
-
-        // Get public URL
-        const { data: urlData } = supabase.storage
-            .from('pdfs')
-            .getPublicUrl(filepath);
-
-        const fileUrl = urlData.publicUrl;
+        const filename = req.file.filename;
+        const filepath = `documents/${filename}`; // Relative path
+        const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+        const fileUrl = `${baseUrl}/uploads/documents/${filename}`;
 
         // Save document record to database
         try {
             const document = await db.createDocument({
                 franchiseId: (req as any).user?.franchiseId, // Assuming user is attached to req
                 type: type || 'invoice',
-                title: (metadata as any).invoiceNumber ? `Invoice ${(metadata as any).invoiceNumber}` : filename,
-                filename,
-                filepath,
+                title: (metadata as any).invoiceNumber ? `Invoice ${(metadata as any).invoiceNumber}` : req.file.originalname,
+                filename: req.file.originalname,
+                filepath, // Store relative path or absolute? Storing relative is better.
                 fileUrl,
                 status: (metadata as any).status || 'sent',
                 amount: (metadata as any).amount ? String((metadata as any).amount) : null,
@@ -119,7 +88,10 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         } catch (dbError) {
             console.error('Database insert error:', dbError);
             // Try to clean up the uploaded file if DB insert fails
-            await supabase.storage.from('pdfs').remove([filepath]);
+            const fullPath = path.join(documentsDir, filename);
+            if (fs.existsSync(fullPath)) {
+                fs.unlinkSync(fullPath);
+            }
             return res.status(500).json({ error: 'Failed to save document record', details: dbError instanceof Error ? dbError.message : String(dbError) });
         }
     } catch (error) {
@@ -135,7 +107,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 router.get('/', async (req, res) => {
     try {
         const { type, status, limit = '50' } = req.query;
-        console.log(`Fetching documents with params: type=${type}, status=${status}, limit=${limit}`);
+        // console.log(`Fetching documents with params: type=${type}, status=${status}, limit=${limit}`);
 
         const parsedLimit = parseInt(limit as string);
         const validLimit = isNaN(parsedLimit) ? 50 : parsedLimit;
@@ -146,13 +118,10 @@ router.get('/', async (req, res) => {
             limit: validLimit
         });
 
-        console.log(`Successfully fetched ${allDocuments.length} documents`);
+        // console.log(`Successfully fetched ${allDocuments.length} documents`);
         res.json(allDocuments);
     } catch (error) {
         console.error('Error fetching documents:', error);
-        if (error instanceof Error) {
-            console.error('Stack:', error.stack);
-        }
         res.status(500).json({
             error: 'Failed to fetch documents',
             details: error instanceof Error ? error.message : JSON.stringify(error)
@@ -179,32 +148,41 @@ router.get('/:id', async (req, res) => {
 // Download document
 router.get('/:id/download', async (req, res) => {
     try {
-        const supabase = getSupabase();
-        if (!supabase) {
-            return res.status(503).json({ error: 'Document storage not configured.' });
-        }
-
         const document = await db.getDocument(req.params.id);
 
         if (!document) {
             return res.status(404).json({ error: 'Document not found' });
         }
 
-        // Get file from Supabase
-        const { data, error } = await supabase.storage
-            .from('pdfs')
-            .download(document.filepath);
+        // Logic to resolve file path
+        // Legacy paths might be just "documents/foo.pdf" or "pdfs/foo.pdf" used in Supabase bucket
+        // New paths are "documents/filename"
 
-        if (error) {
-            console.error('Download error:', error);
-            return res.status(500).json({ error: 'Failed to download file' });
+        let fullPath = "";
+
+        if (document.filepath.startsWith('documents/')) {
+            const fname = document.filepath.split('documents/')[1];
+            fullPath = path.join(documentsDir, fname);
+        } else {
+            // Fallback for legacy or other paths - might fail if not in local storage
+            fullPath = path.join(documentsDir, document.filename);
+        }
+
+        if (!fs.existsSync(fullPath)) {
+            // Last ditch effort: check by filename directly
+            const altPath = path.join(documentsDir, document.filename);
+            if (fs.existsSync(altPath)) {
+                fullPath = altPath;
+            } else {
+                return res.status(404).json({ error: 'File not found on server' });
+            }
         }
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${document.filename}"`);
 
-        const buffer = Buffer.from(await data.arrayBuffer());
-        res.send(buffer);
+        const fileStream = fs.createReadStream(fullPath);
+        fileStream.pipe(res);
     } catch (error) {
         console.error('Error downloading document:', error);
         res.status(500).json({ error: 'Failed to download document' });
@@ -214,22 +192,28 @@ router.get('/:id/download', async (req, res) => {
 // Delete document
 router.delete('/:id', async (req, res) => {
     try {
-        const supabase = getSupabase();
-
         const document = await db.getDocument(req.params.id);
 
         if (!document) {
             return res.status(404).json({ error: 'Document not found' });
         }
 
-        // Delete from Supabase Storage (only if supabase is configured)
-        if (supabase) {
-            const { error: deleteError } = await supabase.storage
-                .from('pdfs')
-                .remove([document.filepath]);
+        // Delete from local filesystem
+        if (document.filepath) {
+            let fullPath = "";
+            if (document.filepath.startsWith('documents/')) {
+                const fname = document.filepath.split('documents/')[1];
+                fullPath = path.join(documentsDir, fname);
+            } else {
+                fullPath = path.join(documentsDir, document.filename);
+            }
 
-            if (deleteError) {
-                console.error('Storage delete error:', deleteError);
+            if (fs.existsSync(fullPath)) {
+                try {
+                    fs.unlinkSync(fullPath);
+                } catch (e) {
+                    console.error('Failed to delete local file:', e);
+                }
             }
         }
 

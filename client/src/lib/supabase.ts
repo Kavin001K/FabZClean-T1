@@ -1,43 +1,36 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+// Mock Supabase Client for Local-Only Mode
+// This allows the frontend to run without the @supabase/supabase-js dependency
 
-// Get Supabase credentials from environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+export const isSupabaseConfigured = false;
 
-// Check if Supabase is properly configured (not placeholder values)
-export const isSupabaseConfigured = Boolean(
-  supabaseUrl &&
-  supabaseAnonKey &&
-  !supabaseUrl.includes('placeholder') &&
-  supabaseUrl.startsWith('https://')
-);
+// detailed mock to prevent crashes on chained calls
+const mockSupabase = {
+  auth: {
+    getSession: async () => ({ data: { session: null }, error: null }),
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => { } } } }),
+    signInWithPassword: async () => ({ data: null, error: { message: "Supabase disabled" } }),
+    signOut: async () => ({ error: null }),
+  },
+  from: () => ({
+    select: () => ({ data: [], error: null }),
+    insert: () => ({ data: [], error: null }),
+    update: () => ({ data: [], error: null }),
+    delete: () => ({ data: [], error: null }),
+    eq: () => ({ data: [], error: null }),
+    single: () => ({ data: null, error: null }),
+  }),
+  storage: {
+    from: () => ({
+      upload: async () => ({ data: null, error: { message: "Supabase storage disabled" } }),
+      getPublicUrl: () => ({ data: { publicUrl: "" } }),
+    })
+  },
+  channel: () => ({
+    on: () => ({ subscribe: () => { } }),
+    subscribe: () => { }
+  })
+};
 
-// Create a minimal mock client when Supabase is not configured
-// This prevents errors and allows the app to work with local backend only
-let supabaseClient: SupabaseClient;
+// @ts-ignore
+export const supabase = mockSupabase;
 
-if (isSupabaseConfigured) {
-  supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-    realtime: {
-      params: {
-        eventsPerSecond: 10,
-      },
-    },
-  });
-} else {
-  // Create a placeholder client that won't be used
-  // but prevents import errors
-  supabaseClient = createClient(
-    'https://placeholder.supabase.co',
-    'placeholder-key',
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false,
-      },
-    }
-  );
-}
-
-export const supabase = supabaseClient;

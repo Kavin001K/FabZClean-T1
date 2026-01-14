@@ -1,25 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
+import { db } from '../db';
 
 const router = Router();
-
-// Lazy Supabase client
-let _supabase: SupabaseClient | null = null;
-
-function getSupabase(): SupabaseClient | null {
-    if (_supabase) return _supabase;
-
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-        return null;
-    }
-
-    _supabase = createClient(supabaseUrl, supabaseKey);
-    return _supabase;
-}
 
 router.get('/check-user', async (req: Request, res: Response) => {
     const { username, secret } = req.query;
@@ -28,36 +11,33 @@ router.get('/check-user', async (req: Request, res: Response) => {
         return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const supabase = getSupabase();
-    if (!supabase) {
-        return res.status(503).json({ error: 'Supabase not configured' });
-    }
-
     try {
-        const { data: employees, error } = await supabase
-            .from('auth_employees')
-            .select('*')
-            .or(`username.eq."${username}",email.eq."${username}"`);
+        const term = String(username).toLowerCase();
+        // Since we don't have a direct getEmployeeByUsername, we list and filter
+        // This is a debug route, so performance isn't critical
+        const employees = await db.listEmployees();
 
-        if (error) {
-            return res.json({ status: 'error', error: error.message });
+        const emp = employees.find((e: any) =>
+            (e.username && e.username.toLowerCase() === term) ||
+            (e.email && e.email.toLowerCase() === term) ||
+            (e.employeeId && e.employeeId.toLowerCase() === term)
+        );
+
+        if (!emp) {
+            return res.json({ status: 'not_found', message: 'User not found' });
         }
 
-        if (!employees || employees.length === 0) {
-            return res.json({ status: 'not_found', message: 'User not found in auth_employees' });
-        }
-
-        const emp = employees[0];
-        const passwordMatch = await bcrypt.compare('admin123', emp.password_hash);
+        const passwordMatch = emp.password ? await bcrypt.compare('admin123', emp.password) : false;
 
         return res.json({
             status: 'found',
             user: {
                 id: emp.id,
-                username: emp.username,
-                isActive: emp.is_active,
+                username: emp.username || emp.employeeId,
+                email: emp.email,
+                isActive: emp.status === 'active',
                 role: emp.role,
-                hasPasswordHash: !!emp.password_hash,
+                hasPasswordHash: !!emp.password,
                 passwordMatchWithAdmin123: passwordMatch
             }
         });
@@ -74,29 +54,34 @@ router.get('/reset-password', async (req: Request, res: Response) => {
         return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const supabase = getSupabase();
-    if (!supabase) {
-        return res.status(503).json({ error: 'Supabase not configured' });
-    }
-
     try {
+        const term = String(username).toLowerCase();
+        const employees = await db.listEmployees();
+        const emp = employees.find((e: any) =>
+            (e.username && e.username.toLowerCase() === term) ||
+            (e.email && e.email.toLowerCase() === term) ||
+            (e.employeeId && e.employeeId.toLowerCase() === term)
+        );
+
+        if (!emp) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
         // Generate hash using the server's bcrypt library
         const passwordHash = await bcrypt.hash('admin123', 10);
 
-        const { data, error } = await supabase
-            .from('auth_employees')
-            .update({ password_hash: passwordHash, is_active: true })
-            .eq('username', username)
-            .select();
+        // Update employee
+        await db.updateEmployee(emp.id, {
+            password: passwordHash,
+            status: 'active'
+        });
 
-        if (error) {
-            return res.json({ status: 'error', error: error.message });
-        }
+        const updated = await db.getEmployee(emp.id);
 
         return res.json({
             status: 'success',
             message: 'Password reset to admin123',
-            user: data
+            user: updated
         });
 
     } catch (err: any) {
