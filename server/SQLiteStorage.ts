@@ -1214,26 +1214,34 @@ export class SQLiteStorage implements IStorage {
       `);
 
       // Fetch franchiseId for the actor to ensure the log is scoped
-      let franchiseId = 'SYSTEM';
-      try {
-        const actor = await this.getEmployee(actorId);
-        if (actor?.franchiseId) {
-          franchiseId = actor.franchiseId;
+      // Use NULL instead of string placeholders to avoid FK constraint failures
+      let franchiseId: string | null = null;
+      let employeeId: string | null = null;
+
+      if (actorId && actorId !== 'SYSTEM' && actorId !== 'ANONYMOUS') {
+        try {
+          const actor = await this.getEmployee(actorId);
+          if (actor) {
+            employeeId = actor.id;
+            if (actor.franchiseId) {
+              franchiseId = actor.franchiseId as string;
+            }
+          }
+        } catch {
+          // Actor not found, keep as null
         }
-      } catch {
-        // Actor not found, use SYSTEM
       }
 
       stmt.run(
         randomUUID(),
-        franchiseId,
-        actorId || 'ANONYMOUS',
+        franchiseId,  // NULL if no franchise
+        employeeId,   // NULL if no employee
         action,
-        entityType,
-        entityId,
+        entityType || null,
+        entityId || null,
         JSON.stringify(details),
-        ip || 'LOCALHOST',
-        userAgent || 'UNKNOWN',
+        ip || null,
+        userAgent || null,
         new Date().toISOString()
       );
     } catch (error) {
