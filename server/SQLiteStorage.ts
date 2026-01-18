@@ -680,6 +680,272 @@ export class SQLiteStorage implements IStorage {
       CREATE INDEX IF NOT EXISTS idx_auth_sessions_token ON auth_sessions(token);
       CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions(user_id);
       CREATE INDEX IF NOT EXISTS idx_auth_sessions_refresh_token ON auth_sessions(refresh_token);
+
+      -- ======= PAYMENT TRANSACTIONS =======
+      CREATE TABLE IF NOT EXISTS payment_transactions (
+        id TEXT PRIMARY KEY,
+        franchiseId TEXT,
+        orderId TEXT,
+        orderNumber TEXT,
+        customerId TEXT,
+        paymentMethod TEXT CHECK(paymentMethod IN ('cash', 'card', 'upi', 'netbanking', 'wallet', 'credit', 'other')) NOT NULL,
+        amount TEXT NOT NULL,
+        currency TEXT DEFAULT 'INR',
+        status TEXT CHECK(status IN ('initiated', 'pending', 'completed', 'failed', 'refunded', 'partial_refund')) DEFAULT 'pending',
+        paymentGateway TEXT,
+        gatewayTransactionId TEXT,
+        gatewayOrderId TEXT,
+        gatewayResponse TEXT,
+        refundAmount TEXT,
+        refundReason TEXT,
+        employeeId TEXT,
+        notes TEXT,
+        metadata TEXT,
+        completedAt TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (orderId) REFERENCES orders(id),
+        FOREIGN KEY (customerId) REFERENCES customers(id),
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_payment_transactions_order ON payment_transactions(orderId);
+      CREATE INDEX IF NOT EXISTS idx_payment_transactions_customer ON payment_transactions(customerId);
+      CREATE INDEX IF NOT EXISTS idx_payment_transactions_franchise ON payment_transactions(franchiseId);
+      CREATE INDEX IF NOT EXISTS idx_payment_transactions_status ON payment_transactions(status);
+      CREATE INDEX IF NOT EXISTS idx_payment_transactions_gateway ON payment_transactions(gatewayTransactionId);
+
+      -- ======= FILE STORAGE RECORDS =======
+      CREATE TABLE IF NOT EXISTS file_storage (
+        id TEXT PRIMARY KEY,
+        fileId TEXT UNIQUE NOT NULL,
+        franchiseId TEXT,
+        originalName TEXT NOT NULL,
+        storedName TEXT NOT NULL,
+        mimeType TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        path TEXT NOT NULL,
+        url TEXT,
+        category TEXT CHECK(category IN ('invoice', 'bill', 'receipt', 'document', 'image', 'barcode', 'signature', 'report', 'other')) DEFAULT 'other',
+        entityType TEXT,
+        entityId TEXT,
+        orderId TEXT,
+        orderNumber TEXT,
+        customerId TEXT,
+        employeeId TEXT,
+        description TEXT,
+        tags TEXT,
+        isArchived INTEGER DEFAULT 0,
+        checksum TEXT,
+        metadata TEXT,
+        createdBy TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id),
+        FOREIGN KEY (orderId) REFERENCES orders(id),
+        FOREIGN KEY (customerId) REFERENCES customers(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_file_storage_fileId ON file_storage(fileId);
+      CREATE INDEX IF NOT EXISTS idx_file_storage_category ON file_storage(category);
+      CREATE INDEX IF NOT EXISTS idx_file_storage_entity ON file_storage(entityType, entityId);
+      CREATE INDEX IF NOT EXISTS idx_file_storage_order ON file_storage(orderId);
+      CREATE INDEX IF NOT EXISTS idx_file_storage_customer ON file_storage(customerId);
+      CREATE INDEX IF NOT EXISTS idx_file_storage_franchise ON file_storage(franchiseId);
+
+      -- ======= ORDER STATUS HISTORY =======
+      CREATE TABLE IF NOT EXISTS order_history (
+        id TEXT PRIMARY KEY,
+        orderId TEXT NOT NULL,
+        orderNumber TEXT,
+        franchiseId TEXT,
+        previousStatus TEXT,
+        newStatus TEXT NOT NULL,
+        action TEXT NOT NULL,
+        notes TEXT,
+        employeeId TEXT,
+        employeeName TEXT,
+        metadata TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (orderId) REFERENCES orders(id),
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_order_history_order ON order_history(orderId);
+      CREATE INDEX IF NOT EXISTS idx_order_history_franchise ON order_history(franchiseId);
+      CREATE INDEX IF NOT EXISTS idx_order_history_created ON order_history(createdAt);
+
+      -- ======= COUPONS & PROMOTIONS =======
+      CREATE TABLE IF NOT EXISTS coupons (
+        id TEXT PRIMARY KEY,
+        franchiseId TEXT,
+        code TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        discountType TEXT CHECK(discountType IN ('percentage', 'fixed', 'free_service')) NOT NULL,
+        discountValue TEXT NOT NULL,
+        minOrderAmount TEXT DEFAULT '0',
+        maxDiscountAmount TEXT,
+        validFrom TEXT,
+        validUntil TEXT,
+        usageLimit INTEGER,
+        usedCount INTEGER DEFAULT 0,
+        perCustomerLimit INTEGER DEFAULT 1,
+        applicableServices TEXT,
+        applicableCategories TEXT,
+        isActive INTEGER DEFAULT 1,
+        createdBy TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_coupons_code ON coupons(code);
+      CREATE INDEX IF NOT EXISTS idx_coupons_franchise ON coupons(franchiseId);
+      CREATE INDEX IF NOT EXISTS idx_coupons_active ON coupons(isActive);
+
+      -- ======= COUPON USAGE TRACKING =======
+      CREATE TABLE IF NOT EXISTS coupon_usage (
+        id TEXT PRIMARY KEY,
+        couponId TEXT NOT NULL,
+        customerId TEXT NOT NULL,
+        orderId TEXT NOT NULL,
+        discountApplied TEXT NOT NULL,
+        usedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (couponId) REFERENCES coupons(id),
+        FOREIGN KEY (customerId) REFERENCES customers(id),
+        FOREIGN KEY (orderId) REFERENCES orders(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_coupon_usage_coupon ON coupon_usage(couponId);
+      CREATE INDEX IF NOT EXISTS idx_coupon_usage_customer ON coupon_usage(customerId);
+
+      -- ======= INVENTORY MOVEMENTS =======
+      CREATE TABLE IF NOT EXISTS inventory_movements (
+        id TEXT PRIMARY KEY,
+        franchiseId TEXT,
+        productId TEXT NOT NULL,
+        movementType TEXT CHECK(movementType IN ('in', 'out', 'adjustment', 'transfer', 'damage', 'return')) NOT NULL,
+        quantity INTEGER NOT NULL,
+        previousStock INTEGER,
+        newStock INTEGER,
+        reason TEXT,
+        referenceType TEXT,
+        referenceId TEXT,
+        notes TEXT,
+        employeeId TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (productId) REFERENCES products(id),
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_inventory_movements_product ON inventory_movements(productId);
+      CREATE INDEX IF NOT EXISTS idx_inventory_movements_franchise ON inventory_movements(franchiseId);
+      CREATE INDEX IF NOT EXISTS idx_inventory_movements_type ON inventory_movements(movementType);
+
+      -- ======= NOTIFICATION QUEUE =======
+      CREATE TABLE IF NOT EXISTS notification_queue (
+        id TEXT PRIMARY KEY,
+        franchiseId TEXT,
+        type TEXT CHECK(type IN ('whatsapp', 'sms', 'email', 'push')) NOT NULL,
+        recipient TEXT NOT NULL,
+        templateName TEXT,
+        templateId TEXT,
+        templateParams TEXT,
+        messageContent TEXT,
+        status TEXT CHECK(status IN ('pending', 'sent', 'delivered', 'failed', 'cancelled')) DEFAULT 'pending',
+        priority INTEGER DEFAULT 5,
+        scheduledAt TEXT,
+        sentAt TEXT,
+        deliveredAt TEXT,
+        provider TEXT,
+        providerMessageId TEXT,
+        providerResponse TEXT,
+        errorCode TEXT,
+        errorMessage TEXT,
+        retryCount INTEGER DEFAULT 0,
+        maxRetries INTEGER DEFAULT 3,
+        orderId TEXT,
+        customerId TEXT,
+        employeeId TEXT,
+        metadata TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id),
+        FOREIGN KEY (orderId) REFERENCES orders(id),
+        FOREIGN KEY (customerId) REFERENCES customers(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_notification_queue_status ON notification_queue(status);
+      CREATE INDEX IF NOT EXISTS idx_notification_queue_type ON notification_queue(type);
+      CREATE INDEX IF NOT EXISTS idx_notification_queue_scheduled ON notification_queue(scheduledAt);
+      CREATE INDEX IF NOT EXISTS idx_notification_queue_franchise ON notification_queue(franchiseId);
+
+      -- ======= DAILY REPORTS CACHE =======
+      CREATE TABLE IF NOT EXISTS daily_reports (
+        id TEXT PRIMARY KEY,
+        franchiseId TEXT,
+        reportDate TEXT NOT NULL,
+        totalOrders INTEGER DEFAULT 0,
+        completedOrders INTEGER DEFAULT 0,
+        pendingOrders INTEGER DEFAULT 0,
+        cancelledOrders INTEGER DEFAULT 0,
+        totalRevenue TEXT DEFAULT '0',
+        cashRevenue TEXT DEFAULT '0',
+        cardRevenue TEXT DEFAULT '0',
+        upiRevenue TEXT DEFAULT '0',
+        creditRevenue TEXT DEFAULT '0',
+        averageOrderValue TEXT DEFAULT '0',
+        newCustomers INTEGER DEFAULT 0,
+        repeatCustomers INTEGER DEFAULT 0,
+        totalItems INTEGER DEFAULT 0,
+        topServices TEXT,
+        employeeStats TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id),
+        UNIQUE(franchiseId, reportDate)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_daily_reports_date ON daily_reports(reportDate);
+      CREATE INDEX IF NOT EXISTS idx_daily_reports_franchise ON daily_reports(franchiseId);
+
+      -- ======= LOYALTY POINTS =======
+      CREATE TABLE IF NOT EXISTS loyalty_points (
+        id TEXT PRIMARY KEY,
+        customerId TEXT NOT NULL,
+        franchiseId TEXT,
+        points INTEGER NOT NULL,
+        type TEXT CHECK(type IN ('earned', 'redeemed', 'expired', 'bonus', 'adjustment')) NOT NULL,
+        orderId TEXT,
+        description TEXT,
+        expiresAt TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (customerId) REFERENCES customers(id),
+        FOREIGN KEY (orderId) REFERENCES orders(id),
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_loyalty_points_customer ON loyalty_points(customerId);
+      CREATE INDEX IF NOT EXISTS idx_loyalty_points_franchise ON loyalty_points(franchiseId);
+
+      -- ======= CUSTOMER PREFERENCES =======
+      CREATE TABLE IF NOT EXISTS customer_preferences (
+        id TEXT PRIMARY KEY,
+        customerId TEXT UNIQUE NOT NULL,
+        preferredServices TEXT,
+        allergies TEXT,
+        fabricPreferences TEXT,
+        deliveryPreferences TEXT,
+        communicationPreference TEXT CHECK(communicationPreference IN ('whatsapp', 'sms', 'email', 'none')) DEFAULT 'whatsapp',
+        specialInstructions TEXT,
+        metadata TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (customerId) REFERENCES customers(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_customer_preferences_customer ON customer_preferences(customerId);
     `);
   }
 
@@ -770,9 +1036,30 @@ export class SQLiteStorage implements IStorage {
         const columns = this.db.prepare("PRAGMA table_info(customers)").all() as any[];
         const columnNames = columns.map(c => c.name);
 
-        if (!columnNames.includes('creditBalance')) {
-          console.log('🔄 Migrating customers table: Adding column creditBalance');
-          this.db.exec("ALTER TABLE customers ADD COLUMN creditBalance TEXT DEFAULT '0'");
+        const customerColumns = [
+          { name: 'creditBalance', type: "TEXT DEFAULT '0'" },
+          { name: 'loyaltyPoints', type: 'INTEGER DEFAULT 0' },
+          { name: 'loyaltyTier', type: "TEXT DEFAULT 'bronze'" },
+          { name: 'tags', type: 'TEXT' },
+          { name: 'notes', type: 'TEXT' },
+          { name: 'preferredPaymentMethod', type: 'TEXT' },
+          { name: 'communicationPreference', type: "TEXT DEFAULT 'whatsapp'" },
+          { name: 'referredBy', type: 'TEXT' },
+          { name: 'dateOfBirth', type: 'TEXT' },
+          { name: 'anniversary', type: 'TEXT' },
+          { name: 'gender', type: 'TEXT' },
+          { name: 'alternatePhone', type: 'TEXT' },
+          { name: 'gstNumber', type: 'TEXT' },
+          { name: 'companyName', type: 'TEXT' },
+          { name: 'source', type: "TEXT DEFAULT 'walk-in'" },
+          { name: 'isVip', type: 'INTEGER DEFAULT 0' },
+        ];
+
+        for (const col of customerColumns) {
+          if (!columnNames.includes(col.name)) {
+            console.log(`🔄 Migrating customers table: Adding column ${col.name}`);
+            this.db.exec(`ALTER TABLE customers ADD COLUMN ${col.name} ${col.type}`);
+          }
         }
       }
 
