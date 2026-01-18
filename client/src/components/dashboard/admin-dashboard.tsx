@@ -10,10 +10,13 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
 import { ordersApi, franchisesApi } from "@/lib/data-service";
-import { DashboardDueToday } from "./components/dashboard-due-today";
-import { DashboardRecentOrders } from "./components/dashboard-recent-orders";
+// ✅ FIXED: Changed from named import { } to default import
+import DashboardDueToday from "./components/dashboard-due-today";
+// ✅ FIXED: Changed from named import { } to default import
+import DashboardRecentOrders from "./components/dashboard-recent-orders";
 // ✅ FIXED: Changed from named import { } to default import
 import DashboardQuickActions from "./components/dashboard-quick-actions";
+
 import { useQuery } from "@tanstack/react-query";
 import {
     Select,
@@ -22,6 +25,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Order as RecentOrder } from "./components/dashboard-recent-orders";
+import { DueTodayOrder } from "./components/dashboard-due-today";
 
 export default function AdminDashboard() {
     const [selectedFranchiseId, setSelectedFranchiseId] = useState<string>("all");
@@ -62,18 +67,37 @@ export default function AdminDashboard() {
         };
     }, [filteredOrders, franchises.length, selectedFranchiseId]);
 
-    const dueTodayOrders = filteredOrders.filter((order: any) => {
-        if (!order.pickupDate && !order.deliveryDate) return false;
-        const date = new Date(order.pickupDate || order.deliveryDate);
-        const today = new Date();
-        return date.getDate() === today.getDate() &&
-            date.getMonth() === today.getMonth() &&
-            date.getFullYear() === today.getFullYear();
-    });
+    const dueTodayOrders: DueTodayOrder[] = useMemo(() => {
+        return filteredOrders.map((order: any) => ({
+            id: order.id,
+            orderNumber: order.orderNumber,
+            customerName: order.customerName || 'Unknown',
+            status: order.status,
+            paymentStatus: order.paymentStatus || 'pending',
+            total: parseFloat(order.totalAmount || 0),
+            service: order.items?.[0]?.serviceName,
+            pickupDate: order.pickupDate,
+            createdAt: order.createdAt
+        }));
+    }, [filteredOrders]);
 
-    const recentOrders = [...filteredOrders].sort((a: any, b: any) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    ).slice(0, 5);
+    const recentOrders: RecentOrder[] = useMemo(() => {
+        return filteredOrders
+            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 5)
+            .map((order: any) => ({
+                id: order.id,
+                orderNumber: order.orderNumber,
+                customerName: order.customerName || 'Unknown',
+                date: order.createdAt,
+                status: order.status,
+                paymentStatus: order.paymentStatus || 'pending',
+                total: parseFloat(order.totalAmount || 0),
+                service: order.items?.[0]?.serviceName,
+                createdAt: order.createdAt,
+                isExpressOrder: order.isExpress
+            }));
+    }, [filteredOrders]);
 
     return (
         <div className="p-8 space-y-8">
@@ -188,10 +212,11 @@ export default function AdminDashboard() {
             {/* Due Today & Recent Orders */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <DashboardDueToday
-                    franchiseId={selectedFranchiseId}
+                    orders={dueTodayOrders}
+                    isLoading={isLoadingOrders}
                 />
                 <DashboardRecentOrders
-                    recentOrders={recentOrders}
+                    orders={recentOrders}
                     isLoading={isLoadingOrders}
                 />
             </div>
