@@ -1441,6 +1441,17 @@ export class SQLiteStorage implements IStorage {
       }
     }
 
+    // Sanitize foreign key fields - convert empty strings to null
+    // This prevents FOREIGN KEY constraint failures
+    const foreignKeyFields = ['franchiseId', 'factoryId', 'managerId', 'customerId', 'orderId', 'employeeId', 'productId', 'couponId', 'driverId'];
+    for (const fkField of foreignKeyFields) {
+      if (anyData[fkField] !== undefined && anyData[fkField] !== null) {
+        if (typeof anyData[fkField] === 'string' && anyData[fkField].trim() === '') {
+          anyData[fkField] = null;
+        }
+      }
+    }
+
     const keys = Object.keys(dataWithTimestamps);
     const values = Object.values(dataWithTimestamps).map(value => {
       if (value === undefined) return null;
@@ -1616,6 +1627,17 @@ export class SQLiteStorage implements IStorage {
           typeof processedData.documents === "string"
             ? processedData.documents
             : JSON.stringify(processedData.documents);
+      }
+    }
+
+    // Sanitize foreign key fields - convert empty strings to null
+    // This prevents FOREIGN KEY constraint failures
+    const foreignKeyFields = ['franchiseId', 'factoryId', 'managerId', 'customerId', 'orderId', 'employeeId', 'productId', 'couponId', 'driverId'];
+    for (const fkField of foreignKeyFields) {
+      if (processedData[fkField] !== undefined && processedData[fkField] !== null) {
+        if (typeof processedData[fkField] === 'string' && processedData[fkField].trim() === '') {
+          processedData[fkField] = null;
+        }
       }
     }
 
@@ -2361,12 +2383,24 @@ export class SQLiteStorage implements IStorage {
   }
 
   async createEmployee(data: InsertEmployee): Promise<Employee> {
-    // Auto-assign order letter if not provided
-    if (!(data as any).orderLetter) {
-      (data as any).orderLetter = this.getNextOrderLetter((data as any).franchiseId);
+    // Sanitize foreign key fields - convert empty strings to null
+    const sanitizedData = { ...data } as any;
+    if (sanitizedData.franchiseId === '' || sanitizedData.franchiseId === undefined) {
+      sanitizedData.franchiseId = null;
+    }
+    if (sanitizedData.factoryId === '' || sanitizedData.factoryId === undefined) {
+      sanitizedData.factoryId = null;
+    }
+    if (sanitizedData.managerId === '' || sanitizedData.managerId === undefined) {
+      sanitizedData.managerId = null;
     }
 
-    const id = this.insertRecord("employees", data);
+    // Auto-assign order letter if not provided
+    if (!sanitizedData.orderLetter) {
+      sanitizedData.orderLetter = this.getNextOrderLetter(sanitizedData.franchiseId);
+    }
+
+    const id = this.insertRecord("employees", sanitizedData);
     return this.getRecord<Employee>("employees", id)!;
   }
 

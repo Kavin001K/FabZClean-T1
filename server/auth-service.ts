@@ -248,9 +248,9 @@ export class AuthService {
             status: 'active',
             firstName: firstName,
             lastName: lastName,
-            // Work Details
-            franchiseId: data.franchiseId || null,
-            factoryId: data.factoryId || null,
+            // Work Details - explicitly convert empty strings to null
+            franchiseId: (data.franchiseId && data.franchiseId.trim() !== '') ? data.franchiseId : null,
+            factoryId: (data.factoryId && data.factoryId.trim() !== '') ? data.factoryId : null,
             position: data.position,
             department: data.department,
             hireDate: data.hireDate ? data.hireDate.toISOString() : undefined,
