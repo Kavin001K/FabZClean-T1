@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatAddress, parseAddress, createAddressObject } from '@/lib/address-utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -20,7 +21,10 @@ import {
   ShoppingBag,
   Star,
   Clock,
-  Trash2
+  Trash2,
+  Wallet,
+  User,
+  History
 } from 'lucide-react';
 import {
   Dialog,
@@ -41,6 +45,8 @@ import {
 import { formatDate, formatCurrency } from '@/lib/data-service';
 import { cn } from '@/lib/utils';
 import type { Customer, Order } from '@shared/schema';
+import { CustomerWalletTab } from './customer-wallet-tab';
+
 
 // Form validation schemas - with separate address fields
 const customerFormSchema = z.object({
@@ -253,162 +259,186 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-6">
-                {/* Customer Info */}
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Email</Label>
-                      <p className="text-sm">{selectedCustomer.email || 'Not provided'}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
-                      <p className="text-sm">{selectedCustomer.phone || 'Not provided'}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Address</Label>
-                      <p className="text-sm">
-                        {formatAddress(parseAddress(selectedCustomer.address))}
-                      </p>
-                    </div>
-                  </div>
+              <Tabs defaultValue="overview" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="overview" className="flex items-center gap-2">
+                    <User className="h-4 w-4" /> Overview
+                  </TabsTrigger>
+                  <TabsTrigger value="orders" className="flex items-center gap-2">
+                    <History className="h-4 w-4" /> Orders
+                  </TabsTrigger>
+                  <TabsTrigger value="wallet" className="flex items-center gap-2">
+                    <Wallet className="h-4 w-4" /> Wallet
+                  </TabsTrigger>
+                </TabsList>
 
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-muted/50 rounded-lg">
-                        <div className="text-2xl font-bold text-primary">{totalOrders}</div>
-                        <div className="text-sm text-muted-foreground">Total Orders</div>
+                {/* Overview Tab */}
+                <TabsContent value="overview" className="space-y-6 mt-4">
+                  {/* Customer Info */}
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Email</Label>
+                        <p className="text-sm">{selectedCustomer.email || 'Not provided'}</p>
                       </div>
-                      <div className="p-4 bg-muted/50 rounded-lg">
-                        <div className="text-2xl font-bold text-primary">
-                          ₹{totalSpent.toLocaleString('en-IN')}
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
+                        <p className="text-sm">{selectedCustomer.phone || 'Not provided'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Address</Label>
+                        <p className="text-sm">
+                          {formatAddress(parseAddress(selectedCustomer.address))}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-muted/50 rounded-lg">
+                          <div className="text-2xl font-bold text-primary">{totalOrders}</div>
+                          <div className="text-sm text-muted-foreground">Total Orders</div>
                         </div>
-                        <div className="text-sm text-muted-foreground">Total Spent</div>
+                        <div className="p-4 bg-muted/50 rounded-lg">
+                          <div className="text-2xl font-bold text-primary">
+                            ₹{totalSpent.toLocaleString('en-IN')}
+                          </div>
+                          <div className="text-sm text-muted-foreground">Total Spent</div>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex gap-2">
-                      <Badge variant={totalOrders > 5 ? 'default' : 'secondary'}>
-                        {totalOrders > 5 ? 'Loyal Customer' : 'Regular Customer'}
-                      </Badge>
-                      <Badge variant={totalSpent > 10000 ? 'default' : 'outline'}>
-                        {totalSpent > 10000 ? 'High Value' : 'Standard'}
-                      </Badge>
+                      <div className="flex gap-2">
+                        <Badge variant={totalOrders > 5 ? 'default' : 'secondary'}>
+                          {totalOrders > 5 ? 'Loyal Customer' : 'Regular Customer'}
+                        </Badge>
+                        <Badge variant={totalSpent > 10000 ? 'default' : 'outline'}>
+                          {totalSpent > 10000 ? 'High Value' : 'Standard'}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <Separator />
+                  <Separator />
 
-                {/* Customer Insights */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Card className="border-l-4 border-l-blue-500">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-blue-500" />
-                        Order Frequency
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-blue-600">
-                        {totalOrders > 0 ? `${Math.round(totalOrders / Math.max(daysSinceJoined, 1) * 30)}` : '0'}
-                      </div>
-                      <p className="text-xs text-muted-foreground">orders per month</p>
-                    </CardContent>
-                  </Card>
+                  {/* Customer Insights */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card className="border-l-4 border-l-blue-500">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-blue-500" />
+                          Order Frequency
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-blue-600">
+                          {totalOrders > 0 ? `${Math.round(totalOrders / Math.max(daysSinceJoined, 1) * 30)}` : '0'}
+                        </div>
+                        <p className="text-xs text-muted-foreground">orders per month</p>
+                      </CardContent>
+                    </Card>
 
-                  <Card className="border-l-4 border-l-green-500">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-green-500" />
-                        Average Order Value
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-green-600">
-                        ₹{totalOrders > 0 ? Math.round(totalSpent / totalOrders).toLocaleString('en-IN') : '0'}
-                      </div>
-                      <p className="text-xs text-muted-foreground">per order</p>
-                    </CardContent>
-                  </Card>
+                    <Card className="border-l-4 border-l-green-500">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                          <DollarSign className="h-4 w-4 text-green-500" />
+                          Average Order Value
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-green-600">
+                          ₹{totalOrders > 0 ? Math.round(totalSpent / totalOrders).toLocaleString('en-IN') : '0'}
+                        </div>
+                        <p className="text-xs text-muted-foreground">per order</p>
+                      </CardContent>
+                    </Card>
 
-                  <Card className="border-l-4 border-l-purple-500">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <Star className="h-4 w-4 text-purple-500" />
-                        Customer Rating
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-purple-600">
-                        {totalOrders > 5 ? '4.8' : totalOrders > 2 ? '4.5' : '4.2'}
-                      </div>
-                      <p className="text-xs text-muted-foreground">out of 5.0</p>
-                    </CardContent>
-                  </Card>
-                </div>
+                    <Card className="border-l-4 border-l-orange-500">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                          <Wallet className="h-4 w-4 text-orange-500" />
+                          Credit Balance
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className={`text-2xl font-bold ${parseFloat(selectedCustomer.creditBalance || '0') > 0
+                            ? 'text-orange-600'
+                            : 'text-green-600'
+                          }`}>
+                          ₹{parseFloat(selectedCustomer.creditBalance || '0').toLocaleString('en-IN')}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {parseFloat(selectedCustomer.creditBalance || '0') > 0 ? 'outstanding' : 'no dues'}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
 
-                <Separator />
-
-                {/* Recent Orders */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Order #</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Services</TableHead>
-                        <TableHead>Total</TableHead>
-                        <TableHead>Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {customerOrders.length > 0 ? (
-                        customerOrders.map((order) => {
-                          // Parse items to get service names
-                          const serviceNames = Array.isArray(order.items)
-                            ? (order.items as any[]).map(item => item.productName || item.serviceName || 'Service').slice(0, 2)
-                            : ['Services'];
-
-                          return (
-                            <TableRow key={order.id}>
-                              <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                              <TableCell>
-                                <Badge className={getStatusColor(order.status)}>
-                                  {order.status ? order.status.replace('_', ' ') : 'Unknown'}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-wrap gap-1">
-                                  {serviceNames.map((service, i) => (
-                                    <Badge key={i} variant="outline" className="text-xs">
-                                      {service}
-                                    </Badge>
-                                  ))}
-                                  {Array.isArray(order.items) && (order.items as any[]).length > 2 && (
-                                    <Badge variant="outline" className="text-xs">+{(order.items as any[]).length - 2}</Badge>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="font-medium">{formatCurrency(parseFloat(order.totalAmount))}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {formatDate(order.createdAt ? new Date(order.createdAt).toISOString() : '')}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      ) : (
+                {/* Orders Tab */}
+                <TabsContent value="orders" className="mt-4">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
-                            No orders found for this customer.
-                          </TableCell>
+                          <TableHead>Order #</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Services</TableHead>
+                          <TableHead>Total</TableHead>
+                          <TableHead>Date</TableHead>
                         </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
+                      </TableHeader>
+                      <TableBody>
+                        {customerOrders.length > 0 ? (
+                          customerOrders.map((order) => {
+                            const serviceNames = Array.isArray(order.items)
+                              ? (order.items as any[]).map(item => item.productName || item.serviceName || 'Service').slice(0, 2)
+                              : ['Services'];
+
+                            return (
+                              <TableRow key={order.id}>
+                                <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                                <TableCell>
+                                  <Badge className={getStatusColor(order.status)}>
+                                    {order.status ? order.status.replace('_', ' ') : 'Unknown'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-wrap gap-1">
+                                    {serviceNames.map((service, i) => (
+                                      <Badge key={i} variant="outline" className="text-xs">
+                                        {service}
+                                      </Badge>
+                                    ))}
+                                    {Array.isArray(order.items) && (order.items as any[]).length > 2 && (
+                                      <Badge variant="outline" className="text-xs">+{(order.items as any[]).length - 2}</Badge>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="font-medium">{formatCurrency(parseFloat(order.totalAmount))}</TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {formatDate(order.createdAt ? new Date(order.createdAt).toISOString() : '')}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
+                              No orders found for this customer.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
+
+                {/* Wallet Tab */}
+                <TabsContent value="wallet" className="mt-4">
+                  <CustomerWalletTab customer={selectedCustomer} />
+                </TabsContent>
+              </Tabs>
 
               <DialogFooter>
                 <Button variant="outline" onClick={onCloseViewDialog}>

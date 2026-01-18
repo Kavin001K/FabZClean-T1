@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -548,11 +549,13 @@ export default function EmployeeManagement() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                      <Input
-                        id="dateOfBirth"
-                        type="date"
-                        value={employeeForm.dateOfBirth}
-                        onChange={(e) => setEmployeeForm({ ...employeeForm, dateOfBirth: e.target.value })}
+                      <DatePicker
+                        date={employeeForm.dateOfBirth ? new Date(employeeForm.dateOfBirth) : undefined}
+                        setDate={(date) => setEmployeeForm({
+                          ...employeeForm,
+                          dateOfBirth: date ? date.toISOString().split('T')[0] : ''
+                        })}
+                        placeholder="Select date of birth"
                       />
                     </div>
                   </div>
@@ -681,11 +684,13 @@ export default function EmployeeManagement() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="hireDate">Hire Date *</Label>
-                      <Input
-                        id="hireDate"
-                        type="date"
-                        value={employeeForm.hireDate}
-                        onChange={(e) => setEmployeeForm({ ...employeeForm, hireDate: e.target.value })}
+                      <DatePicker
+                        date={employeeForm.hireDate ? new Date(employeeForm.hireDate) : undefined}
+                        setDate={(date) => setEmployeeForm({
+                          ...employeeForm,
+                          hireDate: date ? date.toISOString().split('T')[0] : ''
+                        })}
+                        placeholder="Select hire date"
                       />
                     </div>
                   </div>
@@ -1091,11 +1096,13 @@ export default function EmployeeManagement() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-hireDate">Hire Date *</Label>
-                  <Input
-                    id="edit-hireDate"
-                    type="date"
-                    value={employeeForm.hireDate}
-                    onChange={(e) => setEmployeeForm({ ...employeeForm, hireDate: e.target.value })}
+                  <DatePicker
+                    date={employeeForm.hireDate ? new Date(employeeForm.hireDate) : undefined}
+                    setDate={(date) => setEmployeeForm({
+                      ...employeeForm,
+                      hireDate: date ? date.toISOString().split('T')[0] : ''
+                    })}
+                    placeholder="Select hire date"
                   />
                 </div>
               </div>

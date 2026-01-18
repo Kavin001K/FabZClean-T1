@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
     Card,
     CardContent,
@@ -542,11 +543,19 @@ export default function FranchiseManagement() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="agreementStartDate">Agreement Start Date</Label>
-                                        <Input {...form.register("agreementStartDate")} type="date" />
+                                        <DatePicker
+                                            date={form.watch("agreementStartDate") ? new Date(form.watch("agreementStartDate") as string) : undefined}
+                                            setDate={(date) => form.setValue("agreementStartDate", date ? date.toISOString().split('T')[0] : "")}
+                                            placeholder="Select start date"
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="agreementEndDate">Agreement End Date</Label>
-                                        <Input {...form.register("agreementEndDate")} type="date" />
+                                        <DatePicker
+                                            date={form.watch("agreementEndDate") ? new Date(form.watch("agreementEndDate") as string) : undefined}
+                                            setDate={(date) => form.setValue("agreementEndDate", date ? date.toISOString().split('T')[0] : "")}
+                                            placeholder="Select end date"
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="royaltyPercentage">Royalty Percentage</Label>

@@ -26,6 +26,111 @@ const ADMIN_ONLY: UserRole[] = ['admin'];
 router.use(jwtRequired);
 
 /**
+ * GET /credits/stats
+ * Get dashboard-level credit statistics
+ */
+router.get('/stats', requireRole(CREDIT_VIEW_ROLES), async (req, res) => {
+    try {
+        const customers = await storage.listCustomers();
+        const totalOutstanding = customers.reduce((sum: number, c: any) =>
+            sum + parseFloat(c.creditBalance || '0'), 0);
+        const activeCustomers = customers.filter((c: any) =>
+            parseFloat(c.creditBalance || '0') > 0).length;
+
+        // Get all credit transactions for monthly stats
+        const allHistory: any[] = [];
+        for (const c of customers.slice(0, 50)) { // Limit for performance
+            const history = await storage.getCustomerCreditHistory(c.id);
+            allHistory.push(...history);
+        }
+
+        // Calculate monthly stats
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthlyTransactions = allHistory.filter((t: any) =>
+            new Date(t.createdAt) >= monthStart);
+
+        const monthlyCreditGiven = monthlyTransactions
+            .filter((t: any) => t.type === 'credit' || t.type === 'adjustment' && parseFloat(t.amount) > 0)
+            .reduce((sum: number, t: any) => sum + Math.abs(parseFloat(t.amount || '0')), 0);
+
+        const monthlyCreditUsed = monthlyTransactions
+            .filter((t: any) => t.type === 'payment' || t.type === 'debit')
+            .reduce((sum: number, t: any) => sum + Math.abs(parseFloat(t.amount || '0')), 0);
+
+        res.json(createSuccessResponse({
+            totalOutstanding,
+            activeCustomers,
+            monthlyCreditGiven,
+            monthlyCreditUsed
+        }));
+    } catch (error: any) {
+        console.error('Get credit stats error:', error);
+        res.status(500).json(createErrorResponse('Failed to get credit stats', 500));
+    }
+});
+
+/**
+ * GET /credits/transactions
+ * Get all credit transactions with filtering
+ */
+router.get('/transactions', requireRole(CREDIT_VIEW_ROLES), async (req, res) => {
+    try {
+        const { search, type } = req.query;
+        const customers = await storage.listCustomers();
+
+        // Collect all transactions with customer info
+        const allTransactions: any[] = [];
+        for (const customer of customers) {
+            const history = await storage.getCustomerCreditHistory(customer.id);
+            allTransactions.push(...history.map((t: any) => ({
+                ...t,
+                customerName: customer.name,
+                customerPhone: customer.phone
+            })));
+        }
+
+        // Sort by date (newest first)
+        allTransactions.sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        // Apply filters
+        let filtered = allTransactions;
+
+        if (type && type !== 'all') {
+            filtered = filtered.filter((t: any) => t.type === type);
+        }
+
+        if (search) {
+            const searchStr = (search as string).toLowerCase();
+            filtered = filtered.filter((t: any) =>
+                t.customerName?.toLowerCase().includes(searchStr) ||
+                t.customerPhone?.includes(searchStr));
+        }
+
+        res.json(createSuccessResponse(filtered.slice(0, 100))); // Limit to 100
+    } catch (error: any) {
+        console.error('Get credit transactions error:', error);
+        res.status(500).json(createErrorResponse('Failed to get transactions', 500));
+    }
+});
+
+/**
+ * GET /credits/history/:customerId
+ * Get specific customer's credit history (for customer dialog)
+ */
+router.get('/history/:customerId', requireRole(CREDIT_VIEW_ROLES), async (req, res) => {
+    try {
+        const { customerId } = req.params;
+        const history = await storage.getCustomerCreditHistory(customerId);
+        res.json(createSuccessResponse(history));
+    } catch (error: any) {
+        console.error('Get customer credit history error:', error);
+        res.status(500).json(createErrorResponse('Failed to get history', 500));
+    }
+});
+
+/**
  * GET /credits/:customerId
  * Get customer credit details including balance and history
  */
@@ -104,7 +209,7 @@ router.post('/:customerId/add', requireRole(CREDIT_MANAGE_ROLES), async (req, re
         const result = await storage.addCustomerCredit(
             customerId,
             creditAmount,
-            'credit',
+            'usage',
             description,
             orderId,
             req.employee?.employeeId
@@ -172,7 +277,7 @@ router.post('/:customerId/payment', requireRole(CREDIT_MANAGE_ROLES), async (req
         const result = await storage.addCustomerCredit(
             customerId,
             -paymentAmount, // Negative to reduce balance
-            'payment',
+            'deposit',
             description,
             referenceNumber,
             req.employee?.employeeId

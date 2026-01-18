@@ -446,7 +446,7 @@ router.post(
               await storage.addCustomerCredit(
                 order.customerId,
                 creditAmount,
-                'credit',
+                'usage',
                 `Order ${order.orderNumber} placed on credit (Total: ${totalAmount}, Advance: ${advancePaid})`,
                 order.id,
                 req.employee?.employeeId
