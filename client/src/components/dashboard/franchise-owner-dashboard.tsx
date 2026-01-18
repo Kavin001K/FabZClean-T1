@@ -1065,7 +1065,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
                 transition={{ type: "spring", stiffness: 300 }}
               >
                 <RecentOrders
-                  orders={recentOrders}
+                  orders={recentOrders as any[]}
                   isLoading={isLoading}
                   limit={5}
                 />
@@ -1076,7 +1076,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
                 transition={{ type: "spring", stiffness: 300 }}
               >
                 <DueTodayOrders
-                  orders={dueTodayOrders}
+                  orders={dueTodayOrders as any[]}
                   isLoading={isLoading}
                   limit={5}
                   showDateSelector={true}

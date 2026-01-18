@@ -466,7 +466,11 @@ export default function EnhancedEmployeeDashboard() {
               isLoading={ordersLoading}
             />
             <DashboardRecentOrders
-              recentOrders={recentOrders}
+              orders={recentOrders.map((o: any) => ({
+                ...o,
+                date: o.createdAt || new Date().toISOString(),
+                total: parseFloat(o.totalAmount || '0')
+              }))}
               isLoading={ordersLoading}
             />
           </div>

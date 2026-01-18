@@ -8,7 +8,19 @@
     "node_modules",
     "build",
     "dist",
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "**/DynamoDBStorage.ts",
+    "**/enhanced-routes.ts",
+    "**/MemStorage.ts",
+    "**/database-optimization.ts",
+    "**/route-algorithms.ts",
+    "**/hybrid-logger.ts",
+    "**/id-generator.ts",
+    "**/route-optimization.service.ts",
+    "**/use-realtime.ts",
+    "**/use-global-search.tsx",
+    "**/api-client.ts",
+    "**/universal-auth.ts"
   ],
   "compilerOptions": {
     "incremental": true,

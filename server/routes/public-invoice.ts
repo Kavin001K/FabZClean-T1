@@ -29,7 +29,7 @@ router.get('/invoice/:orderNumber', async (req: Request, res: Response) => {
             const storedId = (o.id || '').toLowerCase();
             return storedOrderNum === searchTerm || storedId === searchTerm ||
                 storedOrderNum.includes(searchTerm) || searchTerm.includes(storedOrderNum);
-        });
+        }) as any;
 
         if (!order) {
             return res.status(404).json({ error: 'Order not found' });

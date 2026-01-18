@@ -8,11 +8,22 @@ import { SQLiteStorage } from "./SQLiteStorage";
 import path from "path";
 import { existsSync, mkdirSync, chmodSync } from "fs";
 
-// 1. Define Secure Folder Path
-// ✅ MODIFIED: Prioritize external environment variable, fall back to local folder
-const SECURE_DATA_PATH = process.env.DATA_STORAGE_PATH
-  ? process.env.DATA_STORAGE_PATH
-  : path.join(process.cwd(), "server", "secure_data");
+// 1. Determine Storage Paths
+// PRIORITIZE environment variable (Docker/Render), fallback to local secure folder
+let SECURE_DATA_PATH: string;
+let DB_PATH: string;
+
+if (process.env.DATABASE_PATH) {
+  // If running in Docker/Render with explicit path
+  DB_PATH = process.env.DATABASE_PATH;
+  SECURE_DATA_PATH = path.dirname(DB_PATH);
+} else {
+  // Local development fallback
+  SECURE_DATA_PATH = process.env.DATA_STORAGE_PATH
+    ? process.env.DATA_STORAGE_PATH
+    : path.join(process.cwd(), "server", "secure_data");
+  DB_PATH = path.join(SECURE_DATA_PATH, "fabzclean.db");
+}
 
 const BACKUPS_PATH = path.join(SECURE_DATA_PATH, "backups");
 const LOGS_PATH = path.join(SECURE_DATA_PATH, "logs");
@@ -32,29 +43,26 @@ function ensureSecureDirectory(dirPath: string) {
   if (!existsSync(dirPath)) {
     try {
       mkdirSync(dirPath, { recursive: true });
-      // Set permissions to 700 (owner read/write/execute only)
-      // Only apply restricted permissions if creating the folder fresh
-      chmodSync(dirPath, 0o700);
+      // Try setting permissions (Linux/Docker only), ignore on Windows
+      if (process.platform !== 'win32') {
+        try {
+          chmodSync(dirPath, 0o700);
+        } catch (e) {
+          // Ignore permission errors on some file systems
+        }
+      }
     } catch (err) {
-      console.warn(`⚠️  Could not set permissions on ${dirPath}:`, err);
+      console.warn(`⚠️  Could not create directory ${dirPath}:`, err);
     }
   }
 }
 
 // Initialize all directories
-ensureSecureDirectory(SECURE_DATA_PATH);
-ensureSecureDirectory(BACKUPS_PATH);
-ensureSecureDirectory(LOGS_PATH);
-ensureSecureDirectory(FILES_PATH);
-ensureSecureDirectory(INVOICES_PATH);
-ensureSecureDirectory(BILLS_PATH);
-ensureSecureDirectory(RECEIPTS_PATH);
-ensureSecureDirectory(BARCODES_PATH);
-ensureSecureDirectory(SIGNATURES_PATH);
-ensureSecureDirectory(DOCUMENTS_PATH);
-ensureSecureDirectory(IMAGES_PATH);
-ensureSecureDirectory(REPORTS_PATH);
-ensureSecureDirectory(TEMP_PATH);
+[
+  SECURE_DATA_PATH, BACKUPS_PATH, LOGS_PATH, FILES_PATH,
+  INVOICES_PATH, BILLS_PATH, RECEIPTS_PATH, BARCODES_PATH,
+  SIGNATURES_PATH, DOCUMENTS_PATH, IMAGES_PATH, REPORTS_PATH, TEMP_PATH
+].forEach(ensureSecureDirectory);
 
 // Create year/month subdirectories for invoices and bills
 const now = new Date();
@@ -66,9 +74,6 @@ for (const basePath of [INVOICES_PATH, BILLS_PATH, RECEIPTS_PATH, REPORTS_PATH])
     mkdirSync(datePath, { recursive: true });
   }
 }
-
-// 3. Database path within secure folder
-const DB_PATH = path.join(SECURE_DATA_PATH, "fabzclean.db");
 
 // 4. Initialize ONLY SQLite
 console.log(`🔒 Initializing Secure Local Database at: ${DB_PATH}`);

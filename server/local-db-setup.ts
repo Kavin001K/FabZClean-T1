@@ -15,8 +15,18 @@ import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { existsSync, mkdirSync } from "fs";
 import { dirname } from "path";
+import path from "path";
 
-const DB_PATH = "./fabzclean.db";
+// Logic to match server/db.ts for consistency
+let DB_PATH: string;
+if (process.env.DATABASE_PATH) {
+  DB_PATH = process.env.DATABASE_PATH;
+} else {
+  const SECURE_DATA_PATH = process.env.DATA_STORAGE_PATH
+    ? process.env.DATA_STORAGE_PATH
+    : path.join(process.cwd(), "server", "secure_data");
+  DB_PATH = path.join(SECURE_DATA_PATH, "fabzclean.db");
+}
 
 // Ensure directory exists
 const dir = dirname(DB_PATH);
@@ -24,7 +34,7 @@ if (dir !== "." && !existsSync(dir)) {
   mkdirSync(dir, { recursive: true });
 }
 
-console.log("🗄️  Setting up local FabZClean database...\n");
+console.log(`🗄️  Setting up local FabZClean database at: ${DB_PATH}\n`);
 
 const db = new Database(DB_PATH);
 db.pragma("foreign_keys = ON");

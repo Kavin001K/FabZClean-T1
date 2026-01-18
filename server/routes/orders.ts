@@ -70,10 +70,9 @@ router.get('/next-order-number', async (req, res) => {
 
     // Get employee letter
     let employeeLetter = 'X';
-    if (employee?.fullName) {
-      employeeLetter = employee.fullName.charAt(0).toUpperCase();
-    } else if (employee?.username) {
-      employeeLetter = employee.username.charAt(0).toUpperCase();
+    const employeeName = (employee as any)?.fullName || employee?.username;
+    if (employeeName) {
+      employeeLetter = employeeName.charAt(0).toUpperCase();
     }
     if (!/[A-Z]/.test(employeeLetter)) employeeLetter = 'X';
 
@@ -164,7 +163,7 @@ router.get('/search', async (req, res) => {
     let transitMatches: any[] = [];
     if (query.startsWith('TR-') || query.startsWith('tr-')) {
       try {
-        const allTransits = await storage.listTransitOrders(franchiseId);
+        const allTransits = await storage.listTransitOrders();
         transitMatches = allTransits.filter((t: any) =>
           t.transitId?.toLowerCase().includes(queryLower)
         );

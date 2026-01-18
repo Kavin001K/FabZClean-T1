@@ -73,10 +73,10 @@ interface FranchiseMetrics {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { employeesApi, ordersApi } from "@/lib/data-service";
 
-import { DashboardDueToday } from "@/components/dashboard/components/dashboard-due-today";
-import { DashboardRecentOrders } from "@/components/dashboard/components/dashboard-recent-orders";
-import { DashboardReadyOrders } from "@/components/dashboard/components/dashboard-ready-orders";
-import { DashboardQuickActions } from "@/components/dashboard/components/dashboard-quick-actions";
+import DashboardDueToday from "@/components/dashboard/components/dashboard-due-today";
+import DashboardRecentOrders from "@/components/dashboard/components/dashboard-recent-orders";
+import DashboardReadyOrders from "@/components/dashboard/components/dashboard-ready-orders";
+import DashboardQuickActions from "@/components/dashboard/components/dashboard-quick-actions";
 
 import { useAuth } from "@/contexts/auth-context";
 import { franchisesApi } from "@/lib/data-service";
@@ -283,9 +283,15 @@ export default function FranchiseDashboard() {
       date.getFullYear() === today.getFullYear();
   });
 
-  const recentOrders = [...orders].sort((a: any, b: any) =>
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  ).slice(0, 5);
+  const recentOrders = React.useMemo(() => {
+    return [...orders].sort((a: any, b: any) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    ).slice(0, 5).map((order: any) => ({
+      ...order,
+      date: order.createdAt || new Date().toISOString(),
+      total: parseFloat(order.totalAmount || '0')
+    }));
+  }, [orders]);
 
   // Calculate real franchise metrics
   const franchiseMetrics: FranchiseMetrics = React.useMemo(() => {
@@ -417,13 +423,16 @@ export default function FranchiseDashboard() {
       </div>
 
       {/* Quick Actions - Settings Controlled */}
-      <DashboardQuickActions />
+      <DashboardQuickActions
+        employeeId={employee?.employeeId || ''}
+        employeeName={employee ? `${employee.firstName} ${employee.lastName}` : ''}
+      />
 
       {/* Due Today & Recent Orders */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <DashboardDueToday />
         <DashboardRecentOrders
-          recentOrders={recentOrders}
+          orders={recentOrders}
           isLoading={isLoadingOrders}
         />
         <DashboardReadyOrders franchiseId={employee?.franchiseId} />

@@ -7,7 +7,8 @@ import { createServer } from "http";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./db-utils";
 import { corsOptions, errorHandler } from "./middleware/auth";
-import { registerAllRoutes } from "./routes/index";
+import { surveillanceMiddleware } from "./middleware/surveillance";
+// import { registerAllRoutes } from "./routes/index";
 import { db as storage } from "./db";
 import { realtimeServer } from "./websocket-server";
 import { performanceMiddleware, getPerformanceStats } from "./performance-optimizer";
@@ -33,6 +34,9 @@ app.use(performanceMiddleware());
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// Surveillance Middleware (Critical for Audit Logs)
+app.use(surveillanceMiddleware);
 
 // Serve uploaded files statically
 // Uses process.cwd() for consistent path resolution
@@ -90,7 +94,10 @@ app.get('/api/performance', (req, res) => {
   }
 
   // Register all API routes AFTER Vite setup
-  registerAllRoutes(app);
+  // Register all API routes AFTER Vite setup
+  // Use the function we defined in server/routes.ts
+  const { registerRoutes } = await import('./routes.ts');
+  await registerRoutes(app);
   log("✅ All API routes registered");
 
   // Error handling middleware (must be last)

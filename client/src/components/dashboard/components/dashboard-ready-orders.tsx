@@ -1,206 +1,111 @@
-/**
- * Example component showing how to use useRealtime hook
- * This demonstrates fetching "Recent Orders" and "Revenue" with realtime updates
- */
+import React, { useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Eye, Package, Clock, CheckCircle } from "lucide-react";
+import { Link } from "wouter";
+import { formatCurrency } from "@/lib/data-service";
+import { cn } from "@/lib/utils";
+import * as LoadingSkeleton from "@/components/ui/loading-skeleton";
+import { useQuery } from "@tanstack/react-query";
+import { ordersApi } from "@/lib/data-service";
 
-import React from 'react';
-import { useRealtime } from '@/hooks/use-realtime';
-import { formatData } from '@/lib/format-data';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
-
-interface Order {
-  id: string;
-  orderNumber: string;
-  customerName: string;
-  totalAmount: number;
-  status: string;
-  createdAt: string;
+interface DashboardReadyOrdersProps {
+  franchiseId?: string;
+  className?: string;
 }
 
-/**
- * Example: Recent Orders with Realtime Updates
- * 
- * This component automatically:
- * 1. Fetches initial orders from Supabase
- * 2. Subscribes to realtime changes (INSERT, UPDATE, DELETE)
- * 3. Updates the UI optimistically without re-fetching
- */
-export function RealtimeRecentOrders() {
-  // ✅ Hook called at top level (no conditional hooks)
-  const { data: orders, isLoading, error } = useRealtime<Order>({
-    tableName: 'orders',
-    selectQuery: 'id, orderNumber, customerName, totalAmount, status, createdAt',
-    orderBy: 'createdAt.desc', // Most recent first
-    limit: 10, // Show only 10 most recent
+export default function DashboardReadyOrders({ franchiseId, className }: DashboardReadyOrdersProps) {
+  // Fetch all orders and filter client-side for now, or use a specific API if available
+  const { data: orders = [], isLoading } = useQuery({
+    queryKey: ['ready-orders', franchiseId],
+    queryFn: () => ordersApi.getAll(), // Ideally filter by status 'ready' via API
+    enabled: !!franchiseId
   });
 
-  // ✅ All hooks must be called before any conditional returns
+  const readyOrders = useMemo(() => {
+    if (!Array.isArray(orders)) return [];
+    // Filter for orders that are 'ready', 'processed', or 'ready_for_pickup'
+    return orders.filter((order: any) =>
+      ['ready', 'ready_for_pickup', 'processed'].includes(order.status?.toLowerCase()) ||
+      (order.status === 'processing' && order.progress === 100) // Hypothetical
+    ).slice(0, 5);
+  }, [orders]);
+
   if (isLoading) {
     return (
-      <Card>
+      <Card className={className}>
         <CardHeader>
-          <CardTitle>Recent Orders</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Ready for Pickup/Delivery
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center h-32">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
+          <LoadingSkeleton.TableSkeleton rows={3} />
         </CardContent>
       </Card>
     );
   }
-
-  if (error) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Orders</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center text-destructive">
-            Error: {error.message}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // ✅ Data is always an array (never null/undefined)
-  // Safe to use .slice(), .map(), etc.
-  const displayOrders = orders.slice(0, 5);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Recent Orders (Realtime)</CardTitle>
+    <Card className={cn("h-full flex flex-col", className)}>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-lg font-medium flex items-center gap-2">
+          <CheckCircle className="h-5 w-5 text-green-500" />
+          Ready Orders
+        </CardTitle>
+        <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-200">
+          {readyOrders.length} Ready
+        </Badge>
       </CardHeader>
       <CardContent>
-        {displayOrders.length === 0 ? (
-          <div className="text-center text-muted-foreground py-8">
-            No orders yet
+        {readyOrders.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-32 text-center text-muted-foreground p-4 border-2 border-dashed rounded-lg">
+            <Package className="h-8 w-8 mb-2 opacity-50" />
+            <p className="text-sm font-medium">No orders ready</p>
+            <p className="text-xs">Orders marked as ready will appear here</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {displayOrders.map((order) => (
-              <div
-                key={order.id}
-                className="flex items-center justify-between p-3 border rounded-lg"
-              >
-                <div className="flex-1">
-                  <div className="font-medium">
-                    {formatData(order.orderNumber, 'text')}
+            {readyOrders.map((order: any) => (
+              <div key={order.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border hover:bg-muted/50 transition-colors">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">#{order.orderNumber}</span>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-green-200 text-green-700 bg-green-50">
+                      Paid
+                    </Badge>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    {formatData(order.customerName, 'text')}
-                  </div>
+                  <span className="text-xs text-muted-foreground">{order.customerName}</span>
                 </div>
-                <div className="text-right">
-                  <div className="font-semibold">
-                    {formatData(order.totalAmount, 'currency')}
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <span className="text-sm font-medium block">{formatCurrency(order.totalAmount || order.total)}</span>
+                    <span className="text-[10px] text-muted-foreground flex items-center justify-end gap-1">
+                      <Clock className="w-3 h-3" />
+                      {new Date(order.updatedAt || order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatData(order.status, 'status')}
-                  </div>
+                  <Link href={`/orders/${order.id}`}>
+                    <Button size="icon" variant="ghost" className="h-8 w-8">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </Link>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
-  );
-}
 
-/**
- * Example: Revenue Calculation with Realtime Updates
- * 
- * This component calculates total revenue from orders
- * and updates automatically when orders change
- */
-export function RealtimeRevenue() {
-  // ✅ Hook called at top level
-  const { data: orders, isLoading, error } = useRealtime<Order>({
-    tableName: 'orders',
-    selectQuery: 'id, totalAmount, status',
-    filter: 'status.eq.completed', // Only count completed orders
-  });
-
-  // ✅ Calculate revenue from orders
-  const totalRevenue = React.useMemo(() => {
-    if (!Array.isArray(orders)) return 0;
-    
-    return orders.reduce((sum, order) => {
-      const amount = typeof order.totalAmount === 'number' 
-        ? order.totalAmount 
-        : parseFloat(String(order.totalAmount || 0));
-      return sum + (isNaN(amount) ? 0 : amount);
-    }, 0);
-  }, [orders]);
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Total Revenue</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center h-32">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Total Revenue</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center text-destructive">
-            Error: {error.message}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Total Revenue (Realtime)</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-bold">
-          {formatData(totalRevenue, 'currency')}
-        </div>
-        <div className="text-sm text-muted-foreground mt-2">
-          From {formatData(orders.length, 'number')} completed orders
+        <div className="mt-4 pt-2 border-t text-center">
+          <Link href="/orders?status=ready">
+            <Button variant="link" size="sm" className="text-xs text-muted-foreground h-auto p-0">
+              View all ready orders
+            </Button>
+          </Link>
         </div>
       </CardContent>
     </Card>
   );
 }
-
-/**
- * Example: How to use both components together in Dashboard
- * 
- * Usage in Dashboard.tsx or any component:
- * 
- * ```tsx
- * import { RealtimeRecentOrders, RealtimeRevenue } from '@/components/dashboard/realtime-orders-example';
- * 
- * export default function Dashboard() {
- *   return (
- *     <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
- *       <RealtimeRevenue />
- *       <RealtimeRecentOrders />
- *     </div>
- *   );
- * }
- * ```
- */
-

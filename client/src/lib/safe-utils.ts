@@ -142,7 +142,7 @@ export function safeSlice<T>(
 export function safeSum(arr: (number | string | undefined | null)[]): number {
   if (!arr || arr.length === 0) return 0;
 
-  return arr.reduce((sum, val) => {
+  return arr.reduce<number>((sum: number, val) => {
     const num = safeParseFloat(val);
     return sum + num;
   }, 0);

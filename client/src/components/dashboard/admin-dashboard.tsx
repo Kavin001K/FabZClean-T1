@@ -193,7 +193,11 @@ export default function AdminDashboard() {
                     franchiseId={selectedFranchiseId}
                 />
                 <DashboardRecentOrders
-                    recentOrders={recentOrders}
+                    orders={recentOrders.map((order: any) => ({
+                        ...order,
+                        date: order.createdAt || new Date().toISOString(),
+                        total: parseFloat(order.totalAmount || '0')
+                    }))}
                     isLoading={isLoadingOrders}
                 />
             </div>

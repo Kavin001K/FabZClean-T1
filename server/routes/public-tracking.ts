@@ -45,7 +45,7 @@ router.get('/track/:orderNumber', async (req, res) => {
                 storedOrderNum.includes(searchTerm) ||
                 searchTerm.includes(storedOrderNum)
             );
-        });
+        }) as any;
 
         if (!order) {
             console.log(`[Track] Order not found for: ${orderNumber}`);

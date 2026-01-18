@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import cron from "node-cron";
-import { registerAllRoutes } from "./routes";
+import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./db-utils";
 import { realtimeServer } from "./websocket-server";
@@ -92,7 +92,7 @@ app.use(surveillanceMiddleware);
 
 (async () => {
   // Register all routes
-  registerAllRoutes(app);
+  await registerRoutes(app);
 
   // Create HTTP server
   const server = realtimeServer.createServer(app);

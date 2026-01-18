@@ -32,8 +32,12 @@ import transitOrdersRouter from "./routes/transit-orders";
 import reportsRouter from "./routes/reports";
 import publicTrackingRouter from "./routes/public-tracking";
 import creditsRouter from "./routes/credits";
+import authRouter from "./routes/auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Register Auth routes (login, logout, me, etc.)
+  app.use("/api/auth", authRouter);
+
   // Register Public routes (no auth required)
   app.use("/api/public", publicTrackingRouter);
 
@@ -403,7 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         let action = 'update_employee';
         const details: any = {
-          employeeName: employee.fullName,
+          employeeName: `${employee.firstName} ${employee.lastName}`,
           employeeId: employee.employeeId
         };
 
@@ -471,7 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           entityType: 'employee',
           entityId: req.params.id,
           details: {
-            employeeName: employee?.fullName || 'Unknown',
+            employeeName: employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown',
             employeeIdCode: employee?.employeeId || 'Unknown',
             role: employee?.role || 'Unknown'
           },
@@ -943,45 +947,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const retentionRate =
         totalCustomers > 0 ? (repeatCustomers / totalCustomers) * 100 : 0;
 
-      // Calculate customer rank based on spending
-      const sortedCustomers = customers.sort((a: Customer, b: Customer) => {
-        const spentA = parseFloat(a.totalSpent || "0");
-        const spentB = parseFloat(b.totalSpent || "0");
-        return spentB - spentA;
-      });
-      // This part of the edit was likely intended to be inside a loop or specific customer context,
-      // but as per instructions, it's placed where it was provided.
-      // It will cause a type error if `customer` is not defined in this scope.
-      // Assuming `customer` refers to an individual customer from the `customers` array for the purpose of this fix.
-      // To make it syntactically correct and avoid a direct error, we'll assume it's meant to be a placeholder
-      // or part of a larger, unprovided context.
-      // For a real fix, `customer` would need to be defined, e.g., by iterating `customers`.
-      // Given the instruction is "Fix type errors" and the provided snippet,
-      // the `customer` variable is not defined in this scope.
-      // To avoid a hard error, we'll comment out the lines that would directly reference an undefined `customer`.
-      // If the intent was to calculate rank for *each* customer, the structure would be different.
-      // As the instruction is to apply the change faithfully, and the change itself is problematic,
-      // I'm applying it as literally as possible while ensuring the file remains syntactically valid.
-      // The `rank` and `percentile` calculations below are also problematic without a specific `customer.id`.
-      // I will assume the user intended to calculate these for a hypothetical 'current' customer or as part of a larger context.
-      // For now, I'll define `customer` as the first customer to make it syntactically valid,
-      // but this is likely not the intended logic.
-
-      // const customer = customers[0]; // Placeholder to make `customer.id` valid for the next lines
-      // if (customer) {
-      //   const rank = sortedCustomers.findIndex((c: Customer) => c.id === customer.id) + 1;
-      //   const percentile = totalCustomers > 0 ? ((totalCustomers - rank) / totalCustomers) * 100 : 0;
-      // }
-
-
       res.json({
         totalCustomers,
         newCustomersThisMonth,
         totalRevenue,
         avgOrderValue,
         retentionRate,
-        // rank, // These would be undefined without the above placeholder logic
-        // percentile,
       });
     } catch (error) {
       console.error("Failed to fetch customer KPIs:", error);
@@ -1052,7 +1023,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/customers", async (req, res) => {
     try {
-      const validatedData = insertCustomerSchema.parse(req.body);
+      const validatedData = insertCustomerSchema.parse(req.body) as any;
 
       // Check if customer already exists (Get or Create pattern)
       const allCustomers = await storage.listCustomers();

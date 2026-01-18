@@ -12,6 +12,8 @@ interface Employee {
   franchiseId?: string;
   factoryId?: string;
   fullName?: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
   phone?: string;
   isActive: boolean;

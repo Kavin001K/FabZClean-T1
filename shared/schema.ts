@@ -148,16 +148,22 @@ export const orders = pgTable("orders", {
   lastWhatsappStatus: text("last_whatsapp_status"),
   lastWhatsappSentAt: timestamp("last_whatsapp_sent_at"),
   whatsappMessageCount: integer("whatsapp_message_count").default(0),
+  employeeId: text("employee_id"),
+  createdBy: text("created_by"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const deliveries = pgTable("deliveries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
   orderId: varchar("order_id").references(() => orders.id),
+  driverId: varchar("driver_id"),
   driverName: text("driver_name").notNull(),
   vehicleId: text("vehicle_id").notNull(),
-  status: text("status", { enum: ["pending", "in_transit", "delivered", "failed"] }).notNull().default("pending"), // pending, in_transit, delivered, failed
+  status: text("status", { enum: ["pending", "in_transit", "delivered", "failed", "scheduled"] }).notNull().default("pending"),
+  scheduledDate: timestamp("scheduled_date"),
+  statusUpdatedAt: timestamp("status_updated_at"),
   estimatedDelivery: timestamp("estimated_delivery"),
   actualDelivery: timestamp("actual_delivery"),
   location: jsonb("location"), // Current GPS coordinates
@@ -238,6 +244,8 @@ export const employees = pgTable("employees", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   franchiseId: varchar("franchise_id").references(() => franchises.id),
   employeeId: text("employee_id").notNull(), // Removed unique constraint globally
+  username: text("username"),
+  password: text("password"),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email"), // Removed unique constraint globally
@@ -248,6 +256,7 @@ export const employees = pgTable("employees", {
   salary: decimal("salary", { precision: 10, scale: 2 }).notNull(),
   hourlyRate: decimal("hourly_rate", { precision: 8, scale: 2 }),
   status: text("status", { enum: ["active", "inactive", "terminated"] }).notNull().default("active"),
+  role: text("role", { enum: ["admin", "franchise_manager", "staff", "driver"] }).default("staff"),
   managerId: varchar("manager_id").references((): any => employees.id),
   address: jsonb("address"),
   emergencyContact: jsonb("emergency_contact"),
@@ -341,14 +350,7 @@ export const auditLogs = pgTable("audit_logs", {
 });
 
 // Insert schemas
-export const insertFranchiseSchema = createInsertSchema(franchises, {
-  agreementStartDate: z.coerce.date().optional().nullable(),
-  agreementEndDate: z.coerce.date().optional().nullable(),
-  royaltyPercentage: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().default("0"),
-  documents: z.any().optional(),
-  createdAt: z.coerce.date().optional(),
-  updatedAt: z.coerce.date().optional(),
-});
+export const insertFranchiseSchema = createInsertSchema(franchises);
 export const insertUserSchema = createInsertSchema(users);
 
 export const insertProductSchema = createInsertSchema(products);

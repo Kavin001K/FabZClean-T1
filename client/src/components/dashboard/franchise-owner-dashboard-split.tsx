@@ -16,9 +16,9 @@ import { createHeaderComponent, createContentSection, createFooterComponent } fr
 import { DashboardHeader } from "./components/dashboard-header";
 import { DashboardKPIs } from "./components/dashboard-kpis";
 import { DashboardCharts } from "./components/dashboard-charts";
-import { DashboardQuickActions } from "./components/dashboard-quick-actions";
-import { DashboardRecentOrders } from "./components/dashboard-recent-orders";
-import { DashboardDueToday } from "./components/dashboard-due-today";
+import DashboardQuickActions from "./components/dashboard-quick-actions";
+import DashboardRecentOrders from "./components/dashboard-recent-orders";
+import DashboardDueToday from "./components/dashboard-due-today";
 import { DashboardFooter } from "./components/dashboard-footer";
 
 /**
@@ -130,38 +130,24 @@ export default React.memo(function FranchiseOwnerDashboard() {
   }), [salesData, orderStatusData, servicePopularityData, isLoading]);
 
   const dashboardQuickActionsProps = useMemo(() => ({
-    onQuickAction: handleQuickAction,
-    isCustomerDialogOpen,
-    isOrderDialogOpen,
-    isEmployeeDialogOpen,
-    onCloseDialog: handleCloseDialog,
-    quickActionForms,
-    updateQuickActionForm: updateQuickActionForm as (formType: string, updates: any) => void,
-    resetQuickActionForm: resetQuickActionForm as (formType: string) => void,
-    isSubmittingCustomer,
-    isSubmittingOrder,
-    isSubmittingEmployee,
-  }), [
-    handleQuickAction,
-    isCustomerDialogOpen,
-    isOrderDialogOpen,
-    isEmployeeDialogOpen,
-    handleCloseDialog,
-    quickActionForms,
-    updateQuickActionForm,
-    resetQuickActionForm,
-    isSubmittingCustomer,
-    isSubmittingOrder,
-    isSubmittingEmployee,
-  ]);
+    employeeId: 'dashboard',
+    employeeName: 'Dashboard User',
+  }), []);
 
   const dashboardRecentOrdersProps = useMemo(() => ({
-    recentOrders,
+    orders: recentOrders?.map((order: any) => ({
+      ...order,
+      date: order.createdAt || new Date().toISOString(),
+      total: parseFloat(order.totalAmount || '0')
+    })) || [],
     isLoading,
   }), [recentOrders, isLoading]);
 
   const dashboardDueTodayProps = useMemo(() => ({
-    orders: allOrders, // Use allOrders for correct date filtering
+    orders: allOrders?.map((order: any) => ({
+      ...order,
+      total: parseFloat(order.totalAmount || '0')
+    })) || [],
     isLoading,
   }), [allOrders, isLoading]);
 

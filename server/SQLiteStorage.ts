@@ -88,16 +88,6 @@ export class SQLiteStorage implements IStorage {
     this.migrateTables();
   }
 
-  private safeJsonParse(data: string | null): any {
-    if (!data) return null;
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      // If it's not valid JSON, return original string or null
-      return data;
-    }
-  }
-
   private createTables() {
     // Self-healing: Check if 'orders' table exists but is missing 'customerId' (corrupt from previous bad schema)
     try {
@@ -368,7 +358,7 @@ export class SQLiteStorage implements IStorage {
       CREATE TABLE IF NOT EXISTS shipments (
         id TEXT PRIMARY KEY,
         franchiseId TEXT,
-        orderId TEXT,
+        orderIds TEXT,
         trackingNumber TEXT,
         carrier TEXT,
         status TEXT,
@@ -626,7 +616,7 @@ export class SQLiteStorage implements IStorage {
       -- Create indexes for better performance
       CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customerId);
       CREATE INDEX IF NOT EXISTS idx_deliveries_order ON deliveries(orderId);
-      CREATE INDEX IF NOT EXISTS idx_shipments_order ON shipments(orderId);
+      -- CREATE INDEX IF NOT EXISTS idx_shipments_order ON shipments(orderId);
       CREATE INDEX IF NOT EXISTS idx_barcodes_product ON barcodes(productId);
       CREATE INDEX IF NOT EXISTS idx_barcodes_code ON barcodes(code);
       CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
@@ -1306,6 +1296,7 @@ export class SQLiteStorage implements IStorage {
   async createUser(data: InsertUser): Promise<User> {
     const id = randomUUID();
     const now = new Date().toISOString();
+    const userData = data as any; // Cast to any for property access
 
     this.db
       .prepare(
@@ -1314,16 +1305,17 @@ export class SQLiteStorage implements IStorage {
         VALUES (?, ?, ?, ?, ?, ?)
       `,
       )
-      .run(id, data.username, data.password, data.email, now, now);
+      .run(id, userData.username, userData.password, userData.email, now, now);
 
     return {
       id,
-      ...data,
-      email: data.email ?? null,
-      franchiseId: data.franchiseId ?? null,
+      username: userData.username,
+      password: userData.password,
+      email: userData.email ?? null,
+      franchiseId: userData.franchiseId ?? null,
       createdAt: new Date(now),
       updatedAt: new Date(now),
-    };
+    } as User;
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -2060,15 +2052,18 @@ export class SQLiteStorage implements IStorage {
   async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
     const id = randomUUID();
     const now = new Date().toISOString();
+    const logData = data as any; // Cast to any for property access
     const auditLog = {
-      ...data,
       id,
-      franchiseId: data.franchiseId || null,
-      employeeId: data.employeeId || null,
-      entityType: data.entityType || null,
-      entityId: data.entityId || null,
+      franchiseId: logData.franchiseId || null,
+      employeeId: logData.employeeId || null,
+      action: logData.action,
+      entityType: logData.entityType || null,
+      entityId: logData.entityId || null,
+      ipAddress: logData.ipAddress || null,
+      userAgent: logData.userAgent || null,
       createdAt: now,
-      details: data.details ? JSON.stringify(data.details) : null
+      details: logData.details ? JSON.stringify(logData.details) : null
     };
 
     this.db.prepare(`
@@ -2079,7 +2074,7 @@ export class SQLiteStorage implements IStorage {
     return {
       ...auditLog,
       createdAt: new Date(now),
-      details: data.details
+      details: logData.details
     } as AuditLog;
   }
 
@@ -2543,7 +2538,8 @@ export class SQLiteStorage implements IStorage {
 
   async getShipmentsByOrder(orderId: string): Promise<Shipment[]> {
     const rows = this.db
-      .prepare("SELECT * FROM shipments WHERE orderId = ?")
+      // Since orderIds is a JSON array string like ["abc","def"], use LIKE for simple search
+      .prepare("SELECT * FROM shipments WHERE orderIds LIKE '%' || ? || '%'")
       .all(orderId) as any[];
 
     return rows.map((row) => ({
