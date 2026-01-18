@@ -40,7 +40,7 @@ RUN addgroup -g 1001 -S fabzclean && \
 
 # Copy package files and install production deps only
 COPY package*.json ./
-RUN npm install --omit=dev && npm cache clean --force
+RUN npm install --omit=dev --ignore-scripts && npm cache clean --force
 
 # Copy built assets from builder
 COPY --from=builder /app/dist ./dist
