@@ -1,21 +1,19 @@
-
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Users,
     DollarSign,
     ShoppingBag,
-    Activity,
-    TrendingUp,
+    Building2,
     ArrowUpRight,
-    ArrowDownRight,
-    Building2
+    ArrowDownRight
 } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
 import { ordersApi, franchisesApi } from "@/lib/data-service";
 import { DashboardDueToday } from "./components/dashboard-due-today";
 import { DashboardRecentOrders } from "./components/dashboard-recent-orders";
-import { DashboardQuickActions } from "./components/dashboard-quick-actions";
+// ✅ FIXED: Changed from named import { } to default import
+import DashboardQuickActions from "./components/dashboard-quick-actions";
 import { useQuery } from "@tanstack/react-query";
 import {
     Select,
@@ -184,7 +182,8 @@ export default function AdminDashboard() {
             </div>
 
             {/* Quick Actions - Settings Controlled */}
-            <DashboardQuickActions />
+            {/* ✅ FIXED: Added required props for Admin view */}
+            <DashboardQuickActions employeeId="admin" employeeName="Administrator" />
 
             {/* Due Today & Recent Orders */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
