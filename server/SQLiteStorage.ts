@@ -1746,6 +1746,10 @@ export class SQLiteStorage implements IStorage {
     const auditLog = {
       ...data,
       id,
+      franchiseId: data.franchiseId || null,
+      employeeId: data.employeeId || null,
+      entityType: data.entityType || null,
+      entityId: data.entityId || null,
       createdAt: now,
       details: data.details ? JSON.stringify(data.details) : null
     };
