@@ -13,11 +13,8 @@ RUN apk add --no-cache python3 make g++ git
 
 # Copy package files
 COPY package*.json ./
-COPY client/package*.json ./client/
-
-# Install all dependencies (including dev)
-RUN npm ci
-RUN cd client && npm ci
+# Client dependencies are managed in root package.json
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -43,7 +40,7 @@ RUN addgroup -g 1001 -S fabzclean && \
 
 # Copy package files and install production deps only
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 
 # Copy built assets from builder
 COPY --from=builder /app/dist ./dist
