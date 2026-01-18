@@ -1,0 +1,373 @@
+/* Desktop-First Optimizations for FabZClean */
+
+/* Desktop-specific styles */
+@media (min-width: 1024px) {
+  /* Enhanced scrollbars for desktop */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Desktop table optimizations */
+  .desktop-table {
+    font-size: 0.875rem;
+  }
+
+  .desktop-table th {
+    font-weight: 600;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .desktop-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  .desktop-table tr:hover {
+    background-color: hsl(var(--muted) / 0.5);
+  }
+
+  /* Desktop sidebar optimizations */
+  .desktop-sidebar {
+    width: 18rem; /* 288px */
+    transition: width 0.3s ease-in-out;
+  }
+
+  .desktop-sidebar.collapsed {
+    width: 4rem; /* 64px */
+  }
+
+  /* Desktop window controls */
+  .desktop-window-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .desktop-window-controls button {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .desktop-window-controls button:hover {
+    background-color: hsl(var(--muted));
+  }
+
+  .desktop-window-controls button.close:hover {
+    background-color: hsl(var(--destructive));
+    color: hsl(var(--destructive-foreground));
+  }
+
+  /* Desktop search optimizations */
+  .desktop-search {
+    width: 16rem; /* 256px */
+    transition: width 0.2s ease;
+  }
+
+  .desktop-search:focus {
+    width: 20rem; /* 320px */
+  }
+
+  /* Desktop keyboard shortcuts */
+  .desktop-shortcut {
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .desktop-shortcut.visible {
+    opacity: 1;
+  }
+
+  /* Desktop status bar */
+  .desktop-status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    background-color: hsl(var(--muted) / 0.3);
+    border-top: 1px solid hsl(var(--border));
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Desktop card optimizations */
+  .desktop-card {
+    border-radius: 0.5rem;
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+    box-shadow: 0 1px 3px 0 hsl(var(--foreground) / 0.1);
+  }
+
+  .desktop-card:hover {
+    box-shadow: 0 4px 6px -1px hsl(var(--foreground) / 0.1);
+  }
+
+  /* Desktop button optimizations */
+  .desktop-button {
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+
+  .desktop-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px 0 hsl(var(--foreground) / 0.1);
+  }
+
+  /* Desktop form optimizations */
+  .desktop-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .desktop-form .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  /* Desktop navigation optimizations */
+  .desktop-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .desktop-nav-item:hover {
+    background-color: hsl(var(--muted) / 0.5);
+    transform: translateX(2px);
+  }
+
+  .desktop-nav-item.active {
+    background-color: hsl(var(--primary) / 0.1);
+    color: hsl(var(--primary));
+    border: 1px solid hsl(var(--primary) / 0.2);
+  }
+
+  .desktop-nav-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background-color: hsl(var(--primary));
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* Desktop badge optimizations */
+  .desktop-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  /* Desktop tooltip optimizations */
+  .desktop-tooltip {
+    background-color: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    box-shadow: 0 4px 6px -1px hsl(var(--foreground) / 0.1);
+  }
+
+  /* Desktop modal optimizations */
+  .desktop-modal {
+    max-width: 90vw;
+    max-height: 90vh;
+    border-radius: 0.75rem;
+    box-shadow: 0 25px 50px -12px hsl(var(--foreground) / 0.25);
+  }
+
+  /* Desktop data table optimizations */
+  .desktop-data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    border: 1px solid hsl(var(--border));
+  }
+
+  .desktop-data-table th {
+    background-color: hsl(var(--muted));
+    font-weight: 600;
+    text-align: left;
+    padding: 1rem;
+    border-bottom: 1px solid hsl(var(--border));
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .desktop-data-table td {
+    padding: 1rem;
+    border-bottom: 1px solid hsl(var(--border) / 0.5);
+    vertical-align: middle;
+  }
+
+  .desktop-data-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .desktop-data-table tr:hover {
+    background-color: hsl(var(--muted) / 0.3);
+  }
+
+  /* Desktop sortable headers */
+  .desktop-sortable-header {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+  }
+
+  .desktop-sortable-header:hover {
+    background-color: hsl(var(--muted) / 0.5);
+  }
+
+  .desktop-sortable-header.active {
+    color: hsl(var(--primary));
+  }
+
+  /* Desktop responsive grid */
+  .desktop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .desktop-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .desktop-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .desktop-grid-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* Desktop performance optimizations */
+  .desktop-optimized {
+    will-change: transform;
+    transform: translateZ(0);
+  }
+
+  /* Desktop focus styles */
+  .desktop-focus:focus {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
+  }
+
+  /* Desktop selection styles */
+  .desktop-selectable {
+    user-select: text;
+    cursor: text;
+  }
+
+  .desktop-selectable::selection {
+    background-color: hsl(var(--primary) / 0.2);
+  }
+}
+
+/* Desktop-specific animations */
+@keyframes desktop-slide-in {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes desktop-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.desktop-animate-slide-in {
+  animation: desktop-slide-in 0.3s ease-out;
+}
+
+.desktop-animate-fade-in {
+  animation: desktop-fade-in 0.2s ease-out;
+}
+
+/* Desktop-specific utilities */
+.desktop-hidden {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .desktop-hidden {
+    display: block;
+  }
+}
+
+.desktop-only {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .desktop-only {
+    display: block;
+  }
+}
+
+.mobile-only {
+  display: block;
+}
+
+@media (min-width: 1024px) {
+  .mobile-only {
+    display: none;
+  }
+}

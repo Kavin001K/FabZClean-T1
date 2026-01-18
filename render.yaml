@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: fabzclean
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: EXTERNAL_API_BASE_URL
+        sync: false
+      - key: EXTERNAL_API_KEY
+        sync: false
+      - key: WA_INSTANCE_ID
+        sync: false

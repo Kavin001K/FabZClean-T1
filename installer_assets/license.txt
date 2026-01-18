@@ -1,0 +1,36 @@
+END USER LICENSE AGREEMENT
+
+IMPORTANT: PLEASE READ THIS END USER LICENSE AGREEMENT ("AGREEMENT") CAREFULLY BEFORE INSTALLING OR USING THE SOFTWARE.
+
+1. ACKNOWLEDGMENT
+This Agreement is a legal document between you (hereinafter referred to as "User" or "Licensee") and Ace-Digital Pvt Ltd. (hereinafter referred to as "Licensor"). By installing, copying, or otherwise using the software application (the "Software"), you agree to be bound by the terms of this Agreement. If you do not agree to the terms of this Agreement, do not install or use the Software.
+
+2. GRANT OF LICENSE
+Subject to the terms of this Agreement, Licensor hereby grants User a personal, non-exclusive, non-transferable, revocable, and limited license to install and use the Software solely for User's internal business or personal purposes. This license does not convey any title or ownership in the Software.
+
+3. RESTRICTIONS ON USE
+User shall not:
+(a) Decompile, reverse engineer, disassemble, attempt to derive the source code of, or decrypt the Software;
+(b) Modify, adapt, improve, or create derivative works from the Software;
+(c) Violate any applicable laws, rules, or regulations in connection with access or use of the Software;
+(d) Remove, alter, or obscure any proprietary notice (including any notice of copyright or trademark) of Licensor or its affiliates, partners, suppliers, or the licensors of the Software.
+
+4. INTELLECTUAL PROPERTY AND PROPRIETARY RIGHTS
+The Software is protected by copyright laws and international copyright treaties, as well as other intellectual property laws and treaties. Ace-Digital Pvt Ltd. retains all right, title, and interest in and to the Software, including but not limited to all copyrights, trademarks, trade secrets, trade names, proprietary rights, patents, titles, computer codes, audiovisual effects, themes, characters, business methods, and moral rights whether registered or not and all applications thereof.
+
+RESERVATION OF RIGHTS AND SOURCE CODE USAGE:
+User acknowledges and agrees that the structure, organization, and source code of the Software are the valuable trade secrets and confidential information of Ace-Digital Pvt Ltd. The User obtains no rights to the source code. Ace-Digital Pvt Ltd. expressly reserves the exclusive, unilateral, and unrestricted right to utilize, reuse, repurpose, license, sub-license, resell, distribute, modify, or otherwise exploit the underlying source code, architecture, and core components of the Software for any purpose whatsoever, including but not limited to the creation of derivative products, white-label solutions, or sale to third parties, without any obligation, notification, or compensation to the User. The User's entitlement is strictly limited to the executable version of the Software as provided.
+
+5. TERMINATION
+This Agreement is effective until terminated. Your rights under this Agreement will terminate automatically without notice from the Licensor if you fail to comply with any term(s) of this Agreement. Upon termination of the Agreement, you shall cease all use of the Software and destroy all copies, full or partial, of the Software.
+
+6. DISCLAIMER OF WARRANTIES
+THE SOFTWARE IS PROVIDED TO YOU "AS IS" AND "AS AVAILABLE" AND WITH ALL FAULTS AND DEFECTS WITHOUT WARRANTY OF ANY KIND. TO THE MAXIMUM EXTENT PERMITTED UNDER APPLICABLE LAW, LICENSOR EXPRESSLY DISCLAIMS ALL WARRANTIES, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE.
+
+7. LIMITATION OF LIABILITY
+IN NO EVENT SHALL ACE-DIGITAL PVT LTD. BE LIABLE FOR ANY DAMAGES (INCLUDING, WITHOUT LIMITATION, LOST PROFITS, BUSINESS INTERRUPTION, OR LOST INFORMATION) RISING OUT OF 'AUTHORIZED USERS' USE OF OR INABILITY TO USE THE SOFTWARE, EVEN IF LICENSOR HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+8. GOVERNING LAW
+This Agreement shall be governed by and construed in accordance with the laws of the jurisdiction in which Ace-Digital Pvt Ltd. is registered, without regard to its conflict of law principles.
+
+BY INSTALLING THE SOFTWARE, YOU ACKNOWLEDGE THAT YOU HAVE READ THIS AGREEMENT, UNDERSTAND IT, AND AGREE TO BE BOUND BY ITS TERMS AND CONDITIONS.

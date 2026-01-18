@@ -1,0 +1,72 @@
+# Dependencies
+node_modules/
+client/node_modules/
+
+# Build outputs (will be rebuilt in container)
+dist/
+dist-server/
+build/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+fabzclean*.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+*.tmp
+*.temp
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Tests
+**/__tests__/
+*.test.*
+*.spec.*
+coverage/
+
+# Storybook
+storybook-static/
+*.storybook.log
+
+# Development files
+.replit
+replit.nix
+.local/
+
+# Backups
+backups/
+
+# PM2
+.pm2/
+*.pid
+
+# Certificates (handled separately)
+nginx/certs/

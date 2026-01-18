@@ -1,0 +1,703 @@
+/**
+ * Comprehensive Print Service
+ * Centralized printing system for the entire application
+ * Supports multiple template types and print destinations
+ */
+
+import { printDriver, InvoicePrintData, convertOrderToInvoiceData } from './print-driver';
+import { generatePrintHTML, printDocument } from './print-templates';
+
+export interface PrintSettings {
+  pageSize: 'A4' | 'A5' | 'Letter' | 'Legal';
+  orientation: 'portrait' | 'landscape';
+  margins: {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  };
+  includeHeader: boolean;
+  includeFooter: boolean;
+  includeLogo: boolean;
+  colorPrint: boolean;
+}
+
+export interface CompanyInfo {
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  website?: string;
+  taxId?: string;
+  logo?: string;
+}
+
+export const defaultCompanyInfo: CompanyInfo = {
+  name: 'FabzClean Services',
+  address: '123 Business Street, City, State 12345',
+  phone: '+1 (555) 123-4567',
+  email: 'info@fabzclean.com',
+  website: 'www.fabzclean.com',
+  taxId: 'TAX-123456789',
+};
+
+export const defaultPrintSettings: PrintSettings = {
+  pageSize: 'A4',
+  orientation: 'portrait',
+  margins: { top: 20, right: 20, bottom: 20, left: 20 },
+  includeHeader: true,
+  includeFooter: true,
+  includeLogo: true,
+  colorPrint: true,
+};
+
+// ============================================================================
+// BROWSER-BASED PRINT FUNCTIONS (using window.print())
+// ============================================================================
+
+/**
+ * Print using browser's native print dialog
+ * Better for quick prints and when PDF generation is not needed
+ */
+import { isElectron } from '@/lib/utils';
+
+/**
+ * Print using browser's native print dialog
+ * Better for quick prints and when PDF generation is not needed
+ */
+export function browserPrint(html: string, title: string = 'Print Document') {
+  if (isElectron()) {
+    // Electron-optimized printing using hidden iframe
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(html);
+      doc.close();
+
+      // Wait for content to load then print
+      iframe.onload = () => {
+        setTimeout(() => {
+          iframe.contentWindow?.print();
+          // Remove iframe after printing (with a delay to allow print dialog to open)
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
+        }, 500);
+      };
+    }
+    return;
+  }
+
+  // Standard browser printing
+  const printWindow = window.open('', '_blank');
+
+  if (!printWindow) {
+    throw new Error('Pop-up blocker prevented print window. Please allow pop-ups for this site.');
+  }
+
+  printWindow.document.write(html);
+  printWindow.document.title = title;
+  printWindow.document.close();
+
+  // Auto-print after a short delay to ensure content is loaded
+  printWindow.onload = () => {
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
+}
+
+/**
+ * Print preview - opens in new window without auto-printing
+ */
+export function printPreview(html: string, title: string = 'Print Preview') {
+  const previewWindow = window.open('', '_blank');
+
+  if (!previewWindow) {
+    throw new Error('Pop-up blocker prevented preview window. Please allow pop-ups for this site.');
+  }
+
+  previewWindow.document.write(html);
+  previewWindow.document.title = title;
+  previewWindow.document.close();
+}
+
+// ============================================================================
+// ORDER PRINTING
+// ============================================================================
+
+export async function printOrderInvoice(
+  order: any,
+  settings: Partial<PrintSettings> = {}
+): Promise<void> {
+  const invoiceData = convertOrderToInvoiceData(order);
+  const finalSettings = { ...defaultPrintSettings, ...settings };
+
+  await printDriver.printInvoice(invoiceData, 'invoice');
+}
+
+export async function printOrderReceipt(
+  order: any,
+  settings: Partial<PrintSettings> = {}
+): Promise<void> {
+  const invoiceData = convertOrderToInvoiceData(order);
+  const finalSettings = { ...defaultPrintSettings, ...settings };
+
+  await printDriver.printReceipt(invoiceData, 'receipt');
+}
+
+export function printOrderList(orders: any[]): void {
+  const formattedData = orders.map(order => ({
+    'Order #': order.orderNumber || order.id,
+    'Customer': order.customerName || 'N/A',
+    'Service': order.service || order.serviceName || 'N/A',
+    'Status': order.status || 'pending',
+    'Payment': order.paymentStatus || 'pending',
+    'Amount': `₹${parseFloat(order.totalAmount || 0).toFixed(2)}`,
+    'Date': new Date(order.createdAt || Date.now()).toLocaleDateString(),
+  }));
+
+  const totalRevenue = orders.reduce((sum, o) => sum + parseFloat(o.totalAmount || 0), 0);
+  const completedOrders = orders.filter(o => o.status === 'completed').length;
+  const pendingOrders = orders.filter(o => ['pending', 'in_progress'].includes(o.status)).length;
+  const paidOrders = orders.filter(o => o.paymentStatus === 'paid').length;
+
+  printDocument({
+    title: 'Orders Report',
+    subtitle: `Complete listing of ${orders.length} orders`,
+    data: formattedData,
+    stats: [
+      { label: 'Total Orders', value: orders.length },
+      { label: 'Total Revenue', value: `₹${totalRevenue.toFixed(2)}` },
+      { label: 'Completed', value: completedOrders },
+      { label: 'Pending', value: pendingOrders },
+    ],
+    footer: 'Generated by FabzClean Order Management System',
+  });
+}
+
+export function printOrderDetails(order: any): void {
+  const items = order.items || [];
+  const formattedItems = items.map((item: any, index: number) => ({
+    '#': index + 1,
+    'Item': item.name || item.description || 'Service Item',
+    'Quantity': item.quantity || 1,
+    'Unit Price': `₹${parseFloat(item.unitPrice || item.price || 0).toFixed(2)}`,
+    'Total': `₹${parseFloat(item.total || (item.quantity * item.unitPrice) || 0).toFixed(2)}`,
+  }));
+
+  const subtotal = items.reduce((sum: number, item: any) => {
+    return sum + parseFloat(item.total || (item.quantity * item.unitPrice) || 0);
+  }, 0);
+
+  printDocument({
+    title: `Order Details - ${order.orderNumber || order.id}`,
+    subtitle: `Customer: ${order.customerName || 'N/A'} | Status: ${order.status || 'N/A'}`,
+    data: formattedItems,
+    stats: [
+      { label: 'Order Number', value: order.orderNumber || order.id },
+      { label: 'Order Date', value: new Date(order.createdAt).toLocaleDateString() },
+      { label: 'Total Items', value: items.length },
+      { label: 'Total Amount', value: `₹${parseFloat(order.totalAmount || subtotal).toFixed(2)}` },
+    ],
+    footer: `Payment Method: ${order.paymentMethod || 'N/A'} | Payment Status: ${order.paymentStatus || 'N/A'}`,
+  });
+}
+
+// ============================================================================
+// CUSTOMER PRINTING
+// ============================================================================
+
+export function printCustomerList(customers: any[]): void {
+  const formattedData = customers.map(customer => ({
+    'Name': customer.name || 'N/A',
+    'Email': customer.email || 'N/A',
+    'Phone': customer.phone || 'N/A',
+    'Orders': customer.totalOrders || customer.orderCount || 0,
+    'Total Spent': `₹${parseFloat(customer.totalSpent || customer.lifetimeValue || 0).toFixed(2)}`,
+    'Last Order': customer.lastOrder ? new Date(customer.lastOrder).toLocaleDateString() : 'Never',
+    'Status': customer.status || 'active',
+  }));
+
+  const totalRevenue = customers.reduce((sum, c) => sum + parseFloat(c.totalSpent || c.lifetimeValue || 0), 0);
+  const activeCustomers = customers.filter(c => (c.totalOrders || c.orderCount || 0) > 0).length;
+  const totalOrders = customers.reduce((sum, c) => sum + (c.totalOrders || c.orderCount || 0), 0);
+  const avgOrderValue = totalRevenue / totalOrders || 0;
+
+  printDocument({
+    title: 'Customer Database Report',
+    subtitle: `${customers.length} customers with lifetime value and activity`,
+    data: formattedData,
+    stats: [
+      { label: 'Total Customers', value: customers.length },
+      { label: 'Active Customers', value: activeCustomers },
+      { label: 'Total Revenue', value: `₹${totalRevenue.toFixed(2)}` },
+      { label: 'Avg Order Value', value: `₹${avgOrderValue.toFixed(2)}` },
+    ],
+    footer: 'Customer data is confidential and for internal use only',
+  });
+}
+
+export function printCustomerDetails(customer: any): void {
+  const orders = customer.orders || [];
+  const formattedOrders = orders.map((order: any) => ({
+    'Order #': order.orderNumber || order.id,
+    'Date': new Date(order.createdAt).toLocaleDateString(),
+    'Service': order.service || order.serviceName || 'N/A',
+    'Amount': `₹${parseFloat(order.totalAmount || 0).toFixed(2)}`,
+    'Status': order.status || 'N/A',
+  }));
+
+  printDocument({
+    title: `Customer Details - ${customer.name}`,
+    subtitle: `${customer.email || ''} | ${customer.phone || ''}`,
+    data: formattedOrders,
+    stats: [
+      { label: 'Total Orders', value: orders.length },
+      { label: 'Total Spent', value: `₹${parseFloat(customer.totalSpent || 0).toFixed(2)}` },
+      { label: 'Average Order', value: `₹${(parseFloat(customer.totalSpent || 0) / orders.length || 0).toFixed(2)}` },
+      { label: 'Member Since', value: new Date(customer.createdAt).toLocaleDateString() },
+    ],
+    footer: `Customer ID: ${customer.id} | Status: ${customer.status || 'active'}`,
+  });
+}
+
+// ============================================================================
+// SERVICE PRINTING
+// ============================================================================
+
+export function printServiceCatalog(services: any[]): void {
+  const formattedData = services.map(service => ({
+    'Service Name': service.name || 'N/A',
+    'Category': service.category || 'General',
+    'Price': `₹${parseFloat(service.price || 0).toFixed(2)}`,
+    'Duration': service.duration || service.estimatedDuration || 'N/A',
+    'Status': service.status || service.isActive ? 'Active' : 'Inactive',
+    'Description': service.description?.substring(0, 50) || 'N/A',
+  }));
+
+  const avgPrice = services.reduce((sum, s) => sum + parseFloat(s.price || 0), 0) / services.length || 0;
+  const activeServices = services.filter(s => s.status === 'active' || s.isActive).length;
+  const categories = new Set(services.map(s => s.category)).size;
+  const totalServices = services.length;
+
+  printDocument({
+    title: 'Service Catalog',
+    subtitle: 'Complete list of available services with pricing',
+    data: formattedData,
+    stats: [
+      { label: 'Total Services', value: totalServices },
+      { label: 'Active Services', value: activeServices },
+      { label: 'Categories', value: categories },
+      { label: 'Average Price', value: `₹${avgPrice.toFixed(2)}` },
+    ],
+    footer: 'Prices are subject to change. Please verify current pricing before quoting.',
+  });
+}
+
+export function printServicePerformance(services: any[]): void {
+  const formattedData = services.map(service => ({
+    'Service': service.name || 'N/A',
+    'Total Orders': service.orderCount || service.totalOrders || 0,
+    'Revenue': `₹${parseFloat(service.revenue || service.totalRevenue || 0).toFixed(2)}`,
+    'Avg Rating': service.avgRating || service.rating || 'N/A',
+    'Completion Rate': service.completionRate ? `${service.completionRate}%` : 'N/A',
+  }));
+
+  const totalRevenue = services.reduce((sum, s) => sum + parseFloat(s.revenue || s.totalRevenue || 0), 0);
+  const totalOrders = services.reduce((sum, s) => sum + (s.orderCount || s.totalOrders || 0), 0);
+  const avgRating = services.reduce((sum, s) => sum + parseFloat(s.avgRating || s.rating || 0), 0) / services.length || 0;
+
+  printDocument({
+    title: 'Service Performance Report',
+    subtitle: 'Analysis of service popularity and revenue',
+    data: formattedData,
+    stats: [
+      { label: 'Total Services', value: services.length },
+      { label: 'Total Orders', value: totalOrders },
+      { label: 'Total Revenue', value: `₹${totalRevenue.toFixed(2)}` },
+      { label: 'Avg Rating', value: avgRating.toFixed(1) },
+    ],
+  });
+}
+
+// ============================================================================
+// INVENTORY PRINTING
+// ============================================================================
+
+export function printInventoryReport(inventory: any[]): void {
+  const formattedData = inventory.map(item => ({
+    'SKU': item.sku || item.id,
+    'Product Name': item.name || item.productName || 'N/A',
+    'Category': item.category || 'N/A',
+    'Stock': item.stockQuantity || item.quantity || 0,
+    'Min Stock': item.minStockLevel || item.reorderPoint || 'N/A',
+    'Unit Price': `₹${parseFloat(item.price || item.unitPrice || 0).toFixed(2)}`,
+    'Total Value': `₹${parseFloat((item.stockQuantity || 0) * (item.price || 0)).toFixed(2)}`,
+    'Status': (item.stockQuantity || 0) <= (item.minStockLevel || 0) ? 'Low Stock' : 'OK',
+  }));
+
+  const totalItems = inventory.length;
+  const totalValue = inventory.reduce((sum, item) => {
+    return sum + (item.stockQuantity || 0) * (item.price || item.unitPrice || 0);
+  }, 0);
+  const lowStockItems = inventory.filter(item =>
+    (item.stockQuantity || 0) <= (item.minStockLevel || item.reorderPoint || 0)
+  ).length;
+  const outOfStock = inventory.filter(item => (item.stockQuantity || 0) === 0).length;
+
+  printDocument({
+    title: 'Inventory Report',
+    subtitle: 'Current stock levels and inventory valuation',
+    data: formattedData,
+    stats: [
+      { label: 'Total Items', value: totalItems },
+      { label: 'Total Value', value: `₹${totalValue.toFixed(2)}` },
+      { label: 'Low Stock Items', value: lowStockItems },
+      { label: 'Out of Stock', value: outOfStock },
+    ],
+    footer: 'Inventory report generated for stock management and reordering purposes',
+  });
+}
+
+export function printStockMovement(movements: any[]): void {
+  const formattedData = movements.map(movement => ({
+    'Date': new Date(movement.date || movement.createdAt).toLocaleDateString(),
+    'Product': movement.productName || movement.name || 'N/A',
+    'Type': movement.type || movement.movementType || 'N/A',
+    'Quantity': movement.quantity || 0,
+    'Reference': movement.reference || movement.referenceNumber || 'N/A',
+    'User': movement.userName || movement.createdBy || 'System',
+  }));
+
+  const totalMovements = movements.length;
+  const inbound = movements.filter(m => m.type === 'inbound' || m.type === 'purchase').length;
+  const outbound = movements.filter(m => m.type === 'outbound' || m.type === 'sale').length;
+  const adjustments = movements.filter(m => m.type === 'adjustment').length;
+
+  printDocument({
+    title: 'Stock Movement Report',
+    subtitle: 'Detailed log of all inventory transactions',
+    data: formattedData,
+    stats: [
+      { label: 'Total Movements', value: totalMovements },
+      { label: 'Inbound', value: inbound },
+      { label: 'Outbound', value: outbound },
+      { label: 'Adjustments', value: adjustments },
+    ],
+  });
+}
+
+// ============================================================================
+// ACCOUNTING & FINANCIAL PRINTING
+// ============================================================================
+
+export function printFinancialStatement(data: any): void {
+  const transactions = data.transactions || [];
+  const formattedData = transactions.map((txn: any) => ({
+    'Date': new Date(txn.date || txn.createdAt).toLocaleDateString(),
+    'Description': txn.description || txn.notes || 'N/A',
+    'Type': txn.type || txn.transactionType || 'N/A',
+    'Category': txn.category || 'N/A',
+    'Debit': txn.type === 'debit' ? `₹${parseFloat(txn.amount || 0).toFixed(2)}` : '-',
+    'Credit': txn.type === 'credit' ? `₹${parseFloat(txn.amount || 0).toFixed(2)}` : '-',
+    'Balance': `₹${parseFloat(txn.balance || 0).toFixed(2)}`,
+  }));
+
+  const totalCredit = transactions
+    .filter((t: any) => t.type === 'credit')
+    .reduce((sum: number, t: any) => sum + parseFloat(t.amount || 0), 0);
+
+  const totalDebit = transactions
+    .filter((t: any) => t.type === 'debit')
+    .reduce((sum: number, t: any) => sum + parseFloat(t.amount || 0), 0);
+
+  const netBalance = totalCredit - totalDebit;
+
+  printDocument({
+    title: 'Financial Statement',
+    subtitle: `Period: ${data.startDate || 'N/A'} to ${data.endDate || 'N/A'}`,
+    data: formattedData,
+    stats: [
+      { label: 'Total Credit', value: `₹${totalCredit.toFixed(2)}` },
+      { label: 'Total Debit', value: `₹${totalDebit.toFixed(2)}` },
+      { label: 'Net Balance', value: `₹${netBalance.toFixed(2)}` },
+      { label: 'Transactions', value: transactions.length },
+    ],
+    footer: 'This financial statement is for internal use only and should be kept confidential',
+  });
+}
+
+export function printProfitLossStatement(data: any): void {
+  const income = [
+    { 'Category': 'Service Revenue', 'Amount': `₹${parseFloat(data.serviceRevenue || 0).toFixed(2)}` },
+    { 'Category': 'Product Sales', 'Amount': `₹${parseFloat(data.productSales || 0).toFixed(2)}` },
+    { 'Category': 'Other Income', 'Amount': `₹${parseFloat(data.otherIncome || 0).toFixed(2)}` },
+  ];
+
+  const expenses = [
+    { 'Category': 'Operating Expenses', 'Amount': `₹${parseFloat(data.operatingExpenses || 0).toFixed(2)}` },
+    { 'Category': 'Salaries & Wages', 'Amount': `₹${parseFloat(data.salaries || 0).toFixed(2)}` },
+    { 'Category': 'Rent & Utilities', 'Amount': `₹${parseFloat(data.rentUtilities || 0).toFixed(2)}` },
+    { 'Category': 'Marketing', 'Amount': `₹${parseFloat(data.marketing || 0).toFixed(2)}` },
+    { 'Category': 'Other Expenses', 'Amount': `₹${parseFloat(data.otherExpenses || 0).toFixed(2)}` },
+  ];
+
+  const totalIncome = (data.serviceRevenue || 0) + (data.productSales || 0) + (data.otherIncome || 0);
+  const totalExpenses = (data.operatingExpenses || 0) + (data.salaries || 0) +
+    (data.rentUtilities || 0) + (data.marketing || 0) + (data.otherExpenses || 0);
+  const netProfit = totalIncome - totalExpenses;
+  const profitMargin = totalIncome > 0 ? ((netProfit / totalIncome) * 100).toFixed(2) : 0;
+
+  const combinedData = [
+    ...income.map(i => ({ ...i, 'Type': 'Income' })),
+    ...expenses.map(e => ({ ...e, 'Type': 'Expense' })),
+  ];
+
+  printDocument({
+    title: 'Profit & Loss Statement',
+    subtitle: `Period: ${data.startDate || 'N/A'} to ${data.endDate || 'N/A'}`,
+    data: combinedData,
+    stats: [
+      { label: 'Total Income', value: `₹${totalIncome.toFixed(2)}` },
+      { label: 'Total Expenses', value: `₹${totalExpenses.toFixed(2)}` },
+      { label: 'Net Profit', value: `₹${netProfit.toFixed(2)}` },
+      { label: 'Profit Margin', value: `${profitMargin}%` },
+    ],
+  });
+}
+
+export function printBalanceSheet(data: any): void {
+  const assets = [
+    { 'Category': 'Cash & Bank', 'Amount': `₹${parseFloat(data.cash || 0).toFixed(2)}` },
+    { 'Category': 'Accounts Receivable', 'Amount': `₹${parseFloat(data.accountsReceivable || 0).toFixed(2)}` },
+    { 'Category': 'Inventory', 'Amount': `₹${parseFloat(data.inventory || 0).toFixed(2)}` },
+    { 'Category': 'Fixed Assets', 'Amount': `₹${parseFloat(data.fixedAssets || 0).toFixed(2)}` },
+  ];
+
+  const liabilities = [
+    { 'Category': 'Accounts Payable', 'Amount': `₹${parseFloat(data.accountsPayable || 0).toFixed(2)}` },
+    { 'Category': 'Loans', 'Amount': `₹${parseFloat(data.loans || 0).toFixed(2)}` },
+    { 'Category': 'Other Liabilities', 'Amount': `₹${parseFloat(data.otherLiabilities || 0).toFixed(2)}` },
+  ];
+
+  const totalAssets = (data.cash || 0) + (data.accountsReceivable || 0) +
+    (data.inventory || 0) + (data.fixedAssets || 0);
+  const totalLiabilities = (data.accountsPayable || 0) + (data.loans || 0) + (data.otherLiabilities || 0);
+  const equity = totalAssets - totalLiabilities;
+
+  const combinedData = [
+    ...assets.map(a => ({ ...a, 'Type': 'Asset' })),
+    ...liabilities.map(l => ({ ...l, 'Type': 'Liability' })),
+  ];
+
+  printDocument({
+    title: 'Balance Sheet',
+    subtitle: `As of ${data.asOfDate || new Date().toLocaleDateString()}`,
+    data: combinedData,
+    stats: [
+      { label: 'Total Assets', value: `₹${totalAssets.toFixed(2)}` },
+      { label: 'Total Liabilities', value: `₹${totalLiabilities.toFixed(2)}` },
+      { label: 'Equity', value: `₹${equity.toFixed(2)}` },
+      { label: 'Debt Ratio', value: `${((totalLiabilities / totalAssets) * 100).toFixed(2)}%` },
+    ],
+  });
+}
+
+// ============================================================================
+// ANALYTICS & DASHBOARD PRINTING
+// ============================================================================
+
+export function printDashboardSummary(metrics: any): void {
+  const data = [
+    { 'Metric': 'Total Revenue', 'Value': `₹${parseFloat(metrics.totalRevenue || 0).toFixed(2)}`, 'Change': metrics.revenueChange || 'N/A' },
+    { 'Metric': 'Total Orders', 'Value': metrics.totalOrders || 0, 'Change': metrics.ordersChange || 'N/A' },
+    { 'Metric': 'Active Customers', 'Value': metrics.activeCustomers || 0, 'Change': metrics.customersChange || 'N/A' },
+    { 'Metric': 'Completion Rate', 'Value': `${metrics.completionRate || 0}%`, 'Change': metrics.completionChange || 'N/A' },
+    { 'Metric': 'Average Order Value', 'Value': `₹${parseFloat(metrics.averageOrderValue || 0).toFixed(2)}`, 'Change': metrics.aovChange || 'N/A' },
+    { 'Metric': 'Customer Satisfaction', 'Value': `${metrics.satisfaction || 0}%`, 'Change': metrics.satisfactionChange || 'N/A' },
+  ];
+
+  printDocument({
+    title: 'Business Dashboard Summary',
+    subtitle: 'Performance overview and key metrics',
+    data,
+    stats: [
+      { label: 'Total Revenue', value: `₹${parseFloat(metrics.totalRevenue || 0).toFixed(2)}` },
+      { label: 'Total Orders', value: metrics.totalOrders || 0 },
+      { label: 'Active Customers', value: metrics.activeCustomers || 0 },
+      { label: 'Avg Order Value', value: `₹${parseFloat(metrics.averageOrderValue || 0).toFixed(2)}` },
+    ],
+  });
+}
+
+// ============================================================================
+// LOGISTICS & TRACKING PRINTING
+// ============================================================================
+
+export function printShipmentManifest(shipments: any[]): void {
+  const formattedData = shipments.map(shipment => ({
+    'Shipment #': shipment.shipmentNumber || shipment.id,
+    'Carrier': shipment.carrier || 'N/A',
+    'Tracking #': shipment.trackingNumber || 'N/A',
+    'Status': shipment.status || 'pending',
+    'Orders': shipment.orderIds?.length || shipment.orderCount || 0,
+    'Destination': shipment.destination || 'N/A',
+    'Scheduled': new Date(shipment.scheduledDate || shipment.createdAt).toLocaleDateString(),
+  }));
+
+  const totalShipments = shipments.length;
+  const delivered = shipments.filter(s => s.status === 'delivered').length;
+  const inTransit = shipments.filter(s => s.status === 'in_transit').length;
+  const pending = shipments.filter(s => s.status === 'pending').length;
+
+  printDocument({
+    title: 'Shipment Manifest',
+    subtitle: 'Daily shipment tracking and delivery status',
+    data: formattedData,
+    stats: [
+      { label: 'Total Shipments', value: totalShipments },
+      { label: 'Delivered', value: delivered },
+      { label: 'In Transit', value: inTransit },
+      { label: 'Pending', value: pending },
+    ],
+  });
+}
+
+export function printDeliveryRoute(route: any): void {
+  const stops = route.stops || [];
+  const formattedStops = stops.map((stop: any, index: number) => ({
+    'Stop #': index + 1,
+    'Customer': stop.customerName || 'N/A',
+    'Address': stop.address || 'N/A',
+    'Order #': stop.orderNumber || 'N/A',
+    'Time Window': stop.timeWindow || 'N/A',
+    'Status': stop.status || 'pending',
+  }));
+
+  printDocument({
+    title: 'Delivery Route Plan',
+    subtitle: `Driver: ${route.driverName || 'N/A'} | Date: ${new Date(route.date).toLocaleDateString()}`,
+    data: formattedStops,
+    stats: [
+      { label: 'Total Stops', value: stops.length },
+      { label: 'Route Distance', value: `${route.distance || 'N/A'} km` },
+      { label: 'Est. Duration', value: `${route.estimatedDuration || 'N/A'} hrs` },
+      { label: 'Vehicle', value: route.vehicleNumber || 'N/A' },
+    ],
+  });
+}
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Get print settings from localStorage or defaults
+ */
+export function getPrintSettings(): PrintSettings {
+  try {
+    const saved = localStorage.getItem('printSettings');
+    if (saved) {
+      return { ...defaultPrintSettings, ...JSON.parse(saved) };
+    }
+  } catch (error) {
+    console.error('Error loading print settings:', error);
+  }
+  return defaultPrintSettings;
+}
+
+/**
+ * Save print settings to localStorage
+ */
+export function savePrintSettings(settings: Partial<PrintSettings>): void {
+  try {
+    const current = getPrintSettings();
+    const updated = { ...current, ...settings };
+    localStorage.setItem('printSettings', JSON.stringify(updated));
+  } catch (error) {
+    console.error('Error saving print settings:', error);
+  }
+}
+
+/**
+ * Get company info from settings or defaults
+ */
+export function getCompanyInfo(): CompanyInfo {
+  try {
+    const saved = localStorage.getItem('companyInfo');
+    if (saved) {
+      return { ...defaultCompanyInfo, ...JSON.parse(saved) };
+    }
+  } catch (error) {
+    console.error('Error loading company info:', error);
+  }
+  return defaultCompanyInfo;
+}
+
+/**
+ * Save company info to settings
+ */
+export function saveCompanyInfo(info: Partial<CompanyInfo>): void {
+  try {
+    const current = getCompanyInfo();
+    const updated = { ...current, ...info };
+    localStorage.setItem('companyInfo', JSON.stringify(updated));
+  } catch (error) {
+    console.error('Error saving company info:', error);
+  }
+}
+
+// Export all print functions as a single object for convenience
+export const PrintService = {
+  // Browser print
+  browserPrint,
+  printPreview,
+
+  // Orders
+  printOrderInvoice,
+  printOrderReceipt,
+  printOrderList,
+  printOrderDetails,
+
+  // Customers
+  printCustomerList,
+  printCustomerDetails,
+
+  // Services
+  printServiceCatalog,
+  printServicePerformance,
+
+  // Inventory
+  printInventoryReport,
+  printStockMovement,
+
+  // Accounting
+  printFinancialStatement,
+  printProfitLossStatement,
+  printBalanceSheet,
+
+  // Analytics
+  printDashboardSummary,
+
+  // Logistics
+  printShipmentManifest,
+  printDeliveryRoute,
+
+  // Settings
+  getPrintSettings,
+  savePrintSettings,
+  getCompanyInfo,
+  saveCompanyInfo,
+};
+
+export default PrintService;
