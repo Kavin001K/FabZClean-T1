@@ -62,7 +62,17 @@ app.use((req, res, next) => {
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
+    // OPTIMIZATION: Only capture body if it's small to prevent memory leaks
+    try {
+      const bodySize = bodyJson ? JSON.stringify(bodyJson).length : 0;
+      if (bodySize < 2000) {
+        capturedJsonResponse = bodyJson;
+      } else {
+        capturedJsonResponse = { _truncated: 'Response too large to log', size: bodySize };
+      }
+    } catch {
+      capturedJsonResponse = { _truncated: 'Could not serialize response' };
+    }
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 

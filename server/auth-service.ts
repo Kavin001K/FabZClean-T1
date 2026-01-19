@@ -20,6 +20,7 @@ export interface EmployeeJWTPayload {
     id: string; // Add UUID
     employeeId: string;
     username: string;
+    email?: string;
     role: 'admin' | 'franchise_manager' | 'factory_manager' | 'employee' | 'staff' | 'driver' | 'manager';
     franchiseId?: string;
     factoryId?: string;
@@ -40,14 +41,26 @@ export interface AuthEmployee {
     position?: string;
     department?: string;
     hireDate?: Date;
-    salaryType?: 'hourly' | 'monthly';
+    salaryType?: 'hourly' | 'monthly' | string;
     baseSalary?: number;
+    salary?: number;
     hourlyRate?: number;
     workingHours?: number;
     emergencyContact?: string;
     qualifications?: string;
     notes?: string;
     address?: string;
+    status?: 'active' | 'inactive' | 'terminated' | string;
+    // Personal info
+    dateOfBirth?: string;
+    gender?: string;
+    bloodGroup?: string;
+    // Banking
+    bankName?: string;
+    bankAccountNumber?: string;
+    bankIfsc?: string;
+    panNumber?: string;
+    aadharNumber?: string;
 }
 
 export class AuthService {

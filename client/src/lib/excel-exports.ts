@@ -44,8 +44,8 @@ export function exportOrdersToExcel(
     balance: (parseFloat(order.totalAmount) || 0) - (parseFloat(order.advancePaid) || 0),
     createdAt: new Date(order.createdAt),
     updatedAt: new Date(order.updatedAt),
-    pickupAddress: order.pickupAddress || '',
-    deliveryAddress: order.deliveryAddress || '',
+    pickupAddress: (order as any).pickupAddress || '',
+    deliveryAddress: (order as any).deliveryAddress || '',
   }));
 
   // Calculate summary
@@ -135,10 +135,9 @@ export function exportServicesToExcel(services: Service[], filters?: { category?
     { header: 'Service Name', key: 'name', width: 30, align: 'left' },
     { header: 'Description', key: 'description', width: 40, align: 'left' },
     { header: 'Category', key: 'category', width: 20, align: 'left' },
-    { header: 'Base Price', key: 'basePrice', width: 15, format: 'currency', align: 'right' },
+    { header: 'Price', key: 'price', width: 15, format: 'currency', align: 'right' },
     { header: 'Service Duration', key: 'duration', width: 15, align: 'center' },
     { header: 'Status', key: 'status', width: 12, align: 'center' },
-    { header: 'Popularity', key: 'popularity', width: 12, format: 'number', align: 'right' },
     { header: 'Created Date', key: 'createdAt', width: 15, format: 'date', align: 'center' },
   ];
 
@@ -147,17 +146,16 @@ export function exportServicesToExcel(services: Service[], filters?: { category?
     name: service.name,
     description: service.description || '',
     category: service.category || '',
-    basePrice: parseFloat(service.basePrice) || 0,
+    price: parseFloat(service.price) || 0,
     duration: service.duration || '',
-    status: service.status || 'active',
-    popularity: service.popularity || 0,
+    status: service.status || 'Active',
     createdAt: new Date(service.createdAt),
   }));
 
   const totalServices = exportData.length;
-  const activeServices = exportData.filter(s => s.status === 'active').length;
+  const activeServices = exportData.filter(s => s.status === 'Active').length;
   const avgPrice = totalServices > 0
-    ? exportData.reduce((sum, s) => sum + s.basePrice, 0) / totalServices
+    ? exportData.reduce((sum, s) => sum + s.price, 0) / totalServices
     : 0;
 
   const filterInfo = filters ? [

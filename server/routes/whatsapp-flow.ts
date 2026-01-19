@@ -138,7 +138,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
                 orderNumber: orderId,
                 customerName: data.name,
                 customerPhone: data.phone,
-                status: 'confirmed',
+                status: 'pending',
                 items: items.map((id: string) => ({
                     serviceName: `${svc.name} - ${ITEMS[id]?.name || id}`,
                     quantity: Math.ceil((parseInt(data.qty) || 5) / items.length),

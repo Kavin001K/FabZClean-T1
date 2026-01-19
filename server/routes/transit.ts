@@ -140,7 +140,7 @@ router.post('/batches', adminLoginRequired, validateInput(transitBatchSchema), a
     const orders = await storage.listOrders();
     const validOrders = orderIds.filter((orderId: string) => {
       const order = orders.find(o => o.id === orderId);
-      return order && ['At Store', 'Processing'].includes(order.status);
+      return order && ['in_store', 'processing'].includes(order.status);
     });
 
     if (validOrders.length !== orderIds.length) {
@@ -167,7 +167,7 @@ router.post('/batches', adminLoginRequired, validateInput(transitBatchSchema), a
 
     // Update order statuses
     for (const orderId of orderIds) {
-      await storage.updateOrder(orderId, { status: 'In Transit' });
+      await storage.updateOrder(orderId, { status: 'in_transit' });
     }
 
     // Notify real-time clients
@@ -285,8 +285,7 @@ router.put('/batches/:id/complete', adminLoginRequired, async (req, res) => {
       await storage.updateTransitOrder(transitOrder.id, { status: 'COMPLETED' });
     }
 
-    // Update order statuses based on batch type
-    const newOrderStatus = batch.type === 'STORE_TO_FACTORY' ? 'Processing' : 'Ready for Delivery';
+    const newOrderStatus = batch.type === 'STORE_TO_FACTORY' ? 'processing' : 'ready_for_pickup';
     for (const transitOrder of batchTransitOrders) {
       await storage.updateOrder(transitOrder.orderId, { status: newOrderStatus });
     }
@@ -355,7 +354,7 @@ router.delete('/batches/:id', adminLoginRequired, async (req, res) => {
     // Reset order statuses if batch was pending
     if (batch.status === 'PENDING') {
       for (const transitOrder of batchTransitOrders) {
-        await storage.updateOrder(transitOrder.orderId, { status: 'At Store' });
+        await storage.updateOrder(transitOrder.orderId, { status: 'in_store' });
       }
     }
 
@@ -436,11 +435,11 @@ router.get('/available-orders', adminLoginRequired, async (req, res) => {
     let availableOrders;
     if (type === 'STORE_TO_FACTORY') {
       availableOrders = orders.filter(order =>
-        order.status === 'At Store' && !ordersInTransit.has(order.id)
+        order.status === 'in_store' && !ordersInTransit.has(order.id)
       );
     } else {
       availableOrders = orders.filter(order =>
-        order.status === 'Processing' && !ordersInTransit.has(order.id)
+        order.status === 'processing' && !ordersInTransit.has(order.id)
       );
     }
 

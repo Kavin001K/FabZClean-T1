@@ -41,7 +41,7 @@ router.get("/", async (req, res) => {
         }
 
         // Fetch from database with franchise filter
-        let transits = await storage.listTransitOrders(effectiveFranchiseId);
+        let transits = await storage.listTransitOrders();
 
         // Filter by type if provided (e.g., "To Factory", "Return to Store")
         if (type) {
@@ -246,7 +246,7 @@ router.post("/", auditMiddleware('create_transit_order', 'transit_order'), async
             if (order) {
                 // Try to create transit order item, but don't fail if it errors
                 try {
-                    await storage.createTransitOrderItem({
+                    await storage.addTransitOrderItem({
                         transitOrderId: newTransit.id,
                         orderId: order.id,
                         orderNumber: order.orderNumber,
@@ -309,10 +309,12 @@ router.put("/:id/status", auditMiddleware('update_transit_status', 'transit_orde
 
         // Create history record
         try {
-            await storage.createTransitStatusHistory({
-                transitOrderId: req.params.id,
-                status
-            });
+            await storage.addTransitStatusHistory(
+                req.params.id,
+                status,
+                undefined,
+                undefined
+            );
         } catch (historyError) {
             console.warn('Could not create transit history:', historyError);
         }
