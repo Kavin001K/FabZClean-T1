@@ -12,7 +12,6 @@ import {
   Server,
   MapPin,
   FileText,
-  Calculator,
   Shield,
   Building2,
   BarChart3,
@@ -95,12 +94,6 @@ const NAV_ITEMS: NavItem[] = [
     label: "Documents",
     icon: FileText,
     roles: ["admin", "franchise_manager", "manager", "staff"],
-  },
-  {
-    to: "/accounting",
-    label: "Accounting",
-    icon: Calculator,
-    roles: ["admin", "franchise_manager", "manager"],
   },
   {
     to: "/credits",

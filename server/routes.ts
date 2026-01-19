@@ -33,6 +33,9 @@ import reportsRouter from "./routes/reports";
 import publicTrackingRouter from "./routes/public-tracking";
 import creditsRouter from "./routes/credits";
 import authRouter from "./routes/auth";
+import businessSettingsRouter from "./routes/business-settings";
+import documentsRouter from "./routes/documents";
+import analyticsRouter from "./routes/analytics";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register Auth routes (login, logout, me, etc.)
@@ -46,6 +49,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Settings routes
   app.use("/api/settings", settingsRoutes);
+
+  // Register Business Settings routes
+  app.use("/api/business-settings", businessSettingsRouter);
+
+  // Register Documents routes
+  app.use("/api/documents", documentsRouter);
+
+  // Register Analytics routes
+  app.use("/api/analytics", analyticsRouter);
 
   // Register Audit Logs routes
   app.use("/api/audit-logs", auditLogsRouter);
@@ -705,6 +717,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           order.customerId,
           parseFloat(order.totalAmount || "0"),
         );
+
+        // ============ AUTOMATIC CREDIT TRACKING ============
+        // If payment status is 'credit' or 'pending' and there's an unpaid balance,
+        // automatically add it to the customer's credit balance
+        try {
+          const totalAmount = parseFloat(order.totalAmount || "0");
+          const advancePaid = parseFloat(order.advancePaid || "0");
+          const balanceDue = totalAmount - advancePaid;
+
+          // Only add credit if there's a balance AND payment status indicates credit
+          if (balanceDue > 0 && (order.paymentStatus === 'credit' || order.paymentStatus === 'pending')) {
+            const description = `Order ${order.orderNumber} - Balance due (Total: ₹${totalAmount.toFixed(2)}, Advance: ₹${advancePaid.toFixed(2)})`;
+
+            await storage.addCustomerCredit(
+              order.customerId,
+              balanceDue,  // Add positive amount to credit (money owed to store)
+              'usage',     // Type: usage means customer is using credit (owes money)
+              description,
+              order.id,    // Reference to order
+              req.body.createdBy || 'system'
+            );
+
+            console.log(`✅ Auto-credit: Added ₹${balanceDue.toFixed(2)} credit for customer ${order.customerName} (Order: ${order.orderNumber})`);
+          }
+        } catch (creditError) {
+          console.error('Auto-credit tracking error (non-blocking):', creditError);
+          // Don't fail order creation if credit tracking fails
+        }
       }
 
       // Log to audit trail
@@ -797,6 +837,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } catch (auditError) {
         console.error('Audit log error (non-blocking):', auditError);
+      }
+
+      // ============ AUTOMATIC CREDIT SETTLEMENT ============
+      // When payment status changes from 'credit'/'pending' to 'paid',
+      // deduct the balance from customer's credit
+      if (order.customerId && originalOrder) {
+        try {
+          const wasCredit = originalOrder.paymentStatus === 'credit' || originalOrder.paymentStatus === 'pending';
+          const nowPaid = order.paymentStatus === 'paid';
+
+          if (wasCredit && nowPaid) {
+            const totalAmount = parseFloat(order.totalAmount || "0");
+            const advancePaid = parseFloat(originalOrder.advancePaid || "0");
+            const creditToSettle = totalAmount - advancePaid;
+
+            if (creditToSettle > 0) {
+              const description = `Order ${order.orderNumber} - Payment received (Settled: ₹${creditToSettle.toFixed(2)})`;
+
+              await storage.addCustomerCredit(
+                order.customerId,
+                -creditToSettle,  // Negative amount to REDUCE credit (payment received)
+                'payment',        // Type: payment means credit is being settled
+                description,
+                order.id,
+                req.body.updatedBy || 'system'
+              );
+
+              console.log(`✅ Credit settled: Deducted ₹${creditToSettle.toFixed(2)} from customer credit (Order: ${order.orderNumber})`);
+            }
+          }
+
+          // If payment status changed TO 'credit' from something else, add credit
+          if (!wasCredit && order.paymentStatus === 'credit') {
+            const totalAmount = parseFloat(order.totalAmount || "0");
+            const advancePaid = parseFloat(order.advancePaid || "0");
+            const balanceDue = totalAmount - advancePaid;
+
+            if (balanceDue > 0) {
+              const description = `Order ${order.orderNumber} - Marked as credit (Balance: ₹${balanceDue.toFixed(2)})`;
+
+              await storage.addCustomerCredit(
+                order.customerId,
+                balanceDue,
+                'usage',
+                description,
+                order.id,
+                req.body.updatedBy || 'system'
+              );
+
+              console.log(`✅ Auto-credit: Added ₹${balanceDue.toFixed(2)} credit (Order: ${order.orderNumber})`);
+            }
+          }
+        } catch (creditError) {
+          console.error('Credit settlement error (non-blocking):', creditError);
+        }
       }
 
       // Trigger real-time update
@@ -2028,55 +2123,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Assign driver error:", error);
       res.status(500).json({ message: "Failed to assign driver" });
-    }
-  });
-
-  // ======= ACCOUNTING DASHBOARD API =======
-  app.get("/api/accounting/dashboard", async (req, res) => {
-    try {
-      const orders = await storage.listOrders();
-      const customers = await storage.listCustomers();
-
-      // Calculate financial metrics
-      const totalRevenue = orders.reduce((sum: number, order: Order) =>
-        sum + parseFloat(order.totalAmount || "0"), 0
-      );
-
-      const paidOrders = orders.filter((order: Order) => order.paymentStatus === 'paid');
-      const pendingPayments = orders.filter((order: Order) => order.paymentStatus === 'pending');
-
-      const totalPaid = paidOrders.reduce((sum: number, order: Order) =>
-        sum + parseFloat(order.totalAmount || "0"), 0
-      );
-
-      const totalPending = pendingPayments.reduce((sum: number, order: Order) =>
-        sum + parseFloat(order.totalAmount || "0"), 0
-      );
-
-      const dashboard = {
-        totalRevenue: totalRevenue.toFixed(2),
-        totalPaid: totalPaid.toFixed(2),
-        totalPending: totalPending.toFixed(2),
-        totalOrders: orders.length,
-        totalCustomers: customers.length,
-        paidOrders: paidOrders.length,
-        pendingOrders: pendingPayments.length,
-        averageOrderValue: orders.length > 0 ? (totalRevenue / orders.length).toFixed(2) : "0.00",
-        monthlyRevenue: orders
-          .filter((order: Order) => {
-            const orderDate = order.createdAt ? new Date(order.createdAt) : new Date();
-            const currentMonth = new Date().getMonth();
-            const currentYear = new Date().getFullYear();
-            return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
-          })
-          .reduce((sum: number, order: Order) => sum + parseFloat(order.totalAmount || "0"), 0)
-          .toFixed(2)
-      };
-
-      res.json(dashboard);
-    } catch (error) {
-      console.error("Accounting dashboard error:", error);
-      res.status(500).json({ message: "Failed to fetch accounting data" });
     }
   });
 

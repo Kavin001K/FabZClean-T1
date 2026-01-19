@@ -1652,7 +1652,17 @@ export class SQLiteStorage implements IStorage {
       Object.keys(processedData)
         .map((k) => `${k} = ?`)
         .join(", ") + ", updatedAt = ?";
-    const values = [...Object.values(processedData).map(v => v === undefined ? null : v), now, id];
+
+    // Convert values: undefined -> null, Date -> ISO string
+    const values = [
+      ...Object.values(processedData).map(v => {
+        if (v === undefined) return null;
+        if (v instanceof Date) return v.toISOString();
+        return v;
+      }),
+      now,
+      id
+    ];
 
     this.db
       .prepare(`UPDATE ${table} SET ${setStmt} WHERE id = ?`)
@@ -1821,20 +1831,30 @@ export class SQLiteStorage implements IStorage {
     const newBalance = currentBalance + amount;
 
     // Update customer balance
-    this.updateCustomer(customerId, { creditBalance: String(newBalance) });
+    await this.updateCustomer(customerId, { creditBalance: String(newBalance) });
 
-    // Record transaction
-    const transaction = {
+    // Record transaction directly (not using insertRecord since table doesn't have updatedAt)
+    const id = randomUUID();
+    const now = new Date().toISOString();
+
+    const stmt = this.db.prepare(`
+      INSERT INTO customer_credit_history (id, customerId, amount, type, description, referenceId, balanceAfter, createdBy, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(id, customerId, String(amount), type, description, referenceId || null, String(newBalance), createdBy || null, now);
+
+    return {
+      id,
       customerId,
       amount: String(amount),
       type,
       description,
       referenceId,
       balanceAfter: String(newBalance),
-      createdBy
+      createdBy,
+      createdAt: now
     };
-
-    return this.insertRecord("customer_credit_history", transaction);
   }
 
   async getCustomerCreditHistory(customerId: string): Promise<any[]> {

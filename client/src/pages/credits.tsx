@@ -77,7 +77,10 @@ import { formatCurrency } from "@/lib/data-service";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { CustomerAutocomplete } from "@/components/customer-autocomplete"; // Assuming this exists or using generic select
+import { CustomerAutocomplete } from "@/components/customer-autocomplete";
+import CustomerDialogs from "@/components/customers/customer-dialogs";
+import { customersApi, ordersApi } from "@/lib/data-service";
+import type { Customer, Order } from "@shared/schema";
 
 // --- Zod Schemas for Validation ---
 const creditTransactionSchema = z.object({
@@ -101,6 +104,29 @@ export default function CreditsPage() {
     const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
     const [selectedActionType, setSelectedActionType] = useState<"payment" | "credit" | "adjustment">("payment");
 
+    // Customer popup state
+    const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+    const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
+    const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
+
+    // Function to open customer popup
+    const openCustomerPopup = async (customerId: string) => {
+        try {
+            const customer = await customersApi.getById(customerId);
+            if (customer) {
+                setSelectedCustomer(customer);
+                // Fetch customer orders
+                const orders = await ordersApi.getAll({ customerId });
+                setCustomerOrders(orders);
+                setIsCustomerDialogOpen(true);
+            } else {
+                toast({ title: "Error", description: "Customer not found", variant: "destructive" });
+            }
+        } catch (error) {
+            toast({ title: "Error", description: "Failed to load customer details", variant: "destructive" });
+        }
+    };
+
     // --- Role Access Control ---
     const canManageCredits = useMemo(() => {
         return employee?.role && ['admin', 'franchise_manager', 'manager'].includes(employee.role);
@@ -108,42 +134,83 @@ export default function CreditsPage() {
 
     // --- Queries ---
 
+    // Helper to get auth headers
+    const getAuthHeaders = () => {
+        const token = localStorage.getItem('employee_token');
+        return {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        };
+    };
+
     // 1. Stats
-    const { data: statsResponse, isLoading: statsLoading } = useQuery({
+    const { data: statsResponse, isLoading: statsLoading, error: statsError, refetch: refetchStats } = useQuery({
         queryKey: ["credit-stats"],
         queryFn: async () => {
-            const res = await fetch("/api/credits/stats");
-            if (!res.ok) throw new Error("Failed to fetch stats");
+            const res = await fetch("/api/credits/stats", {
+                credentials: 'include',
+                headers: getAuthHeaders()
+            });
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({ message: 'Failed to fetch stats' }));
+                throw new Error(error.message || error.error || 'Failed to fetch stats');
+            }
             return res.json();
-        }
+        },
+        retry: 1,
+        refetchOnWindowFocus: false
     });
-    const creditStats = statsResponse?.data || { totalOutstanding: 0, activeCustomers: 0, monthlyCreditGiven: 0, monthlyCreditUsed: 0 };
+    const creditStats = statsResponse?.data || {
+        totalOutstanding: 0,
+        activeCustomers: 0,
+        monthlyCreditGiven: 0,
+        monthlyPaymentsReceived: 0,
+        franchiseBreakdown: [],
+        isAdmin: false
+    };
 
     // 2. Transactions
-    const { data: transactionsResponse, isLoading: isLoadingTransactions, refetch: refetchTransactions } = useQuery({
+    const { data: transactionsResponse, isLoading: isLoadingTransactions, refetch: refetchTransactions, error: transactionsError } = useQuery({
         queryKey: ["credit-transactions", searchTerm, typeFilter],
         queryFn: async () => {
             const params = new URLSearchParams();
             if (searchTerm) params.append("search", searchTerm);
             if (typeFilter !== "all") params.append("type", typeFilter);
-            const res = await fetch(`/api/credits/transactions?${params}`);
-            if (!res.ok) throw new Error("Failed to fetch transactions");
+            const res = await fetch(`/api/credits/transactions?${params}`, {
+                credentials: 'include',
+                headers: getAuthHeaders()
+            });
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({ message: 'Failed to fetch transactions' }));
+                throw new Error(error.message || error.error || 'Failed to fetch transactions');
+            }
             return res.json();
-        }
+        },
+        retry: 1,
+        refetchOnWindowFocus: false
     });
     const transactions = transactionsResponse?.data || [];
 
     // 3. Customers with Balances
-    const { data: customersResponse, isLoading: isLoadingCustomers } = useQuery({
+    const { data: customersResponse, isLoading: isLoadingCustomers, error: customersError, refetch: refetchCustomers } = useQuery({
         queryKey: ["credit-customers-report"],
         queryFn: async () => {
-            const res = await fetch("/api/credits/report/outstanding");
-            if (!res.ok) throw new Error("Failed to fetch customers");
+            const res = await fetch("/api/credits/report/outstanding", {
+                credentials: 'include',
+                headers: getAuthHeaders()
+            });
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({ message: 'Failed to fetch customers' }));
+                throw new Error(error.message || error.error || 'Failed to fetch customers');
+            }
             return res.json();
         },
-        enabled: activeTab === "balances"
+        enabled: activeTab === "balances",
+        retry: 1,
+        refetchOnWindowFocus: false
     });
     const customersWithCredit = customersResponse?.data?.customers || [];
+    const outstandingTotal = customersResponse?.data?.totalOutstanding || 0;
 
     // --- Mutations ---
 
@@ -151,41 +218,35 @@ export default function CreditsPage() {
         mutationFn: async (values: z.infer<typeof creditTransactionSchema>) => {
             // Determine endpoint based on type
             let endpoint = "";
-            let body = {};
+            let body: any = {
+                customerId: values.customerId,
+                amount: values.amount,
+            };
 
             if (values.type === "payment") {
-                endpoint = `/api/credits/${values.customerId}/payment`;
-                body = {
-                    amount: values.amount,
-                    paymentMethod: values.paymentMethod,
-                    referenceNumber: values.reference,
-                    notes: values.reason
-                };
+                endpoint = `/api/credits/payment`;
+                body.paymentMethod = values.paymentMethod;
+                body.referenceNumber = values.reference;
+                body.notes = values.reason;
             } else if (values.type === "adjustment") {
-                endpoint = `/api/credits/${values.customerId}/adjust`;
-                body = {
-                    amount: values.amount, // API handles sign based on context, but usually adjustment adds/subtracts
-                    reason: values.reason,
-                    notes: values.reference
-                };
+                endpoint = `/api/credits/adjustment`;
+                body.reason = values.reason;
             } else {
                 // Manual Credit Add
-                endpoint = `/api/credits/${values.customerId}/add`;
-                body = {
-                    amount: values.amount,
-                    reason: values.reason,
-                    notes: values.reference
-                };
+                endpoint = `/api/credits/add`;
+                body.reason = values.reason;
+                body.orderId = values.reference;
             }
 
             const res = await fetch(endpoint, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders(),
+                credentials: 'include',
                 body: JSON.stringify(body)
             });
 
             if (!res.ok) {
-                const error = await res.json();
+                const error = await res.json().catch(() => ({ message: 'Transaction failed' }));
                 throw new Error(error.message || "Transaction failed");
             }
             return res.json();
@@ -255,8 +316,17 @@ export default function CreditsPage() {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => refetchTransactions()}>
-                        <RefreshCw className={`mr-2 h-4 w-4 ${isLoadingTransactions ? 'animate-spin' : ''}`} />
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            refetchStats();
+                            refetchTransactions();
+                            if (activeTab === 'balances') refetchCustomers();
+                        }}
+                        disabled={statsLoading || isLoadingTransactions}
+                    >
+                        <RefreshCw className={`mr-2 h-4 w-4 ${statsLoading || isLoadingTransactions ? 'animate-spin' : ''}`} />
                         Refresh
                     </Button>
                     <Button variant="outline" size="sm" onClick={handleExport}>
@@ -295,7 +365,7 @@ export default function CreditsPage() {
                 />
                 <KpiCard
                     title="Recovered (Mo)"
-                    value={formatCurrency(creditStats.monthlyCreditUsed)}
+                    value={formatCurrency(creditStats.monthlyPaymentsReceived || 0)}
                     subtext="Payments & Usage this month"
                     icon={ArrowDownLeft}
                     color="text-blue-600"
@@ -434,7 +504,7 @@ export default function CreditsPage() {
                                                             </DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end">
                                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                                <DropdownMenuItem onClick={() => window.location.href = `/customers?id=${tx.customerId}`}>
+                                                                <DropdownMenuItem onClick={() => openCustomerPopup(tx.customerId)}>
                                                                     <Users className="mr-2 h-4 w-4" /> View Customer
                                                                 </DropdownMenuItem>
                                                                 {tx.orderId && (
@@ -491,7 +561,7 @@ export default function CreditsPage() {
                                         customersWithCredit.map((c: any) => (
                                             <TableRow key={c.id}>
                                                 <TableCell>
-                                                    <div className="font-medium text-base text-primary hover:underline cursor-pointer" onClick={() => window.location.href = `/customers?id=${c.id}`}>
+                                                    <div className="font-medium text-base text-primary hover:underline cursor-pointer" onClick={() => openCustomerPopup(c.id)}>
                                                         {c.name}
                                                     </div>
                                                     <div className="text-sm text-muted-foreground">{c.phone}</div>
@@ -540,6 +610,22 @@ export default function CreditsPage() {
                 type={selectedActionType}
                 setType={setSelectedActionType}
                 mutation={transactionMutation}
+            />
+
+            {/* Customer View Dialog */}
+            <CustomerDialogs
+                selectedCustomer={selectedCustomer}
+                isViewDialogOpen={isCustomerDialogOpen}
+                isEditDialogOpen={false}
+                isCreateDialogOpen={false}
+                isCreating={false}
+                isUpdating={false}
+                onCloseViewDialog={() => setIsCustomerDialogOpen(false)}
+                onCloseEditDialog={() => { }}
+                onCloseCreateDialog={() => { }}
+                onEditCustomer={() => { }}
+                onCreateCustomer={() => { }}
+                orders={customerOrders}
             />
         </div>
     );
