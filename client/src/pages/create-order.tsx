@@ -562,7 +562,7 @@ export default function CreateOrder() {
     }
 
     // Ensure total is not negative and Apply Rounding
-    setTotalAmount(roundInvoiceAmount(Math.max(0, calculatedTotal), 'nearest_1'));
+    setTotalAmount(roundInvoiceAmount(Math.max(0, calculatedTotal)));
   }, [subtotal, discountAmount, extraCharges, enableGST, fulfillmentType, deliveryCharges, gstAmount]);
 
   // Create order mutation
@@ -1036,23 +1036,24 @@ export default function CreateOrder() {
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                <CustomerAutocomplete
-                  customers={customers}
-                  onSelect={handleSelectCustomer}
-                  onCreateNew={(query) => {
-                    // Pre-fill based on query type (phone or name)
-                    const isPhone = /^\d+$/.test(query.replace(/[\s\-\(\)]/g, ''));
-                    if (isPhone) {
-                      setNewCustomerPhone(query);
+                <div className="flex gap-2 items-start">
+                  <div className="flex-1">
+                    <CustomerAutocomplete
+                      onSelect={handleSelectCustomer}
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
                       setNewCustomerName('');
-                    } else {
-                      setNewCustomerName(query);
-                      setNewCustomerPhone('');
-                    }
-                    setShowCustomerDialog(true);
-                  }}
-                  placeholder="Search by name, phone, or email..."
-                />
+                      setNewCustomerPhone(phoneNumber || '');
+                      setShowCustomerDialog(true);
+                    }}
+                    title="Create New Customer"
+                  >
+                    <PlusCircle className="h-4 w-4" />
+                  </Button>
+                </div>
 
                 <AnimatePresence>
                   {foundCustomer && (

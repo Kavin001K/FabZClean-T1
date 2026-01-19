@@ -46,6 +46,32 @@ export interface IStorage {
   getTransitOrdersByStatus(status: string, franchiseId?: string): Promise<any[]>;
   updateTransitStatus(id: string, status: string, notes?: string, location?: string, updatedBy?: string): Promise<any>;
 
+  // Credit methods
+  processCreditTransaction(data: {
+    customerId: string;
+    amount: number;
+    type: 'credit' | 'payment' | 'adjustment';
+    reason: string;
+    reference?: string;
+    franchiseId?: string;
+    employeeId?: string;
+    employeeName?: string;
+    orderId?: string;
+  }): Promise<any>;
+  getCreditTransactions(filters: {
+    franchiseId?: string;
+    customerId?: string;
+    type?: string;
+    search?: string;
+  }): Promise<any[]>;
+  getCreditStats(franchiseId?: string): Promise<{
+    totalOutstanding: number;
+    activeCustomers: number;
+    monthlyCreditGiven: number;
+    monthlyCreditUsed: number;
+  }>;
+  getOutstandingCreditCustomers(franchiseId?: string): Promise<any[]>;
+
   // Audit Log methods
   createAuditLog(data: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(params: any): Promise<{ data: AuditLog[]; count: number }>;
@@ -81,6 +107,12 @@ export class MemStorage implements IStorage {
   async listTransitOrders(franchiseId?: string): Promise<any[]> { return []; }
   async getTransitOrdersByStatus(status: string, franchiseId?: string): Promise<any[]> { return []; }
   async updateTransitStatus(id: string, status: string, notes?: string, location?: string, updatedBy?: string): Promise<any> { return null; }
+
+  // Credit methods (Delegated)
+  async processCreditTransaction(data: any): Promise<any> { return this.sqliteStorage.processCreditTransaction(data); }
+  async getCreditTransactions(filters: any): Promise<any[]> { return this.sqliteStorage.getCreditTransactions(filters); }
+  async getCreditStats(franchiseId?: string): Promise<any> { return this.sqliteStorage.getCreditStats(franchiseId); }
+  async getOutstandingCreditCustomers(franchiseId?: string): Promise<any[]> { return this.sqliteStorage.getOutstandingCreditCustomers(franchiseId); }
 
   private async initializeData() {
     // Check if database already has data to avoid duplicating

@@ -230,17 +230,24 @@ export class SQLiteStorage implements IStorage {
         FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
 
-      CREATE TABLE IF NOT EXISTS customer_credit_history (
+      CREATE TABLE IF NOT EXISTS credit_transactions (
         id TEXT PRIMARY KEY,
+        franchiseId TEXT,
         customerId TEXT NOT NULL,
-        amount TEXT NOT NULL, -- Stored as string to avoid precision issues
-        type TEXT CHECK(type IN ('deposit', 'usage', 'adjustment', 'refund')) NOT NULL,
-        referenceId TEXT,
-        description TEXT,
-        balanceAfter TEXT,
-        createdBy TEXT,
+        orderId TEXT,
+        type TEXT NOT NULL,
+        amount TEXT NOT NULL,
+        balanceAfter TEXT NOT NULL,
+        paymentMethod TEXT,
+        referenceNumber TEXT,
+        notes TEXT,
+        reason TEXT,
+        recordedBy TEXT,
+        recordedByName TEXT,
+        transactionDate TEXT DEFAULT CURRENT_TIMESTAMP,
         createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (customerId) REFERENCES customers(id)
+        FOREIGN KEY (customerId) REFERENCES customers(id),
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
 
       CREATE TABLE IF NOT EXISTS orders (
@@ -1833,6 +1840,10 @@ export class SQLiteStorage implements IStorage {
   async getCustomerCreditHistory(customerId: string): Promise<any[]> {
     return this.db.prepare('SELECT * FROM customer_credit_history WHERE customerId = ? ORDER BY createdAt DESC').all(customerId) as any[];
   }
+
+
+
+
 
   // ======= ORDER NUMBER GENERATION =======
   /**
@@ -3590,5 +3601,287 @@ export class SQLiteStorage implements IStorage {
     }
 
     return this.getRecord('transit_orders', id);
+  }
+
+  // ===========================================
+  // CREDIT TRANSACTION METHODS (ACID Compliant)
+  // ===========================================
+
+  /**
+   * Process a credit transaction with full ACID compliance.
+   * Steps: Validate -> Update Customer Balance -> Create Transaction Record -> Create Audit Log
+   * All within a single SQLite transaction.
+   */
+  async processCreditTransaction(data: {
+    customerId: string;
+    amount: number;
+    type: 'credit' | 'payment' | 'adjustment';
+    reason: string;
+    reference?: string;
+    franchiseId?: string;
+    employeeId?: string;
+    employeeName?: string;
+    orderId?: string;
+    paymentMethod?: string;
+  }): Promise<any> {
+    const { customerId, amount, type, reason, reference, franchiseId, employeeId, employeeName, orderId, paymentMethod } = data;
+
+    // STEP A: Validate Input
+    if (!customerId || typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
+      throw new Error('Invalid transaction data: customerId and positive amount are required');
+    }
+    if (!['credit', 'payment', 'adjustment'].includes(type)) {
+      throw new Error('Invalid transaction type');
+    }
+
+    // Use SQLite transaction for atomicity
+    const txn = this.db.transaction(() => {
+      // STEP B: Get current customer balance and update it
+      const customer = this.db.prepare("SELECT * FROM customers WHERE id = ?").get(customerId) as any;
+      if (!customer) {
+        throw new Error(`Customer not found: ${customerId}`);
+      }
+
+      const currentBalance = parseFloat(customer.creditBalance || '0');
+      let newBalance: number;
+
+      // Calculate new balance based on transaction type
+      // Credit/Adjustment ADD to the balance (customer owes more or gets store credit)
+      // Payment SUBTRACTS from the balance (customer pays off debt)
+      if (type === 'payment') {
+        newBalance = currentBalance - amount;
+      } else {
+        // credit or adjustment
+        newBalance = currentBalance + amount;
+      }
+
+      // Update customer balance
+      this.db.prepare(
+        "UPDATE customers SET creditBalance = ?, updatedAt = ? WHERE id = ?"
+      ).run(newBalance.toFixed(2), new Date().toISOString(), customerId);
+
+      // STEP C: Create Transaction Record
+      const txnId = randomUUID();
+      const now = new Date().toISOString();
+
+      this.db.prepare(`
+        INSERT INTO credit_transactions 
+        (id, franchiseId, customerId, orderId, type, amount, balanceAfter, paymentMethod, referenceNumber, notes, reason, recordedBy, recordedByName, transactionDate, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        txnId,
+        franchiseId || null,
+        customerId,
+        orderId || null,
+        type,
+        amount.toFixed(2),
+        newBalance.toFixed(2),
+        paymentMethod || null,
+        reference || null,
+        reason || null,
+        reason || null,
+        employeeId || null,
+        employeeName || null,
+        now,
+        now
+      );
+
+      // STEP D: Create Audit Log Entry
+      const auditId = randomUUID();
+      this.db.prepare(`
+        INSERT INTO audit_logs (id, franchiseId, employeeId, action, entityType, entityId, details, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        auditId,
+        franchiseId || null,
+        employeeId || null,
+        `credit_${type}`,
+        'credit_transaction',
+        txnId,
+        JSON.stringify({
+          customerId,
+          customerName: customer.name,
+          amount: amount.toFixed(2),
+          type,
+          previousBalance: currentBalance.toFixed(2),
+          newBalance: newBalance.toFixed(2),
+          reason,
+          reference,
+          orderId
+        }),
+        now
+      );
+
+      return {
+        id: txnId,
+        customerId,
+        customerName: customer.name,
+        type,
+        amount: amount.toFixed(2),
+        balanceAfter: newBalance.toFixed(2),
+        previousBalance: currentBalance.toFixed(2),
+        reason,
+        reference,
+        createdAt: now
+      };
+    });
+
+    // Execute the transaction - if any step fails, everything rolls back
+    return txn();
+  }
+
+  /**
+   * Get credit transactions with optional filters
+   */
+  async getCreditTransactions(filters: {
+    franchiseId?: string;
+    customerId?: string;
+    type?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<any[]> {
+    const { franchiseId, customerId, type, search, limit = 100, offset = 0 } = filters;
+
+    let sql = `
+      SELECT 
+        ct.*,
+        c.name as customerName,
+        c.phone as customerPhone,
+        c.email as customerEmail
+      FROM credit_transactions ct
+      LEFT JOIN customers c ON ct.customerId = c.id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (franchiseId) {
+      sql += " AND ct.franchiseId = ?";
+      params.push(franchiseId);
+    }
+
+    if (customerId) {
+      sql += " AND ct.customerId = ?";
+      params.push(customerId);
+    }
+
+    if (type && type !== 'all') {
+      sql += " AND ct.type = ?";
+      params.push(type);
+    }
+
+    if (search) {
+      sql += " AND (c.name LIKE ? OR c.phone LIKE ? OR ct.reason LIKE ?)";
+      const searchPattern = `%${search}%`;
+      params.push(searchPattern, searchPattern, searchPattern);
+    }
+
+    sql += " ORDER BY ct.createdAt DESC LIMIT ? OFFSET ?";
+    params.push(limit, offset);
+
+    const stmt = this.db.prepare(sql);
+    const results = stmt.all(...params) as any[];
+
+    return results.map(row => ({
+      ...row,
+      amount: parseFloat(row.amount || '0'),
+      balanceAfter: parseFloat(row.balanceAfter || '0')
+    }));
+  }
+
+  /**
+   * Get credit statistics for dashboard KPIs
+   */
+  async getCreditStats(franchiseId?: string): Promise<{
+    totalOutstanding: number;
+    activeCustomers: number;
+    monthlyCreditGiven: number;
+    monthlyCreditUsed: number;
+  }> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    // Total outstanding (sum of all positive credit balances)
+    let outstandingSql = "SELECT COALESCE(SUM(CAST(creditBalance AS REAL)), 0) as total FROM customers WHERE CAST(creditBalance AS REAL) > 0";
+    let activeCustomersSql = "SELECT COUNT(*) as count FROM customers WHERE CAST(creditBalance AS REAL) != 0";
+    const outstandingParams: any[] = [];
+    const activeParams: any[] = [];
+
+    if (franchiseId) {
+      outstandingSql += " AND franchiseId = ?";
+      activeCustomersSql += " AND franchiseId = ?";
+      outstandingParams.push(franchiseId);
+      activeParams.push(franchiseId);
+    }
+
+    const outstanding = this.db.prepare(outstandingSql).get(...outstandingParams) as any;
+    const activeCustomers = this.db.prepare(activeCustomersSql).get(...activeParams) as any;
+
+    // Monthly credit given (credits added this month)
+    let creditGivenSql = `
+      SELECT COALESCE(SUM(CAST(amount AS REAL)), 0) as total 
+      FROM credit_transactions 
+      WHERE type = 'credit' AND createdAt >= ?
+    `;
+    const creditGivenParams: any[] = [startOfMonth];
+
+    if (franchiseId) {
+      creditGivenSql += " AND franchiseId = ?";
+      creditGivenParams.push(franchiseId);
+    }
+
+    const creditGiven = this.db.prepare(creditGivenSql).get(...creditGivenParams) as any;
+
+    // Monthly credit used/payments (payments and usage this month)
+    let creditUsedSql = `
+      SELECT COALESCE(SUM(CAST(amount AS REAL)), 0) as total 
+      FROM credit_transactions 
+      WHERE type IN ('payment', 'usage') AND createdAt >= ?
+    `;
+    const creditUsedParams: any[] = [startOfMonth];
+
+    if (franchiseId) {
+      creditUsedSql += " AND franchiseId = ?";
+      creditUsedParams.push(franchiseId);
+    }
+
+    const creditUsed = this.db.prepare(creditUsedSql).get(...creditUsedParams) as any;
+
+    return {
+      totalOutstanding: parseFloat(outstanding?.total || '0'),
+      activeCustomers: parseInt(activeCustomers?.count || '0'),
+      monthlyCreditGiven: parseFloat(creditGiven?.total || '0'),
+      monthlyCreditUsed: parseFloat(creditUsed?.total || '0')
+    };
+  }
+
+  /**
+   * Get customers with outstanding credit balances
+   */
+  async getOutstandingCreditCustomers(franchiseId?: string): Promise<any[]> {
+    let sql = `
+      SELECT 
+        id,
+        name,
+        phone,
+        email,
+        CAST(creditBalance AS REAL) as creditBalance,
+        totalOrders,
+        lastOrder,
+        createdAt
+      FROM customers 
+      WHERE CAST(creditBalance AS REAL) > 0
+    `;
+    const params: any[] = [];
+
+    if (franchiseId) {
+      sql += " AND franchiseId = ?";
+      params.push(franchiseId);
+    }
+
+    sql += " ORDER BY CAST(creditBalance AS REAL) DESC";
+
+    const stmt = this.db.prepare(sql);
+    return stmt.all(...params) as any[];
   }
 }
