@@ -318,8 +318,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Check if employee has specific role(s)
+  // Admin always has access to all pages
   const hasRole = (roles: string | string[]): boolean => {
     if (!employee) return false;
+    // Admin has access to everything
+    if (employee.role === 'admin') return true;
     const roleArray = Array.isArray(roles) ? roles : [roles];
     return roleArray.includes(employee.role);
   };
