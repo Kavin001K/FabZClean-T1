@@ -34,6 +34,12 @@ const inventoryItemFormSchema = z.object({
   reorderLevel: z.string().min(1, 'Reorder level is required').refine((val) => !isNaN(parseInt(val)) && parseInt(val) >= 0, 'Reorder level must be a non-negative integer'),
   supplier: z.string().optional(),
   description: z.string().optional(),
+  // New Fields
+  batchNumber: z.string().optional(),
+  expiryDate: z.string().optional(), // Will store as ISO string in backend if parsed
+  costPerUnit: z.string().optional(),
+  unitType: z.enum(['piece', 'kg', 'liter', 'meter', 'box']).default('piece'),
+  conversionFactor: z.string().default('1'),
 });
 
 type InventoryItemFormData = z.infer<typeof inventoryItemFormSchema>;
@@ -113,6 +119,11 @@ export const InventoryDialogs: React.FC<InventoryDialogsProps> = React.memo(({
         reorderLevel: selectedItem.reorderLevel?.toString() || '',
         supplier: selectedItem.supplier || '',
         description: '',
+        // New Fields
+        batchNumber: selectedItem.batchNumber || '',
+        expiryDate: selectedItem.expiryDate ? new Date(selectedItem.expiryDate).toISOString().split('T')[0] : '',
+        costPerUnit: selectedItem.costPerUnit?.toString() || '',
+        unitType: (selectedItem.unitType as 'piece' | 'kg' | 'liter' | 'meter' | 'box') || 'piece',
       });
     }
   }, [isEditDialogOpen, selectedItem, editForm]);
@@ -263,33 +274,76 @@ export const InventoryDialogs: React.FC<InventoryDialogsProps> = React.memo(({
               )}
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-supplier">Supplier</Label>
+                <Input
+                  id="edit-supplier"
+                  {...editForm.register('supplier')}
+                  placeholder="Enter supplier name"
+                  className={cn(editForm.formState.errors.supplier && 'border-red-500')}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-unit-type">Unit Type</Label>
+                <Select
+                  value={editForm.watch('unitType') || 'piece'}
+                  onValueChange={(value) => editForm.setValue('unitType', value as any)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Piece" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="piece">Piece</SelectItem>
+                    <SelectItem value="kg">Kg</SelectItem>
+                    <SelectItem value="liter">Liter</SelectItem>
+                    <SelectItem value="meter">Meter</SelectItem>
+                    <SelectItem value="box">Box</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-cost">Cost Per Unit (₹)</Label>
+                <Input
+                  id="edit-cost"
+                  type="number"
+                  step="0.01"
+                  {...editForm.register('costPerUnit')}
+                  placeholder="Cost price"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-batch">Batch Number</Label>
+                <Input
+                  id="edit-batch"
+                  {...editForm.register('batchNumber')}
+                  placeholder="e.g. B-2024-001"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="edit-supplier">Supplier</Label>
+              <Label htmlFor="edit-expiry">Expiry Date</Label>
               <Input
-                id="edit-supplier"
-                {...editForm.register('supplier')}
-                placeholder="Enter supplier name"
-                className={cn(
-                  editForm.formState.errors.supplier && 'border-red-500'
-                )}
+                type="date"
+                id="edit-expiry"
+                {...editForm.register('expiryDate')}
               />
-              {editForm.formState.errors.supplier && (
-                <p className="text-sm text-red-500">
-                  {editForm.formState.errors.supplier.message}
-                </p>
-              )}
             </div>
 
             <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={onCloseEditDialog}
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={isUpdating}
               >
                 {isUpdating ? 'Saving...' : 'Save Changes'}
@@ -425,33 +479,76 @@ export const InventoryDialogs: React.FC<InventoryDialogsProps> = React.memo(({
               )}
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-supplier">Supplier</Label>
+                <Input
+                  id="create-supplier"
+                  {...createForm.register('supplier')}
+                  placeholder="Enter supplier name"
+                  className={cn(createForm.formState.errors.supplier && 'border-red-500')}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-unit-type">Unit Type</Label>
+                <Select
+                  value={createForm.watch('unitType') || 'piece'}
+                  onValueChange={(value) => createForm.setValue('unitType', value as any)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Piece" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="piece">Piece</SelectItem>
+                    <SelectItem value="kg">Kg</SelectItem>
+                    <SelectItem value="liter">Liter</SelectItem>
+                    <SelectItem value="meter">Meter</SelectItem>
+                    <SelectItem value="box">Box</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-cost">Cost Per Unit (₹)</Label>
+                <Input
+                  id="create-cost"
+                  type="number"
+                  step="0.01"
+                  {...createForm.register('costPerUnit')}
+                  placeholder="Cost price"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-batch">Batch Number</Label>
+                <Input
+                  id="create-batch"
+                  {...createForm.register('batchNumber')}
+                  placeholder="e.g. B-2024-001"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="create-supplier">Supplier</Label>
+              <Label htmlFor="create-expiry">Expiry Date</Label>
               <Input
-                id="create-supplier"
-                {...createForm.register('supplier')}
-                placeholder="Enter supplier name"
-                className={cn(
-                  createForm.formState.errors.supplier && 'border-red-500'
-                )}
+                type="date"
+                id="create-expiry"
+                {...createForm.register('expiryDate')}
               />
-              {createForm.formState.errors.supplier && (
-                <p className="text-sm text-red-500">
-                  {createForm.formState.errors.supplier.message}
-                </p>
-              )}
             </div>
 
             <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={onCloseCreateDialog}
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={isCreating}
               >
                 {isCreating ? 'Creating...' : 'Create Item'}

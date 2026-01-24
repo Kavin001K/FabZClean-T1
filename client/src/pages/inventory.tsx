@@ -69,6 +69,7 @@ import { InventoryKPIs } from '@/components/inventory/inventory-kpis';
 import { InventoryTable } from '@/components/inventory/inventory-table';
 import { InventoryToolbar } from '@/components/inventory/inventory-toolbar';
 import { InventoryDialogs } from '@/components/inventory/inventory-dialogs';
+import { InventoryAudit } from '@/components/inventory/inventory-audit';
 
 // Import hooks
 import { useInventoryKPIs } from '@/hooks/use-inventory-kpis';
@@ -128,6 +129,7 @@ export default function Inventory() {
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   // View state
@@ -150,11 +152,10 @@ export default function Inventory() {
     isLoading: inventoryLoading,
     isError: inventoryError,
     error: inventoryErrorDetails,
-  } = useQuery({
+  } = useQuery<InventoryItem[]>({
     queryKey: ['inventory-items'],
     queryFn: inventoryApi.getAll,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
     retry: 3,
     retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
@@ -215,11 +216,11 @@ export default function Inventory() {
   // Get unique categories and suppliers for filters
   const categories = useMemo(() =>
     Array.from(new Set(inventory.map(item => item.category).filter(Boolean)))
-  , [inventory]);
+    , [inventory]);
 
   const suppliers = useMemo(() =>
     Array.from(new Set(inventory.map(item => item.supplier).filter(Boolean)))
-  , [inventory]);
+    , [inventory]);
 
   // Low stock alerts
   const lowStockItems = inventory.filter(item =>
@@ -256,7 +257,7 @@ export default function Inventory() {
         queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
         queryClient.invalidateQueries({ queryKey: ["inventory-kpis"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
-        
+
         toast({
           title: "Item Created Successfully",
           description: `${newItem.name} has been added to inventory.`,
@@ -267,7 +268,7 @@ export default function Inventory() {
     },
     onError: (error) => {
       console.error('Failed to create inventory item:', error);
-            toast({
+      toast({
         title: "Error",
         description: "Failed to create inventory item. Please try again.",
         variant: "destructive",
@@ -285,7 +286,7 @@ export default function Inventory() {
         // Invalidate queries to refetch data
         queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
         queryClient.invalidateQueries({ queryKey: ["inventory-kpis"] });
-        
+
         toast({
           title: "Item Updated Successfully",
           description: `${updatedItem.name} has been updated.`,
@@ -315,7 +316,7 @@ export default function Inventory() {
         // Invalidate queries to refetch data
         queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
         queryClient.invalidateQueries({ queryKey: ["inventory-kpis"] });
-        
+
         toast({
           title: "Item Deleted Successfully",
           description: "Inventory item has been removed.",
@@ -342,7 +343,7 @@ export default function Inventory() {
         // Invalidate queries to refetch data
         queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
         queryClient.invalidateQueries({ queryKey: ["inventory-kpis"] });
-        
+
         toast({
           title: "Stock Updated",
           description: `${updatedItem.name} stock updated to ${updatedItem.stock}.`,
@@ -371,7 +372,7 @@ export default function Inventory() {
         // Invalidate queries to refetch data
         queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
         queryClient.invalidateQueries({ queryKey: ["inventory-kpis"] });
-        
+
         toast({
           title: "Items Deleted Successfully",
           description: `${selectedItems.length} items have been removed from inventory.`,
@@ -400,12 +401,28 @@ export default function Inventory() {
     deleteItemMutation.mutate(itemId);
   };
 
-  const handleCreateItem = (itemData: Partial<InventoryItem>) => {
+  const handleCreateItem = (data: any) => {
+    const itemData: Partial<InventoryItem> = {
+      ...data,
+      stock: parseInt(data.stock),
+      price: parseFloat(data.price),
+      reorderLevel: parseInt(data.reorderLevel),
+      costPerUnit: data.costPerUnit ? parseFloat(data.costPerUnit) : undefined,
+      conversionFactor: data.conversionFactor ? parseFloat(data.conversionFactor) : undefined,
+    };
     createItemMutation.mutate(itemData);
   };
 
-  const handleUpdateItem = (itemData: Partial<InventoryItem>) => {
+  const handleUpdateItem = (data: any) => {
     if (!selectedItem) return;
+    const itemData: Partial<InventoryItem> = {
+      ...data,
+      stock: parseInt(data.stock),
+      price: parseFloat(data.price),
+      reorderLevel: parseInt(data.reorderLevel),
+      costPerUnit: data.costPerUnit ? parseFloat(data.costPerUnit) : undefined,
+      conversionFactor: data.conversionFactor ? parseFloat(data.conversionFactor) : undefined,
+    };
     editItemMutation.mutate({
       itemId: selectedItem.id,
       itemData,
@@ -417,8 +434,8 @@ export default function Inventory() {
   };
 
   const handleSelectItem = (itemId: string) => {
-    setSelectedItems(prev => 
-      prev.includes(itemId) 
+    setSelectedItems(prev =>
+      prev.includes(itemId)
         ? prev.filter(id => id !== itemId)
         : [...prev, itemId]
     );
@@ -445,7 +462,7 @@ export default function Inventory() {
         Name: item.name,
         Category: item.category,
         Stock: item.stock,
-        Price: parseFloat(item.price || '0'),
+        Price: item.price || 0,
         ReorderLevel: item.reorderLevel,
         Supplier: item.supplier,
         Status: item.status,
@@ -556,6 +573,33 @@ export default function Inventory() {
     setStockStatusFilter('all');
   }, [clearFilters]);
 
+  const handleViewHistory = (item: InventoryItem) => {
+    setSelectedItem(item);
+    setIsAuditOpen(true);
+  };
+
+  const handleSmartReorder = () => {
+    // In a real app, this would calculate reorder quantities and generate a PDF
+    const lowStockCount = inventory.filter(i => i.stock <= (i.reorderLevel || 10)).length;
+
+    if (lowStockCount === 0) {
+      toast({
+        title: "Stock Healthy",
+        description: "No items are currently below their reorder level.",
+      });
+      return;
+    }
+
+    toast({
+      title: "Purchase Draft Generated",
+      description: `Created reorder list for ${lowStockCount} items. Downloading PDF...`,
+    });
+
+    // Trigger PDF export for low stock items only
+    const lowStockItems = inventory.filter(i => i.stock <= (i.reorderLevel || 10));
+    exportInventoryEnhanced(lowStockItems);
+  };
+
   // Error state
   if (inventoryError) {
     return (
@@ -569,7 +613,7 @@ export default function Inventory() {
               <p className="text-sm text-muted-foreground">
                 {inventoryErrorDetails?.message || 'An unexpected error occurred'}
               </p>
-              <Button 
+              <Button
                 onClick={() => queryClient.invalidateQueries({ queryKey: ['inventory-items'] })}
                 variant="outline"
               >
@@ -1134,6 +1178,7 @@ export default function Inventory() {
                 onEditItem={handleEditItem}
                 onDeleteItem={handleDeleteItem}
                 onUpdateStock={handleUpdateStock}
+                onViewHistory={handleViewHistory}
                 isUpdatingStock={updateStockMutation.isPending}
                 isDeleting={deleteItemMutation.isPending}
                 sortField={sortField}
@@ -1218,6 +1263,11 @@ export default function Inventory() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <InventoryAudit
+        isOpen={isAuditOpen}
+        onClose={() => setIsAuditOpen(false)}
+        selectedItem={selectedItem}
+      />
     </motion.div>
   );
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, ListFilter, Download, FileText, Plus, Trash2 } from 'lucide-react';
+import { Search, ListFilter, Download, FileText, Plus, Trash2, ShoppingCart } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +27,7 @@ interface InventoryToolbarProps {
   onExportExcel?: (data: InventoryItem[]) => void;
   onAddItem: () => void;
   onBulkDelete: () => void;
+  onSmartReorder: () => void;
   selectedItems: string[];
   inventory: InventoryItem[];
   filteredCount: number;
@@ -49,6 +50,7 @@ export const InventoryToolbar: React.FC<InventoryToolbarProps> = React.memo(({
   onExportExcel,
   onAddItem,
   onBulkDelete,
+  onSmartReorder,
   selectedItems,
   inventory,
   filteredCount,
@@ -208,6 +210,19 @@ export const InventoryToolbar: React.FC<InventoryToolbarProps> = React.memo(({
             </span>
           </Button>
         )}
+
+        {/* Smart Reorder Button */}
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={onSmartReorder}
+          className="h-8 gap-1 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border border-indigo-200"
+        >
+          <ShoppingCart className="h-3.5 w-3.5" />
+          <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+            Smart Reorder
+          </span>
+        </Button>
 
         {/* Add Item Button */}
         <Button size="sm" onClick={onAddItem} className="h-8 gap-1">

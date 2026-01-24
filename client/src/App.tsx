@@ -52,6 +52,7 @@ const BillView = lazy(() => retryDynamicImport(() => import("@/pages/bill-view")
 
 const AuditLogsPage = lazy(() => retryDynamicImport(() => import("@/pages/admin/audit-logs")));
 const ReportsPage = lazy(() => retryDynamicImport(() => import("@/pages/reports")));
+const BusinessIntelligence = lazy(() => retryDynamicImport(() => import("@/pages/business-intelligence")));
 const OrderTracking = lazy(() => retryDynamicImport(() => import("@/pages/order-tracking")));
 const TermsPage = lazy(() => retryDynamicImport(() => import("@/pages/terms")));
 const PrivacyPage = lazy(() => retryDynamicImport(() => import("@/pages/privacy")));
@@ -136,6 +137,14 @@ function Router() {
         <ProtectedRoute allowedRoles={['admin', 'franchise_manager', 'factory_manager']}>
           <MainLayout>
             <Analytics />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/business-intelligence">
+        <ProtectedRoute allowedRoles={['admin', 'franchise_manager']}>
+          <MainLayout>
+            <BusinessIntelligence />
           </MainLayout>
         </ProtectedRoute>
       </Route>

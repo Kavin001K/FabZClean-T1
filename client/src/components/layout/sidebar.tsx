@@ -114,6 +114,12 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "franchise_manager", "manager", "factory_manager"],
   },
   {
+    to: "/business-intelligence",
+    label: "BI Suite",
+    icon: BarChart3,
+    roles: ["admin", "franchise_manager"],
+  },
+  {
     to: "/users",
     label: "User Management",
     icon: Shield,

@@ -132,8 +132,20 @@ export const products = pgTable("products", {
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   stockQuantity: integer("stock_quantity").notNull().default(0),
-  reorderLevel: integer("reorder_level").notNull().default(10),
+  reorderLevel: integer("reorder_level").notNull().default(10), // Acts as min_stock_level
   supplier: text("supplier"),
+
+  // New Inventory Management Fields
+  batchNumber: text("batch_number"),
+  expiryDate: timestamp("expiry_date"),
+  costPerUnit: decimal("cost_per_unit", { precision: 10, scale: 2 }), // For cost tracking
+  unitType: text("unit_type", { enum: ["piece", "kg", "liter", "meter", "box"] }).default("piece"),
+  conversionFactor: decimal("conversion_factor", { precision: 10, scale: 4 }).default("1"), // e.g. 1 Box = 100 Pieces
+
+  // Audit Trail (Lightweight)
+  lastStockUpdate: timestamp("last_stock_update"),
+  lastStockUpdateBy: text("last_stock_update_by"),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -161,11 +173,13 @@ export const orders = pgTable("orders", {
   franchiseId: varchar("franchise_id").references(() => franchises.id),
   orderNumber: text("order_number").notNull(),
   customerId: text("customer_id").references(() => customers.id),
+  employeeId: varchar("employee_id").references(() => employees.id),
+  createdBy: text("created_by"), // Identifier for who created the order
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
   customerPhone: text("customer_phone"),
   status: text("status", { enum: ["pending", "processing", "completed", "cancelled", "assigned", "in_transit", "shipped", "out_for_delivery", "delivered", "in_store", "ready_for_transit", "ready_for_pickup", "archived"] }).notNull(),
-  paymentStatus: text("payment_status", { enum: ["pending", "paid", "failed", "credit"] }).notNull().default("pending"),
+  paymentStatus: text("payment_status", { enum: ["pending", "partial", "paid", "failed", "credit"] }).notNull().default("pending"),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   items: jsonb("items").$type<OrderItem[]>().notNull(),
   shippingAddress: jsonb("shipping_address").$type<ShippingAddress>(),
@@ -200,6 +214,11 @@ export const orders = pgTable("orders", {
   customerInstructions: text("customer_instructions"),
   photoUrls: jsonb("photo_urls"), // Proof of garment condition at pickup
 
+  // Financial additions for Partial Payments
+  amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).default("0.00"),
+  lastPaymentMethod: text("last_payment_method"), // cash, upi, wallet
+
+  createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -411,16 +430,29 @@ export const employeePerformance = pgTable("employee_performance", {
 export const documents = pgTable("documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   franchiseId: varchar("franchise_id").references(() => franchises.id),
-  type: text("type", { enum: ["invoice", "receipt", "report", "label", "other", "legal"] }).notNull().default("invoice"),
+  type: text("type", { enum: ["invoice", "receipt", "report", "label", "other", "legal_agreement", "tax_compliance", "kyc_proof", "operational_license", "insurance"] }).notNull().default("invoice"),
+  category: text("category", { enum: ["legal", "tax", "kyc", "license", "insurance", "operational"] }),
   title: text("title").notNull(),
   filename: text("filename").notNull(),
   filepath: text("filepath").notNull(), // Path in Supabase storage
   fileUrl: text("file_url").notNull(), // Public URL
-  status: text("status", { enum: ["draft", "sent", "paid", "overdue", "cancelled"] }).default("draft"),
+  status: text("status", { enum: ["draft", "sent", "paid", "overdue", "cancelled", "active", "expired", "revoked"] }).default("draft"),
+
+  // Versions & Expiry
+  versionNumber: integer("version_number").default(1),
+  expiryDate: timestamp("expiry_date"),
+
+  // Verification Logic
+  isVerified: boolean("is_verified").default(false),
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: varchar("verified_by").references(() => employees.id),
+  verificationStatus: text("verification_status", { enum: ["unverified", "verified", "rejected"] }).default("unverified"),
+  rejectionReason: text("rejection_reason"),
+
   amount: decimal("amount", { precision: 10, scale: 2 }),
   customerName: text("customer_name"),
   orderNumber: text("order_number"),
-  metadata: jsonb("metadata"), // Additional data (invoice details, etc.)
+  metadata: jsonb("metadata"), // Additional data (extracted OCR text, etc.)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -439,18 +471,25 @@ export const auditLogs = pgTable("audit_logs", {
 });
 
 // Updated Franchise Onboarding Schema
-export const insertFranchiseSchema = createInsertSchema(franchises, {
-  gstRate: z.string().regex(/^\d+(\.\d{1,2})?$/).optional().nullable(),
-  agreementEndDate: z.coerce.date().optional().nullable(),
-  serviceRadiusKm: z.coerce.number().min(1).max(100).optional().nullable(),
-}).extend({
+export const insertFranchiseSchema = createInsertSchema(franchises).extend({
   // Adding manual validations for flattened address fields if needed
   street: z.string().min(5).optional(),
   pincode: z.string().length(6).optional(),
 });
 
 export const insertUserSchema = createInsertSchema(users);
-export const insertProductSchema = createInsertSchema(products);
+
+export const insertProductSchema = createInsertSchema(products).extend({
+  price: z.union([z.string(), z.number()]).transform(val => val.toString()),
+  stockQuantity: z.coerce.number().min(0),
+  reorderLevel: z.coerce.number().min(0),
+  // New Fields Validation
+  batchNumber: z.string().optional(),
+  expiryDate: z.coerce.date().optional(),
+  costPerUnit: z.union([z.string(), z.number()]).transform(val => val.toString()).optional(),
+  unitType: z.enum(["piece", "kg", "liter", "meter", "box"]).optional().default("piece"),
+  conversionFactor: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().default("1"),
+});
 export const insertDeliverySchema = createInsertSchema(deliveries);
 
 // Create a base insert schema and extend it with additional fields
@@ -463,7 +502,7 @@ export const insertOrderSchema = z.object({
   customerEmail: z.string().optional().nullable(),
   customerPhone: z.string().optional().nullable(),
   status: z.enum(["pending", "processing", "completed", "cancelled", "assigned", "in_transit", "shipped", "out_for_delivery", "delivered", "in_store", "ready_for_transit", "ready_for_pickup", "archived"]),
-  paymentStatus: z.enum(["pending", "paid", "failed", "credit"]).default("pending"),
+  paymentStatus: z.enum(["pending", "partial", "paid", "failed", "credit"]).default("pending"),
   totalAmount: z.union([z.string(), z.number()]).transform(val => val.toString()),
   items: z.any(),
   shippingAddress: z.any().optional().nullable(),
@@ -506,18 +545,39 @@ export const insertOrderSchema = z.object({
 export const insertOrderTransactionSchema = createInsertSchema(orderTransactions);
 
 // Updated Customer CRM Schema
-export const insertCustomerSchema = createInsertSchema(customers, {
-  phone: z.string().min(10).max(15),
+export const insertCustomerSchema = z.object({
+  id: z.string().optional(),
+  franchiseId: z.string().optional().nullable(),
+  name: z.string().optional(),
+  email: z.string().optional().nullable(),
+  phone: z.string().min(10).max(15).optional(),
+  address: z.any().optional().nullable(),
+  loyaltyTier: z.enum(["bronze", "silver", "gold", "platinum"]).optional(),
+  loyaltyPoints: z.number().optional(),
+  marketingOptIn: z.boolean().optional(),
+  walletBalance: z.coerce.string().optional(),
   creditLimit: z.coerce.string().optional(),
-}).extend({
+  totalLifetimeSpent: z.coerce.string().optional(),
+  totalOrders: z.number().optional(),
+  creditBalance: z.coerce.string().optional(),
+  tier: z.string().optional(),
+  status: z.string().optional(),
+  lastOrderAt: z.coerce.date().optional().nullable(),
+  lastOrder: z.coerce.date().optional().nullable(),
   initialDeposit: z.coerce.number().optional(),
-});
+}).passthrough();
 
 export const insertServiceSchema = createInsertSchema(services).extend({
   price: z.union([z.string(), z.number()]).transform(val => val.toString()),
   leadTimeHours: z.coerce.number().optional().default(24),
   pricingModel: z.enum(["per_piece", "per_kg", "per_sqft", "fixed"]).optional().default("per_piece"),
   isAddOn: z.coerce.boolean().optional().default(false),
+  // New Fields Validation
+  hsnSacCode: z.string().optional(),
+  technicianNotes: z.string().optional(),
+  thumbnailUrl: z.string().url().optional().or(z.literal("")),
+  parentServiceId: z.string().optional(),
+  requiredInventory: z.any().optional(), // JSONB
 });
 
 export const insertShipmentSchema = createInsertSchema(shipments);
@@ -746,6 +806,184 @@ export const insertVehicleSchema = createInsertSchema(vehicles);
 export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
 export type Vehicle = typeof vehicles.$inferSelect;
 
-export const insertCreditTransactionSchema = createInsertSchema(creditTransactions);
-export type InsertCreditTransaction = z.infer<typeof insertCreditTransactionSchema>;
-export type CreditTransaction = typeof creditTransactions.$inferSelect;
+// ============================================================================
+// DAILY SUMMARIES TABLE - Enterprise BI Data Warehouse
+// Pre-calculated statistical data for <200ms analytics load times
+// ============================================================================
+
+export const dailySummaries = pgTable("daily_summaries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
+  date: timestamp("date").notNull(),
+
+  // ============================================================================
+  // REVENUE METRICS
+  // ============================================================================
+  totalRevenue: decimal("total_revenue", { precision: 14, scale: 2 }).default("0"),
+  orderCount: integer("order_count").default(0),
+  avgOrderValue: decimal("avg_order_value", { precision: 10, scale: 2 }).default("0"),
+
+  // Growth Metrics
+  revenueGrowthDaily: decimal("revenue_growth_daily", { precision: 8, scale: 4 }),  // vs previous day %
+  revenueGrowthWeekly: decimal("revenue_growth_weekly", { precision: 8, scale: 4 }), // vs same day last week %
+  revenueGrowthMonthly: decimal("revenue_growth_mom", { precision: 8, scale: 4 }),  // Month over Month %
+  revenueGrowthYearly: decimal("revenue_growth_yoy", { precision: 8, scale: 4 }),   // Year over Year %
+
+  // ============================================================================
+  // PREDICTIVE METRICS
+  // ============================================================================
+  projectedMonthEndRevenue: decimal("projected_month_end_revenue", { precision: 14, scale: 2 }),
+  revenueVelocity: decimal("revenue_velocity", { precision: 8, scale: 4 }),  // Current vs 7-day SMA %
+  revenueVelocityTrend: text("revenue_velocity_trend", { enum: ["accelerating", "decelerating", "stable"] }),
+  atRiskRevenue: decimal("at_risk_revenue", { precision: 12, scale: 2 }).default("0"),  // Orders past due
+
+  // Linear Regression for Revenue Forecasting (y = mx + b)
+  regressionSlope: decimal("regression_slope", { precision: 12, scale: 6 }),  // m
+  regressionIntercept: decimal("regression_intercept", { precision: 12, scale: 2 }),  // b
+  regressionR2: decimal("regression_r2", { precision: 5, scale: 4 }),  // Coefficient of determination
+  forecastNext7Days: jsonb("forecast_next_7_days"),  // [{ date, predicted, confidence }]
+
+  // ============================================================================
+  // CUSTOMER METRICS
+  // ============================================================================
+  customerCount: integer("customer_count").default(0),
+  newCustomerCount: integer("new_customer_count").default(0),
+  returningCustomerCount: integer("returning_customer_count").default(0),
+
+  // Customer Lifetime Value (CLV) Metrics
+  avgCustomerClv: decimal("avg_customer_clv", { precision: 12, scale: 2 }),
+  totalPlatinumCustomers: integer("total_platinum_customers").default(0),
+  totalGoldCustomers: integer("total_gold_customers").default(0),
+  totalSilverCustomers: integer("total_silver_customers").default(0),
+  totalBronzeCustomers: integer("total_bronze_customers").default(0),
+
+  // Cohort Metrics
+  customerChurnRate: decimal("customer_churn_rate", { precision: 6, scale: 4 }),  // %
+  avgRetentionRate: decimal("avg_retention_rate", { precision: 6, scale: 4 }),  // %
+  cohortData: jsonb("cohort_data"),  // Detailed cohort retention matrix
+
+  // ============================================================================
+  // SERVICE METRICS (Contribution Analysis)
+  // ============================================================================
+  topServiceId: varchar("top_service_id"),
+  topServiceName: text("top_service_name"),
+  topServiceRevenue: decimal("top_service_revenue", { precision: 12, scale: 2 }),
+
+  // Service Mix Variance: (Actual% - Target%) * TotalRevenue
+  serviceMixVariance: decimal("service_mix_variance", { precision: 12, scale: 2 }),
+  heroServicesCount: integer("hero_services_count").default(0),  // High margin performers
+  lossLeaderServicesCount: integer("loss_leader_services_count").default(0),
+
+  // Detailed breakdown
+  serviceMix: jsonb("service_mix"),  // { serviceId: { name, count, revenue, actualPercent, variance, category } }
+  serviceCorrelationTop5: jsonb("service_correlation_top5"),  // Top 5 frequently bought together pairs
+
+  // ============================================================================
+  // OPERATIONAL METRICS (Little's Law: L = λ × W)
+  // ============================================================================
+  avgTurnaroundHours: decimal("avg_turnaround_hours", { precision: 10, scale: 2 }),
+  turnaroundStdDev: decimal("turnaround_std_dev", { precision: 10, scale: 4 }),  // Variance in hours
+  turnaroundConsistencyScore: integer("turnaround_consistency_score"),  // 0-100
+  percentWithinTarget: decimal("percent_within_target", { precision: 6, scale: 2 }),  // % within ±2 hours
+
+  // Little's Law Components
+  ordersArrivalRate: decimal("orders_arrival_rate", { precision: 10, scale: 4 }),  // λ (orders per day)
+  avgWaitTime: decimal("avg_wait_time", { precision: 10, scale: 4 }),  // W (processing days)
+  itemsInProcess: decimal("items_in_process", { precision: 10, scale: 2 }),  // L = λ × W
+  bottleneckType: text("bottleneck_type", { enum: ["volume", "processing", "balanced"] }),
+  bottleneckRecommendation: text("bottleneck_recommendation"),
+
+  // Order Status Metrics
+  readyOnTimeCount: integer("ready_on_time_count").default(0),
+  delayedOrderCount: integer("delayed_order_count").default(0),
+  pendingOrdersCount: integer("pending_orders_count").default(0),
+  completedOrdersCount: integer("completed_orders_count").default(0),
+
+  // ============================================================================
+  // STAFF PRODUCTIVITY (Weighted Z-Scores)
+  // ============================================================================
+  avgStaffZScore: decimal("avg_staff_z_score", { precision: 6, scale: 4 }),
+  topPerformerEmployeeId: varchar("top_performer_employee_id"),
+  topPerformerName: text("top_performer_name"),
+  topPerformerZScore: decimal("top_performer_z_score", { precision: 6, scale: 4 }),
+  totalStaffProductivity: decimal("total_staff_productivity", { precision: 12, scale: 2 }),  // Weighted items/hr
+
+  // Detailed staff breakdown
+  staffPerformance: jsonb("staff_performance"),  // { staffId: { name, zScore, percentile, rating, weightedScore } }
+
+  // ============================================================================
+  // TAX METRICS (GST Breakout Model)
+  // ============================================================================
+  totalTaxCollected: decimal("total_tax_collected", { precision: 12, scale: 2 }).default("0"),
+  cgstAmount: decimal("cgst_amount", { precision: 12, scale: 2 }).default("0"),
+  sgstAmount: decimal("sgst_amount", { precision: 12, scale: 2 }).default("0"),
+  igstAmount: decimal("igst_amount", { precision: 12, scale: 2 }).default("0"),
+  taxableAmount: decimal("taxable_amount", { precision: 14, scale: 2 }).default("0"),
+
+  // HSN/SAC Code Breakdown
+  taxByHsnCode: jsonb("tax_by_hsn_code"),  // { hsnCode: { taxableAmount, cgst, sgst, igst } }
+
+  // ============================================================================
+  // FINANCIAL METRICS (Contribution Margin)
+  // ============================================================================
+  totalCost: decimal("total_cost", { precision: 12, scale: 2 }).default("0"),
+  contributionMargin: decimal("contribution_margin", { precision: 8, scale: 4 }),  // Percentage
+  grossProfit: decimal("gross_profit", { precision: 14, scale: 2 }),
+
+  // Payment breakdown
+  paymentMethodMix: jsonb("payment_method_mix"),  // { cash: amount, upi: amount, card: amount, credit: amount }
+  creditSalesAmount: decimal("credit_sales_amount", { precision: 12, scale: 2 }).default("0"),
+  creditCollectedAmount: decimal("credit_collected_amount", { precision: 12, scale: 2 }).default("0"),
+
+  // ============================================================================
+  // ANOMALY DETECTION (Fraud Audit)
+  // ============================================================================
+  anomalyCount: integer("anomaly_count").default(0),
+  anomalyDetails: jsonb("anomaly_details"),  // [{ orderId, orderNumber, zScore, flagReason }]
+  suspiciousOrderIds: jsonb("suspicious_order_ids"),  // Array of order IDs >3 std devs
+
+  // ============================================================================
+  // STATISTICAL AGGREGATES
+  // ============================================================================
+  orderValueMean: decimal("order_value_mean", { precision: 10, scale: 2 }),
+  orderValueMedian: decimal("order_value_median", { precision: 10, scale: 2 }),
+  orderValueMode: decimal("order_value_mode", { precision: 10, scale: 2 }),
+  orderValueStdDev: decimal("order_value_std_dev", { precision: 10, scale: 4 }),
+  orderValueVariance: decimal("order_value_variance", { precision: 14, scale: 4 }),
+  orderValue25thPercentile: decimal("order_value_p25", { precision: 10, scale: 2 }),
+  orderValue75thPercentile: decimal("order_value_p75", { precision: 10, scale: 2 }),
+  orderValue85thPercentile: decimal("order_value_p85", { precision: 10, scale: 2 }),
+  orderValue95thPercentile: decimal("order_value_p95", { precision: 10, scale: 2 }),
+
+  // ============================================================================
+  // PEAK DEMAND HEATMAP DATA
+  // ============================================================================
+  peakDemandHour: integer("peak_demand_hour"),  // 0-23
+  peakDemandDayOfWeek: integer("peak_demand_day_of_week"),  // 0-6 (Sun-Sat)
+  peakDemandScore: decimal("peak_demand_score", { precision: 5, scale: 4 }),  // 0-1 normalized
+  demandHeatmapTop10: jsonb("demand_heatmap_top10"),  // Top 10 busiest time slots
+
+  // ============================================================================
+  // MOVING AVERAGES (Seasonality)
+  // ============================================================================
+  sma7DayRevenue: decimal("sma_7_day_revenue", { precision: 12, scale: 2 }),  // 7-day Simple Moving Average
+  sma14DayRevenue: decimal("sma_14_day_revenue", { precision: 12, scale: 2 }),  // 14-day SMA
+  sma30DayRevenue: decimal("sma_30_day_revenue", { precision: 12, scale: 2 }),  // 30-day SMA
+  ema7DayRevenue: decimal("ema_7_day_revenue", { precision: 12, scale: 2 }),  // 7-day Exponential Moving Average
+
+  // ============================================================================
+  // METADATA & AUDIT
+  // ============================================================================
+  calculationDurationMs: integer("calculation_duration_ms"),  // Time to compute this summary
+  dataQualityScore: integer("data_quality_score"),  // 0-100, based on completeness
+  lastRecalculatedAt: timestamp("last_recalculated_at"),
+  version: integer("version").default(1),  // Schema version for migrations
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDailySummarySchema = createInsertSchema(dailySummaries);
+export type InsertDailySummary = z.infer<typeof insertDailySummarySchema>;
+export type DailySummary = typeof dailySummaries.$inferSelect;
+

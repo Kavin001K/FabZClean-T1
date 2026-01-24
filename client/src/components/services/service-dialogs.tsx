@@ -30,8 +30,15 @@ const serviceFormSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   description: z.string().optional(),
   price: z.string().min(1, 'Price is required').refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, 'Price must be a positive number'),
-  duration: z.string().min(1, 'Duration is required'),
-  status: z.enum(['Active', 'Inactive']),
+  duration: z.string().optional(), // Now optional as we use leadTimeHours
+  status: z.enum(['Active', 'Inactive', 'Archived']),
+  // New Fields
+  leadTimeHours: z.coerce.number().min(0).default(24),
+  pricingModel: z.enum(['per_piece', 'per_kg', 'per_sqft', 'fixed']).default('per_piece'),
+  hsnSacCode: z.string().optional(),
+  technicianNotes: z.string().optional(),
+  isAddOn: z.boolean().default(false),
+  parentServiceId: z.string().optional(),
 });
 
 const productFormSchema = z.object({
@@ -135,8 +142,15 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
         category: selectedService.category,
         description: selectedService.description || '',
         price: selectedService.price,
-        duration: selectedService.duration,
-        status: selectedService.status,
+        duration: selectedService.duration || '',
+        status: (selectedService.status as 'Active' | 'Inactive' | 'Archived') || 'Active',
+        // New Fields
+        leadTimeHours: selectedService.leadTimeHours || 24,
+        pricingModel: (selectedService.pricingModel as 'per_piece' | 'per_kg' | 'per_sqft' | 'fixed') || 'per_piece',
+        hsnSacCode: selectedService.hsnSacCode || '',
+        technicianNotes: selectedService.technicianNotes || '',
+        isAddOn: selectedService.isAddOn || false,
+        parentServiceId: selectedService.parentServiceId || '',
       });
     }
   }, [isEditDialogOpen, selectedService, editForm]);
@@ -190,93 +204,103 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
           </DialogHeader>
 
           <form onSubmit={editForm.handleSubmit(handleEditSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Service Name *</Label>
-              <Input
-                id="edit-name"
-                {...editForm.register('name')}
-                className={cn(
-                  editForm.formState.errors.name && 'border-red-500'
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Service Name *</Label>
+                <Input
+                  id="edit-name"
+                  {...editForm.register('name')}
+                  className={cn(editForm.formState.errors.name && 'border-red-500')}
+                />
+                {editForm.formState.errors.name && (
+                  <p className="text-sm text-red-500">{editForm.formState.errors.name.message}</p>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-category">Category *</Label>
+                <Select
+                  value={editForm.watch('category')}
+                  onValueChange={(value) => editForm.setValue('category', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {serviceCategories.map((category) => (
+                      <SelectItem key={category} value={category}>{category}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-pricing-model">Pricing Model</Label>
+                <Select
+                  value={editForm.watch('pricingModel') || 'per_piece'}
+                  onValueChange={(value) => editForm.setValue('pricingModel', value as any)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Per Piece" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="per_piece">Per Piece</SelectItem>
+                    <SelectItem value="per_kg">Per Kg</SelectItem>
+                    <SelectItem value="per_sqft">Per Sq Ft</SelectItem>
+                    <SelectItem value="fixed">Fixed Price</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-price">Price (₹) *</Label>
+                <Input
+                  id="edit-price"
+                  type="number"
+                  step="0.01"
+                  {...editForm.register('price')}
+                  className={cn(editForm.formState.errors.price && 'border-red-500')}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-hsn">HSN/SAC Code</Label>
+                <Input
+                  id="edit-hsn"
+                  {...editForm.register('hsnSacCode')}
+                  placeholder="e.g. 9997"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-lead-time">Lead Time (Hours)</Label>
+                <Input
+                  type="number"
+                  id="edit-lead-time"
+                  {...editForm.register('leadTimeHours')}
+                  placeholder="24"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-tech-notes">Technician Notes (Printed on Tag)</Label>
+              <Textarea
+                id="edit-tech-notes"
+                {...editForm.register('technicianNotes')}
+                placeholder="e.g. Wash cold, do not tumble dry"
+                rows={2}
               />
-              {editForm.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {editForm.formState.errors.name.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-category">Category *</Label>
-              <Select
-                value={editForm.watch('category')}
-                onValueChange={(value) => editForm.setValue('category', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {serviceCategories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {editForm.formState.errors.category && (
-                <p className="text-sm text-red-500">
-                  {editForm.formState.errors.category.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-price">Price (₹) *</Label>
-              <Input
-                id="edit-price"
-                type="number"
-                step="0.01"
-                {...editForm.register('price')}
-                className={cn(
-                  editForm.formState.errors.price && 'border-red-500'
-                )}
-              />
-              {editForm.formState.errors.price && (
-                <p className="text-sm text-red-500">
-                  {editForm.formState.errors.price.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-duration">Duration *</Label>
-              <Select
-                value={editForm.watch('duration')}
-                onValueChange={(value) => editForm.setValue('duration', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select duration" />
-                </SelectTrigger>
-                <SelectContent>
-                  {durationOptions.map((duration) => (
-                    <SelectItem key={duration} value={duration}>
-                      {duration}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {editForm.formState.errors.duration && (
-                <p className="text-sm text-red-500">
-                  {editForm.formState.errors.duration.message}
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="edit-status">Status *</Label>
               <Select
                 value={editForm.watch('status')}
-                onValueChange={(value) => editForm.setValue('status', value as 'Active' | 'Inactive')}
+                onValueChange={(value) => editForm.setValue('status', value as 'Active' | 'Inactive' | 'Archived')}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select status" />
@@ -284,6 +308,7 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
                 <SelectContent>
                   <SelectItem value="Active">Active</SelectItem>
                   <SelectItem value="Inactive">Inactive</SelectItem>
+                  <SelectItem value="Archived">Archived</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -293,32 +318,13 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
               <Textarea
                 id="edit-description"
                 {...editForm.register('description')}
-                placeholder="Enter service description"
-                className={cn(
-                  editForm.formState.errors.description && 'border-red-500'
-                )}
+                className={cn(editForm.formState.errors.description && 'border-red-500')}
               />
-              {editForm.formState.errors.description && (
-                <p className="text-sm text-red-500">
-                  {editForm.formState.errors.description.message}
-                </p>
-              )}
             </div>
 
             <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onCloseEditDialog}
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={isUpdating}
-              >
-                {isUpdating ? 'Saving...' : 'Save Changes'}
-              </Button>
+              <Button type="button" variant="outline" onClick={onCloseEditDialog}>Cancel</Button>
+              <Button type="submit" disabled={isUpdating}>{isUpdating ? 'Saving...' : 'Save Changes'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -334,105 +340,100 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
             </DialogDescription>
           </DialogHeader>
 
+
           <form onSubmit={createForm.handleSubmit(handleCreateSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="create-name">Service Name *</Label>
-              <Input
-                id="create-name"
-                {...createForm.register('name')}
-                placeholder="Enter service name"
-                className={cn(
-                  createForm.formState.errors.name && 'border-red-500'
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-name">Service Name *</Label>
+                <Input
+                  id="create-name"
+                  {...createForm.register('name')}
+                  placeholder="e.g. Premium Dry Clean"
+                  className={cn(createForm.formState.errors.name && 'border-red-500')}
+                />
+                {createForm.formState.errors.name && (
+                  <p className="text-sm text-red-500">{createForm.formState.errors.name.message}</p>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-category">Category *</Label>
+                <Select
+                  value={createForm.watch('category')}
+                  onValueChange={(value) => createForm.setValue('category', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {serviceCategories.map((category) => (
+                      <SelectItem key={category} value={category}>{category}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-pricing-model">Pricing Model</Label>
+                <Select
+                  value={createForm.watch('pricingModel') || 'per_piece'}
+                  onValueChange={(value) => createForm.setValue('pricingModel', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Per Piece" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="per_piece">Per Piece</SelectItem>
+                    <SelectItem value="per_kg">Per Kg</SelectItem>
+                    <SelectItem value="per_sqft">Per Sq Ft</SelectItem>
+                    <SelectItem value="fixed">Fixed Price</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-price">Price (₹) *</Label>
+                <Input
+                  id="create-price"
+                  type="number"
+                  step="0.01"
+                  {...createForm.register('price')}
+                  placeholder="0.00"
+                  className={cn(createForm.formState.errors.price && 'border-red-500')}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-hsn">HSN/SAC Code</Label>
+                <Input
+                  id="create-hsn"
+                  {...createForm.register('hsnSacCode')}
+                  placeholder="e.g. 9997"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-lead-time">Lead Time (Hours)</Label>
+                <Input
+                  type="number"
+                  id="create-lead-time"
+                  {...createForm.register('leadTimeHours')}
+                  placeholder="24"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-tech-notes">Technician Notes (Printed on Tag)</Label>
+              <Textarea
+                id="create-tech-notes"
+                {...createForm.register('technicianNotes')}
+                placeholder="e.g. Wash cold, do not tumble dry"
+                rows={2}
               />
-              {createForm.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {createForm.formState.errors.name.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="create-category">Category *</Label>
-              <Select
-                value={createForm.watch('category')}
-                onValueChange={(value) => createForm.setValue('category', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {serviceCategories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {createForm.formState.errors.category && (
-                <p className="text-sm text-red-500">
-                  {createForm.formState.errors.category.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="create-price">Price (₹) *</Label>
-              <Input
-                id="create-price"
-                type="number"
-                step="0.01"
-                {...createForm.register('price')}
-                placeholder="Enter service price"
-                className={cn(
-                  createForm.formState.errors.price && 'border-red-500'
-                )}
-              />
-              {createForm.formState.errors.price && (
-                <p className="text-sm text-red-500">
-                  {createForm.formState.errors.price.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="create-duration">Duration *</Label>
-              <Select
-                value={createForm.watch('duration')}
-                onValueChange={(value) => createForm.setValue('duration', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select duration" />
-                </SelectTrigger>
-                <SelectContent>
-                  {durationOptions.map((duration) => (
-                    <SelectItem key={duration} value={duration}>
-                      {duration}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {createForm.formState.errors.duration && (
-                <p className="text-sm text-red-500">
-                  {createForm.formState.errors.duration.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="create-status">Status *</Label>
-              <Select
-                value={createForm.watch('status')}
-                onValueChange={(value) => createForm.setValue('status', value as 'Active' | 'Inactive')}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="space-y-2">
@@ -440,28 +441,22 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
               <Textarea
                 id="create-description"
                 {...createForm.register('description')}
-                placeholder="Enter service description"
-                className={cn(
-                  createForm.formState.errors.description && 'border-red-500'
-                )}
+                placeholder="Customer-facing description"
+                className={cn(createForm.formState.errors.description && 'border-red-500')}
               />
-              {createForm.formState.errors.description && (
-                <p className="text-sm text-red-500">
-                  {createForm.formState.errors.description.message}
-                </p>
-              )}
             </div>
 
             <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
+
+              <Button
+                type="button"
+                variant="outline"
                 onClick={onCloseCreateDialog}
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={isCreating}
               >
                 {isCreating ? 'Creating...' : 'Create Service'}
@@ -559,15 +554,15 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
             </div>
 
             <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={onCloseProductDialog}
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={isCreating}
               >
                 {isCreating ? 'Adding...' : 'Add Product'}

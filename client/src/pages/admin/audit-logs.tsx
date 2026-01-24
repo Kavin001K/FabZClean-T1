@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Card,
     CardContent,
+    CardHeader,
+    CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -29,10 +31,22 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    HoverCard,
+    HoverCardContent,
+    HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { format, formatDistanceToNow } from "date-fns";
 import {
     Calendar as CalendarIcon,
@@ -63,12 +77,27 @@ import {
     Activity,
     ChevronDown,
     ChevronUp,
+    ChevronRight,
     Building,
     Factory,
+    Wifi,
+    WifiOff,
+    MessageSquare,
+    ArrowUpRight,
+    ArrowDownRight,
+    Globe,
+    Fingerprint,
+    AlertOctagon,
+    TrendingUp,
+    Monitor,
+    Zap,
+    Database,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
+
+// ============ TYPES ============
 
 interface AuditLog {
     id: string;
@@ -79,219 +108,382 @@ interface AuditLog {
     entityType: string;
     entityId: string;
     details: any;
+    oldValue?: any;
+    newValue?: any;
+    category?: string;
+    severity?: string;
     ipAddress: string;
     userAgent: string;
     createdAt: string;
 }
 
-// Convert action to human-readable description
+interface SurveillanceStats {
+    highSeverityCount: number;
+    communicationCount: number;
+    totalToday: number;
+    failedLogins: number;
+    activeSessions: number;
+    anomalyCount: number;
+    anomalies: { employeeId: string; reason: string; timestamp: string }[];
+    categoryBreakdown: Record<string, number>;
+}
+
+interface EmployeeInfo {
+    id: string;
+    fullName: string;
+    username: string;
+    role: string;
+    franchiseId: string;
+}
+
+// ============ HELPER FUNCTIONS ============
+
 const formatActionDescription = (log: AuditLog): string => {
     const { action, entityType, entityId, details } = log;
     const d = details || {};
 
-    // Build human-readable descriptions
     switch (action) {
-        // Authentication
-        case 'login':
-            return `Logged in successfully`;
-        case 'logout':
-            return `Logged out`;
-        case 'failed_login':
-            return `Failed login attempt for ${d.email || 'unknown user'}`;
-        case 'password_change':
-            return `Changed password`;
-
-        // Orders
-        case 'create_order':
-            return `Created new order ${d.orderNumber || entityId} for ${d.customerName || 'customer'}`;
-        case 'update_order':
-            return `Updated order ${d.orderNumber || entityId}`;
-        case 'delete_order':
-            return `Deleted order ${entityId}`;
-        case 'order_status_pending':
-        case 'order_status_processing':
-        case 'order_status_ready':
-        case 'order_status_completed':
-        case 'order_status_cancelled':
-        case 'order_status_delivered':
-            const status = action.replace('order_status_', '');
-            return `Changed order ${d.orderNumber || entityId} status to ${status}`;
-
-        // Payments
-        case 'payment_received':
-            const amount = d.amount ? `₹${d.amount}` : '';
-            return `Received payment ${amount} for order ${d.orderNumber || entityId}`;
-        case 'mark_paid':
-            return `Marked order ${d.orderNumber || entityId} as paid`;
-        case 'refund_issued':
-            return `Issued refund of ₹${d.amount || 0} for order ${d.orderNumber || entityId}`;
-
-        // Printing
-        case 'print_invoice':
-            return `Printed invoice for order ${d.orderNumber || entityId}`;
-        case 'print_tags':
-            return `Printed ${d.tagCount || ''} tags for order ${d.orderNumber || entityId}`;
-        case 'print_document':
-            return `Printed document: ${d.documentType || entityId}`;
-
-        // Employees
-        case 'create_employee':
-            return `Created new user: ${d.username || d.fullName || entityId} (${d.role || 'staff'})`;
-        case 'update_employee':
-            return `Updated user profile: ${d.username || entityId}`;
-        case 'delete_employee':
-            return `Deactivated user: ${entityId}`;
-        case 'revoke_access':
-            return `Revoked access for user: ${entityId}`;
-        case 'restore_access':
-            return `Restored access for user: ${entityId}`;
-        case 'role_change':
-            return `Changed role for ${d.username || entityId} from ${d.oldRole} to ${d.newRole}`;
-
-        // Customers
-        case 'create_customer':
-            return `Added new customer: ${d.name || d.customerName || entityId}`;
-        case 'update_customer':
-            return `Updated customer: ${d.name || entityId}`;
-        case 'delete_customer':
-            return `Removed customer: ${entityId}`;
-
-        // Transit
-        case 'create_transit':
-            return `Created transit order ${d.transitId || entityId} with ${d.orderCount || 0} orders`;
-        case 'update_transit':
-            return `Updated transit ${d.transitId || entityId} status to ${d.status || 'updated'}`;
-        case 'complete_transit':
-            return `Completed transit ${d.transitId || entityId}`;
-        case 'cancel_transit':
-            return `Cancelled transit ${d.transitId || entityId}`;
-
-        // Services
-        case 'create_service':
-            return `Added new service: ${d.name || entityId}`;
-        case 'update_service':
-            return `Updated service: ${d.name || entityId}`;
-        case 'delete_service':
-            return `Removed service: ${entityId}`;
-
-        // Inventory
-        case 'add_inventory':
-            return `Added ${d.quantity || 0} units of ${d.productName || entityId} to inventory`;
-        case 'update_inventory':
-            return `Updated inventory for ${d.productName || entityId}`;
-        case 'low_stock_alert':
-            return `Low stock alert: ${d.productName || entityId} (${d.currentStock || 0} remaining)`;
-
-        // Settings
-        case 'settings_update':
-            return `Updated ${d.settingKey || 'system'} settings`;
-        case 'backup_created':
-            return `Created system backup`;
-        case 'data_export':
-            return `Exported ${d.exportType || 'data'} report`;
-
+        case 'login': return `Logged in successfully`;
+        case 'logout': return `Logged out`;
+        case 'failed_login': return `Failed login attempt for ${d.email || d.username || 'unknown user'}`;
+        case 'password_change': return `Changed password`;
+        case 'create_order': return `Created order ${d.orderNumber || entityId}`;
+        case 'update_order': return `Updated order ${d.orderNumber || entityId}`;
+        case 'delete_order': return `Deleted order ${entityId}`;
+        case 'payment_received': return `Received payment ₹${d.amount || 0}`;
+        case 'mark_paid': return `Marked order ${d.orderNumber || entityId} as paid`;
+        case 'refund_issued': return `Issued refund of ₹${d.amount || 0}`;
+        case 'print_invoice': return `Printed invoice for ${d.orderNumber || entityId}`;
+        case 'create_employee': return `Created user: ${d.username || d.fullName || entityId}`;
+        case 'update_employee': return `Updated user: ${d.username || entityId}`;
+        case 'delete_employee': return `Deactivated user: ${entityId}`;
+        case 'role_change': return `Changed role: ${d.oldRole} → ${d.newRole}`;
+        case 'create_transit': return `Created transit with ${d.orderCount || 0} orders`;
+        case 'update_transit': return `Updated transit status to ${d.status}`;
+        case 'whatsapp_sent':
+        case 'whatsapp_success': return `Sent WhatsApp to ${d.recipientPhone || 'customer'}`;
+        case 'whatsapp_failed': return `WhatsApp failed: ${d.error || 'unknown error'}`;
+        case 'data_export': return `Exported ${d.exportType || 'data'}`;
+        case 'database_access': return `Accessed database monitor`;
         default:
-            return `${action.replace(/_/g, ' ')} on ${entityType || 'system'}`;
+            if (action.startsWith('order_status_')) {
+                return `Order status → ${action.replace('order_status_', '')}`;
+            }
+            if (action.startsWith('HTTP_')) {
+                return `${action.replace('HTTP_', '')} ${d.path || entityId}`;
+            }
+            return `${action.replace(/_/g, ' ')}`;
     }
 };
 
-// Get icon for action type
-const getActionIcon = (action: string) => {
+const getActionIcon = (action: string, category?: string) => {
     if (action.includes('login')) return <LogIn className="h-4 w-4" />;
     if (action.includes('logout')) return <LogOut className="h-4 w-4" />;
+    if (action.includes('whatsapp')) return <MessageSquare className="h-4 w-4" />;
     if (action.includes('order') && action.includes('create')) return <ShoppingBag className="h-4 w-4" />;
     if (action.includes('order')) return <Package className="h-4 w-4" />;
-    if (action.includes('payment') || action.includes('paid')) return <CreditCard className="h-4 w-4" />;
+    if (action.includes('payment') || action.includes('paid') || action.includes('credit')) return <CreditCard className="h-4 w-4" />;
     if (action.includes('print')) return <Printer className="h-4 w-4" />;
     if (action.includes('employee') && action.includes('create')) return <UserPlus className="h-4 w-4" />;
     if (action.includes('employee') && action.includes('delete')) return <UserMinus className="h-4 w-4" />;
-    if (action.includes('employee')) return <User className="h-4 w-4" />;
-    if (action.includes('customer')) return <User className="h-4 w-4" />;
     if (action.includes('transit')) return <Truck className="h-4 w-4" />;
-    if (action.includes('service')) return <Settings className="h-4 w-4" />;
-    if (action.includes('inventory')) return <Package className="h-4 w-4" />;
-    if (action.includes('settings')) return <Settings className="h-4 w-4" />;
-    if (action.includes('revoke')) return <Shield className="h-4 w-4" />;
-    if (action.includes('restore')) return <CheckCircle className="h-4 w-4" />;
-    if (action.includes('delete') || action.includes('cancel')) return <Trash2 className="h-4 w-4" />;
-    if (action.includes('update') || action.includes('edit')) return <Edit className="h-4 w-4" />;
-    if (action.includes('create') || action.includes('add')) return <Plus className="h-4 w-4" />;
+    if (action.includes('settings') || action.includes('database')) return <Settings className="h-4 w-4" />;
+    if (action.includes('export')) return <Download className="h-4 w-4" />;
+    if (action.includes('delete')) return <Trash2 className="h-4 w-4" />;
+    if (action.includes('update')) return <Edit className="h-4 w-4" />;
+    if (action.includes('create')) return <Plus className="h-4 w-4" />;
+    if (category === 'security') return <Shield className="h-4 w-4" />;
     return <Activity className="h-4 w-4" />;
 };
 
-// Get color scheme for action type
-const getActionColorScheme = (action: string) => {
-    if (action.includes('create') || action.includes('add'))
-        return { bg: 'bg-emerald-500/10', text: 'text-emerald-600', border: 'border-emerald-500/20', dot: 'bg-emerald-500' };
-    if (action.includes('delete') || action.includes('cancel') || action.includes('failed'))
-        return { bg: 'bg-red-500/10', text: 'text-red-600', border: 'border-red-500/20', dot: 'bg-red-500' };
-    if (action.includes('update') || action.includes('edit') || action.includes('change'))
-        return { bg: 'bg-blue-500/10', text: 'text-blue-600', border: 'border-blue-500/20', dot: 'bg-blue-500' };
-    if (action.includes('payment') || action.includes('paid'))
-        return { bg: 'bg-amber-500/10', text: 'text-amber-600', border: 'border-amber-500/20', dot: 'bg-amber-500' };
-    if (action.includes('print'))
-        return { bg: 'bg-purple-500/10', text: 'text-purple-600', border: 'border-purple-500/20', dot: 'bg-purple-500' };
-    if (action.includes('login') || action.includes('logout'))
-        return { bg: 'bg-indigo-500/10', text: 'text-indigo-600', border: 'border-indigo-500/20', dot: 'bg-indigo-500' };
-    if (action.includes('transit'))
-        return { bg: 'bg-cyan-500/10', text: 'text-cyan-600', border: 'border-cyan-500/20', dot: 'bg-cyan-500' };
-    return { bg: 'bg-gray-500/10', text: 'text-gray-600', border: 'border-gray-500/20', dot: 'bg-gray-500' };
+const getCategoryConfig = (category: string) => {
+    const configs: Record<string, { bg: string; text: string; border: string; label: string; icon: React.ReactNode }> = {
+        financial: {
+            bg: 'bg-amber-500/10',
+            text: 'text-amber-600',
+            border: 'border-amber-500/30',
+            label: 'Financial',
+            icon: <CreditCard className="h-3 w-3" />
+        },
+        logistics: {
+            bg: 'bg-cyan-500/10',
+            text: 'text-cyan-600',
+            border: 'border-cyan-500/30',
+            label: 'Logistics',
+            icon: <Truck className="h-3 w-3" />
+        },
+        security: {
+            bg: 'bg-red-500/10',
+            text: 'text-red-600',
+            border: 'border-red-500/30',
+            label: 'Security',
+            icon: <Shield className="h-3 w-3" />
+        },
+        lifecycle: {
+            bg: 'bg-blue-500/10',
+            text: 'text-blue-600',
+            border: 'border-blue-500/30',
+            label: 'Lifecycle',
+            icon: <RefreshCw className="h-3 w-3" />
+        },
+        communication: {
+            bg: 'bg-green-500/10',
+            text: 'text-green-600',
+            border: 'border-green-500/30',
+            label: 'Communication',
+            icon: <MessageSquare className="h-3 w-3" />
+        },
+        api: {
+            bg: 'bg-violet-500/10',
+            text: 'text-violet-600',
+            border: 'border-violet-500/30',
+            label: 'API',
+            icon: <Globe className="h-3 w-3" />
+        },
+        system: {
+            bg: 'bg-purple-500/10',
+            text: 'text-purple-600',
+            border: 'border-purple-500/30',
+            label: 'System',
+            icon: <Settings className="h-3 w-3" />
+        }
+    };
+    return configs[category] || configs.system;
 };
 
-// Get category label
-const getActionCategory = (action: string): string => {
-    if (action.includes('login') || action.includes('logout') || action.includes('password')) return 'Authentication';
-    if (action.includes('order')) return 'Orders';
-    if (action.includes('payment') || action.includes('paid') || action.includes('refund')) return 'Payments';
-    if (action.includes('print')) return 'Printing';
-    if (action.includes('employee') || action.includes('access') || action.includes('role')) return 'Users';
-    if (action.includes('customer')) return 'Customers';
-    if (action.includes('transit')) return 'Transit';
-    if (action.includes('service')) return 'Services';
-    if (action.includes('inventory')) return 'Inventory';
-    if (action.includes('settings') || action.includes('backup') || action.includes('export')) return 'System';
-    return 'Activity';
+const getSeverityConfig = (severity: string) => {
+    const configs: Record<string, { color: string; label: string; pulse?: boolean }> = {
+        critical: { color: 'bg-red-500', label: 'Critical', pulse: true },
+        warning: { color: 'bg-amber-500', label: 'Warning' },
+        info: { color: 'bg-blue-500', label: 'Info' }
+    };
+    return configs[severity] || configs.info;
 };
+
+// ============ COMPONENTS ============
+
+// KPI Card Component
+const KPICard = ({
+    title,
+    value,
+    icon: Icon,
+    trend,
+    trendValue,
+    color = 'blue',
+    pulse = false
+}: {
+    title: string;
+    value: string | number;
+    icon: any;
+    trend?: 'up' | 'down';
+    trendValue?: string;
+    color?: string;
+    pulse?: boolean;
+}) => (
+    <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-card to-card/50">
+        <div className={cn(
+            "absolute inset-0 opacity-5",
+            color === 'red' && "bg-gradient-to-br from-red-500 to-red-600",
+            color === 'green' && "bg-gradient-to-br from-green-500 to-green-600",
+            color === 'amber' && "bg-gradient-to-br from-amber-500 to-amber-600",
+            color === 'blue' && "bg-gradient-to-br from-blue-500 to-blue-600",
+            color === 'purple' && "bg-gradient-to-br from-purple-500 to-purple-600"
+        )} />
+        <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+                <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
+                    <p className="text-2xl font-bold mt-1">{value}</p>
+                    {trendValue && (
+                        <p className={cn(
+                            "text-xs mt-1 flex items-center gap-1",
+                            trend === 'up' ? 'text-green-600' : 'text-red-600'
+                        )}>
+                            {trend === 'up' ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                            {trendValue}
+                        </p>
+                    )}
+                </div>
+                <div className={cn(
+                    "p-3 rounded-xl",
+                    color === 'red' && "bg-red-500/10 text-red-600",
+                    color === 'green' && "bg-green-500/10 text-green-600",
+                    color === 'amber' && "bg-amber-500/10 text-amber-600",
+                    color === 'blue' && "bg-blue-500/10 text-blue-600",
+                    color === 'purple' && "bg-purple-500/10 text-purple-600",
+                    pulse && "animate-pulse"
+                )}>
+                    <Icon className="h-5 w-5" />
+                </div>
+            </div>
+        </CardContent>
+    </Card>
+);
+
+// Delta Diff View Component
+const DeltaDiffView = ({ oldValue, newValue }: { oldValue: any; newValue: any }) => {
+    if (!oldValue && !newValue) return null;
+
+    const allKeys = new Set([
+        ...Object.keys(oldValue || {}),
+        ...Object.keys(newValue || {})
+    ]);
+
+    const changes = Array.from(allKeys).filter(key => {
+        if (['id', 'createdAt', 'updatedAt'].includes(key)) return false;
+        return JSON.stringify(oldValue?.[key]) !== JSON.stringify(newValue?.[key]);
+    });
+
+    if (changes.length === 0) {
+        return (
+            <p className="text-sm text-muted-foreground italic">No changes detected</p>
+        );
+    }
+
+    return (
+        <div className="space-y-2">
+            {changes.map(key => (
+                <div key={key} className="flex items-start gap-2 text-xs">
+                    <span className="font-medium text-muted-foreground min-w-[100px]">{key}:</span>
+                    <div className="flex-1 flex items-center gap-2">
+                        {oldValue?.[key] !== undefined && (
+                            <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-600 line-through">
+                                {String(oldValue[key])}
+                            </span>
+                        )}
+                        <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                        {newValue?.[key] !== undefined && (
+                            <span className="px-2 py-0.5 rounded bg-green-500/10 text-green-600">
+                                {String(newValue[key])}
+                            </span>
+                        )}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// Employee Hover Card Component
+const EmployeeHoverCard = ({ employeeId, children }: { employeeId: string; children: React.ReactNode }) => {
+    const [info, setInfo] = useState<EmployeeInfo | null>(null);
+
+    const fetchEmployeeInfo = async () => {
+        if (info) return;
+        try {
+            const response = await fetch(`/api/audit-logs/employee/${employeeId}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('employee_token')}`
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setInfo(data.data.employee);
+            }
+        } catch (error) {
+            console.error('Failed to fetch employee info:', error);
+        }
+    };
+
+    return (
+        <HoverCard onOpenChange={(open) => open && fetchEmployeeInfo()}>
+            <HoverCardTrigger asChild>
+                {children}
+            </HoverCardTrigger>
+            <HoverCardContent className="w-64" side="right">
+                {info ? (
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                <User className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                                <p className="font-medium">{info.fullName || info.username}</p>
+                                <p className="text-xs text-muted-foreground">@{info.username}</p>
+                            </div>
+                        </div>
+                        <Separator />
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <p className="text-muted-foreground">Role</p>
+                                <Badge variant="outline" className="mt-1">{info.role}</Badge>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Franchise</p>
+                                <p className="font-mono text-xs mt-1">{info.franchiseId || 'HQ'}</p>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        <Skeleton className="h-10 w-10 rounded-full" />
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-24" />
+                    </div>
+                )}
+            </HoverCardContent>
+        </HoverCard>
+    );
+};
+
+// ============ MAIN COMPONENT ============
 
 export default function AuditLogsPage() {
     const { toast } = useToast();
     const { employee: currentUser } = useAuth();
-    const [page, setPage] = useState(1);
-    const [limit] = useState(50);
     const [actionFilter, setActionFilter] = useState<string>('all');
+    const [categoryFilter, setCategoryFilter] = useState<string>('all');
     const [date, setDate] = useState<Date | undefined>(undefined);
     const [searchQuery, setSearchQuery] = useState('');
     const [isLive, setIsLive] = useState(true);
+    const [criticalOnly, setCriticalOnly] = useState(false);
     const [expandedLog, setExpandedLog] = useState<string | null>(null);
-    const [newLogIds, setNewLogIds] = useState<Set<string>>(new Set());
 
-    // Determine franchise isolation based on role
-    const franchiseFilter = useMemo(() => {
-        if (!currentUser) return '';
-        // Admins see all
-        if (currentUser.role === 'admin') return '';
-        // Franchise managers see their franchise only
-        if (currentUser.role === 'franchise_manager' && currentUser.franchiseId) {
-            return currentUser.franchiseId;
-        }
-        // Others see only their own actions
-        return `user:${currentUser.employeeId}`;
-    }, [currentUser]);
-
-    // Fetch logs
-    const { data, isLoading, error, refetch, isRefetching } = useQuery({
-        queryKey: ['audit-logs', page, limit, actionFilter, date, franchiseFilter],
+    // Fetch surveillance stats
+    const { data: statsData, refetch: refetchStats } = useQuery({
+        queryKey: ['audit-stats'],
         queryFn: async () => {
-            const params = new URLSearchParams({
-                page: page.toString(),
-                limit: limit.toString(),
-                sortBy: 'createdAt',
-                sortOrder: 'desc',
+            const response = await fetch('/api/audit-logs/stats', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('employee_token')}`
+                }
             });
+            if (!response.ok) throw new Error('Failed to fetch stats');
+            return response.json();
+        },
+        refetchInterval: isLive ? 10000 : false,
+    });
 
-            if (actionFilter && actionFilter !== 'all') {
-                params.append('action', actionFilter);
-            }
+    const stats: SurveillanceStats = statsData?.data || {
+        highSeverityCount: 0,
+        communicationCount: 0,
+        totalToday: 0,
+        failedLogins: 0,
+        activeSessions: 0,
+        anomalyCount: 0,
+        anomalies: [],
+        categoryBreakdown: {}
+    };
+
+    // Infinite query for logs with cursor pagination
+    const {
+        data: logsData,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isLoading,
+        error,
+        refetch
+    } = useInfiniteQuery({
+        queryKey: ['audit-logs', actionFilter, categoryFilter, date, criticalOnly],
+        queryFn: async ({ pageParam }) => {
+            const params = new URLSearchParams({
+                limit: '30',
+                ...(pageParam && { cursor: pageParam }),
+                ...(actionFilter !== 'all' && { action: actionFilter }),
+                ...(categoryFilter !== 'all' && { category: categoryFilter }),
+                ...(criticalOnly && { criticalOnly: 'true' }),
+            });
 
             if (date) {
                 const startDate = new Date(date);
@@ -303,85 +495,51 @@ export default function AuditLogsPage() {
                 params.append('endDate', endDate.toISOString());
             }
 
-            // Add franchise filter for isolation
-            if (franchiseFilter && !franchiseFilter.startsWith('user:')) {
-                params.append('franchiseId', franchiseFilter);
-            } else if (franchiseFilter.startsWith('user:')) {
-                params.append('employeeId', franchiseFilter.replace('user:', ''));
-            }
-
             const response = await fetch(`/api/audit-logs?${params.toString()}`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('employee_token')}`
                 }
             });
 
-            if (!response.ok) {
-                throw new Error('Failed to fetch audit logs');
-            }
-
+            if (!response.ok) throw new Error('Failed to fetch audit logs');
             return response.json();
         },
-        refetchInterval: isLive ? 3000 : false,
+        getNextPageParam: (lastPage) => lastPage.pagination?.nextCursor,
+        initialPageParam: undefined as string | undefined,
+        refetchInterval: isLive ? 5000 : false,
     });
 
-    // Track new logs for animation
-    const [previousLogIds, setPreviousLogIds] = useState<Set<string>>(new Set());
+    // Flatten all pages into single log array
+    const allLogs = useMemo(() => {
+        return logsData?.pages.flatMap(page => page.data) || [];
+    }, [logsData]);
 
-    useEffect(() => {
-        if (data?.data) {
-            const currentIds = new Set(data.data.map((log: AuditLog) => log.id));
-            const newIds = new Set<string>();
-
-            currentIds.forEach((id: string) => {
-                if (!previousLogIds.has(id)) {
-                    newIds.add(id);
-                }
-            });
-
-            if (newIds.size > 0 && previousLogIds.size > 0) {
-                setNewLogIds(newIds);
-                // Clear new indicators after animation
-                setTimeout(() => setNewLogIds(new Set()), 3000);
-            }
-
-            setPreviousLogIds(currentIds);
-        }
-    }, [data?.data]);
-
-    // Filter logs by search query
+    // Filter by search query
     const filteredLogs = useMemo(() => {
-        if (!data?.data) return [];
-        if (!searchQuery.trim()) return data.data;
-
+        if (!searchQuery.trim()) return allLogs;
         const query = searchQuery.toLowerCase();
-        return data.data.filter((log: AuditLog) => {
+        return allLogs.filter((log: AuditLog) => {
             const description = formatActionDescription(log).toLowerCase();
             return (
                 description.includes(query) ||
                 log.employeeId?.toLowerCase().includes(query) ||
                 log.action.toLowerCase().includes(query) ||
-                log.entityId?.toLowerCase().includes(query)
+                log.entityId?.toLowerCase().includes(query) ||
+                log.ipAddress?.toLowerCase().includes(query)
             );
         });
-    }, [data?.data, searchQuery]);
+    }, [allLogs, searchQuery]);
 
-    // Group logs by date
-    const groupedLogs = useMemo(() => {
-        const groups: { [key: string]: AuditLog[] } = {};
+    // Infinite scroll handler
+    const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+        if (scrollHeight - scrollTop <= clientHeight * 1.5 && hasNextPage && !isFetchingNextPage) {
+            fetchNextPage();
+        }
+    }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-        filteredLogs.forEach((log: AuditLog) => {
-            const dateKey = format(new Date(log.createdAt), 'yyyy-MM-dd');
-            if (!groups[dateKey]) {
-                groups[dateKey] = [];
-            }
-            groups[dateKey].push(log);
-        });
-
-        return groups;
-    }, [filteredLogs]);
-
-    const handleExport = (formatType: 'csv' | 'json') => {
+    // Export handler
+    const handleExport = async (formatType: 'csv' | 'json') => {
         if (!filteredLogs.length) {
             toast({
                 title: "Nothing to export",
@@ -391,439 +549,589 @@ export default function AuditLogsPage() {
             return;
         }
 
-        if (formatType === 'json') {
-            const exportData = filteredLogs.map((log: AuditLog) => ({
-                time: new Date(log.createdAt).toISOString(),
-                user: log.employeeId,
-                action: log.action,
-                description: formatActionDescription(log),
-                entityType: log.entityType,
-                entityId: log.entityId,
-                ipAddress: log.ipAddress,
-            }));
-
-            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `audit-logs-${format(new Date(), 'yyyy-MM-dd')}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } else {
-            const headers = ['Time', 'User', 'Action', 'Description', 'IP Address'];
-            const csvRows = [
-                headers.join(','),
-                ...filteredLogs.map((log: AuditLog) => {
-                    const row = [
-                        format(new Date(log.createdAt), 'yyyy-MM-dd HH:mm:ss'),
-                        log.employeeId,
-                        log.action,
-                        `"${formatActionDescription(log).replace(/"/g, '""')}"`,
-                        log.ipAddress
-                    ];
-                    return row.join(',');
+        try {
+            // Log export action on server
+            await fetch('/api/audit-logs/export', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('employee_token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    format: formatType,
+                    startDate: date?.toISOString(),
                 })
-            ];
+            });
 
-            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `audit-logs-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            if (formatType === 'json') {
+                const exportData = filteredLogs.map((log: AuditLog) => ({
+                    time: log.createdAt,
+                    user: log.employeeId,
+                    action: log.action,
+                    category: log.category,
+                    severity: log.severity,
+                    description: formatActionDescription(log),
+                    entityType: log.entityType,
+                    entityId: log.entityId,
+                    ipAddress: log.ipAddress,
+                }));
+
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `surveillance-logs-${format(new Date(), 'yyyy-MM-dd-HHmm')}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } else {
+                const headers = ['Time', 'User', 'Action', 'Category', 'Severity', 'Description', 'IP Address'];
+                const csvRows = [
+                    headers.join(','),
+                    ...filteredLogs.map((log: AuditLog) => {
+                        const row = [
+                            format(new Date(log.createdAt), 'yyyy-MM-dd HH:mm:ss'),
+                            log.employeeId,
+                            log.action,
+                            log.category || '',
+                            log.severity || '',
+                            `"${formatActionDescription(log).replace(/"/g, '""')}"`,
+                            log.ipAddress
+                        ];
+                        return row.join(',');
+                    })
+                ];
+
+                const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `surveillance-logs-${format(new Date(), 'yyyy-MM-dd-HHmm')}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            toast({
+                title: "Export Successful",
+                description: `Surveillance logs exported as ${formatType.toUpperCase()}`,
+            });
+        } catch (error) {
+            toast({
+                title: "Export Failed",
+                description: "Failed to export logs. Please try again.",
+                variant: "destructive"
+            });
         }
-
-        toast({
-            title: "Export Successful",
-            description: `Audit logs exported as ${formatType.toUpperCase()}`,
-        });
     };
 
+    // Role badge renderer
     const getRoleBadge = () => {
         if (!currentUser) return null;
         const role = currentUser.role;
 
-        if (role === 'admin') {
-            return (
-                <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/30">
-                    <Shield className="h-3 w-3 mr-1" />
-                    System Admin View
-                </Badge>
-            );
-        }
-        if (role === 'franchise_manager') {
-            return (
-                <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30">
-                    <Building className="h-3 w-3 mr-1" />
-                    Franchise View
-                </Badge>
-            );
-        }
-        if (role === 'factory_manager') {
-            return (
-                <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
-                    <Factory className="h-3 w-3 mr-1" />
-                    Factory View
-                </Badge>
-            );
-        }
+        const badges: Record<string, { bg: string; text: string; icon: React.ReactNode; label: string }> = {
+            admin: {
+                bg: 'bg-purple-500/10',
+                text: 'text-purple-600',
+                icon: <Shield className="h-3 w-3" />,
+                label: 'System Admin'
+            },
+            franchise_manager: {
+                bg: 'bg-blue-500/10',
+                text: 'text-blue-600',
+                icon: <Building className="h-3 w-3" />,
+                label: 'Franchise Manager'
+            },
+            factory_manager: {
+                bg: 'bg-amber-500/10',
+                text: 'text-amber-600',
+                icon: <Factory className="h-3 w-3" />,
+                label: 'Factory Manager'
+            }
+        };
+
+        const badge = badges[role] || { bg: 'bg-gray-500/10', text: 'text-gray-600', icon: <User className="h-3 w-3" />, label: 'Staff' };
+
         return (
-            <Badge variant="outline" className="bg-gray-500/10 text-gray-600 border-gray-500/30">
-                <User className="h-3 w-3 mr-1" />
-                My Activity
+            <Badge variant="outline" className={cn(badge.bg, badge.text, "border-current/30")}>
+                {badge.icon}
+                <span className="ml-1">{badge.label}</span>
             </Badge>
         );
     };
 
     return (
-        <div className="p-4 md:p-6 space-y-6 bg-background min-h-screen">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Activity Log</h1>
+        <TooltipProvider>
+            <div className="p-4 md:p-6 space-y-6 bg-background min-h-screen">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white">
+                                <Fingerprint className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                                    Surveillance Hub
+                                </h1>
+                                <p className="text-muted-foreground text-sm">
+                                    System accountability & security monitoring
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
                         {getRoleBadge()}
-                    </div>
-                    <p className="text-muted-foreground mt-1 text-sm md:text-base">
-                        Real-time system activities and security events
-                    </p>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                    {/* Live Toggle */}
-                    <div className="flex items-center space-x-2 bg-card p-2 px-3 rounded-lg border">
-                        <Switch
-                            id="live-mode"
-                            checked={isLive}
-                            onCheckedChange={setIsLive}
-                        />
-                        <Label htmlFor="live-mode" className="text-sm font-medium cursor-pointer flex items-center gap-2">
-                            {isLive ? (
-                                <>
-                                    <span className="relative flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                                    </span>
-                                    Live
-                                </>
-                            ) : (
-                                <span className="text-muted-foreground">Paused</span>
-                            )}
-                        </Label>
-                    </div>
 
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => refetch()}
-                        disabled={isLoading || isRefetching}
+                        {/* Live Toggle */}
+                        <div className="flex items-center space-x-2 bg-card p-2 px-3 rounded-lg border">
+                            <Switch
+                                id="live-mode"
+                                checked={isLive}
+                                onCheckedChange={setIsLive}
+                            />
+                            <Label htmlFor="live-mode" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                                {isLive ? (
+                                    <>
+                                        <span className="relative flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                        </span>
+                                        <Wifi className="h-4 w-4 text-green-600" />
+                                    </>
+                                ) : (
+                                    <WifiOff className="h-4 w-4 text-muted-foreground" />
+                                )}
+                            </Label>
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => { refetch(); refetchStats(); }}
+                            disabled={isLoading}
+                        >
+                            <RefreshCw className={cn("h-4 w-4 mr-2", isLoading && "animate-spin")} />
+                            Refresh
+                        </Button>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Export
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Export Format</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleExport('csv')}>
+                                    Export as CSV
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleExport('json')}>
+                                    Export as JSON
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </div>
+
+                {/* Security Pulse KPI Ribbon */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <KPICard
+                        title="High Severity"
+                        value={stats.highSeverityCount}
+                        icon={AlertOctagon}
+                        color="red"
+                        pulse={stats.highSeverityCount > 0}
+                    />
+                    <KPICard
+                        title="Communications"
+                        value={stats.communicationCount}
+                        icon={MessageSquare}
+                        color="green"
+                    />
+                    <KPICard
+                        title="Active Sessions"
+                        value={stats.activeSessions}
+                        icon={Monitor}
+                        color="blue"
+                    />
+                    <KPICard
+                        title="Failed Logins"
+                        value={stats.failedLogins}
+                        icon={Shield}
+                        color={stats.failedLogins > 0 ? 'amber' : 'blue'}
+                    />
+                    <KPICard
+                        title="Total Today"
+                        value={stats.totalToday}
+                        icon={Activity}
+                        color="purple"
+                    />
+                    <KPICard
+                        title="Anomalies"
+                        value={stats.anomalyCount}
+                        icon={AlertTriangle}
+                        color={stats.anomalyCount > 0 ? 'red' : 'blue'}
+                        pulse={stats.anomalyCount > 0}
+                    />
+                </div>
+
+                {/* Anomaly Alert */}
+                {stats.anomalies.length > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
                     >
-                        <RefreshCw className={cn("h-4 w-4 mr-2", isRefetching && "animate-spin")} />
-                        Refresh
-                    </Button>
+                        <Card className="border-red-500/30 bg-red-500/5">
+                            <CardContent className="p-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-full bg-red-500/10 animate-pulse">
+                                        <AlertTriangle className="h-5 w-5 text-red-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-red-600">Security Anomalies Detected</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            {stats.anomalies.map(a => `${a.employeeId}: ${a.reason}`).join(' • ')}
+                                        </p>
+                                    </div>
+                                    <Button variant="outline" size="sm" className="border-red-500/30 text-red-600 hover:bg-red-500/10">
+                                        Investigate
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </motion.div>
+                )}
 
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm">
-                                <Download className="h-4 w-4 mr-2" />
-                                Export
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Export Format</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleExport('csv')}>
-                                Export as CSV
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleExport('json')}>
-                                Export as JSON
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            </div>
+                {/* Filters */}
+                <Card className="border shadow-sm">
+                    <CardContent className="p-4">
+                        <div className="flex flex-col md:flex-row gap-4">
+                            <div className="flex-1">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Search logs by user, action, IP..."
+                                        className="pl-9"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                                    <SelectTrigger className="w-[140px]">
+                                        <SelectValue placeholder="Category" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Categories</SelectItem>
+                                        <SelectItem value="financial">💰 Financial</SelectItem>
+                                        <SelectItem value="logistics">🚚 Logistics</SelectItem>
+                                        <SelectItem value="security">🔐 Security</SelectItem>
+                                        <SelectItem value="lifecycle">🔄 Lifecycle</SelectItem>
+                                        <SelectItem value="communication">💬 Communication</SelectItem>
+                                        <SelectItem value="system">⚙️ System</SelectItem>
+                                    </SelectContent>
+                                </Select>
 
-            {/* Filters */}
-            <Card className="border shadow-sm">
-                <CardContent className="p-4">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search activities..."
-                                    className="pl-9"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                />
+                                <Select value={actionFilter} onValueChange={setActionFilter}>
+                                    <SelectTrigger className="w-[140px]">
+                                        <Filter className="h-4 w-4 mr-2" />
+                                        <SelectValue placeholder="Action" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Actions</SelectItem>
+                                        <SelectItem value="login">🔐 Login</SelectItem>
+                                        <SelectItem value="order">📦 Orders</SelectItem>
+                                        <SelectItem value="payment">💳 Payments</SelectItem>
+                                        <SelectItem value="transit">🚚 Transit</SelectItem>
+                                        <SelectItem value="employee">👤 Users</SelectItem>
+                                        <SelectItem value="whatsapp">💬 WhatsApp</SelectItem>
+                                        <SelectItem value="export">📤 Exports</SelectItem>
+                                    </SelectContent>
+                                </Select>
+
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            className={cn(
+                                                "w-[140px] justify-start text-left font-normal",
+                                                !date && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {date ? format(date, "MMM d") : "Date"}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="end">
+                                        <Calendar
+                                            mode="single"
+                                            selected={date}
+                                            onSelect={setDate}
+                                            disabled={(d) => d > new Date()}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+
+                                {date && (
+                                    <Button variant="ghost" size="icon" onClick={() => setDate(undefined)}>
+                                        <XCircle className="h-4 w-4" />
+                                    </Button>
+                                )}
+
+                                <div className="flex items-center space-x-2 bg-card p-2 px-3 rounded-lg border">
+                                    <Switch
+                                        id="critical-only"
+                                        checked={criticalOnly}
+                                        onCheckedChange={setCriticalOnly}
+                                    />
+                                    <Label htmlFor="critical-only" className="text-sm cursor-pointer">
+                                        Critical Only
+                                    </Label>
+                                </div>
                             </div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                            <Select value={actionFilter} onValueChange={setActionFilter}>
-                                <SelectTrigger className="w-[160px]">
-                                    <Filter className="h-4 w-4 mr-2" />
-                                    <SelectValue placeholder="All Actions" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Actions</SelectItem>
-                                    <SelectItem value="login">Authentication</SelectItem>
-                                    <SelectItem value="create_order">Order Creation</SelectItem>
-                                    <SelectItem value="update_order">Order Updates</SelectItem>
-                                    <SelectItem value="payment">Payments</SelectItem>
-                                    <SelectItem value="print">Printing</SelectItem>
-                                    <SelectItem value="employee">User Management</SelectItem>
-                                    <SelectItem value="transit">Transit</SelectItem>
-                                </SelectContent>
-                            </Select>
+                    </CardContent>
+                </Card>
 
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        className={cn(
-                                            "w-[160px] justify-start text-left font-normal",
-                                            !date && "text-muted-foreground"
-                                        )}
-                                    >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {date ? format(date, "MMM d, yyyy") : "Pick date"}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="end">
-                                    <Calendar
-                                        mode="single"
-                                        selected={date}
-                                        onSelect={setDate}
-                                        disabled={(d) => d > new Date()}
-                                        initialFocus
-                                    />
-                                </PopoverContent>
-                            </Popover>
-
-                            {date && (
-                                <Button variant="ghost" size="icon" onClick={() => setDate(undefined)}>
-                                    <XCircle className="h-4 w-4" />
-                                </Button>
+                {/* Activity Feed */}
+                <Card className="border shadow-sm overflow-hidden">
+                    <CardHeader className="py-3 px-4 border-b bg-muted/30">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm font-medium flex items-center gap-2">
+                                <Database className="h-4 w-4" />
+                                Activity Feed
+                                <Badge variant="secondary" className="ml-2">
+                                    {logsData?.pages[0]?.pagination?.total || 0} records
+                                </Badge>
+                            </CardTitle>
+                            {hasNextPage && (
+                                <Badge variant="outline" className="text-xs">
+                                    Scroll for more
+                                </Badge>
                             )}
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Activity Timeline */}
-            <Card className="border shadow-sm overflow-hidden">
-                <ScrollArea className="h-[calc(100vh-320px)] min-h-[400px]">
-                    <div className="p-4">
-                        {isLoading ? (
-                            <div className="space-y-4">
-                                {[...Array(5)].map((_, i) => (
-                                    <div key={i} className="animate-pulse flex gap-4">
-                                        <div className="w-10 h-10 bg-muted rounded-full" />
-                                        <div className="flex-1 space-y-2">
-                                            <div className="h-4 bg-muted rounded w-3/4" />
-                                            <div className="h-3 bg-muted rounded w-1/2" />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : error ? (
-                            <div className="text-center py-10">
-                                <AlertTriangle className="h-12 w-12 mx-auto text-destructive mb-4" />
-                                <p className="text-destructive font-medium">Failed to load activity logs</p>
-                                <Button variant="outline" className="mt-4" onClick={() => refetch()}>
-                                    Try Again
-                                </Button>
-                            </div>
-                        ) : filteredLogs.length === 0 ? (
-                            <div className="text-center py-10">
-                                <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                                <p className="text-muted-foreground">No activities found</p>
-                            </div>
-                        ) : (
-                            <div className="relative">
-                                {/* Timeline line */}
-                                <div className="absolute left-5 top-0 bottom-0 w-px bg-border" />
-
-                                <AnimatePresence mode="popLayout">
-                                    {Object.entries(groupedLogs).map(([dateKey, logs]) => (
-                                        <div key={dateKey} className="mb-6">
-                                            {/* Date Header */}
-                                            <div className="flex items-center gap-3 mb-4 relative z-10">
-                                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                                    <CalendarIcon className="h-4 w-4 text-primary" />
-                                                </div>
-                                                <span className="text-sm font-semibold text-foreground">
-                                                    {format(new Date(dateKey), 'EEEE, MMMM d, yyyy')}
-                                                </span>
-                                            </div>
-
-                                            {/* Logs for this date */}
-                                            <div className="space-y-2 ml-5 pl-8 border-l border-border">
-                                                {logs.map((log: AuditLog) => {
-                                                    const colors = getActionColorScheme(log.action);
-                                                    const isNew = newLogIds.has(log.id);
-                                                    const isExpanded = expandedLog === log.id;
-
-                                                    return (
-                                                        <motion.div
-                                                            key={log.id}
-                                                            layout
-                                                            initial={isNew ? { opacity: 0, x: -20, scale: 0.95 } : { opacity: 1 }}
-                                                            animate={{ opacity: 1, x: 0, scale: 1 }}
-                                                            exit={{ opacity: 0, scale: 0.95 }}
-                                                            transition={{ duration: 0.3, ease: "easeOut" }}
-                                                            className={cn(
-                                                                "relative rounded-lg border p-3 cursor-pointer transition-all duration-200",
-                                                                colors.bg,
-                                                                colors.border,
-                                                                isExpanded && "ring-2 ring-primary/20",
-                                                                isNew && "ring-2 ring-green-500/50 animate-pulse"
-                                                            )}
-                                                            onClick={() => setExpandedLog(isExpanded ? null : log.id)}
-                                                        >
-                                                            {/* Timeline dot */}
-                                                            <div className={cn(
-                                                                "absolute -left-[41px] top-4 w-3 h-3 rounded-full border-2 border-background",
-                                                                colors.dot
-                                                            )} />
-
-                                                            <div className="flex items-start gap-3">
-                                                                {/* Icon */}
-                                                                <div className={cn(
-                                                                    "p-2 rounded-lg shrink-0",
-                                                                    colors.bg
-                                                                )}>
-                                                                    <span className={colors.text}>
-                                                                        {getActionIcon(log.action)}
-                                                                    </span>
-                                                                </div>
-
-                                                                {/* Content */}
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                                                                        <p className={cn("font-medium text-sm", colors.text)}>
-                                                                            {formatActionDescription(log)}
-                                                                        </p>
-                                                                        <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
-                                                                            <Clock className="h-3 w-3" />
-                                                                            {format(new Date(log.createdAt), 'HH:mm:ss')}
-                                                                        </div>
-                                                                    </div>
-
-                                                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                                                        <Badge variant="secondary" className="text-xs">
-                                                                            {getActionCategory(log.action)}
-                                                                        </Badge>
-                                                                        <span className="text-xs text-muted-foreground">
-                                                                            by {log.employeeId}
-                                                                        </span>
-                                                                        <span className="text-xs text-muted-foreground">
-                                                                            • {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
-                                                                        </span>
-                                                                    </div>
-
-                                                                    {/* Expanded Details */}
-                                                                    <AnimatePresence>
-                                                                        {isExpanded && (
-                                                                            <motion.div
-                                                                                initial={{ height: 0, opacity: 0 }}
-                                                                                animate={{ height: 'auto', opacity: 1 }}
-                                                                                exit={{ height: 0, opacity: 0 }}
-                                                                                transition={{ duration: 0.2 }}
-                                                                                className="overflow-hidden"
-                                                                            >
-                                                                                <Separator className="my-3" />
-                                                                                <div className="grid grid-cols-2 gap-4 text-xs">
-                                                                                    <div>
-                                                                                        <p className="text-muted-foreground">Entity Type</p>
-                                                                                        <p className="font-medium capitalize">{log.entityType || 'System'}</p>
-                                                                                    </div>
-                                                                                    <div>
-                                                                                        <p className="text-muted-foreground">Entity ID</p>
-                                                                                        <p className="font-medium font-mono truncate">{log.entityId || 'N/A'}</p>
-                                                                                    </div>
-                                                                                    <div>
-                                                                                        <p className="text-muted-foreground">IP Address</p>
-                                                                                        <p className="font-medium font-mono">{log.ipAddress || 'Unknown'}</p>
-                                                                                    </div>
-                                                                                    <div>
-                                                                                        <p className="text-muted-foreground">Timestamp</p>
-                                                                                        <p className="font-medium">{format(new Date(log.createdAt), 'PPpp')}</p>
-                                                                                    </div>
-                                                                                </div>
-                                                                                {log.details && Object.keys(log.details).length > 0 && (
-                                                                                    <div className="mt-3">
-                                                                                        <p className="text-muted-foreground text-xs mb-1">Additional Details</p>
-                                                                                        <div className="bg-background/50 rounded p-2 text-xs font-mono">
-                                                                                            {Object.entries(log.details).map(([key, value]) => (
-                                                                                                <div key={key} className="flex gap-2">
-                                                                                                    <span className="text-muted-foreground">{key}:</span>
-                                                                                                    <span className="truncate">{String(value)}</span>
-                                                                                                </div>
-                                                                                            ))}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                )}
-                                                                            </motion.div>
-                                                                        )}
-                                                                    </AnimatePresence>
-                                                                </div>
-
-                                                                {/* Expand indicator */}
-                                                                <div className="shrink-0">
-                                                                    {isExpanded ? (
-                                                                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                                                                    ) : (
-                                                                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </motion.div>
-                                                    );
-                                                })}
+                    </CardHeader>
+                    <ScrollArea className="h-[calc(100vh-480px)] min-h-[400px]" onScroll={handleScroll as any}>
+                        <div className="p-4">
+                            {isLoading ? (
+                                <div className="space-y-3">
+                                    {[...Array(5)].map((_, i) => (
+                                        <div key={i} className="flex gap-4 p-3 rounded-lg border">
+                                            <Skeleton className="w-10 h-10 rounded-lg" />
+                                            <div className="flex-1 space-y-2">
+                                                <Skeleton className="h-4 w-3/4" />
+                                                <Skeleton className="h-3 w-1/2" />
                                             </div>
                                         </div>
                                     ))}
-                                </AnimatePresence>
-                            </div>
-                        )}
-                    </div>
-                </ScrollArea>
+                                </div>
+                            ) : error ? (
+                                <div className="text-center py-10">
+                                    <AlertTriangle className="h-12 w-12 mx-auto text-destructive mb-4" />
+                                    <p className="text-destructive font-medium">Failed to load activity logs</p>
+                                    <Button variant="outline" className="mt-4" onClick={() => refetch()}>
+                                        Try Again
+                                    </Button>
+                                </div>
+                            ) : filteredLogs.length === 0 ? (
+                                <div className="text-center py-10">
+                                    <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                                    <p className="text-muted-foreground">No activities found</p>
+                                </div>
+                            ) : (
+                                <AnimatePresence mode="popLayout">
+                                    <div className="space-y-2">
+                                        {filteredLogs.map((log: AuditLog, index: number) => {
+                                            const categoryConfig = getCategoryConfig(log.category || 'system');
+                                            const severityConfig = getSeverityConfig(log.severity || 'info');
+                                            const isExpanded = expandedLog === log.id;
 
-                {/* Pagination */}
-                {data?.pagination && (
-                    <div className="flex items-center justify-between p-4 border-t">
-                        <p className="text-sm text-muted-foreground">
-                            Showing {filteredLogs.length} of {data.pagination.total || 0} activities
-                        </p>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setPage(p => Math.max(1, p - 1))}
-                                disabled={page === 1 || isLoading}
-                            >
-                                Previous
-                            </Button>
-                            <span className="text-sm text-muted-foreground px-2">
-                                Page {page}
-                            </span>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setPage(p => p + 1)}
-                                disabled={!data?.pagination?.hasMore || isLoading}
-                            >
-                                Next
-                            </Button>
+                                            return (
+                                                <motion.div
+                                                    key={log.id}
+                                                    layout
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, scale: 0.95 }}
+                                                    transition={{ delay: Math.min(index * 0.02, 0.2) }}
+                                                    className={cn(
+                                                        "relative group rounded-lg border p-3 transition-all cursor-pointer",
+                                                        categoryConfig.bg,
+                                                        categoryConfig.border,
+                                                        isExpanded && "ring-2 ring-primary/20",
+                                                        log.severity === 'critical' && "border-red-500/50"
+                                                    )}
+                                                    onClick={() => setExpandedLog(isExpanded ? null : log.id)}
+                                                >
+                                                    {/* Severity indicator */}
+                                                    <div className={cn(
+                                                        "absolute left-0 top-0 bottom-0 w-1 rounded-l-lg",
+                                                        severityConfig.color,
+                                                        severityConfig.pulse && "animate-pulse"
+                                                    )} />
+
+                                                    <div className="flex items-start gap-3 pl-2">
+                                                        {/* Icon */}
+                                                        <div className={cn(
+                                                            "p-2 rounded-lg shrink-0",
+                                                            categoryConfig.bg
+                                                        )}>
+                                                            <span className={categoryConfig.text}>
+                                                                {getActionIcon(log.action, log.category)}
+                                                            </span>
+                                                        </div>
+
+                                                        {/* Content */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                                <p className={cn("font-medium text-sm", categoryConfig.text)}>
+                                                                    {formatActionDescription(log)}
+                                                                </p>
+                                                                <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+                                                                    <Clock className="h-3 w-3" />
+                                                                    {format(new Date(log.createdAt), 'HH:mm:ss')}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                                <Badge
+                                                                    variant="secondary"
+                                                                    className={cn("text-xs", categoryConfig.bg, categoryConfig.text)}
+                                                                >
+                                                                    {categoryConfig.icon}
+                                                                    <span className="ml-1">{categoryConfig.label}</span>
+                                                                </Badge>
+
+                                                                <EmployeeHoverCard employeeId={log.employeeId}>
+                                                                    <span className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                                                                        by <span className="font-medium">{log.employeeId}</span>
+                                                                    </span>
+                                                                </EmployeeHoverCard>
+
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                            <Globe className="h-3 w-3" />
+                                                                            {log.ipAddress?.substring(0, 15) || 'unknown'}
+                                                                        </span>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        <p>IP: {log.ipAddress}</p>
+                                                                        <p className="text-xs text-muted-foreground">{log.userAgent?.substring(0, 50)}...</p>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    • {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Expanded Details */}
+                                                            <AnimatePresence>
+                                                                {isExpanded && (
+                                                                    <motion.div
+                                                                        initial={{ height: 0, opacity: 0 }}
+                                                                        animate={{ height: 'auto', opacity: 1 }}
+                                                                        exit={{ height: 0, opacity: 0 }}
+                                                                        transition={{ duration: 0.2 }}
+                                                                        className="overflow-hidden"
+                                                                    >
+                                                                        <Separator className="my-3" />
+
+                                                                        {/* Delta View */}
+                                                                        {(log.oldValue || log.newValue) && (
+                                                                            <div className="mb-3">
+                                                                                <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                                                                                    <Zap className="h-3 w-3" />
+                                                                                    Change Delta
+                                                                                </p>
+                                                                                <div className="bg-background/50 rounded-lg p-3">
+                                                                                    <DeltaDiffView
+                                                                                        oldValue={log.oldValue}
+                                                                                        newValue={log.newValue}
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                                                            <div>
+                                                                                <p className="text-muted-foreground">Entity Type</p>
+                                                                                <p className="font-medium capitalize">{log.entityType || 'System'}</p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-muted-foreground">Entity ID</p>
+                                                                                <p className="font-medium font-mono truncate">{log.entityId || 'N/A'}</p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-muted-foreground">Severity</p>
+                                                                                <Badge
+                                                                                    className={cn(
+                                                                                        "mt-1",
+                                                                                        log.severity === 'critical' && "bg-red-500",
+                                                                                        log.severity === 'warning' && "bg-amber-500",
+                                                                                        log.severity === 'info' && "bg-blue-500"
+                                                                                    )}
+                                                                                >
+                                                                                    {log.severity || 'info'}
+                                                                                </Badge>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-muted-foreground">Timestamp</p>
+                                                                                <p className="font-medium">{format(new Date(log.createdAt), 'PPpp')}</p>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {log.details && Object.keys(log.details).length > 0 && (
+                                                                            <div className="mt-3">
+                                                                                <p className="text-muted-foreground text-xs mb-1">Raw Details</p>
+                                                                                <div className="bg-background/50 rounded p-2 text-xs font-mono max-h-32 overflow-auto">
+                                                                                    <pre className="whitespace-pre-wrap">
+                                                                                        {JSON.stringify(log.details, null, 2)}
+                                                                                    </pre>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </motion.div>
+                                                                )}
+                                                            </AnimatePresence>
+                                                        </div>
+
+                                                        {/* Expand indicator */}
+                                                        <div className="shrink-0">
+                                                            {isExpanded ? (
+                                                                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                                            ) : (
+                                                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        })}
+
+                                        {/* Loading more indicator */}
+                                        {isFetchingNextPage && (
+                                            <div className="flex items-center justify-center py-4">
+                                                <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+                                                <span className="ml-2 text-sm text-muted-foreground">Loading more...</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </AnimatePresence>
+                            )}
                         </div>
-                    </div>
-                )}
-            </Card>
-        </div>
+                    </ScrollArea>
+                </Card>
+            </div>
+        </TooltipProvider>
     );
 }

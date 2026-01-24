@@ -16,6 +16,8 @@ import { Order, InsertOrder } from '../../shared/schema';
 
 export interface OrderFilters {
   status?: string;
+  paymentStatus?: string;
+  customerId?: string;
   search?: string;
   customerEmail?: string;
   sortBy?: string;
@@ -56,6 +58,16 @@ export class OrderService {
       // Apply status filter if provided
       if (filters.status && filters.status !== 'all') {
         orders = orders.filter((order: Order) => order.status === filters.status);
+      }
+
+      // Apply payment status filter if provided
+      if (filters.paymentStatus && filters.paymentStatus !== 'all') {
+        orders = orders.filter((order: Order) => (order as any).paymentStatus === filters.paymentStatus);
+      }
+
+      // Apply customerId filter if provided
+      if (filters.customerId) {
+        orders = orders.filter((order: Order) => order.customerId === filters.customerId);
       }
 
       // Apply search filter if provided
@@ -226,13 +238,13 @@ export class OrderService {
         try {
           const customer = await storage.getCustomer(order.customerId);
           if (customer) {
-            const currentTotalSpent = parseFloat(customer.totalSpent || '0');
+            const currentTotalSpent = parseFloat(customer.totalLifetimeSpent || '0');
             const orderTotal = parseFloat(order.totalAmount || '0');
 
             await storage.updateCustomer(order.customerId, {
               totalOrders: (customer.totalOrders || 0) + 1,
-              totalSpent: (currentTotalSpent + orderTotal).toString(),
-              lastOrder: new Date().toISOString()
+              totalLifetimeSpent: (currentTotalSpent + orderTotal).toString(),
+              lastOrderAt: new Date()
             });
             console.log(`✅ [OrderService] Updated stats for customer: ${order.customerId}`);
           }

@@ -79,6 +79,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { CustomerAutocomplete } from "@/components/customer-autocomplete";
 import CustomerDialogs from "@/components/customers/customer-dialogs";
+import { CreditsTable } from "@/components/credits/credits-table";
 import { customersApi, ordersApi } from "@/lib/data-service";
 import type { Customer, Order } from "@shared/schema";
 
@@ -528,76 +529,21 @@ export default function CreditsPage() {
                 {/* Balances Tab */}
                 <TabsContent value="balances" className="space-y-4">
                     <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-lg font-medium">Customer Outstanding Report</CardTitle>
+                        <CardHeader className="pb-3 px-6">
+                            <CardTitle className="text-xl font-bold flex items-center gap-2">
+                                <Users className="h-5 w-5 text-primary" />
+                                Customer Outstanding Report
+                            </CardTitle>
                             <CardDescription>
-                                Showing top customers by credit balance.
+                                Detailed breakdown of customer credit balances and repayment status.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="p-0">
-                            <Table>
-                                <TableHeader className="bg-muted/40">
-                                    <TableRow>
-                                        <TableHead>Customer Details</TableHead>
-                                        <TableHead>Last Activity</TableHead>
-                                        <TableHead className="text-right">Total Orders</TableHead>
-                                        <TableHead className="text-right">Outstanding Balance</TableHead>
-                                        <TableHead className="w-[100px]">Quick Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {isLoadingCustomers ? (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="h-24 text-center">Loading balances...</TableCell>
-                                        </TableRow>
-                                    ) : customersWithCredit.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                                                <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                                                No customers with outstanding balance.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        customersWithCredit.map((c: any) => (
-                                            <TableRow key={c.id}>
-                                                <TableCell>
-                                                    <div className="font-medium text-base text-primary hover:underline cursor-pointer" onClick={() => openCustomerPopup(c.id)}>
-                                                        {c.name}
-                                                    </div>
-                                                    <div className="text-sm text-muted-foreground">{c.phone}</div>
-                                                </TableCell>
-                                                <TableCell className="text-muted-foreground">
-                                                    {c.lastOrder ? format(new Date(c.lastOrder), "MMM d, yyyy") : "N/A"}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {c.totalOrders}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <span className={`text-lg font-bold ${c.creditBalance > 5000 ? 'text-rose-600' : 'text-orange-600'
-                                                        }`}>
-                                                        {formatCurrency(c.creditBalance)}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-8 w-full justify-start text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                                        onClick={() => {
-                                                            // We would need to pre-fill the dialog form here
-                                                            // For now, simpler to redirect or open standard dialog
-                                                            setSelectedActionType('payment');
-                                                            setIsActionDialogOpen(true);
-                                                        }}
-                                                    >
-                                                        Record Pay
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
+                        <CardContent>
+                            <CreditsTable
+                                customers={customersWithCredit}
+                                isLoading={isLoadingCustomers}
+                                onViewCustomer={openCustomerPopup}
+                            />
                         </CardContent>
                     </Card>
                 </TabsContent>

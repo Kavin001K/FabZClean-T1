@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
+import { creditsApi } from "@/lib/data-service";
 import {
   DollarSign,
   CreditCard,
@@ -29,7 +30,8 @@ interface OrderPaymentModalProps {
     customerName: string;
     totalAmount: string;
     advancePaid?: string;
-    paymentStatus: 'pending' | 'paid' | 'partial' | 'failed';
+    amountPaid?: string;
+    paymentStatus: 'pending' | 'paid' | 'partial' | 'failed' | 'credit';
     items: any[];
   };
   onPaymentUpdate?: (orderId: string, paymentData: any) => void;
@@ -66,6 +68,12 @@ const paymentMethods: PaymentMethod[] = [
     name: 'Bank Transfer',
     icon: <Banknote className="w-5 h-5" />,
     type: 'bank_transfer'
+  },
+  {
+    id: 'wallet',
+    name: 'Customer Wallet',
+    icon: <Smartphone className="w-5 h-5 text-purple-600" />,
+    type: 'upi' // Using upi icon/type logic as placeholder
   }
 ];
 
@@ -104,16 +112,7 @@ export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPayme
       return;
     }
 
-    if (paymentType === 'advance' && parseFloat(amount) >= totalAmount) {
-      toast({
-        title: "Invalid Amount",
-        description: "Advance payment cannot be equal to or greater than total amount.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (paymentType === 'delivery' && parseFloat(amount) > remainingAmount) {
+    if (paymentType === 'delivery' && parseFloat(amount) > remainingAmount + 0.01) {
       toast({
         title: "Invalid Amount",
         description: "Payment amount cannot exceed remaining balance.",
@@ -125,45 +124,35 @@ export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPayme
     setIsProcessing(true);
 
     try {
-      // Update payment status
-      let newPaymentStatus: string;
-      if (paymentType === 'full' || (paymentType === 'delivery' && parseFloat(amount) >= remainingAmount)) {
-        newPaymentStatus = 'paid';
-      } else if (paymentType === 'advance' || (paymentType === 'delivery' && parseFloat(amount) < remainingAmount)) {
-        newPaymentStatus = 'partial';
-      } else {
-        newPaymentStatus = 'partial';
-      }
-
-      const updatedAdvancePaid = paymentType === 'advance' ?
-        (advancePaid + parseFloat(amount)).toString() :
-        order.advancePaid;
-
-      // Call API
-      await apiRequest("PUT", `/api/orders/${order.id}`, {
-        paymentStatus: newPaymentStatus,
-        advancePaid: updatedAdvancePaid
+      // Use the new simplified settlement API
+      const result = await creditsApi.settleOrderCredit(order.id, {
+        amountPaid: parseFloat(amount),
+        paymentMethod: selectedMethod as 'cash' | 'upi' | 'wallet',
+        notes: notes
       });
 
-      const updatedOrder = {
-        ...order,
-        advancePaid: updatedAdvancePaid,
-        paymentStatus: newPaymentStatus
-      };
+      if (!result.success) {
+        throw new Error(result.error || "Failed to process payment");
+      }
 
-      onPaymentUpdate?.(order.id, updatedOrder);
+      onPaymentUpdate?.(order.id, {
+        ...order,
+        amountPaid: (parseFloat(order.amountPaid || '0') + parseFloat(amount)).toString(),
+        paymentStatus: result.status,
+        lastPaymentMethod: selectedMethod
+      });
 
       addNotification({
         type: 'success',
-        title: 'Payment Processed Successfully!',
-        message: `${formatCurrency(parseFloat(amount))} ${paymentType} payment received via ${paymentMethods.find(m => m.id === selectedMethod)?.name}`,
+        title: 'Payment Processed!',
+        message: `${formatCurrency(parseFloat(amount))} payment received via ${selectedMethod.toUpperCase()}.`,
         actionUrl: '/orders',
-        actionText: 'View Orders'
+        actionText: 'View Order'
       });
 
       toast({
         title: "Payment Successful",
-        description: `${formatCurrency(parseFloat(amount))} payment processed successfully.`,
+        description: `${formatCurrency(parseFloat(amount))} payment processed. Status: ${result.status}`,
       });
 
       // Reset form
@@ -172,10 +161,10 @@ export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPayme
       setNotes('');
       setIsOpen(false);
 
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Payment Failed",
-        description: "There was an error processing the payment. Please try again.",
+        description: error.message || "There was an error processing the payment.",
         variant: "destructive",
       });
     } finally {

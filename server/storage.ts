@@ -86,6 +86,11 @@ export interface IStorage {
   getRevenueGrowth(franchiseId?: string): Promise<any>;
   getLowStockProducts(franchiseId?: string, threshold?: number): Promise<any[]>;
   getEmployeeStats(employeeId: string): Promise<any>;
+
+  // Daily Summary methods
+  createDailySummary(data: any): Promise<any>;
+  getDailySummaries(filters: { franchiseId?: string; startDate?: Date; endDate?: Date }): Promise<any[]>;
+  getDailySummary(id: string): Promise<any | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -139,6 +144,11 @@ export class MemStorage implements IStorage {
   async getRevenueGrowth(franchiseId?: string): Promise<any> { return this.sqliteStorage.getRevenueGrowth(franchiseId); }
   async getLowStockProducts(franchiseId?: string, threshold?: number): Promise<any[]> { return this.sqliteStorage.getLowStockProducts(franchiseId, threshold); }
   async getEmployeeStats(employeeId: string): Promise<any> { return this.sqliteStorage.getEmployeeStats(employeeId); }
+
+  // Daily Summary methods
+  async createDailySummary(data: any): Promise<any> { return this.sqliteStorage.createDailySummary(data); }
+  async getDailySummaries(filters: any): Promise<any[]> { return this.sqliteStorage.getDailySummaries(filters); }
+  async getDailySummary(id: string): Promise<any | undefined> { return this.sqliteStorage.getDailySummary(id); }
 
   private async initializeData() {
     // Check if database already has data to avoid duplicating

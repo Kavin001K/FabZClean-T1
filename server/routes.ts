@@ -37,6 +37,9 @@ import businessSettingsRouter from "./routes/business-settings";
 import documentsRouter from "./routes/documents";
 import analyticsRouter from "./routes/analytics";
 import dashboardRouter from "./routes/dashboard";
+import biReportsRouter from "./routes/bi-reports";
+import biAnalyticsRouter from "./routes/bi-analytics";
+import dbMonitorRouter from "./routes/db-monitor";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register Auth routes (login, logout, me, etc.)
@@ -81,18 +84,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard routes - Optimized
   app.use("/api/dashboard", dashboardRouter);
 
+  // BI Suite routes
+  app.use("/api/reports/bi", biReportsRouter);
+
+  // BI Analytics API routes (for dashboard)
+  app.use("/api/analytics", biAnalyticsRouter);
+
+  // Database System Monitor (Admin Only)
+  app.use("/api/database-monitor", dbMonitorRouter);
+
   // Database health check endpoints
-  app.get("/api/health/database", async (req, res) => {
-    try {
-      const health = await getDatabaseHealth();
-      res.json(health);
-    } catch (error) {
-      res.status(500).json({
-        status: "unhealthy",
-        error: (error as Error).message,
-      });
-    }
-  });
+
 
   app.get("/api/health/ping", async (req, res) => {
     try {
@@ -106,14 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/database/info", async (req, res) => {
-    try {
-      const info = await getDatabaseInfo();
-      res.json(info);
-    } catch (error) {
-      res.status(500).json({ error: (error as Error).message });
-    }
-  });
+
 
   // Due date orders endpoint
   app.get("/api/due-date-orders", async (req, res) => {
@@ -620,13 +615,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const customer = await storage.getCustomer(order.customerId);
           if (customer) {
             const currentOrders = customer.totalOrders || 0;
-            const currentSpent = parseFloat(customer.totalSpent?.toString() || "0");
+            const currentSpent = parseFloat(customer.totalLifetimeSpent?.toString() || "0");
             const orderAmount = parseFloat(order.totalAmount || "0");
 
             await storage.updateCustomer(order.customerId, {
               totalOrders: currentOrders + 1,
-              totalSpent: (currentSpent + orderAmount).toString(),
-              lastOrder: new Date(),
+              totalLifetimeSpent: (currentSpent + orderAmount).toString(),
+              lastOrderAt: new Date(),
             });
           }
         } catch (customerUpdateError) {
@@ -945,7 +940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).length;
 
       const totalRevenue = customers.reduce(
-        (sum: number, customer: Customer) => sum + parseFloat(customer.totalSpent || "0"),
+        (sum: number, customer: Customer) => sum + parseFloat(customer.totalLifetimeSpent || "0"),
         0,
       );
 
@@ -1008,7 +1003,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transformedCustomers = customers.map((customer: Customer) => ({
         ...customer,
         joinDate: customer.createdAt,
-        totalSpent: parseFloat(customer.totalSpent || "0"),
+        totalLifetimeSpent: parseFloat(customer.totalLifetimeSpent || "0"),
       }));
 
       res.json(transformedCustomers);
@@ -1028,7 +1023,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transformedCustomer = {
         ...customer,
         joinDate: customer.createdAt,
-        totalSpent: parseFloat(customer.totalSpent || "0"),
+        totalLifetimeSpent: parseFloat(customer.totalLifetimeSpent || "0"),
       };
 
       res.json(transformedCustomer);
@@ -1039,10 +1034,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Helper function for Tier Calculation
-  const calculateTier = (totalSpent: number): string => {
-    if (totalSpent >= 50000) return "Platinum";
-    if (totalSpent >= 20000) return "Gold";
-    if (totalSpent >= 10000) return "Silver";
+  const calculateTier = (totalLifetimeSpent: number): string => {
+    if (totalLifetimeSpent >= 50000) return "Platinum";
+    if (totalLifetimeSpent >= 20000) return "Gold";
+    if (totalLifetimeSpent >= 10000) return "Silver";
     return "Bronze";
   };
 
@@ -1079,7 +1074,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Initialize defaults
-      validatedData.tier = calculateTier(parseFloat(validatedData.totalSpent || "0"));
+      validatedData.tier = calculateTier(parseFloat(validatedData.totalLifetimeSpent || "0"));
       validatedData.walletBalance = validatedData.walletBalance || "0";
       validatedData.creditLimit = validatedData.creditLimit || "1000";
       validatedData.status = "active";
@@ -1106,9 +1101,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertCustomerSchema.partial().parse(req.body);
 
-      // Auto-update tier if totalSpent is changed
-      if (validatedData.totalSpent) {
-        validatedData.tier = calculateTier(parseFloat(validatedData.totalSpent as string));
+      // Auto-update tier if totalLifetimeSpent is changed
+      if (validatedData.totalLifetimeSpent) {
+        validatedData.tier = calculateTier(parseFloat(validatedData.totalLifetimeSpent as string));
       }
 
       const customer = await storage.updateCustomer(
@@ -1142,7 +1137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transformedCustomer = {
         ...customer,
         joinDate: customer.createdAt,
-        totalSpent: parseFloat(customer.totalSpent || "0"),
+        totalLifetimeSpent: parseFloat(customer.totalLifetimeSpent || "0"),
       };
 
       res.json(transformedCustomer);

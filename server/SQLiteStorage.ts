@@ -254,6 +254,8 @@ export class SQLiteStorage implements IStorage {
         id TEXT PRIMARY KEY,
         franchiseId TEXT,
         customerId TEXT,
+        employeeId TEXT,
+        createdBy TEXT,
         status TEXT DEFAULT 'pending',
         totalAmount TEXT,
         items TEXT,
@@ -492,11 +494,19 @@ export class SQLiteStorage implements IStorage {
         id TEXT PRIMARY KEY,
         franchiseId TEXT,
         type TEXT DEFAULT 'invoice',
+        category TEXT,
         title TEXT NOT NULL,
         filename TEXT NOT NULL,
         filepath TEXT NOT NULL,
         fileUrl TEXT NOT NULL,
         status TEXT DEFAULT 'draft',
+        versionNumber INTEGER DEFAULT 1,
+        expiryDate TEXT,
+        isVerified INTEGER DEFAULT 0,
+        verifiedAt TEXT,
+        verifiedBy TEXT,
+        verificationStatus TEXT DEFAULT 'unverified',
+        rejectionReason TEXT,
         amount TEXT,
         customerName TEXT,
         orderNumber TEXT,
@@ -924,6 +934,32 @@ export class SQLiteStorage implements IStorage {
 
       CREATE INDEX IF NOT EXISTS idx_daily_reports_date ON daily_reports(reportDate);
       CREATE INDEX IF NOT EXISTS idx_daily_reports_franchise ON daily_reports(franchiseId);
+
+      CREATE TABLE IF NOT EXISTS daily_summaries (
+        id TEXT PRIMARY KEY,
+        franchiseId TEXT,
+        date TEXT NOT NULL,
+        totalRevenue TEXT DEFAULT '0',
+        orderCount INTEGER DEFAULT 0,
+        customerCount INTEGER DEFAULT 0,
+        newCustomerCount INTEGER DEFAULT 0,
+        serviceMix TEXT, -- JSON
+        paymentMethodMix TEXT, -- JSON
+        staffPerformance TEXT, -- JSON
+        avgTurnaroundHours TEXT,
+        readyOnTimeCount INTEGER DEFAULT 0,
+        delayedOrderCount INTEGER DEFAULT 0,
+        totalCost TEXT DEFAULT '0',
+        contributionMargin TEXT DEFAULT '0', -- Percentage or Absolute
+        analytics TEXT, -- Stores complex results like CLV, SMA, Forecasts
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_daily_summaries_date ON daily_summaries(date);
+      CREATE INDEX IF NOT EXISTS idx_daily_summaries_franchise ON daily_summaries(franchiseId);
+
 
       -- ======= LOYALTY POINTS =======
       CREATE TABLE IF NOT EXISTS loyalty_points (
@@ -1450,6 +1486,15 @@ export class SQLiteStorage implements IStorage {
           ? anyData.segments
           : JSON.stringify(anyData.segments);
     }
+    // Handle daily_summaries JSON fields
+    if (table === "daily_summaries") {
+      const jsonFields = ['serviceMix', 'paymentMethodMix', 'staffPerformance', 'analytics'];
+      for (const field of jsonFields) {
+        if (anyData[field]) {
+          anyData[field] = typeof anyData[field] === "string" ? anyData[field] : JSON.stringify(anyData[field]);
+        }
+      }
+    }
     // Handle franchises table JSON fields
     if (table === "franchises") {
       if (anyData.address) {
@@ -1638,6 +1683,15 @@ export class SQLiteStorage implements IStorage {
         typeof processedData.items === "string"
           ? processedData.items
           : JSON.stringify(processedData.items);
+    }
+    // Handle daily_summaries JSON fields
+    if (table === "daily_summaries") {
+      const jsonFields = ['serviceMix', 'paymentMethodMix', 'staffPerformance', 'analytics'];
+      for (const field of jsonFields) {
+        if (processedData[field]) {
+          processedData[field] = typeof processedData[field] === "string" ? processedData[field] : JSON.stringify(processedData[field]);
+        }
+      }
     }
     // Handle franchises table JSON fields
     if (table === "franchises") {
@@ -3459,10 +3513,11 @@ export class SQLiteStorage implements IStorage {
 
     const stmt = this.db.prepare(`
       INSERT INTO documents (
-        id, franchiseId, type, title, filename, filepath, fileUrl, 
-        status, amount, customerName, orderNumber, metadata, createdAt, updatedAt
+        id, franchiseId, type, category, title, filename, filepath, fileUrl, 
+        status, versionNumber, expiryDate, isVerified, verificationStatus,
+        amount, customerName, orderNumber, metadata, createdAt, updatedAt
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
     `);
 
@@ -3470,11 +3525,16 @@ export class SQLiteStorage implements IStorage {
       id,
       data.franchiseId,
       data.type,
+      data.category,
       data.title,
       data.filename,
       data.filepath,
       data.fileUrl,
-      data.status,
+      data.status || 'draft',
+      data.versionNumber || 1,
+      data.expiryDate,
+      data.isVerified ? 1 : 0,
+      data.verificationStatus || 'unverified',
       data.amount,
       data.customerName,
       data.orderNumber,
@@ -3495,9 +3555,19 @@ export class SQLiteStorage implements IStorage {
       params.push(filters.type);
     }
 
+    if (filters.category) {
+      query += " AND category = ?";
+      params.push(filters.category);
+    }
+
     if (filters.status) {
       query += " AND status = ?";
       params.push(filters.status);
+    }
+
+    if (filters.franchiseId) {
+      query += " AND franchiseId = ?";
+      params.push(filters.franchiseId);
     }
 
     query += " ORDER BY createdAt DESC";
@@ -3507,13 +3577,25 @@ export class SQLiteStorage implements IStorage {
       params.push(filters.limit);
     }
 
-    const stmt = this.db.prepare(query);
-    const docs = stmt.all(...params);
-
+    const docs = this.db.prepare(query).all(...params) as any[];
     return docs.map((doc: any) => ({
       ...doc,
+      isVerified: doc.isVerified === 1,
       metadata: doc.metadata ? JSON.parse(doc.metadata) : {}
     }));
+  }
+
+  async verifyDocument(id: string, status: string, reason?: string, employeeId?: string) {
+    const now = new Date().toISOString();
+    this.updateRecord("documents", id, {
+      verificationStatus: status,
+      isVerified: status === 'verified' ? 1 : 0,
+      verifiedAt: status === 'verified' ? now : null,
+      verifiedBy: employeeId,
+      rejectionReason: reason,
+      updatedAt: now
+    });
+    return this.getDocument(id);
   }
 
   async getDocument(id: string) {
@@ -4080,5 +4162,64 @@ export class SQLiteStorage implements IStorage {
 
   async listVehicles(): Promise<any[]> {
     return this.db.prepare("SELECT * FROM vehicles ORDER BY createdAt DESC").all();
+  }
+
+  // Daily Summary methods
+  async createDailySummary(data: any): Promise<any> {
+    const id = this.insertRecord("daily_summaries", data);
+    return this.getDailySummary(id);
+  }
+
+  async getDailySummaries(filters: { franchiseId?: string; startDate?: Date; endDate?: Date }): Promise<any[]> {
+    let query = "SELECT * FROM daily_summaries WHERE 1=1";
+    const params: any[] = [];
+
+    if (filters.franchiseId) {
+      query += " AND franchiseId = ?";
+      params.push(filters.franchiseId);
+    }
+    if (filters.startDate) {
+      query += " AND date >= ?";
+      params.push(filters.startDate.toISOString());
+    }
+    if (filters.endDate) {
+      query += " AND date <= ?";
+      params.push(filters.endDate.toISOString());
+    }
+
+    query += " ORDER BY date DESC";
+
+    const rows = this.db.prepare(query).all(...params);
+    return rows.map(row => {
+      // Parse JSON fields
+      const jsonFields = ['serviceMix', 'paymentMethodMix', 'staffPerformance', 'analytics'];
+      for (const field of jsonFields) {
+        if (row[field]) {
+          try {
+            row[field] = JSON.parse(row[field]);
+          } catch (e) {
+            // Non-critical
+          }
+        }
+      }
+      return row;
+    });
+  }
+
+  async getDailySummary(id: string): Promise<any | undefined> {
+    const row = this.db.prepare("SELECT * FROM daily_summaries WHERE id = ?").get(id) as any;
+    if (!row) return undefined;
+
+    const jsonFields = ['serviceMix', 'paymentMethodMix', 'staffPerformance', 'analytics'];
+    for (const field of jsonFields) {
+      if (row[field]) {
+        try {
+          row[field] = JSON.parse(row[field]);
+        } catch (e) {
+          // Non-critical
+        }
+      }
+    }
+    return row;
   }
 }

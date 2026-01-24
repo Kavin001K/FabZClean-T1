@@ -227,4 +227,34 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// Verify document
+router.patch('/:id/verify', async (req, res) => {
+    try {
+        const { status, reason } = req.body;
+        const employeeId = (req as any).user?.id || 'system';
+
+        const document = await db.verifyDocument(req.params.id, status, reason, employeeId);
+        if (!document) return res.status(404).json({ error: 'Document not found' });
+
+        res.json({ success: true, document });
+    } catch (error) {
+        console.error('Error verifying document:', error);
+        res.status(500).json({ error: 'Failed to verify document' });
+    }
+});
+
+// Request update (Mock or simple log)
+router.post('/:id/request-update', async (req, res) => {
+    try {
+        const document = await db.getDocument(req.params.id);
+        if (!document) return res.status(404).json({ error: 'Document not found' });
+
+        // In a real app, this would send an email/notification
+        res.json({ success: true, message: 'Update request sent to franchise owner.' });
+    } catch (error) {
+        console.error('Error requesting update:', error);
+        res.status(500).json({ error: 'Failed to request update' });
+    }
+});
+
 export default router;

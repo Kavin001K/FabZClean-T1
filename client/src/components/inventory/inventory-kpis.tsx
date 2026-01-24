@@ -23,6 +23,7 @@ interface InventoryKPIsProps {
   data?: InventoryKpiData;
   isLoading: boolean;
   isError: boolean;
+  expiringSoonCount?: number;
 }
 
 interface KpiCardProps {
@@ -33,16 +34,18 @@ interface KpiCardProps {
   icon: React.ReactNode;
   description: string;
   color?: string;
+  isAlert?: boolean;
 }
 
-const KpiCard: React.FC<KpiCardProps> = React.memo(({ 
-  title, 
-  value, 
-  change, 
-  changeType, 
-  icon, 
+const KpiCard: React.FC<KpiCardProps> = React.memo(({
+  title,
+  value,
+  change,
+  changeType,
+  icon,
   description,
-  color = "text-primary"
+  color = "text-primary",
+  isAlert = false
 }) => {
   const getChangeColor = () => {
     if (changeType === "positive") return "text-green-600";
@@ -57,17 +60,20 @@ const KpiCard: React.FC<KpiCardProps> = React.memo(({
   };
 
   return (
-    <Card className="hover:shadow-lg transition-all duration-200 border-l-4 border-l-primary/20 hover:border-l-primary/40 group">
+    <Card className={cn(
+      "hover:shadow-lg transition-all duration-200 border-l-4 group",
+      isAlert ? "border-l-red-500 bg-red-50/50" : "border-l-primary/20 hover:border-l-primary/40"
+    )}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
           {title}
         </CardTitle>
-        <div className={cn("transition-colors", color)}>
+        <div className={cn("transition-colors", isAlert ? "text-red-600 animate-pulse" : color)}>
           {icon}
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold text-foreground group-hover:text-primary transition-colors">
+        <div className={cn("text-2xl font-bold transition-colors", isAlert ? "text-red-700" : "text-foreground group-hover:text-primary")}>
           {value}
         </div>
         <div className={cn("flex items-center text-xs mt-1", getChangeColor())}>
@@ -82,14 +88,15 @@ const KpiCard: React.FC<KpiCardProps> = React.memo(({
   );
 });
 
-export const InventoryKPIs: React.FC<InventoryKPIsProps> = React.memo(({ 
-  data, 
-  isLoading, 
-  isError 
+export const InventoryKPIs: React.FC<InventoryKPIsProps> = React.memo(({
+  data,
+  isLoading,
+  isError,
+  expiringSoonCount = 0
 }) => {
   if (isLoading) {
     return (
-      <div className="grid gap-6 grid-cols-4">
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <LoadingSkeleton.KpiCardSkeleton key={i} />
         ))}
@@ -99,7 +106,7 @@ export const InventoryKPIs: React.FC<InventoryKPIsProps> = React.memo(({
 
   if (isError || !data) {
     return (
-      <div className="grid gap-6 grid-cols-4">
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i} className="border-dashed">
             <CardContent className="flex items-center justify-center h-24">
@@ -127,47 +134,50 @@ export const InventoryKPIs: React.FC<InventoryKPIsProps> = React.memo(({
     return 'neutral';
   };
 
+  const criticalItems = data.lowStockItems + data.outOfStockItems;
+
   const kpiData = [
+    {
+      title: "Critical Alerts",
+      value: formatNumber(criticalItems),
+      change: `${criticalItems > 5 ? 'Action Needed' : 'Stable'}`,
+      changeType: criticalItems > 0 ? 'negative' : 'neutral' as any,
+      icon: <AlertTriangle className="h-5 w-5" />,
+      description: "Low stock & Out of stock",
+      color: "text-red-600",
+      isAlert: criticalItems > 0
+    },
+    {
+      title: "Upcoming Expiries",
+      value: formatNumber(expiringSoonCount),
+      change: "Next 15 Days",
+      changeType: "neutral" as any,
+      icon: <AlertTriangle className="h-5 w-5" />,
+      description: "Chemicals expiring soon",
+      color: "text-orange-600"
+    },
+    {
+      title: "Inventory Value",
+      value: formatCurrency(data.totalValue),
+      change: `${formatPercentage(data.totalValueChange)} vs last month`,
+      changeType: getChangeType(data.totalValueChange),
+      icon: <DollarSign className="h-5 w-5" />,
+      description: "Total asset value",
+      color: "text-green-600"
+    },
     {
       title: "Total Items",
       value: formatNumber(data.totalItems),
-      change: `${formatPercentage(data.totalItemsChange)} this month`,
+      change: `${formatPercentage(data.totalItemsChange)} vs last month`,
       changeType: getChangeType(data.totalItemsChange),
       icon: <Package className="h-5 w-5" />,
-      description: "All inventory items",
+      description: "Tracked SKUs",
       color: "text-blue-600"
-    },
-    {
-      title: "Total Value",
-      value: formatCurrency(data.totalValue),
-      change: `${formatPercentage(data.totalValueChange)} this month`,
-      changeType: getChangeType(data.totalValueChange),
-      icon: <DollarSign className="h-5 w-5" />,
-      description: "Inventory value",
-      color: "text-green-600"
-    },
-    {
-      title: "In Stock",
-      value: formatNumber(data.inStockItems),
-      change: `${formatPercentage(data.inStockItemsChange)} this week`,
-      changeType: getChangeType(data.inStockItemsChange),
-      icon: <CheckCircle className="h-5 w-5" />,
-      description: "Items available",
-      color: "text-green-600"
-    },
-    {
-      title: "Low Stock",
-      value: formatNumber(data.lowStockItems),
-      change: `${formatPercentage(data.lowStockItemsChange)} this week`,
-      changeType: getChangeType(data.lowStockItemsChange),
-      icon: <AlertTriangle className="h-5 w-5" />,
-      description: "Items need restocking",
-      color: "text-orange-600"
     }
   ];
 
   return (
-    <div className="grid gap-6 grid-cols-4">
+    <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
       {kpiData.map((kpi) => (
         <KpiCard key={kpi.title} {...kpi} />
       ))}

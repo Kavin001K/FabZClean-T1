@@ -21,6 +21,12 @@ export type InventoryItem = {
   price?: number;
   reorderLevel?: number;
   supplier?: string;
+  // New Fields
+  batchNumber?: string;
+  expiryDate?: string;
+  costPerUnit?: number;
+  unitType?: string;
+  conversionFactor?: number;
 };
 
 export type SalesData = {
@@ -486,6 +492,12 @@ export const inventoryApi = {
         price: parseFloat(rawData.price) || 0,
         reorderLevel: rawData.reorderLevel || 10,
         supplier: rawData.supplier || '',
+        // New Fields
+        batchNumber: rawData.batchNumber || '',
+        expiryDate: rawData.expiryDate || '',
+        costPerUnit: parseFloat(rawData.costPerUnit) || 0,
+        unitType: rawData.unitType || 'piece',
+        conversionFactor: parseFloat(rawData.conversionFactor) || 1,
       };
     } catch (error) {
       console.error(`Failed to fetch inventory item ${id}:`, error);
@@ -505,6 +517,12 @@ export const inventoryApi = {
           stockQuantity: item.stock || 0,
           reorderLevel: item.reorderLevel || 10,
           supplier: item.supplier || "",
+          // New Fields
+          batchNumber: item.batchNumber,
+          expiryDate: item.expiryDate,
+          costPerUnit: item.costPerUnit?.toString(),
+          unitType: item.unitType,
+          conversionFactor: item.conversionFactor?.toString(),
         }),
       });
       if (!response.ok) throw new Error("Failed to create inventory item");
@@ -520,6 +538,12 @@ export const inventoryApi = {
         price: parseFloat(product.price) || 0,
         reorderLevel: product.reorderLevel || 10,
         supplier: product.supplier || '',
+        // New Fields
+        batchNumber: product.batchNumber || '',
+        expiryDate: product.expiryDate || '',
+        costPerUnit: parseFloat(product.costPerUnit) || 0,
+        unitType: product.unitType || 'piece',
+        conversionFactor: parseFloat(product.conversionFactor) || 1,
       };
     } catch (error) {
       console.error('Failed to create inventory item:', error);
@@ -539,6 +563,12 @@ export const inventoryApi = {
           stockQuantity: item.stock,
           reorderLevel: item.reorderLevel,
           supplier: item.supplier,
+          // New Fields
+          batchNumber: item.batchNumber,
+          expiryDate: item.expiryDate,
+          costPerUnit: item.costPerUnit?.toString(),
+          unitType: item.unitType,
+          conversionFactor: item.conversionFactor?.toString(),
         }),
       });
       if (!response.ok) throw new Error("Failed to update inventory item");
@@ -554,6 +584,12 @@ export const inventoryApi = {
         price: parseFloat(product.price) || 0,
         reorderLevel: product.reorderLevel || 10,
         supplier: product.supplier || '',
+        // New Fields
+        batchNumber: product.batchNumber || '',
+        expiryDate: product.expiryDate || '',
+        costPerUnit: parseFloat(product.costPerUnit) || 0,
+        unitType: product.unitType || 'piece',
+        conversionFactor: parseFloat(product.conversionFactor) || 1,
       };
     } catch (error) {
       console.error('Failed to update inventory item:', error);
@@ -1206,4 +1242,77 @@ export const creditsApi = {
       return null;
     }
   },
+
+  /**
+   * Settle an order credit (Full or partial payment)
+   */
+  async settleOrderCredit(orderId: string, data: {
+    amountPaid: number;
+    paymentMethod: 'cash' | 'upi' | 'wallet';
+    notes?: string;
+  }): Promise<{ success: boolean; remainingBalance?: number; status?: string; error?: string }> {
+    try {
+      const response = await authorizedFetch(`/credits/${orderId}/settle`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to settle credit');
+      }
+
+      const result = await response.json();
+      return {
+        success: true,
+        remainingBalance: parseFloat(result.remainingBalance),
+        status: result.status
+      };
+    } catch (error: any) {
+      console.error('Failed to settle order credit:', error);
+      return { success: false, error: error.message };
+    }
+  },
+};
+
+// Documents API
+export const documentsApi = {
+  async getAll(): Promise<any[]> {
+    try {
+      return await fetchData<any[]>('/documents');
+    } catch (error) {
+      console.error('Failed to fetch documents:', error);
+      return [];
+    }
+  },
+
+  async upload(formData: FormData): Promise<any> {
+    const response = await fetch(`${API_BASE}/documents/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getAccessToken()}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Upload failed');
+    }
+
+    return await response.json();
+  },
+
+  async verify(id: string, status: 'verified' | 'rejected', reason?: string): Promise<any> {
+    return await fetchData(`/documents/${id}/verify`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, reason }),
+    });
+  },
+
+  async requestUpdate(id: string): Promise<any> {
+    return await fetchData(`/documents/${id}/request-update`, {
+      method: 'POST',
+    });
+  }
 };

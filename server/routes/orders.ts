@@ -267,6 +267,8 @@ router.get('/', async (req, res) => {
       limit,
       search,
       status: status === 'all' ? undefined : status,
+      paymentStatus: req.query.paymentStatus as string,
+      customerId: req.query.customerId as string,
       customerEmail,
       franchiseId
     };
@@ -421,8 +423,8 @@ router.post(
 
           // Limit Hierarchy: Customer specific > Franchise default > Global default
           let limit = 1000;
-          if (customer.customCreditLimit) {
-            limit = parseFloat(customer.customCreditLimit);
+          if (customer.creditLimit) {
+            limit = parseFloat(customer.creditLimit);
           } else if (orderData.franchiseId) {
             const franchise = await storage.getFranchise(orderData.franchiseId);
             if (franchise && franchise.defaultCreditLimit) {
