@@ -567,6 +567,7 @@ export default function CreateOrder() {
 
   // Create order mutation
   const createOrderMutation = useMutation({
+    mutationKey: ['createOrder'],
     mutationFn: async (orderData: Partial<Order>) => {
       return await ordersApi.create(orderData);
     },

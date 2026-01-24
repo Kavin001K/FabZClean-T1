@@ -8,12 +8,17 @@ interface MainLayoutProps {
   children: React.ReactNode;
 }
 
+import { useFranchiseData } from '@/hooks/use-franchise-data';
+
 /**
  * Establishes the primary desktop layout with a toggleable sidebar and main content area.
  * The main content div adjusts its left padding based on sidebar visibility.
  */
 export function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+
+  // Initialize the Single Source of Truth ecosystem
+  useFranchiseData();
 
   const toggleSidebar = () => {
     setIsSidebarVisible(!isSidebarVisible);

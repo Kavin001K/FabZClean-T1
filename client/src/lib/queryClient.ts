@@ -1,4 +1,4 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { QueryClient, QueryFunction, MutationCache } from "@tanstack/react-query";
 import { isElectron } from "./utils";
 
 async function throwIfResNotOk(res: Response) {
@@ -48,6 +48,33 @@ const browserStaleTime = 5 * 60 * 1000;   // 5 minutes for browser
 const gcTime = 30 * 60 * 1000;            // 30 minutes garbage collection
 
 export const queryClient = new QueryClient({
+  mutationCache: new MutationCache({
+    onSuccess: async (_data, _variables, _context, mutation) => {
+      // 🧪 Ecosystem Integration: Cross-Page Referencing
+      // This listener acts as the "Central Nervous System" for data.
+      // When a mutation happens, it intelligently refreshes related parts of the app.
+
+      const mutationKey = mutation.options.mutationKey;
+
+      if (mutationKey) {
+        // 1. If an Order is created/updated -> Refresh Inventory & Dashboard
+        if (mutationKey.includes('createOrder') || mutationKey.includes('updateOrder')) {
+          console.log('🔄 Ecosystem: Order Change detected. Syncing Inventory & Dashboard...');
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+            queryClient.invalidateQueries({ queryKey: ['orders'] }),
+            queryClient.invalidateQueries({ queryKey: ['customers'] })
+          ]);
+        }
+
+        // 2. If Inventory changes -> Refresh Dashboard
+        if (mutationKey.includes('inventory')) {
+          await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+        }
+      }
+    },
+  }),
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
@@ -108,4 +135,3 @@ export async function prefetchCommonData() {
     }
   }
 }
-

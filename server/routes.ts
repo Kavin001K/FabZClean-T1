@@ -449,6 +449,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Inventory endpoint (alias for products list)
+  app.get("/api/inventory", async (req, res) => {
+    try {
+      const products = await storage.listProducts();
+      res.json(products);
+    } catch (error) {
+      console.error("Fetch inventory error:", error);
+      res.status(500).json({ message: "Failed to fetch inventory" });
+    }
+  });
+
   app.post("/api/products", async (req, res) => {
     try {
       const validatedData = insertProductSchema.parse(req.body);

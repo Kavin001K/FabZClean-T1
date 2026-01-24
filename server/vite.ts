@@ -21,7 +21,7 @@ export async function setupVite(app: Express, server: Server) {
   // Dynamic imports - only loaded when this function is called (development only)
   // This prevents vite and its config from being loaded in production
   const { createServer: createViteServer, createLogger } = await import("vite");
-  const viteConfigModule = await import("../vite.config.minimal.js");
+  const viteConfigModule = await import("../vite.config.ts");
   const viteConfig = viteConfigModule.default;
 
   const viteLogger = createLogger();

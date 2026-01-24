@@ -388,7 +388,15 @@ export function CartBillPanel({
                             <Trash2 className="h-4 w-4 mr-2" />
                             Clear
                         </Button>
-                        <Button variant="outline" className="flex-1">
+                        <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => {
+                                // Save cart to localStorage as draft
+                                localStorage.setItem('fabz_held_cart', JSON.stringify(cart));
+                                onClearCart();
+                            }}
+                        >
                             <Receipt className="h-4 w-4 mr-2" />
                             Hold <kbd className="ml-1 px-1 bg-muted rounded text-[10px]">F4</kbd>
                         </Button>
@@ -509,9 +517,15 @@ function CartItemCard({
                         variant="outline"
                         size="sm"
                         className="h-7 w-7 p-0"
-                        onClick={() => onUpdateQuantity(item.quantity - 1)}
+                        onClick={() => {
+                            if (item.quantity > 1) {
+                                onUpdateQuantity(item.quantity - 1);
+                            } else {
+                                onRemove();
+                            }
+                        }}
                     >
-                        <Minus className="h-3.5 w-3.5" />
+                        {item.quantity === 1 ? <Trash2 className="h-3.5 w-3.5 text-destructive" /> : <Minus className="h-3.5 w-3.5" />}
                     </Button>
                 </div>
 

@@ -40,7 +40,11 @@ import {
     Plus,
     History,
     Settings,
+    Home,
+    Minimize2,
+    Maximize2,
 } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -123,6 +127,55 @@ export default function POSPage() {
     const [showDiscountModal, setShowDiscountModal] = useState(false);
     const [customerSearchQuery, setCustomerSearchQuery] = useState('');
 
+    const [isFullScreen, setIsFullScreen] = useState(false);
+
+    // Toggle Full Screen
+    const toggleFullScreen = useCallback(() => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch((e) => {
+                console.error(`Error attempting to enable full-screen mode: ${e.message} (${e.name})`);
+            });
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    }, []);
+
+    // Listen for full screen changes
+    useEffect(() => {
+        const handleFullScreenChange = () => {
+            setIsFullScreen(!!document.fullscreenElement);
+        };
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isFullScreen) {
+                // Browser handles exit, just need to ensure state sync if needed
+                // But if we want to ensure it exits:
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                }
+            }
+        };
+
+        document.addEventListener('fullscreenchange', handleFullScreenChange);
+        document.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullScreenChange);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isFullScreen]);
+
+    // Go Home and Exit Full Screen
+    const handleGoHome = useCallback(() => {
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(err => console.error(err));
+        }
+        setLocation('/');
+    }, [setLocation]);
+
+
     // Order Creation State
     const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -193,10 +246,12 @@ export default function POSPage() {
         return { orderCount, totalSpent, lastOrderDate, favoriteServiceIds };
     }, [customerOrders, services]);
 
+
     // ============ MUTATIONS ============
 
     // Create order mutation
     const createOrderMutation = useMutation({
+        mutationKey: ['createOrder'],
         mutationFn: async (orderData: Partial<Order>) => {
             return await ordersApi.create(orderData);
         },
@@ -356,7 +411,11 @@ export default function POSPage() {
         onCheckout: handleCheckout,
         onNewCart: handleCreateCart,
         onSaveDraft: () => {
-            toast({ title: 'Cart saved as draft', description: 'Auto-saved to local storage.' });
+            if (activeCart && activeCartId) {
+                localStorage.setItem('fabz_held_cart', JSON.stringify(activeCart));
+                clearCart(activeCartId);
+                toast({ title: 'Cart held', description: 'Cart saved and cleared for next customer.' });
+            }
         },
         onToggleExpress: handleToggleExpress,
         onClearCart: () => {
@@ -438,47 +497,75 @@ export default function POSPage() {
 
     return (
         <TooltipProvider>
-            <div className="h-screen flex flex-col bg-background overflow-hidden">
+            <div className="h-screen flex flex-col bg-background overflow-hidden relative">
 
-                {/* Top Bar */}
-                <header className="h-14 border-b bg-white dark:bg-slate-900 px-4 flex items-center justify-between shrink-0">
-                    <div className="flex items-center gap-4">
+                {/* Top Bar - Hidden in Full Screen */}
+                {!isFullScreen && (
+                    <header className="h-14 border-b bg-white dark:bg-slate-900 px-4 flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <Receipt className="h-6 w-6 text-primary" />
+                                <h1 className="text-lg font-bold hidden md:block">Point of Sale</h1>
+                            </div>
+
+                            {/* Mobile Cart Switcher */}
+                            <div className="md:hidden">
+                                <CartSwitcherMobile
+                                    carts={carts}
+                                    activeCartId={activeCartId}
+                                    onSelectCart={setActiveCart}
+                                    onCreateCart={handleCreateCart}
+                                    maxCarts={maxCarts}
+                                />
+                            </div>
+                        </div>
+
                         <div className="flex items-center gap-2">
-                            <Receipt className="h-6 w-6 text-primary" />
-                            <h1 className="text-lg font-bold hidden md:block">Point of Sale</h1>
-                        </div>
+                            {/* Full Screen Button */}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={toggleFullScreen}
+                                className="hidden md:flex gap-2"
+                            >
+                                <Maximize2 className="h-4 w-4" />
+                                Full Screen
+                            </Button>
 
-                        {/* Mobile Cart Switcher */}
-                        <div className="md:hidden">
-                            <CartSwitcherMobile
-                                carts={carts}
-                                activeCartId={activeCartId}
-                                onSelectCart={setActiveCart}
-                                onCreateCart={handleCreateCart}
-                                maxCarts={maxCarts}
-                            />
-                        </div>
-                    </div>
+                            {/* Keyboard Shortcuts Help */}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowShortcutHelp(true)}
+                                className="hidden md:flex gap-2"
+                            >
+                                <Keyboard className="h-4 w-4" />
+                                Shortcuts
+                            </Button>
 
-                    <div className="flex items-center gap-2">
-                        {/* Keyboard Shortcuts Help */}
+                            {/* Current User */}
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <User className="h-4 w-4" />
+                                <span className="hidden md:inline">{currentUser?.fullName || 'Staff'}</span>
+                            </div>
+                        </div>
+                    </header>
+                )}
+
+                {/* Minimal Home Button for Full Screen */}
+                {isFullScreen && (
+                    <div className="absolute top-0 left-0 right-0 z-50 flex justify-center p-2 pointer-events-none">
                         <Button
-                            variant="ghost"
+                            variant="secondary"
                             size="sm"
-                            onClick={() => setShowShortcutHelp(true)}
-                            className="hidden md:flex gap-2"
+                            onClick={handleGoHome}
+                            className="shadow-md bg-white/90 hover:bg-white backdrop-blur-sm pointer-events-auto rounded-full px-4 gap-2 border"
                         >
-                            <Keyboard className="h-4 w-4" />
-                            Shortcuts
+                            <Home className="h-4 w-4" />
+                            <span className="text-xs font-semibold">Home</span>
                         </Button>
-
-                        {/* Current User */}
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <User className="h-4 w-4" />
-                            <span className="hidden md:inline">{currentUser?.fullName || 'Staff'}</span>
-                        </div>
                     </div>
-                </header>
+                )}
 
                 {/* Cart Tabs (Desktop) */}
                 <div className="hidden md:block shrink-0">

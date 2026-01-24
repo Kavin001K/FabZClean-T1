@@ -14,7 +14,7 @@ RUN apk add --no-cache python3 make g++ git
 # Copy package files
 COPY package*.json ./
 # Client dependencies are managed in root package.json
-RUN npm install
+RUN npm install --ignore-scripts
 
 # Copy source code
 COPY . .
