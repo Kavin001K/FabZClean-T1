@@ -403,6 +403,39 @@ router.post(
         orderData.employeeId = employee.employeeId;
       }
 
+      // Express Order Logic
+      if (orderData.isExpressOrder) {
+        const now = new Date();
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        orderData.expectedDeliveryDate = tomorrow.toISOString();
+      }
+
+      // Financial Integrity: Credit Limit Check
+      if (orderData.paymentStatus === 'credit' && orderData.customerId) {
+        const customer = await storage.getCustomer(orderData.customerId);
+        if (customer) {
+          const currentDebt = parseFloat(customer.creditBalance || "0");
+          const newOrderAmount = parseFloat(orderData.totalAmount || "0");
+          const advance = parseFloat(orderData.advancePaid || "0");
+
+          // Limit Hierarchy: Customer specific > Franchise default > Global default
+          let limit = 1000;
+          if (customer.customCreditLimit) {
+            limit = parseFloat(customer.customCreditLimit);
+          } else if (orderData.franchiseId) {
+            const franchise = await storage.getFranchise(orderData.franchiseId);
+            if (franchise && franchise.defaultCreditLimit) {
+              limit = parseFloat(franchise.defaultCreditLimit);
+            }
+          }
+
+          if (currentDebt + (newOrderAmount - advance) > limit) {
+            return res.status(400).json(createErrorResponse(`Credit Limit Exceeded. Limit: ${limit}, Current Balance: ${currentDebt}`, 400));
+          }
+        }
+      }
+
       // Use OrderService to create order (includes external validation and enrichment)
       const order = await orderService.createOrder(orderData);
 
@@ -708,48 +741,47 @@ router.patch(
        * Order statuses follow a strict progression. Once an order moves forward,
        * it CANNOT go back to a previous status (irreversible).
        * 
-       * Flow: pending -> processing -> ready -> out_for_delivery -> delivered/completed
-       * 
-       * Special cases:
-       * - 'cancelled' can only be set from 'pending' or 'processing'
-       * - 'refunded' can only be set after 'completed' or 'delivered'
+       * Flow: pending -> processing -> ready_for_pickup/ready_for_transit -> out_for_delivery -> delivered -> completed
        */
       const STATUS_ORDER: Record<string, number> = {
         'pending': 1,
         'processing': 2,
-        'ready': 3,
+        'ready_for_pickup': 3,
+        'ready_for_transit': 3,
+        'in_store': 3, // Assuming in_store is equivalent to ready state
         'out_for_delivery': 4,
+        'in_transit': 4,
         'delivered': 5,
-        'completed': 5,  // Same level as delivered
-        'cancelled': 99, // Special status
-        'refunded': 100, // Special status
+        'completed': 6,
+        'cancelled': 99,
+        'refunded': 100,
+        'archived': 101,
       };
 
       const currentStatusLevel = STATUS_ORDER[order.status] || 0;
       const newStatusLevel = STATUS_ORDER[status] || 0;
 
       // Validate status transition
-      if (status !== 'cancelled' && status !== 'refunded') {
-        // Normal flow: can only go forward, not backward
+      if (status !== 'cancelled' && status !== 'refunded' && status !== 'archived') {
+        // Normal flow: can only go forward
         if (newStatusLevel < currentStatusLevel) {
           return res.status(400).json(createErrorResponse(
             `Cannot change status from '${order.status}' to '${status}'. Order status changes are irreversible.`,
             400
           ));
         }
-      } else if (status === 'cancelled') {
-        // Can only cancel orders that are pending or processing
-        if (!['pending', 'processing'].includes(order.status)) {
+
+        // STRICT STATE MACHINE: Processing check
+        if ((status === 'ready_for_pickup' || status === 'ready_for_transit') && order.status !== 'processing') {
           return res.status(400).json(createErrorResponse(
-            `Cannot cancel an order with status '${order.status}'. Orders can only be cancelled when pending or processing.`,
+            `Invalid Workflow: Orders must be in 'processing' state before being marked as Ready. Current status: ${order.status}`,
             400
           ));
         }
-      } else if (status === 'refunded') {
-        // Can only refund completed or delivered orders
-        if (!['completed', 'delivered'].includes(order.status)) {
+      } else if (status === 'cancelled') {
+        if (!['pending', 'processing'].includes(order.status)) {
           return res.status(400).json(createErrorResponse(
-            `Cannot refund an order with status '${order.status}'. Only completed or delivered orders can be refunded.`,
+            `Cannot cancel an order with status '${order.status}'. Orders can only be cancelled when pending or processing.`,
             400
           ));
         }
@@ -760,7 +792,6 @@ router.patch(
        * Orders cannot be marked as 'completed' or 'delivered' unless:
        * 1. Payment status is 'paid', OR
        * 2. Payment status is 'credit' (amount is tracked as customer debt)
-       * This ensures no order is handed over without payment being collected or credit being recorded
        */
       if ((status === 'completed' || status === 'delivered') && order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit') {
         return res.status(400).json(createErrorResponse(
@@ -874,7 +905,7 @@ router.post('/:id/log-print', async (req, res) => {
   }
 });
 
-// Delete order
+// Archive order (formerly Delete)
 router.delete('/:id', requireRole(ADMIN_ONLY), async (req, res) => {
   try {
     const orderId = req.params.id;
@@ -884,22 +915,25 @@ router.delete('/:id', requireRole(ADMIN_ONLY), async (req, res) => {
       return res.status(404).json(createErrorResponse('Order not found', 404));
     }
 
-    const deleted = await storage.deleteOrder(orderId);
+    // Instead of deleting, we archive
+    // Check if ARCHIVE status exists in schema enum (we added it)
+    const archived = await storage.updateOrder(orderId, { status: 'archived' });
 
-    if (!deleted) {
-      return res.status(500).json(createErrorResponse('Failed to delete order', 500));
+    if (!archived) {
+      return res.status(500).json(createErrorResponse('Failed to archive order', 500));
     }
 
-    // Log deletion
+    // Log archiving
     if (req.employee) {
       await AuthService.logAction(
         req.employee.employeeId,
         req.employee.username,
-        'delete_order',
+        'archive_order',
         'order',
         orderId,
         {
-          orderNumber: order.orderNumber
+          orderNumber: order.orderNumber,
+          originalStatus: order.status
         },
         req.ip || req.connection.remoteAddress,
         req.get('user-agent')
@@ -907,12 +941,16 @@ router.delete('/:id', requireRole(ADMIN_ONLY), async (req, res) => {
     }
 
     // Notify real-time clients
-    realtimeServer.triggerUpdate('order', 'deleted', { orderId });
+    realtimeServer.triggerUpdate('order', 'status_changed', {
+      orderId,
+      status: 'archived',
+      previousStatus: order.status
+    });
 
-    res.json(createSuccessResponse(null, 'Order deleted successfully'));
+    res.json(createSuccessResponse(null, 'Order archived successfully'));
   } catch (error) {
-    console.error('Delete order error:', error);
-    res.status(500).json(createErrorResponse('Failed to delete order', 500));
+    console.error('Archive order error:', error);
+    res.status(500).json(createErrorResponse('Failed to archive order', 500));
   }
 });
 

@@ -620,6 +620,23 @@ export class SQLiteStorage implements IStorage {
         updatedAt TEXT
       );
 
+      -- ======= VEHICLES =======
+      CREATE TABLE IF NOT EXISTS vehicles (
+        id TEXT PRIMARY KEY,
+        franchiseId TEXT,
+        licensePlate TEXT UNIQUE NOT NULL,
+        makeModel TEXT NOT NULL,
+        type TEXT NOT NULL,
+        capacityKg TEXT NOT NULL,
+        status TEXT DEFAULT 'active',
+        gpsDeviceId TEXT,
+        insuranceExpiry TEXT,
+        fitnessExpiry TEXT,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (franchiseId) REFERENCES franchises(id)
+      );
+
       -- Create indexes for better performance
       CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customerId);
       CREATE INDEX IF NOT EXISTS idx_deliveries_order ON deliveries(orderId);
@@ -641,6 +658,7 @@ export class SQLiteStorage implements IStorage {
       CREATE INDEX IF NOT EXISTS idx_drivers_status ON drivers(status);
       CREATE INDEX IF NOT EXISTS idx_drivers_vehicleNumber ON drivers(vehicleNumber);
       CREATE INDEX IF NOT EXISTS idx_drivers_licenseNumber ON drivers(licenseNumber);
+      CREATE INDEX IF NOT EXISTS idx_vehicles_licensePlate ON vehicles(licensePlate);
       
       -- Indexes for franchise isolation
       CREATE INDEX IF NOT EXISTS idx_orders_franchise ON orders(franchiseId);
@@ -2580,65 +2598,7 @@ export class SQLiteStorage implements IStorage {
     }));
   }
 
-  // Add the dashboard metrics method that MemStorage has
-  async getDashboardMetrics() {
-    const orders = await this.listOrders();
-    const posTransactions = await this.listPosTransactions();
-    const deliveries = await this.listDeliveries();
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const ordersToday = orders.filter(
-      (order) => order.createdAt && new Date(order.createdAt) >= today,
-    ).length;
-
-    const posTransactionsToday = posTransactions.filter(
-      (transaction) =>
-        transaction.createdAt && new Date(transaction.createdAt) >= today,
-    ).length;
-
-    const totalRevenue = orders.reduce(
-      (sum, order) => sum + parseFloat(order.totalAmount || "0"),
-      0,
-    );
-
-    const dailyRevenue = orders
-      .filter((order) => order.createdAt && new Date(order.createdAt) >= today)
-      .reduce((sum, order) => sum + parseFloat(order.totalAmount || "0"), 0);
-
-    const averageOrderValue =
-      orders.length > 0 ? totalRevenue / orders.length : 0;
-
-    const completedDeliveries = deliveries.filter(
-      (delivery) => delivery.status === "delivered",
-    );
-
-    const onTimeDeliveries = completedDeliveries.filter((delivery) => {
-      if (!delivery.actualDelivery || !delivery.createdAt) return false;
-
-      // Assume 24 hours is the standard delivery time
-      const expectedDelivery = new Date(delivery.createdAt);
-      expectedDelivery.setHours(expectedDelivery.getHours() + 24);
-
-      return new Date(delivery.actualDelivery) <= expectedDelivery;
-    });
-
-    const onTimeDelivery =
-      completedDeliveries.length > 0
-        ? (onTimeDeliveries.length / completedDeliveries.length) * 100
-        : 98.7;
-
-    return {
-      totalRevenue,
-      averageOrderValue,
-      onTimeDelivery,
-      inventoryTurnover: 4.2, // Static value for now
-      ordersToday,
-      posTransactionsToday,
-      dailyRevenue,
-    };
-  }
 
   // Add method for barcode queries that routes expect
   async getBarcodesByEntity(
@@ -2901,10 +2861,20 @@ export class SQLiteStorage implements IStorage {
     }
   }
 
-  async listTransitOrders(): Promise<any[]> {
+  async listTransitOrders(franchiseId?: string): Promise<any[]> {
+    let query = 'SELECT * FROM transit_orders';
+    const params: any[] = [];
+
+    if (franchiseId) {
+      query += ' WHERE franchiseId = ?';
+      params.push(franchiseId);
+    }
+
+    query += ' ORDER BY createdAt DESC';
+
     const rows = this.db
-      .prepare('SELECT * FROM transit_orders ORDER BY createdAt DESC')
-      .all() as any[];
+      .prepare(query)
+      .all(...params) as any[];
 
     return rows.map((row) => ({
       ...row,
@@ -2919,10 +2889,20 @@ export class SQLiteStorage implements IStorage {
     }));
   }
 
-  async getTransitOrdersByStatus(status: string): Promise<any[]> {
+  async getTransitOrdersByStatus(status: string, franchiseId?: string): Promise<any[]> {
+    let query = 'SELECT * FROM transit_orders WHERE status = ?';
+    const params: any[] = [status];
+
+    if (franchiseId) {
+      query += ' AND franchiseId = ?';
+      params.push(franchiseId);
+    }
+
+    query += ' ORDER BY createdAt DESC';
+
     const rows = this.db
-      .prepare('SELECT * FROM transit_orders WHERE status = ? ORDER BY createdAt DESC')
-      .all(status) as any[];
+      .prepare(query)
+      .all(...params) as any[];
 
     return rows.map((row) => ({
       ...row,
@@ -3903,5 +3883,202 @@ export class SQLiteStorage implements IStorage {
 
     const stmt = this.db.prepare(sql);
     return stmt.all(...params) as any[];
+  }
+
+
+  // ==========================================================
+  // DASHBOARD & ANALYTICS METHODS
+  // ==========================================================
+
+  async getDashboardMetrics(franchiseId?: string): Promise<any> {
+    const params: any[] = [];
+    let franchiseFilter = "";
+
+    if (franchiseId) {
+      franchiseFilter = "WHERE franchiseId = ?";
+      params.push(franchiseId);
+    }
+
+    // Revenue
+    const revenueSql = `SELECT SUM(CAST(totalAmount AS REAL)) as totalRevenue FROM orders ${franchiseFilter}`;
+    const revenueResult = this.db.prepare(revenueSql).get(...params) as any;
+    const totalRevenue = revenueResult?.totalRevenue || 0;
+
+    // Orders count (Today)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString();
+
+    let ordersFilter = franchiseFilter ? `${franchiseFilter} AND` : "WHERE";
+    const ordersParams = franchiseId ? [franchiseId, todayStr] : [todayStr];
+
+    const ordersSql = `SELECT COUNT(*) as count FROM orders ${ordersFilter} createdAt >= ?`;
+    const ordersResult = this.db.prepare(ordersSql).get(...ordersParams) as any;
+    const ordersToday = ordersResult?.count || 0;
+
+    // New Customers (Today)
+    let customersFilter = franchiseFilter ? `${franchiseFilter} AND` : "WHERE";
+    const customersParams = franchiseId ? [franchiseId, todayStr] : [todayStr];
+
+    const customersSql = `SELECT COUNT(*) as count FROM customers ${customersFilter} createdAt >= ?`;
+    const customersResult = this.db.prepare(customersSql).get(...customersParams) as any;
+    const newCustomersToday = customersResult?.count || 0;
+
+    // Inventory Items Count
+    const inventorySql = `SELECT COUNT(*) as count FROM products ${franchiseFilter}`;
+    const inventoryResult = this.db.prepare(inventorySql).get(...params) as any;
+
+    // Revenue Today
+    const revenueTodaySql = `SELECT SUM(CAST(totalAmount AS REAL)) as totalRevenue FROM orders ${ordersFilter} createdAt >= ?`;
+    const revenueTodayResult = this.db.prepare(revenueTodaySql).get(...ordersParams) as any;
+    const revenueToday = revenueTodayResult?.totalRevenue || 0;
+
+    // Pending Orders
+    const pendingSql = `SELECT COUNT(*) as count FROM orders ${franchiseFilter ? franchiseFilter + " AND" : "WHERE"} status IN ('pending', 'processing', 'ready_for_transit', 'in_transit')`;
+    const pendingResult = this.db.prepare(pendingSql).get(...params) as any;
+    const pendingOrders = pendingResult?.count || 0;
+
+    // Completed Today
+    const completedSql = `SELECT COUNT(*) as count FROM orders ${ordersFilter} createdAt >= ? AND status IN ('completed', 'delivered')`;
+    const completedResult = this.db.prepare(completedSql).get(...ordersParams) as any;
+    const completedToday = completedResult?.count || 0;
+
+    return {
+      totalRevenue,
+      revenueToday,
+      totalOrders: ordersToday,
+      newCustomers: newCustomersToday,
+      inventoryItems: inventoryResult?.count || 0,
+      pendingOrders,
+      ordersCompletedToday: completedToday
+    };
+  }
+
+  async getAdminLeaderboard(): Promise<any[]> {
+    const sql = `
+      SELECT 
+        f.name as label,
+        f.id as franchiseId,
+        SUM(CAST(o.totalAmount AS REAL)) as revenue,
+        COUNT(o.id) as orders
+      FROM franchises f
+      LEFT JOIN orders o ON f.id = o.franchiseId
+      GROUP BY f.id, f.name
+      ORDER BY revenue DESC
+      LIMIT 10
+    `;
+
+    return this.db.prepare(sql).all() as any[];
+  }
+
+  async getRevenueGrowth(franchiseId?: string): Promise<any> {
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+    const lastMonthEnd = currentMonthStart;
+
+    const params: any[] = [];
+    let filter = "";
+
+    if (franchiseId) {
+      filter = "AND franchiseId = ?";
+      params.push(franchiseId);
+    }
+
+    // Current Month Revenue
+    const currentSql = `
+      SELECT SUM(CAST(totalAmount AS REAL)) as total 
+      FROM orders 
+      WHERE createdAt >= ? ${filter}
+    `;
+    const currentResult = this.db.prepare(currentSql).get(currentMonthStart, ...params) as any;
+    const currentRevenue = currentResult?.total || 0;
+
+    // Last Month Revenue
+    const lastSql = `
+      SELECT SUM(CAST(totalAmount AS REAL)) as total 
+      FROM orders 
+      WHERE createdAt >= ? AND createdAt < ? ${filter}
+    `;
+    const lastResult = this.db.prepare(lastSql).get(lastMonthStart, lastMonthEnd, ...params) as any;
+    const lastRevenue = lastResult?.total || 0;
+
+    let growth = 0;
+    if (lastRevenue > 0) {
+      growth = ((currentRevenue - lastRevenue) / lastRevenue) * 100;
+    } else if (currentRevenue > 0) {
+      growth = 100;
+    }
+
+    return {
+      currentRevenue,
+      lastRevenue,
+      growth: parseFloat(growth.toFixed(1))
+    };
+  }
+
+  async getLowStockProducts(franchiseId?: string, threshold: number = 10): Promise<any[]> {
+    let sql = `SELECT * FROM products WHERE stockQuantity < ?`;
+    const params: any[] = [threshold];
+
+    if (franchiseId) {
+      sql += " AND franchiseId = ?";
+      params.push(franchiseId);
+    }
+
+    sql += " ORDER BY stockQuantity ASC LIMIT 10";
+
+    return this.db.prepare(sql).all(...params) as any[];
+  }
+
+  async getEmployeeStats(employeeId: string): Promise<any> {
+    // Get basic task stats
+    const taskValues = {
+      pending: 0,
+      in_progress: 0,
+      completed: 0
+    };
+
+    const tasksSql = `
+      SELECT status, COUNT(*) as count 
+      FROM employee_tasks 
+      WHERE employeeId = ? 
+      GROUP BY status
+    `;
+
+    const taskResults = this.db.prepare(tasksSql).all(employeeId) as any[];
+    taskResults.forEach(row => {
+      if (taskValues[row.status as keyof typeof taskValues] !== undefined) {
+        taskValues[row.status as keyof typeof taskValues] = row.count;
+      }
+    });
+
+    // Calculate completion rate or other metrics
+    const totalTasks = taskValues.pending + taskValues.in_progress + taskValues.completed;
+    const completionRate = totalTasks > 0 ? (taskValues.completed / totalTasks) * 100 : 0;
+
+    // Get recent activity log count
+    const activitySql = `SELECT COUNT(*) as count FROM audit_logs WHERE employeeId = ? AND createdAt >= date('now', '-7 days')`;
+    const activityResult = this.db.prepare(activitySql).get(employeeId) as any;
+
+    return {
+      tasks: taskValues,
+      completionRate: Math.round(completionRate),
+      weeklyActivity: activityResult?.count || 0
+    };
+  }
+
+  async createVehicle(data: any): Promise<any> {
+    const id = randomUUID();
+    const vehicle = { ...data, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const columns = Object.keys(vehicle).join(", ");
+    const placeholders = Object.keys(vehicle).map(() => "?").join(", ");
+    const stmt = this.db.prepare(`INSERT INTO vehicles (${columns}) VALUES (${placeholders})`);
+    stmt.run(...Object.values(vehicle));
+    return vehicle;
+  }
+
+  async listVehicles(): Promise<any[]> {
+    return this.db.prepare("SELECT * FROM vehicles ORDER BY createdAt DESC").all();
   }
 }

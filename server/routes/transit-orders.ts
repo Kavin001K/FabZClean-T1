@@ -224,6 +224,7 @@ router.post("/", auditMiddleware('create_transit_order', 'transit_order'), async
             vehicleType,
             driverName,
             driverPhone,
+            driverLicense,
             employeeId: employeeId || employee?.employeeId,
             employeeName: employeeName || employee?.username,
             franchiseId: effectiveFranchiseId,

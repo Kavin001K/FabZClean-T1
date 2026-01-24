@@ -69,8 +69,9 @@ import { ServiceImportDialog } from '@/components/services/service-import-dialog
 
 // Service icon mapping
 const getServiceIcon = (category: string) => {
-  const icons: Record<string, typeof Package> = {
+  const icons: Record<string, any> = {
     'Cleaning': Sparkles,
+    'Laundry': ShoppingCart,
     'Maintenance': Package,
     'Repair': Package,
     'Installation': Package,
@@ -730,18 +731,35 @@ export default function Services() {
                         {service.description || 'Professional service with quality guarantee'}
                       </p>
 
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <span>{service.duration}</span>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="flex items-center gap-1.5 text-muted-foreground bg-muted/30 p-1.5 rounded">
+                          <Clock className="h-3.5 w-3.5 text-blue-500" />
+                          <span className="font-medium">{service.leadTimeHours || 24}h Turnaround</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-muted-foreground bg-muted/30 p-1.5 rounded">
+                          <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+                          <span className="truncate">{service.pricingModel?.replace('per_', '/') || '/ piece'}</span>
+                        </div>
                       </div>
 
-                      <div className="pt-3 border-t">
+                      {/* Health / KPI Mock */}
+                      <div className="text-[10px] text-muted-foreground flex items-center justify-between border-t pt-2 mt-1">
+                        <span>Used 42 times this week</span>
+                        <span className="text-green-600 font-medium">+12% vs last week</span>
+                      </div>
+
+                      <div className="pt-2">
                         <div className="flex items-end justify-between mb-3">
                           <div>
-                            <p className="text-sm text-muted-foreground">Service Price</p>
-                            <p className="text-2xl font-bold text-lime-600">
-                              {formatCurrency(service.price)}
-                            </p>
+                            <p className="text-xs text-muted-foreground">Base Price</p>
+                            <div className="flex items-baseline gap-1">
+                              <p className="text-2xl font-bold text-lime-600">
+                                {formatCurrency(service.price)}
+                              </p>
+                              {service.pricingModel && (
+                                <span className="text-xs text-muted-foreground font-medium">/{service.pricingModel.replace('per_', '')}</span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -768,7 +786,6 @@ export default function Services() {
                           >
                             <Trash className="h-4 w-4" />
                           </Button>
-
                         </div>
                       </div>
                     </CardContent>

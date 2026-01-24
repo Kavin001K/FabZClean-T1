@@ -90,7 +90,23 @@ router.post("/", upload.array("documents"), async (req, res) => {
 // List Franchises
 router.get("/", async (req, res) => {
     try {
-        const franchises = await storage.listFranchises();
+        let franchises = await storage.listFranchises();
+
+        // 🟢 Automated Status Transition: Check agreement expiry
+        const now = new Date();
+        const updates = franchises.map(async (f) => {
+            if (f.agreementEndDate && new Date(f.agreementEndDate) < now && f.status === 'active') {
+                console.log(`Auto-suspending franchise ${f.name} (Agreement Expired)`);
+                // Update in DB - Assuming storage.updateFranchise handles partial updates
+                const updated = await storage.updateFranchise(f.id, { status: 'suspended' });
+                return updated || f;
+            }
+            return f;
+        });
+
+        // Wait for potential updates to reflect in the response
+        franchises = await Promise.all(updates);
+
         res.json(franchises);
     } catch (error) {
         console.error("List franchises error:", error);
@@ -130,12 +146,43 @@ router.put("/:id", upload.array("documents"), async (req, res) => {
             franchiseData = req.body;
         }
 
-        // If new documents are uploaded, append them to existing ones or replace?
-        // For now, let's assume we append if documents are provided
+        // If new documents are uploaded, append them
         if (documents.length > 0) {
             const existing = await storage.getFranchise(req.params.id);
             const existingDocs = existing?.documents ? (Array.isArray(existing.documents) ? existing.documents : JSON.parse(existing.documents as unknown as string)) : [];
             franchiseData.documents = [...existingDocs, ...documents];
+        }
+
+        // 🔒 Audit Logging for Sensitive Changes
+        const existing = await storage.getFranchise(req.params.id);
+        if (existing) {
+            const changes: Record<string, any> = {};
+
+            // Check Royalty Change
+            if (franchiseData.royaltyPercentage !== undefined && String(franchiseData.royaltyPercentage) !== String(existing.royaltyPercentage)) {
+                changes.royaltyPercentage = { old: existing.royaltyPercentage, new: franchiseData.royaltyPercentage };
+            }
+
+            // Check Bank Account Change
+            if (franchiseData.bankAccountNumber !== undefined && franchiseData.bankAccountNumber !== existing.bankAccountNumber) {
+                changes.bankAccountNumber = { old: existing.bankAccountNumber, new: franchiseData.bankAccountNumber };
+            }
+
+            if (Object.keys(changes).length > 0) {
+                try {
+                    await storage.createAuditLog({
+                        franchiseId: req.params.id,
+                        action: 'franchise_update_sensitive',
+                        entityType: 'franchise',
+                        entityId: req.params.id,
+                        details: changes,
+                        ipAddress: req.ip || 'unknown',
+                        userAgent: req.get('User-Agent') || 'unknown'
+                    });
+                } catch (auditError) {
+                    console.error('Failed to create audit log:', auditError);
+                }
+            }
         }
 
         const updatedFranchise = await storage.updateFranchise(req.params.id, franchiseData);

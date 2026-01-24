@@ -93,110 +93,60 @@ export function useDashboard() {
   }, [rawServicePopularityData]);
 
   const {
-    data: allOrders,
+    data: recentOrders = [],
     isLoading: ordersLoading,
     error: ordersError,
   } = useQuery({
-    queryKey: ['dashboard/all-orders'],
-    queryFn: () => ordersApi.getAll(),
+    queryKey: ['dashboard/recent-orders'],
+    queryFn: () => ordersApi.getAll({ limit: 10, sort: 'desc' }),
     staleTime: 2 * 60 * 1000, // 2 minutes
     retry: 3,
   });
 
-  // Due today orders - filter from all orders
+  // Due today orders - fetch specifically (or can serve separately)
+  // For now, we might lose "Due Today" list if we don't fetch all.
+  // Ideally use /api/due-date-orders endpoint
+  const { data: dueOrdersResponse } = useQuery({
+    queryKey: ['dashboard/due-orders'],
+    queryFn: () => fetch('/api/due-date-orders?type=today').then(r => r.json())
+  });
+
   const dueTodayOrders = useMemo(() => {
-    if (!allOrders) return [];
+    return dueOrdersResponse?.orders || [];
+  }, [dueOrdersResponse]);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    return allOrders.filter(order => {
-      if (!order.pickupDate) return false;
-      const pickup = new Date(order.pickupDate);
-      pickup.setHours(0, 0, 0, 0);
-      return pickup <= today; // Include overdue and due today
-    }).map(order => ({
-      ...order,
-      total: parseFloat(order.totalAmount || '0'),
-      customerPhone: order.customerPhone || undefined,
-      customerEmail: order.customerEmail || undefined,
-      pickupDate: order.pickupDate ? new Date(order.pickupDate).toISOString() : '',
-      createdAt: order.createdAt ? new Date(order.createdAt).toISOString() : '',
-    }));
-  }, [allOrders]);
-
-  // Orders created today
+  // Orders created today - Use server metrics
   const ordersTodayCount = useMemo(() => {
-    if (!allOrders) return 0;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    return allOrders.filter(order => {
-      if (!order.createdAt) return false;
-      const created = new Date(order.createdAt);
-      return created >= today && created < tomorrow;
-    }).length;
-  }, [allOrders]);
+    return dashboardMetrics?.totalOrders || 0;
+  }, [dashboardMetrics]);
 
   const {
     data: customers,
     isLoading: customersLoading,
     error: customersError,
   } = useQuery({
-    queryKey: ['dashboard/customers'],
+    queryKey: ['dashboard/customers', { limit: 10 }], // Limit if possible, but currently getAll returns all
     queryFn: () => customersApi.getAll(),
     staleTime: 5 * 60 * 1000,
     retry: 3,
   });
 
-  // Revenue today
+  // Revenue today - Use server metrics
   const revenueToday = useMemo(() => {
-    if (!allOrders) return 0;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    return allOrders.filter(order => {
-      if (!order.createdAt) return false;
-      const created = new Date(order.createdAt);
-      return created >= today && created < tomorrow;
-    }).reduce((sum, order) => sum + (parseFloat(order.totalAmount || '0')), 0);
-  }, [allOrders]);
+    return dashboardMetrics?.revenueToday || 0;
+  }, [dashboardMetrics]);
 
   const ordersCompletedToday = useMemo(() => {
-    if (!allOrders) return 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    return allOrders.filter(order => {
-      const dateStr = order.updatedAt || order.createdAt;
-      if (!dateStr) return false;
-      const date = new Date(dateStr);
-      return date >= today && ['completed', 'delivered'].includes(order.status);
-    }).length;
-  }, [allOrders]);
+    return dashboardMetrics?.ordersCompletedToday || 0;
+  }, [dashboardMetrics]);
 
   const pendingOrdersCount = useMemo(() => {
-    if (!allOrders) return 0;
-    return allOrders.filter(order => ['pending', 'processing', 'ready', 'assigned', 'in_transit'].includes(order.status)).length;
-  }, [allOrders]);
+    return dashboardMetrics?.pendingOrders || 0;
+  }, [dashboardMetrics]);
 
   const newCustomersToday = useMemo(() => {
-    if (!customers) return 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    return customers.filter(customer => {
-      if (!customer.createdAt) return false;
-      const created = new Date(customer.createdAt);
-      return created >= today;
-    }).length;
-  }, [customers]);
+    return dashboardMetrics?.newCustomers || 0;
+  }, [dashboardMetrics]);
 
   // Computed state
   const isLoading = useMemo(() =>
@@ -269,14 +219,8 @@ export function useDashboard() {
   }, [servicePopularityData]);
 
   const processedRecentOrders = useMemo(() => {
-    if (!allOrders || !Array.isArray(allOrders)) return [];
-    return allOrders
-      .sort((a, b) => {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return dateB - dateA;
-      })
-      .slice(0, 10)
+    if (!recentOrders || !Array.isArray(recentOrders)) return [];
+    return recentOrders
       .map(order => ({
         ...order,
         date: order.createdAt ? new Date(order.createdAt).toISOString() : '',
@@ -285,7 +229,7 @@ export function useDashboard() {
         customerEmail: order.customerEmail || undefined,
         createdAt: order.createdAt ? new Date(order.createdAt).toISOString() : '',
       }));
-  }, [allOrders]);
+  }, [recentOrders]);
 
   // Actions
   const updateFilters = useCallback((newFilters: Partial<DashboardFilters>) => {
@@ -348,7 +292,7 @@ export function useDashboard() {
     ordersCompletedToday,
     pendingOrdersCount,
     newCustomersToday,
-    allOrders: allOrders || [],
+    allOrders: [], // Deprecated: Use recentOrders or specific queries
 
     // Loading states
     isLoading,

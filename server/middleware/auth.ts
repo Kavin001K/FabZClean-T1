@@ -14,15 +14,7 @@ export const corsOptions = {
       return callback(null, true);
     }
 
-    // Allow all myfabclean.com subdomains
-    if (origin.includes('myfabclean.com')) {
-      return callback(null, true);
-    }
 
-    // Allow all motorprt.com subdomains
-    if (origin.includes('motorprt.com')) {
-      return callback(null, true);
-    }
 
     // Get allowed origins from environment variable (comma-separated list)
     const envOrigins = process.env.ALLOWED_ORIGINS
@@ -50,12 +42,16 @@ export const corsOptions = {
     // Check if origin matches any allowed origin
     const isAllowed = allowedOrigins.some(allowed => {
       if (origin === allowed) return true;
-      if (origin.startsWith(allowed)) return true;
-      // Allow matching by domain suffix (for wildcard subdomain support)
+
       try {
         const originUrl = new URL(origin);
         const allowedUrl = new URL(allowed);
-        if (originUrl.hostname.endsWith(allowedUrl.hostname)) return true;
+
+        // Exact match
+        if (originUrl.hostname === allowedUrl.hostname) return true;
+
+        // Subdomain match (strict)
+        if (originUrl.hostname.endsWith('.' + allowedUrl.hostname)) return true;
       } catch {
         // Ignore URL parse errors
       }
@@ -190,9 +186,10 @@ export const rateLimit = (windowMs: number = 60000, maxRequests: number = 100) =
 // Type exports for compatibility
 export interface AuthenticatedRequest extends Request {
   employee?: {
+    id: string;
     employeeId: string;
     username: string;
-    role: string;
+    role: 'admin' | 'franchise_manager' | 'factory_manager' | 'employee' | 'staff' | 'driver' | 'manager';
     franchiseId?: string;
     factoryId?: string;
   };

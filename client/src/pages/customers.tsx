@@ -51,6 +51,7 @@ import { PageTransition, FadeIn } from '@/components/ui/page-transition';
 
 // Import child components
 import { CustomerDialogs } from '@/components/customers/customer-dialogs';
+import { CustomerDetailsSheet } from '@/components/customers/customer-details-sheet';
 
 // Import data service and types
 import { customersApi, ordersApi } from '@/lib/data-service';
@@ -749,12 +750,18 @@ export default function Customers() {
                             )}
                           </div>
 
-                          {/* Credit Balance */}
-                          <div className="flex items-center justify-between text-sm py-2 px-3 bg-muted/50 rounded-md">
-                            <span className="text-muted-foreground">Store Credit</span>
-                            <span className={`font-bold ${parseFloat(customer.creditBalance || '0') < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              ₹{customer.creditBalance || '0.00'}
-                            </span>
+                          {/* Financial Info */}
+                          <div className="grid grid-cols-2 gap-2 text-sm pt-2">
+                            <div className="flex flex-col p-2 bg-muted/30 rounded border">
+                              <span className="text-xs text-muted-foreground">Wallet</span>
+                              <span className="font-bold text-green-600">₹{customer.walletBalance || '0.00'}</span>
+                            </div>
+                            <div className="flex flex-col p-2 bg-muted/30 rounded border">
+                              <span className="text-xs text-muted-foreground">Credit</span>
+                              <span className={`font-bold ${parseFloat(customer.creditBalance || '0') > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                ₹{customer.creditBalance || '0.00'}
+                              </span>
+                            </div>
                           </div>
 
                           {/* Stats */}
@@ -840,18 +847,28 @@ export default function Customers() {
         {/* Customer Dialogs */}
         <CustomerDialogs
           selectedCustomer={selectedCustomer}
-          isViewDialogOpen={isViewDialogOpen}
+          isViewDialogOpen={false}
           isEditDialogOpen={isEditDialogOpen}
           isCreateDialogOpen={isCreateDialogOpen}
           isCreating={createCustomerMutation.isPending}
           isUpdating={editCustomerMutation.isPending}
-          onCloseViewDialog={() => setIsViewDialogOpen(false)}
+          onCloseViewDialog={() => { }}
           onCloseEditDialog={() => setIsEditDialogOpen(false)}
           onCloseCreateDialog={() => setIsCreateDialogOpen(false)}
           onEditCustomer={handleUpdateCustomer}
           onCreateCustomer={handleCreateCustomer}
           onDeleteCustomer={handleDeleteCustomer}
           orders={orders}
+        />
+
+        <CustomerDetailsSheet
+          customer={selectedCustomer}
+          isOpen={isViewDialogOpen}
+          onClose={() => setIsViewDialogOpen(false)}
+          onEdit={(customer) => {
+            setIsViewDialogOpen(false);
+            handleEditCustomer(customer);
+          }}
         />
       </div>
     </PageTransition>

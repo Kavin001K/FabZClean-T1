@@ -73,8 +73,32 @@ export default function FactoryDashboard() {
     const [showScanDialog, setShowScanDialog] = useState(false);
     const [selectedShipment, setSelectedShipment] = useState<any>(null);
     const [showShipmentDialog, setShowShipmentDialog] = useState(false);
+    const [otpDialog, setOtpDialog] = useState<{ open: boolean, transitId?: string }>({ open: false });
+    const [otpInput, setOtpInput] = useState('');
 
     // Mutations
+    const verifyHandoverMutation = useMutation({
+        mutationFn: async ({ id, otp }: { id: string, otp: string }) => {
+            const token = localStorage.getItem('employee_token');
+            const res = await fetch(`/api/transit-orders/orders/${id}/verify-otp`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ otp })
+            });
+            if (!res.ok) throw new Error('Invalid OTP');
+            return res.json();
+        },
+        onSuccess: () => {
+            toast({ title: 'Success', description: 'Shipment verified and received' });
+            setOtpDialog({ open: false });
+            setOtpInput('');
+            queryClient.invalidateQueries({ queryKey: ['factory-incoming-shipments'] });
+        },
+        onError: () => toast({ title: 'Error', description: 'Invalid OTP or verification failed', variant: 'destructive' })
+    });
     const markReceivedMutation = useMutation({
         mutationFn: async (transitId: string) => {
             const token = localStorage.getItem('employee_token');
@@ -530,11 +554,11 @@ export default function FactoryDashboard() {
                                                         className="bg-orange-600 hover:bg-orange-700"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            markReceivedMutation.mutate(shipment.id);
+                                                            setOtpDialog({ open: true, transitId: shipment.id });
                                                         }}
-                                                        disabled={markReceivedMutation.isPending}
                                                     >
-                                                        {markReceivedMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Mark Received"}
+                                                        <Zap className="h-3 w-3 mr-1" />
+                                                        Verify & Receive
                                                     </Button>
                                                 )}
                                             </div>
@@ -584,8 +608,8 @@ export default function FactoryDashboard() {
                                                 <div
                                                     key={item.id}
                                                     className={`flex items-center justify-between p-3 border rounded-lg ${isExpress
-                                                            ? 'border-orange-400 bg-orange-50 dark:bg-orange-950/20 relative overflow-hidden'
-                                                            : ''
+                                                        ? 'border-orange-400 bg-orange-50 dark:bg-orange-950/20 relative overflow-hidden'
+                                                        : ''
                                                         }`}
                                                 >
                                                     {/* EXPRESS Watermark */}
@@ -772,6 +796,38 @@ export default function FactoryDashboard() {
                     )}
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowScanDialog(false)}>Close</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* OTP Verification Dialog */}
+            <Dialog open={otpDialog.open} onOpenChange={(o) => setOtpDialog({ ...otpDialog, open: o })}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Secure Handover Verification</DialogTitle>
+                        <DialogDescription>
+                            Enter the OTP provided by the driver to verify and receive this shipment.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-6 flex flex-col items-center gap-4">
+                        <Label>Enter Dispatch OTP</Label>
+                        <Input
+                            value={otpInput}
+                            onChange={(e) => setOtpInput(e.target.value)}
+                            className="text-center text-2xl tracking-widest font-mono w-48"
+                            maxLength={6}
+                            placeholder="• • • • • •"
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setOtpDialog({ open: false })}>Cancel</Button>
+                        <Button
+                            onClick={() => otpDialog.transitId && verifyHandoverMutation.mutate({ id: otpDialog.transitId, otp: otpInput })}
+                            disabled={otpInput.length < 4 || verifyHandoverMutation.isPending}
+                            className="bg-green-600 hover:bg-green-700"
+                        >
+                            {verifyHandoverMutation.isPending ? "Verifying..." : "Confirm Receipt"}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -456,4 +456,89 @@ router.get('/available-orders', adminLoginRequired, async (req, res) => {
   }
 });
 
+// ==========================================
+// LOGISTICS UPGRADES
+// ==========================================
+
+// Verify OTP (Chain of Custody Handover)
+router.post('/orders/:id/verify-otp', adminLoginRequired, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { otp, notes } = req.body;
+
+    const transitOrder = await storage.getTransitOrder(id);
+    if (!transitOrder) {
+      return res.status(404).json(createErrorResponse('Transit Order not found', 404));
+    }
+
+    if (transitOrder.verificationOtp !== otp) {
+      // Log failed attempt?
+      return res.status(403).json(createErrorResponse('Invalid OTP', 403));
+    }
+
+    // Verify Success
+    const updated = await storage.updateTransitOrder(id, {
+      isVerified: true,
+      verifiedAt: new Date(),
+      status: 'Received', // or next step
+      // Add secure notes if needed
+    });
+
+    // Log Audit
+    if ((req as any).employee) {
+      await AuthService.logAction(
+        (req as any).employee.employeeId,
+        (req as any).employee.username,
+        'verify_transit_handover',
+        'transit_order',
+        id,
+        { otpUsed: true, notes },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
+
+    res.json(createSuccessResponse(updated, 'Handover Verified Successfully'));
+  } catch (error) {
+    console.error('OTP Verify error:', error);
+    res.status(500).json(createErrorResponse('Verification failed', 500));
+  }
+});
+
+// Scan Individual Item (Item-Level Tracking)
+router.post('/orders/:id/scan', adminLoginRequired, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { barcode } = req.body;
+    // Logic to mark a specific item in the transit order as "Scanned"
+    // This assumes transit_order_items logic is in place.
+    // For now, we stub this out as a secure action.
+    res.json(createSuccessResponse({ scanned: true, barcode }, 'Item scanned'));
+  } catch (error) {
+    res.status(500).json(createErrorResponse('Scan failed', 500));
+  }
+});
+
+// ==========================================
+// VEHICLE MANAGEMENT
+// ==========================================
+
+router.get('/vehicles', adminLoginRequired, async (req, res) => {
+  try {
+    const vehicles = await storage.listVehicles();
+    res.json(createSuccessResponse(vehicles));
+  } catch (error) {
+    res.status(500).json(createErrorResponse('Failed to fetch vehicles', 500));
+  }
+});
+
+router.post('/vehicles', adminLoginRequired, async (req, res) => {
+  try {
+    const vehicle = await storage.createVehicle(req.body);
+    res.status(201).json(createSuccessResponse(vehicle));
+  } catch (error) {
+    res.status(500).json(createErrorResponse('Failed to create vehicle', 500));
+  }
+});
+
 export default router;

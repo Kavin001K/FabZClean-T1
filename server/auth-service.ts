@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { storage } from './storage';
+import { maskSensitiveData } from './utils/mask-data';
 
 // Remove Supabase - we now use local SQLite storage only
 // const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL!;
@@ -10,7 +11,8 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
     // In production, we must have a secure secret
-    console.warn("⚠️ JWT_SECRET is not set. Using fallback for now, but this is insecure for production.");
+    console.error("❌ JWT_SECRET is not set. Terminating server to prevent insecure operation.");
+    process.exit(1);
 }
 
 const FINAL_SECRET = JWT_SECRET || process.env.SESSION_SECRET || 'fabzclean-secret-key-change-in-production';
@@ -721,7 +723,7 @@ export class AuthService {
                 entityType || 'system',
                 entityId || 'none',
                 {
-                    ...details,
+                    ...maskSensitiveData(details),
                     username,
                 },
                 ipAddress,

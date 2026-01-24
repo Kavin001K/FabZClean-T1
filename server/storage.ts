@@ -13,6 +13,10 @@ export interface IStorage {
   getDriversByStatus(status: string): Promise<Driver[]>;
   updateDriverLocation(id: string, latitude: number, longitude: number): Promise<Driver | null>;
 
+  // Vehicle methods
+  createVehicle(data: any): Promise<any>;
+  listVehicles(): Promise<any[]>;
+
   // Franchise methods
   createFranchise(data: any): Promise<any>;
   listFranchises(): Promise<any[]>;
@@ -75,6 +79,13 @@ export interface IStorage {
   // Audit Log methods
   createAuditLog(data: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(params: any): Promise<{ data: AuditLog[]; count: number }>;
+
+  // Dashboard & Analytics
+  getDashboardMetrics(franchiseId?: string): Promise<any>;
+  getAdminLeaderboard(): Promise<any[]>;
+  getRevenueGrowth(franchiseId?: string): Promise<any>;
+  getLowStockProducts(franchiseId?: string, threshold?: number): Promise<any[]>;
+  getEmployeeStats(employeeId: string): Promise<any>;
 }
 
 export class MemStorage implements IStorage {
@@ -86,33 +97,48 @@ export class MemStorage implements IStorage {
   }
 
   // Franchise methods
-  async createFranchise(data: any): Promise<any> { return null; }
-  async listFranchises(): Promise<any[]> { return []; }
-  async getFranchise(id: string): Promise<any | undefined> { return undefined; }
-  async updateFranchise(id: string, data: any): Promise<any | undefined> { return undefined; }
+  // Franchise methods
+  async createFranchise(data: any): Promise<any> { return this.sqliteStorage.createFranchise(data); }
+  async listFranchises(): Promise<any[]> { return this.sqliteStorage.listFranchises(); }
+  async getFranchise(id: string): Promise<any | undefined> { return this.sqliteStorage.getFranchise(id); }
+  async updateFranchise(id: string, data: any): Promise<any | undefined> { return this.sqliteStorage.updateFranchise(id, data); }
+
+  // Vehicle methods
+  async createVehicle(data: any): Promise<any> { return this.sqliteStorage.createVehicle(data); }
+  async listVehicles(): Promise<any[]> { return this.sqliteStorage.listVehicles(); }
 
   // Task methods
-  async createTask(data: any): Promise<any> { return null; }
-  async listTasks(franchiseId?: string, employeeId?: string): Promise<any[]> { return []; }
-  async updateTask(id: string, data: any): Promise<any | undefined> { return undefined; }
+  // Task methods
+  async createTask(data: any): Promise<any> { return this.sqliteStorage.createTask(data); }
+  async listTasks(franchiseId?: string, employeeId?: string): Promise<any[]> { return this.sqliteStorage.listTasks(franchiseId, employeeId); }
+  async updateTask(id: string, data: any): Promise<any | undefined> { return this.sqliteStorage.updateTask(id, data); }
 
   // Attendance methods
-  async createAttendance(data: any): Promise<any> { return null; }
-  async listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]> { return []; }
-  async updateAttendance(id: string, data: any): Promise<any> { return null; }
+  // Attendance methods
+  async createAttendance(data: any): Promise<any> { return this.sqliteStorage.createAttendance(data); }
+  async listAttendance(franchiseId?: string, employeeId?: string, date?: Date): Promise<any[]> { return this.sqliteStorage.listAttendance(franchiseId, employeeId, date); }
+  async updateAttendance(id: string, data: any): Promise<any> { return this.sqliteStorage.updateAttendance(id, data); }
 
   // Transit methods
-  async createTransitOrder(data: any): Promise<any> { return null; }
-  async getNextTransitId(franchiseId?: string, type?: string): Promise<string> { return `TRN-${Date.now()}`; }
-  async listTransitOrders(franchiseId?: string): Promise<any[]> { return []; }
-  async getTransitOrdersByStatus(status: string, franchiseId?: string): Promise<any[]> { return []; }
-  async updateTransitStatus(id: string, status: string, notes?: string, location?: string, updatedBy?: string): Promise<any> { return null; }
+  // Transit methods
+  async createTransitOrder(data: any): Promise<any> { return this.sqliteStorage.createTransitOrder(data); }
+  async getNextTransitId(franchiseId?: string, type?: string): Promise<string> { return this.sqliteStorage.getNextTransitId(franchiseId, type); }
+  async listTransitOrders(franchiseId?: string): Promise<any[]> { return this.sqliteStorage.listTransitOrders(franchiseId); }
+  async getTransitOrdersByStatus(status: string, franchiseId?: string): Promise<any[]> { return this.sqliteStorage.getTransitOrdersByStatus(status, franchiseId); }
+  async updateTransitStatus(id: string, status: string, notes?: string, location?: string, updatedBy?: string): Promise<any> { return this.sqliteStorage.updateTransitStatus(id, status, notes, location, updatedBy); }
 
   // Credit methods (Delegated)
   async processCreditTransaction(data: any): Promise<any> { return this.sqliteStorage.processCreditTransaction(data); }
   async getCreditTransactions(filters: any): Promise<any[]> { return this.sqliteStorage.getCreditTransactions(filters); }
   async getCreditStats(franchiseId?: string): Promise<any> { return this.sqliteStorage.getCreditStats(franchiseId); }
   async getOutstandingCreditCustomers(franchiseId?: string): Promise<any[]> { return this.sqliteStorage.getOutstandingCreditCustomers(franchiseId); }
+
+  // Dashboard & Analytics
+  async getDashboardMetrics(franchiseId?: string): Promise<any> { return this.sqliteStorage.getDashboardMetrics(franchiseId); }
+  async getAdminLeaderboard(): Promise<any[]> { return this.sqliteStorage.getAdminLeaderboard(); }
+  async getRevenueGrowth(franchiseId?: string): Promise<any> { return this.sqliteStorage.getRevenueGrowth(franchiseId); }
+  async getLowStockProducts(franchiseId?: string, threshold?: number): Promise<any[]> { return this.sqliteStorage.getLowStockProducts(franchiseId, threshold); }
+  async getEmployeeStats(employeeId: string): Promise<any> { return this.sqliteStorage.getEmployeeStats(employeeId); }
 
   private async initializeData() {
     // Check if database already has data to avoid duplicating
@@ -947,9 +973,7 @@ export class MemStorage implements IStorage {
     return this.sqliteStorage.updateShipment(id, updates);
   }
 
-  async getDashboardMetrics() {
-    return this.sqliteStorage.getDashboardMetrics();
-  }
+
 
   // ======= DRIVER METHODS =======
   async createDriver(data: InsertDriver): Promise<Driver> {

@@ -36,6 +36,7 @@ import authRouter from "./routes/auth";
 import businessSettingsRouter from "./routes/business-settings";
 import documentsRouter from "./routes/documents";
 import analyticsRouter from "./routes/analytics";
+import dashboardRouter from "./routes/dashboard";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register Auth routes (login, logout, me, etc.)
@@ -77,87 +78,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register Credits routes (Customer credit management)
   app.use("/api/credits", creditsRouter);
 
-  // Dashboard metrics
-  app.get("/api/dashboard/metrics", async (req, res) => {
-    try {
-      // Since getDashboardMetrics doesn't exist in SQLiteStorage, calculate manually
-      const allOrders = await storage.listOrders();
-      const customers = await storage.listCustomers();
-      const products = await storage.listProducts();
-
-      const totalRevenue = allOrders.reduce(
-        (sum: number, order: Order) => sum + parseFloat(order.totalAmount || "0"),
-        0,
-      );
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const ordersToday = allOrders.filter(
-        (order: Order) => new Date(order.createdAt || new Date()).getTime() >= today.getTime(),
-      ).length;
-
-      const newCustomersToday = customers.filter(
-        (customer: Customer) => {
-          const createdAt = customer.createdAt ? new Date(customer.createdAt) : new Date();
-          return createdAt.getTime() >= today.getTime();
-        }
-      ).length;
-
-      // Calculate due date statistics
-      const currentDate = new Date();
-      const tomorrow = new Date(currentDate.getTime() + (24 * 60 * 60 * 1000));
-
-      const ordersWithDueDates = allOrders.filter((order: Order) => {
-        const pickupDate = order.pickupDate;
-        return pickupDate && ['pending', 'processing', 'ready'].includes(order.status);
-      }).map((order: Order) => {
-        try {
-          const pickupDate = new Date(order.pickupDate!);
-          const dueDate = new Date(pickupDate.getTime() + (2 * 24 * 60 * 60 * 1000));
-          return { ...order, dueDate: dueDate.toISOString().split('T')[0] };
-        } catch (error) {
-          // Skip orders with invalid pickup dates
-          return null;
-        }
-      }).filter((order: any) => order !== null);
-
-      const todaysDueOrders = ordersWithDueDates.filter((order: any) => {
-        const dueDateStr = order.dueDate;
-        const todayStr = currentDate.toISOString().split('T')[0];
-        return dueDateStr === todayStr;
-      }).length;
-
-      const tomorrowsDueOrders = ordersWithDueDates.filter((order: any) => {
-        const dueDateStr = order.dueDate;
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
-        return dueDateStr === tomorrowStr;
-      }).length;
-
-      const overdueOrders = ordersWithDueDates.filter((order: any) => {
-        const dueDate = new Date(order.dueDate);
-        return dueDate < today && ['pending', 'processing'].includes(order.status);
-      }).length;
-
-      const transformedMetrics = {
-        totalRevenue,
-        totalOrders: ordersToday,
-        newCustomers: newCustomersToday,
-        inventoryItems: products.length,
-        dueDateStats: {
-          today: todaysDueOrders,
-          tomorrow: tomorrowsDueOrders,
-          overdue: overdueOrders,
-          upcoming: ordersWithDueDates.length - todaysDueOrders - tomorrowsDueOrders - overdueOrders
-        }
-      };
-
-      res.json(transformedMetrics);
-    } catch (error) {
-      console.error("Dashboard metrics error:", error);
-      res.status(500).json({ message: "Failed to fetch dashboard metrics" });
-    }
-  });
+  // Dashboard routes - Optimized
+  app.use("/api/dashboard", dashboardRouter);
 
   // Database health check endpoints
   app.get("/api/health/database", async (req, res) => {
@@ -1116,6 +1038,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function for Tier Calculation
+  const calculateTier = (totalSpent: number): string => {
+    if (totalSpent >= 50000) return "Platinum";
+    if (totalSpent >= 20000) return "Gold";
+    if (totalSpent >= 10000) return "Silver";
+    return "Bronze";
+  };
+
   app.post("/api/customers", async (req, res) => {
     try {
       const validatedData = insertCustomerSchema.parse(req.body) as any;
@@ -1126,10 +1056,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check by email
       if (validatedData.email) {
         const existingByEmail = allCustomers.find((c: Customer) =>
-          c.email?.toLowerCase() === validatedData.email?.toLowerCase()
+          c.email?.toLowerCase() === validatedData.email?.toLowerCase() && c.status !== 'archived'
         );
         if (existingByEmail) {
-          return res.status(200).json(existingByEmail);
+          return res.status(409).json({ message: "Customer with this email already exists" });
         }
       }
 
@@ -1138,15 +1068,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const normalizedInputPhone = validatedData.phone.replace(/\D/g, '');
         if (normalizedInputPhone.length > 0) {
           const existingByPhone = allCustomers.find((c: Customer) => {
-            if (!c.phone) return false;
+            if (!c.phone || c.status === 'archived') return false;
             const normalizedDbPhone = c.phone.replace(/\D/g, '');
             return normalizedDbPhone === normalizedInputPhone;
           });
           if (existingByPhone) {
-            return res.status(200).json(existingByPhone);
+            return res.status(409).json({ message: "Customer with this phone number already exists" });
           }
         }
       }
+
+      // Initialize defaults
+      validatedData.tier = calculateTier(parseFloat(validatedData.totalSpent || "0"));
+      validatedData.walletBalance = validatedData.walletBalance || "0";
+      validatedData.creditLimit = validatedData.creditLimit || "1000";
+      validatedData.status = "active";
 
       const customer = await storage.createCustomer(validatedData);
 
@@ -1161,14 +1097,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           errors: error.errors,
         });
       }
-
-      // Handle unique constraint violations as fallback
-      if (error.code === 'SQLITE_CONSTRAINT_UNIQUE' || error.message?.includes('UNIQUE constraint failed')) {
-        return res.status(409).json({
-          message: "Customer with this phone number or email already exists",
-        });
-      }
-
       console.error("Create customer error:", error);
       res.status(500).json({ message: "Failed to create customer" });
     }
@@ -1177,6 +1105,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/customers/:id", async (req, res) => {
     try {
       const validatedData = insertCustomerSchema.partial().parse(req.body);
+
+      // Auto-update tier if totalSpent is changed
+      if (validatedData.totalSpent) {
+        validatedData.tier = calculateTier(parseFloat(validatedData.totalSpent as string));
+      }
+
       const customer = await storage.updateCustomer(
         req.params.id,
         validatedData,
@@ -1184,6 +1118,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!customer) {
         return res.status(404).json({ message: "Customer not found" });
+      }
+
+      // Audit Log for Wallet/Credit changes
+      if (validatedData.walletBalance || validatedData.creditBalance) {
+        try {
+          await storage.createAuditLog({
+            employeeId: req.body.updatedBy || 'system',
+            action: 'wallet_update',
+            entityType: 'customer',
+            entityId: customer.id,
+            details: {
+              walletBalance: customer.walletBalance,
+              creditBalance: customer.creditBalance,
+              reason: req.body.reason || 'Manual Update'
+            },
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent')
+          });
+        } catch (e) { console.error("Audit log failed", e); }
       }
 
       const transformedCustomer = {
@@ -1207,8 +1160,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/customers/:id", async (req, res) => {
     try {
-      await storage.deleteCustomer(req.params.id);
-      res.json({ message: "Customer deleted successfully" });
+      // Soft Delete Implementation
+      const customer = await storage.getCustomer(req.params.id);
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+      // If customer has no orders, we might hard delete? No, Stick to soft delete for consistency.
+      await storage.updateCustomer(req.params.id, { status: "archived" });
+
+      await storage.createAuditLog({
+        employeeId: req.body.deletedBy || 'system',
+        action: 'archive_customer',
+        entityType: 'customer',
+        entityId: req.params.id,
+        details: { name: customer.name },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json({ message: "Customer deactivated successfully" });
     } catch (error) {
       console.error("Delete customer error:", error);
       res.status(500).json({ message: "Failed to delete customer" });

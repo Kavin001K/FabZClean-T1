@@ -66,6 +66,51 @@ export const franchises = pgTable("franchises", {
   // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+
+  // INDUSTRY STANDARD ADDITIONS
+
+  // Legal & Compliance
+  tradeLicenseNumber: text("trade_license_number"),
+  msmeRegistration: text("msme_registration"),
+  onboardingStatus: text("onboarding_status", { enum: ["pending", "in_progress", "verified", "suspended"] }).default("pending"),
+  onboardingChecklist: jsonb("onboarding_checklist").default({
+    staff_trained: false,
+    machinery_installed: false,
+    legal_signed: false
+  }),
+
+  // Geofencing for Logistics
+  serviceRadiusKm: decimal("service_radius_km", { precision: 5, scale: 2 }).default("5.00"),
+  latitude: decimal("latitude", { precision: 10, scale: 7 }),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }),
+
+  // Financial Agreements
+  securityDeposit: decimal("security_deposit", { precision: 10, scale: 2 }).default("0"),
+  billingCycle: text("billing_cycle", { enum: ["weekly", "fortnightly", "monthly"] }).default("monthly"),
+
+  // 1. Onboarding & Compliance (Merging existing)
+  onboardingSteps: jsonb("onboarding_steps"),
+  isDepositPaid: boolean("is_deposit_paid").default(false),
+  securityDepositAmount: decimal("security_deposit_amount", { precision: 12, scale: 2 }).default("0"),
+
+  // 2. Legal & KYC (Merging existing - avoiding duplicates)
+  licenseExpiryDate: timestamp("license_expiry_date"),
+  fireSafetyStatus: text("fire_safety_status", { enum: ["compliant", "pending", "expired", "not_applicable"] }).default("pending"),
+
+  // 3. Financial Configuration (Merging existing)
+  royaltyModel: text("royalty_model", { enum: ["fixed", "percentage"] }).default("percentage"),
+
+  // 4. Territory & Geofencing (Merging existing)
+  pinCode: text("pin_code"),
+
+  // 5. Digital Footprint (Merging existing)
+  googleMapsPlaceId: text("google_maps_place_id"),
+  socialHandles: jsonb("social_handles"), // { instagram: string, facebook: string }
+  adminAlertEmail: text("admin_alert_email"),
+  customerSupportEmail: text("customer_support_email"),
+
+  // Finance Settings
+  defaultCreditLimit: decimal("default_credit_limit", { precision: 10, scale: 2 }).default("1000"),
 });
 
 export const users = pgTable("users", {
@@ -119,7 +164,7 @@ export const orders = pgTable("orders", {
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
   customerPhone: text("customer_phone"),
-  status: text("status", { enum: ["pending", "processing", "completed", "cancelled", "assigned", "in_transit", "shipped", "out_for_delivery", "delivered", "in_store", "ready_for_transit", "ready_for_pickup"] }).notNull(),
+  status: text("status", { enum: ["pending", "processing", "completed", "cancelled", "assigned", "in_transit", "shipped", "out_for_delivery", "delivered", "in_store", "ready_for_transit", "ready_for_pickup", "archived"] }).notNull(),
   paymentStatus: text("payment_status", { enum: ["pending", "paid", "failed", "credit"] }).notNull().default("pending"),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   items: jsonb("items").$type<OrderItem[]>().notNull(),
@@ -141,16 +186,20 @@ export const orders = pgTable("orders", {
   fulfillmentType: text("fulfillment_type", { enum: ["pickup", "delivery"] }).default("pickup"),
   deliveryCharges: decimal("delivery_charges", { precision: 10, scale: 2 }).default("0"),
   deliveryAddress: jsonb("delivery_address").$type<ShippingAddress>(),
-  // Express Order / Priority
-  isExpressOrder: boolean("is_express_order").default(false),
-  priority: text("priority", { enum: ["normal", "high", "urgent"] }).default("normal"),
-  // WhatsApp notification tracking
-  lastWhatsappStatus: text("last_whatsapp_status"),
-  lastWhatsappSentAt: timestamp("last_whatsapp_sent_at"),
-  whatsappMessageCount: integer("whatsapp_message_count").default(0),
-  employeeId: text("employee_id"),
-  createdBy: text("created_by"),
-  createdAt: timestamp("created_at").defaultNow(),
+  // Operational Metadata
+  isExpress: boolean("is_express").default(false),
+  garmentCount: integer("garment_count").notNull().default(0),
+  rackLocation: text("rack_location"), // For store pickup efficiency
+
+  // Security Handshake
+  handoverOtp: text("handover_otp"), // Generated for driver/factory handshake
+  itemVerificationStatus: text("item_verification", { enum: ["unverified", "verified", "disputed"] }).default("unverified"),
+
+  // Insurance / Liability
+  orderNotes: text("order_notes"), // Internal staff notes
+  customerInstructions: text("customer_instructions"),
+  photoUrls: jsonb("photo_urls"), // Proof of garment condition at pickup
+
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -188,13 +237,34 @@ export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   franchiseId: varchar("franchise_id").references(() => franchises.id),
   name: text("name").notNull(),
-  email: text("email"), // Removed unique constraint globally
-  phone: text("phone"),
+  email: text("email"),
+  phone: text("phone").notNull(), // Required for ID verification
   address: jsonb("address"),
+
+  // CRM & Retention
+  loyaltyTier: text("loyalty_tier", { enum: ["bronze", "silver", "gold", "platinum"] }).default("bronze"),
+  loyaltyPoints: integer("loyalty_points").default(0),
+  marketingOptIn: boolean("marketing_opt_in").default(true),
+  customerPreferences: jsonb("customer_preferences").default({
+    starch: "none",
+    packaging: "fold",
+    fragrance: "standard"
+  }),
+
+  // Financial Ledger
+  walletBalance: decimal("wallet_balance", { precision: 10, scale: 2 }).default("0"),
+  creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }).default("5000"), // Store-defined limit
+  totalLifetimeSpent: decimal("total_spent", { precision: 10, scale: 2 }).default("0"), // Renaming/Mapping to existing
   totalOrders: integer("total_orders").default(0),
-  totalSpent: decimal("total_spent", { precision: 10, scale: 2 }).default("0"),
+
+  // Kept for backward compatibility
   creditBalance: decimal("credit_balance", { precision: 10, scale: 2 }).default("0"),
-  lastOrder: timestamp("last_order"),
+  tier: text("tier", { enum: ["Bronze", "Silver", "Gold", "Platinum"] }).default("Bronze"),
+  preferences: jsonb("preferences"),
+  status: text("status", { enum: ["active", "inactive", "archived"] }).default("active"),
+
+  lastOrderAt: timestamp("last_order_at"), // Mapped from last_order
+  lastOrder: timestamp("last_order"), // Keeping existing field but maybe deprecating?
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -203,11 +273,30 @@ export const services = pgTable("services", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   franchiseId: varchar("franchise_id").references(() => franchises.id),
   name: text("name").notNull(),
-  category: text("category").notNull(),
+  category: text("category").notNull(), // Laundry, Dry Cleaning, Repairs, etc.
   description: text("description"),
+
+  // Pricing & Tax
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  duration: text("duration").notNull(),
-  status: text("status", { enum: ["Active", "Inactive"] }).notNull().default("Active"),
+  pricingModel: text("pricing_model", { enum: ["per_piece", "per_kg", "per_sqft", "fixed"] }).default("per_piece"),
+  hsnSacCode: text("hsn_sac_code"), // For GST compliance
+
+  // Workflow & Resources
+  duration: text("duration"), // Keeping for backward compatibility (display string)
+  leadTimeHours: integer("lead_time_hours").default(24), // For automatic due date calculation
+  requiredInventory: jsonb("required_inventory"), // [{ chemicalId, amount }, ...]
+
+  // Handling
+  technicianNotes: text("technician_notes"), // Printed on tags
+
+  // Display
+  thumbnailUrl: text("thumbnail_url"),
+
+  // Hierarchy
+  parentServiceId: text("parent_service_id"), // If this is an add-on (e.g., Starch)
+  isAddOn: boolean("is_add_on").default(false),
+
+  status: text("status", { enum: ["Active", "Inactive", "Archived"] }).notNull().default("Active"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -349,16 +438,22 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Insert schemas
-export const insertFranchiseSchema = createInsertSchema(franchises);
-export const insertUserSchema = createInsertSchema(users);
+// Updated Franchise Onboarding Schema
+export const insertFranchiseSchema = createInsertSchema(franchises, {
+  gstRate: z.string().regex(/^\d+(\.\d{1,2})?$/).optional().nullable(),
+  agreementEndDate: z.coerce.date().optional().nullable(),
+  serviceRadiusKm: z.coerce.number().min(1).max(100).optional().nullable(),
+}).extend({
+  // Adding manual validations for flattened address fields if needed
+  street: z.string().min(5).optional(),
+  pincode: z.string().length(6).optional(),
+});
 
+export const insertUserSchema = createInsertSchema(users);
 export const insertProductSchema = createInsertSchema(products);
+export const insertDeliverySchema = createInsertSchema(deliveries);
 
 // Create a base insert schema and extend it with additional fields
-// Using a more permissive approach to avoid drizzle-zod strict key checking
-const baseOrderSchema = createInsertSchema(orders);
-
 export const insertOrderSchema = z.object({
   id: z.string().optional(),
   franchiseId: z.string().optional().nullable(),
@@ -367,7 +462,7 @@ export const insertOrderSchema = z.object({
   customerName: z.string(),
   customerEmail: z.string().optional().nullable(),
   customerPhone: z.string().optional().nullable(),
-  status: z.enum(["pending", "processing", "completed", "cancelled", "assigned", "in_transit", "shipped", "out_for_delivery", "delivered", "in_store", "ready_for_transit", "ready_for_pickup"]),
+  status: z.enum(["pending", "processing", "completed", "cancelled", "assigned", "in_transit", "shipped", "out_for_delivery", "delivered", "in_store", "ready_for_transit", "ready_for_pickup", "archived"]),
   paymentStatus: z.enum(["pending", "paid", "failed", "credit"]).default("pending"),
   totalAmount: z.union([z.string(), z.number()]).transform(val => val.toString()),
   items: z.any(),
@@ -396,15 +491,34 @@ export const insertOrderSchema = z.object({
   whatsappMessageCount: z.number().optional().default(0),
   createdAt: z.coerce.date().optional(),
   updatedAt: z.coerce.date().optional(),
-}).passthrough();
 
-export const insertDeliverySchema = createInsertSchema(deliveries);
+  // New Fields
+  isExpress: z.boolean().optional().default(false),
+  garmentCount: z.number().optional().default(0),
+  rackLocation: z.string().optional().nullable(),
+  handoverOtp: z.string().optional().nullable(),
+  itemVerificationStatus: z.enum(["unverified", "verified", "disputed"]).optional().default("unverified"),
+  orderNotes: z.string().optional().nullable(),
+  customerInstructions: z.string().optional().nullable(),
+  photoUrls: z.any().optional().nullable(),
+}).passthrough();
 
 export const insertOrderTransactionSchema = createInsertSchema(orderTransactions);
 
-export const insertCustomerSchema = createInsertSchema(customers);
+// Updated Customer CRM Schema
+export const insertCustomerSchema = createInsertSchema(customers, {
+  phone: z.string().min(10).max(15),
+  creditLimit: z.coerce.string().optional(),
+}).extend({
+  initialDeposit: z.coerce.number().optional(),
+});
 
-export const insertServiceSchema = createInsertSchema(services);
+export const insertServiceSchema = createInsertSchema(services).extend({
+  price: z.union([z.string(), z.number()]).transform(val => val.toString()),
+  leadTimeHours: z.coerce.number().optional().default(24),
+  pricingModel: z.enum(["per_piece", "per_kg", "per_sqft", "fixed"]).optional().default("per_piece"),
+  isAddOn: z.coerce.boolean().optional().default(false),
+});
 
 export const insertShipmentSchema = createInsertSchema(shipments);
 
@@ -470,6 +584,22 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs);
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 
+// Logistics Vehicles
+export const vehicles = pgTable("vehicles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  franchiseId: varchar("franchise_id").references(() => franchises.id),
+  licensePlate: text("license_plate").notNull().unique(),
+  makeModel: text("make_model").notNull(),
+  type: text("type", { enum: ["bike", "scooter", "van", "truck"] }).notNull().default("van"),
+  capacityKg: decimal("capacity_kg", { precision: 8, scale: 2 }).notNull(),
+  status: text("status", { enum: ["active", "maintenance", "inactive"] }).default("active"),
+  gpsDeviceId: text("gps_device_id"),
+  insuranceExpiry: timestamp("insurance_expiry"),
+  fitnessExpiry: timestamp("fitness_expiry"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const transitOrders = pgTable("transit_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   transitId: text("transit_id").notNull().unique(),
@@ -478,19 +608,50 @@ export const transitOrders = pgTable("transit_orders", {
   origin: text("origin"),
   destination: text("destination"),
   createdBy: text("created_by"),
+
+  // Logistics Accountability
+  totalWeightKg: decimal("total_weight_kg", { precision: 10, scale: 2 }),
+  vehicleCapacityUtilization: decimal("utilization_percent", { precision: 5, scale: 2 }),
+
+  // Handshake Proofs
+  dispatchVerifiedBy: text("dispatch_verified_by"), // Staff ID
+  receiptVerifiedBy: text("receipt_verified_by"), // Factory Manager ID
+  dispatchSignature: text("dispatch_signature"), // Base64 or URL
+  receiptSignature: text("receipt_signature"),
+
+  // GPS Snapshot
+  originCoords: jsonb("origin_coords"),
+  destinationCoords: jsonb("destination_coords"),
+
+  // Handover Security (Chain of Custody)
+  verificationOtp: text("verification_otp"),
+  isVerified: boolean("is_verified").default(false),
+  verifiedAt: timestamp("verified_at"),
+
+  // Link to Real Vehicle
+  vehicleId: varchar("vehicle_id").references(() => vehicles.id),
+  driverId: varchar("driver_id").references(() => employees.id),
+
+  // Legacy fields (keep for fallback)
   vehicleNumber: text("vehicle_number"),
   vehicleType: text("vehicle_type"),
   driverName: text("driver_name"),
   driverPhone: text("driver_phone"),
   driverLicense: text("driver_license"),
+
+  employeeId: text("employee_id"), // Redundant if driverId is used, but keeping
   employeeName: text("employee_name"),
-  employeeId: text("employee_id"),
   designation: text("designation"),
   employeePhone: text("employee_phone"),
+
   franchiseId: text("franchise_id"),
   totalOrders: integer("total_orders").default(0),
   totalItems: integer("total_items").default(0),
-  totalWeight: decimal("total_weight").default("0"),
+  totalWeight: decimal("total_weight").default("0"), // Keeping existing along with totalWeightKg
+
+  // New: Security Flags
+  securityFlags: jsonb("security_flags"), // e.g. ["delayed", "off_route"]
+
   orders: jsonb("orders"), // Stores summary of orders if needed
   storeDetails: jsonb("store_details"),
   factoryDetails: jsonb("factory_details"),
@@ -579,6 +740,11 @@ export const creditTransactions = pgTable("credit_transactions", {
   transactionDate: timestamp("transaction_date").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Insert Schemas
+export const insertVehicleSchema = createInsertSchema(vehicles);
+export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
+export type Vehicle = typeof vehicles.$inferSelect;
 
 export const insertCreditTransactionSchema = createInsertSchema(creditTransactions);
 export type InsertCreditTransaction = z.infer<typeof insertCreditTransactionSchema>;

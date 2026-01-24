@@ -8,6 +8,7 @@ import { realtimeServer } from "./websocket-server";
 import { driverTrackingService } from "./driver-tracking";
 import { corsOptions, errorHandler } from "./middleware/auth";
 import { surveillanceMiddleware } from "./middleware/surveillance";
+import { maskSensitiveData } from "./utils/mask-data";
 
 const app = express();
 
@@ -18,29 +19,8 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
-// Helper to mask sensitive PII and secrets in logs
-function maskSensitiveData(data: any): any {
-  if (!data) return data;
-  if (typeof data !== 'object') return data;
+// Helper to mask sensitive PII and secrets in logs - Imported from utils/mask-data.ts
 
-  const masked = Array.isArray(data) ? [...data] : { ...data };
-
-  // Fields to completely redact
-  const sensitiveFields = ['password', 'token', 'access_token', 'refreshToken', 'card', 'cvc', 'secret', 'auth'];
-  // Fields to mask as PII
-  const piiFields = ['email', 'phone', 'phoneNumber', 'mobile', 'address'];
-
-  for (const key in masked) {
-    if (sensitiveFields.some(field => key.toLowerCase().includes(field))) {
-      masked[key] = '***MASKED_SECRET***';
-    } else if (piiFields.some(field => key.toLowerCase().includes(field))) {
-      masked[key] = '***MASKED_PII***';
-    } else if (typeof masked[key] === 'object') {
-      masked[key] = maskSensitiveData(masked[key]);
-    }
-  }
-  return masked;
-}
 
 // Security Headers Middleware (Strict CSP)
 app.use((req, res, next) => {

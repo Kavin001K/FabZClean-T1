@@ -608,11 +608,15 @@ export const analyticsApi = {
     return [];
   },
 
-  async getDashboardMetrics(): Promise<{
+  async getDashboardMetrics(franchiseId?: string): Promise<{
     totalRevenue: number;
+    revenueToday?: number;
     totalOrders: number;
     newCustomers: number;
     inventoryItems: number;
+    pendingOrders?: number;
+    ordersCompletedToday?: number;
+    revenueGrowth?: number;
     dueDateStats?: {
       today: number;
       tomorrow: number;
@@ -621,7 +625,8 @@ export const analyticsApi = {
     };
   }> {
     try {
-      return await fetchData('/dashboard/metrics');
+      const query = franchiseId ? `?franchiseId=${franchiseId}` : '';
+      return await fetchData(`/dashboard/metrics${query}`);
     } catch (error) {
       console.error('Failed to fetch dashboard metrics:', error);
       return {
@@ -636,6 +641,15 @@ export const analyticsApi = {
           upcoming: 0,
         }
       };
+    }
+  },
+
+  async getAdminLeaderboard(): Promise<any[]> {
+    try {
+      return await fetchData('/dashboard/admin/leaderboard');
+    } catch (error) {
+      console.error('Failed to fetch leaderboard:', error);
+      return [];
     }
   }
 };

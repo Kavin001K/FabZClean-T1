@@ -23,6 +23,7 @@ router.get('/', jwtRequired, requireRole(AUDIT_VIEW_ROLES), async (req, res) => 
             startDate,
             endDate,
             entityType,
+            entityId,
             franchiseId
         } = req.query;
 
@@ -56,6 +57,7 @@ router.get('/', jwtRequired, requireRole(AUDIT_VIEW_ROLES), async (req, res) => 
             startDate,
             endDate,
             entityType,
+            entityId: entityId as string,
             sortBy: req.query.sortBy === 'createdAt' ? 'createdAt' : req.query.sortBy as string,
             sortOrder: req.query.sortOrder as string
         });
