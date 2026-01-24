@@ -29,6 +29,7 @@ const Orders = lazy(() => retryDynamicImport(() => import("@/pages/orders")));
 const OrderDetail = lazy(() => retryDynamicImport(() => import("@/pages/order-detail")));
 const Services = lazy(() => retryDynamicImport(() => import("@/pages/services")));
 const CreateOrder = lazy(() => retryDynamicImport(() => import("@/pages/create-order")));
+const POSPage = lazy(() => retryDynamicImport(() => import("@/pages/pos")));
 const Documents = lazy(() => retryDynamicImport(() => import("@/pages/documents")));
 const Customers = lazy(() => retryDynamicImport(() => import("@/pages/customers")));
 const Analytics = lazy(() => retryDynamicImport(() => import("@/pages/analytics")));
@@ -154,6 +155,12 @@ function Router() {
           <MainLayout>
             <Services />
           </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/pos">
+        <ProtectedRoute allowedRoles={['admin', 'employee', 'franchise_manager']}>
+          <POSPage />
         </ProtectedRoute>
       </Route>
 
