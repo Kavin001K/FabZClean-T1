@@ -8,35 +8,33 @@ function createWindow() {
         width: 1200,
         height: 800,
         title: "FabzClean Manager",
-        icon: path.join(__dirname, '../client/public/assets/Logoz.ico'), // Uses your existing icon
+        // This points to your existing icon
+        icon: path.join(__dirname, '../client/public/assets/Logoz.ico'),
         webPreferences: {
             nodeIntegration: true,
-            contextIsolation: false, // Allows simple printing communication
-            webSecurity: false // Helps with loading content across domains if needed
+            contextIsolation: false,
+            webSecurity: false // Required for cross-domain loading
         }
     });
 
-    // 🚀 CRITICAL: Connects to your live server
-    const storeUrl = 'https://fabz.acedigital.space';
+    // 🚀 CONNECT TO YOUR NEW LIVE SERVER
+    mainWindow.loadURL('https://fab.acedigital.space');
 
-    mainWindow.loadURL(storeUrl);
-
-    // Handle external links (open in default browser instead of the app)
+    // Open external links in default browser
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
         shell.openExternal(url);
         return { action: 'deny' };
     });
 
-    // 🖨️ Silent Printing Handler
-    // This receives the print command from your website and prints without a popup
+    // Silent Printing Handler (No popup)
     ipcMain.on('do-print', (event, options) => {
-        const printWindow = new BrowserWindow({ show: false, width: 800, height: 600 });
+        const printWindow = new BrowserWindow({ show: false });
         printWindow.loadURL(options.url);
 
         printWindow.webContents.on('did-finish-load', () => {
             printWindow.webContents.print({
                 silent: true,
-                deviceName: options.printerName || '' // Uses default printer if specific name not found
+                deviceName: options.printerName || ''
             }, (success, errorType) => {
                 if (!success) console.log("Print failed:", errorType);
                 printWindow.close();
@@ -48,11 +46,4 @@ function createWindow() {
 }
 
 app.on('ready', createWindow);
-
-app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
-});
-
-app.on('activate', () => {
-    if (mainWindow === null) createWindow();
-});
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
