@@ -108,7 +108,7 @@ function getItemNames(ids: string[]): string {
 
 router.post('/webhook', async (req: Request, res: Response) => {
     const { action, ...data } = req.body;
-    console.log(`[WhatsApp Flow] ${action}:`, JSON.stringify(data, null, 2));
+);
 
     if (action === 'book') {
         const orderId = genOrderId();
@@ -158,8 +158,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
                 notes: data.notes || '',
                 source: 'whatsapp',
             });
-            console.log(`[WhatsApp Flow] ✅ Order ${orderId} created`);
-        } catch (err) {
+} catch (err) {
             console.error('[WhatsApp Flow] DB Error:', err);
         }
 

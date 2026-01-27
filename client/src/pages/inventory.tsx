@@ -78,7 +78,7 @@ import { useInventoryFilters } from '@/hooks/use-inventory-filters';
 // Import data service and types
 import { inventoryApi, formatCurrency } from '@/lib/data-service';
 import type { InventoryItem } from '@/lib/data-service';
-import { exportToExcel } from '@/lib/excel-export';
+import { exportToExcel } from '@/lib/excel-export-service';
 import { exportInventoryEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportInventoryToExcel } from '@/lib/excel-exports';
 import { cn } from '@/lib/utils';

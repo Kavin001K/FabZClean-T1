@@ -45,9 +45,7 @@ export class OrderService {
    */
   async findAllOrders(filters: OrderFilters = {}): Promise<Order[]> {
     try {
-      console.log('📦 [OrderService] Fetching orders with filters:', filters);
-
-      // Fetch orders from database
+// Fetch orders from database
       let orders = await storage.listOrders(filters.franchiseId);
 
       // Apply email filter if provided
@@ -133,12 +131,7 @@ export class OrderService {
       // Enrich orders with external data and algorithms
       // Passing empty map as we are skipping external enrichment
       const enrichedOrders = enrichOrdersWithAlgorithms(orders, new Map());
-
-      console.log(
-        `✅ [OrderService] Fetched ${enrichedOrders.length} orders`
-      );
-
-      return enrichedOrders;
+return enrichedOrders;
     } catch (error) {
       console.error('❌ [OrderService] Error fetching orders:', error);
       throw error;
@@ -151,9 +144,7 @@ export class OrderService {
    */
   async getOrderById(orderId: string): Promise<Order> {
     try {
-      console.log(`📦 [OrderService] Fetching order: ${orderId}`);
-
-      // Fetch order from database
+// Fetch order from database
       const order = await storage.getOrder(orderId);
       if (!order) {
         throw new Error(`Order not found: ${orderId}`);
@@ -175,10 +166,7 @@ export class OrderService {
 
       // Enrich with external data and algorithms
       const enrichedOrder = enrichOrderWithAlgorithms(order, externalData);
-
-      console.log(`✅ [OrderService] Fetched order: ${orderId}`);
-
-      return enrichedOrder;
+return enrichedOrder;
     } catch (error) {
       console.error(`❌ [OrderService] Error fetching order ${orderId}:`, error);
       throw error;
@@ -191,9 +179,7 @@ export class OrderService {
    */
   async createOrder(orderData: InsertOrder): Promise<Order> {
     try {
-      console.log('📦 [OrderService] Creating order for customer:', orderData.customerId);
-
-      // Pre-validate customer via external API if customerId is provided
+// Pre-validate customer via external API if customerId is provided
       // Skip validation if external API is not configured
       /*
       if (orderData.customerId) {
@@ -210,10 +196,7 @@ export class OrderService {
               `Customer validation failed: ${validation.reason || 'Unknown reason'}`
             );
           } else {
-            console.log(
-              `✅ [OrderService] Customer validated: ${orderData.customerId}`
-            );
-          }
+}
         } catch (error) {
           if (error instanceof ExternalApiError) {
             console.warn(
@@ -246,8 +229,7 @@ export class OrderService {
               totalLifetimeSpent: (currentTotalSpent + orderTotal).toString(),
               lastOrderAt: new Date()
             });
-            console.log(`✅ [OrderService] Updated stats for customer: ${order.customerId}`);
-          }
+}
         } catch (error) {
           console.error(`❌ [OrderService] Failed to update customer stats:`, error);
           // Don't fail the order creation if stats update fails
@@ -256,10 +238,7 @@ export class OrderService {
 
       // Enrich with algorithm processing
       const enrichedOrder = enrichOrderWithAlgorithms(order);
-
-      console.log(`✅ [OrderService] Order created: ${order.id}`);
-
-      // WhatsApp confirmation is now handled by the client after PDF generation
+// WhatsApp confirmation is now handled by the client after PDF generation
       // to ensure the invoice is attached.
 
       return enrichedOrder;
@@ -277,9 +256,7 @@ export class OrderService {
    */
   async updateOrder(orderId: string, updateData: Partial<InsertOrder>): Promise<Order> {
     try {
-      console.log(`📦 [OrderService] Updating order: ${orderId}`);
-
-      const order = await storage.getOrder(orderId);
+const order = await storage.getOrder(orderId);
       if (!order) {
         throw new Error(`Order not found: ${orderId}`);
       }
@@ -288,10 +265,7 @@ export class OrderService {
 
       // Re-enrich with algorithms
       const enrichedOrder = enrichOrderWithAlgorithms(updatedOrder);
-
-      console.log(`✅ [OrderService] Order updated: ${orderId}`);
-
-      return enrichedOrder;
+return enrichedOrder;
     } catch (error) {
       console.error(`❌ [OrderService] Error updating order ${orderId}:`, error);
       throw error;
@@ -303,17 +277,12 @@ export class OrderService {
    */
   async deleteOrder(orderId: string): Promise<boolean> {
     try {
-      console.log(`📦 [OrderService] Deleting order: ${orderId}`);
-
-      const deleted = await storage.deleteOrder(orderId);
+const deleted = await storage.deleteOrder(orderId);
 
       if (!deleted) {
         throw new Error(`Failed to delete order: ${orderId}`);
       }
-
-      console.log(`✅ [OrderService] Order deleted: ${orderId}`);
-
-      return deleted;
+return deleted;
     } catch (error) {
       console.error(`❌ [OrderService] Error deleting order ${orderId}:`, error);
       throw error;
@@ -328,10 +297,7 @@ export class OrderService {
       const validation = await externalApiClient.get<CustomerValidationResult>(
         `/customer-validation/${customerId}`
       );
-
-      console.log(`✅ [OrderService] Customer validation result:`, validation);
-
-      return validation;
+return validation;
     } catch (error) {
       if (error instanceof ExternalApiError) {
         console.error(

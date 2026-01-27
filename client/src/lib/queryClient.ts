@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction, MutationCache } from "@tanstack/react-query";
 import { isElectron } from "./utils";
+import { getApiUrl } from "./api-config";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -13,7 +14,10 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const baseUrl = getApiUrl();
+  const fullUrl = url.startsWith("http") ? url : `${baseUrl}${url}`;
+
+  const res = await fetch(fullUrl, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
@@ -30,7 +34,8 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
     async ({ queryKey }) => {
-      const res = await fetch(`/api/${queryKey.join("/")}` as string, {
+      const baseUrl = getApiUrl();
+      const res = await fetch(`${baseUrl}/api/${queryKey.join("/")}` as string, {
         credentials: "include",
       });
 
@@ -59,8 +64,7 @@ export const queryClient = new QueryClient({
       if (mutationKey) {
         // 1. If an Order is created/updated -> Refresh Inventory & Dashboard
         if (mutationKey.includes('createOrder') || mutationKey.includes('updateOrder')) {
-          console.log('🔄 Ecosystem: Order Change detected. Syncing Inventory & Dashboard...');
-          await Promise.all([
+await Promise.all([
             queryClient.invalidateQueries({ queryKey: ['inventory'] }),
             queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
             queryClient.invalidateQueries({ queryKey: ['orders'] }),

@@ -9,9 +9,7 @@
 import { db as storage } from '../db';
 
 async function syncOrderCredits() {
-    console.log('🔄 Starting credit sync for existing orders...\n');
-
-    try {
+try {
         // Get all orders with credit or pending payment status
         const allOrders = await storage.listOrders();
         const creditOrders = allOrders.filter(
@@ -19,10 +17,7 @@ async function syncOrderCredits() {
                 (order.paymentStatus === 'credit' || order.paymentStatus === 'pending') &&
                 order.customerId
         );
-
-        console.log(`📊 Found ${creditOrders.length} orders with credit/pending status`);
-
-        let created = 0;
+let created = 0;
         let skipped = 0;
         let errors = 0;
 
@@ -33,7 +28,7 @@ async function syncOrderCredits() {
                 const balanceDue = totalAmount - advancePaid;
 
                 if (balanceDue <= 0) {
-                    console.log(`  ⏭️  ${order.orderNumber}: No balance due (fully paid)`);
+`);
                     skipped++;
                     continue;
                 }
@@ -45,8 +40,7 @@ async function syncOrderCredits() {
                 );
 
                 if (alreadyRecorded) {
-                    console.log(`  ⏭️  ${order.orderNumber}: Credit already recorded`);
-                    skipped++;
+skipped++;
                     continue;
                 }
 
@@ -61,8 +55,7 @@ async function syncOrderCredits() {
                     order.id,
                     'system-sync'
                 );
-
-                console.log(`  ✅ ${order.orderNumber}: Added ₹${balanceDue.toFixed(2)} credit for customer`);
+} credit for customer`);
                 created++;
 
             } catch (err: any) {
@@ -71,13 +64,8 @@ async function syncOrderCredits() {
             }
         }
 
-        console.log('\n📈 Credit Sync Summary:');
-        console.log(`   Created: ${created}`);
-        console.log(`   Skipped: ${skipped}`);
-        console.log(`   Errors:  ${errors}`);
-        console.log('\n✅ Credit sync complete!');
 
-    } catch (error) {
+} catch (error) {
         console.error('❌ Sync failed:', error);
         process.exit(1);
     }

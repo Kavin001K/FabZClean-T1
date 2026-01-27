@@ -98,9 +98,7 @@ export default React.memo(function EditOrderDialog({
       if (updates.advancePaid !== undefined && updates.advancePaid !== null) {
         updates.advancePaid = updates.advancePaid.toString();
       }
-
-      console.log('Saving order updates:', updates);
-      onSave(order.id, updates);
+onSave(order.id, updates);
     }
   };
 

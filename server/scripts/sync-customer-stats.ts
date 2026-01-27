@@ -8,9 +8,7 @@
 import { db as storage } from '../db';
 
 async function syncCustomerStats() {
-    console.log('🔄 Starting customer stats sync...\n');
-
-    try {
+try {
         const customers = await storage.listCustomers();
         const orders = await storage.listOrders();
 
@@ -40,29 +38,24 @@ async function syncCustomerStats() {
 
             // Check if update needed
             const currentOrders = customer.totalOrders || 0;
-            const currentSpent = parseFloat(customer.totalSpent?.toString() || '0');
+            const currentSpent = parseFloat(customer.totalLifetimeSpent?.toString() || '0');
 
             if (currentOrders !== totalOrders || Math.abs(currentSpent - totalSpent) > 0.01) {
                 // Update customer - pass lastOrder as string (ISO format)
                 await storage.updateCustomer(customer.id, {
                     totalOrders,
-                    totalSpent: totalSpent.toFixed(2),
+                    totalLifetimeSpent: totalSpent.toFixed(2),
                     lastOrder: lastOrder || undefined
                 });
-
-                console.log(`  ✅ ${customer.name}: Orders ${currentOrders} → ${totalOrders}, Spent ₹${currentSpent.toFixed(2)} → ₹${totalSpent.toFixed(2)}`);
+} → ₹${totalSpent.toFixed(2)}`);
                 updated++;
             } else {
                 skipped++;
             }
         }
 
-        console.log('\n📈 Customer Stats Sync Summary:');
-        console.log(`   Updated: ${updated}`);
-        console.log(`   Skipped: ${skipped}`);
-        console.log('\n✅ Sync complete!');
 
-    } catch (error) {
+} catch (error) {
         console.error('❌ Sync failed:', error);
         process.exit(1);
     }

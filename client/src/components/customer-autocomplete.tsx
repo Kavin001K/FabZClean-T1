@@ -17,13 +17,7 @@ import {
 } from "@/components/ui/popover";
 import { useQuery } from "@tanstack/react-query";
 
-interface Customer {
-    id: string;
-    name: string;
-    phone?: string;
-    email?: string;
-    address?: string;
-}
+import type { Customer } from "@shared/schema";
 
 interface CustomerAutocompleteProps {
     onSelect: (customer: Customer) => void;

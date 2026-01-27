@@ -465,6 +465,11 @@ export const auditLogs = pgTable("audit_logs", {
   entityType: text("entity_type"), // order, employee, product
   entityId: text("entity_id"),
   details: jsonb("details"),
+  // New Delta Capture Fields
+  oldValue: jsonb("old_value"),
+  newValue: jsonb("new_value"),
+  severity: text("severity", { enum: ["info", "warning", "critical", "error"] }).default("info"),
+  category: text("category"), // financial, logistics, security, lifecycle
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   createdAt: timestamp("created_at").defaultNow(),

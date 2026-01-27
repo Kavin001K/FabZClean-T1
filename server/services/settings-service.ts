@@ -210,10 +210,8 @@ class SettingsService {
       const existingSettings = await this.getAllSettings();
 
       if (existingSettings.length === 0) {
-        console.log("Initializing default settings...");
-        await db.updateSettings(DEFAULT_SETTINGS, "system");
-        console.log("Default settings initialized successfully");
-      }
+await db.updateSettings(DEFAULT_SETTINGS, "system");
+}
     } catch (error) {
       console.error("Error initializing default settings:", error);
       throw error;

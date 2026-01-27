@@ -348,9 +348,7 @@ class SearchService {
       this.searchIndex.set('customers', customers);
       this.searchIndex.set('products', products);
       this.lastIndexUpdate = Date.now();
-
-      console.log('Search index built successfully');
-    } catch (error) {
+} catch (error) {
       console.error('Failed to build search index:', error);
     }
   }

@@ -925,12 +925,12 @@ export class MemStorage implements IStorage {
         entityId: order.id,
         action: 'CREATE',
         employeeId: insertOrder.createdBy || 'system',
-        newValue: JSON.stringify({
+        newValue: {
           orderNumber: order.orderNumber,
           customerId: order.customerId,
           totalAmount: order.totalAmount,
           status: order.status
-        }),
+        },
         ipAddress: insertOrder._requestIp,
         userAgent: insertOrder._requestUserAgent
       });
@@ -970,16 +970,16 @@ export class MemStorage implements IStorage {
           entityId: id,
           action: 'UPDATE',
           employeeId: updates.updatedBy || 'system',
-          oldValue: JSON.stringify({
+          oldValue: {
             status: oldOrder.status,
             totalAmount: oldOrder.totalAmount,
             paymentStatus: oldOrder.paymentStatus
-          }),
-          newValue: JSON.stringify({
+          },
+          newValue: {
             status: updatedOrder?.status,
             totalAmount: updatedOrder?.totalAmount,
             paymentStatus: updatedOrder?.paymentStatus
-          }),
+          },
           ipAddress: updates._requestIp,
           userAgent: updates._requestUserAgent
         });

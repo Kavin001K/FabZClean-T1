@@ -246,9 +246,7 @@ export const InvoiceGenerator: React.FC = () => {
       }
 
       const pdfUrl = savedDocResponse.document.fileUrl;
-      console.log("PDF Uploaded to:", pdfUrl);
-
-      // 3. Send WhatsApp
+// 3. Send WhatsApp
       const response = await fetch('/api/whatsapp/send-bill', {
         method: 'POST',
         headers: {

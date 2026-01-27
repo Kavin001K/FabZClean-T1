@@ -58,8 +58,7 @@ export class AlgorithmUtils {
 
     const totalTime = times.reduce((sum, time) => sum + time, 0);
     const averageTime = totalTime / iterations;
-
-    console.log(`Benchmark ${name}: ${averageTime.toFixed(4)}ms average over ${iterations} iterations`);
+}ms average over ${iterations} iterations`);
 
     return {
       result: result!,
@@ -80,15 +79,11 @@ export class AlgorithmUtils {
    * Generate performance report
    */
   static generatePerformanceReport(metrics: { [key: string]: number }): void {
-    console.log('\n=== Performance Report ===');
-    
-    const sortedMetrics = Object.entries(metrics)
+const sortedMetrics = Object.entries(metrics)
       .sort(([, a], [, b]) => b - a);
 
     sortedMetrics.forEach(([name, value]) => {
-      console.log(`${name}: ${value.toFixed(2)}ms`);
+}ms`);
     });
-    
-    console.log('========================\n');
-  }
+}
 }

@@ -79,15 +79,9 @@ function validateConfig(): void {
   }
 
   // Log environment info
-  console.log(
-    `📝 Environment: ${config.isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`
-  );
-  console.log(
-    `🚀 Deployment: Self-hosted Ubuntu Server`
-  );
-  if (config.staticIP) {
-    console.log(`🌐 Static IP: ${config.staticIP}`);
-  }
+
+if (config.staticIP) {
+}
 }
 
 validateConfig();

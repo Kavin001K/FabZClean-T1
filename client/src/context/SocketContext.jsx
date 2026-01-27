@@ -35,8 +35,7 @@ export const SocketProvider = ({ children }) => {
   const wsUrl = useMemo(() => {
     try {
       const url = getWebSocketUrl();
-      console.log('SocketContext URL:', url);
-      return url;
+return url;
     } catch (error) {
       console.error('Error getting WebSocket URL:', error);
       // Fallback to current host if getWebSocketUrl fails
@@ -59,15 +58,13 @@ export const SocketProvider = ({ children }) => {
     maxReconnectAttempts: 5,
     reconnectInterval: 3000,
     onOpen: () => {
-      console.log('WebSocket connected successfully');
-      // Resubscribe to any previous subscriptions
+// Resubscribe to any previous subscriptions
       if (subscriptions.length > 0) {
         wsSubscribe(subscriptions);
       }
     },
     onClose: () => {
-      console.log('WebSocket disconnected');
-    },
+},
     onError: (error) => {
       // Silently handle errors - WebSocket is optional functionality
       // Only log in development

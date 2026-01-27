@@ -171,7 +171,6 @@ export default function CreateOrder() {
   const [isHistoryDetailsOpen, setIsHistoryDetailsOpen] = useState(false);
 
 
-
   // Fetch services - only active ones
   const { data: servicesData, isLoading: servicesLoading, isError: servicesError } = useQuery<Service[]>({
     queryKey: ["services"],
@@ -632,10 +631,7 @@ export default function CreateOrder() {
             };
           });
         }
-
-        console.log('✅ Normalized Order for Dialog:', newOrder);
-
-        setCreatedOrder(newOrder);
+setCreatedOrder(newOrder);
         setIsModalOpen(true);
         queryClient.invalidateQueries({ queryKey: ["orders"] });
         queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -658,9 +654,7 @@ export default function CreateOrder() {
               await customersApi.update(foundCustomer.id, {
                 address: newAddressList
               });
-
-              console.log('✅ Saved new delivery address to customer');
-            } catch (e) {
+} catch (e) {
               console.warn('Could not save new address:', e);
             }
           }
@@ -733,8 +727,7 @@ export default function CreateOrder() {
 
                 const { PDFService } = await import('@/lib/pdf-service');
                 pdfUrl = await PDFService.generateAndUploadBillPDF(newOrder.orderNumber, enableGST);
-                console.log('✅ PDF generated:', pdfUrl);
-              } catch (pdfError) {
+} catch (pdfError) {
                 console.warn('⚠️ PDF failed, sending link only:', pdfError);
               }
 

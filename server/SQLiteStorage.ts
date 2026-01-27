@@ -180,6 +180,10 @@ export class SQLiteStorage implements IStorage {
         entityType TEXT,
         entityId TEXT,
         details TEXT,
+        oldValue TEXT,
+        newValue TEXT,
+        severity TEXT DEFAULT 'info',
+        category TEXT,
         ipAddress TEXT,
         userAgent TEXT,
         createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -223,6 +227,7 @@ export class SQLiteStorage implements IStorage {
         address TEXT,
         totalOrders INTEGER,
         totalSpent TEXT,
+        totalLifetimeSpent TEXT DEFAULT '0',
         creditBalance TEXT DEFAULT '0',
         lastOrder TEXT,
         createdAt TEXT,
@@ -308,8 +313,6 @@ export class SQLiteStorage implements IStorage {
         lastWhatsappSentAt TEXT,
         whatsappMessageCount INTEGER DEFAULT 0,
         
-        createdBy TEXT,
-        employeeId TEXT,
         createdAt TEXT,
         updatedAt TEXT,
         FOREIGN KEY (customerId) REFERENCES customers(id),
@@ -373,7 +376,6 @@ export class SQLiteStorage implements IStorage {
         status TEXT,
         createdAt TEXT,
         updatedAt TEXT,
-        FOREIGN KEY (orderId) REFERENCES orders(id),
         FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
 
@@ -1089,6 +1091,7 @@ export class SQLiteStorage implements IStorage {
 
         const customerColumns = [
           { name: 'creditBalance', type: "TEXT DEFAULT '0'" },
+          { name: 'totalLifetimeSpent', type: "TEXT DEFAULT '0'" },
           { name: 'loyaltyPoints', type: 'INTEGER DEFAULT 0' },
           { name: 'loyaltyTier', type: "TEXT DEFAULT 'bronze'" },
           { name: 'tags', type: 'TEXT' },
@@ -1172,6 +1175,30 @@ export class SQLiteStorage implements IStorage {
         } catch (err) {
           console.error('Failed to backfill order letters:', err);
         }
+      }
+
+      // Check audit_logs table migration
+      const auditLogsTableExists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='audit_logs'").get();
+      if (auditLogsTableExists) {
+        const columns = this.db.prepare("PRAGMA table_info(audit_logs)").all() as any[];
+        const columnNames = columns.map(c => c.name);
+
+        if (!columnNames.includes('oldValue')) {
+          console.log('🔄 Migrating audit_logs table: Adding Delta Capture columns');
+          this.db.exec("ALTER TABLE audit_logs ADD COLUMN oldValue TEXT");
+          this.db.exec("ALTER TABLE audit_logs ADD COLUMN newValue TEXT");
+          this.db.exec("ALTER TABLE audit_logs ADD COLUMN severity TEXT DEFAULT 'info'");
+          this.db.exec("ALTER TABLE audit_logs ADD COLUMN category TEXT");
+        }
+
+        // Ensure indices exist for performance
+        this.db.exec(`
+          CREATE INDEX IF NOT EXISTS idx_audit_logs_severity ON audit_logs(severity);
+          CREATE INDEX IF NOT EXISTS idx_audit_logs_category ON audit_logs(category);
+          CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(createdAt);
+          CREATE INDEX IF NOT EXISTS idx_audit_logs_franchise_id ON audit_logs(franchiseId);
+          CREATE INDEX IF NOT EXISTS idx_audit_logs_employee_id ON audit_logs(employeeId);
+        `);
       }
 
     } catch (error) {
@@ -2166,18 +2193,32 @@ export class SQLiteStorage implements IStorage {
       ipAddress: logData.ipAddress || null,
       userAgent: logData.userAgent || null,
       createdAt: now,
-      details: logData.details ? JSON.stringify(logData.details) : null
+      details: logData.details ? JSON.stringify(logData.details) : null,
+      oldValue: logData.oldValue ? JSON.stringify(logData.oldValue) : null,
+      newValue: logData.newValue ? JSON.stringify(logData.newValue) : null,
+      severity: logData.severity || 'info',
+      category: logData.category || null
     };
 
     this.db.prepare(`
-      INSERT INTO audit_logs (id, franchiseId, employeeId, action, entityType, entityId, details, ipAddress, userAgent, createdAt)
-      VALUES (@id, @franchiseId, @employeeId, @action, @entityType, @entityId, @details, @ipAddress, @userAgent, @createdAt)
+      INSERT INTO audit_logs (
+        id, franchiseId, employeeId, action, entityType, entityId,
+        details, oldValue, newValue, severity, category,
+        ipAddress, userAgent, createdAt
+      )
+      VALUES (
+        @id, @franchiseId, @employeeId, @action, @entityType, @entityId,
+        @details, @oldValue, @newValue, @severity, @category,
+        @ipAddress, @userAgent, @createdAt
+      )
     `).run(auditLog);
 
     return {
       ...auditLog,
       createdAt: new Date(now),
-      details: logData.details
+      details: logData.details,
+      oldValue: logData.oldValue,
+      newValue: logData.newValue
     } as AuditLog;
   }
 
@@ -2232,7 +2273,9 @@ export class SQLiteStorage implements IStorage {
     const data = rows.map(row => ({
       ...row,
       createdAt: row.createdAt,
-      details: row.details ? this.safeJsonParse(row.details) : null
+      details: row.details ? this.safeJsonParse(row.details) : null,
+      oldValue: row.oldValue ? this.safeJsonParse(row.oldValue) : null,
+      newValue: row.newValue ? this.safeJsonParse(row.newValue) : null
     }));
 
     return {

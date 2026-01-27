@@ -22,33 +22,24 @@ import { randomUUID } from "crypto";
 import { existsSync, mkdirSync } from "fs";
 import { dirname } from "path";
 import path from "path";
+import { DATABASE_PATH, ensureDatabaseDirectory, getDatabaseInfo } from "./db-path";
 
 // ============================================================================
-// DATABASE PATH CONFIGURATION
+// DATABASE PATH CONFIGURATION - USES UNIFIED db-path.ts
 // ============================================================================
 
-let DB_PATH: string;
-if (process.env.DATABASE_PATH) {
-  DB_PATH = process.env.DATABASE_PATH;
-} else {
-  const SECURE_DATA_PATH = process.env.DATA_STORAGE_PATH
-    ? process.env.DATA_STORAGE_PATH
-    : path.join(process.cwd(), "server", "secure_data");
-  DB_PATH = path.join(SECURE_DATA_PATH, "fabzclean.db");
-}
+const DB_PATH = DATABASE_PATH;
 
 // Ensure directory exists
-const dir = dirname(DB_PATH);
-if (dir !== "." && !existsSync(dir)) {
-  mkdirSync(dir, { recursive: true });
-}
+ensureDatabaseDirectory();
 
-console.log(`🗄️  Setting up FabZClean Enterprise Database at: ${DB_PATH}\n`);
-console.log("=".repeat(70));
-console.log("               FABZCLEAN ENTERPRISE DATABASE SETUP v3.0");
-console.log("                    with Business Intelligence Suite");
-console.log("=".repeat(70) + "\n");
+// Log database info
+const dbInfo = getDatabaseInfo();
 
+);
+
+
++ "\n");
 const db = new Database(DB_PATH);
 db.pragma("foreign_keys = ON");
 db.pragma("journal_mode = WAL"); // Better concurrent performance
@@ -57,8 +48,6 @@ db.pragma("synchronous = NORMAL"); // Faster writes with reasonable safety
 // ============================================================================
 // PART 1: DROP EXISTING TABLES (Clean Slate)
 // ============================================================================
-console.log("🗑️  Preparing clean database...");
-
 const tablesToDrop = [
   "daily_summaries",
   "credit_transactions",
@@ -96,13 +85,9 @@ for (const table of tablesToDrop) {
     // Ignore errors
   }
 }
-console.log("  ✓ Cleaned existing tables\n");
-
 // ============================================================================
 // PART 2: CREATE ALL TABLES
 // ============================================================================
-console.log("📋 Creating database schema...\n");
-
 // --- FRANCHISES TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS franchises (
@@ -167,8 +152,6 @@ db.exec(`
     updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
   )
 `);
-console.log("  ✓ Created: franchises");
-
 // --- USERS TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -182,8 +165,6 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: users");
-
 // --- EMPLOYEES TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS employees (
@@ -219,8 +200,6 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: employees");
-
 // --- CUSTOMERS TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS customers (
@@ -250,8 +229,6 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: customers");
-
 // --- SERVICES TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS services (
@@ -276,8 +253,6 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: services");
-
 // --- PRODUCTS TABLE (Inventory) ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS products (
@@ -303,8 +278,6 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: products");
-
 // --- ORDERS TABLE (Core) ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS orders (
@@ -360,8 +333,6 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: orders");
-
 // --- ORDER SEQUENCES TABLE (Auto-increment order numbers) ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS order_sequences (
@@ -375,8 +346,6 @@ db.exec(`
     UNIQUE(branchCode, year)
   )
 `);
-console.log("  ✓ Created: order_sequences");
-
 // --- VEHICLES TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS vehicles (
@@ -395,8 +364,6 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: vehicles");
-
 // --- DELIVERIES TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS deliveries (
@@ -419,8 +386,6 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: deliveries");
-
 // --- DRIVERS TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS drivers (
@@ -447,8 +412,6 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: drivers");
-
 // --- TRANSIT ORDERS TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS transit_orders (
@@ -499,8 +462,6 @@ db.exec(`
     FOREIGN KEY (driverId) REFERENCES employees(id)
   )
 `);
-console.log("  ✓ Created: transit_orders");
-
 // --- TRANSIT ORDER ITEMS TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS transit_order_items (
@@ -520,8 +481,6 @@ db.exec(`
     FOREIGN KEY (orderId) REFERENCES orders(id)
   )
 `);
-console.log("  ✓ Created: transit_order_items");
-
 // --- TRANSIT STATUS HISTORY TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS transit_status_history (
@@ -537,8 +496,6 @@ db.exec(`
     FOREIGN KEY (transitOrderId) REFERENCES transit_orders(id) ON DELETE CASCADE
   )
 `);
-console.log("  ✓ Created: transit_status_history");
-
 // --- CREDIT TRANSACTIONS TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS credit_transactions (
@@ -562,8 +519,6 @@ db.exec(`
     FOREIGN KEY (orderId) REFERENCES orders(id)
   )
 `);
-console.log("  ✓ Created: credit_transactions");
-
 // --- AUDIT LOGS TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS audit_logs (
@@ -581,8 +536,6 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: audit_logs");
-
 // --- DOCUMENTS TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS documents (
@@ -614,8 +567,6 @@ db.exec(`
     FOREIGN KEY (orderId) REFERENCES orders(id)
   )
 `);
-console.log("  ✓ Created: documents");
-
 // --- GST CONFIG TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS gst_config (
@@ -640,8 +591,6 @@ db.exec(`
     updatedAt TEXT
   )
 `);
-console.log("  ✓ Created: gst_config");
-
 // --- SETTINGS TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS settings (
@@ -653,8 +602,6 @@ db.exec(`
     updatedBy TEXT
   )
 `);
-console.log("  ✓ Created: settings");
-
 // --- ORDER TRANSACTIONS TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS order_transactions (
@@ -670,8 +617,6 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: order_transactions");
-
 // --- SHIPMENTS TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS shipments (
@@ -689,8 +634,6 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: shipments");
-
 // --- BARCODES TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS barcodes (
@@ -708,8 +651,6 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: barcodes");
-
 // --- EMPLOYEE ATTENDANCE TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS employee_attendance (
@@ -732,8 +673,6 @@ db.exec(`
     UNIQUE(employeeId, date)
   )
 `);
-console.log("  ✓ Created: employee_attendance");
-
 // --- EMPLOYEE TASKS TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS employee_tasks (
@@ -756,8 +695,6 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: employee_tasks");
-
 // --- EMPLOYEE PERFORMANCE TABLE ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS employee_performance (
@@ -776,13 +713,9 @@ db.exec(`
     FOREIGN KEY (franchiseId) REFERENCES franchises(id)
   )
 `);
-console.log("  ✓ Created: employee_performance");
-
 // ============================================================================
 // PART 3: DAILY SUMMARIES TABLE (Enterprise BI Data Warehouse)
 // ============================================================================
-console.log("\n📊 Creating Business Intelligence tables...\n");
-
 db.exec(`
   CREATE TABLE IF NOT EXISTS daily_summaries (
     id TEXT PRIMARY KEY,
@@ -910,13 +843,11 @@ db.exec(`
     UNIQUE(franchiseId, date)
   )
 `);
-console.log("  ✓ Created: daily_summaries (BI Data Warehouse)");
+");
 
 // ============================================================================
 // PART 4: CREATE PERFORMANCE INDEXES
 // ============================================================================
-console.log("\n🚀 Creating performance indexes...\n");
-
 const indexes = [
   // Core table indexes
   ["idx_orders_franchise", "orders", "franchiseId"],
@@ -976,13 +907,9 @@ for (const [name, table, columns] of indexes) {
     // Index might already exist with different structure
   }
 }
-console.log(`  ✓ Created ${indexes.length} performance indexes`);
-
 // ============================================================================
 // PART 5: SEED FRANCHISES
 // ============================================================================
-console.log("\n🏢 Seeding franchises...\n");
-
 const now = new Date().toISOString();
 const franchises = [
   {
@@ -1097,14 +1024,12 @@ for (const f of franchises) {
     f.status, f.autoGenerateOrderNumber, f.enableDelivery, f.defaultDeliveryCharge,
     f.enableExpressService, f.expressServiceMultiplier, f.onboardingStatus, now, now
   );
-  console.log(`  ✓ Created franchise: ${f.name} (${f.branchCode})`);
+`);
 }
 
 // ============================================================================
 // PART 6: SEED EMPLOYEES WITH ROLES
 // ============================================================================
-console.log("\n👥 Seeding employees...\n");
-
 const adminPasswordHash = bcrypt.hashSync("Durai@2025", 10);
 const defaultPasswordHash = bcrypt.hashSync("password123", 10);
 
@@ -1228,14 +1153,12 @@ for (const e of employees) {
     e.email, e.phone, e.position, e.department, e.salary,
     e.role, e.password, e.status, now, now, now
   );
-  console.log(`  ✓ Created: ${e.firstName} ${e.lastName} (${e.role}) - Login: ${e.employeeId}`);
+- Login: ${e.employeeId}`);
 }
 
 // ============================================================================
 // PART 7: SEED SERVICES
 // ============================================================================
-console.log("\n🧹 Seeding services...\n");
-
 const servicesList = [
   // Ironing Services
   { name: "Shirt", category: "Ironing", price: "20.00", duration: "24 hours", leadTime: 24 },
@@ -1298,13 +1221,9 @@ for (const franchise of franchises) {
     serviceCount++;
   }
 }
-console.log(`  ✓ Created ${serviceCount} services across ${franchises.length} franchises`);
-
 // ============================================================================
 // PART 8: SEED CUSTOMERS
 // ============================================================================
-console.log("\n👤 Seeding customers...\n");
-
 const customers = [
   {
     id: `cust-walkin-pol-${randomUUID().slice(0, 8)}`,
@@ -1364,13 +1283,9 @@ const insertCustomer = db.prepare(`
 for (const c of customers) {
   insertCustomer.run(c.id, c.franchiseId, c.name, c.email, c.phone, c.address, now, now);
 }
-console.log(`  ✓ Created ${customers.length} customers`);
-
 // ============================================================================
 // PART 9: SEED VEHICLES & DRIVERS
 // ============================================================================
-console.log("\n🚗 Seeding vehicles and drivers...\n");
-
 const vehiclesData = [
   {
     id: randomUUID(),
@@ -1397,7 +1312,7 @@ const insertVehicle = db.prepare(`
 
 for (const v of vehiclesData) {
   insertVehicle.run(v.id, v.franchiseId, v.licensePlate, v.makeModel, v.type, v.capacityKg, now, now);
-  console.log(`  ✓ Created vehicle: ${v.licensePlate} (${v.makeModel})`);
+`);
 }
 
 const driversData = [
@@ -1432,14 +1347,11 @@ const insertDriver = db.prepare(`
 
 for (const d of driversData) {
   insertDriver.run(d.id, d.franchiseId, d.name, d.phone, d.email, d.licenseNumber, d.vehicleNumber, d.vehicleType, d.status, now, now);
-  console.log(`  ✓ Created driver: ${d.name}`);
 }
 
 // ============================================================================
 // PART 10: SEED SETTINGS
 // ============================================================================
-console.log("\n⚙️  Seeding settings...\n");
-
 const settings = [
   { key: "company_name", value: "FabZ Clean", category: "general" },
   { key: "company_phone", value: "9363059595", category: "general" },
@@ -1463,13 +1375,9 @@ const insertSetting = db.prepare(`
 for (const s of settings) {
   insertSetting.run(randomUUID(), s.key, s.value, s.category, now);
 }
-console.log(`  ✓ Created ${settings.length} settings`);
-
 // ============================================================================
 // PART 11: SEED ORDER SEQUENCES
 // ============================================================================
-console.log("\n🔢 Initializing order sequences...\n");
-
 const currentYear = new Date().getFullYear();
 
 const insertSequence = db.prepare(`
@@ -1479,57 +1387,23 @@ const insertSequence = db.prepare(`
 
 for (const f of franchises) {
   insertSequence.run(randomUUID(), f.branchCode, currentYear, now, now);
-  console.log(`  ✓ Initialized sequence for: ${f.branchCode}`);
 }
 
 // ============================================================================
 // DONE!
 // ============================================================================
-console.log("\n" + "=".repeat(70));
-console.log("✅ FABZCLEAN ENTERPRISE DATABASE SETUP COMPLETE!");
-console.log("=".repeat(70));
+);
 
-console.log("\n📊 Database Summary:");
-console.log(`   • Franchises: ${franchises.length}`);
-console.log(`   • Employees: ${employees.length}`);
-console.log(`   • Services: ${serviceCount}`);
-console.log(`   • Customers: ${customers.length}`);
-console.log(`   • Vehicles: ${vehiclesData.length}`);
-console.log(`   • Drivers: ${driversData.length}`);
-console.log(`   • Settings: ${settings.length}`);
-console.log(`   • Tables: ${tablesToDrop.length}`);
-console.log(`   • Indexes: ${indexes.length}`);
+);
 
-console.log("\n📈 BI Suite Tables:");
-console.log("   • daily_summaries - Pre-calculated analytics data");
-console.log("   • credit_transactions - Customer credit ledger");
-console.log("   • vehicles - Fleet management");
 
-console.log("\n🔐 LOGIN CREDENTIALS:");
-console.log("   ┌───────────────────────────────────────────────────────────┐");
-console.log("   │ ADMIN (Full Access to ALL Franchises)                    │");
-console.log("   │   Employee ID: myfabclean                                │");
-console.log("   │   Password: Durai@2025                                   │");
-console.log("   ├───────────────────────────────────────────────────────────┤");
-console.log("   │ POLLACHI MANAGER (Pollachi Franchise Only)               │");
-console.log("   │   Employee ID: mgr-pollachi                              │");
-console.log("   │   Password: password123                                  │");
-console.log("   ├───────────────────────────────────────────────────────────┤");
-console.log("   │ KINATHUKADAVU MANAGER (Kinathukadavu Franchise Only)     │");
-console.log("   │   Employee ID: mgr-kin                                   │");
-console.log("   │   Password: password123                                  │");
-console.log("   └───────────────────────────────────────────────────────────┘");
+│");
 
-console.log("\n🔒 DATA ISOLATION RULES:");
-console.log("   • Admin users see ALL franchise data");
-console.log("   • Franchise Managers see ONLY their franchise data");
-console.log("   • Staff/Drivers see ONLY their franchise data");
 
-console.log("\n📊 BI MAINTENANCE:");
-console.log("   • Daily calculations run at midnight");
-console.log("   • Run manually: npx tsx server/scripts/daily-maintenance.ts");
+│");
 
-console.log("\n🚀 Start your server with: npm run dev");
-console.log("");
+
+│");
+
 
 db.close();

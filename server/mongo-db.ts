@@ -14,11 +14,9 @@ export const connectToMongo = async (): Promise<boolean> => {
             serverSelectionTimeoutMS: 5000, // Fail fast if local DB isn't running
         });
         isConnected = true;
-        console.log('🍃 MongoDB Connected Successfully (Local)');
         return true;
     } catch (error) {
         console.error('❌ MongoDB Connection Error:', error);
-        console.log('✅ App will continue with SQLite analytics. All features remain available.');
         return false;
     }
 };
@@ -27,7 +25,6 @@ export const disconnectMongo = async (): Promise<void> => {
     if (isConnected) {
         await mongoose.disconnect();
         isConnected = false;
-        console.log('🍃 MongoDB Disconnected');
     }
 };
 

@@ -655,7 +655,7 @@ export default function DatabaseStatus() {
             value={stats.latencyMs >= 0 ? stats.latencyMs : 'N/A'}
             unit={stats.latencyMs >= 0 ? 'ms' : ''}
             icon={Gauge}
-            status={latency?.status || (stats.latencyMs < 50 ? 'healthy' : stats.latencyMs < 200 ? 'warning' : 'critical')}
+            status={(latency?.status === 'healthy' || latency?.status === 'warning' || latency?.status === 'critical') ? latency.status : (stats.latencyMs < 50 ? 'healthy' : stats.latencyMs < 200 ? 'warning' : 'critical')}
             color={stats.latencyMs < 50 ? 'green' : stats.latencyMs < 200 ? 'amber' : 'red'}
             subtitle={latency?.trend ? `Trend: ${latency.trend}` : `Avg: ${latency?.averageMs || stats.latencyMs}ms`}
           />

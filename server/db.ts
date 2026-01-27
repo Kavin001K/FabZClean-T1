@@ -7,27 +7,18 @@
 import { SQLiteStorage } from "./SQLiteStorage";
 import path from "path";
 import { existsSync, mkdirSync, chmodSync } from "fs";
+import { DATABASE_PATH, getSecurePaths, initializeSecureDirectories } from "./db-path";
 
-// 1. Determine Storage Paths
-// PRIORITIZE environment variable (Docker/Render), fallback to local secure folder
-let SECURE_DATA_PATH: string;
-let DB_PATH: string;
+// Initialize secure directories on import
+initializeSecureDirectories();
 
-if (process.env.DATABASE_PATH) {
-  // If running in Docker/Render with explicit path
-  DB_PATH = process.env.DATABASE_PATH;
-  SECURE_DATA_PATH = path.dirname(DB_PATH);
-} else {
-  // Local development fallback
-  SECURE_DATA_PATH = process.env.DATA_STORAGE_PATH
-    ? process.env.DATA_STORAGE_PATH
-    : path.join(process.cwd(), "server", "secure_data");
-  DB_PATH = path.join(SECURE_DATA_PATH, "fabzclean.db");
-}
-
-const BACKUPS_PATH = path.join(SECURE_DATA_PATH, "backups");
-const LOGS_PATH = path.join(SECURE_DATA_PATH, "logs");
-const FILES_PATH = path.join(SECURE_DATA_PATH, "files");
+// Get all paths from the unified configuration
+const paths = getSecurePaths();
+const SECURE_DATA_PATH = path.dirname(DATABASE_PATH);
+const DB_PATH = DATABASE_PATH;
+const BACKUPS_PATH = paths.backups;
+const LOGS_PATH = paths.logs;
+const FILES_PATH = paths.files;
 const INVOICES_PATH = path.join(FILES_PATH, "invoices");
 const BILLS_PATH = path.join(FILES_PATH, "bills");
 const RECEIPTS_PATH = path.join(FILES_PATH, "receipts");
@@ -36,7 +27,7 @@ const SIGNATURES_PATH = path.join(FILES_PATH, "signatures");
 const DOCUMENTS_PATH = path.join(FILES_PATH, "documents");
 const IMAGES_PATH = path.join(FILES_PATH, "images");
 const REPORTS_PATH = path.join(FILES_PATH, "reports");
-const TEMP_PATH = path.join(FILES_PATH, "temp");
+const TEMP_PATH = paths.temp;
 
 // 2. Ensure secure directories exist with restricted permissions
 function ensureSecureDirectory(dirPath: string) {
@@ -76,8 +67,7 @@ for (const basePath of [INVOICES_PATH, BILLS_PATH, RECEIPTS_PATH, REPORTS_PATH])
 }
 
 // 4. Initialize ONLY SQLite
-console.log(`🔒 Initializing Secure Local Database at: ${DB_PATH}`);
-console.log(`📁 File storage initialized at: ${FILES_PATH}`);
+
 const dbInstance = new SQLiteStorage(DB_PATH);
 
 export const db = dbInstance;

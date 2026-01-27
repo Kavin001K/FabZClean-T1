@@ -445,17 +445,14 @@ export class MemoryManager {
   forceGarbageCollection(): void {
     if (global.gc) {
       global.gc();
-      console.log('🧹 Forced garbage collection');
-    }
+}
   }
 
   async cleanup(): Promise<void> {
     const memCheck = this.checkMemoryUsage();
 
     if (memCheck.shouldGC) {
-      console.log('⚠️  High memory usage detected, cleaning up...');
-
-      // Clear old cache entries
+// Clear old cache entries
       cache.clear();
 
       // Force garbage collection if available

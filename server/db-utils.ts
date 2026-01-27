@@ -4,14 +4,9 @@ import { seedDatabase } from "./seed-data";
 export async function initializeDatabase() {
   try {
     const dbType = process.env.USE_SUPABASE === 'true' ? 'supabase' : 'sqlite';
-    console.log(`🔄 Initializing ${dbType} database...`);
-
-    // Test the database connection by trying to get customers
+// Test the database connection by trying to get customers
     await db.listCustomers();
-
-    console.log(`✅ ${dbType} database initialized successfully`);
-
-    // Seed the database with sample data if empty
+// Seed the database with sample data if empty
     // Note: Seeding might need adjustment for Supabase if not desired
     if (dbType === 'sqlite') {
       await seedDatabase();

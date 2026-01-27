@@ -120,8 +120,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       // Auto-reset after delay to prevent permanent failure state
       this.resetTimeoutId = setTimeout(() => {
         if (this.state.hasError) {
-          console.log('Auto-resetting error boundary after timeout');
-          this.resetError();
+this.resetError();
         }
       }, 5000);
     }

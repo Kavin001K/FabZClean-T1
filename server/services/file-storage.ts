@@ -62,8 +62,7 @@ export function initializeFileStorage(): void {
     // Create base directory
     if (!fs.existsSync(BASE_STORAGE_PATH)) {
         fs.mkdirSync(BASE_STORAGE_PATH, { recursive: true });
-        console.log(`📁 Created file storage directory: ${BASE_STORAGE_PATH}`);
-    }
+}
 
     // Create category subdirectories
     for (const category of Object.values(FILE_CATEGORIES)) {
@@ -84,8 +83,6 @@ export function initializeFileStorage(): void {
             fs.mkdirSync(datePath, { recursive: true });
         }
     }
-
-    console.log(`✅ File storage initialized at: ${BASE_STORAGE_PATH}`);
 }
 
 /**
@@ -355,8 +352,7 @@ export function cleanupTempFiles(maxAgeHours: number = 24): number {
     }
 
     if (deletedCount > 0) {
-        console.log(`🧹 Cleaned up ${deletedCount} temp files`);
-    }
+}
 
     return deletedCount;
 }

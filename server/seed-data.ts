@@ -3,13 +3,10 @@ import type { InsertCustomer, InsertProduct, InsertService, InsertOrder, InsertE
 
 export async function seedDatabase() {
   try {
-    console.log("🌱 Seeding database with sample data...");
-
-    // Check if data already exists
+// Check if data already exists
     const existingCustomers = await db.listCustomers();
     if (existingCustomers.length > 0) {
-      console.log("✅ Database already has data, skipping seed");
-      return;
+return;
     }
 
     // Seed Customers
@@ -20,7 +17,7 @@ export async function seedDatabase() {
         phone: "+1-555-0101",
         address: "123 Main St, Anytown, USA 12345",
         totalOrders: 0,
-        totalSpent: "0",
+        totalLifetimeSpent: "0",
         lastOrder: null,
       },
       {
@@ -29,7 +26,7 @@ export async function seedDatabase() {
         phone: "+1-555-0102",
         address: "456 Oak Ave, Springfield, USA 67890",
         totalOrders: 0,
-        totalSpent: "0",
+        totalLifetimeSpent: "0",
         lastOrder: null,
       },
       {
@@ -38,7 +35,7 @@ export async function seedDatabase() {
         phone: "(741) 854-0759",
         address: "789 Pine Rd, Riverside, USA 54321",
         totalOrders: 0,
-        totalSpent: "0",
+        totalLifetimeSpent: "0",
         lastOrder: null,
       },
       {
@@ -47,7 +44,7 @@ export async function seedDatabase() {
         phone: "555-234-5678",
         address: "321 Elm St, Lakeside, USA 98765",
         totalOrders: 0,
-        totalSpent: "0",
+        totalLifetimeSpent: "0",
         lastOrder: null,
       },
       {
@@ -56,7 +53,7 @@ export async function seedDatabase() {
         phone: "555-876-5432",
         address: "654 Maple Dr, Hilltown, USA 13579",
         totalOrders: 0,
-        totalSpent: "0",
+        totalLifetimeSpent: "0",
         lastOrder: null,
       },
       {
@@ -65,7 +62,7 @@ export async function seedDatabase() {
         phone: "555-999-1234",
         address: "890 Cedar Ln, Mountainview, USA 24680",
         totalOrders: 0,
-        totalSpent: "0",
+        totalLifetimeSpent: "0",
         lastOrder: null,
       },
       {
@@ -74,7 +71,7 @@ export async function seedDatabase() {
         phone: "555-777-8888",
         address: "147 Birch St, Seaside, USA 36912",
         totalOrders: 0,
-        totalSpent: "0",
+        totalLifetimeSpent: "0",
         lastOrder: null,
       },
     ];
@@ -83,11 +80,10 @@ export async function seedDatabase() {
     for (const customer of customerData) {
       const created = await db.createCustomer(customer);
       customers.push(created);
-      console.log(`  ✓ Created customer: ${created.name}`);
-    }
+}
 
     // Seed Products
-    const productData: InsertProduct[] = [
+    const productData: any[] = [
       {
         name: "Laundry Detergent - Premium",
         sku: "DET-001",
@@ -144,11 +140,10 @@ export async function seedDatabase() {
     for (const product of productData) {
       const created = await db.createProduct(product);
       products.push(created);
-      console.log(`  ✓ Created product: ${created.name}`);
-    }
+}
 
     // Seed Services
-    const serviceData: InsertService[] = [
+    const serviceData: any[] = [
       {
         name: "Wash & Fold",
         description: "Professional wash and fold service for everyday laundry",
@@ -219,8 +214,7 @@ export async function seedDatabase() {
     for (const service of serviceData) {
       const created = await db.createService(service);
       services.push(created);
-      console.log(`  ✓ Created service: ${created.name}`);
-    }
+}
 
     // Seed Employees
     const employeeData: any[] = [
@@ -266,8 +260,7 @@ export async function seedDatabase() {
     for (const employee of employeeData) {
       const created = await db.createEmployee(employee);
       employees.push(created);
-      console.log(`  ✓ Created employee: ${created.firstName} ${created.lastName}`);
-    }
+}
 
     // Seed Sample Orders
     const orderData: InsertOrder[] = [
@@ -352,27 +345,19 @@ export async function seedDatabase() {
 
     for (const order of orderData) {
       const created = await db.createOrder(order);
-      console.log(`  ✓ Created order: ${created.orderNumber}`);
-
-      // Update customer stats
+// Update customer stats
       const customer = await db.getCustomer(order.customerId);
       if (customer) {
         await db.updateCustomer(customer.id, {
           totalOrders: (customer.totalOrders || 0) + 1,
-          totalSpent: (parseFloat(customer.totalSpent || "0") + parseFloat(order.totalAmount)).toFixed(2),
-          lastOrder: new Date().toISOString(),
+          totalLifetimeSpent: (parseFloat(customer.totalLifetimeSpent || "0") + parseFloat(order.totalAmount)).toFixed(2),
+          lastOrder: new Date(),
         });
       }
     }
 
-    console.log("✅ Database seeded successfully!");
-    console.log(`  📊 Created ${customers.length} customers`);
-    console.log(`  📦 Created ${products.length} products`);
-    console.log(`  🧹 Created ${services.length} services`);
-    console.log(`  👥 Created ${employees.length} employees`);
-    console.log(`  📋 Created ${orderData.length} orders`);
 
-    return {
+return {
       customers: customers.length,
       products: products.length,
       services: services.length,

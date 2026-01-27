@@ -23,8 +23,7 @@ export function initSqliteAnalytics(): void {
         db = new Database(DB_PATH);
         db.pragma('foreign_keys = ON');
         createAnalyticsTables();
-        console.log('✅ SQLite Analytics initialized successfully');
-    } catch (error) {
+} catch (error) {
         console.error('❌ Failed to initialize SQLite Analytics:', error);
         db = null;
     }
@@ -809,9 +808,7 @@ export function cleanupOldData(): void {
         const auditExpiry = new Date(now);
         auditExpiry.setDate(auditExpiry.getDate() - 180);
         db.prepare('DELETE FROM audit_trail WHERE createdAt < ?').run(auditExpiry.toISOString());
-
-        console.log('✅ SQLite Analytics: Cleaned up old data');
-    } catch (error) {
+} catch (error) {
         console.error('SQLite Analytics: Failed to cleanup old data:', error);
     }
 }

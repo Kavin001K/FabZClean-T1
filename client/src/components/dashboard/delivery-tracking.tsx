@@ -68,8 +68,7 @@ export default function DeliveryTracking() {
             data-testid="view-map"
             className="text-xs sm:text-sm"
             onClick={() => {
-              console.log("Opening delivery map...");
-              alert("Delivery map feature coming soon! This would show real-time delivery locations and routes.");
+alert("Delivery map feature coming soon! This would show real-time delivery locations and routes.");
             }}
           >
             View Map

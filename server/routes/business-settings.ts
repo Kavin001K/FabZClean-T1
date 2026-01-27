@@ -97,10 +97,7 @@ router.put('/', authMiddleware, async (req: Request, res: Response) => {
             },
             req.employee?.employeeId
         );
-
-        console.log(`[BusinessSettings] Updated by ${req.employee?.employeeId}`);
-
-        res.json({
+res.json({
             success: true,
             settings: updatedSettings,
             message: 'Business settings updated successfully'

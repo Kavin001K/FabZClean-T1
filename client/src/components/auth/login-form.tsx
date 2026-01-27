@@ -44,8 +44,7 @@ export const LoginForm: React.FC = () => {
 
         // 2. Otherwise use the settings-defined landing page
         const targetPage = settings.defaultLandingPage || '/dashboard';
-        console.log("Redirecting to preference:", targetPage, "User role:", employee?.role);
-        setLocation(targetPage);
+setLocation(targetPage);
       }
     } catch (err) {
       console.error(err);

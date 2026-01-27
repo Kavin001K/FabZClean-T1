@@ -39,9 +39,7 @@ class DriverTrackingService {
 
   private startSimulation() {
     this.isSimulating = true;
-    console.log('Starting driver tracking simulation...');
-
-    // Update driver locations every 3 seconds
+// Update driver locations every 3 seconds
     this.simulationInterval = setInterval(() => {
       this.updateDriverLocations();
     }, 3000);
@@ -53,8 +51,7 @@ class DriverTrackingService {
       this.simulationInterval = null;
     }
     this.isSimulating = false;
-    console.log('Driver tracking simulation stopped');
-  }
+}
 
   private async updateDriverLocations() {
     try {

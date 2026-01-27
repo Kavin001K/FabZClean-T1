@@ -13,24 +13,29 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function versionPlugin() {
   return {
     name: 'version-plugin',
-    closeBundle() {
+    writeBundle() {
       const version = {
         version: `2.0.${Date.now()}`,
         buildTime: new Date().toISOString()
       };
       // Write to dist folder (output directory relative to root)
-      const versionPath = path.resolve(__dirname, 'dist', 'version.json');
+      const distPath = path.resolve(__dirname, 'dist');
+      const versionPath = path.resolve(distPath, 'version.json');
       try {
+        // Ensure dist directory exists
+        if (!fs.existsSync(distPath)) {
+          fs.mkdirSync(distPath, { recursive: true });
+        }
         fs.writeFileSync(versionPath, JSON.stringify(version, null, 2));
-        console.log('📄 Generated version.json:', version.version);
       } catch (err) {
-        console.warn('⚠️ Could not generate version.json:', err);
+        // Silent fail - version.json is not critical
       }
     }
   };
 }
 export default defineConfig({
   plugins: [react(), versionPlugin()],
+  base: './',
   define: {
     global: 'globalThis'
   },
@@ -104,6 +109,21 @@ export default defineConfig({
     include: ['react', 'react-dom', 'scheduler', 'recharts']
   },
   server: {
+    port: 5000,
+    strictPort: false,
+    host: true,
+    proxy: {
+      '/api': {
+        target: 'http://0.0.0.0:5001',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/socket.io': {
+        target: 'http://0.0.0.0:5001',
+        changeOrigin: true,
+        ws: true,
+      }
+    },
     fs: {
       strict: false
     },

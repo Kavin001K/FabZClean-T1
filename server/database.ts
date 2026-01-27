@@ -17,8 +17,7 @@ export const db = drizzle(sql, { schema });
 export async function testConnection() {
   try {
     const result = await sql`SELECT NOW() as current_time`;
-    console.log('✅ Database connected successfully:', result[0]);
-    return true;
+return true;
   } catch (error: any) {
     console.error('❌ Database connection failed:', error);
     return false;

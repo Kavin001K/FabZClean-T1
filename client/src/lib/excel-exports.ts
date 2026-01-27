@@ -95,9 +95,9 @@ export function exportCustomersToExcel(customers: Customer[], filters?: { segmen
     email: customer.email || '',
     phone: customer.phone || '',
     totalOrders: customer.totalOrders || 0,
-    totalSpent: parseFloat(customer.totalSpent || '0'),
+    totalSpent: parseFloat(customer.totalLifetimeSpent || '0'),
     avgOrderValue: customer.totalOrders > 0
-      ? parseFloat(customer.totalSpent || '0') / customer.totalOrders
+      ? parseFloat(customer.totalLifetimeSpent || '0') / customer.totalOrders
       : 0,
     lastOrder: customer.lastOrder ? new Date(customer.lastOrder) : null,
     createdAt: new Date(customer.createdAt),

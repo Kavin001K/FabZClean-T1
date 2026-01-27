@@ -14,7 +14,6 @@ import { formatCurrency, ordersApi, franchisesApi, analyticsApi } from "@/lib/da
 import DashboardDueToday from "./components/dashboard-due-today";
 import DashboardRecentOrders from "./components/dashboard-recent-orders";
 import DashboardQuickActions from "./components/dashboard-quick-actions";
-import LeaderboardCard from "./components/leaderboard-card";
 
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -40,11 +39,7 @@ export default function AdminDashboard() {
         queryFn: () => analyticsApi.getDashboardMetrics(selectedFranchiseId === 'all' ? undefined : selectedFranchiseId)
     });
 
-    // Fetch leaderboard
-    const { data: leaderboard = [], isLoading: isLoadingLeaderboard } = useQuery({
-        queryKey: ['admin-leaderboard'],
-        queryFn: () => analyticsApi.getAdminLeaderboard()
-    });
+
 
     // Fetch recent orders - optimized limit
     const { data: recentOrders = [], isLoading: isLoadingOrders } = useQuery({
@@ -188,18 +183,15 @@ export default function AdminDashboard() {
                 </div>
             </div>
 
-            {/* Leaderboard, Due Today & Recent Orders */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-1">
-                    <LeaderboardCard data={leaderboard} isLoading={isLoadingLeaderboard} />
-                </div>
-                <div className="lg:col-span-1">
+            {/* Due Today & Recent Orders */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
                     <DashboardDueToday
                         // @ts-ignore
                         franchiseId={selectedFranchiseId}
                     />
                 </div>
-                <div className="lg:col-span-1">
+                <div>
                     <DashboardRecentOrders
                         orders={recentOrders.map((order: any) => ({
                             ...order,

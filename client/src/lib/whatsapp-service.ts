@@ -83,9 +83,7 @@ export class WhatsAppService {
         sendCount: number = 0
     ): Promise<SendResult> {
         try {
-            console.log(`[WhatsApp] Sending bill to ${phone}, sendCount: ${sendCount}`);
-
-            const response = await fetch("/api/whatsapp/send-bill", {
+const response = await fetch("/api/whatsapp/send-bill", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -111,10 +109,7 @@ export class WhatsAppService {
                     error: result.error || "Failed to send",
                 };
             }
-
-            console.log("[WhatsApp] Send result:", result);
-
-            return {
+return {
                 success: result.success,
                 templateUsed: result.templateUsed,
                 newSendCount: result.newSendCount,

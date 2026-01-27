@@ -1,10 +1,113 @@
 {
   "name": "fabzclean",
   "version": "1.0.0",
+  "description": "FabZClean Enterprise Management System",
+  "author": "Kavin",
+  "main": "main.cjs",
   "type": "module",
   "license": "MIT",
+  "files": [
+    "main.cjs",
+    "preload.cjs",
+    "package.json",
+    "node_modules/**/*"
+  ],
   "engines": {
     "node": ">=18"
+  },
+  "build": {
+    "appId": "com.fabzclean.app",
+    "productName": "FabZClean",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "installer_assets"
+    },
+    "asar": true,
+    "asarUnpack": [
+      "dist-server/**/*",
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/sharp/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.business",
+      "icon": "client/public/assets/fabclean-logo-512.png",
+      "hardenedRuntime": true,
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "icon": "client/public/assets/fabclean-logo-512.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FabZClean"
+    },
+    "linux": {
+      "icon": "client/public/assets/fabclean-logo-512.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "package.json",
+      "dist/**/*",
+      "dist-server/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "dist-server",
+        "to": "dist-server",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "npmRebuild": false,
+    "nodeGypRebuild": false,
+    "buildDependenciesFromSource": false,
+    "publish": null,
+    "extraFiles": [
+      {
+        "from": "node_modules/better-sqlite3",
+        "to": "node_modules/better-sqlite3",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "node_modules/bindings",
+        "to": "node_modules/bindings",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "node_modules/file-uri-to-path",
+        "to": "node_modules/file-uri-to-path",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
   },
   "scripts": {
     "dev": "npx tsx watch server/minimal-server.ts",
@@ -33,7 +136,9 @@
     "prepare": "husky",
     "test:e2e": "npx playwright test",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "electron:dev": "concurrently \"npm run dev\" \"electron .\"",
+    "electron:build": "electron-builder"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -177,7 +282,10 @@
     "@types/ws": "^8.5.13",
     "@vitest/browser-playwright": "^4.0.16",
     "@vitest/coverage-v8": "^4.0.16",
+    "concurrently": "^9.2.1",
     "drizzle-kit": "^0.31.8",
+    "electron": "^40.0.0",
+    "electron-builder": "^26.4.0",
     "esbuild": "^0.25.9",
     "husky": "^9.1.7",
     "playwright": "^1.57.0",

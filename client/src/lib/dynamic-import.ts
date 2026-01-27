@@ -109,8 +109,7 @@ export function handleChunkLoadError(error: unknown): void {
     console.error('[DynamicImport] Chunk loading failed:', error);
 
     if (shouldRefresh()) {
-        console.log('[DynamicImport] Attempting page refresh to recover...');
-        markRefresh();
+markRefresh();
 
         // Force reload without cache
         window.location.reload();

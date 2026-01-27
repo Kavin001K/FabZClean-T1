@@ -157,8 +157,7 @@ router.post(
       // Ensure address is properly formatted for storage
       // If it's an object (from frontend), keep it as object for Supabase client which handles jsonb
       // If it's a string, it might need parsing or keeping as string depending on storage implementation
-
-      console.log('Creating customer with data:', JSON.stringify(customerData, null, 2));
+);
 
       const customer = await storage.createCustomer(customerData);
 

@@ -70,12 +70,9 @@ export class AuthService {
      * Authenticate employee with username and password
      */
     static async login(username: string, password: string, ipAddress?: string): Promise<{ token: string; employee: AuthEmployee }> {
-        console.log(`🔐 Attempting login for: ${username}`);
-
-        // Use Local Storage (SQLite) ONLY - no cloud fallback
+// Use Local Storage (SQLite) ONLY - no cloud fallback
         try {
-            console.log(`🔍 Searching for user in local DB: ${username}`);
-            const localEmployee = await storage.getEmployeeByEmail(username) as any;
+const localEmployee = await storage.getEmployeeByEmail(username) as any;
 
             if (!localEmployee) {
                 // Log failed attempt
@@ -87,15 +84,10 @@ export class AuthService {
                     { reason: 'User not found', ip: ipAddress },
                     ipAddress
                 );
-                console.log(`❌ User not found: ${username}`);
-                throw new Error('Invalid username or password');
+throw new Error('Invalid username or password');
             }
-
-            console.log(`🔍 Employee found: ${localEmployee.employeeId || localEmployee.employee_id}, status: ${localEmployee.status}`);
-
-            if (!localEmployee.password) {
-                console.log(`❌ No password set for user: ${username}`);
-                throw new Error('Account not properly configured');
+if (!localEmployee.password) {
+throw new Error('Account not properly configured');
             }
 
             const isValidPassword = await bcrypt.compare(password, localEmployee.password);
@@ -110,13 +102,11 @@ export class AuthService {
                     { reason: 'Invalid password', ip: ipAddress },
                     ipAddress
                 );
-                console.log(`❌ Password mismatch for user: ${username}`);
-                throw new Error('Invalid username or password');
+throw new Error('Invalid username or password');
             }
 
             if (localEmployee.status === 'inactive' || localEmployee.status === 'terminated') {
-                console.log(`❌ User inactive: ${username}, status: ${localEmployee.status}`);
-                throw new Error('Account is inactive');
+throw new Error('Account is inactive');
             }
 
             // Normalize role
@@ -156,9 +146,7 @@ export class AuthService {
                 { email: localEmployee.email, ip: ipAddress },
                 ipAddress
             );
-
-            console.log(`✅ Login successful for: ${username}`);
-            return { token, employee };
+return { token, employee };
 
         } catch (err: any) {
             if (err.message === 'Invalid username or password' ||
@@ -302,9 +290,7 @@ export class AuthService {
             username: generatedEmployeeId,
             role: data.role
         });
-
-        console.log(`✅ [Auth] Created employee ${generatedEmployeeId}`);
-        const emp = newEmployee as any;
+const emp = newEmployee as any;
 
         return {
             id: newEmployee.id,
@@ -402,10 +388,7 @@ export class AuthService {
         if (Object.keys(updateData).length === 0) {
             throw new Error('No fields to update');
         }
-
-        console.log('[AuthService] updateEmployee:', employeeId, updateData);
-
-        // Local storage update - no fallback
+// Local storage update - no fallback
         const updatedEmployee = await storage.updateEmployee(employeeId, updateData);
 
         if (!updatedEmployee) {
@@ -475,9 +458,7 @@ export class AuthService {
         // Hash new password and update
         const hash = await bcrypt.hash(newPassword, 10);
         await storage.updateEmployee(localEmp.id, { password: hash });
-
-        console.log(`✅ [Auth] Password changed for ${employeeId}`);
-        await this.logAction(localEmp.id, employeeId, 'password_change', 'employee', employeeId, {}, undefined, undefined, localEmp.franchiseId);
+await this.logAction(localEmp.id, employeeId, 'password_change', 'employee', employeeId, {}, undefined, undefined, localEmp.franchiseId);
     }
 
     /**
@@ -542,17 +523,13 @@ export class AuthService {
             undefined,
             resetBy.franchiseId
         );
-
-        console.log(`✅ Password reset for ${targetEmployeeId} by ${resetByEmployeeId}`);
-    }
+}
 
     /**
      * Delete/Deactivate employee (admin/manager only) - local storage only
      */
     static async deleteEmployee(targetEmployeeId: string, deletedByEmployeeId: string, hardDelete: boolean = false): Promise<void> {
-        console.log(`🗑️ [Auth] deleteEmployee called: target=${targetEmployeeId}, by=${deletedByEmployeeId}, hardDelete=${hardDelete}`);
-
-        const localEmployees = await storage.listEmployees();
+const localEmployees = await storage.listEmployees();
 
         // Find target - match by id, employeeId, or email
         const targetEmployee = localEmployees.find(e =>
@@ -604,8 +581,7 @@ export class AuthService {
                 undefined,
                 deletedBy?.franchiseId
             );
-            console.log(`✅ [Auth] Employee ${targetEmployeeId} permanently deleted`);
-        } else {
+} else {
             await storage.updateEmployee(targetEmployee.id, { status: 'terminated' });
             await this.logAction(
                 deletedBy?.id || deletedByEmployeeId,
@@ -618,8 +594,7 @@ export class AuthService {
                 undefined,
                 deletedBy?.franchiseId
             );
-            console.log(`✅ [Auth] Employee ${targetEmployeeId} deactivated`);
-        }
+}
     }
 
 

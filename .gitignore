@@ -6,28 +6,38 @@ node_modules/
 # Testing
 coverage/
 *.lcov
+.playwright/
+playwright-report/
+test-results/
 
-# Production
+# Production builds
 dist/
 dist-server/
+dist-electron/
 build/
+.next/
+out/
 
-# Misc
-.DS_Store
+# Environment files (keep examples)
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+storybook.log
+*_log*.txt
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.idea
+!.vscode/settings.json
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
@@ -35,24 +45,30 @@ yarn-error.log*
 *.sln
 *.sw?
 
-# Database
+# Database files
 *.db
 *.db-shm
 *.db-wal
 fabzclean.db
 fabzclean*.db
+*.sqlite
+*.sqlite3
 
 # Secure Data Folder (contains database, backups, logs)
 server/secure_data/
 
-# Generated files
+# Generated/Compiled files
 *.map
 *.tsbuildinfo
+*.js.map
+*.d.ts.map
 
 # Temporary files
 *.tmp
 *.temp
 *~
+.cache/
+.parcel-cache/
 
 # OS files
 Thumbs.db
@@ -60,39 +76,57 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
-# Supabase
+# Supabase local
 .supabase/
 
 # Backup files
-*~
 *.bak
 *.backup
 * 2.*
 *2.*
+*.orig
 
-# Test files  
+# Test/Demo files (development only)
 test-*.html
 test-*.js
-**/tests/
-**/*test*.py
-**/*demo*.tsx
-**/*demo*.ts
+**/tests/__snapshots__/
+**/*.test.ts.snap
 
 # Local development
 .local/
 .replit
 replit.nix
 
-# API collections (keep in docs if needed)
+# API collections (if needed, keep in docs/)
 *.postman_collection.json
 openapi.yaml
 
-# Old/legacy code
+# Old/legacy code markers
 src/app/
 fabzclean-fastapi/
 
-*storybook.log
-storybook-static
+# Storybook build artifacts
+storybook-static/
 
-# Debug logs
-*_log*.txt
+# Electron build artifacts
+release/
+
+# Upload directories (runtime data)
+uploads/
+server/uploads/*
+!server/uploads/.gitkeep
+public/barcodes/*
+!public/barcodes/.gitkeep
+
+# IDE specific
+.eslintcache
+.stylelintcache
+*.swp
+*.swo
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*

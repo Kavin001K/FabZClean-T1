@@ -296,7 +296,6 @@ export default function Services() {
   };
 
 
-
   const handleExportPDF = () => {
     exportServicesEnhanced(filteredServices);
 

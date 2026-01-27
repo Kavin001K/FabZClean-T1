@@ -15,7 +15,6 @@ export const corsOptions = {
     }
 
 
-
     // Get allowed origins from environment variable (comma-separated list)
     const envOrigins = process.env.ALLOWED_ORIGINS
       ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())

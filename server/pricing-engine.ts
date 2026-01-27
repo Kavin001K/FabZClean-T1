@@ -48,9 +48,7 @@ class DynamicPricingEngine {
           lastUpdated: new Date()
         });
       });
-      
-      console.log(`Initialized pricing rules for ${services.length} services`);
-    } catch (error) {
+} catch (error) {
       console.error('Error initializing pricing rules:', error);
     }
   }
@@ -70,9 +68,7 @@ class DynamicPricingEngine {
       for (const [serviceId, pricing] of this.pricingRules) {
         await this.calculatePricing(serviceId, pricing, orders, products);
       }
-      
-      console.log('Updated pricing for all services');
-    } catch (error) {
+} catch (error) {
       console.error('Error updating pricing:', error);
     }
   }

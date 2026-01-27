@@ -179,14 +179,7 @@ export default function FranchiseDashboard() {
     }
 
     try {
-      console.log('handleMarkAttendance called:', {
-        employeeId,
-        status,
-        franchiseId: employee.franchiseId,
-        selectedDate
-      });
-
-      const now = new Date();
+const now = new Date();
       // Set time only if present/late. Absent doesn't need clock in
       const clockIn = (status === 'present' || status === 'late') ? now.toISOString() : null;
 
@@ -197,14 +190,8 @@ export default function FranchiseDashboard() {
         clockIn,
         locationCheckIn: { type: 'manual', by: employee.id }
       };
-
-      console.log('Sending attendance payload:', payload);
-
-      const result = await franchisesApi.markAttendance(employee.franchiseId, payload);
-
-      console.log('Attendance marked successfully:', result);
-
-      toast({
+const result = await franchisesApi.markAttendance(employee.franchiseId, payload);
+toast({
         title: "Attendance Saved",
         description: `Marked as ${status} for ${format(new Date(selectedDate), "PPP")}`,
       });
@@ -232,15 +219,7 @@ export default function FranchiseDashboard() {
     try {
       const now = new Date();
       const clockIn = (newStatus === 'present' || newStatus === 'late') ? now.toISOString() : null;
-
-      console.log('Marking attendance:', {
-        franchiseId: employee.franchiseId,
-        employeeId: selectedEmployee.id,
-        date: selectedDate,
-        status: newStatus
-      });
-
-      // Mark attendance and wait for completion
+// Mark attendance and wait for completion
       const result = await franchisesApi.markAttendance(employee.franchiseId, {
         employeeId: selectedEmployee.id,
         date: new Date(selectedDate),
@@ -248,10 +227,7 @@ export default function FranchiseDashboard() {
         clockIn,
         locationCheckIn: { type: 'manual', by: employee.id }
       });
-
-      console.log('Attendance marked result:', result);
-
-      // Wait for queries to invalidate and refetch
+// Wait for queries to invalidate and refetch
       await queryClient.invalidateQueries({ queryKey: ['franchise-attendance'] });
       await queryClient.refetchQueries({ queryKey: ['franchise-attendance'] });
 

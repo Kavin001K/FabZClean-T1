@@ -21,10 +21,7 @@ const isStaticMode = (): boolean => {
 };
 
 // API base URL
-const getApiUrl = (): string => {
-    if (isStaticMode()) return '';
-    return import.meta.env.VITE_API_URL || '';
-};
+import { getApiUrl } from './api-config';
 
 // Initialize local database on first load
 let dbInitialized = false;

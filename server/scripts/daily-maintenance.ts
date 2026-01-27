@@ -900,11 +900,9 @@ function upsertDailySummary(db: Database.Database, summary: DailySummaryData): v
 // ============================================================================
 
 export async function optimizeSystem(): Promise<MaintenanceResult> {
-    console.log("\n🧹 Starting Daily Maintenance & BI Calculation...");
-    console.log(`   Time: ${new Date().toISOString()}`);
-    console.log(`   Database: ${DB_PATH}\n`);
 
-    const biStartTime = Date.now();
+.toISOString()}`);
+const biStartTime = Date.now();
 
     const result: MaintenanceResult = {
         success: true,
@@ -941,12 +939,10 @@ export async function optimizeSystem(): Promise<MaintenanceResult> {
         // ============================================================================
         // STEP 1: VACUUM
         // ============================================================================
-        console.log("   [1/6] Running VACUUM...");
-        try {
+try {
             db.exec("VACUUM;");
             result.operations.vacuum = true;
-            console.log("         ✅ VACUUM complete");
-        } catch (err: any) {
+} catch (err: any) {
             result.errors.push(`VACUUM failed: ${err.message}`);
             console.error("         ❌ VACUUM failed:", err.message);
         }
@@ -954,12 +950,10 @@ export async function optimizeSystem(): Promise<MaintenanceResult> {
         // ============================================================================
         // STEP 2: ANALYZE
         // ============================================================================
-        console.log("   [2/6] Running ANALYZE...");
-        try {
+try {
             db.exec("ANALYZE;");
             result.operations.analyze = true;
-            console.log("         ✅ ANALYZE complete");
-        } catch (err: any) {
+} catch (err: any) {
             result.errors.push(`ANALYZE failed: ${err.message}`);
             console.error("         ❌ ANALYZE failed:", err.message);
         }
@@ -967,8 +961,7 @@ export async function optimizeSystem(): Promise<MaintenanceResult> {
         // ============================================================================
         // STEP 3: BACKUP
         // ============================================================================
-        console.log("   [3/6] Creating backup...");
-        try {
+try {
             if (!fs.existsSync(BACKUPS_PATH)) {
                 fs.mkdirSync(BACKUPS_PATH, { recursive: true });
             }
@@ -980,8 +973,7 @@ export async function optimizeSystem(): Promise<MaintenanceResult> {
             await db.backup(backupPath);
 
             result.operations.backup = true;
-            console.log(`         ✅ Backup created: ${backupFileName}`);
-        } catch (err: any) {
+} catch (err: any) {
             result.errors.push(`Backup failed: ${err.message}`);
             console.error("         ❌ Backup failed:", err.message);
         }
@@ -989,8 +981,7 @@ export async function optimizeSystem(): Promise<MaintenanceResult> {
         // ============================================================================
         // STEP 4: LOG CLEANUP
         // ============================================================================
-        console.log("   [4/6] Archiving old logs...");
-        try {
+try {
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - LOG_RETENTION_DAYS);
             const cutoffStr = cutoffDate.toISOString();
@@ -1023,10 +1014,8 @@ export async function optimizeSystem(): Promise<MaintenanceResult> {
         `).run(cutoffStr);
 
                 result.stats.logsDeleted = logsToDelete;
-                console.log(`         ✅ Archived and deleted ${logsToDelete} old logs`);
-            } else {
-                console.log("         ✅ No old logs to archive");
-            }
+} else {
+}
 
             result.operations.logCleanup = true;
         } catch (err: any) {
@@ -1037,8 +1026,7 @@ export async function optimizeSystem(): Promise<MaintenanceResult> {
         // ============================================================================
         // STEP 5: OLD BACKUP CLEANUP
         // ============================================================================
-        console.log("   [5/6] Cleaning old backups...");
-        try {
+try {
             if (fs.existsSync(BACKUPS_PATH)) {
                 const backups = fs.readdirSync(BACKUPS_PATH)
                     .filter(f => f.endsWith('.db'))
@@ -1055,9 +1043,8 @@ export async function optimizeSystem(): Promise<MaintenanceResult> {
                         fs.unlinkSync(backup.path);
                         result.stats.backupsDeleted++;
                     }
-                    console.log(`         ✅ Deleted ${toDelete.length} old backups`);
-                } else {
-                    console.log(`         ✅ Backup count OK (${backups.length}/${MAX_BACKUPS})`);
+} else {
+`);
                 }
             }
             result.operations.oldBackupCleanup = true;
@@ -1069,8 +1056,7 @@ export async function optimizeSystem(): Promise<MaintenanceResult> {
         // ============================================================================
         // STEP 6: BI CALCULATIONS
         // ============================================================================
-        console.log("   [6/6] Calculating BI Statistics...");
-        try {
+try {
             // Get all franchises
             const franchises = db.prepare(`SELECT id, name FROM franchises WHERE status = 'active'`).all() as any[];
 
@@ -1078,16 +1064,13 @@ export async function optimizeSystem(): Promise<MaintenanceResult> {
             yesterday.setDate(yesterday.getDate() - 1);
 
             for (const franchise of franchises) {
-                console.log(`         📊 Processing ${franchise.name}...`);
-
-                try {
+try {
                     const summary = calculateDailySummary(db, franchise.id, yesterday);
                     upsertDailySummary(db, summary);
 
                     result.stats.dailySummariesGenerated++;
                     result.stats.anomaliesDetected += summary.anomalyCount;
-
-                    console.log(`            ✓ Revenue: ₹${summary.totalRevenue.toFixed(2)}, Orders: ${summary.orderCount}, Anomalies: ${summary.anomalyCount}`);
+}, Orders: ${summary.orderCount}, Anomalies: ${summary.anomalyCount}`);
                 } catch (franchiseErr: any) {
                     console.error(`            ✗ Error: ${franchiseErr.message}`);
                     result.errors.push(`BI calc for ${franchise.name}: ${franchiseErr.message}`);
@@ -1095,7 +1078,7 @@ export async function optimizeSystem(): Promise<MaintenanceResult> {
             }
 
             result.operations.biCalculation = true;
-            console.log(`         ✅ BI Calculation complete (${franchises.length} franchises)`);
+`);
         } catch (err: any) {
             result.errors.push(`BI calculation failed: ${err.message}`);
             console.error("         ❌ BI calculation failed:", err.message);
@@ -1140,22 +1123,14 @@ export async function optimizeSystem(): Promise<MaintenanceResult> {
     result.stats.calculationDurationMs = Date.now() - biStartTime;
 
     // Summary
-    console.log("\n📊 Maintenance Summary:");
-    console.log(`   Database Size: ${formatBytes(result.stats.dbSizeBefore)} → ${formatBytes(result.stats.dbSizeAfter)}`);
-    console.log(`   Logs Archived: ${result.stats.logsDeleted}`);
-    console.log(`   Backups Cleaned: ${result.stats.backupsDeleted}`);
-    console.log(`   Daily Summaries: ${result.stats.dailySummariesGenerated}`);
-    console.log(`   Anomalies Found: ${result.stats.anomaliesDetected}`);
-    console.log(`   Calculation Time: ${result.stats.calculationDurationMs}ms`);
-    console.log(`   Status: ${result.success ? '✅ SUCCESS' : '❌ FAILED'}`);
 
-    if (result.errors.length > 0) {
-        console.log(`   Errors: ${result.errors.join(', ')}`);
+} → ${formatBytes(result.stats.dbSizeAfter)}`);
+
+
+if (result.errors.length > 0) {
+}`);
     }
-
-    console.log("");
-
-    return result;
+return result;
 }
 
 // Run if executed directly

@@ -38,10 +38,7 @@ router.post('/upload-pdf', jwtRequired, upload.single('pdf'), async (req: Reques
 
         // Save using LocalStorage service
         const publicUrl = await LocalStorage.saveInvoicePdf(orderId, req.file.buffer);
-
-        console.log('✅ PDF saved:', publicUrl);
-
-        // LOGGING: Log PDF upload (typically invoice generation)
+// LOGGING: Log PDF upload (typically invoice generation)
         if ((req as any).employee) {
             await AuthService.logAction(
                 (req as any).employee.employeeId,
@@ -91,10 +88,7 @@ router.post('/generate-invoice/:orderId', jwtRequired, async (req: Request, res:
 
         // Save using LocalStorage service
         const publicUrl = await LocalStorage.saveInvoicePdf(orderId, buffer);
-
-        console.log(`✅ Invoice PDF generated for order ${orderId}: ${publicUrl}`);
-
-        // Log the action
+// Log the action
         if ((req as any).employee) {
             await AuthService.logAction(
                 (req as any).employee.employeeId,
@@ -136,10 +130,7 @@ router.post('/save-report', jwtRequired, async (req: Request, res: Response) => 
             : Buffer.from(pdfBuffer, 'base64');
 
         const publicUrl = await LocalStorage.saveReport(reportName, buffer, extension || '.pdf');
-
-        console.log(`✅ Report saved: ${publicUrl}`);
-
-        if ((req as any).employee) {
+if ((req as any).employee) {
             await AuthService.logAction(
                 (req as any).employee.employeeId,
                 (req as any).employee.username,

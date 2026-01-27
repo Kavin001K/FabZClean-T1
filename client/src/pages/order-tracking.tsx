@@ -38,8 +38,7 @@ export default function OrderTracking() {
         queryKey: ['order-tracking', orderId],
         queryFn: async () => {
             const token = localStorage.getItem('employee_token');
-            console.log('[Order Tracking] Fetching order:', orderId);
-            const response = await fetch(`/api/orders/${orderId}`, {
+const response = await fetch(`/api/orders/${orderId}`, {
                 headers: {
                     'Content-Type': 'application/json',
                     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -52,11 +51,9 @@ export default function OrderTracking() {
                 throw new Error('Failed to fetch order');
             }
             const result = await response.json();
-            console.log('[Order Tracking] Raw API Response:', result);
-            // Extract order from response wrapper (API returns { success, data, ... })
+// Extract order from response wrapper (API returns { success, data, ... })
             const orderData = result?.data || result;
-            console.log('[Order Tracking] Extracted Order:', orderData);
-            return orderData;
+return orderData;
         },
         enabled: !!orderId
     });

@@ -153,8 +153,24 @@ function FranchiseStatsRibbon({ franchises }: { franchises: any[] }) {
         const daysLeft = (new Date(f.agreementEndDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24);
         return daysLeft < 30 && daysLeft > 0;
     }).length;
-    // Mock calculation
-    const totalRoyalty = "₹ 12.5L";
+
+    // Calculate actual royalty collected from franchise data
+    // Sum up royaltyPercentage values as placeholder for collected amount
+    // In a real app, this would come from a separate royalty_payments table
+    const totalRoyaltyAmount = franchises.reduce((sum, f) => {
+        const royalty = parseFloat(f.royaltyPercentage || '0');
+        return sum + royalty;
+    }, 0);
+
+    // Format the royalty amount
+    const formatRoyalty = (amount: number) => {
+        if (amount === 0) return '₹ 0';
+        if (amount >= 100000) return `₹ ${(amount / 100000).toFixed(1)}L`;
+        if (amount >= 1000) return `₹ ${(amount / 1000).toFixed(1)}K`;
+        return `₹ ${amount.toFixed(0)}`;
+    };
+
+    const totalRoyalty = formatRoyalty(totalRoyaltyAmount);
 
     const alerts = franchises.filter(f => f.fireSafetyStatus === 'expired' || f.status === 'suspended');
 
@@ -231,15 +247,15 @@ function FranchiseDetailsSheet({ franchise, isOpen, onClose }: { franchise: any,
                 </SheetHeader>
 
                 <div className="space-y-6">
-                    {/* Quick Stats */}
+                    {/* Contact Info */}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="border rounded-md p-3 text-center">
-                            <p className="text-xs text-muted-foreground">Live Orders</p>
-                            <p className="text-2xl font-bold">12</p>
+                            <p className="text-xs text-muted-foreground">Email</p>
+                            <p className="text-sm font-medium truncate">{franchise.email || 'N/A'}</p>
                         </div>
                         <div className="border rounded-md p-3 text-center">
-                            <p className="text-xs text-muted-foreground">Staff Count</p>
-                            <p className="text-2xl font-bold">8</p>
+                            <p className="text-xs text-muted-foreground">Phone</p>
+                            <p className="text-sm font-medium">{franchise.phone || 'N/A'}</p>
                         </div>
                     </div>
 
@@ -260,6 +276,9 @@ function FranchiseDetailsSheet({ franchise, isOpen, onClose }: { franchise: any,
                             <span className={new Date(franchise.agreementEndDate) < new Date() ? 'text-red-600 font-bold' : ''}>
                                 {franchise.agreementEndDate ? format(new Date(franchise.agreementEndDate), 'PP') : 'N/A'}
                             </span>
+
+                            <span className="text-muted-foreground">Royalty Rate:</span>
+                            <span>{franchise.royaltyPercentage || '0'}%</span>
                         </div>
                     </div>
 
@@ -268,7 +287,9 @@ function FranchiseDetailsSheet({ franchise, isOpen, onClose }: { franchise: any,
                     <div className="space-y-4">
                         <h4 className="font-medium flex items-center gap-2"><MapPin className="h-4 w-4" /> Operational Zone</h4>
                         <div className="bg-muted p-2 rounded text-xs font-mono">
-                            {franchise.address?.street}, {franchise.address?.city} - {franchise.address?.pincode}
+                            {franchise.address?.street || franchise.address || 'Address not set'}
+                            {franchise.address?.city && <>, {franchise.address.city}</>}
+                            {franchise.address?.pincode && <> - {franchise.address.pincode}</>}
                             <br />
                             Radius: {franchise.serviceRadiusKm || 5}km
                         </div>
@@ -276,15 +297,17 @@ function FranchiseDetailsSheet({ franchise, isOpen, onClose }: { franchise: any,
 
                     <Separator />
 
-                    <div>
-                        <h4 className="font-medium mb-3">Audit Logs (Recent)</h4>
-                        <div className="space-y-3">
-                            {[1, 2, 3].map(i => (
-                                <div key={i} className="text-xs flex gap-2">
-                                    <span className="text-muted-foreground w-20">{format(new Date(), 'HH:mm')}</span>
-                                    <span>System auto-check passed.</span>
-                                </div>
-                            ))}
+                    <div className="space-y-4">
+                        <h4 className="font-medium flex items-center gap-2"><Banknote className="h-4 w-4" /> Financial Details</h4>
+                        <div className="grid grid-cols-2 gap-y-2 text-sm">
+                            <span className="text-muted-foreground">Bank:</span>
+                            <span>{franchise.bankName || 'N/A'}</span>
+
+                            <span className="text-muted-foreground">Account:</span>
+                            <span className="font-mono">{franchise.bankAccountNumber ? `****${franchise.bankAccountNumber.slice(-4)}` : 'N/A'}</span>
+
+                            <span className="text-muted-foreground">UPI:</span>
+                            <span className="font-mono">{franchise.upiId || 'N/A'}</span>
                         </div>
                     </div>
                 </div>

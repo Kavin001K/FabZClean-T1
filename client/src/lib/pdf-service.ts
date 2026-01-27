@@ -211,17 +211,11 @@ export class PDFService {
         try {
             // Generate PDF from bill URL
             const billUrl = `${window.location.origin}/bill/${orderNumber}?enableGST=${enableGST}`;
-            console.log('📄 Generating PDF from:', billUrl);
-
-            const pdfBlob = await this.generatePDFFromURL(billUrl);
-            console.log('✅ PDF generated, size:', pdfBlob.size, 'bytes');
-
-            // Upload to server
+const pdfBlob = await this.generatePDFFromURL(billUrl);
+// Upload to server
             const filename = `invoice-${orderNumber}.pdf`;
             const publicUrl = await this.uploadPDFToServer(pdfBlob, filename);
-            console.log('✅ PDF uploaded to:', publicUrl);
-
-            return publicUrl;
+return publicUrl;
         } catch (error) {
             console.error('❌ Generate and upload PDF error:', error);
             throw error;

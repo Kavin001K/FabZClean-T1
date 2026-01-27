@@ -17,8 +17,9 @@ import {
   BarChart3,
   CreditCard,
   Receipt,
+  FolderOpen,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, isDesktopApp } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -174,6 +175,13 @@ const NavLink = ({
 
 export function Sidebar() {
   const { employee } = useAuth();
+  const isElectron = isDesktopApp();
+
+  const openDataFolder = async () => {
+    if ((window as any).electronAPI) {
+      await (window as any).electronAPI.openDataFolder();
+    }
+  };
 
   const filteredNav = NAV_ITEMS.filter((item) =>
     employee ? item.roles.includes(employee.role) : false,
@@ -200,6 +208,21 @@ export function Sidebar() {
         )}
       </nav>
       <div className="border-t p-4">
+        {isElectron && (
+          <div className="mb-3 rounded-lg border bg-blue-50/50 p-2 dark:bg-blue-950/20">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Desktop App</span>
+              <button
+                onClick={openDataFolder}
+                className="text-muted-foreground hover:text-primary transition-colors"
+                title="Open Data Folder"
+              >
+                <FolderOpen className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-3">
           <Avatar className="h-10 w-10">
             <AvatarImage src={(employee as any)?.profileImage || ''} alt={employee?.fullName} />

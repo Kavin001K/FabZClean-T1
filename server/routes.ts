@@ -709,7 +709,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       console.error("Create order error:", error);
-      res.status(500).json({ message: "Failed to create order" });
+      const errorMessage = error instanceof Error ? error.message : "Failed to create order";
+      res.status(500).json({ message: errorMessage, detail: String(error) });
     }
   });
 

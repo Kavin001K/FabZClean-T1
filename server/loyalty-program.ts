@@ -191,9 +191,7 @@ class LoyaltyProgram {
           lastUpdated: new Date()
         });
       });
-
-      console.log(`Loaded loyalty data for ${customers.length} customers`);
-    } catch (error) {
+} catch (error) {
       console.error('Error loading customer loyalty data:', error);
     }
   }
@@ -300,9 +298,7 @@ class LoyaltyProgram {
 
     // Check for new badges
     await this.checkForNewBadges(customerId);
-
-    console.log(`Added ${points} points to customer ${customerId} for ${source}`);
-  }
+}
 
   public async redeemPoints(customerId: string, points: number, rewardId: string): Promise<boolean> {
     const customer = this.customerPoints.get(customerId);
@@ -334,9 +330,7 @@ class LoyaltyProgram {
       this.pointsTransactions.set(customerId, []);
     }
     this.pointsTransactions.get(customerId)!.push(transaction);
-
-    console.log(`Customer ${customerId} redeemed ${points} points for ${reward.name}`);
-    return true;
+return true;
   }
 
   public getCustomerPoints(customerId: string): CustomerPoints | null {
@@ -397,8 +391,7 @@ class LoyaltyProgram {
       const existingBadge = customer.badges.find(badge => badge.id === newBadge.id);
       if (!existingBadge) {
         customer.badges.push(newBadge);
-        console.log(`Customer ${customerId} earned new badge: ${newBadge.name}`);
-      }
+}
     });
   }
 

@@ -13,16 +13,14 @@ router.use(authMiddleware);
  */
 router.get('/', async (req: Request, res: Response) => {
     try {
-        console.log('GET /api/employees - Requesting user:', JSON.stringify(req.employee));
+);
 
         const employees = await AuthService.listEmployees(
             req.employee!.role,
             req.employee!.franchiseId,
             req.employee!.factoryId
         );
-
-        console.log(`GET /api/employees - Found ${employees.length} employees`);
-        res.json({ success: true, employees });
+res.json({ success: true, employees });
     } catch (error: any) {
         console.error('GET /api/employees - Error:', error);
         res.status(500).json({ error: error.message || 'Failed to list employees' });
@@ -42,7 +40,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         }
 
         // Check if user has permission to view this employee
-        console.log(`[GET /api/employees/:id] Requester: ${req.employee?.username} (${req.employee?.role}), Target: ${employee.username} (Franchise: ${employee.franchiseId})`);
+, Target: ${employee.username} (Franchise: ${employee.franchiseId})`);
 
         if (req.employee!.role !== 'admin') {
             if (req.employee!.role === 'franchise_manager' && employee.franchiseId !== req.employee!.franchiseId) {

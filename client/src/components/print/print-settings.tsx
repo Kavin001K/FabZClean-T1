@@ -42,8 +42,7 @@ export default function PrintSettings({ order, onClose }: PrintSettingsProps) {
     try {
       const invoiceData = await previewInvoice(order, selectedTemplate);
       // Here you could open a preview modal or navigate to a preview page
-      console.log('Preview data:', invoiceData);
-    } catch (error) {
+} catch (error) {
       console.error('Preview failed:', error);
     }
   };
@@ -52,8 +51,7 @@ export default function PrintSettings({ order, onClose }: PrintSettingsProps) {
     try {
       // This would trigger a download instead of printing
       const invoiceData = convertOrderToInvoiceData(order);
-      console.log('Download invoice:', invoiceData);
-      // You could implement a download function here
+// You could implement a download function here
     } catch (error) {
       console.error('Download failed:', error);
     }

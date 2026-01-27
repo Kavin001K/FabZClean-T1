@@ -90,33 +90,7 @@ interface CustomerDialogsProps {
   orders?: Order[];
 }
 
-// Mock recent orders data - in real app this would come from API
-const mockRecentOrders = [
-  {
-    id: '1',
-    orderNumber: 'FC-2024-001',
-    status: 'completed',
-    total: '₹2,450',
-    createdAt: '2025-09-15T10:30:00Z',
-    services: ['Dry Cleaning', 'Ironing']
-  },
-  {
-    id: '2',
-    orderNumber: 'FC-2024-002',
-    status: 'in_progress',
-    total: '₹1,850',
-    createdAt: '2025-09-18T14:20:00Z',
-    services: ['Wash & Fold']
-  },
-  {
-    id: '3',
-    orderNumber: 'FC-2024-003',
-    status: 'completed',
-    total: '₹3,200',
-    createdAt: '2025-09-20T09:15:00Z',
-    services: ['Dry Cleaning', 'Stain Removal', 'Ironing']
-  }
-];
+
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -209,7 +183,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   };
 
   // Compute customer stats only when we have a selected customer (View/Edit dialogs)
-  const totalSpent = selectedCustomer ? parseFloat(selectedCustomer.totalSpent || '0') : 0;
+  const totalSpent = selectedCustomer ? parseFloat(selectedCustomer.totalLifetimeSpent?.toString() || '0') : 0;
   const totalOrders = selectedCustomer?.totalOrders || 0;
   const customerSince = selectedCustomer ? new Date(selectedCustomer.createdAt || new Date()) : new Date();
   const daysSinceJoined = Math.max(1, Math.floor((Date.now() - customerSince.getTime()) / (1000 * 60 * 60 * 24)));
@@ -361,8 +335,8 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                       </CardHeader>
                       <CardContent>
                         <div className={`text-2xl font-bold ${parseFloat(selectedCustomer.creditBalance || '0') > 0
-                            ? 'text-orange-600'
-                            : 'text-green-600'
+                          ? 'text-orange-600'
+                          : 'text-green-600'
                           }`}>
                           ₹{parseFloat(selectedCustomer.creditBalance || '0').toLocaleString('en-IN')}
                         </div>
@@ -451,7 +425,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
 
       {/* Edit Customer Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={onCloseEditDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           {selectedCustomer ? (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -723,7 +697,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
 
       {/* Create Customer Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={onCloseCreateDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}

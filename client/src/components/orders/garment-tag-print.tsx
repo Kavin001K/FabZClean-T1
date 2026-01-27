@@ -80,8 +80,7 @@ export function GarmentTagPrint({
               background: "#ffffff"
             });
           } catch (e) {
-            console.log('Preview barcode error:', e);
-          }
+}
         }
       }, 100);
       return () => clearTimeout(timeoutId);

@@ -21,9 +21,7 @@ router.get('/', async (req, res) => {
 router.post('/bulk', jwtRequired, requireRole(['admin', 'factory_manager', 'franchise_manager']), async (req, res) => {
     try {
         const services = req.body;
-        console.log('[Services] Bulk import request received:', services?.length || 0, 'services');
-
-        if (!Array.isArray(services)) {
+if (!Array.isArray(services)) {
             return res.status(400).json({ error: "Expected array of services" });
         }
 
@@ -58,17 +56,13 @@ router.post('/bulk', jwtRequired, requireRole(['admin', 'factory_manager', 'fran
                 const created = await db.createService(serviceData);
                 results.push({ success: true, data: created });
                 successCount++;
-                console.log(`[Services] Created: ${s.name}`);
-            } catch (e: any) {
+} catch (e: any) {
                 console.error("[Services] Failed to create service in bulk:", s.name, e.message);
                 errors.push(`${s.name}: ${e.message}`);
                 results.push({ success: false, error: e.message, data: s });
             }
         }
-
-        console.log(`[Services] Bulk import completed: ${successCount}/${services.length} successful`);
-
-        res.status(201).json({
+res.status(201).json({
             success: true,
             message: `Imported ${successCount} of ${services.length} services`,
             successCount,
@@ -124,10 +118,8 @@ router.put('/:id', jwtRequired, requireRole(['admin', 'factory_manager', 'franch
 // DELETE service
 router.delete('/:id', jwtRequired, requireRole(['admin', 'factory_manager']), async (req, res) => {
     try {
-        console.log(`[Services] Deleting service: ${req.params.id}`);
-        await db.deleteService(req.params.id);
-        console.log(`[Services] Service deleted: ${req.params.id}`);
-        res.status(204).send();
+await db.deleteService(req.params.id);
+res.status(204).send();
     } catch (error: any) {
         console.error('Error deleting service:', error);
         res.status(500).json({ error: error.message });

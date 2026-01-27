@@ -29,7 +29,7 @@ export const SupabaseAuthService = {
     },
 
     logout(): void {
-        console.log('Supabase auth logout called (no-op)');
+        // Supabase auth is disabled
     },
 };
 

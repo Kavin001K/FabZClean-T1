@@ -356,9 +356,7 @@ class RealtimeServer {
   private setupWebSocketHandlers() {
     this.wss.on('connection', (ws: WebSocket, req) => {
       const clientId = this.generateClientId();
-      console.log(`Client ${clientId} connected`);
-
-      this.clients.set(clientId, {
+this.clients.set(clientId, {
         ws,
         subscriptions: [],
         lastSeen: Date.now()
@@ -377,8 +375,7 @@ class RealtimeServer {
       });
 
       ws.on('close', () => {
-        console.log(`Client ${clientId} disconnected`);
-        this.clients.delete(clientId);
+this.clients.delete(clientId);
         this.metrics.activeConnections = this.clients.size;
       });
 
@@ -421,8 +418,7 @@ class RealtimeServer {
 
     this.clients.forEach((client, clientId) => {
       if (client.lastSeen < fiveMinutesAgo && client.ws.readyState !== WebSocket.OPEN) {
-        console.log(`Cleaning up old connection: ${clientId}`);
-        this.clients.delete(clientId);
+this.clients.delete(clientId);
       }
     });
 

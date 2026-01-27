@@ -75,13 +75,11 @@ export function setupOnlineListeners(callbacks: {
   onOffline?: () => void;
 }) {
   const handleOnline = () => {
-    console.log('App is now online');
-    if (callbacks.onOnline) callbacks.onOnline();
+if (callbacks.onOnline) callbacks.onOnline();
   };
 
   const handleOffline = () => {
-    console.log('App is now offline');
-    if (callbacks.onOffline) callbacks.onOffline();
+if (callbacks.onOffline) callbacks.onOffline();
   };
 
   window.addEventListener('online', handleOnline);
@@ -192,10 +190,7 @@ export class OfflineMutationQueue {
     if (!isOnline() || this.queue.length === 0) {
       return;
     }
-
-    console.log(`Processing ${this.queue.length} queued mutations...`);
-
-    const mutations = [...this.queue];
+const mutations = [...this.queue];
     this.queue = [];
 
     for (const mutation of mutations) {
@@ -205,8 +200,7 @@ export class OfflineMutationQueue {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(mutation.body),
         });
-        console.log(`Processed queued mutation: ${mutation.id}`);
-      } catch (error) {
+} catch (error) {
         console.error(`Failed to process mutation ${mutation.id}:`, error);
         // Re-queue failed mutations
         this.queue.push(mutation);
@@ -259,8 +253,7 @@ export const mutationQueue = new OfflineMutationQueue();
 export function setupOfflineSync() {
   setupOnlineListeners({
     onOnline: () => {
-      console.log('Back online - processing queued mutations...');
-      mutationQueue.processQueue();
+mutationQueue.processQueue();
     },
   });
 

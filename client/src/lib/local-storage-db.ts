@@ -489,13 +489,9 @@ export async function seedDefaultData() {
     // Check if already seeded
     const franchises = await db.getAll('franchises');
     if (franchises.length > 0) {
-        console.log('Database already seeded');
-        return;
+return;
     }
-
-    console.log('🌱 Seeding default data...');
-
-    // Seed franchises
+// Seed franchises
     const pollachi = {
         id: 'franchise-pollachi',
         name: 'Fab Clean Pollachi',
@@ -590,8 +586,6 @@ export async function seedDefaultData() {
             updatedAt: now(),
         });
     }
-
-    console.log('✅ Default data seeded successfully!');
 }
 
 // ============================================

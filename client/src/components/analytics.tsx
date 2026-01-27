@@ -13,20 +13,11 @@ export default function Analytics() {
       for (const entry of list.getEntries()) {
         if (entry.entryType === 'navigation') {
           const navEntry = entry as PerformanceNavigationTiming;
-          console.log('Page Load Performance:', {
-            domContentLoaded: navEntry.domContentLoadedEventEnd - navEntry.domContentLoadedEventStart,
-            loadComplete: navEntry.loadEventEnd - navEntry.loadEventStart,
-            totalTime: navEntry.loadEventEnd - navEntry.fetchStart,
-          });
-        }
+}
         
         if (entry.entryType === 'paint') {
           const paintEntry = entry as PerformancePaintTiming;
-          console.log('Paint Performance:', {
-            name: paintEntry.name,
-            startTime: paintEntry.startTime,
-          });
-        }
+}
       }
     });
 

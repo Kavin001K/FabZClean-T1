@@ -125,7 +125,7 @@ export const bundleAnalyzer = {
   // Track bundle size
   trackBundleSize: (bundleName: string, size: number) => {
     if (process.env.NODE_ENV === 'development') {
-      console.log(`Bundle ${bundleName}: ${(size / 1024).toFixed(2)} KB`);
+.toFixed(2)} KB`);
     }
   },
 
@@ -148,9 +148,7 @@ export const bundleAnalyzer = {
       .filter(module => module.size > 100 * 1024) // > 100KB
       .sort((a, b) => b.size - a.size)
       .slice(0, 10);
-
-    console.log('Large dependencies:', largeModules);
-    return largeModules;
+return largeModules;
   }
 };
 
@@ -202,7 +200,7 @@ export const performanceMonitor = {
       const loadTime = end - start;
 
       if (process.env.NODE_ENV === 'development') {
-        console.log(`${componentName} loaded in ${loadTime.toFixed(2)}ms`);
+}ms`);
       }
 
       return loadTime;
@@ -215,8 +213,7 @@ export const performanceMonitor = {
     const sizeKB = (size / 1024).toFixed(2);
 
     if (process.env.NODE_ENV === 'development') {
-      console.log(`Bundle size: ${sizeKB} KB`);
-    }
+}
 
     return size;
   },
@@ -242,8 +239,7 @@ export const cacheOptimization = {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
         .then(registration => {
-          console.log('Service Worker registered:', registration);
-        })
+})
         .catch(error => {
           console.error('Service Worker registration failed:', error);
         });

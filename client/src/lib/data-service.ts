@@ -4,6 +4,8 @@
 // Import types from shared schema instead of defining them here
 import type { Order, Customer, Service, Product, Delivery, Employee } from "@shared/schema";
 
+import { isElectron } from "@/lib/utils";
+
 // Get access token from localStorage (employee-based auth)
 function getAccessToken(): string | null {
   return localStorage.getItem('employee_token') ||
@@ -49,27 +51,40 @@ export type ServicePopularityData = {
 // In production (Vercel), this will use /api which is handled by rewrites
 // In development, this uses Vite proxy
 const getApiBase = () => {
-  if (import.meta.env.PROD) {
-    // Check for explicit API URL in environment
-    const apiUrl = import.meta.env.VITE_API_URL;
-    if (apiUrl) {
-      return apiUrl;
-    }
-    // Default to relative path for production (Vercel handles rewrites)
-    return '/api';
+  // Check for explicit API URL in environment
+  const apiUrl = import.meta.env.VITE_API_URL;
+  if (apiUrl) {
+    return apiUrl;
   }
-  // Development: use relative path (handled by Vite proxy)
+
+  // In Electron (both dev and prod), backend is always local on 5001
+  if (isElectron()) {
+    return 'http://localhost:5001/api';
+  }
+
+  // Default to relative path
   return '/api';
 };
 
+
 export const getWebSocketUrl = () => {
+  // Check for explicit WS URL in environment
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL;
+  }
+
+  // In Electron (both dev and prod), backend is always local on 5001
+  if (isElectron()) {
+    return 'ws://localhost:5001/ws';
+  }
+
   if (import.meta.env.PROD) {
-    // In production, use wss:// and the current host
+    // In production web, use wss:// and the current host
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     return `${protocol}//${host}/ws`;
   }
-  // In development, use ws://localhost:5001
+  // In development web, use ws://localhost:5001
   return 'ws://localhost:5001/ws';
 };
 

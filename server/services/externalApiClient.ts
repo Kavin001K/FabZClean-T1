@@ -138,9 +138,7 @@ export class ExternalApiClient {
     const startTime = Date.now();
 
     try {
-      console.log(`🌐 [External API] ${method} ${url}`);
-
-      // Create fetch with timeout
+// Create fetch with timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
@@ -172,9 +170,7 @@ export class ExternalApiClient {
       }
 
       const data = await response.json();
-
-      console.log(
-        `✅ [External API] ${method} ${url} - ${response.status} (${responseTime}ms)`
+`
       );
 
       return data;

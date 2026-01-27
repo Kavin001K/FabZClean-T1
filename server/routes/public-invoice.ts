@@ -17,10 +17,7 @@ router.get('/invoice/:orderNumber', async (req: Request, res: Response) => {
         if (!orderNumber) {
             return res.status(400).json({ error: 'Order number is required' });
         }
-
-        console.log(`[Invoice] Generating invoice for order: ${orderNumber}`);
-
-        // Find the order
+// Find the order
         const orders = await storage.listOrders();
         const searchTerm = orderNumber.trim().replace(/^#/, '').toLowerCase();
 

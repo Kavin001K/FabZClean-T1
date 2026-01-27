@@ -69,8 +69,7 @@ class BusinessSettingsServiceClass {
           updatedBy TEXT
         );
       `);
-            console.log('✅ Business settings table ready');
-        } catch (error) {
+} catch (error) {
             console.error('❌ Failed to create business_settings table:', error);
         }
     }
@@ -128,9 +127,7 @@ class BusinessSettingsServiceClass {
                 DEFAULT_SETTINGS.receiptFooter,
                 now
             );
-
-            console.log('✅ Initialized default business settings');
-            return { id, ...DEFAULT_SETTINGS, updatedAt: now };
+return { id, ...DEFAULT_SETTINGS, updatedAt: now };
         } catch (error) {
             console.error('Failed to initialize business settings:', error);
             return { id, ...DEFAULT_SETTINGS };
@@ -208,9 +205,7 @@ class BusinessSettingsServiceClass {
 
             const sql = `UPDATE ${this.tableName} SET ${fields.join(', ')} WHERE id = ?`;
             (db as any).db.prepare(sql).run(...values);
-
-            console.log('✅ Business settings updated');
-            return await this.getSettings();
+return await this.getSettings();
         } catch (error) {
             console.error('Failed to update business settings:', error);
             throw new Error('Failed to update business settings');

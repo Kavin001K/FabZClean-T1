@@ -107,7 +107,7 @@ export const UniversalAuthService = {
      * Initialize the auth service
      */
     async init() {
-        console.log(`🔐 Auth Mode: ${this.mode.toUpperCase()}`);
+}`);
 
         if (this.mode === 'offline') {
             await localDB.init();
@@ -119,9 +119,7 @@ export const UniversalAuthService = {
      * Login with username/email and password
      */
     async login(username: string, password: string): Promise<{ token: string; employee: AuthEmployee }> {
-        console.log(`🔐 Attempting ${this.mode} login for: ${username}`);
-
-        if (this.mode === 'offline') {
+if (this.mode === 'offline') {
             return this.loginOffline(username, password);
         } else if (this.mode === 'supabase') {
             return this.loginSupabase(username, password);
@@ -185,9 +183,7 @@ export const UniversalAuthService = {
         // Store session
         localStorage.setItem(STORAGE_KEYS.TOKEN, token);
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(authEmployee));
-
-        console.log(`✅ Offline login successful for: ${username}`);
-        return { token, employee: authEmployee };
+return { token, employee: authEmployee };
     },
 
     /**
@@ -247,9 +243,7 @@ export const UniversalAuthService = {
 
             localStorage.setItem(STORAGE_KEYS.TOKEN, token);
             localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(authEmployee));
-
-            console.log(`✅ Supabase login successful for: ${username}`);
-            return { token, employee: authEmployee };
+return { token, employee: authEmployee };
         }
 
         throw new Error('Invalid username or password');
@@ -274,9 +268,7 @@ export const UniversalAuthService = {
 
         localStorage.setItem(STORAGE_KEYS.TOKEN, data.token);
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(data.employee));
-
-        console.log(`✅ API login successful for: ${username}`);
-        return data;
+return data;
     },
 
     /**
@@ -359,8 +351,7 @@ export const UniversalAuthService = {
     logout(): void {
         localStorage.removeItem(STORAGE_KEYS.TOKEN);
         localStorage.removeItem(STORAGE_KEYS.USER);
-        console.log('🔓 Logged out');
-    },
+},
 
     /**
      * Force mode change

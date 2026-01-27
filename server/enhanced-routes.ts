@@ -548,8 +548,7 @@ export async function registerEnhancedRoutes(app: Express): Promise<Server> {
   setInterval(async () => {
     try {
       await updateSearchEngines();
-      console.log('Search engines updated successfully');
-    } catch (error) {
+} catch (error) {
       console.error('Failed to update search engines:', error);
     }
   }, 300000); // 5 minutes

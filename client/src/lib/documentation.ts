@@ -99,8 +99,8 @@ export const INTERFACE_JSDOC_TEMPLATE = `/**
  * const example: {interfaceName} = {
  *   property1: 'value',
  *   property2: 42,
- *   property3: () => console.log('hello')
- * };
+ *   property3: () =>
+* };
  * \`\`\`
  */`;
 

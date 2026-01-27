@@ -44,10 +44,7 @@ router.post("/send-invoice", async (req, res) => {
 
         // Get template based on send count
         const templateType = getTemplateForSendCount(sendCount);
-
-        console.log(`[WhatsApp] Send #${sendCount + 1} using template: ${templateType}`);
-
-        const result = await sendInvoiceWhatsApp({
+const result = await sendInvoiceWhatsApp({
             phoneNumber,
             pdfUrl,
             filename: filename || `Invoice-${invoiceNumber || 'order'}.pdf`,
@@ -109,13 +106,9 @@ router.post("/send-bill", async (req, res) => {
 
         // Smart Item Summary
         const itemSummary = mainItem || smartItemSummary(items) || "Laundry Items";
-        console.log(`[WhatsApp] Bill for order ${orderId}, sendCount: ${sendCount}, item: "${itemSummary}"`);
-
-        // Get template based on send count
+// Get template based on send count
         const templateType = getTemplateForSendCount(sendCount);
-        console.log(`[WhatsApp] Using template: ${templateType}`);
-
-        // If no PDF URL, send text message instead
+// If no PDF URL, send text message instead
         if (!pdfUrl) {
             const itemText = itemSummary !== "Laundry Items"
                 ? `This includes your ${itemSummary}.`

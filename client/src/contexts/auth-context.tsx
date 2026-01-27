@@ -190,8 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Set logout timer
     logoutTimerRef.current = setTimeout(() => {
-      console.log('Session expired due to inactivity');
-      signOut();
+signOut();
     }, SESSION_DURATION);
   }, [employee, signOut]);
 

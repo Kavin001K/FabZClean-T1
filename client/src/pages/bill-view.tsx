@@ -20,7 +20,6 @@ export default function BillView() {
     const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
 
 
-
     const { data: order, isLoading, error } = useQuery({
         queryKey: ["order", orderNumber],
         queryFn: async () => {
@@ -53,15 +52,11 @@ export default function BillView() {
 
     useEffect(() => {
         if (!order) return;
-
-        console.log('📄 Bill View: Generating codes for', order.orderNumber);
-
         const generateCodes = () => {
             if (barcodeRef.current) {
                 try {
                     // Ensure the element exists and is visible
                     if (barcodeRef.current.clientWidth === 0) {
-                        console.log('⏳ Barcode ref not ready, retrying...');
                         setTimeout(generateCodes, 100);
                         return;
                     }
@@ -75,7 +70,6 @@ export default function BillView() {
                         margin: 5,
                         background: "transparent",
                     });
-                    console.log('✅ Bill barcode generated');
                 } catch (e) {
                     console.error("❌ Bill barcode error:", e);
                 }
@@ -108,8 +102,7 @@ export default function BillView() {
                             light: '#ffffff'
                         }
                     }, (error: any) => {
-                        if (error) console.error("❌ QR Code error:", error);
-                        else console.log('✅ QR code generated');
+                        // QR Code generation completed
                     });
                 }
             } else {

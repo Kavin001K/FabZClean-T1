@@ -7,6 +7,11 @@ export function cn(...inputs: ClassValue[]) {
 
 export function isElectron(): boolean {
   // Renderer process
+  if (typeof window !== 'undefined' && (window as any).electronAPI) {
+    return true;
+  }
+
+  // Renderer process (legacy)
   if (typeof window !== 'undefined' && typeof window.process === 'object' && (window.process as any).type === 'renderer') {
     return true;
   }

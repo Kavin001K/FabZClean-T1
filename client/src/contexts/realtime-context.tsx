@@ -63,9 +63,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     onMessage: (message) => {
       // Skip processing if in development mode
       if (skipBackendWS) return;
-
-      console.log('Realtime update:', message);
-      const { type, data } = message || {};
+const { type, data } = message || {};
 
       // Guard against undefined or null type
       if (!type) {

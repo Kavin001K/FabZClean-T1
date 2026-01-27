@@ -67,6 +67,16 @@ import { isElectron } from '@/lib/utils';
  */
 export function browserPrint(html: string, title: string = 'Print Document') {
   if (isElectron()) {
+    // Access the bridge we created in preload.js
+    if ((window as any).electronAPI) {
+      (window as any).electronAPI.sendPrintRequest({
+        header: title,
+        footer: 'FabZClean Service'
+      });
+      return;
+    }
+
+    // Fallback or legacy Electron handling (kept if needed, but the new API is preferred)
     // Electron-optimized printing using hidden iframe
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';

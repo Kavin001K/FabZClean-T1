@@ -168,8 +168,8 @@ router.get('/test-whatsapp', async (req: Request, res: Response) => {
     };
 
     try {
-        console.log('📱 [Test WhatsApp] Sending to:', phone);
-        console.log('📄 [Test WhatsApp] Payload:', JSON.stringify(payload, null, 2));
+
+);
 
         const response = await fetch(
             "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
@@ -184,7 +184,7 @@ router.get('/test-whatsapp', async (req: Request, res: Response) => {
         );
 
         const resultText = await response.text();
-        console.log(`✅ [Test WhatsApp] Response (${response.status}):`, resultText);
+:`, resultText);
 
         let result;
         try {

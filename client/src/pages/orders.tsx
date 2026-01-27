@@ -567,8 +567,7 @@ function OrdersComponent() {
 
   const { printInvoice } = useInvoicePrint({
     onSuccess: (invoiceData) => {
-      console.log('Invoice printed successfully:', invoiceData);
-    },
+},
     onError: (error) => {
       console.error('Invoice print failed:', error);
     }
@@ -1312,7 +1311,6 @@ function OrdersComponent() {
                         ))}
                       </div>
                     </div>
-
 
 
                     <Button variant="outline" className="w-full" onClick={handleClearFilters}>

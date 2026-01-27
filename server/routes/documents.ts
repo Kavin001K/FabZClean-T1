@@ -107,9 +107,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 router.get('/', async (req, res) => {
     try {
         const { type, status, limit = '50' } = req.query;
-        // console.log(`Fetching documents with params: type=${type}, status=${status}, limit=${limit}`);
-
-        const parsedLimit = parseInt(limit as string);
+        //
+const parsedLimit = parseInt(limit as string);
         const validLimit = isNaN(parsedLimit) ? 50 : parsedLimit;
 
         const allDocuments = await db.listDocuments({
@@ -118,8 +117,8 @@ router.get('/', async (req, res) => {
             limit: validLimit
         });
 
-        // console.log(`Successfully fetched ${allDocuments.length} documents`);
-        res.json(allDocuments);
+        //
+res.json(allDocuments);
     } catch (error) {
         console.error('Error fetching documents:', error);
         res.status(500).json({

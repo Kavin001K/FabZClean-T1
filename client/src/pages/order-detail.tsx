@@ -53,8 +53,7 @@ export default function OrderDetailPage() {
 
   const { printInvoice } = useInvoicePrint({
     onSuccess: (invoiceData) => {
-      console.log('Invoice printed successfully:', invoiceData);
-    },
+},
     onError: (error) => {
       console.error('Invoice print failed:', error);
     }

@@ -234,7 +234,7 @@ router.get('/', async (req, res) => {
     const customerEmail = req.query.customerEmail as string;
 
     // Log incoming request for debugging 400 errors
-    console.log(`[GET /api/orders] Query: ${JSON.stringify(req.query)}`);
+}`);
 
     // STRICT FRANCHISE ISOLATION
     // Only admin and factory_manager can see all orders
@@ -259,7 +259,8 @@ router.get('/', async (req, res) => {
           });
         }
         franchiseId = employee.franchiseId;
-        // console.log(`[ORDERS] Filtering orders for franchise: ${franchiseId} (user: ${employee.username})`);
+        //
+`);
       }
     }
 
@@ -393,8 +394,7 @@ router.post(
           });
         }
         orderData.franchiseId = employee.franchiseId;
-        console.log(`[CREATE ORDER] Assigning to franchise: ${employee.franchiseId}`);
-      } else if (!orderData.franchiseId) {
+} else if (!orderData.franchiseId) {
         // Admins should ideally provide a franchiseId
         console.warn('[CREATE ORDER] Admin creating order without franchiseId');
       }
@@ -486,8 +486,7 @@ router.post(
                 order.id,
                 req.employee?.employeeId
               );
-              console.log(`💳 [Credit] Added ₹${creditAmount} to customer ${order.customerId} credit for order ${order.orderNumber}`);
-            }
+}
           } catch (creditError) {
             console.warn('Failed to add customer credit:', creditError);
             // Don't fail the order creation if credit update fails
@@ -516,8 +515,7 @@ router.post(
           amount: formattedAmount,
         }).then(async (result) => {
           if (result.success) {
-            console.log(`✅ [WhatsApp] Order created notification sent for ${order.orderNumber}`);
-            // Update order with WhatsApp status
+// Update order with WhatsApp status
             try {
               await storage.updateOrder(order.id, {
                 lastWhatsappStatus: 'Order Created - Sent',
@@ -568,7 +566,7 @@ router.put('/:id', requireRole(ORDER_UPDATE_ROLES), async (req, res) => {
   try {
     const orderId = req.params.id;
     const updateData = req.body;
-    console.log(`[UPDATE ORDER] ID: ${orderId}`, JSON.stringify(updateData, null, 2));
+);
 
     const order = await storage.getOrder(orderId);
     if (!order) {
@@ -624,8 +622,7 @@ router.put('/:id', requireRole(ORDER_UPDATE_ROLES), async (req, res) => {
                 orderId,
                 req.employee?.employeeId
               );
-              console.log(`💳 [Credit] Reduced ₹${orderAmount} from customer ${order.customerId} credit - order ${order.orderNumber} paid`);
-            } catch (creditError) {
+} catch (creditError) {
               console.warn('Failed to reduce customer credit:', creditError);
             }
           }
@@ -643,8 +640,7 @@ router.put('/:id', requireRole(ORDER_UPDATE_ROLES), async (req, res) => {
               orderId,
               req.employee?.employeeId
             );
-            console.log(`💳 [Credit] Added ₹${orderAmount} to customer ${order.customerId} credit for order ${order.orderNumber}`);
-          } catch (creditError) {
+} catch (creditError) {
             console.warn('Failed to add customer credit:', creditError);
           }
         }
@@ -686,8 +682,7 @@ router.put('/:id', requireRole(ORDER_UPDATE_ROLES), async (req, res) => {
         order.status as OrderStatus
       ).then(async (result) => {
         if (result?.success) {
-          console.log(`✅ [WhatsApp] Status update notification sent for ${order.orderNumber}`);
-          try {
+try {
             const currentCount = (updatedOrder as any)?.whatsappMessageCount || 0;
             await storage.updateOrder(orderId, {
               lastWhatsappStatus: `${updateData.status} - Sent`,
@@ -844,8 +839,7 @@ router.patch(
         order.status as OrderStatus
       ).then(async (result) => {
         if (result?.success) {
-          console.log(`✅ [WhatsApp] Status update notification sent for ${order.orderNumber}`);
-          // Update order with WhatsApp status
+// Update order with WhatsApp status
           try {
             const currentCount = (updatedOrder as any)?.whatsappMessageCount || 0;
             await storage.updateOrder(orderId, {
@@ -955,7 +949,6 @@ router.delete('/:id', requireRole(ADMIN_ONLY), async (req, res) => {
     res.status(500).json(createErrorResponse('Failed to archive order', 500));
   }
 });
-
 
 
 // Get order analytics

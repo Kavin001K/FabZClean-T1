@@ -257,3 +257,24 @@ export function createColumnsFromData(
     ...columnConfig?.[key]
   }));
 }
+
+// Simple export function for basic Excel exports
+// This is a drop-in replacement for the basic exportToExcel function
+export interface SimpleExportOptions {
+  data: any[];
+  fileName: string;
+  sheetName?: string;
+  header?: string[];
+}
+
+export function exportToExcel({
+  data,
+  fileName,
+  sheetName = 'Sheet1',
+  header,
+}: SimpleExportOptions) {
+  const ws = XLSX.utils.json_to_sheet(data, { header });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, `${fileName}.xlsx`);
+}

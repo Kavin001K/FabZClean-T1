@@ -208,9 +208,7 @@ class CacheService {
       for (const { key, value } of data) {
         cache.set(key, value);
       }
-
-      console.log(`Cache ${cacheName} warmed up with ${data.length} items`);
-    } catch (error) {
+} catch (error) {
       console.error(`Failed to warm up cache ${cacheName}:`, error);
     }
   }
