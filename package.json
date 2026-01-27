@@ -1,7 +1,7 @@
 {
   "name": "fabzclean",
   "version": "1.0.0",
-  "main": "electron/main.js",
+  "main": "electron/main.cjs",
   "type": "module",
   "license": "MIT",
   "engines": {
