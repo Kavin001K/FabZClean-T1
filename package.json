@@ -11,6 +11,7 @@
     "dev": "npx tsx watch server/minimal-server.ts",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "electron-builder -w -c.asar=false",
+    "electron:build:mac": "electron-builder -m -c.asar=false",
     "build": "npm run build:client && npm run build:server",
     "build:ec2": "NODE_OPTIONS='--max-old-space-size=4096' npm run build",
     "build:client": "vite build --config vite.config.ts",
@@ -207,6 +208,26 @@
     "productName": "FabzClean Manager",
     "directories": {
       "output": "dist-electron"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "client/public/assets/fabclean-logo-512.png",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
     },
     "win": {
       "target": "nsis",
