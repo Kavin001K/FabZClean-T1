@@ -11,6 +11,7 @@ coverage/
 dist/
 dist-server/
 build/
+dist-electron/
 
 # Misc
 .DS_Store
