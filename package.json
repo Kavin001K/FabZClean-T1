@@ -110,8 +110,8 @@
     ]
   },
   "scripts": {
-    "dev": "npx tsx watch server/minimal-server.ts",
-    "build": "npm run build:client && npm run build:server",
+    "dev": "vite",
+    "build": "vite build",
     "build:ec2": "NODE_OPTIONS='--max-old-space-size=4096' npm run build",
     "build:client": "vite build --config vite.config.ts",
     "build:server": "esbuild server/minimal-server.ts --bundle --platform=node --target=node18 --outfile=dist-server/server.js --format=esm --packages=external",
@@ -137,8 +137,8 @@
     "test:e2e": "npx playwright test",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "electron:dev": "concurrently \"npm run dev\" \"electron .\"",
-    "electron:build": "electron-builder"
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "vite build && electron-builder -w"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
