@@ -395,8 +395,19 @@ router.post(
         orderData.franchiseId = employee.franchiseId;
         console.log(`[CREATE ORDER] Assigning to franchise: ${employee.franchiseId}`);
       } else if (!orderData.franchiseId) {
-        // Admins should ideally provide a franchiseId
-        console.warn('[CREATE ORDER] Admin creating order without franchiseId');
+        // For Admins: If no franchiseId provided, fallback to the first active franchise
+        // This prevents 500 errors when admins create orders without explicit franchise selection
+        try {
+          const franchises = await storage.listFranchises();
+          if (franchises.length > 0) {
+            orderData.franchiseId = franchises[0].id;
+            console.log(`[CREATE ORDER] Admin: Auto-assigned to default franchise: ${franchises[0].name} (${franchises[0].id})`);
+          } else {
+            console.warn('[CREATE ORDER] Admin: No franchises available to assign!');
+          }
+        } catch (err) {
+          console.error('[CREATE ORDER] Failed to fetch default franchise for admin fallback', err);
+        }
       }
 
       // Add employee ID for order number generation (FZC26POLA0001 format)

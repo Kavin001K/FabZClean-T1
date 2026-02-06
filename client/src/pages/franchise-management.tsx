@@ -153,8 +153,14 @@ function FranchiseStatsRibbon({ franchises }: { franchises: any[] }) {
         const daysLeft = (new Date(f.agreementEndDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24);
         return daysLeft < 30 && daysLeft > 0;
     }).length;
-    // Mock calculation
-    const totalRoyalty = "₹ 12.5L";
+    // Calculate total fixed royalty expected
+    const calculatedRoyalty = franchises.reduce((sum, f) => {
+        if (f.royaltyModel === 'fixed') {
+            return sum + (Number(f.royaltyPercentage) || 0);
+        }
+        return sum;
+    }, 0);
+    const totalRoyalty = `₹ ${calculatedRoyalty.toLocaleString('en-IN')}`;
 
     const alerts = franchises.filter(f => f.fireSafetyStatus === 'expired' || f.status === 'suspended');
 
@@ -370,6 +376,14 @@ export default function FranchiseManagement() {
 
     const createMutation = useMutation({
         mutationFn: async (data: FranchiseFormValues) => {
+            const formData = new FormData();
+
+            // Append files with specific naming conventions for identification
+            if (data.doc_agreement) formData.append("documents", data.doc_agreement, `agreement_${data.doc_agreement.name}`);
+            if (data.doc_pan) formData.append("documents", data.doc_pan, `pan_${data.doc_pan.name}`);
+            if (data.doc_electricity) formData.append("documents", data.doc_electricity, `utility_${data.doc_electricity.name}`);
+
+            // Prepare JSON payload
             const payload = {
                 ...data,
                 address: {
@@ -379,14 +393,18 @@ export default function FranchiseManagement() {
                     pincode: data.pincode,
                     googleMapsPlaceId: data.googleMapsPlaceId
                 },
-                // Map legacy fields
                 branchCode: data.code,
             };
+
+            // Remove file objects from payload to keep JSON clean
+            const { doc_agreement, doc_pan, doc_electricity, ...jsonPayload } = payload;
+            formData.append("data", JSON.stringify(jsonPayload));
+
             const token = localStorage.getItem('employee_token');
             const res = await fetch("/api/franchises", {
                 method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify(payload)
+                headers: { "Authorization": `Bearer ${token}` }, // Content-Type is auto-set for FormData
+                body: formData
             });
             if (!res.ok) throw new Error("Failed to create");
             return res.json();
@@ -400,6 +418,12 @@ export default function FranchiseManagement() {
 
     const updateMutation = useMutation({
         mutationFn: async (data: FranchiseFormValues) => {
+            const formData = new FormData();
+
+            if (data.doc_agreement instanceof File) formData.append("documents", data.doc_agreement, `agreement_${data.doc_agreement.name}`);
+            if (data.doc_pan instanceof File) formData.append("documents", data.doc_pan, `pan_${data.doc_pan.name}`);
+            if (data.doc_electricity instanceof File) formData.append("documents", data.doc_electricity, `utility_${data.doc_electricity.name}`);
+
             const payload = {
                 ...data,
                 address: {
@@ -410,11 +434,15 @@ export default function FranchiseManagement() {
                 },
                 branchCode: data.code
             };
+
+            const { doc_agreement, doc_pan, doc_electricity, ...jsonPayload } = payload;
+            formData.append("data", JSON.stringify(jsonPayload));
+
             const token = localStorage.getItem('employee_token');
             const res = await fetch(`/api/franchises/${editingFranchise.id}`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify(payload)
+                headers: { "Authorization": `Bearer ${token}` },
+                body: formData
             });
             if (!res.ok) throw new Error("Failed");
             return res.json();
@@ -672,17 +700,100 @@ export default function FranchiseManagement() {
                                     <div className="bg-orange-50 border border-orange-100 p-4 rounded-md">
                                         <h4 className="text-sm font-semibold text-orange-800 mb-2">Required Documents</h4>
                                         <div className="grid grid-cols-3 gap-4">
-                                            <div className="border border-dashed border-orange-200 bg-white p-4 text-center rounded hover:bg-orange-50 cursor-pointer">
-                                                <Upload className="h-6 w-6 mx-auto text-orange-400 mb-2" />
-                                                <span className="text-xs">Upload Agreement</span>
+                                            {/* Agreement Upload */}
+                                            <div className="relative group">
+                                                <input
+                                                    type="file"
+                                                    id="file-agreement"
+                                                    className="hidden"
+                                                    accept=".pdf,image/*"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) form.setValue("doc_agreement", file);
+                                                    }}
+                                                />
+                                                <label
+                                                    htmlFor="file-agreement"
+                                                    className={`border border-dashed p-4 text-center rounded cursor-pointer block h-full flex flex-col items-center justify-center transition-colors ${form.watch("doc_agreement") ? "bg-green-50 border-green-300" : "border-orange-200 bg-white hover:bg-orange-50"}`}
+                                                >
+                                                    {form.watch("doc_agreement") ? (
+                                                        <>
+                                                            <CheckCircle2 className="h-6 w-6 text-green-500 mb-2" />
+                                                            <span className="text-xs font-medium text-green-700 truncate w-full px-2">
+                                                                {(form.watch("doc_agreement") as File)?.name || "Selected"}
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Upload className="h-6 w-6 text-orange-400 mb-2" />
+                                                            <span className="text-xs">Upload Agreement</span>
+                                                        </>
+                                                    )}
+                                                </label>
                                             </div>
-                                            <div className="border border-dashed border-orange-200 bg-white p-4 text-center rounded hover:bg-orange-50 cursor-pointer">
-                                                <Upload className="h-6 w-6 mx-auto text-orange-400 mb-2" />
-                                                <span className="text-xs">Upload PAN Card</span>
+
+                                            {/* PAN Card Upload */}
+                                            <div className="relative group">
+                                                <input
+                                                    type="file"
+                                                    id="file-pan"
+                                                    className="hidden"
+                                                    accept=".pdf,image/*"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) form.setValue("doc_pan", file);
+                                                    }}
+                                                />
+                                                <label
+                                                    htmlFor="file-pan"
+                                                    className={`border border-dashed p-4 text-center rounded cursor-pointer block h-full flex flex-col items-center justify-center transition-colors ${form.watch("doc_pan") ? "bg-green-50 border-green-300" : "border-orange-200 bg-white hover:bg-orange-50"}`}
+                                                >
+                                                    {form.watch("doc_pan") ? (
+                                                        <>
+                                                            <CheckCircle2 className="h-6 w-6 text-green-500 mb-2" />
+                                                            <span className="text-xs font-medium text-green-700 truncate w-full px-2">
+                                                                {(form.watch("doc_pan") as File)?.name || "Selected"}
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Upload className="h-6 w-6 text-orange-400 mb-2" />
+                                                            <span className="text-xs">Upload PAN Card</span>
+                                                        </>
+                                                    )}
+                                                </label>
                                             </div>
-                                            <div className="border border-dashed border-orange-200 bg-white p-4 text-center rounded hover:bg-orange-50 cursor-pointer">
-                                                <Upload className="h-6 w-6 mx-auto text-orange-400 mb-2" />
-                                                <span className="text-xs">Utility Bill</span>
+
+                                            {/* Utility Bill Upload */}
+                                            <div className="relative group">
+                                                <input
+                                                    type="file"
+                                                    id="file-utility"
+                                                    className="hidden"
+                                                    accept=".pdf,image/*"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) form.setValue("doc_electricity", file);
+                                                    }}
+                                                />
+                                                <label
+                                                    htmlFor="file-utility"
+                                                    className={`border border-dashed p-4 text-center rounded cursor-pointer block h-full flex flex-col items-center justify-center transition-colors ${form.watch("doc_electricity") ? "bg-green-50 border-green-300" : "border-orange-200 bg-white hover:bg-orange-50"}`}
+                                                >
+                                                    {form.watch("doc_electricity") ? (
+                                                        <>
+                                                            <CheckCircle2 className="h-6 w-6 text-green-500 mb-2" />
+                                                            <span className="text-xs font-medium text-green-700 truncate w-full px-2">
+                                                                {(form.watch("doc_electricity") as File)?.name || "Selected"}
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Upload className="h-6 w-6 text-orange-400 mb-2" />
+                                                            <span className="text-xs">Utility Bill</span>
+                                                        </>
+                                                    )}
+                                                </label>
                                             </div>
                                         </div>
                                     </div>

@@ -1072,6 +1072,50 @@ const franchises = [
     enableExpressService: 1,
     expressServiceMultiplier: "1.50",
     onboardingStatus: "verified"
+  },
+  {
+    id: "franchise-udumalpet",
+    name: "Fab Clean Udumalaipettai",
+    franchiseId: "FAB-UDT",
+    branchCode: "UDT",
+    ownerName: "Manager Udumalpet",
+    email: "udumalpet@fabzclean.com",
+    phone: "9363012345",
+    whatsappNumber: "919363012345",
+    address: JSON.stringify({
+      street: "#10, Palani Road, Near Bus Stand",
+      city: "Udumalaipettai",
+      state: "Tamil Nadu",
+      pincode: "642126"
+    }),
+    legalEntityName: "Fab Clean Laundry Services",
+    taxId: "AITPD3522F",
+    gstNumber: "33AITPD3522F1ZK",
+    gstEnabled: 1,
+    gstRate: "18.00",
+    sacCode: "9971",
+    bankName: "State Bank of India",
+    bankAccountNumber: "39876543210",
+    bankIfsc: "SBIN0001234",
+    bankAccountName: "Fab Clean Laundry Services",
+    bankBranch: "Udumalpet Branch",
+    upiId: "9886788858@pz",
+    upiDisplayName: "Fab Clean Udumalaipettai",
+    openingTime: "09:00",
+    closingTime: "21:00",
+    workingDays: JSON.stringify(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]),
+    primaryColor: "#4CAF50",
+    secondaryColor: "#2196F3",
+    managerName: "Udumalpet Manager",
+    managerPhone: "9876543230",
+    managerEmail: "manager.udt@fabzclean.com",
+    status: "active",
+    autoGenerateOrderNumber: 1,
+    enableDelivery: 1,
+    defaultDeliveryCharge: "50.00",
+    enableExpressService: 1,
+    expressServiceMultiplier: "1.50",
+    onboardingStatus: "verified"
   }
 ];
 
@@ -1141,36 +1185,6 @@ const employees = [
   },
   {
     id: randomUUID(),
-    franchiseId: "franchise-pollachi",
-    employeeId: "staff-pol-01",
-    firstName: "Priya",
-    lastName: "Devi",
-    email: "staff1.pollachi@fabzclean.com",
-    phone: "9876543211",
-    position: "Counter Staff",
-    department: "Operations",
-    salary: "18000.00",
-    role: "staff",
-    password: defaultPasswordHash,
-    status: "active"
-  },
-  {
-    id: randomUUID(),
-    franchiseId: "franchise-pollachi",
-    employeeId: "drv-pol-01",
-    firstName: "Ramesh",
-    lastName: "Kumar",
-    email: "driver1.pollachi@fabzclean.com",
-    phone: "9876543212",
-    position: "Delivery Driver",
-    department: "Logistics",
-    salary: "15000.00",
-    role: "driver",
-    password: defaultPasswordHash,
-    status: "active"
-  },
-  {
-    id: randomUUID(),
     franchiseId: "franchise-kinathukadavu",
     employeeId: "mgr-kin",
     firstName: "Rajesh",
@@ -1186,31 +1200,16 @@ const employees = [
   },
   {
     id: randomUUID(),
-    franchiseId: "franchise-kinathukadavu",
-    employeeId: "staff-kin-01",
-    firstName: "Karthik",
-    lastName: "Raja",
-    email: "staff1.kin@fabzclean.com",
-    phone: "9876543221",
-    position: "Counter Staff",
+    franchiseId: "franchise-udumalpet",
+    employeeId: "mgr-udt",
+    firstName: "Udumalpet",
+    lastName: "Manager",
+    email: "manager.udt@fabzclean.com",
+    phone: "9876543230",
+    position: "Store Manager",
     department: "Operations",
-    salary: "18000.00",
-    role: "staff",
-    password: defaultPasswordHash,
-    status: "active"
-  },
-  {
-    id: randomUUID(),
-    franchiseId: "franchise-kinathukadavu",
-    employeeId: "drv-kin-01",
-    firstName: "Suresh",
-    lastName: "Babu",
-    email: "driver1.kin@fabzclean.com",
-    phone: "9876543222",
-    position: "Delivery Driver",
-    department: "Logistics",
-    salary: "15000.00",
-    role: "driver",
+    salary: "25000.00",
+    role: "franchise_manager",
     password: defaultPasswordHash,
     status: "active"
   }
@@ -1315,22 +1314,6 @@ const customers = [
     address: JSON.stringify({ street: "Local", city: "Pollachi" })
   },
   {
-    id: randomUUID(),
-    franchiseId: "franchise-pollachi",
-    name: "Arun Kumar",
-    email: "arun.kumar@gmail.com",
-    phone: "9876012345",
-    address: JSON.stringify({ street: "123, Main Road", city: "Pollachi", state: "Tamil Nadu" })
-  },
-  {
-    id: randomUUID(),
-    franchiseId: "franchise-pollachi",
-    name: "Lakshmi Narayanan",
-    email: "lakshmi.n@gmail.com",
-    phone: "9876012346",
-    address: JSON.stringify({ street: "45, Temple Street", city: "Pollachi", state: "Tamil Nadu" })
-  },
-  {
     id: `cust-walkin-kin-${randomUUID().slice(0, 8)}`,
     franchiseId: "franchise-kinathukadavu",
     name: "Walk-in Customer",
@@ -1339,20 +1322,12 @@ const customers = [
     address: JSON.stringify({ street: "Local", city: "Kinathukadavu" })
   },
   {
-    id: randomUUID(),
-    franchiseId: "franchise-kinathukadavu",
-    name: "Lakshmi Devi",
-    email: "lakshmi.devi@gmail.com",
-    phone: "9876054321",
-    address: JSON.stringify({ street: "456, Temple Street", city: "Kinathukadavu", state: "Tamil Nadu" })
-  },
-  {
-    id: randomUUID(),
-    franchiseId: "franchise-kinathukadavu",
-    name: "Muthu Raja",
-    email: "muthu.raja@gmail.com",
-    phone: "9876054322",
-    address: JSON.stringify({ street: "78, Gandhi Road", city: "Kinathukadavu", state: "Tamil Nadu" })
+    id: `cust-walkin-udt-${randomUUID().slice(0, 8)}`,
+    franchiseId: "franchise-udumalpet",
+    name: "Walk-in Customer",
+    email: "walkin.udt@example.com",
+    phone: "0000000002",
+    address: JSON.stringify({ street: "Local", city: "Udumalaipettai" })
   }
 ];
 
@@ -1371,24 +1346,7 @@ console.log(`  ✓ Created ${customers.length} customers`);
 // ============================================================================
 console.log("\n🚗 Seeding vehicles and drivers...\n");
 
-const vehiclesData = [
-  {
-    id: randomUUID(),
-    franchiseId: "franchise-pollachi",
-    licensePlate: "TN-39-AB-1234",
-    makeModel: "TVS XL100",
-    type: "bike",
-    capacityKg: "20"
-  },
-  {
-    id: randomUUID(),
-    franchiseId: "franchise-kinathukadavu",
-    licensePlate: "TN-39-CD-5678",
-    makeModel: "Hero Splendor",
-    type: "bike",
-    capacityKg: "25"
-  }
-];
+const vehiclesData = [];
 
 const insertVehicle = db.prepare(`
   INSERT INTO vehicles (id, franchiseId, licensePlate, makeModel, type, capacityKg, status, createdAt, updatedAt)
@@ -1400,30 +1358,7 @@ for (const v of vehiclesData) {
   console.log(`  ✓ Created vehicle: ${v.licensePlate} (${v.makeModel})`);
 }
 
-const driversData = [
-  {
-    id: randomUUID(),
-    franchiseId: "franchise-pollachi",
-    name: "Ramesh Kumar",
-    phone: "9876543212",
-    email: "driver1.pollachi@fabzclean.com",
-    licenseNumber: "TN01-2020-0012345",
-    vehicleNumber: "TN-39-AB-1234",
-    vehicleType: "bike",
-    status: "available"
-  },
-  {
-    id: randomUUID(),
-    franchiseId: "franchise-kinathukadavu",
-    name: "Suresh Babu",
-    phone: "9876543222",
-    email: "driver1.kin@fabzclean.com",
-    licenseNumber: "TN01-2019-0054321",
-    vehicleNumber: "TN-39-CD-5678",
-    vehicleType: "bike",
-    status: "available"
-  }
-];
+const driversData = [];
 
 const insertDriver = db.prepare(`
   INSERT INTO drivers (id, franchiseId, name, phone, email, licenseNumber, vehicleNumber, vehicleType, status, createdAt, updatedAt)
@@ -1517,6 +1452,10 @@ console.log("   │   Password: password123                                  │
 console.log("   ├───────────────────────────────────────────────────────────┤");
 console.log("   │ KINATHUKADAVU MANAGER (Kinathukadavu Franchise Only)     │");
 console.log("   │   Employee ID: mgr-kin                                   │");
+console.log("   │   Password: password123                                  │");
+console.log("   ├───────────────────────────────────────────────────────────┤");
+console.log("   │ UDUMALPET MANAGER (Udumalaipettai Franchise Only)        │");
+console.log("   │   Employee ID: mgr-udt                                   │");
 console.log("   │   Password: password123                                  │");
 console.log("   └───────────────────────────────────────────────────────────┘");
 

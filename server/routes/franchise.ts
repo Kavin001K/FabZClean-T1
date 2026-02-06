@@ -4,6 +4,7 @@ import { storage } from "../db";
 import { insertFranchiseSchema, insertEmployeeTaskSchema, insertEmployeeAttendanceSchema } from "../../shared/schema";
 import { z } from "zod";
 import path from "path";
+import sharp from "sharp";
 import fs from "fs";
 
 const router = Router();
@@ -29,13 +30,30 @@ const upload = multer({
 // Create Franchise
 router.post("/", upload.array("documents"), async (req, res) => {
     try {
-        const documents = (req.files as Express.Multer.File[])?.map((file) => ({
-            filename: file.filename,
-            originalName: file.originalname,
-            path: file.path,
-            mimetype: file.mimetype,
-            size: file.size,
-        })) || [];
+        const documents = await Promise.all((req.files as Express.Multer.File[])?.map(async (file) => {
+            if (file.mimetype.startsWith('image/')) {
+                try {
+                    const buffer = await sharp(file.path)
+                        .rotate() // Auto-orient based on EXIF
+                        .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+                        .jpeg({ quality: 80, mozjpeg: true })
+                        .toBuffer();
+
+                    fs.writeFileSync(file.path, buffer);
+                    file.size = buffer.length; // Update size after optimization
+                } catch (err) {
+                    console.error("Image optimization failed:", err);
+                }
+            }
+
+            return {
+                filename: file.filename,
+                originalName: file.originalname,
+                path: file.path,
+                mimetype: file.mimetype,
+                size: file.size,
+            };
+        }) || []);
 
         // Parse body data (it comes as stringified JSON if multipart/form-data is used for everything, 
         // or individual fields. Assuming individual fields for simplicity or a 'data' field)
@@ -131,13 +149,30 @@ router.get("/:id", async (req, res) => {
 // Update Franchise
 router.put("/:id", upload.array("documents"), async (req, res) => {
     try {
-        const documents = (req.files as Express.Multer.File[])?.map((file) => ({
-            filename: file.filename,
-            originalName: file.originalname,
-            path: file.path,
-            mimetype: file.mimetype,
-            size: file.size,
-        })) || [];
+        const documents = await Promise.all((req.files as Express.Multer.File[])?.map(async (file) => {
+            if (file.mimetype.startsWith('image/')) {
+                try {
+                    const buffer = await sharp(file.path)
+                        .rotate()
+                        .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+                        .jpeg({ quality: 80, mozjpeg: true })
+                        .toBuffer();
+
+                    fs.writeFileSync(file.path, buffer);
+                    file.size = buffer.length;
+                } catch (err) {
+                    console.error("Image optimization failed:", err);
+                }
+            }
+
+            return {
+                filename: file.filename,
+                originalName: file.originalname,
+                path: file.path,
+                mimetype: file.mimetype,
+                size: file.size,
+            };
+        }) || []);
 
         let franchiseData;
         if (req.body.data) {

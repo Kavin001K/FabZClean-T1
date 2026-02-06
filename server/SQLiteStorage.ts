@@ -381,7 +381,7 @@ export class SQLiteStorage implements IStorage {
         id TEXT PRIMARY KEY,
         franchiseId TEXT,
         code TEXT UNIQUE,
-        productId TEXT,
+
         type TEXT,
         entityType TEXT,
         entityId TEXT,
@@ -390,7 +390,7 @@ export class SQLiteStorage implements IStorage {
         isActive INTEGER DEFAULT 1,
         createdAt TEXT,
         updatedAt TEXT,
-        FOREIGN KEY (productId) REFERENCES products(id),
+
         FOREIGN KEY (franchiseId) REFERENCES franchises(id)
       );
 
@@ -651,7 +651,7 @@ export class SQLiteStorage implements IStorage {
       CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customerId);
       CREATE INDEX IF NOT EXISTS idx_deliveries_order ON deliveries(orderId);
       -- CREATE INDEX IF NOT EXISTS idx_shipments_order ON shipments(orderId);
-      CREATE INDEX IF NOT EXISTS idx_barcodes_product ON barcodes(productId);
+
       CREATE INDEX IF NOT EXISTS idx_barcodes_code ON barcodes(code);
       CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
