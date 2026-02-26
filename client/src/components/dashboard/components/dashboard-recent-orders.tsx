@@ -1,142 +1,222 @@
-/**
- * Dashboard Recent Orders Component
- * 
- * @component
- * @param {Object} props - Component props
- * @param {Array} props.recentOrders - Recent orders data
- * @param {boolean} props.isLoading - Loading state
- * @returns {JSX.Element} Rendered recent orders component
- * 
- * @example
- * ```tsx
- * <DashboardRecentOrders
- *   recentOrders={recentOrders}
- *   isLoading={false}
- * />
- * ```
- */
+import React from "react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/lib/data-service";
+import { Eye, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Link } from "wouter";
+import { cn } from "@/lib/utils";
+import * as LoadingSkeleton from "@/components/ui/loading-skeleton";
 
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { TEST_IDS, getTestId } from '@/lib/test-ids';
-import { formatCurrency } from '@/lib/data-service';
-import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
-import { useLocation } from 'wouter';
-
-interface DashboardRecentOrdersProps {
-  /** Recent orders data */
-  recentOrders: any[];
-  /** Loading state */
-  isLoading: boolean;
+export interface Order {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  date: string;
+  status: string; // Relaxed to string to support all statuses like 'assigned', 'in_transit'
+  paymentStatus: 'pending' | 'paid' | 'partial' | 'failed';
+  total: number;
+  service?: string;
+  createdAt: string;
+  isExpressOrder?: boolean;
+  is_express_order?: boolean;
 }
 
+interface RecentOrdersProps {
+  orders?: Order[];
+  isLoading?: boolean;
+  limit?: number;
+  showViewAll?: boolean;
+  className?: string;
+}
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case 'pending': return <Clock className="h-3 w-3" />;
+    case 'processing': return <AlertCircle className="h-3 w-3" />;
+    case 'completed':
+    case 'delivered': return <CheckCircle className="h-3 w-3" />;
+    case 'cancelled': return <XCircle className="h-3 w-3" />;
+    case 'assigned': return <Clock className="h-3 w-3" />;
+    case 'in_transit': return <Clock className="h-3 w-3" />;
+    default: return <Clock className="h-3 w-3" />;
+  }
+};
+
 const getStatusColor = (status: string) => {
-  switch (status?.toLowerCase()) {
+  switch (status) {
+    case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    case 'processing': return 'bg-blue-100 text-blue-800 border-blue-200';
     case 'completed':
-      return 'bg-green-100 text-green-800';
-    case 'pending':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'processing':
-      return 'bg-blue-100 text-blue-800';
-    case 'cancelled':
-      return 'bg-red-100 text-red-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
+    case 'delivered': return 'bg-green-100 text-green-800 border-green-200';
+    case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
+    case 'assigned': return 'bg-purple-100 text-purple-800 border-purple-200';
+    case 'in_transit': return 'bg-blue-100 text-blue-800 border-blue-200';
+    default: return 'bg-gray-100 text-gray-800 border-gray-200';
   }
 };
 
-const getStatusText = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case 'completed':
-      return 'Completed';
-    case 'pending':
-      return 'Pending';
-    case 'processing':
-      return 'Processing';
-    case 'cancelled':
-      return 'Cancelled';
-    default:
-      return status || 'Unknown';
+const getPaymentStatusColor = (status: Order['paymentStatus']) => {
+  switch (status) {
+    case 'paid': return 'bg-green-100 text-green-800 border-green-200';
+    case 'partial': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    case 'pending': return 'bg-orange-100 text-orange-800 border-orange-200';
+    case 'failed': return 'bg-red-100 text-red-800 border-red-200';
+    default: return 'bg-gray-100 text-gray-800 border-gray-200';
   }
 };
 
-export const DashboardRecentOrders: React.FC<DashboardRecentOrdersProps> = React.memo(({
-  recentOrders,
-  isLoading,
-}) => {
-  const [, setLocation] = useLocation();
+export default React.memo(function RecentOrders({
+  orders = [],
+  isLoading = false,
+  limit = 5,
+  showViewAll = true,
+  className
+}: RecentOrdersProps) {
+  // Ensure orders is an array before calling slice
+  const displayOrders = Array.isArray(orders) ? orders.slice(0, limit) : [];
 
   if (isLoading) {
-    // ... (keep loading state)
+    return (
+      <Card className={className}>
+        <CardHeader>
+          <CardTitle>Recent Orders</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <LoadingSkeleton.TableSkeleton rows={5} />
+        </CardContent>
+      </Card>
+    );
   }
 
-  // Ensure recentOrders is an array before calling slice
-  const displayOrders = Array.isArray(recentOrders) ? recentOrders.slice(0, 5) : [];
+  if (!displayOrders || displayOrders.length === 0) {
+    return (
+      <Card className={className}>
+        <CardHeader>
+          <CardTitle>Recent Orders</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-32 text-muted-foreground">
+            <div className="text-center">
+              <p className="text-lg font-medium">No orders yet</p>
+              <p className="text-sm">Orders will appear here once created</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <Card
-      data-testid={getTestId(TEST_IDS.DASHBOARD.WIDGET, 'recent-orders')}
-    >
+    <Card className={className}>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Recent Orders</CardTitle>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setLocation('/orders')}
-          data-testid={getTestId(TEST_IDS.BUTTON.VIEW, 'all-orders')}
-        >
-          View All
-        </Button>
+        {showViewAll && (
+          <Link to="/orders">
+            <Button variant="outline" size="sm">
+              <Eye className="h-4 w-4 mr-2" />
+              View All
+            </Button>
+          </Link>
+        )}
       </CardHeader>
       <CardContent>
-        {displayOrders.length === 0 ? (
-          <div
-            className="text-center py-8 text-muted-foreground"
-            data-testid={getTestId(TEST_IDS.DATA.EMPTY, 'recent-orders')}
-          >
-            No recent orders found
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {displayOrders.map((order, index) => (
+        <div className="space-y-3">
+          {displayOrders.map((order, index) => {
+            const isExpress = order.isExpressOrder || order.is_express_order || (order as any).priority === 'high';
+            return (
               <div
                 key={order.id || index}
-                className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                data-testid={getTestId(TEST_IDS.DATA.ITEM, `order-${order.id || index}`)}
+                className={`relative flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors overflow-hidden ${isExpress ? 'border-orange-400 bg-orange-50/50 dark:bg-orange-950/20' : ''
+                  }`}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm truncate">
-                      {order.customerName || order.customer?.name || 'Unknown Customer'}
+                {/* EXPRESS Stamp Watermark */}
+                {isExpress && (
+                  <div className="absolute top-1/2 right-8 transform -translate-y-1/2 rotate-[-15deg] pointer-events-none z-0">
+                    <span className="text-orange-500/15 text-3xl font-black tracking-widest">
+                      EXPRESS
                     </span>
+                  </div>
+                )}
+
+                <div className="flex items-center space-x-4 relative z-10">
+                  <Avatar className={`h-10 w-10 ${isExpress ? 'ring-2 ring-orange-400' : ''}`}>
+                    <AvatarFallback className={`text-xs ${isExpress ? 'bg-orange-100 text-orange-700' : ''}`}>
+                      {order.customerName ?
+                        order.customerName.split(' ').map(n => n[0]).join('').toUpperCase() :
+                        'N/A'
+                      }
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                      <p className={`text-sm font-medium leading-none truncate ${isExpress ? 'text-orange-800 dark:text-orange-200' : ''}`}>
+                        {order.customerName || 'Unknown Customer'}
+                      </p>
+                      {/* EXPRESS Badge - Prominent Stamp Style */}
+                      {isExpress && (
+                        <Badge className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[10px] px-2 py-0.5 flex items-center gap-1 shadow-sm animate-pulse">
+                          <span className="text-xs">⚡</span>
+                          EXPRESS
+                        </Badge>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className={cn("text-xs border", getStatusColor(order.status))}
+                      >
+                        <span className="flex items-center space-x-1">
+                          {getStatusIcon(order.status)}
+                          <span className="capitalize">{order.status}</span>
+                        </span>
+                      </Badge>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <p className="text-xs text-muted-foreground">
+                        #{order.orderNumber || (order.id ? order.id.slice(-8) : 'N/A')}
+                      </p>
+                      <span className="text-xs text-muted-foreground">•</span>
+                      <p className="text-xs text-muted-foreground">
+                        {order.service || 'Dry Cleaning'}
+                      </p>
+                      <span className="text-xs text-muted-foreground">•</span>
+                      <p className="text-xs text-muted-foreground">
+                        {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Unknown Date'}
+                      </p>
+                    </div>
                     <Badge
-                      variant="secondary"
-                      className={`text-xs ${getStatusColor(order.status)}`}
+                      variant="outline"
+                      className={cn("text-xs border w-fit", getPaymentStatusColor(order.paymentStatus))}
                     >
-                      {getStatusText(order.status)}
+                      Payment: {order.paymentStatus || 'Unknown'}
                     </Badge>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    Order #{order.id || 'N/A'} • {order.service || 'Service'}
-                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-medium text-sm">
-                    {formatCurrency(order.totalAmount || order.total || 0)}
+                <div className="flex items-center space-x-3 relative z-10">
+                  <div className="text-right">
+                    <div className={`font-semibold text-sm ${isExpress ? 'text-orange-600' : ''}`}>
+                      {formatCurrency(order.total || 0)}
+                    </div>
+                    {isExpress && (
+                      <div className="text-[10px] text-orange-500 font-medium">
+                        Priority
+                      </div>
+                    )}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
-                  </div>
+                  <Link to={order.id ? `/orders/${order.id}` : '#'}>
+                    <Button variant={isExpress ? "default" : "ghost"} size="sm" className={`text-xs ${isExpress ? 'bg-orange-500 hover:bg-orange-600' : ''}`}>
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                  </Link>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );
 });
-
-DashboardRecentOrders.displayName = 'DashboardRecentOrders';

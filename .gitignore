@@ -93,3 +93,6 @@ fabzclean-fastapi/
 
 *storybook.log
 storybook-static
+
+# Debug logs
+*_log*.txt

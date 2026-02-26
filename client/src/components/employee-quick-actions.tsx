@@ -54,7 +54,7 @@ interface TimeOffRequest {
   type: 'sick' | 'personal' | 'vacation' | 'emergency';
 }
 
-export default function EmployeeQuickActions({ employeeId, employeeName }: EmployeeQuickActionsProps) {
+export default function DashboardQuickActions({ employeeId, employeeName }: EmployeeQuickActionsProps) {
   const { toast } = useToast();
   const { addNotification } = useNotifications();
 
