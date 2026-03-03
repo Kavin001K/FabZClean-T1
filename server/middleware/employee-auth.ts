@@ -51,17 +51,14 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
 /**
  * Middleware to check if employee has required role
+ * In the simplified POS system, this is a passthrough — all logged-in users have full access.
  */
 export function roleMiddleware(allowedRoles: string[]) {
     return (req: Request, res: Response, next: NextFunction) => {
         if (!req.employee) {
             return res.status(401).json({ error: 'Authentication required' });
         }
-
-        if (!allowedRoles.includes(req.employee.role)) {
-            return res.status(403).json({ error: 'Insufficient permissions' });
-        }
-
+        // Simplified: all authenticated users have access
         next();
     };
 }
@@ -84,7 +81,7 @@ export function auditMiddleware(action: string, entityType?: string) {
 
                 // Log action asynchronously (don't wait)
                 AuthService.logAction(
-                    req.employee.id, // Use UUID from JWT payload
+                    req.employee.id,
                     req.employee.username,
                     action,
                     entityType || null,
@@ -95,8 +92,7 @@ export function auditMiddleware(action: string, entityType?: string) {
                         body: req.body,
                     },
                     ipAddress,
-                    userAgent,
-                    req.employee.franchiseId // Pass franchise config
+                    userAgent
                 ).catch(err => {
                     console.error('Failed to log action:', err);
                 });
@@ -110,35 +106,12 @@ export function auditMiddleware(action: string, entityType?: string) {
 }
 
 /**
- * Middleware to filter data based on employee's scope
- * Adds franchiseId or factoryId to query filters for non-admin users
+ * Middleware to ensure user is authenticated (no scope filtering needed in single-tenant system)
  */
 export function scopeMiddleware(req: Request, res: Response, next: NextFunction) {
     if (!req.employee) {
         return res.status(401).json({ error: 'Authentication required' });
     }
-
-    // Admin sees everything - no filtering needed
-    if (req.employee.role === 'admin') {
-        return next();
-    }
-
-    // Add scope filters to query/body
-    if (req.employee.role === 'franchise_manager' && req.employee.franchiseId) {
-        // Add franchise filter
-        if (req.method === 'GET') {
-            req.query.franchiseId = req.employee.franchiseId;
-        } else {
-            req.body.franchiseId = req.employee.franchiseId;
-        }
-    } else if (req.employee.role === 'factory_manager' && req.employee.factoryId) {
-        // Add factory filter
-        if (req.method === 'GET') {
-            req.query.factoryId = req.employee.factoryId;
-        } else {
-            req.body.factoryId = req.employee.factoryId;
-        }
-    }
-
+    // Single-tenant: no franchise/factory scoping needed
     next();
 }

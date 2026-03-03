@@ -1,19 +1,4 @@
-export type UserRole =
-  | "admin"
-  | "employee"
-  | "franchise_manager"
-  | "factory_manager";
-
-export interface RoleCapability {
-  role: UserRole;
-  label: string;
-  description: string;
-  canManageOrders: boolean;
-  canManageCustomers: boolean;
-  canManageInventory: boolean;
-  canViewAnalytics: boolean;
-  canManageLogistics: boolean;
-}
+export type UserRole = "admin" | "staff";
 
 export interface ProfileRow {
   id: string;
@@ -43,12 +28,6 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
       };
-      role_capabilities: {
-        Row: RoleCapability & {
-          updated_at: string;
-        };
-      };
     };
   };
 }
-

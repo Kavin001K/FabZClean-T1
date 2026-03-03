@@ -190,11 +190,11 @@ export const rateLimit = (windowMs: number = 60000, maxRequests: number = 100) =
 // Type exports for compatibility
 export interface AuthenticatedRequest extends Request {
   employee?: {
+    id: string;
     employeeId: string;
     username: string;
     role: string;
-    franchiseId?: string;
-    factoryId?: string;
+    fullName?: string;
   };
   user?: {
     id: string;

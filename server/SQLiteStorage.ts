@@ -88,15 +88,7 @@ export class SQLiteStorage implements IStorage {
     this.migrateTables();
   }
 
-  private safeJsonParse(data: string | null): any {
-    if (!data) return null;
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      // If it's not valid JSON, return original string or null
-      return data;
-    }
-  }
+
 
   private createTables() {
     // Self-healing: Check if 'orders' table exists but is missing 'customerId' (corrupt from previous bad schema)
@@ -922,24 +914,12 @@ export class SQLiteStorage implements IStorage {
     try {
       const stmt = this.db.prepare(`
         INSERT INTO audit_logs (
-          id, franchiseId, employeeId, action, entityType, entityId, details, ipAddress, userAgent, createdAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          id, employeeId, action, entityType, entityId, details, ipAddress, userAgent, createdAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-
-      // Fetch franchiseId for the actor to ensure the log is scoped
-      let franchiseId = 'SYSTEM';
-      try {
-        const actor = await this.getEmployee(actorId);
-        if (actor?.franchiseId) {
-          franchiseId = actor.franchiseId;
-        }
-      } catch {
-        // Actor not found, use SYSTEM
-      }
 
       stmt.run(
         randomUUID(),
-        franchiseId,
         actorId || 'ANONYMOUS',
         action,
         entityType,
@@ -1011,6 +991,7 @@ export class SQLiteStorage implements IStorage {
   async createUser(data: InsertUser): Promise<User> {
     const id = randomUUID();
     const now = new Date().toISOString();
+    const userData = data as any;
 
     this.db
       .prepare(
@@ -1019,13 +1000,13 @@ export class SQLiteStorage implements IStorage {
         VALUES (?, ?, ?, ?, ?, ?)
       `,
       )
-      .run(id, data.username, data.password, data.email, now, now);
+      .run(id, userData.username, userData.password, userData.email, now, now);
 
     return {
       id,
-      ...data,
-      email: data.email ?? null,
-      franchiseId: data.franchiseId ?? null,
+      username: userData.username,
+      password: userData.password,
+      email: userData.email ?? null,
       createdAt: new Date(now),
       updatedAt: new Date(now),
     };
@@ -1474,21 +1455,13 @@ export class SQLiteStorage implements IStorage {
     }
   }
 
-  async listCustomers(franchiseId?: string): Promise<Customer[]> {
-    if (franchiseId) {
-      return this.db.prepare("SELECT * FROM customers WHERE franchiseId = ?").all(franchiseId) as Customer[];
-    }
+  async listCustomers(): Promise<Customer[]> {
     return this.listAllRecords<Customer>("customers");
   }
 
-  async getCustomersWithOutstandingCredit(franchiseId?: string): Promise<Customer[]> {
-    let sql = "SELECT * FROM customers WHERE CAST(creditBalance AS REAL) > 0";
-    const params: any[] = [];
-    if (franchiseId) {
-      sql += " AND franchiseId = ?";
-      params.push(franchiseId);
-    }
-    return this.db.prepare(sql).all(params) as Customer[];
+  async getCustomersWithOutstandingCredit(): Promise<Customer[]> {
+    const sql = "SELECT * FROM customers WHERE CAST(creditBalance AS REAL) > 0";
+    return this.db.prepare(sql).all() as Customer[];
   }
 
   // Alias for compatibility with existing routes
@@ -1528,56 +1501,15 @@ export class SQLiteStorage implements IStorage {
   // ======= ORDER NUMBER GENERATION =======
   /**
    * Generate next sequential order number
-   * Format: PREFIXYYFRCESEQ
-   * Example: FZC26POLA0001
-   * - FZC = Company/Franchise prefix (3 chars)
-   * - 26 = Year (last 2 digits)
-   * - POL = Franchise location code (3 chars)
-   * - A = Employee code (single letter based on employee)
-   * - 0001 = Daily sequence number (4 digits)
-   *
-   * This format enables efficient isolation:
-   * - By franchise: Filter by FZC26POL*
-   * - By employee: Filter by FZC26POL[A]*
-   * - By date: Check sequence + createdAt
+   * Format: FAB + YY + 4-digit sequence
+   * Example: FAB260001
    */
-  getNextOrderNumber(franchiseId?: string | null, employeeId?: string | null): string {
+  getNextOrderNumber(): string {
     const now = new Date();
-    const yearStr = String(now.getFullYear()).slice(-2); // Last 2 digits of year (26 from 2026)
+    const yearStr = String(now.getFullYear()).slice(-2);
+    const basePattern = `FAB${yearStr}`;
 
-    // Get prefix and franchise code from franchise settings
-    let prefix = 'FZC';
-    let franchiseCode = 'HQ'; // Default for headquarters/no franchise
-
-    if (franchiseId) {
-      try {
-        const franchise = this.db.prepare(
-          'SELECT orderNumberPrefix, code, name FROM franchises WHERE id = ?'
-        ).get(franchiseId) as any;
-
-        if (franchise) {
-          if (franchise.orderNumberPrefix) {
-            prefix = franchise.orderNumberPrefix.slice(0, 3).toUpperCase();
-          }
-          // Use franchise code if available, otherwise generate from name
-          if (franchise.code) {
-            franchiseCode = franchise.code.slice(0, 3).toUpperCase();
-          } else if (franchise.name) {
-            // Generate 3-letter code from franchise name
-            franchiseCode = franchise.name.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase() || 'FRC';
-          }
-        }
-      } catch (err) {
-        // Use defaults if franchise not found
-      }
-    }
-
-    // Generate the base pattern for this year: PREFIX + YEAR + FRANCHISE
-    // Format: FZC26POL (without employee letter for cleaner numbers)
-    const basePattern = `${prefix}${yearStr}${franchiseCode}`;
-
-    // Count existing orders with this pattern for the entire year
-    const yearStart = `${now.getFullYear()}-01-01`;
+    // Count existing orders with this year's pattern
     const existingOrders = this.db.prepare(`
       SELECT COUNT(*) as count FROM orders
       WHERE orderNumber LIKE ?
@@ -1586,18 +1518,43 @@ export class SQLiteStorage implements IStorage {
     const sequenceNumber = (existingOrders?.count || 0) + 1;
     const paddedSequence = String(sequenceNumber).padStart(4, '0');
 
-    // Final format: FZC26POL0001
     return `${basePattern}${paddedSequence}`;
+  }
+
+  // ======= PRINT QUEUE =======
+  async getOrdersForPrintQueue(): Promise<Order[]> {
+    const rows = this.db.prepare(`
+      SELECT * FROM orders
+      WHERE tagsPrinted = 0 AND status IN ('pending', 'processing')
+      ORDER BY createdAt DESC
+    `).all() as any[];
+
+    return rows.map(row => {
+      if (row.items && typeof row.items === "string") {
+        try { row.items = JSON.parse(row.items); } catch (e) { }
+      }
+      if (row.shippingAddress) {
+        row.shippingAddress = this.safeJsonParse(row.shippingAddress);
+      }
+      Object.keys(row).forEach((key) => {
+        if (key.includes("At") && typeof row[key] === "string") {
+          row[key] = new Date(row[key]);
+        }
+      });
+      return row;
+    });
+  }
+
+  markTagsPrinted(orderId: string): void {
+    this.db.prepare('UPDATE orders SET tagsPrinted = 1, updatedAt = ? WHERE id = ?')
+      .run(new Date().toISOString(), orderId);
   }
 
   // ======= ORDERS =======
   async createOrder(data: InsertOrder): Promise<Order> {
     // Auto-generate orderNumber if not provided
     if (!data.orderNumber) {
-      data.orderNumber = this.getNextOrderNumber(
-        (data as any).franchiseId,
-        (data as any).createdBy || (data as any).employeeId
-      );
+      data.orderNumber = this.getNextOrderNumber();
     }
 
     // Ensure status has a default
@@ -1652,26 +1609,7 @@ export class SQLiteStorage implements IStorage {
     }
   }
 
-  async listOrders(franchiseId?: string): Promise<Order[]> {
-    if (franchiseId) {
-      const rows = this.db.prepare("SELECT * FROM orders WHERE franchiseId = ?").all(franchiseId) as any[];
-      return rows.map(row => {
-        // Parse JSON fields
-        if (row.items && typeof row.items === "string") {
-          try { row.items = JSON.parse(row.items); } catch (e) { }
-        }
-        if (row.shippingAddress) {
-          row.shippingAddress = this.safeJsonParse(row.shippingAddress);
-        }
-        // Parse timestamps
-        Object.keys(row).forEach((key) => {
-          if (key.includes("At") && typeof row[key] === "string") {
-            row[key] = new Date(row[key]);
-          }
-        });
-        return row;
-      });
-    }
+  async listOrders(): Promise<Order[]> {
     return this.listAllRecords<Order>("orders");
   }
 
@@ -1743,22 +1681,23 @@ export class SQLiteStorage implements IStorage {
   async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
     const id = randomUUID();
     const now = new Date().toISOString();
+    const auditData = data as any;
     const auditLog = {
-      ...data,
+      ...auditData,
       id,
       createdAt: now,
-      details: data.details ? JSON.stringify(data.details) : null
+      details: auditData.details ? JSON.stringify(auditData.details) : null
     };
 
     this.db.prepare(`
-      INSERT INTO audit_logs (id, franchiseId, employeeId, action, entityType, entityId, details, ipAddress, userAgent, createdAt)
-      VALUES (@id, @franchiseId, @employeeId, @action, @entityType, @entityId, @details, @ipAddress, @userAgent, @createdAt)
+      INSERT INTO audit_logs (id, employeeId, action, entityType, entityId, details, ipAddress, userAgent, createdAt)
+      VALUES (@id, @employeeId, @action, @entityType, @entityId, @details, @ipAddress, @userAgent, @createdAt)
     `).run(auditLog);
 
     return {
       ...auditLog,
       createdAt: new Date(now),
-      details: data.details
+      details: auditData.details
     } as AuditLog;
   }
 
@@ -1769,11 +1708,6 @@ export class SQLiteStorage implements IStorage {
     if (params.employeeId) {
       query += ' AND employeeId = ?';
       queryParams.push(params.employeeId);
-    }
-    if (params.franchiseId) {
-      // Filter by franchise if provided
-      query += ' AND franchiseId = ?';
-      queryParams.push(params.franchiseId);
     }
     if (params.action) {
       // Support partial matching for action categories (e.g., 'order' matches 'create_order', 'update_order')

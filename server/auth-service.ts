@@ -17,26 +17,23 @@ const FINAL_SECRET = JWT_SECRET || process.env.SESSION_SECRET || 'fabzclean-secr
 const JWT_EXPIRY = '24h'; // 24 hours - standard session length
 
 export interface EmployeeJWTPayload {
-    id: string; // Add UUID
+    id: string;
     employeeId: string;
     username: string;
-    role: 'admin' | 'franchise_manager' | 'factory_manager' | 'employee' | 'staff' | 'driver' | 'manager';
-    franchiseId?: string;
-    factoryId?: string;
+    role: string;
+    email?: string;
+    exp?: number;
 }
 
 export interface AuthEmployee {
     id: string;
     employeeId: string;
     username: string;
-    role: 'admin' | 'franchise_manager' | 'factory_manager' | 'employee' | 'staff' | 'driver' | 'manager';
-    franchiseId?: string;
-    factoryId?: string;
+    role: string;
     fullName?: string;
     email?: string;
     phone?: string;
     isActive: boolean;
-    // HR Fields
     position?: string;
     department?: string;
     hireDate?: Date;
@@ -48,6 +45,7 @@ export interface AuthEmployee {
     qualifications?: string;
     notes?: string;
     address?: string;
+    [key: string]: any;
 }
 
 export class AuthService {
@@ -113,8 +111,6 @@ export class AuthService {
                 employeeId: localEmployee.employee_id || localEmployee.employeeId,
                 username: localEmployee.email || localEmployee.employee_id,
                 role: normalizedRole as any,
-                franchiseId: localEmployee.franchise_id || localEmployee.franchiseId,
-                factoryId: localEmployee.factory_id || localEmployee.factoryId,
             };
 
             const token = jwt.sign(payload, FINAL_SECRET, { expiresIn: JWT_EXPIRY });
@@ -124,8 +120,6 @@ export class AuthService {
                 employeeId: localEmployee.employee_id || localEmployee.employeeId,
                 username: localEmployee.employee_id || localEmployee.employeeId,
                 role: normalizedRole as any,
-                franchiseId: localEmployee.franchise_id || localEmployee.franchiseId,
-                factoryId: localEmployee.factory_id || localEmployee.factoryId,
                 fullName: `${localEmployee.first_name || ''} ${localEmployee.last_name || ''}`.trim() || localEmployee.fullName || localEmployee.name,
                 email: localEmployee.email,
                 phone: localEmployee.phone,
@@ -173,8 +167,6 @@ export class AuthService {
                     id: local.id,
                     employeeId: local.employeeId,
                     username: local.username || local.employeeId,
-                    franchiseId: local.franchiseId || (local as any).franchise_id || undefined,
-                    factoryId: local.factoryId || (local as any).factory_id || undefined,
                     role: local.role as any
                 };
             }
@@ -198,9 +190,7 @@ export class AuthService {
         data: {
             username: string;
             password: string;
-            role: 'admin' | 'franchise_manager' | 'factory_manager' | 'staff' | 'driver';
-            franchiseId?: string;
-            factoryId?: string;
+            role: 'admin' | 'staff';
             fullName?: string;
             email?: string;
             phone?: string;
@@ -249,8 +239,6 @@ export class AuthService {
             firstName: firstName,
             lastName: lastName,
             // Work Details
-            franchiseId: data.franchiseId || null,
-            factoryId: data.factoryId || null,
             position: data.position,
             department: data.department,
             hireDate: data.hireDate ? data.hireDate.toISOString() : undefined,
@@ -296,8 +284,6 @@ export class AuthService {
             employeeId: generatedEmployeeId,
             username: generatedEmployeeId,
             role: data.role as any,
-            franchiseId: data.franchiseId,
-            factoryId: data.factoryId,
             fullName: data.fullName || `${firstName} ${lastName}`,
             email: newEmployee.email,
             phone: newEmployee.phone,
@@ -333,8 +319,6 @@ export class AuthService {
             fullName: string;
             email: string;
             phone: string;
-            franchiseId: string;
-            factoryId: string;
             isActive: boolean;
             status: 'active' | 'inactive' | 'terminated';
             position: string;
@@ -364,8 +348,6 @@ export class AuthService {
         if (data.email !== undefined) updateData.email = data.email;
         if (data.phone !== undefined) updateData.phone = data.phone;
         if (data.profileImage !== undefined) updateData.profileImage = data.profileImage;
-        if (data.franchiseId !== undefined) updateData.franchiseId = data.franchiseId;
-        if (data.factoryId !== undefined) updateData.factoryId = data.factoryId;
         // Handle both isActive (boolean) and status (string)
         if (data.isActive !== undefined) updateData.status = data.isActive ? 'active' : 'inactive';
         if (data.status !== undefined) updateData.status = data.status;
@@ -416,8 +398,6 @@ export class AuthService {
             employeeId: updatedEmployee.employeeId || updatedEmployee.username,
             username: updatedEmployee.username || updatedEmployee.employeeId,
             role: updatedEmployee.role as any,
-            franchiseId: updatedEmployee.franchiseId,
-            factoryId: updatedEmployee.factoryId,
             fullName: updatedEmployee.firstName
                 ? `${updatedEmployee.firstName} ${updatedEmployee.lastName || ''}`.trim()
                 : updatedEmployee.fullName,
@@ -462,7 +442,7 @@ export class AuthService {
         await storage.updateEmployee(localEmp.id, { password: hash });
 
         console.log(`✅ [Auth] Password changed for ${employeeId}`);
-        await this.logAction(localEmp.id, employeeId, 'password_change', 'employee', employeeId, {}, undefined, undefined, localEmp.franchiseId);
+        await this.logAction(localEmp.id, employeeId, 'password_change', 'employee', employeeId, {});
     }
 
     /**
@@ -495,18 +475,8 @@ export class AuthService {
         }
 
         // Authorization check
-        if (resetBy.role === 'franchise_manager') {
-            // Franchise managers can only reset passwords for employees in their franchise
-            if (targetEmp.franchiseId !== resetBy.franchiseId) {
-                throw new Error('Unauthorized: You can only reset passwords for employees in your franchise');
-            }
-            // Franchise managers cannot reset admin passwords
-            if (targetEmp.role === 'admin') {
-                throw new Error('Unauthorized: You cannot reset admin passwords');
-            }
-        } else if (resetBy.role !== 'admin') {
-            // Only admins and franchise managers can reset passwords
-            throw new Error('Unauthorized: Only admins and managers can reset passwords');
+        if (resetBy.role !== 'admin') {
+            throw new Error('Unauthorized: Only admins can reset passwords');
         }
 
         // Hash new password
@@ -522,31 +492,26 @@ export class AuthService {
             'reset_employee_password',
             'employee',
             targetEmployeeId,
-            { target_employee: targetEmp.employeeId, reset_by: resetBy.employeeId },
-            undefined,
-            undefined,
-            resetBy.franchiseId
+            { target_employee: targetEmp.employeeId, reset_by: resetBy.employeeId }
         );
 
         console.log(`✅ Password reset for ${targetEmployeeId} by ${resetByEmployeeId}`);
     }
 
     /**
-     * Delete/Deactivate employee (admin/manager only) - local storage only
+     * Delete/Deactivate employee (admin only) - local storage only
      */
     static async deleteEmployee(targetEmployeeId: string, deletedByEmployeeId: string, hardDelete: boolean = false): Promise<void> {
         console.log(`🗑️ [Auth] deleteEmployee called: target=${targetEmployeeId}, by=${deletedByEmployeeId}, hardDelete=${hardDelete}`);
 
         const localEmployees = await storage.listEmployees();
 
-        // Find target - match by id, employeeId, or email
         const targetEmployee = localEmployees.find(e =>
             e.id === targetEmployeeId ||
             e.employeeId === targetEmployeeId ||
             e.email === targetEmployeeId
         );
 
-        // Find deleter - match by id, employeeId, or email  
         const deletedBy = localEmployees.find(e =>
             e.id === deletedByEmployeeId ||
             e.employeeId === deletedByEmployeeId ||
@@ -557,21 +522,10 @@ export class AuthService {
             throw new Error('Target employee not found');
         }
 
-        // Authorization check if deleter found
-        if (deletedBy) {
-            if (deletedBy.role === 'franchise_manager') {
-                if (targetEmployee.franchiseId !== deletedBy.franchiseId) {
-                    throw new Error('Unauthorized: You can only delete employees in your franchise');
-                }
-                if (targetEmployee.role === 'admin') {
-                    throw new Error('Unauthorized: You cannot delete admin accounts');
-                }
-            } else if (deletedBy.role !== 'admin') {
-                throw new Error('Unauthorized: Only admins and managers can delete employees');
-            }
+        if (deletedBy && deletedBy.role !== 'admin') {
+            throw new Error('Unauthorized: Only admins can delete employees');
         }
 
-        // Prevent self-deletion
         if (targetEmployee.id === deletedByEmployeeId || targetEmployee.employeeId === deletedByEmployeeId) {
             throw new Error('You cannot delete your own account');
         }
@@ -584,10 +538,7 @@ export class AuthService {
                 'employee_terminated',
                 'employee',
                 targetEmployeeId,
-                { hard_delete: true },
-                undefined,
-                undefined,
-                deletedBy?.franchiseId
+                { hard_delete: true }
             );
             console.log(`✅ [Auth] Employee ${targetEmployeeId} permanently deleted`);
         } else {
@@ -598,24 +549,18 @@ export class AuthService {
                 'employee_terminated',
                 'employee',
                 targetEmployeeId,
-                { hard_delete: false, status: 'terminated' },
-                undefined,
-                undefined,
-                deletedBy?.franchiseId
+                { hard_delete: false, status: 'terminated' }
             );
             console.log(`✅ [Auth] Employee ${targetEmployeeId} deactivated`);
         }
     }
 
-
     /**
      * Get employee by ID - local storage only
      */
     static async getEmployee(employeeId: string): Promise<AuthEmployee | null> {
-        // Try finding by UUID (id) first
         let localEmployee = await storage.getEmployee(employeeId) as any;
 
-        // If not found, try by Email/EmployeeID String
         if (!localEmployee) {
             localEmployee = await storage.getEmployeeByEmail(employeeId) as any;
         }
@@ -629,15 +574,13 @@ export class AuthService {
         }
 
         let normalizedRole = localEmployee.role;
-        if (normalizedRole === 'manager') normalizedRole = 'franchise_manager';
+        if (normalizedRole === 'manager') normalizedRole = 'admin';
 
         return {
             id: localEmployee.id,
             employeeId: localEmployee.employeeId || localEmployee.employee_id || localEmployee.email,
             username: localEmployee.employeeId || localEmployee.employee_id || localEmployee.email || localEmployee.name,
             role: normalizedRole as any,
-            franchiseId: localEmployee.franchiseId || localEmployee.franchise_id,
-            factoryId: localEmployee.factoryId || localEmployee.factory_id,
             fullName: `${localEmployee.firstName || localEmployee.first_name || ''} ${localEmployee.lastName || localEmployee.last_name || ''}`.trim() || localEmployee.name || localEmployee.fullName,
             email: localEmployee.email,
             phone: localEmployee.phone,
@@ -660,21 +603,14 @@ export class AuthService {
     /**
      * List employees - local storage only
      */
-    static async listEmployees(requesterRole: string, franchiseId?: string, factoryId?: string): Promise<AuthEmployee[]> {
+    static async listEmployees(requesterRole: string): Promise<AuthEmployee[]> {
         const localEmployees = await storage.listEmployees();
 
-        // Filter by franchise if needed (RLS enforcement)
-        let filteredEmployees = localEmployees;
-        if (requesterRole === 'franchise_manager' && franchiseId) {
-            filteredEmployees = localEmployees.filter(emp => emp.franchiseId === franchiseId);
-        }
-
-        return filteredEmployees.map(emp => ({
+        return localEmployees.map(emp => ({
             id: emp.id,
             employeeId: emp.employeeId || emp.email || emp.id,
             username: emp.employeeId || emp.email || emp.name,
             role: emp.role as any,
-            franchiseId: emp.franchiseId,
             fullName: emp.name || 'Unknown',
             email: emp.email,
             phone: emp.phone,
@@ -690,18 +626,16 @@ export class AuthService {
      * Log employee action to audit log - uses local SQLite storage
      */
     static async logAction(
-        employeeId: string, // MUST be UUID
+        employeeId: string,
         username: string,
         action: string,
         entityType: string | null,
         entityId: string | null,
         details: any,
         ipAddress?: string,
-        userAgent?: string,
-        franchiseId?: string
+        userAgent?: string
     ): Promise<void> {
         try {
-            // Use local storage logAction method
             await (storage as any).logAction(
                 employeeId,
                 action,
@@ -715,7 +649,6 @@ export class AuthService {
                 userAgent
             );
 
-            // Broadcast realtime event
             try {
                 // @ts-ignore
                 const { realtimeServer } = await import('./websocket-server');
@@ -723,7 +656,6 @@ export class AuthService {
                     realtimeServer.broadcast({
                         type: 'audit_log_created',
                         data: {
-                            franchise_id: franchiseId,
                             employee_id: employeeId,
                             username,
                             action,
@@ -735,7 +667,7 @@ export class AuthService {
                     });
                 }
             } catch (importError) {
-                // Realtime not available, that's ok
+                // Realtime not available
             }
 
         } catch (e) {
@@ -769,3 +701,4 @@ export class AuthService {
         }
     }
 }
+
