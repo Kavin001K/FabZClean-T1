@@ -9,17 +9,19 @@ import { GlobalSearch } from '@/components/global-search';
 import { UserMenu } from '@/components/layout/user-menu';
 
 const capitalize = (s: string) => {
-  // Handle special cases for better display
   if (s === 'employee-dashboard') return 'Employee Dashboard';
+  if (s === 'create-order') return 'New Order';
+  if (s === 'print-queue') return 'Print Tags';
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
 interface HeaderProps {
   onToggleSidebar: () => void;
   isSidebarVisible: boolean;
+  isMobile?: boolean;
 }
 
-export function Header({ onToggleSidebar, isSidebarVisible }: HeaderProps) {
+export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: HeaderProps) {
   const [location] = useLocation();
   const [paths, setPaths] = useState(['Dashboard']);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -41,7 +43,6 @@ export function Header({ onToggleSidebar, isSidebarVisible }: HeaderProps) {
         event.preventDefault();
         onToggleSidebar();
       }
-      // Keyboard shortcut for refresh (Ctrl/Cmd + R)
       if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
         event.preventDefault();
         handleRefresh();
@@ -54,61 +55,81 @@ export function Header({ onToggleSidebar, isSidebarVisible }: HeaderProps) {
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    // Reload the entire app
     window.location.reload();
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-6">
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={onToggleSidebar}
-        className="h-8 w-8"
-        title={isSidebarVisible ? "Hide sidebar (⌘B)" : "Show sidebar (⌘B)"}
-      >
-        {isSidebarVisible ? (
-          <PanelLeftClose className="h-4 w-4" />
-        ) : (
-          <PanelLeftOpen className="h-4 w-4" />
-        )}
-      </Button>
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/">Home</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          {paths.map((path, index) => (
-            <div key={path} className="flex items-center">
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                {index === paths.length - 1 ? (
-                  <BreadcrumbPage>{path}</BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink asChild>
-                    <Link href={`/${path.toLowerCase()}`}>{path}</Link>
-                  </BreadcrumbLink>
-                )}
-              </BreadcrumbItem>
-            </div>
-          ))}
-        </BreadcrumbList>
-      </Breadcrumb>
-      <div className="ml-auto flex-1 md:max-w-md lg:max-w-lg xl:max-w-xl">
-        <GlobalSearch />
-      </div>
-      <div className="flex items-center gap-2">
+    <header className="sticky top-0 z-30 flex h-14 md:h-16 items-center gap-2 md:gap-4 border-b bg-background px-3 md:px-6">
+      {/* Sidebar toggle — hidden on mobile since we use bottom nav */}
+      {!isMobile && (
         <Button
           variant="ghost"
           size="icon"
-          onClick={showShortcuts}
-          className="h-8 w-8"
-          title="Keyboard Shortcuts (F1)"
+          onClick={onToggleSidebar}
+          className="h-8 w-8 shrink-0"
+          title={isSidebarVisible ? "Hide sidebar (⌘B)" : "Show sidebar (⌘B)"}
         >
-          <Keyboard className="h-4 w-4" />
+          {isSidebarVisible ? (
+            <PanelLeftClose className="h-4 w-4" />
+          ) : (
+            <PanelLeftOpen className="h-4 w-4" />
+          )}
         </Button>
+      )}
+
+      {/* Breadcrumbs — hide on mobile to save space */}
+      {!isMobile && (
+        <Breadcrumb className="hidden sm:block">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/">Home</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            {paths.map((path, index) => (
+              <div key={path} className="flex items-center">
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  {index === paths.length - 1 ? (
+                    <BreadcrumbPage>{path}</BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink asChild>
+                      <Link href={`/${path.toLowerCase()}`}>{path}</Link>
+                    </BreadcrumbLink>
+                  )}
+                </BreadcrumbItem>
+              </div>
+            ))}
+          </BreadcrumbList>
+        </Breadcrumb>
+      )}
+
+      {/* Mobile: show current page title instead of breadcrumbs */}
+      {isMobile && (
+        <h1 className="text-sm font-semibold truncate">
+          {paths[paths.length - 1] || 'Dashboard'}
+        </h1>
+      )}
+
+      {/* Search */}
+      <div className="ml-auto flex-1 max-w-[200px] md:max-w-md lg:max-w-lg xl:max-w-xl">
+        <GlobalSearch />
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex items-center gap-1 md:gap-2 shrink-0">
+        {/* Keyboard shortcuts — hide on mobile */}
+        {!isMobile && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={showShortcuts}
+            className="h-8 w-8"
+            title="Keyboard Shortcuts (F1)"
+          >
+            <Keyboard className="h-4 w-4" />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"

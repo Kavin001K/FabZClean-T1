@@ -1148,19 +1148,19 @@ function OrdersComponent() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="flex items-center justify-between"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
         >
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
               Orders Management
             </h1>
-            <p className="text-muted-foreground mt-2 text-lg">
-              Monitor, manage, and analyze your orders with powerful filtering and insights
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base lg:text-lg">
+              Monitor, manage, and analyze your orders
             </p>
           </div>
           <Button
             size="lg"
-            className="gap-2 shadow-lg hover:shadow-xl transition-all"
+            className="gap-2 shadow-lg hover:shadow-xl transition-all w-full sm:w-auto shrink-0"
             onClick={() => window.location.href = '/create-order'}
           >
             <PlusCircle className="h-5 w-5" />
@@ -1173,7 +1173,7 @@ function OrdersComponent() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6"
         >
           <Card className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-primary">
             <CardContent className="pt-6">
@@ -1256,10 +1256,10 @@ function OrdersComponent() {
         >
           <Card className="shadow-xl">
             <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-accent/5">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <CardTitle className="text-2xl">All Orders</CardTitle>
-                  <CardDescription className="text-base mt-1">
+                  <CardTitle className="text-lg sm:text-2xl">All Orders</CardTitle>
+                  <CardDescription className="text-sm sm:text-base mt-1">
                     Showing {filteredOrders.length} of {orders.length} orders
                     {hasActiveFilters && <span className="text-primary ml-2">(Filtered)</span>}
                   </CardDescription>
@@ -1272,7 +1272,7 @@ function OrdersComponent() {
                     className="gap-2"
                   >
                     <Printer className="h-4 w-4" />
-                    Print
+                    <span className="hidden sm:inline">Print</span>
                   </Button>
                   <Button
                     variant="outline"
@@ -1281,19 +1281,19 @@ function OrdersComponent() {
                     className="gap-2"
                   >
                     <RefreshCw className="h-4 w-4" />
-                    Refresh
+                    <span className="hidden sm:inline">Refresh</span>
                   </Button>
                 </div>
               </div>
             </CardHeader>
 
-            <CardContent className="p-6 space-y-6">
+            <CardContent className="p-3 sm:p-6 space-y-4 sm:space-y-6">
               {/* Enhanced Toolbar */}
               <div className="space-y-4">
                 {/* Search and Primary Actions */}
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                   {/* Search Bar */}
-                  <div className="relative flex-1 max-w-md">
+                  <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                       placeholder="Search orders, customers, services..."
@@ -1338,7 +1338,7 @@ function OrdersComponent() {
                         )}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[500px] p-6" align="start">
+                    <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-4 sm:p-6" align="start">
                       <div className="space-y-6">
                         <div className="flex items-center justify-between">
                           <h3 className="text-lg font-semibold">Advanced Filters</h3>

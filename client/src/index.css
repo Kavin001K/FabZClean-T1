@@ -280,7 +280,7 @@
 
   /* Desktop Optimized Layouts */
   .container-desktop {
-    @apply max-w-[1920px] mx-auto px-8;
+    @apply max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8;
   }
 
   .grid-desktop {
@@ -393,24 +393,35 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+/* Custom Scrollbar — subtle muted style */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--muted-foreground) / 0.25);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--muted-foreground) / 0.45);
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: rgb(var(--muted));
-  border-radius: 5px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgb(var(--primary));
-  border-radius: 5px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--primary) / 0.8);
+/* Hide scrollbars on mobile for cleaner appearance */
+@media (max-width: 767px) {
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  html {
+    scrollbar-width: none;
+  }
 }
 
 /* Selection */

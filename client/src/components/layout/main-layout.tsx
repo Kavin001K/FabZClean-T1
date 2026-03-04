@@ -11,17 +11,19 @@ interface MainLayoutProps {
 
 /**
  * Responsive layout:
- * - Desktop (sm+): Sidebar + Header + Content
+ * - Desktop (md+): Sidebar + Header + Content
+ * - Tablet (sm–md): Header + Content + BottomNav (no sidebar)
  * - Mobile (<sm): Header + Content + BottomNav (no sidebar)
  */
 export function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Detect mobile viewport
+  // Detect mobile/tablet viewport — hide sidebar below md (768px)
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 640); // sm breakpoint
+      const mobile = window.innerWidth < 768; // md breakpoint
+      setIsMobile(mobile);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -32,7 +34,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     setIsSidebarVisible(!isSidebarVisible);
   };
 
-  // On mobile, always hide sidebar
+  // On mobile/tablet, always hide sidebar
   const showSidebar = !isMobile && isSidebarVisible;
 
   return (
@@ -41,9 +43,12 @@ export function MainLayout({ children }: MainLayoutProps) {
 
       <div className="flex min-h-screen w-full bg-muted/40">
         {showSidebar && <Sidebar />}
-        <div className={`flex flex-col w-full transition-all duration-300 ease-in-out ${showSidebar ? 'pl-60' : 'pl-0'}`}>
-          <Header onToggleSidebar={toggleSidebar} isSidebarVisible={showSidebar} />
-          <main className={`flex-1 overflow-y-auto p-4 md:p-6 ${isMobile ? 'pb-24' : ''}`}>
+        <div
+          className="flex flex-col w-full min-w-0 transition-all duration-300 ease-in-out"
+          style={{ paddingLeft: showSidebar ? '15rem' : 0 }}
+        >
+          <Header onToggleSidebar={toggleSidebar} isSidebarVisible={showSidebar} isMobile={isMobile} />
+          <main className={`flex-1 overflow-x-hidden overflow-y-auto ${isMobile ? 'pb-24' : ''}`}>
             <ErrorBoundary>
               {children}
             </ErrorBoundary>
@@ -51,7 +56,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         </div>
       </div>
 
-      {/* Mobile bottom navigation */}
+      {/* Mobile/tablet bottom navigation */}
       {isMobile && <BottomNav />}
     </>
   );

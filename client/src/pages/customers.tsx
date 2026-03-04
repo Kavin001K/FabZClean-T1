@@ -403,22 +403,22 @@ export default function Customers() {
       <div className="container-desktop min-h-screen py-8 gradient-mesh">
         {/* Header Section */}
         <FadeIn delay={0.1}>
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-3">
-                <Users className="h-10 w-10 text-primary" />
-                Customer Management
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-2 sm:gap-3">
+                <Users className="h-7 w-7 sm:h-10 sm:w-10 text-primary shrink-0" />
+                <span className="truncate">Customers</span>
               </h1>
-              <p className="text-muted-foreground mt-2">
-                Manage customers, track lifetime value, and analyze purchasing behavior
+              <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+                Manage customers and track lifetime value
               </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2 sm:gap-3 shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
+                  <Button variant="outline" size="sm" className="gap-2">
                     <Download className="h-4 w-4" />
-                    Export
+                    <span className="hidden sm:inline">Export</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -447,9 +447,10 @@ export default function Customers() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2 gradient-primary">
+              <Button onClick={() => setIsCreateDialogOpen(true)} size="sm" className="gap-2 gradient-primary">
                 <UserPlus className="h-4 w-4" />
-                Add Customer
+                <span className="hidden sm:inline">Add Customer</span>
+                <span className="sm:hidden">Add</span>
               </Button>
             </div>
           </div>
@@ -457,7 +458,7 @@ export default function Customers() {
 
         {/* KPI Cards */}
         <FadeIn delay={0.2}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
             <Card className="glass hover:shadow-lg transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -561,7 +562,7 @@ export default function Customers() {
                 </div>
 
                 <Select value={segmentFilter} onValueChange={setSegmentFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[180px]">
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Segment" />
                   </SelectTrigger>
@@ -575,7 +576,7 @@ export default function Customers() {
                 </Select>
 
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent>

@@ -71,17 +71,17 @@ export default function AdminDashboard() {
     }, [orders]);
 
     return (
-        <div className="p-4 md:p-8 space-y-8">
+        <div className="p-3 sm:p-4 md:p-8 space-y-4 sm:space-y-6 md:space-y-8">
             {/* Header */}
             <div>
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Dashboard</h1>
-                <p className="text-muted-foreground">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Dashboard</h1>
+                <p className="text-sm sm:text-base text-muted-foreground">
                     Overview of FabZClean POS operations
                 </p>
             </div>
 
             {/* Key Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
