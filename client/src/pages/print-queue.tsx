@@ -289,11 +289,13 @@ export default function PrintTags() {
     }
 
     return (
-        <div className="space-y-4">
+        <div className="container-desktop min-h-screen py-8 space-y-8 gradient-mesh">
             {/* ── Header ─────────────────────────────────────────────────── */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Print Tags</h1>
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                        Print Queue
+                    </h1>
                     <p className="text-sm text-muted-foreground">
                         Print garment tags & bills for your orders
                     </p>
@@ -309,38 +311,43 @@ export default function PrintTags() {
                 </div>
             </div>
 
-            {/* ── Stats Cards ────────────────────────────────────────────── */}
-            <div className="grid grid-cols-3 gap-3">
-                <Card>
-                    <CardContent className="p-3 sm:p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs text-muted-foreground">Total</p>
-                                <p className="text-xl sm:text-2xl font-bold">{stats.total}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
+                <Card className="glass border-none shadow-xl">
+                    <CardContent className="pt-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                                <Package className="h-6 w-6 text-primary" />
                             </div>
-                            <Package className="h-5 w-5 text-muted-foreground hidden sm:block" />
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">Total Displayed</p>
+                                <h3 className="text-2xl font-bold">{stats.total}</h3>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardContent className="p-3 sm:p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs text-muted-foreground">Tags Pending</p>
-                                <p className="text-xl sm:text-2xl font-bold text-yellow-600">{stats.tagsPending}</p>
+                <Card className="glass border-none shadow-xl">
+                    <CardContent className="pt-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                                <Tag className="h-6 w-6 text-amber-500" />
                             </div>
-                            <Tag className="h-5 w-5 text-yellow-500 hidden sm:block" />
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">Tags Not Printed</p>
+                                <h3 className="text-2xl font-bold text-amber-500">{stats.tagsPending}</h3>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardContent className="p-3 sm:p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs text-muted-foreground">Printed</p>
-                                <p className="text-xl sm:text-2xl font-bold text-green-600">{stats.tagsDone}</p>
+                <Card className="glass border-none shadow-xl">
+                    <CardContent className="pt-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                                <CheckCircle2 className="h-6 w-6 text-emerald-500" />
                             </div>
-                            <CheckCircle2 className="h-5 w-5 text-green-500 hidden sm:block" />
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">Tags Printed</p>
+                                <h3 className="text-2xl font-bold text-emerald-500">{stats.tagsDone}</h3>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>

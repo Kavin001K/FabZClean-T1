@@ -1142,7 +1142,7 @@ function OrdersComponent() {
 
   return (
     <PageTransition>
-      <div className="container-desktop min-h-screen py-8 space-y-8">
+      <div className="container-desktop min-h-screen py-8 space-y-8 gradient-mesh">
         {/* Header Section */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -1175,7 +1175,7 @@ function OrdersComponent() {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6"
         >
-          <Card className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-primary">
+          <Card className="glass hover:shadow-lg transition-all duration-300 border-l-4 border-l-primary shadow-xl">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -1194,7 +1194,7 @@ function OrdersComponent() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-accent">
+          <Card className="glass hover:shadow-lg transition-all duration-300 border-l-4 border-l-accent shadow-xl">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -1213,7 +1213,7 @@ function OrdersComponent() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-blue-500">
+          <Card className="glass hover:shadow-lg transition-all duration-300 border-l-4 border-l-blue-500 shadow-xl">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -1232,7 +1232,7 @@ function OrdersComponent() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-green-500">
+          <Card className="glass hover:shadow-lg transition-all duration-300 border-l-4 border-l-green-500 shadow-xl">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>

@@ -71,10 +71,12 @@ export default function AdminDashboard() {
     }, [orders]);
 
     return (
-        <div className="p-3 sm:p-4 md:p-8 space-y-4 sm:space-y-6 md:space-y-8">
+        <div className="p-3 sm:p-4 md:p-8 space-y-4 sm:space-y-6 md:space-y-8 gradient-mesh min-h-screen">
             {/* Header */}
             <div>
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Dashboard</h1>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-2">
+                    <span className="truncate">Dashboard</span>
+                </h1>
                 <p className="text-sm sm:text-base text-muted-foreground">
                     Overview of FabZClean POS operations
                 </p>
@@ -82,7 +84,7 @@ export default function AdminDashboard() {
 
             {/* Key Metrics */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-                <Card>
+                <Card className="glass hover:shadow-lg transition-all duration-300 border-t-primary/50">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
                         <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -103,7 +105,7 @@ export default function AdminDashboard() {
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="glass hover:shadow-lg transition-all duration-300 border-t-accent/50">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
                         <ShoppingBag className="h-4 w-4 text-muted-foreground" />
@@ -124,7 +126,7 @@ export default function AdminDashboard() {
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="glass hover:shadow-lg transition-all duration-300 border-t-blue-500/50">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
                         <Users className="h-4 w-4 text-muted-foreground" />

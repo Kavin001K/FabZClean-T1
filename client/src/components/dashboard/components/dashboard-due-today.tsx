@@ -117,13 +117,13 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
   return (
     <Card
       data-testid={getTestId(TEST_IDS.DASHBOARD.WIDGET, 'due-today')}
-      className="h-full flex flex-col"
+      className="glass overflow-hidden border-none shadow-xl h-full flex flex-col"
     >
-      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-        <CardTitle className="flex items-center gap-2 text-base font-semibold">
+      <CardHeader className="pb-3 border-b border-white/5 bg-white/5 flex flex-row items-center justify-between space-y-0">
+        <CardTitle className="flex items-center gap-2 text-base font-semibold text-muted-foreground">
           <Clock className="h-5 w-5 text-primary" />
           {isToday ? 'Due Today' : `Due: ${format(selectedDate, 'MMM d')}`}
-          <Badge variant="secondary" className="ml-2">
+          <Badge variant="secondary" className="ml-2 bg-primary/20 text-primary border-primary/20">
             {dueOrders.length}
           </Badge>
         </CardTitle>
@@ -200,7 +200,7 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
               return (
                 <div
                   key={order.id || index}
-                  className="flex flex-col p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                  className="flex flex-col p-3 border border-white/5 bg-white/5 rounded-lg hover:bg-primary/10 hover:border-primary/30 transition-all duration-300 cursor-pointer group"
                   onClick={() => setLocation(`/orders/${order.id}`)}
                   data-testid={getTestId(TEST_IDS.DATA.ITEM, `due-order-${order.id || index}`)}
                 >

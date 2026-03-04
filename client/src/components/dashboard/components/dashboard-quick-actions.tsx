@@ -118,13 +118,14 @@ export function DashboardQuickActions(_props: DashboardQuickActionsProps = {}) {
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+    <Card className="glass overflow-hidden border-none shadow-xl">
+      <CardHeader className="pb-3 border-b border-white/5 bg-white/5">
+        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+          <Settings className="h-4 w-4" />
           Quick Actions
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {enabledActions.map((action) => {
             const IconComponent = action.icon;
@@ -132,11 +133,11 @@ export function DashboardQuickActions(_props: DashboardQuickActionsProps = {}) {
               <Button
                 key={action.id}
                 variant="outline"
-                className="h-24 flex flex-col gap-2 hover:bg-accent/50 hover:border-primary/50 transition-all group"
+                className="h-24 flex flex-col gap-2 bg-white/5 border-white/10 hover:bg-primary/20 hover:border-primary/50 hover:shadow-[0_0_15px_rgba(var(--primary),0.3)] transition-all duration-300 group"
                 onClick={() => setLocation(action.route)}
               >
-                <IconComponent className={`h-8 w-8 ${action.color} group-hover:scale-110 transition-transform`} />
-                <span className="font-semibold text-sm">{action.label}</span>
+                <IconComponent className={`h-8 w-8 ${action.color} group-hover:scale-110 transition-transform duration-300`} />
+                <span className="font-semibold text-sm group-hover:text-primary transition-colors">{action.label}</span>
               </Button>
             );
           })}

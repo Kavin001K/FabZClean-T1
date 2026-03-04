@@ -150,13 +150,10 @@ export default function Inventory() {
     isLoading: inventoryLoading,
     isError: inventoryError,
     error: inventoryErrorDetails,
-  } = useQuery({
+  } = useQuery<InventoryItem[], Error>({
     queryKey: ['inventory-items'],
     queryFn: inventoryApi.getAll,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
-    retry: 3,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+    staleTime: 5 * 60 * 1000,
   });
 
   // Fetch inventory KPIs
@@ -215,11 +212,11 @@ export default function Inventory() {
   // Get unique categories and suppliers for filters
   const categories = useMemo(() =>
     Array.from(new Set(inventory.map(item => item.category).filter(Boolean)))
-  , [inventory]);
+    , [inventory]);
 
   const suppliers = useMemo(() =>
     Array.from(new Set(inventory.map(item => item.supplier).filter(Boolean)))
-  , [inventory]);
+    , [inventory]);
 
   // Low stock alerts
   const lowStockItems = inventory.filter(item =>
@@ -228,13 +225,15 @@ export default function Inventory() {
 
   // Analytics data
   const analytics = useMemo(() => {
-    const totalValue = inventory.reduce((sum, item) => sum + ((item.price || 0) * item.stock), 0);
+    const totalValue = inventory.reduce((sum, item) => sum + ((parseFloat(item.price?.toString() || '0')) * item.stock), 0);
     const itemsNeedingReorder = inventory.filter(item =>
       item.stock <= (item.reorderLevel || 10)
     ).length;
 
-    // Calculate stock turnover (simplified - would need historical data for accurate calculation)
-    const averageStock = inventory.reduce((sum, item) => sum + item.stock, 0) / (inventory.length || 1);
+    // Calculate stock turnover (simplified)
+    const averageStock = inventory.length > 0
+      ? inventory.reduce((sum, item) => sum + item.stock, 0) / inventory.length
+      : 0;
 
     return {
       totalValue,
@@ -256,7 +255,7 @@ export default function Inventory() {
         queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
         queryClient.invalidateQueries({ queryKey: ["inventory-kpis"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
-        
+
         toast({
           title: "Item Created Successfully",
           description: `${newItem.name} has been added to inventory.`,
@@ -267,7 +266,7 @@ export default function Inventory() {
     },
     onError: (error) => {
       console.error('Failed to create inventory item:', error);
-            toast({
+      toast({
         title: "Error",
         description: "Failed to create inventory item. Please try again.",
         variant: "destructive",
@@ -285,7 +284,7 @@ export default function Inventory() {
         // Invalidate queries to refetch data
         queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
         queryClient.invalidateQueries({ queryKey: ["inventory-kpis"] });
-        
+
         toast({
           title: "Item Updated Successfully",
           description: `${updatedItem.name} has been updated.`,
@@ -315,7 +314,7 @@ export default function Inventory() {
         // Invalidate queries to refetch data
         queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
         queryClient.invalidateQueries({ queryKey: ["inventory-kpis"] });
-        
+
         toast({
           title: "Item Deleted Successfully",
           description: "Inventory item has been removed.",
@@ -342,7 +341,7 @@ export default function Inventory() {
         // Invalidate queries to refetch data
         queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
         queryClient.invalidateQueries({ queryKey: ["inventory-kpis"] });
-        
+
         toast({
           title: "Stock Updated",
           description: `${updatedItem.name} stock updated to ${updatedItem.stock}.`,
@@ -371,7 +370,7 @@ export default function Inventory() {
         // Invalidate queries to refetch data
         queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
         queryClient.invalidateQueries({ queryKey: ["inventory-kpis"] });
-        
+
         toast({
           title: "Items Deleted Successfully",
           description: `${selectedItems.length} items have been removed from inventory.`,
@@ -417,8 +416,8 @@ export default function Inventory() {
   };
 
   const handleSelectItem = (itemId: string) => {
-    setSelectedItems(prev => 
-      prev.includes(itemId) 
+    setSelectedItems(prev =>
+      prev.includes(itemId)
         ? prev.filter(id => id !== itemId)
         : [...prev, itemId]
     );
@@ -445,7 +444,7 @@ export default function Inventory() {
         Name: item.name,
         Category: item.category,
         Stock: item.stock,
-        Price: parseFloat(item.price || '0'),
+        Price: parseFloat(item.price?.toString() || '0'),
         ReorderLevel: item.reorderLevel,
         Supplier: item.supplier,
         Status: item.status,
@@ -569,7 +568,7 @@ export default function Inventory() {
               <p className="text-sm text-muted-foreground">
                 {inventoryErrorDetails?.message || 'An unexpected error occurred'}
               </p>
-              <Button 
+              <Button
                 onClick={() => queryClient.invalidateQueries({ queryKey: ['inventory-items'] })}
                 variant="outline"
               >
@@ -740,11 +739,7 @@ export default function Inventory() {
   );
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8"
-    >
+    <div className="container-desktop min-h-screen py-8 gradient-mesh">
       {/* Enhanced Header with Analytics */}
       <motion.div
         initial={{ y: -20, opacity: 0 }}
@@ -761,7 +756,7 @@ export default function Inventory() {
               <Package className="w-6 h-6 text-primary" />
             </motion.div>
             <div>
-              <h1 className="font-display font-bold text-3xl text-foreground">
+              <h1 className="font-display font-bold text-3xl bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                 Smart Inventory Management
               </h1>
               <p className="text-muted-foreground">
@@ -791,10 +786,10 @@ export default function Inventory() {
           transition={{ delay: 0.1 }}
           className="grid grid-cols-2 md:grid-cols-5 gap-4"
         >
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200">
+          <Card className="glass border-blue-500/20 shadow-lg shadow-blue-500/5">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-500 rounded-lg">
+                <div className="p-2 bg-blue-500 rounded-lg shadow-lg shadow-blue-500/30">
                   <DollarSign className="h-4 w-4 text-white" />
                 </div>
                 <div>
@@ -1154,8 +1149,18 @@ export default function Inventory() {
         isUpdating={editItemMutation.isPending}
         onCloseEditDialog={() => setIsEditDialogOpen(false)}
         onCloseCreateDialog={() => setIsCreateDialogOpen(false)}
-        onEditItem={handleUpdateItem}
-        onCreateItem={handleCreateItem}
+        onEditItem={(data) => handleUpdateItem({
+          ...data,
+          price: data.price.toString(),
+          stock: parseInt(data.stock.toString()),
+          reorderLevel: parseInt(data.reorderLevel.toString())
+        })}
+        onCreateItem={(data) => handleCreateItem({
+          ...data,
+          price: data.price.toString(),
+          stock: parseInt(data.stock.toString()),
+          reorderLevel: parseInt(data.reorderLevel.toString())
+        })}
       />
 
       {/* Barcode Dialog */}
@@ -1218,6 +1223,6 @@ export default function Inventory() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </motion.div>
+    </div>
   );
 }

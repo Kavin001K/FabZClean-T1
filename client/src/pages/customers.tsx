@@ -459,62 +459,71 @@ export default function Customers() {
         {/* KPI Cards */}
         <FadeIn delay={0.2}>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
-            <Card className="glass hover:shadow-lg transition-all duration-300">
+            <Card className="glass border-none shadow-xl hover:shadow-primary/10 transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Customers
+                  Total Reached
                 </CardTitle>
-                <Users className="h-5 w-5 text-primary" />
+                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{metrics.totalCustomers}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {metrics.inactiveCustomers} inactive
-                </p>
+                <div className="text-3xl font-bold text-foreground">{metrics.totalCustomers}</div>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
+                  <span className="text-red-500 font-medium">{metrics.inactiveCustomers}</span> inactive accounts
+                </div>
               </CardContent>
             </Card>
 
-            <Card className="glass hover:shadow-lg transition-all duration-300">
+            <Card className="glass border-none shadow-xl hover:shadow-green-500/10 transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Total Revenue
                 </CardTitle>
-                <DollarSign className="h-5 w-5 text-green-600" />
+                <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                  <DollarSign className="h-5 w-5 text-green-500" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">₹{metrics.totalRevenue.toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Avg: ₹{metrics.avgOrderValue.toFixed(2)}/order
-                </p>
+                <div className="text-3xl font-bold text-foreground">₹{metrics.totalRevenue.toFixed(0)}</div>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2 text-green-500 font-medium">
+                  <TrendingUp className="h-3 w-3" />
+                  ₹{metrics.avgOrderValue.toFixed(0)} avg/order
+                </div>
               </CardContent>
             </Card>
 
-            <Card className="glass hover:shadow-lg transition-all duration-300">
+            <Card className="glass border-none shadow-xl hover:shadow-yellow-500/10 transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  VIP Customers
+                  VIP Club
                 </CardTitle>
-                <Award className="h-5 w-5 text-yellow-600" />
+                <div className="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+                  <Award className="h-5 w-5 text-yellow-500" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{metrics.vipCustomers}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {metrics.premiumCustomers} premium
+                <div className="text-3xl font-bold text-foreground">{metrics.vipCustomers}</div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  <span className="text-yellow-600 font-medium">{metrics.premiumCustomers}</span> premium tier
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="glass hover:shadow-lg transition-all duration-300">
+            <Card className="glass border-none shadow-xl hover:shadow-blue-500/10 transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Total Orders
                 </CardTitle>
-                <ShoppingBag className="h-5 w-5 text-blue-600" />
+                <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                  <ShoppingBag className="h-5 w-5 text-blue-500" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{metrics.totalOrders}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  From {metrics.totalCustomers} customers
+                <div className="text-3xl font-bold text-foreground">{metrics.totalOrders}</div>
+                <p className="text-xs text-muted-foreground mt-2 font-medium">
+                  Across entire base
                 </p>
               </CardContent>
             </Card>
@@ -704,7 +713,7 @@ export default function Customers() {
                       layout
                     >
                       <Card
-                        className="glass hover:shadow-xl transition-all duration-300 cursor-pointer group h-full"
+                        className="glass border-none shadow-xl hover:shadow-primary/20 hover:-translate-y-1 transition-all duration-300 cursor-pointer group h-full overflow-hidden"
                         onClick={() => handleViewCustomer(customer)}
                       >
                         <CardHeader className="pb-4">
@@ -751,36 +760,35 @@ export default function Customers() {
                           </div>
 
                           {/* Credit Balance */}
-                          <div className="flex items-center justify-between text-sm py-2 px-3 bg-muted/50 rounded-md">
-                            <span className="text-muted-foreground">Store Credit</span>
-                            <span className={`font-bold ${parseFloat(customer.creditBalance || '0') < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          <div className="flex items-center justify-between text-sm py-2 px-3 bg-white/5 rounded-md border border-white/5">
+                            <span className="text-muted-foreground font-medium">Store Credit</span>
+                            <span className={`font-bold ${parseFloat(customer.creditBalance || '0') < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
                               ₹{customer.creditBalance || '0.00'}
                             </span>
                           </div>
 
                           {/* Stats */}
-                          <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
                             <div>
-                              <div className="text-xs text-muted-foreground mb-1">Total Orders</div>
+                              <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Orders</div>
                               <div className="text-2xl font-bold text-primary">
                                 {customer.totalOrders || 0}
                               </div>
                             </div>
                             <div>
-                              <div className="text-xs text-muted-foreground mb-1">Lifetime Value</div>
-                              <div className="text-2xl font-bold text-green-600">
+                              <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">LTV</div>
+                              <div className="text-2xl font-bold text-emerald-500">
                                 ₹{totalSpent.toFixed(0)}
                               </div>
                             </div>
                           </div>
 
-                          {/* Last Order */}
-                          <div className="flex items-center justify-between text-sm pt-2 border-t">
+                          <div className="flex items-center justify-between text-sm pt-3 border-t border-white/5">
                             <div className="flex items-center gap-2 text-muted-foreground">
                               <Clock className="h-4 w-4" />
-                              <span>Last order:</span>
+                              <span>Last active:</span>
                             </div>
-                            <span className="font-medium">{lastOrderDate}</span>
+                            <span className="font-medium text-foreground">{lastOrderDate}</span>
                           </div>
 
                           {/* Quick Actions */}

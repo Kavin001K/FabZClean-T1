@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TEST_IDS, getTestId } from '@/lib/test-ids';
 import { formatCurrency } from '@/lib/data-service';
+import { Package, ChevronRight } from 'lucide-react';
 import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
 import { useLocation } from 'wouter';
 
@@ -78,16 +79,22 @@ export const DashboardRecentOrders: React.FC<DashboardRecentOrdersProps> = React
   return (
     <Card
       data-testid={getTestId(TEST_IDS.DASHBOARD.WIDGET, 'recent-orders')}
+      className="glass overflow-hidden border-none shadow-xl"
     >
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Recent Orders</CardTitle>
+      <CardHeader className="pb-3 border-b border-white/5 bg-white/5 flex flex-row items-center justify-between">
+        <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-2">
+          <Package className="h-5 w-5 text-primary" />
+          Recent Orders
+        </CardTitle>
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
+          className="h-8 text-xs hover:bg-primary/20 hover:text-primary transition-all duration-300"
           onClick={() => setLocation('/orders')}
           data-testid={getTestId(TEST_IDS.BUTTON.VIEW, 'all-orders')}
         >
           View All
+          <ChevronRight className="ml-1 h-3 w-3" />
         </Button>
       </CardHeader>
       <CardContent>
@@ -103,7 +110,8 @@ export const DashboardRecentOrders: React.FC<DashboardRecentOrdersProps> = React
             {displayOrders.map((order, index) => (
               <div
                 key={order.id || index}
-                className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                className="flex items-center justify-between p-3 border border-white/5 bg-white/5 rounded-lg hover:bg-primary/10 hover:border-primary/30 transition-all duration-300 cursor-pointer group"
+                onClick={() => setLocation(`/orders/${order.id}`)}
                 data-testid={getTestId(TEST_IDS.DATA.ITEM, `order-${order.id || index}`)}
               >
                 <div className="flex-1 min-w-0">
