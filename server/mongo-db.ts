@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/fabzclean_local';
+const MONGO_URI = process.env.MONGO_URI || '';
+// If no MONGO_URI is provided, we skip MongoDB initialization and fall back to SQLite analytics.
 
 let isConnected = false;
 
@@ -10,14 +11,20 @@ export const connectToMongo = async (): Promise<boolean> => {
     }
 
     try {
+        // Only attempt connection if a valid URI is supplied
+        if (!MONGO_URI) {
+            console.log('⚠️ No MONGO_URI provided – skipping MongoDB connection.');
+            return false;
+        }
         await mongoose.connect(MONGO_URI, {
-            serverSelectionTimeoutMS: 5000, // Fail fast if local DB isn't running
+            serverSelectionTimeoutMS: 5000, // Fail fast if DB isn't reachable
         });
         isConnected = true;
-        console.log('🍃 MongoDB Connected Successfully (Local)');
+        console.log('🍃 MongoDB Connected Successfully');
         return true;
     } catch (error) {
-        console.error('❌ MongoDB Connection Error:', error);
+        // Log a generic message to avoid leaking internal details
+        console.error('❌ MongoDB Connection Error: unable to connect to the configured database.');
         console.log('✅ App will continue with SQLite analytics. All features remain available.');
         return false;
     }
