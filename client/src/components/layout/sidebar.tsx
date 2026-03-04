@@ -3,20 +3,11 @@ import {
   Home,
   ShoppingCart,
   Users2,
-  LineChart,
-  Package,
   Settings,
-  Truck,
+  Printer,
+  PlusCircle,
+  ListOrdered,
   Scissors,
-  User,
-  Server,
-  MapPin,
-  FileText,
-  Calculator,
-  Shield,
-  Building2,
-  BarChart3,
-  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -26,118 +17,16 @@ interface NavItem {
   to: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  roles: string[];
+  adminOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  {
-    to: "/",
-    label: "Dashboard",
-    icon: Home,
-    roles: ["admin"],
-  },
-  {
-    to: "/franchise-dashboard",
-    label: "Dashboard",
-    icon: Home,
-    roles: ["franchise_manager", "manager"],
-  },
-  {
-    to: "/factory-dashboard",
-    label: "Factory Dashboard",
-    icon: Home,
-    roles: ["factory_manager"],
-  },
-  {
-    to: "/franchise-management",
-    label: "Franchises",
-    icon: Building2,
-    roles: ["admin"],
-  },
-  {
-    to: "/employee-dashboard",
-    label: "Dashboard",
-    icon: Home,
-    roles: ["employee", "driver", "staff"],
-  },
-  {
-    to: "/orders",
-    label: "Orders",
-    icon: ShoppingCart,
-    roles: ["admin", "employee", "franchise_manager", "manager", "factory_manager", "staff"],
-  },
-  {
-    to: "/customers",
-    label: "Customers",
-    icon: Users2,
-    roles: ["admin", "employee", "franchise_manager", "manager", "staff"],
-  },
-  {
-    to: "/transit-orders",
-    label: "Transit Orders",
-    icon: Truck,
-    roles: ["admin", "franchise_manager", "manager", "factory_manager"],
-  },
-  {
-    to: "/services",
-    label: "Services",
-    icon: Scissors,
-    roles: ["admin", "franchise_manager", "manager"],
-  },
-  {
-    to: "/inventory",
-    label: "Inventory",
-    icon: Package,
-    roles: ["admin", "factory_manager"], // Only admin and factory_manager
-  },
-  {
-    to: "/documents",
-    label: "Documents",
-    icon: FileText,
-    roles: ["admin", "franchise_manager", "manager", "staff"],
-  },
-  {
-    to: "/accounting",
-    label: "Accounting",
-    icon: Calculator,
-    roles: ["admin", "franchise_manager", "manager"],
-  },
-  {
-    to: "/credits",
-    label: "Credits",
-    icon: CreditCard,
-    roles: ["admin", "factory_manager", "franchise_manager", "manager"],
-  },
-  {
-    to: "/reports",
-    label: "Reports",
-    icon: BarChart3,
-    roles: ["admin", "franchise_manager", "manager"],
-  },
-  {
-    to: "/analytics",
-    label: "Analytics",
-    icon: LineChart,
-    roles: ["admin", "franchise_manager", "manager", "factory_manager"],
-  },
-  {
-    to: "/users",
-    label: "User Management",
-    icon: Shield,
-    roles: ["admin", "franchise_manager", "manager"],
-  },
-  {
-    to: "/database-status",
-    label: "Database Status",
-    icon: Server,
-    roles: ["admin"],
-  },
-  {
-    to: "/admin/audit-logs",
-    label: "Audit Logs",
-    icon: Shield,
-    roles: ["admin", "franchise_manager", "manager"],
-  },
+  { to: "/", label: "Dashboard", icon: Home },
+  { to: "/create-order", label: "New Order", icon: PlusCircle },
+  { to: "/orders", label: "Active Orders", icon: ListOrdered },
+  { to: "/customers", label: "Customers", icon: Users2 },
+  { to: "/services", label: "Services", icon: Scissors },
+  { to: "/print-queue", label: "Print Tags", icon: Printer },
 ];
 
 const NavLink = ({
@@ -167,11 +56,12 @@ const NavLink = ({
 };
 
 export function Sidebar() {
-  const { employee } = useAuth();
+  const { employee, isAdmin } = useAuth();
 
-  const filteredNav = NAV_ITEMS.filter((item) =>
-    employee ? item.roles.includes(employee.role) : false,
-  );
+  const filteredNav = NAV_ITEMS.filter((item) => {
+    if (item.adminOnly && !isAdmin) return false;
+    return true;
+  });
 
   return (
     <aside className="fixed inset-y-0 left-0 z-10 flex h-full w-60 flex-col border-r bg-background">
@@ -186,12 +76,6 @@ export function Sidebar() {
             {item.label}
           </NavLink>
         ))}
-        {filteredNav.length === 0 && (
-          <div className="flex flex-col items-center rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
-            <Shield className="mb-2 h-5 w-5" />
-            No modules assigned to your role yet.
-          </div>
-        )}
       </nav>
       <div className="border-t p-4">
         <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-3">
@@ -213,14 +97,7 @@ export function Sidebar() {
         <div className="mt-3 flex items-center justify-between text-xs">
           <span className="text-muted-foreground">Role</span>
           <span className="font-medium text-primary">
-            {employee?.role === 'admin' && 'Administrator'}
-            {employee?.role === 'franchise_manager' && 'Franchise Manager'}
-            {employee?.role === 'manager' && 'Manager'}
-            {employee?.role === 'factory_manager' && 'Factory Manager'}
-            {employee?.role === 'employee' && 'Employee'}
-            {employee?.role === 'driver' && 'Driver'}
-            {employee?.role === 'staff' && 'Staff'}
-            {!['admin', 'franchise_manager', 'manager', 'factory_manager', 'employee', 'driver', 'staff'].includes(employee?.role || '') && (employee?.role || 'Unknown')}
+            {employee?.role === 'admin' ? 'Administrator' : 'Staff'}
           </span>
         </div>
         <Link

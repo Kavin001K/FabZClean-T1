@@ -6,19 +6,15 @@ import { useToast } from '@/hooks/use-toast';
 export type Theme = 'light' | 'dark' | 'system';
 export type Density = 'compact' | 'comfortable';
 export type PrinterType = 'thermal' | 'a4';
-export type LandingPage = '/dashboard' | '/orders' | '/create-order' | '/transit-orders';
+export type LandingPage = '/dashboard' | '/orders' | '/create-order' | '/customers' | '/print-queue' | '/services';
 
 // Available quick actions for dashboard
 export const AVAILABLE_QUICK_ACTIONS = [
   { id: 'new-order', label: 'New Order', icon: 'Plus' },
-  { id: 'scan-qr', label: 'Scan QR', icon: 'ScanLine' },
-  { id: 'customer-search', label: 'Find Customer', icon: 'Search' },
-  { id: 'transit', label: 'Transit', icon: 'Truck' },
-  { id: 'transit-batch', label: 'Transit Batch', icon: 'Truck' },
-  { id: 'expenses', label: 'Expenses', icon: 'Calculator' },
-  { id: 'add-expense', label: 'Add Expense', icon: 'Receipt' },
-  { id: 'staff', label: 'Staff', icon: 'Users' },
-  { id: 'daily-report', label: 'Daily Report', icon: 'FileText' },
+  { id: 'active-orders', label: 'Orders', icon: 'Receipt' },
+  { id: 'customer-search', label: 'Customers', icon: 'Users' },
+  { id: 'services', label: 'Services', icon: 'Settings' },
+  { id: 'print-queue', label: 'Print Tags', icon: 'FileText' },
 ] as const;
 
 export type QuickActionId = typeof AVAILABLE_QUICK_ACTIONS[number]['id'];
@@ -93,7 +89,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   debugMode: false,
   autoSubmitOnScan: false,
   defaultLandingPage: '/dashboard',
-  quickActionSlots: ['new-order', 'scan-qr', 'customer-search'],
+  quickActionSlots: ['new-order', 'active-orders', 'customer-search', 'print-queue'],
   lowDataMode: false,
   reduceMotion: false,
   hapticFeedback: true,
@@ -128,7 +124,7 @@ interface SettingsContextType {
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'fabzclean_settings_v2';
+const STORAGE_KEY = 'fabzclean_settings_v3';
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();

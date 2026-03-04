@@ -13,19 +13,17 @@ import { formatCurrency } from '@/lib/data-service';
 import { useLocation } from 'wouter';
 
 interface ReadyOrdersProps {
-    franchiseId?: string;
+    // Single-tenant: no franchise filtering needed
 }
 
-export const DashboardReadyOrders: React.FC<ReadyOrdersProps> = ({ franchiseId }) => {
+export const DashboardReadyOrders: React.FC<ReadyOrdersProps> = () => {
     const [, setLocation] = useLocation();
 
     const { data: readyOrders = [], isLoading, refetch } = useQuery({
-        queryKey: ['ready-orders', franchiseId],
+        queryKey: ['ready-orders'],
         queryFn: async () => {
             const token = localStorage.getItem('employee_token');
-            const url = franchiseId
-                ? `/api/orders?status=ready_for_pickup&franchiseId=${franchiseId}&limit=20`
-                : '/api/orders?status=ready_for_pickup&limit=20';
+            const url = '/api/orders?status=ready_for_pickup&limit=20';
 
             const res = await fetch(url, {
                 headers: token ? { 'Authorization': `Bearer ${token}` } : {}
@@ -38,12 +36,10 @@ export const DashboardReadyOrders: React.FC<ReadyOrdersProps> = ({ franchiseId }
     });
 
     const { data: outForDeliveryOrders = [] } = useQuery({
-        queryKey: ['out-for-delivery-orders', franchiseId],
+        queryKey: ['out-for-delivery-orders'],
         queryFn: async () => {
             const token = localStorage.getItem('employee_token');
-            const url = franchiseId
-                ? `/api/orders?status=out_for_delivery&franchiseId=${franchiseId}&limit=20`
-                : '/api/orders?status=out_for_delivery&limit=20';
+            const url = '/api/orders?status=out_for_delivery&limit=20';
 
             const res = await fetch(url, {
                 headers: token ? { 'Authorization': `Bearer ${token}` } : {}
@@ -130,8 +126,8 @@ export const DashboardReadyOrders: React.FC<ReadyOrdersProps> = ({ franchiseId }
                             >
                                 <div className="flex items-center gap-3">
                                     <div className={`p-2 rounded-full ${order.fulfillmentType === 'delivery'
-                                            ? 'bg-orange-100 text-orange-600'
-                                            : 'bg-emerald-100 text-emerald-600'
+                                        ? 'bg-orange-100 text-orange-600'
+                                        : 'bg-emerald-100 text-emerald-600'
                                         }`}>
                                         {order.fulfillmentType === 'delivery' ? (
                                             <Truck className="h-4 w-4" />

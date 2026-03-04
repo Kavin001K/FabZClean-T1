@@ -36,8 +36,6 @@ interface DashboardDueTodayProps {
   orders?: any[];
   /** Optional loading state */
   isLoading?: boolean;
-  /** Optional franchise ID for filtering */
-  franchiseId?: string;
 }
 
 // Date-based color coding:
@@ -79,20 +77,18 @@ const calculateHoursLeft = (dueDate: string) => {
 export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
   orders: initialOrders = [],
   isLoading: initialLoading,
-  franchiseId = 'all'
 }) => {
   const [, setLocation] = useLocation();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   // Fetch due orders for the selected date
   const { data: apiData, isLoading: isQueryLoading } = useQuery({
-    queryKey: ['due-orders-specific', selectedDate.toISOString().split('T')[0], franchiseId],
+    queryKey: ['due-orders-specific', selectedDate.toISOString().split('T')[0]],
     queryFn: async () => {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const params = new URLSearchParams({
         type: 'specific',
         date: dateStr,
-        franchiseId
       });
       const res = await fetch(`/api/due-date-orders?${params}`, {
         headers: {

@@ -174,7 +174,7 @@ export default function CreditsPage() {
     const [adjustNotes, setAdjustNotes] = useState("");
 
     // Check role access
-    const canManageCredits = user?.role && ['admin', 'factory_manager', 'franchise_manager'].includes(user.role);
+    const canManageCredits = user?.role && ['admin'].includes(user.role);
     const isAdmin = user?.role === 'admin';
 
     // Fetch outstanding credits

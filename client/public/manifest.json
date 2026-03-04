@@ -1,0 +1,27 @@
+{
+    "name": "FabZClean POS",
+    "short_name": "FabZClean",
+    "description": "FabZClean Point of Sale - Laundry Billing System",
+    "start_url": "/",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#ffffff",
+    "theme_color": "#16a34a",
+    "icons": [
+        {
+            "src": "/assets/logo.webp",
+            "sizes": "any",
+            "type": "image/webp"
+        },
+        {
+            "src": "/assets/logo.webp",
+            "sizes": "any",
+            "type": "image/webp"
+        }
+    ],
+    "categories": [
+        "business",
+        "productivity"
+    ],
+    "lang": "en"
+}

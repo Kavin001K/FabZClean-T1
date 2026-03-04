@@ -1,74 +1,45 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Users,
     DollarSign,
     ShoppingBag,
-    Building2,
     ArrowUpRight,
     ArrowDownRight
 } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
-import { ordersApi, franchisesApi } from "@/lib/data-service";
-// ✅ FIXED: Changed from named import { } to default import
+import { ordersApi } from "@/lib/data-service";
 import DashboardDueToday from "./components/dashboard-due-today";
-// ✅ FIXED: Changed from named import { } to default import
 import DashboardRecentOrders from "./components/dashboard-recent-orders";
-// ✅ FIXED: Changed from named import { } to default import
 import DashboardQuickActions from "./components/dashboard-quick-actions";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import { Order as RecentOrder } from "./components/dashboard-recent-orders";
-import { DueTodayOrder } from "./components/dashboard-due-today";
 
 export default function AdminDashboard() {
-    const [selectedFranchiseId, setSelectedFranchiseId] = useState<string>("all");
-
-    // Fetch Franchises
-    const { data: franchises = [] } = useQuery({
-        queryKey: ['franchises'],
-        queryFn: () => franchisesApi.getAll()
-    });
-
-    // Fetch orders
+    // Fetch all orders (single-tenant, no franchise filtering)
     const { data: orders = [], isLoading: isLoadingOrders } = useQuery({
         queryKey: ['admin-orders'],
         queryFn: () => ordersApi.getAll()
     });
 
-    // Filter orders based on selected franchise
-    const filteredOrders = useMemo(() => {
-        if (selectedFranchiseId === "all") return orders;
-        return orders.filter((order: any) => order.franchiseId === selectedFranchiseId);
-    }, [orders, selectedFranchiseId]);
-
-    // Calculate stats based on filtered orders
+    // Calculate stats
     const stats = useMemo(() => {
-        const totalRevenue = filteredOrders.reduce((sum: number, order: any) => sum + parseFloat(order.totalAmount || 0), 0);
-        const totalOrders = filteredOrders.length;
-        const activeCustomers = new Set(filteredOrders.map((o: any) => o.customerId)).size;
+        const totalRevenue = orders.reduce((sum: number, order: any) => sum + parseFloat(order.totalAmount || 0), 0);
+        const totalOrders = orders.length;
+        const activeCustomers = new Set(orders.map((o: any) => o.customerId)).size;
 
         return {
             totalRevenue,
-            revenueGrowth: 12.5, // Mock growth for now
+            revenueGrowth: 12.5,
             totalOrders,
             ordersGrowth: 8.2,
             activeCustomers,
             customersGrowth: 5.4,
-            activeFranchises: selectedFranchiseId === "all" ? franchises.length : 1,
-            franchiseGrowth: 0
         };
-    }, [filteredOrders, franchises.length, selectedFranchiseId]);
+    }, [orders]);
 
-    const dueTodayOrders: DueTodayOrder[] = useMemo(() => {
-        return filteredOrders.map((order: any) => ({
+    const dueTodayOrders: any[] = useMemo(() => {
+        return orders.map((order: any) => ({
             id: order.id,
             orderNumber: order.orderNumber,
             customerName: order.customerName || 'Unknown',
@@ -79,10 +50,10 @@ export default function AdminDashboard() {
             pickupDate: order.pickupDate,
             createdAt: order.createdAt
         }));
-    }, [filteredOrders]);
+    }, [orders]);
 
-    const recentOrders: RecentOrder[] = useMemo(() => {
-        return filteredOrders
+    const recentOrders: any[] = useMemo(() => {
+        return orders
             .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
             .slice(0, 5)
             .map((order: any) => ({
@@ -97,35 +68,20 @@ export default function AdminDashboard() {
                 createdAt: order.createdAt,
                 isExpressOrder: order.isExpress
             }));
-    }, [filteredOrders]);
+    }, [orders]);
 
     return (
-        <div className="p-8 space-y-8">
+        <div className="p-4 md:p-8 space-y-8">
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-                    <p className="text-muted-foreground">
-                        Global overview of FabZClean operations
-                    </p>
-                </div>
-                <div className="w-[200px]">
-                    <Select value={selectedFranchiseId} onValueChange={setSelectedFranchiseId}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Filter by Franchise" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Franchises</SelectItem>
-                            {franchises.map((f: any) => (
-                                <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
+            <div>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Dashboard</h1>
+                <p className="text-muted-foreground">
+                    Overview of FabZClean POS operations
+                </p>
             </div>
 
             {/* Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -188,26 +144,10 @@ export default function AdminDashboard() {
                         </p>
                     </CardContent>
                 </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Active Franchises</CardTitle>
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{stats.activeFranchises}</div>
-                        <p className="text-xs text-muted-foreground flex items-center mt-1">
-                            <span className="text-muted-foreground">
-                                {selectedFranchiseId === 'all' ? 'Across all regions' : 'Selected Franchise'}
-                            </span>
-                        </p>
-                    </CardContent>
-                </Card>
             </div>
 
-            {/* Quick Actions - Settings Controlled */}
-            {/* ✅ FIXED: Added required props for Admin view */}
-            <DashboardQuickActions employeeId="admin" employeeName="Administrator" />
+            {/* Quick Actions */}
+            <DashboardQuickActions />
 
             {/* Due Today & Recent Orders */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -216,7 +156,7 @@ export default function AdminDashboard() {
                     isLoading={isLoadingOrders}
                 />
                 <DashboardRecentOrders
-                    orders={recentOrders}
+                    recentOrders={recentOrders}
                     isLoading={isLoadingOrders}
                 />
             </div>

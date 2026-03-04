@@ -2,15 +2,13 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { isSupabaseConfigured, SupabaseAuthService, AuthEmployee } from '../lib/supabase-auth';
 
 // Define all valid roles
-export type EmployeeRole = 'admin' | 'franchise_manager' | 'factory_manager' | 'employee' | 'driver' | 'manager' | 'staff';
+export type EmployeeRole = 'admin' | 'staff';
 
 interface Employee {
   id: string;
   employeeId: string;
   username: string;
   role: EmployeeRole | string;
-  franchiseId?: string;
-  factoryId?: string;
   fullName?: string;
   email?: string;
   phone?: string;
@@ -38,8 +36,6 @@ interface AuthContextType {
   refreshEmployee: () => Promise<void>;
   hasRole: (roles: string | string[]) => boolean;
   isAdmin: boolean;
-  isFranchiseManager: boolean;
-  isFactoryManager: boolean;
   sessionTimeRemaining: number;
   showSessionWarning: boolean;
   extendSession: () => void;
@@ -324,8 +320,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Role-specific computed properties
   const isAdmin = employee?.role === 'admin';
-  const isFranchiseManager = employee?.role === 'franchise_manager';
-  const isFactoryManager = employee?.role === 'factory_manager';
 
   // Refresh employee data (for profile updates)
   const refreshEmployee = useCallback(async (): Promise<void> => {
@@ -343,8 +337,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshEmployee,
     hasRole,
     isAdmin,
-    isFranchiseManager,
-    isFactoryManager,
     sessionTimeRemaining,
     showSessionWarning,
     extendSession,

@@ -619,7 +619,6 @@ export class SQLiteStorage implements IStorage {
       CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customerId);
       CREATE INDEX IF NOT EXISTS idx_deliveries_order ON deliveries(orderId);
       CREATE INDEX IF NOT EXISTS idx_shipments_order ON shipments(orderId);
-      CREATE INDEX IF NOT EXISTS idx_barcodes_product ON barcodes(productId);
       CREATE INDEX IF NOT EXISTS idx_barcodes_code ON barcodes(code);
       CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -638,12 +637,7 @@ export class SQLiteStorage implements IStorage {
       CREATE INDEX IF NOT EXISTS idx_drivers_licenseNumber ON drivers(licenseNumber);
       
       -- Indexes for franchise isolation
-      CREATE INDEX IF NOT EXISTS idx_orders_franchise ON orders(franchiseId);
-      CREATE INDEX IF NOT EXISTS idx_products_franchise ON products(franchiseId);
-      CREATE INDEX IF NOT EXISTS idx_customers_franchise ON customers(franchiseId);
-      CREATE INDEX IF NOT EXISTS idx_employees_franchise ON employees(franchiseId);
-      CREATE INDEX IF NOT EXISTS idx_employee_attendance_franchise ON employee_attendance(franchiseId);
-      CREATE INDEX IF NOT EXISTS idx_employee_tasks_franchise ON employee_tasks(franchiseId);
+      ${""/* Removed franchiseId indices */}
 
       -- Authentication tables
       CREATE TABLE IF NOT EXISTS auth_users (

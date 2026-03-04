@@ -934,7 +934,7 @@ function OrdersComponent() {
         </table>
 
         <div class="footer">
-          <p><strong>FabzClean - Franchise Management System</strong></p>
+          <p><strong>FabzClean - Point of Sale Management</strong></p>
           <p>Total Records: ${filteredOrders.length} | Generated: ${new Date().toLocaleDateString()}</p>
         </div>
       </body>

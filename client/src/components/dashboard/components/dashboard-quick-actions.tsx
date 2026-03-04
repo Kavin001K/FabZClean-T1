@@ -22,61 +22,33 @@ const ACTIONS_CONFIG: Record<string, {
     color: 'text-green-500',
     description: 'Create a new customer order'
   },
-  'scan-qr': {
-    label: 'Scan QR',
-    icon: QrCode,
-    route: '/orders?scan=true',
+  'active-orders': {
+    label: 'Orders',
+    icon: Receipt,
+    route: '/orders',
     color: 'text-blue-500',
-    description: 'Scan order QR code'
+    description: 'View active orders'
   },
   'customer-search': {
-    label: 'Find Customer',
-    icon: Search,
+    label: 'Customers',
+    icon: Users,
     route: '/customers',
     color: 'text-purple-500',
-    description: 'Search for a customer'
+    description: 'Manage customers'
   },
-  'transit': {
-    label: 'Transit',
-    icon: Truck,
-    route: '/transit-orders',
+  'services': {
+    label: 'Services',
+    icon: Settings,
+    route: '/services',
     color: 'text-orange-500',
-    description: 'View transit orders'
+    description: 'Manage services'
   },
-  'transit-batch': {
-    label: 'Transit Batch',
-    icon: Package,
-    route: '/transit-orders',
-    color: 'text-orange-600',
-    description: 'Manage transit batches'
-  },
-  'expenses': {
-    label: 'Expenses',
-    icon: Calculator,
-    route: '/accounting',
-    color: 'text-red-500',
-    description: 'View expenses'
-  },
-  'add-expense': {
-    label: 'Add Expense',
-    icon: Receipt,
-    route: '/accounting?action=add',
-    color: 'text-red-600',
-    description: 'Record a new expense'
-  },
-  'staff': {
-    label: 'Staff',
-    icon: Users,
-    route: '/users',
-    color: 'text-indigo-500',
-    description: 'Manage staff members'
-  },
-  'daily-report': {
-    label: 'Daily Report',
+  'print-queue': {
+    label: 'Print Tags',
     icon: FileText,
-    route: '/reports',
-    color: 'text-teal-500',
-    description: 'View daily reports'
+    route: '/print-queue',
+    color: 'text-indigo-500',
+    description: 'Print garment tags'
   },
 };
 
@@ -100,7 +72,7 @@ export function DashboardQuickActions(_props: DashboardQuickActionsProps = {}) {
   const [, setLocation] = useLocation();
 
   // Get the quick action slots from settings
-  const quickActionSlots = settings?.quickActionSlots || ['new-order', 'scan-qr', 'customer-search'];
+  const quickActionSlots = settings?.quickActionSlots || ['new-order', 'active-orders', 'customer-search', 'services', 'print-queue'];
 
   // Build the list of enabled actions from settings
   const enabledActions = quickActionSlots

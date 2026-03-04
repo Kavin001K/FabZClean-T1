@@ -539,8 +539,8 @@ export function OrderConfirmationDialog({
                         onClick={handleSendWhatsApp}
                         disabled={sendingWhatsApp || !customerPhone || !canSendWhatsApp}
                         className={`w-full font-bold shadow-sm hover:shadow-md transition-all ${canSendWhatsApp
-                                ? 'bg-[#25D366] hover:bg-[#128C7E] text-white'
-                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            ? 'bg-[#25D366] hover:bg-[#128C7E] text-white'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                             }`}
                     >
                         {sendingWhatsApp ? (
@@ -576,7 +576,7 @@ export function OrderConfirmationDialog({
                 onOpenChange={setShowTagPrint}
                 orderNumber={order?.orderNumber || ''}
                 customerName={order?.customerName}
-                storeCode={order?.franchiseId || 'STORE'}
+                storeCode={'FAB'}
                 commonNote={(order as any)?.specialInstructions || (order as any)?.special_instructions || undefined}
                 isExpressOrder={(order as any)?.isExpressOrder || (order as any)?.is_express_order || false}
                 dueDate={order?.pickupDate ? String(order.pickupDate) : (order as any)?.dueDate ? String((order as any).dueDate) : undefined}

@@ -14,14 +14,14 @@ import {
   Moon, Sun, Printer, Bell, Database, Laptop, Zap, Gauge,
   ScanLine, LayoutDashboard, Plus, Search, Receipt, Truck,
   FileText, Vibrate, Volume2, Image, Sparkles, Info, RotateCcw,
-  Users, Calculator, DollarSign, Clock, Package, Save, Loader2
+  Users, Calculator, DollarSign, Clock, Package, Save, Loader2, Settings
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 // Icon map for quick actions
 const ICON_MAP: Record<string, React.ElementType> = {
-  Plus, ScanLine, Receipt, Search, Truck, FileText, Users, Calculator
+  Plus, ScanLine, Receipt, Search, Truck, FileText, Users, Calculator, Settings
 };
 
 export default function SettingsPage() {
@@ -243,7 +243,9 @@ export default function SettingsPage() {
                     <SelectItem value="/dashboard">Dashboard</SelectItem>
                     <SelectItem value="/orders">Orders List</SelectItem>
                     <SelectItem value="/create-order">New Order Screen</SelectItem>
-                    <SelectItem value="/transit-orders">Transit Orders</SelectItem>
+                    <SelectItem value="/customers">Customers</SelectItem>
+                    <SelectItem value="/print-queue">Print Tags</SelectItem>
+                    <SelectItem value="/services">Services</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
