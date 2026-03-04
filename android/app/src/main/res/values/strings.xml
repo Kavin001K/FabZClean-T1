@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">FabZClean</string>
-    <string name="title_activity_main">FabZClean</string>
-    <string name="package_name">com.fabzclean.pos</string>
-    <string name="custom_url_scheme">com.fabzclean.pos</string>
-</resources>

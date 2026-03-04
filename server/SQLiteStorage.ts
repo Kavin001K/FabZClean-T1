@@ -782,6 +782,7 @@ export class SQLiteStorage implements IStorage {
 
         // Define all columns that should exist
         const employeeColumns = [
+          { name: 'franchiseId', type: 'TEXT' },
           { name: 'factoryId', type: 'TEXT' },
           { name: 'salaryType', type: "TEXT DEFAULT 'monthly'" },
           { name: 'workingHours', type: "TEXT DEFAULT '8'" },
