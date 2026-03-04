@@ -55,7 +55,8 @@ export class MemStorage implements IStorage {
   private sqliteStorage: SQLiteStorage;
 
   constructor() {
-    this.sqliteStorage = new SQLiteStorage("./fabzclean.db");
+    const dbPath = process.env.DB_PATH || "./fabzclean.db";
+    this.sqliteStorage = new SQLiteStorage(dbPath);
     this.initializeData();
   }
 

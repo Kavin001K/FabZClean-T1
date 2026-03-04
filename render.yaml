@@ -1,24 +1,22 @@
 services:
   - type: web
-    name: fabzclean
+    name: fabzclean-pos
     env: node
-    plan: free
+    plan: starter
     buildCommand: npm install && npm run build
-    startCommand: npm run start
+    startCommand: npm run start:prod
     envVars:
       - key: NODE_ENV
         value: production
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_KEY
-        sync: false
-      - key: VITE_SUPABASE_URL
-        sync: false
-      - key: VITE_SUPABASE_ANON_KEY
-        sync: false
-      - key: EXTERNAL_API_BASE_URL
-        sync: false
-      - key: EXTERNAL_API_KEY
-        sync: false
-      - key: WA_INSTANCE_ID
-        sync: false
+      - key: PORT
+        value: "5005"
+      - key: SKIP_SAMPLE_DATA
+        value: "true"
+      - key: DB_PATH
+        value: /data/fabzclean.db
+      - key: UPLOADS_DIR
+        value: /data/uploads
+    disk:
+      name: fabzclean_storage
+      mountPath: /data
+      sizeGB: 1

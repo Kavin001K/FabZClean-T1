@@ -9,7 +9,7 @@ import fs from "fs";
 const router = Router();
 
 // Configure multer for file uploads
-const uploadDir = path.join(process.cwd(), "uploads", "documents");
+const uploadDir = process.env.UPLOADS_DIR ? path.join(process.env.UPLOADS_DIR, 'documents') : path.join(process.cwd(), "uploads", "documents");
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }

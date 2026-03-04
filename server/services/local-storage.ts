@@ -20,7 +20,7 @@ try {
 }
 
 // Base upload directory - relative to project root
-const UPLOAD_ROOT = path.join(process.cwd(), 'server', 'uploads');
+const UPLOAD_ROOT = process.env.UPLOADS_DIR || path.join(process.cwd(), 'server', 'uploads');
 
 /**
  * Ensure a directory exists, creating it recursively if needed

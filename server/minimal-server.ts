@@ -36,7 +36,7 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // Serve uploaded files statically
 // Uses process.cwd() for consistent path resolution
-const uploadsPath = path.join(process.cwd(), 'server', 'uploads');
+const uploadsPath = process.env.UPLOADS_DIR || path.join(process.cwd(), 'server', 'uploads');
 app.use('/uploads', express.static(uploadsPath));
 log(`📁 Serving static uploads from: ${uploadsPath}`);
 

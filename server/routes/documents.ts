@@ -12,7 +12,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Ensure documents directory exists
-const documentsDir = path.join(__dirname, '../uploads/documents');
+const documentsDir = process.env.UPLOADS_DIR
+    ? path.join(process.env.UPLOADS_DIR, 'documents')
+    : path.join(__dirname, '../uploads/documents');
 if (!fs.existsSync(documentsDir)) {
     fs.mkdirSync(documentsDir, { recursive: true });
 }
