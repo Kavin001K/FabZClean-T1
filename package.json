@@ -30,7 +30,7 @@
     "check:dead-code": "./scripts/find-dead-code.sh",
     "check:console": "./scripts/check-console-log.sh",
     "db:check": "drizzle-kit push --check",
-    "prepare": "husky",
+    "prepare": "husky || true",
     "test:e2e": "npx playwright test",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
