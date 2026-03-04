@@ -1180,10 +1180,11 @@ function OrdersComponent() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Orders</p>
-                  <p className="text-3xl font-bold mt-2">{stats.totalOrders}</p>
+                  <p className="text-xl sm:text-3xl font-bold mt-2 truncate">{stats.totalOrders}</p>
                   <div className="flex items-center gap-1 mt-2 text-sm text-green-600">
                     <TrendingUp className="h-4 w-4" />
-                    <span>+12.5% from last month</span>
+                    <span className="hidden sm:inline">+12.5% from last month</span>
+                    <span className="sm:hidden">+12.5%</span>
                   </div>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1198,10 +1199,11 @@ function OrdersComponent() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
-                  <p className="text-3xl font-bold mt-2">{formatCurrency(stats.totalRevenue)}</p>
+                  <p className="text-xl sm:text-3xl font-bold mt-2 truncate">{formatCurrency(stats.totalRevenue)}</p>
                   <div className="flex items-center gap-1 mt-2 text-sm text-green-600">
                     <TrendingUp className="h-4 w-4" />
-                    <span>+18.2% from last month</span>
+                    <span className="hidden sm:inline">+18.2% from last month</span>
+                    <span className="sm:hidden">+18.2%</span>
                   </div>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-accent/10 flex items-center justify-center">
@@ -1216,10 +1218,11 @@ function OrdersComponent() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Avg Order Value</p>
-                  <p className="text-3xl font-bold mt-2">{formatCurrency(stats.avgOrderValue)}</p>
+                  <p className="text-xl sm:text-3xl font-bold mt-2 truncate">{formatCurrency(stats.avgOrderValue)}</p>
                   <div className="flex items-center gap-1 mt-2 text-sm text-blue-600">
                     <TrendingUp className="h-4 w-4" />
-                    <span>+5.4% from last month</span>
+                    <span className="hidden sm:inline">+5.4% from last month</span>
+                    <span className="sm:hidden">+5.4%</span>
                   </div>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-blue-100 flex items-center justify-center">
@@ -1234,10 +1237,10 @@ function OrdersComponent() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Completed</p>
-                  <p className="text-3xl font-bold mt-2">{stats.completedOrders}</p>
+                  <p className="text-xl sm:text-3xl font-bold mt-2 truncate">{stats.completedOrders}</p>
                   <div className="flex items-center gap-1 mt-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
-                    <span>{stats.pendingOrders} pending</span>
+                    <span className="truncate">{stats.pendingOrders} pending</span>
                   </div>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-green-100 flex items-center justify-center">

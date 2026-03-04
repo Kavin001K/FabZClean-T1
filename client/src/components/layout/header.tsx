@@ -111,8 +111,8 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
         </h1>
       )}
 
-      {/* Search */}
-      <div className="ml-auto flex-1 max-w-[200px] md:max-w-md lg:max-w-lg xl:max-w-xl">
+      {/* Search — constrained width, never grows into action buttons */}
+      <div className="ml-auto w-auto min-w-0 max-w-[160px] sm:max-w-[220px] md:max-w-sm lg:max-w-md">
         <GlobalSearch />
       </div>
 

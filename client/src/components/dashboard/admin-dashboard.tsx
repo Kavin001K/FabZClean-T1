@@ -88,7 +88,7 @@ export default function AdminDashboard() {
                         <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</div>
+                        <div className="text-xl sm:text-2xl font-bold truncate">{formatCurrency(stats.totalRevenue)}</div>
                         <p className="text-xs text-muted-foreground flex items-center mt-1">
                             {stats.revenueGrowth > 0 ? (
                                 <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
@@ -98,7 +98,7 @@ export default function AdminDashboard() {
                             <span className={stats.revenueGrowth > 0 ? "text-green-500" : "text-red-500"}>
                                 {Math.abs(stats.revenueGrowth)}%
                             </span>
-                            <span className="ml-1">from last month</span>
+                            <span className="ml-1 hidden sm:inline">from last month</span>
                         </p>
                     </CardContent>
                 </Card>
@@ -109,7 +109,7 @@ export default function AdminDashboard() {
                         <ShoppingBag className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats.totalOrders}</div>
+                        <div className="text-xl sm:text-2xl font-bold">{stats.totalOrders}</div>
                         <p className="text-xs text-muted-foreground flex items-center mt-1">
                             {stats.ordersGrowth > 0 ? (
                                 <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
@@ -130,7 +130,7 @@ export default function AdminDashboard() {
                         <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats.activeCustomers}</div>
+                        <div className="text-xl sm:text-2xl font-bold">{stats.activeCustomers}</div>
                         <p className="text-xs text-muted-foreground flex items-center mt-1">
                             {stats.customersGrowth > 0 ? (
                                 <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
