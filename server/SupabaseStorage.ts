@@ -19,7 +19,7 @@ import {
     type AuditLog,
     type InsertAuditLog
 } from "../shared/schema";
-import { Driver, InsertDriver } from "./SQLiteStorage";
+import { Driver, InsertDriver } from "./storage";
 
 export class SupabaseStorage {
     private supabase: SupabaseClient;
@@ -853,6 +853,10 @@ export class SupabaseStorage {
         return data.map(item => this.mapDates(item));
     }
 
+    async listEmployees(): Promise<Employee[]> {
+        return this.getEmployees();
+    }
+
     // ======= BARCODES =======
     async createBarcode(data: InsertBarcode): Promise<Barcode> {
         const { data: barcode, error } = await this.supabase.from('barcodes').insert(this.toSnakeCase(data)).select().single();
@@ -1075,6 +1079,22 @@ export class SupabaseStorage {
 
     async updateTransitOrder(id: string, data: any): Promise<any> {
         const { data: transitOrder, error } = await this.supabase.from('transit_orders').update(this.toSnakeCase(data)).eq('id', id).select().single();
+        if (error) throw error;
+        return this.mapDates(transitOrder);
+    }
+
+    async updateTransitStatus(id: string, status: string, notes?: string, location?: string, updatedBy?: string): Promise<any> {
+        const updateData: any = { status, updated_at: new Date().toISOString() };
+        if (notes) updateData.notes = notes;
+        if (location) updateData.location = location;
+        if (updatedBy) updateData.updated_by = updatedBy;
+
+        const { data: transitOrder, error } = await this.supabase
+            .from('transit_orders')
+            .update(updateData)
+            .eq('id', id)
+            .select()
+            .single();
         if (error) throw error;
         return this.mapDates(transitOrder);
     }

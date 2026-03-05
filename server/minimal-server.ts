@@ -99,7 +99,7 @@ app.get('/api/performance', (req, res) => {
   // Initialize database connection
   try {
     await initializeDatabase();
-    const dbType = (process.env.SUPABASE_URL && !process.env.SUPABASE_URL.includes('placeholder')) ? 'Supabase' : 'SQLite';
+    const dbType = 'Supabase';
     log(`✅ ${dbType} database initialized and connected`);
   } catch (error: any) {
     log("❌ Database initialization failed:", error);
@@ -112,7 +112,7 @@ app.get('/api/performance', (req, res) => {
     if (connected) {
       log("✅ MongoDB ready for enhanced analytics");
     } else {
-      log("✅ Using SQLite for analytics - all features available");
+      log("✅ Analytics available via Supabase");
     }
   });
 
