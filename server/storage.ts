@@ -1002,5 +1002,9 @@ export class MemStorage implements IStorage {
   }
 }
 
-// Export the storage instance - Force local MemStorage (which wraps SQLite)
-export const storage = new MemStorage();
+import { SupabaseStorage } from "./SupabaseStorage";
+
+// Export the storage instance based on .env config
+export const storage: IStorage = process.env.USE_SUPABASE === 'true' || process.env.OFFLINE_MODE === 'false'
+  ? new SupabaseStorage() as any
+  : new MemStorage();
