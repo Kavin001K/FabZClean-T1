@@ -14,7 +14,7 @@ import {
   TrendingDown,
   BarChart3,
   Sparkles,
-  DollarSign,
+  IndianRupee,
   ShoppingCart,
   Archive,
   Barcode,
@@ -790,7 +790,7 @@ export default function Inventory() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-500 rounded-lg shadow-lg shadow-blue-500/30">
-                  <DollarSign className="h-4 w-4 text-white" />
+                  <IndianRupee className="h-4 w-4 text-white" />
                 </div>
                 <div>
                   <p className="text-xs text-blue-700">Total Value</p>

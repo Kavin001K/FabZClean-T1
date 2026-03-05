@@ -5,7 +5,7 @@ import {
   Search,
   Download,
   Plus,
-  DollarSign,
+  IndianRupee,
   AlertCircle,
   CheckCircle,
   Clock,
@@ -364,7 +364,7 @@ export function AccountsPayable() {
                                   setIsPaymentDialogOpen(true);
                                 }}
                               >
-                                <DollarSign className="h-4 w-4 text-green-600" />
+                                <IndianRupee className="h-4 w-4 text-green-600" />
                               </Button>
                             )}
                           </div>

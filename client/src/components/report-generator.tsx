@@ -17,7 +17,7 @@ import {
   TrendingUp,
   Users,
   ShoppingCart,
-  DollarSign,
+  IndianRupee,
   Plus,
   Trash2
 } from 'lucide-react';
@@ -308,7 +308,7 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({ initialData })
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <DollarSign className="h-4 w-4 text-green-600" />
+                      <IndianRupee className="h-4 w-4 text-green-600" />
                       <span className="text-sm font-medium">Total Revenue</span>
                     </div>
                     <div className="text-2xl font-bold">₹{reportData.summary.totalRevenue.toLocaleString()}</div>

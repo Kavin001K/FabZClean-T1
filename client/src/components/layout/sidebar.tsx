@@ -12,6 +12,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
 
 interface NavItem {
   to: string;
@@ -55,26 +57,40 @@ const NavLink = ({
   );
 };
 
-export function Sidebar() {
-  const { employee, isAdmin } = useAuth();
+export function Sidebar({ className, onClose }: { className?: string; onClose?: () => void }) {
+  const { employee, isAdmin, signOut } = useAuth();
 
   const filteredNav = NAV_ITEMS.filter((item) => {
     if (item.adminOnly && !isAdmin) return false;
     return true;
   });
 
+  const handleLinkClick = () => {
+    if (onClose) onClose();
+  };
+
   return (
-    <aside className="fixed inset-y-0 left-0 z-10 flex h-full w-60 flex-col border-r bg-background">
-      <div className="flex h-16 items-center justify-center border-b px-6">
-        <Link href="/" className="flex items-center gap-2 font-semibold">
-          <img src="/assets/logo.webp" alt="FabzClean Logo" className="h-10 w-auto" />
+    <aside className={cn("flex h-full w-60 flex-col border-r bg-background", className)}>
+      <div className="flex h-16 items-center justify-between border-b px-6">
+        <Link href="/" onClick={handleLinkClick} className="flex items-center gap-2 font-semibold">
+          <img src="/assets/logo.webp" alt="FabzClean Logo" className="h-9 w-auto" />
+          <span className="text-lg font-bold tracking-tight text-primary">FabZClean</span>
         </Link>
       </div>
-      <nav className="flex flex-1 flex-col gap-2 p-4 font-medium overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/50">
+      <nav className="flex flex-1 flex-col gap-1 p-4 font-medium overflow-y-auto">
         {filteredNav.map((item) => (
-          <NavLink key={item.to} to={item.to} icon={item.icon}>
+          <Link
+            key={item.to}
+            href={item.to}
+            onClick={handleLinkClick}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all hover:bg-accent hover:text-accent-foreground",
+              window.location.pathname === item.to ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground"
+            )}
+          >
+            <item.icon className="h-4.5 w-4.5" />
             {item.label}
-          </NavLink>
+          </Link>
         ))}
       </nav>
       <div className="border-t p-4">
@@ -102,11 +118,21 @@ export function Sidebar() {
         </div>
         <Link
           href="/settings"
-          className="mt-3 flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+          onClick={handleLinkClick}
+          className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all hover:bg-accent hover:text-accent-foreground"
         >
           <Settings className="h-4 w-4" />
           <span>Settings</span>
         </Link>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => signOut()}
+          className="mt-1 w-full justify-start gap-3 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Logout</span>
+        </Button>
       </div>
     </aside>
   );

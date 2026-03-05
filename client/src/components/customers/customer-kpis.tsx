@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Users, UserPlus, Repeat, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, UserPlus, Repeat, IndianRupee } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
 
@@ -172,7 +172,7 @@ export const CustomerKPIs: React.FC<CustomerKPIsProps> = React.memo(({
       value: formatCurrency(data.averageSpend),
       change: `${formatPercentage(data.averageSpendChange)} from last month`,
       changeType: getChangeType(data.averageSpendChange),
-      icon: <DollarSign className="h-5 w-5" />,
+      icon: <IndianRupee className="h-5 w-5" />,
       description: "Per customer lifetime value",
       color: "text-orange-600"
     }

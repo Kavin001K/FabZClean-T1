@@ -14,7 +14,7 @@ import {
   Moon, Sun, Printer, Bell, Database, Laptop, Zap, Gauge,
   ScanLine, LayoutDashboard, Plus, Search, Receipt, Truck,
   FileText, Vibrate, Volume2, Image, Sparkles, Info, RotateCcw,
-  Users, Calculator, DollarSign, Clock, Package, Save, Loader2, Settings
+  Users, Calculator, IndianRupee, Clock, Package, Save, Loader2, Settings
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -95,7 +95,7 @@ export default function SettingsPage() {
               Speed
             </TabsTrigger>
             <TabsTrigger value="business" className="gap-1">
-              <DollarSign className="h-4 w-4 hidden sm:block" />
+              <IndianRupee className="h-4 w-4 hidden sm:block" />
               Business
             </TabsTrigger>
             <TabsTrigger value="system" className="gap-1">
@@ -505,7 +505,7 @@ export default function SettingsPage() {
           {/* === BUSINESS LOGIC TAB === */}
           <TabsContent value="business" className="space-y-4 mt-6">
             <Alert>
-              <DollarSign className="h-4 w-4" />
+              <IndianRupee className="h-4 w-4" />
               <AlertDescription>
                 These settings affect <strong>all users</strong> and control core business operations like tax calculation and order processing times.
               </AlertDescription>

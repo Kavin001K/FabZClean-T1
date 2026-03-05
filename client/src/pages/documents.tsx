@@ -9,7 +9,7 @@ import {
   Eye,
   Plus,
   Calendar,
-  DollarSign,
+  IndianRupee,
   BarChart3,
   Receipt,
   FileSpreadsheet,
@@ -203,7 +203,7 @@ export default function DocumentsPage() {
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="h-4 w-4 text-green-600" />
+                  <IndianRupee className="h-4 w-4 text-green-600" />
                   <span className="text-sm font-medium">Total Amount</span>
                 </div>
                 <div className="text-2xl font-bold">₹{stats.totalAmount.toLocaleString()}</div>
@@ -279,7 +279,7 @@ export default function DocumentsPage() {
                           )}
                           {doc.amount && (
                             <span className="flex items-center gap-1">
-                              <DollarSign className="h-3 w-3" />
+                              <IndianRupee className="h-3 w-3" />
                               ₹{parseFloat(doc.amount).toLocaleString()}
                             </span>
                           )}

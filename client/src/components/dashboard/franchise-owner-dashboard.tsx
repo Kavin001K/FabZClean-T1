@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { safeGetInitials, safeSlice } from "@/lib/safe-utils";
 import {
-  DollarSign,
+  IndianRupee,
   Users,
   CreditCard,
   Package,
@@ -323,7 +323,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
       value: metrics.totalRevenue,
       change: "+12.5% from last month",
       changeType: "positive" as const,
-      icon: <DollarSign className="h-4 w-4" />,
+      icon: <IndianRupee className="h-4 w-4" />,
       description: "Total revenue generated from all orders",
       details: (
         <div className="space-y-4">

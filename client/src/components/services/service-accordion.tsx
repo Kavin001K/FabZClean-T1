@@ -33,7 +33,7 @@ import {
   Trash2, 
   Plus, 
   Clock, 
-  DollarSign,
+  IndianRupee,
   Package,
   ChevronRight
 } from 'lucide-react';
@@ -124,7 +124,7 @@ const ServiceItem: React.FC<ServiceItemProps> = React.memo(({
           </div>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
-              <DollarSign className="h-4 w-4" />
+              <IndianRupee className="h-4 w-4" />
               <span className="font-medium">{formatCurrency(parseFloat(service.price))}</span>
             </div>
             <div className="flex items-center gap-1">
@@ -177,7 +177,7 @@ const ServiceItem: React.FC<ServiceItemProps> = React.memo(({
                         </div>
                         <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
-                            <DollarSign className="h-3 w-3" />
+                            <IndianRupee className="h-3 w-3" />
                             {formatCurrency(product.price)}
                           </span>
                           <span className="flex items-center gap-1">

@@ -14,7 +14,7 @@ import {
   Phone,
   Mail,
   Calendar,
-  DollarSign,
+  IndianRupee,
   CreditCard,
   X,
   Eye,
@@ -480,7 +480,7 @@ export default function CustomerNotifications({ customer }: CustomerNotification
                                 )}
                                 {notification.metadata.amount && (
                                   <div className="flex items-center gap-1">
-                                    <DollarSign className="h-4 w-4" />
+                                    <IndianRupee className="h-4 w-4" />
                                     <span>₹{notification.metadata.amount}</span>
                                   </div>
                                 )}

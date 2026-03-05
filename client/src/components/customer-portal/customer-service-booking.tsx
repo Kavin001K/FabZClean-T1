@@ -27,7 +27,7 @@ import {
   ChevronDown,
   Calendar as CalendarIcon,
   Timer,
-  DollarSign,
+  IndianRupee,
   Tag,
   Award
 } from 'lucide-react';
@@ -456,7 +456,7 @@ export default function CustomerServiceBooking({ customer }: CustomerServiceBook
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4 text-sm">
                             <div className="flex items-center gap-1">
-                              <DollarSign className="h-4 w-4 text-green-600" />
+                              <IndianRupee className="h-4 w-4 text-green-600" />
                               <span className="font-semibold">₹{service.price}</span>
                             </div>
                             <div className="flex items-center gap-1">

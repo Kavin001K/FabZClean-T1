@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
 import {
-  DollarSign,
+  IndianRupee,
   CreditCard,
   Smartphone,
   Banknote,
@@ -209,7 +209,7 @@ export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPayme
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <DollarSign className="w-4 h-4 mr-2" />
+          <IndianRupee className="w-4 h-4 mr-2" />
           Payment
         </Button>
       </DialogTrigger>
@@ -325,7 +325,7 @@ export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPayme
               Amount {paymentType === 'advance' ? '(Advance)' : paymentType === 'delivery' ? '(Delivery)' : '(Full)'}
             </Label>
             <div className="relative">
-              <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <IndianRupee className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 id="amount"
                 type="number"

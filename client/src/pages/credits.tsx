@@ -17,7 +17,7 @@ import { format, startOfWeek, endOfWeek, subWeeks, isWithinInterval } from "date
 import {
     CreditCard,
     Users,
-    DollarSign,
+    IndianRupee,
     TrendingUp,
     TrendingDown,
     Search,
@@ -663,7 +663,7 @@ export default function CreditsPage() {
                                                                             }}
                                                                             className="text-green-600"
                                                                         >
-                                                                            <DollarSign className="h-4 w-4 mr-2" />
+                                                                            <IndianRupee className="h-4 w-4 mr-2" />
                                                                             Record Payment
                                                                         </DropdownMenuItem>
                                                                         {isAdmin && (
@@ -698,7 +698,7 @@ export default function CreditsPage() {
                     <DialogContent className="max-w-md">
                         <DialogHeader>
                             <DialogTitle className="flex items-center gap-2">
-                                <DollarSign className="h-5 w-5 text-green-500" />
+                                <IndianRupee className="h-5 w-5 text-green-500" />
                                 Record Payment
                             </DialogTitle>
                             <DialogDescription>

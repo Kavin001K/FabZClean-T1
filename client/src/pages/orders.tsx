@@ -71,7 +71,7 @@ import {
   Package,
   TrendingUp,
   TrendingDown,
-  DollarSign,
+  IndianRupee,
   ShoppingCart,
   Users,
   Calendar as CalendarIcon,
@@ -1207,7 +1207,7 @@ function OrdersComponent() {
                   </div>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-accent/10 flex items-center justify-center">
-                  <DollarSign className="h-7 w-7 text-accent" />
+                  <IndianRupee className="h-7 w-7 text-accent" />
                 </div>
               </div>
             </CardContent>

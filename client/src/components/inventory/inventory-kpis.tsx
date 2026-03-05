@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Package, DollarSign, AlertTriangle, CheckCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Package, IndianRupee, AlertTriangle, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
 import { formatCurrency } from '@/lib/data-service';
@@ -142,7 +142,7 @@ export const InventoryKPIs: React.FC<InventoryKPIsProps> = React.memo(({
       value: formatCurrency(data.totalValue),
       change: `${formatPercentage(data.totalValueChange)} this month`,
       changeType: getChangeType(data.totalValueChange),
-      icon: <DollarSign className="h-5 w-5" />,
+      icon: <IndianRupee className="h-5 w-5" />,
       description: "Inventory value",
       color: "text-green-600"
     },

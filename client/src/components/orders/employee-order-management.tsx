@@ -16,7 +16,7 @@ import {
   Package,
   User,
   Calendar,
-  DollarSign,
+  IndianRupee,
   MapPin,
   Phone,
   Mail,

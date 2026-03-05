@@ -7,7 +7,7 @@ import {
   FileText,
   Scale,
   BarChart3,
-  DollarSign,
+  IndianRupee,
   CreditCard,
   Receipt,
   TrendingUp,
@@ -102,7 +102,7 @@ export default function Accounting() {
               <span className="hidden lg:inline">Financial Statements</span>
             </TabsTrigger>
             <TabsTrigger value="accounts-receivable" className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
+              <IndianRupee className="h-4 w-4" />
               <span className="hidden lg:inline">A/R</span>
             </TabsTrigger>
             <TabsTrigger value="accounts-payable" className="flex items-center gap-2">
@@ -260,7 +260,7 @@ export default function Accounting() {
                               }) || '0.00'}
                             </p>
                           </div>
-                          <DollarSign className="h-8 w-8 text-green-600" />
+                          <IndianRupee className="h-8 w-8 text-green-600" />
                         </div>
                         <div className="flex items-center justify-between p-4 rounded-lg bg-red-50 dark:bg-red-950">
                           <div>
@@ -306,7 +306,7 @@ export default function Accounting() {
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">Amount owed to us</p>
                           </div>
-                          <DollarSign className="h-8 w-8 text-emerald-600" />
+                          <IndianRupee className="h-8 w-8 text-emerald-600" />
                         </div>
                         <div className="flex items-center justify-between p-4 rounded-lg bg-orange-50 dark:bg-orange-950">
                           <div>

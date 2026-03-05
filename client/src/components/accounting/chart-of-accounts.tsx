@@ -8,7 +8,7 @@ import {
   Trash2,
   ChevronRight,
   ChevronDown,
-  DollarSign,
+  IndianRupee,
   TrendingUp,
   CreditCard,
   PiggyBank,
@@ -70,7 +70,7 @@ interface Account {
 }
 
 const accountTypeIcons: Record<string, any> = {
-  asset: DollarSign,
+  asset: IndianRupee,
   liability: CreditCard,
   equity: PiggyBank,
   revenue: TrendingUp,
@@ -434,7 +434,7 @@ export function ChartOfAccounts() {
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-12">
                       <div className="flex flex-col items-center gap-3">
-                        <DollarSign className="h-12 w-12 text-muted-foreground" />
+                        <IndianRupee className="h-12 w-12 text-muted-foreground" />
                         <p className="text-muted-foreground">No accounts found</p>
                         <Button onClick={() => setIsCreateDialogOpen(true)} variant="outline" size="sm">
                           <Plus className="h-4 w-4 mr-2" />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
-import { PlusCircle, User, Calendar as CalendarIcon, Truck, DollarSign, Search, CheckCircle, X, Loader2, AlertCircle, History, Package, TrendingUp, Clock, ShoppingBag, Zap, CreditCard } from "lucide-react";
+import { PlusCircle, User, Calendar as CalendarIcon, Truck, IndianRupee, Search, CheckCircle, X, Loader2, AlertCircle, History, Package, TrendingUp, Clock, ShoppingBag, Zap, CreditCard } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -562,7 +562,7 @@ export default function CreateOrder() {
     }
 
     // Ensure total is not negative and Apply Rounding
-    setTotalAmount(roundInvoiceAmount(Math.max(0, calculatedTotal), 'nearest_1'));
+    setTotalAmount(roundInvoiceAmount(Math.max(0, calculatedTotal)));
   }, [subtotal, discountAmount, extraCharges, enableGST, fulfillmentType, deliveryCharges, gstAmount]);
 
   // Create order mutation
@@ -1092,7 +1092,7 @@ export default function CreateOrder() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="customerName">Name *</Label>
                     <Input
@@ -1101,6 +1101,7 @@ export default function CreateOrder() {
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       required
+                      className="bg-background"
                     />
                   </div>
                   <div className="space-y-2">
@@ -1112,6 +1113,7 @@ export default function CreateOrder() {
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
                       required
+                      className="bg-background"
                     />
                   </div>
                 </div>
@@ -1192,134 +1194,136 @@ export default function CreateOrder() {
                   </div>
                 ) : (
                   <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Service</TableHead>
-                          <TableHead className="w-24">Quantity</TableHead>
-                          <TableHead className="w-28">Price</TableHead>
-                          <TableHead className="w-28">Subtotal</TableHead>
-                          <TableHead className="w-16"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        <AnimatePresence>
-                          {selectedServices.map((item) => (
-                            <React.Fragment key={item.service.id}>
-                              <motion.tr
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 20 }}
-                                transition={{ duration: 0.2 }}
-                                className="border-b-0"
-                              >
-                                <TableCell className="font-medium">
-                                  <Input
-                                    value={item.customName}
-                                    onChange={(e) => {
-                                      const updated = selectedServices.map(s =>
-                                        s.service.id === item.service.id ? { ...s, customName: e.target.value } : s
-                                      );
-                                      setSelectedServices(updated);
-                                    }}
-                                    className="w-full font-medium"
-                                    placeholder="Service name"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={item.quantity}
-                                    onChange={(e) => handleUpdateQuantity(item.service.id, parseInt(e.target.value) || 0)}
-                                    className="w-20"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={item.priceOverride}
-                                    onChange={(e) => {
-                                      const newPrice = parseFloat(e.target.value) || 0;
-                                      const updated = selectedServices.map(s =>
-                                        s.service.id === item.service.id ? { ...s, priceOverride: newPrice, subtotal: s.quantity * newPrice } : s
-                                      );
-                                      setSelectedServices(updated);
-                                    }}
-                                    className="w-24"
-                                  />
-                                </TableCell>
-                                <TableCell className="font-semibold">₹{item.subtotal.toFixed(2)}</TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleRemoveService(item.service.id)}
-                                    className="h-8 w-8 p-0"
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </TableCell>
-                              </motion.tr>
-                              {/* Tag Note & Barcode Row */}
-                              <motion.tr
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="border-b bg-muted/30"
-                              >
-                                <TableCell colSpan={5} className="py-2 px-4">
-                                  <div className="flex flex-col md:flex-row gap-4">
-                                    <div className="flex items-center gap-2 flex-1">
-                                      <span className="text-xs text-muted-foreground whitespace-nowrap">Tag Note:</span>
-                                      <Input
-                                        value={item.tagNote}
-                                        onChange={(e) => {
-                                          const updated = selectedServices.map(s =>
-                                            s.service.id === item.service.id ? { ...s, tagNote: e.target.value } : s
-                                          );
-                                          setSelectedServices(updated);
-                                        }}
-                                        className="h-8 text-sm flex-1"
-                                        placeholder="e.g., Delicate fabric, No bleach"
-                                      />
-                                    </div>
-                                    <div className="flex items-center gap-2 flex-1">
-                                      <span className="text-xs text-muted-foreground whitespace-nowrap">Barcode:</span>
-                                      <Input
-                                        value={item.garmentBarcode || ''}
-                                        onChange={(e) => {
-                                          const updated = selectedServices.map(s =>
-                                            s.service.id === item.service.id ? { ...s, garmentBarcode: e.target.value } : s
-                                          );
-                                          setSelectedServices(updated);
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="min-w-[180px]">Service</TableHead>
+                            <TableHead className="w-24">Quantity</TableHead>
+                            <TableHead className="w-28">Price</TableHead>
+                            <TableHead className="w-28">Subtotal</TableHead>
+                            <TableHead className="w-16"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <AnimatePresence>
+                            {selectedServices.map((item) => (
+                              <React.Fragment key={item.service.id}>
+                                <motion.tr
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  exit={{ opacity: 0, x: 20 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="border-b-0"
+                                >
+                                  <TableCell className="font-medium">
+                                    <Input
+                                      value={item.customName}
+                                      onChange={(e) => {
+                                        const updated = selectedServices.map(s =>
+                                          s.service.id === item.service.id ? { ...s, customName: e.target.value } : s
+                                        );
+                                        setSelectedServices(updated);
+                                      }}
+                                      className="w-full font-medium"
+                                      placeholder="Service name"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      value={item.quantity}
+                                      onChange={(e) => handleUpdateQuantity(item.service.id, parseInt(e.target.value) || 0)}
+                                      className="w-20"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={item.priceOverride}
+                                      onChange={(e) => {
+                                        const newPrice = parseFloat(e.target.value) || 0;
+                                        const updated = selectedServices.map(s =>
+                                          s.service.id === item.service.id ? { ...s, priceOverride: newPrice, subtotal: s.quantity * newPrice } : s
+                                        );
+                                        setSelectedServices(updated);
+                                      }}
+                                      className="w-24"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="font-semibold">₹{item.subtotal.toFixed(2)}</TableCell>
+                                  <TableCell>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleRemoveService(item.service.id)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </TableCell>
+                                </motion.tr>
+                                {/* Tag Note & Barcode Row */}
+                                <motion.tr
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  exit={{ opacity: 0 }}
+                                  className="border-b bg-muted/30"
+                                >
+                                  <TableCell colSpan={5} className="py-2 px-4">
+                                    <div className="flex flex-col md:flex-row gap-4">
+                                      <div className="flex items-center gap-2 flex-1">
+                                        <span className="text-xs text-muted-foreground whitespace-nowrap">Tag Note:</span>
+                                        <Input
+                                          value={item.tagNote}
+                                          onChange={(e) => {
+                                            const updated = selectedServices.map(s =>
+                                              s.service.id === item.service.id ? { ...s, tagNote: e.target.value } : s
+                                            );
+                                            setSelectedServices(updated);
+                                          }}
+                                          className="h-8 text-sm flex-1"
+                                          placeholder="e.g., Delicate fabric, No bleach"
+                                        />
+                                      </div>
+                                      <div className="flex items-center gap-2 flex-1">
+                                        <span className="text-xs text-muted-foreground whitespace-nowrap">Barcode:</span>
+                                        <Input
+                                          value={item.garmentBarcode || ''}
+                                          onChange={(e) => {
+                                            const updated = selectedServices.map(s =>
+                                              s.service.id === item.service.id ? { ...s, garmentBarcode: e.target.value } : s
+                                            );
+                                            setSelectedServices(updated);
 
-                                          // Mock Check for History (Garment Lifecycle)
-                                          if (e.target.value.length > 5) {
-                                            // In real app, query API. Here we mock warning.
-                                            if (e.target.value.endsWith('50')) { // Test condition
-                                              toast({
-                                                title: "Garment Lifecycle Warning",
-                                                description: "This garment has been washed 50 times! Inspect for wear and tear.",
-                                                variant: "destructive"
-                                              });
+                                            // Mock Check for History (Garment Lifecycle)
+                                            if (e.target.value.length > 5) {
+                                              // In real app, query API. Here we mock warning.
+                                              if (e.target.value.endsWith('50')) { // Test condition
+                                                toast({
+                                                  title: "Garment Lifecycle Warning",
+                                                  description: "This garment has been washed 50 times! Inspect for wear and tear.",
+                                                  variant: "destructive"
+                                                });
+                                              }
                                             }
-                                          }
-                                        }}
-                                        className="h-8 text-sm flex-1"
-                                        placeholder="Scan permanent tag..."
-                                      />
+                                          }}
+                                          className="h-8 text-sm flex-1"
+                                          placeholder="Scan permanent tag..."
+                                        />
+                                      </div>
                                     </div>
-                                  </div>
-                                </TableCell>
-                              </motion.tr>
-                            </React.Fragment>
-                          ))}
-                        </AnimatePresence>
-                      </TableBody>
-                    </Table>
+                                  </TableCell>
+                                </motion.tr>
+                              </React.Fragment>
+                            ))}
+                          </AnimatePresence>
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -1558,7 +1562,7 @@ export default function CreateOrder() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <DollarSign className="h-5 w-5 mr-2" />
+                  <IndianRupee className="h-5 w-5 mr-2" />
                   Pricing Adjustments
                 </CardTitle>
               </CardHeader>
@@ -1631,11 +1635,11 @@ export default function CreateOrder() {
                   )}
                 </AnimatePresence>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="discountType">Discount Type</Label>
                     <Select value={discountType} onValueChange={(value: 'percentage' | 'fixed' | 'none') => setDiscountType(value)}>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-background">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1654,6 +1658,7 @@ export default function CreateOrder() {
                       value={discountValue || ''}
                       onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
                       disabled={discountType === 'none'}
+                      className="bg-background"
                     />
                   </div>
                 </div>
@@ -1702,28 +1707,32 @@ export default function CreateOrder() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <DollarSign className="h-5 w-5 mr-2" />
+                  <IndianRupee className="h-5 w-5 mr-2" />
                   Advance Payment
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="advancePayment">Advance Amount</Label>
-                    <Input
-                      id="advancePayment"
-                      type="number"
-                      placeholder="0.00"
-                      value={advancePayment}
-                      onChange={(e) => setAdvancePayment(e.target.value)}
-                      max={totalAmount > 0 ? totalAmount : undefined}
-                    />
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+                      <Input
+                        id="advancePayment"
+                        type="number"
+                        placeholder="0.00"
+                        value={advancePayment}
+                        onChange={(e) => setAdvancePayment(e.target.value)}
+                        max={totalAmount > 0 ? totalAmount : undefined}
+                        className="pl-7 bg-background"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="paymentMethod">Payment Method</Label>
                     <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-background">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -2187,6 +2196,7 @@ export default function CreateOrder() {
         onCancel={() => { }}
         onNextStep={() => { }}
         onPrintInvoice={() => { }}
+        onUpdatePaymentStatus={() => { }}
       />
     </div >
   );

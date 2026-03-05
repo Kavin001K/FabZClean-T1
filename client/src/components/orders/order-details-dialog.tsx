@@ -26,7 +26,7 @@ import {
   MapPin,
   Calendar,
   User,
-  DollarSign
+  IndianRupee
 } from "lucide-react";
 import { formatCurrency, formatDate, getNextStatus } from "@/lib/data-service";
 import type { Order } from "@shared/schema";
@@ -286,7 +286,7 @@ export default React.memo(function OrderDetailsDialog({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="p-4 rounded-lg bg-muted/30 space-y-3">
               <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <IndianRupee className="h-4 w-4 text-muted-foreground" />
                 <p className="font-medium text-sm">Payment Details</p>
               </div>
 

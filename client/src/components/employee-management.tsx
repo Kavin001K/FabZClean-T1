@@ -20,7 +20,7 @@ import {
   User,
   Mail,
   Phone,
-  DollarSign,
+  IndianRupee,
   Eye,
   Edit,
   Download,
@@ -1242,7 +1242,7 @@ export default function EmployeeManagement() {
               {/* Compensation */}
               <div>
                 <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  <DollarSign className="w-4 h-4" /> Compensation
+                  <IndianRupee className="w-4 h-4" /> Compensation
                 </h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>

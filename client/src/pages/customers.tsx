@@ -13,7 +13,7 @@ import {
   Filter,
   X,
   ShoppingBag,
-  DollarSign,
+  IndianRupee,
   Clock,
   FileText,
   UserPlus,
@@ -482,7 +482,7 @@ export default function Customers() {
                   Total Revenue
                 </CardTitle>
                 <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                  <DollarSign className="h-5 w-5 text-green-500" />
+                  <IndianRupee className="h-5 w-5 text-green-500" />
                 </div>
               </CardHeader>
               <CardContent>

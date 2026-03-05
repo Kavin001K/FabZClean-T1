@@ -17,7 +17,7 @@ import {
   CheckCircle,
   AlertTriangle,
   User,
-  DollarSign,
+  IndianRupee,
   TrendingUp,
   FileText,
   BarChart3,
@@ -396,7 +396,7 @@ export default function AttendanceTracker({ employees }: AttendanceTrackerProps)
                   {formatCurrency(salaryCalculations.reduce((sum, calc) => sum + calc.netSalary, 0))}
                 </p>
               </div>
-              <DollarSign className="w-8 h-8 text-green-500" />
+              <IndianRupee className="w-8 h-8 text-green-500" />
             </div>
           </CardContent>
         </Card>

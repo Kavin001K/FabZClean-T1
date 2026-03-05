@@ -36,7 +36,7 @@ import {
   Heart,
   ShoppingBag,
   Clock,
-  DollarSign,
+  IndianRupee,
   Percent,
   Tag
 } from 'lucide-react';

@@ -15,7 +15,7 @@ import {
   Timer,
   FileText,
   User,
-  DollarSign,
+  IndianRupee,
   MapPin,
   Truck,
   CheckCircle,
@@ -282,7 +282,7 @@ export default function DashboardQuickActions({ employeeId, employeeName }: Empl
     },
     {
       label: "View Payslip",
-      icon: DollarSign,
+      icon: IndianRupee,
       action: () => setIsPayslipDialogOpen(true),
       variant: "outline" as const
     }
@@ -596,7 +596,7 @@ export default function DashboardQuickActions({ employeeId, employeeName }: Empl
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5" />
+              <IndianRupee className="w-5 h-5" />
               Pay Slip - September 2024
             </DialogTitle>
             <DialogDescription>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Package, DollarSign, Clock, Star } from 'lucide-react';
+import { TrendingUp, TrendingDown, Package, IndianRupee, Clock, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
 import type { Service } from '@shared/schema';
@@ -157,7 +157,7 @@ export const ServiceKPIs: React.FC<ServiceKPIsProps> = React.memo(({
       value: formatCurrency(data.averagePrice),
       change: `${formatPercentage(data.averagePriceChange)} from last month`,
       changeType: getChangeType(data.averagePriceChange),
-      icon: <DollarSign className="h-5 w-5" />,
+      icon: <IndianRupee className="h-5 w-5" />,
       description: "Per service pricing",
       color: "text-purple-600"
     },

@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import { DollarSign, Users, CreditCard, Package, TrendingUp, TrendingDown } from 'lucide-react';
+import { IndianRupee, Users, CreditCard, Package, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TEST_IDS, getTestId } from '@/lib/test-ids';
 import { formatCurrency } from '@/lib/data-service';
@@ -34,7 +34,7 @@ const KPI_CARDS = [
   {
     id: 'revenue',
     title: 'Total Revenue',
-    icon: DollarSign,
+    icon: IndianRupee,
     color: 'text-green-600',
     bgColor: 'bg-green-50',
   },

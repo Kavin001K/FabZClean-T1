@@ -276,7 +276,23 @@ export class SupabaseStorage {
             // WhatsApp tracking mappings
             'lastWhatsappStatus': 'last_whatsapp_status',
             'lastWhatsappSentAt': 'last_whatsapp_sent_at',
-            'whatsappMessageCount': 'whatsapp_message_count'
+            'whatsappMessageCount': 'whatsapp_message_count',
+            // Created/Updated by mappings
+            'createdBy': 'created_by',
+            'updatedBy': 'updated_by',
+            'assignedTo': 'assigned_to',
+            'completedBy': 'completed_by',
+            'cancelledBy': 'cancelled_by',
+            'approvedBy': 'approved_by',
+            'verifiedBy': 'verified_by',
+            'tagNote': 'tag_note',
+            'barcodeId': 'barcode_id',
+            'licenseNumber': 'license_number',
+            'totalDeliveries': 'total_deliveries',
+            'totalEarnings': 'total_earnings',
+            'currentLatitude': 'current_latitude',
+            'currentLongitude': 'current_longitude',
+            'lastActive': 'last_active'
         };
 
         // If key exists in mappings, use snake_case. If not, preserve original (e.g. 'status', 'email', 'name')
@@ -488,11 +504,30 @@ export class SupabaseStorage {
             delete (cleanData as any).lastWhatsappSentAt;
 
             const snakeCaseData = this.toSnakeCase(cleanData);
-            console.log('[SupabaseStorage] Creating order with data:', JSON.stringify(snakeCaseData, null, 2));
+
+            // Remove fields that may not exist in the orders table to prevent schema errors
+            const safeOrderFields = [
+                'id', 'order_number', 'customer_id', 'customer_name', 'customer_email',
+                'customer_phone', 'status', 'total_amount', 'payment_status', 'payment_method',
+                'items', 'notes', 'special_instructions', 'shipping_address', 'pickup_date',
+                'advance_paid', 'discount_type', 'discount_value', 'coupon_code',
+                'extra_charges', 'gst_enabled', 'gst_rate', 'gst_amount', 'pan_number',
+                'gst_number', 'franchise_id', 'created_at', 'updated_at', 'priority',
+                'is_express_order', 'fulfillment_type', 'delivery_charges', 'delivery_address',
+                'tag_note', 'barcode_id', 'created_by', 'assigned_to'
+            ];
+            const safeData: any = {};
+            for (const key of Object.keys(snakeCaseData)) {
+                if (safeOrderFields.includes(key)) {
+                    safeData[key] = snakeCaseData[key];
+                }
+            }
+
+            console.log('[SupabaseStorage] Creating order with data:', JSON.stringify(safeData, null, 2));
 
             const { data: order, error } = await this.supabase
                 .from('orders')
-                .insert(snakeCaseData)
+                .insert(safeData)
                 .select('*')
                 .single();
 

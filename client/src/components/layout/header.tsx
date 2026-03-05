@@ -2,7 +2,7 @@ import { Link, useLocation } from 'wouter';
 import { useEffect, useState } from 'react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import { PanelLeftClose, PanelLeftOpen, RefreshCw, Keyboard } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, RefreshCw, Keyboard, Menu } from 'lucide-react';
 import { useShortcuts } from '@/components/shortcuts-provider';
 import { NotificationCenter } from '@/components/notification-center';
 import { GlobalSearch } from '@/components/global-search';
@@ -60,22 +60,22 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
 
   return (
     <header className="sticky top-0 z-30 flex h-14 md:h-16 items-center gap-2 md:gap-4 border-b bg-background px-3 md:px-6">
-      {/* Sidebar toggle — hidden on mobile since we use bottom nav */}
-      {!isMobile && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onToggleSidebar}
-          className="h-8 w-8 shrink-0"
-          title={isSidebarVisible ? "Hide sidebar (⌘B)" : "Show sidebar (⌘B)"}
-        >
-          {isSidebarVisible ? (
-            <PanelLeftClose className="h-4 w-4" />
-          ) : (
-            <PanelLeftOpen className="h-4 w-4" />
-          )}
-        </Button>
-      )}
+      {/* Sidebar toggle */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onToggleSidebar}
+        className="h-9 w-9 shrink-0"
+        title={isSidebarVisible ? "Hide menu" : "Show menu"}
+      >
+        {isMobile ? (
+          <Menu className="h-5 w-5" />
+        ) : isSidebarVisible ? (
+          <PanelLeftClose className="h-4 w-4" />
+        ) : (
+          <PanelLeftOpen className="h-4 w-4" />
+        )}
+      </Button>
 
       {/* Breadcrumbs — hide on mobile to save space */}
       {!isMobile && (
