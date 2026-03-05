@@ -67,7 +67,7 @@ export const UserMenu = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+        <Button variant="ghost" className="relative h-9 w-9 rounded-full sm:h-10 sm:w-10">
           <Avatar>
             <AvatarImage src={profileImage || ''} alt={employee.fullName} />
             <AvatarFallback className="bg-primary text-white">
@@ -76,13 +76,13 @@ export const UserMenu = () => {
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end">
+      <DropdownMenuContent className="w-[min(90vw,14rem)] sm:w-56" align="end">
         <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">
+          <div className="flex flex-col space-y-1 min-w-0">
+            <p className="text-sm font-medium leading-none truncate">
               {employee.fullName || employee.username}
             </p>
-            <p className="text-xs leading-none text-muted-foreground">
+            <p className="text-xs leading-none text-muted-foreground truncate">
               {employee.email || employee.employeeId}
             </p>
             <div className="pt-2">

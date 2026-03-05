@@ -49,9 +49,10 @@ export function NotificationCenter() {
     <div className="relative">
       <Button
         variant="ghost"
-        size="sm"
+        size="icon"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative"
+        className="relative h-8 w-8"
+        aria-label="Notifications"
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
@@ -65,7 +66,7 @@ export function NotificationCenter() {
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 top-10 w-80 z-50">
+        <div className="absolute right-0 top-10 z-50 w-[calc(100vw-1rem)] max-w-80 sm:w-80">
           <Card className="shadow-lg border">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">

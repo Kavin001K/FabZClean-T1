@@ -637,6 +637,7 @@ export default function CreateOrder() {
         setCreatedOrder(newOrder);
         setIsModalOpen(true);
         queryClient.invalidateQueries({ queryKey: ["orders"] });
+        queryClient.invalidateQueries({ queryKey: ["print-queue"] });
         queryClient.invalidateQueries({ queryKey: ["customers"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
 
@@ -967,7 +968,7 @@ export default function CreateOrder() {
   if (servicesLoading) {
     return (
       <div className="p-4 md:p-6 lg:p-8 animate-fade-in">
-        <header className="flex items-center justify-between mb-6">
+        <header className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Create New Order</h1>
         </header>
         <div className="flex items-center justify-center h-64">
@@ -984,7 +985,7 @@ export default function CreateOrder() {
   if (servicesError) {
     return (
       <div className="p-4 md:p-6 lg:p-8 animate-fade-in">
-        <header className="flex items-center justify-between mb-6">
+        <header className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Create New Order</h1>
         </header>
         <div className="flex items-center justify-center h-64">
@@ -999,12 +1000,13 @@ export default function CreateOrder() {
 
   return (
     <div className="p-4 md:p-6 lg:p-8 animate-fade-in">
-      <header className="flex items-center justify-between mb-6">
+      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Create New Order</h1>
         <Button
           onClick={handleCreateOrder}
           disabled={createOrderMutation.isPending}
           size="lg"
+          className="w-full sm:w-auto"
         >
           <PlusCircle className="h-4 w-4 mr-2" />
           {createOrderMutation.isPending ? "Creating..." : "Create Order"}

@@ -59,7 +59,7 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 md:h-16 items-center gap-2 md:gap-4 border-b bg-background px-3 md:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/95 px-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:h-16 sm:gap-3 sm:px-4 md:gap-4 md:px-6">
       {/* Sidebar toggle */}
       <Button
         variant="ghost"
@@ -106,18 +106,18 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
 
       {/* Mobile: show current page title instead of breadcrumbs */}
       {isMobile && (
-        <h1 className="text-sm font-semibold truncate">
+        <h1 className="min-w-0 truncate text-sm font-semibold">
           {paths[paths.length - 1] || 'Dashboard'}
         </h1>
       )}
 
-      {/* Search — constrained width, never grows into action buttons */}
-      <div className="ml-auto w-auto min-w-0 max-w-[160px] sm:max-w-[220px] md:max-w-sm lg:max-w-md">
-        <GlobalSearch />
+      {/* Search */}
+      <div className={isMobile ? "ml-auto" : "ml-auto min-w-0 w-[180px] sm:w-[220px] md:w-[280px] lg:w-[360px]"}>
+        <GlobalSearch compact={isMobile} />
       </div>
 
       {/* Action buttons */}
-      <div className="flex items-center gap-1 md:gap-2 shrink-0">
+      <div className="flex shrink-0 items-center gap-1 md:gap-2">
         {/* Keyboard shortcuts — hide on mobile */}
         {!isMobile && (
           <Button

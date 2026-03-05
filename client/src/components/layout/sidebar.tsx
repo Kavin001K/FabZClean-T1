@@ -1,7 +1,6 @@
 import { Link, useLocation } from "wouter";
 import {
   Home,
-  ShoppingCart,
   Users2,
   Settings,
   Printer,
@@ -31,34 +30,9 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/print-queue", label: "Print Tags", icon: Printer },
 ];
 
-const NavLink = ({
-  to,
-  icon: Icon,
-  children,
-}: {
-  to: string;
-  icon: React.ComponentType<{ className?: string }>;
-  children: React.ReactNode;
-}) => {
-  const [location] = useLocation();
-  const isActive = location === to;
-
-  return (
-    <Link
-      href={to}
-      className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
-        isActive && "bg-muted text-primary",
-      )}
-    >
-      <Icon className="h-4 w-4" />
-      {children}
-    </Link>
-  );
-};
-
 export function Sidebar({ className, onClose }: { className?: string; onClose?: () => void }) {
   const { employee, isAdmin, signOut } = useAuth();
+  const [location] = useLocation();
 
   const filteredNav = NAV_ITEMS.filter((item) => {
     if (item.adminOnly && !isAdmin) return false;
@@ -70,28 +44,34 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
   };
 
   return (
-    <aside className={cn("flex h-full w-60 flex-col border-r bg-background", className)}>
+    <aside className={cn("flex h-full w-60 min-w-0 flex-col border-r bg-background", className)}>
       <div className="flex h-16 items-center justify-between border-b px-6">
-        <Link href="/" onClick={handleLinkClick} className="flex items-center gap-2 font-semibold">
+        <Link href="/" onClick={handleLinkClick} className="flex min-w-0 items-center gap-2 font-semibold">
           <img src="/assets/logo.webp" alt="FabzClean Logo" className="h-9 w-auto" />
-          <span className="text-lg font-bold tracking-tight text-primary">FabZClean</span>
+          <span className="truncate text-lg font-bold tracking-tight text-primary">FabZClean</span>
         </Link>
       </div>
-      <nav className="flex flex-1 flex-col gap-1 p-4 font-medium overflow-y-auto">
-        {filteredNav.map((item) => (
-          <Link
-            key={item.to}
-            href={item.to}
-            onClick={handleLinkClick}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all hover:bg-accent hover:text-accent-foreground",
-              window.location.pathname === item.to ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground"
-            )}
-          >
-            <item.icon className="h-4.5 w-4.5" />
-            {item.label}
-          </Link>
-        ))}
+      <nav className="scrollbar-thin flex flex-1 flex-col gap-1 overflow-y-auto p-4 font-medium">
+        {filteredNav.map((item) => {
+          const isActive = item.to === "/"
+            ? location === "/" || location === "/dashboard"
+            : location === item.to || location.startsWith(`${item.to}/`);
+
+          return (
+            <Link
+              key={item.to}
+              href={item.to}
+              onClick={handleLinkClick}
+              className={cn(
+                "flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all hover:bg-accent hover:text-accent-foreground",
+                isActive ? "bg-primary/10 font-semibold text-primary" : "text-muted-foreground"
+              )}
+            >
+              <item.icon className="h-4 w-4" />
+              <span className="truncate">{item.label}</span>
+            </Link>
+          );
+        })}
       </nav>
       <div className="border-t p-4">
         <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-3">
@@ -101,11 +81,11 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
               {employee?.fullName?.[0]?.toUpperCase() ?? employee?.username?.[0]?.toUpperCase() ?? "E"}
             </AvatarFallback>
           </Avatar>
-          <div>
-            <p className="text-sm font-medium leading-tight">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium leading-tight">
               {employee?.fullName ?? employee?.username ?? "Employee"}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="truncate text-xs text-muted-foreground">
               {employee?.email ?? employee?.employeeId ?? "No email"}
             </p>
           </div>

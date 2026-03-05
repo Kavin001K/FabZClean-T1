@@ -21,7 +21,7 @@ export function BottomNav() {
 
     return (
         <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden">
-            <div className="flex items-center justify-around h-16 px-2">
+            <div className="mx-auto flex h-16 w-full max-w-3xl items-center justify-around px-1.5 sm:px-2">
                 {BOTTOM_NAV_ITEMS.map((item) => {
                     const isActive = location === item.to;
                     const Icon = item.icon;
@@ -32,7 +32,7 @@ export function BottomNav() {
                             key={item.to}
                             href={item.to}
                             className={cn(
-                                "flex flex-col items-center justify-center gap-1 flex-1 py-1 rounded-lg transition-colors",
+                                "flex flex-1 flex-col items-center justify-center gap-1 rounded-lg py-1 transition-colors",
                                 isActive
                                     ? "text-primary"
                                     : "text-muted-foreground hover:text-foreground",
@@ -50,7 +50,7 @@ export function BottomNav() {
                             >
                                 <Icon className={cn(isNewOrder ? "h-5 w-5" : "h-5 w-5")} />
                             </div>
-                            <span className={cn("text-[10px] font-medium", isNewOrder && "-mt-0.5")}>
+                            <span className={cn("max-w-full truncate px-0.5 text-[10px] font-medium", isNewOrder && "-mt-0.5")}>
                                 {item.label}
                             </span>
                         </Link>

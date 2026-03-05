@@ -99,11 +99,33 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  #root {
+    min-height: 100dvh;
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
     font-family: var(--font-sans);
-    font-size: var(--text-base);
+    font-size: 1rem;
     line-height: 1.5;
+    overflow-x: hidden;
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    max-width: 100%;
+  }
+
+  :where(.flex, .inline-flex, .grid) > * {
+    min-width: 0;
   }
 
   .font-display {
@@ -114,21 +136,28 @@
   h1,
   .h1 {
     @apply text-h1 font-bold;
+    overflow-wrap: anywhere;
+    line-height: 1.15;
   }
 
   h2,
   .h2 {
     @apply text-h2 font-bold;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
   }
 
   h3,
   .h3 {
     @apply text-h3 font-semibold;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
   }
 
   p,
   .body {
     @apply text-body;
+    overflow-wrap: anywhere;
   }
 
   .small {
@@ -225,6 +254,10 @@
 }
 
 @layer utilities {
+  .text-safe-wrap {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
 
   /* Animation Utilities */
   .animate-in {

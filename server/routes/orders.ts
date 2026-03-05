@@ -212,7 +212,20 @@ router.get('/recent', async (req, res) => {
 // Get print queue (orders with unprinted tags)
 router.get('/print-queue', async (req, res) => {
   try {
-    const orders = await (storage as any).getOrdersForPrintQueue();
+    let orders: Order[] = [];
+    if (typeof (storage as any).getOrdersForPrintQueue === 'function') {
+      orders = await (storage as any).getOrdersForPrintQueue();
+    } else {
+      // Safe fallback for storage backends without dedicated print queue method
+      const allOrders = await storage.listOrders();
+      orders = allOrders
+        .filter((o: any) => !o.tagsPrinted && o.status !== 'cancelled')
+        .sort((a: any, b: any) => {
+          const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
+        });
+    }
     const serializedOrders = orders.map((order: Order) => serializeOrder(order));
     res.json(createSuccessResponse(serializedOrders));
   } catch (error) {
@@ -247,7 +260,6 @@ router.post(
 
       // Add employee ID for order tracking
       if (req.employee) {
-        orderData.createdBy = req.employee.id || req.employee.employeeId;
         orderData.employeeId = req.employee.employeeId;
       }
 

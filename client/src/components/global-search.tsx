@@ -17,7 +17,11 @@ import {
 } from "@/components/ui/command";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
-export function GlobalSearch() {
+interface GlobalSearchProps {
+  compact?: boolean;
+}
+
+export function GlobalSearch({ compact = false }: GlobalSearchProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { searchQuery, setSearchQuery, searchResults, isSearching, clearSearch } = useGlobalSearch();
   const [, setLocation] = useLocation();
@@ -60,17 +64,32 @@ export function GlobalSearch() {
 
   return (
     <>
-      <Button
-        variant="outline"
-        className="relative h-9 w-full justify-start rounded-[0.5rem] bg-background text-sm font-normal text-muted-foreground shadow-none overflow-hidden hover:bg-accent/50 transition-colors"
-        onClick={() => setIsOpen(true)}
-      >
-        <Search className="mr-2 h-4 w-4 opacity-50 shrink-0" />
-        <span className="truncate text-xs sm:text-sm">Search...</span>
-        <kbd className="pointer-events-none absolute right-[0.3rem] top-[0.3rem] hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
-          <span className="text-xs">⌘</span>K
-        </kbd>
-      </Button>
+      {compact ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-9 w-9 shrink-0 rounded-[0.5rem] bg-background text-muted-foreground shadow-none hover:bg-accent/50"
+          onClick={() => setIsOpen(true)}
+          title="Search (Ctrl/Cmd + K)"
+          aria-label="Open global search"
+        >
+          <Search className="h-4 w-4 opacity-70" />
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          className="relative h-9 w-full justify-start overflow-hidden rounded-[0.5rem] bg-background text-sm font-normal text-muted-foreground shadow-none transition-colors hover:bg-accent/50"
+          onClick={() => setIsOpen(true)}
+        >
+          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+          <span className="truncate text-xs sm:text-sm">Search...</span>
+          <kbd className="pointer-events-none absolute right-[0.3rem] top-[0.3rem] hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        </Button>
+      )}
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="overflow-hidden p-0 shadow-2xl max-w-2xl">

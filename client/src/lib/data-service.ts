@@ -174,6 +174,22 @@ export const ordersApi = {
     return this.getAll({ search: query });
   },
 
+  async getPrintQueue(): Promise<Order[]> {
+    try {
+      const response = await fetchData<{ data?: Order[]; success?: boolean } | Order[]>('/orders/print-queue');
+      if (Array.isArray(response)) {
+        return response;
+      }
+      if (response && typeof response === 'object' && Array.isArray((response as any).data)) {
+        return (response as any).data;
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to fetch print queue:', error);
+      return [];
+    }
+  },
+
   async getById(id: string): Promise<Order | null> {
     try {
       const response = await fetchData<{ data: Order } | Order>(`/orders/${id}`);

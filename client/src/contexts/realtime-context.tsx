@@ -89,6 +89,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       // Invalidate queries to refetch data
       if (type.startsWith('order_')) {
         queryClient.invalidateQueries({ queryKey: ['orders'] });
+        queryClient.invalidateQueries({ queryKey: ['print-queue'] });
         queryClient.invalidateQueries({ queryKey: ['order', data?.id] });
         queryClient.invalidateQueries({ queryKey: ['live-tracking-orders'] });
         toast({ title: 'Orders updated', description: 'The list of orders has been updated in real-time.' });

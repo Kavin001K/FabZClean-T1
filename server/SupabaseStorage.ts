@@ -141,7 +141,9 @@ export class SupabaseStorage {
             'delivery_address': 'deliveryAddress',
             // Express/Priority mappings
             'is_express_order': 'isExpressOrder',
-            'priority': 'priority'
+            'priority': 'priority',
+            // Print queue mappings
+            'tags_printed': 'tagsPrinted'
         };
 
         Object.entries(mappings).forEach(([snake, camel]) => {
@@ -277,6 +279,7 @@ export class SupabaseStorage {
             'lastWhatsappStatus': 'last_whatsapp_status',
             'lastWhatsappSentAt': 'last_whatsapp_sent_at',
             'whatsappMessageCount': 'whatsapp_message_count',
+            'tagsPrinted': 'tags_printed',
             // Created/Updated by mappings
             'createdBy': 'created_by',
             'updatedBy': 'updated_by',
@@ -514,7 +517,7 @@ export class SupabaseStorage {
                 'extra_charges', 'gst_enabled', 'gst_rate', 'gst_amount', 'pan_number',
                 'gst_number', 'franchise_id', 'created_at', 'updated_at', 'priority',
                 'is_express_order', 'fulfillment_type', 'delivery_charges', 'delivery_address',
-                'tag_note', 'barcode_id', 'created_by', 'assigned_to'
+                'tag_note', 'barcode_id', 'assigned_to'
             ];
             const safeData: any = {};
             for (const key of Object.keys(snakeCaseData)) {
@@ -524,14 +527,28 @@ export class SupabaseStorage {
             }
 
             console.log('[SupabaseStorage] Creating order with data:', JSON.stringify(safeData, null, 2));
+            // Retry once per unknown-column error by stripping the offending key.
+            // This protects order creation when app payload and Supabase schema are temporarily out of sync.
+            const insertPayload: Record<string, any> = { ...safeData };
+            for (let attempt = 0; attempt < 8; attempt++) {
+                const { data: order, error } = await this.supabase
+                    .from('orders')
+                    .insert(insertPayload)
+                    .select('*')
+                    .single();
 
-            const { data: order, error } = await this.supabase
-                .from('orders')
-                .insert(safeData)
-                .select('*')
-                .single();
+                if (!error) {
+                    return this.mapDates(order);
+                }
 
-            if (error) {
+                const missingColumnMatch = /Could not find the '([^']+)' column of 'orders' in the schema cache/i.exec(error.message || '');
+                const missingColumn = missingColumnMatch?.[1];
+                if (missingColumn && Object.prototype.hasOwnProperty.call(insertPayload, missingColumn)) {
+                    console.warn(`[SupabaseStorage] Removing unknown orders column "${missingColumn}" and retrying insert`);
+                    delete insertPayload[missingColumn];
+                    continue;
+                }
+
                 console.error('[SupabaseStorage] Supabase create order error:', {
                     message: error.message,
                     details: error.details,
@@ -541,7 +558,7 @@ export class SupabaseStorage {
                 throw new Error(`Database error: ${error.message}${error.hint ? ` (Hint: ${error.hint})` : ''}${error.details ? ` - ${error.details}` : ''}`);
             }
 
-            return this.mapDates(order);
+            throw new Error('Database error: Failed to create order after removing unknown columns');
         } catch (err) {
             console.error('[SupabaseStorage] Create order exception:', err);
             if (err instanceof Error) {
@@ -583,6 +600,48 @@ export class SupabaseStorage {
         const { data, error } = await query;
         if (error) throw error;
         return data.map(item => this.mapDates(item));
+    }
+
+    async getOrdersForPrintQueue(): Promise<Order[]> {
+        let query = this.supabase
+            .from('orders')
+            .select('*')
+            .or('tags_printed.is.null,tags_printed.eq.false')
+            .neq('status', 'cancelled')
+            .order('created_at', { ascending: false });
+
+        let { data, error } = await query;
+
+        // If tags_printed column doesn't exist in a drifted schema, fallback gracefully.
+        if (error && /Could not find the 'tags_printed' column of 'orders' in the schema cache/i.test(error.message || '')) {
+            console.warn('[SupabaseStorage] orders.tags_printed missing; falling back to unfiltered print queue');
+            const fallback = await this.supabase
+                .from('orders')
+                .select('*')
+                .neq('status', 'cancelled')
+                .order('created_at', { ascending: false });
+            data = fallback.data as any;
+            error = fallback.error as any;
+        }
+
+        if (error) throw error;
+        return (data || []).map(item => this.mapDates(item));
+    }
+
+    async markTagsPrinted(orderId: string): Promise<void> {
+        const now = new Date().toISOString();
+        const { error } = await this.supabase
+            .from('orders')
+            .update({ tags_printed: true, updated_at: now })
+            .eq('id', orderId);
+
+        // If tags_printed doesn't exist, keep endpoint non-breaking.
+        if (error && /Could not find the 'tags_printed' column of 'orders' in the schema cache/i.test(error.message || '')) {
+            console.warn('[SupabaseStorage] orders.tags_printed missing; skipping tags_printed update');
+            return;
+        }
+
+        if (error) throw error;
     }
 
     // ======= TRANSIT ORDERS =======

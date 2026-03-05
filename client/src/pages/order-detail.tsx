@@ -96,7 +96,7 @@ export default function OrderDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+      <div className="flex-1 gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
         <div className="flex items-center gap-4 mb-6">
           <LoadingSkeleton className="h-10 w-10" />
           <div className="space-y-2">
@@ -125,7 +125,7 @@ export default function OrderDetailPage() {
 
   if (isError || !order) {
     return (
-      <div className="flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+      <div className="flex-1 gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
         <div className="flex items-center gap-4 mb-6">
           <Link to="/orders">
             <Button variant="outline" size="sm">
@@ -154,23 +154,23 @@ export default function OrderDetailPage() {
   const nextStatus = getNextStatus(order.status);
 
   return (
-    <div className="flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+    <div className="flex-1 gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
           <Link to="/orders">
             <Button variant="outline" size="sm">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Orders
             </Button>
           </Link>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold">Order Details</h1>
-            <p className="text-muted-foreground">Order ID: {order.id}</p>
+            <p className="text-safe-wrap text-muted-foreground">Order ID: {order.id}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {order.paymentStatus !== 'paid' && (
             <Button
               variant="outline"
@@ -222,11 +222,11 @@ export default function OrderDetailPage() {
             </Button>
           )}
 
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="w-full sm:w-auto">
             <Edit className="h-4 w-4 mr-2" />
             Edit Order
           </Button>
-          <Button variant="outline" size="sm" onClick={handlePrintInvoice}>
+          <Button variant="outline" size="sm" onClick={handlePrintInvoice} className="w-full sm:w-auto">
             <Printer className="h-4 w-4 mr-2" />
             Print Invoice
           </Button>

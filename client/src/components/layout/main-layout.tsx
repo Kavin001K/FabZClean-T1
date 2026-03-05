@@ -5,8 +5,6 @@ import { BottomNav } from './bottom-nav';
 import ErrorBoundary from '@/components/ui/error-boundary';
 import { SessionTimeoutWarning } from '@/components/session-timeout-warning';
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Menu } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface MainLayoutProps {
@@ -52,23 +50,20 @@ export function MainLayout({ children }: MainLayoutProps) {
     <>
       <SessionTimeoutWarning />
 
-      <div className="flex min-h-screen w-full bg-background">
-        {/* Desktop Sidebar (lg+) */}
-        {!isMobile && isSidebarOpen && (
-          <Sidebar className="w-64" />
-        )}
+      <div className="flex min-h-[100dvh] w-full bg-background">
+        {/* Desktop Sidebar */}
+        {!isMobile && isSidebarOpen && <Sidebar className="w-64 shrink-0" />}
 
         {/* Mobile/Tablet Sidebar Drawer */}
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-          <SheetContent side="left" className="p-0 w-64 border-none">
+          <SheetContent side="left" className="w-72 max-w-[85vw] border-none p-0">
             <Sidebar className="w-full border-none" onClose={() => setIsMobileMenuOpen(false)} />
           </SheetContent>
         </Sheet>
 
         <div
           className={cn(
-            "flex flex-col w-full min-w-0 transition-all duration-300 ease-in-out",
-            !isMobile && isSidebarOpen ? "pl-64" : "pl-0"
+            "flex min-w-0 flex-1 flex-col transition-all duration-300 ease-in-out"
           )}
         >
           <Header
@@ -77,11 +72,13 @@ export function MainLayout({ children }: MainLayoutProps) {
             isMobile={isMobile}
           />
           <main className={cn(
-            "flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6",
-            isMobile ? "pb-24" : "pb-6"
+            "flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 md:p-6",
+            isMobile ? "pb-[calc(5.75rem+env(safe-area-inset-bottom))]" : "pb-6"
           )}>
             <ErrorBoundary>
-              {children}
+              <div className="mx-auto w-full max-w-[1400px]">
+                {children}
+              </div>
             </ErrorBoundary>
           </main>
         </div>

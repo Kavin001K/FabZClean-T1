@@ -108,16 +108,16 @@ export default function ReportsPage() {
     };
 
     return (
-        <div className="container mx-auto p-6 space-y-6">
+        <div className="container mx-auto space-y-6 p-3 sm:p-4 md:p-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Franchise Analytics</h1>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Franchise Analytics</h1>
                     <p className="text-muted-foreground">
                         Comprehensive performance metrics across all franchises
                     </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                     <Button onClick={handleExportMonthlyReport} variant="outline">
                         <FileText className="w-4 h-4 mr-2" />
                         Monthly Report
@@ -191,7 +191,7 @@ export default function ReportsPage() {
 
             {/* Main Content Tabs */}
             <Tabs defaultValue="franchises" className="space-y-4">
-                <TabsList>
+                <TabsList className="w-full justify-start overflow-x-auto">
                     <TabsTrigger value="franchises">Franchise Performance</TabsTrigger>
                     <TabsTrigger value="employees">Employee Performance</TabsTrigger>
                     <TabsTrigger value="trends">Trends</TabsTrigger>

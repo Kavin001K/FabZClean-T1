@@ -547,7 +547,7 @@ export default function Services() {
               </div>
               <div className="flex gap-2">
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="w-[180px]" aria-label="Filter by category">
+                  <SelectTrigger className="w-full sm:w-[180px]" aria-label="Filter by category">
                     <SelectValue placeholder="All Categories" />
                   </SelectTrigger>
                   <SelectContent>
@@ -560,7 +560,7 @@ export default function Services() {
                 </Select>
 
                 <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger className="w-[140px]" aria-label="Filter by status">
+                  <SelectTrigger className="w-full sm:w-[140px]" aria-label="Filter by status">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -571,7 +571,7 @@ export default function Services() {
                 </Select>
 
                 <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-                  <SelectTrigger className="w-[140px]" aria-label="Sort services">
+                  <SelectTrigger className="w-full sm:w-[140px]" aria-label="Sort services">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent>

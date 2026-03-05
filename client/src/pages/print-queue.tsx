@@ -97,9 +97,11 @@ export default function PrintTags() {
         data: orders = [],
         isLoading,
     } = useQuery({
-        queryKey: ["orders"],
-        queryFn: ordersApi.getAll,
-        staleTime: 60_000,
+        queryKey: ["print-queue"],
+        queryFn: ordersApi.getPrintQueue,
+        staleTime: 10_000,
+        refetchOnWindowFocus: true,
+        refetchInterval: 15_000,
     });
 
     // Mark tags as printed
@@ -117,6 +119,7 @@ export default function PrintTags() {
             return res.json();
         },
         onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["print-queue"] });
             queryClient.invalidateQueries({ queryKey: ["orders"] });
             toast({ title: "Marked as printed" });
         },
@@ -304,7 +307,10 @@ export default function PrintTags() {
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => queryClient.invalidateQueries({ queryKey: ["orders"] })}
+                        onClick={() => {
+                            queryClient.invalidateQueries({ queryKey: ["print-queue"] });
+                            queryClient.invalidateQueries({ queryKey: ["orders"] });
+                        }}
                     >
                         <RefreshCw className="h-4 w-4 mr-1" /> Refresh
                     </Button>

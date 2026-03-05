@@ -746,8 +746,8 @@ export default function Inventory() {
         animate={{ y: 0, opacity: 1 }}
         className="flex flex-col gap-4 mb-8"
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
             <motion.div
               whileHover={{ rotate: 360 }}
               transition={{ duration: 0.5 }}
@@ -755,7 +755,7 @@ export default function Inventory() {
             >
               <Package className="w-6 h-6 text-primary" />
             </motion.div>
-            <div>
+            <div className="min-w-0">
               <h1 className="font-display font-bold text-3xl bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                 Smart Inventory Management
               </h1>
@@ -764,15 +764,16 @@ export default function Inventory() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto">
             <Button
               variant="outline"
               onClick={() => queryClient.invalidateQueries({ queryKey: ['inventory-items'] })}
+              className="w-full sm:w-auto"
             >
               <RotateCw className="w-4 h-4 mr-2" />
               Refresh
             </Button>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Button onClick={() => setIsCreateDialogOpen(true)} className="w-full sm:w-auto">
               <Plus className="w-4 w-4 mr-2" />
               Add Item
             </Button>
@@ -879,7 +880,7 @@ export default function Inventory() {
           >
             <Card className="mb-6 border-orange-200 bg-gradient-to-r from-orange-50 to-yellow-50">
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <CardTitle className="flex items-center gap-2 text-orange-800">
                     <motion.div
                       animate={{ rotate: [0, 15, -15, 0] }}
@@ -893,7 +894,7 @@ export default function Inventory() {
                     variant="outline"
                     size="sm"
                     onClick={() => setStockStatusFilter('low_stock')}
-                    className="border-orange-300 text-orange-700 hover:bg-orange-100"
+                    className="w-full border-orange-300 text-orange-700 hover:bg-orange-100 sm:w-auto"
                   >
                     View All
                   </Button>

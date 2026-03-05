@@ -77,7 +77,7 @@ export default function SettingsPage() {
         </div>
 
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 lg:w-[700px]">
+          <TabsList className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 lg:w-[700px] lg:grid-cols-6">
             <TabsTrigger value="general" className="gap-1">
               <Laptop className="h-4 w-4 hidden sm:block" />
               General
@@ -115,13 +115,13 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Theme */}
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label>Theme Mode</Label>
                     <p className="text-sm text-muted-foreground">Select your preferred color scheme.</p>
                   </div>
                   <Select value={settings.theme} onValueChange={(v: Theme) => updateSetting('theme', v)}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue placeholder="Select theme" />
                     </SelectTrigger>
                     <SelectContent>
@@ -139,13 +139,13 @@ export default function SettingsPage() {
                 <Separator />
 
                 {/* Density */}
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label>Information Density</Label>
                     <p className="text-sm text-muted-foreground">Compact mode fits more data on screen.</p>
                   </div>
                   <Select value={settings.density} onValueChange={(v: any) => updateSetting('density', v)}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -166,7 +166,7 @@ export default function SettingsPage() {
                 <CardDescription>Control how the app responds to your actions.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label className="flex items-center gap-2">
                       <Vibrate className="h-4 w-4" /> Haptic Feedback
@@ -181,7 +181,7 @@ export default function SettingsPage() {
 
                 <Separator />
 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label className="flex items-center gap-2">
                       <Volume2 className="h-4 w-4" /> Sound Effects
@@ -207,7 +207,7 @@ export default function SettingsPage() {
                 <CardDescription>Optimize barcode and QR code scanning for speed.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label>Auto-Process Scanned Items</Label>
                     <p className="text-sm text-muted-foreground">
@@ -230,7 +230,7 @@ export default function SettingsPage() {
                 <CardDescription>Customize your starting point and shortcuts.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label>Default Landing Page</Label>
                     <p className="text-sm text-muted-foreground">Where to go after logging in.</p>
@@ -239,7 +239,7 @@ export default function SettingsPage() {
                     value={settings.defaultLandingPage}
                     onValueChange={(v: LandingPage) => updateSetting('defaultLandingPage', v)}
                   >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -311,7 +311,7 @@ export default function SettingsPage() {
                 <CardDescription>Setup your POS or office printer settings.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label>Default Printer Format</Label>
                     <p className="text-sm text-muted-foreground">Choose between thermal receipt or A4 invoice.</p>
@@ -320,7 +320,7 @@ export default function SettingsPage() {
                     value={settings.defaultPrinterType}
                     onValueChange={(v: any) => updateSetting('defaultPrinterType', v)}
                   >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -332,7 +332,7 @@ export default function SettingsPage() {
 
                 <Separator />
 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label>Auto-Print on Creation</Label>
                     <p className="text-sm text-muted-foreground">Automatically open print dialog when order is created.</p>
@@ -343,7 +343,7 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label>Show Print Preview</Label>
                     <p className="text-sm text-muted-foreground">Preview invoice before printing.</p>
@@ -384,7 +384,7 @@ export default function SettingsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label>WhatsApp Integration</Label>
                     <p className="text-sm text-muted-foreground">Send automated bills and status updates via WhatsApp.</p>
@@ -416,7 +416,7 @@ export default function SettingsPage() {
                 <CardDescription>Reduce bandwidth consumption when on mobile data.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label>Low Data Mode</Label>
                     <p className="text-sm text-muted-foreground">
@@ -440,7 +440,7 @@ export default function SettingsPage() {
                 <CardDescription>Speed up navigation by reducing visual effects.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label>Reduce Motion</Label>
                     <p className="text-sm text-muted-foreground">
@@ -466,7 +466,7 @@ export default function SettingsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label>Offline Mode</Label>
                     <p className="text-sm text-muted-foreground">Force application to use local database only.</p>
@@ -479,7 +479,7 @@ export default function SettingsPage() {
 
                 <Separator />
 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
                     <Label>Debug Mode</Label>
                     <p className="text-sm text-muted-foreground">Show additional logging and developer tools.</p>

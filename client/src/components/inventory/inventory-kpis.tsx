@@ -89,7 +89,7 @@ export const InventoryKPIs: React.FC<InventoryKPIsProps> = React.memo(({
 }) => {
   if (isLoading) {
     return (
-      <div className="grid gap-6 grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <LoadingSkeleton.KpiCardSkeleton key={i} />
         ))}
@@ -99,7 +99,7 @@ export const InventoryKPIs: React.FC<InventoryKPIsProps> = React.memo(({
 
   if (isError || !data) {
     return (
-      <div className="grid gap-6 grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i} className="border-dashed">
             <CardContent className="flex items-center justify-center h-24">
@@ -167,7 +167,7 @@ export const InventoryKPIs: React.FC<InventoryKPIsProps> = React.memo(({
   ];
 
   return (
-    <div className="grid gap-6 grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {kpiData.map((kpi) => (
         <KpiCard key={kpi.title} {...kpi} />
       ))}
