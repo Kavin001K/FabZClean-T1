@@ -77,7 +77,7 @@ export class EnhancedPDFExport {
 
     // Date and time
     this.doc.setFontSize(9);
-    const dateStr = new Date().toLocaleString('en-US', {
+    const dateStr = new Date().toLocaleString('en-IN', {
       dateStyle: 'long',
       timeStyle: 'short',
     });

@@ -24,6 +24,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { formatINR } from '@/lib/format';
 
 // Import accounting components
 import { ChartOfAccounts } from '@/components/accounting/chart-of-accounts';
@@ -52,6 +53,7 @@ interface DashboardMetrics {
 
 export default function Accounting() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const formatMoney = (value?: number | null) => `₹${formatINR(value ?? 0)}`;
 
   // Fetch dashboard metrics
   const { data: metrics, isLoading } = useQuery<DashboardMetrics>({
@@ -141,9 +143,7 @@ export default function Accounting() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold text-green-600">
-                          ${metrics?.totalRevenue?.toLocaleString('en-US', {
-                            minimumFractionDigits: 2,
-                          }) || '0.00'}
+                          {formatMoney(metrics?.totalRevenue)}
                         </div>
                         {metrics?.revenueGrowth !== undefined && (
                           <p className="text-xs text-muted-foreground mt-1">
@@ -169,9 +169,7 @@ export default function Accounting() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold text-red-600">
-                          ${metrics?.totalExpenses?.toLocaleString('en-US', {
-                            minimumFractionDigits: 2,
-                          }) || '0.00'}
+                          {formatMoney(metrics?.totalExpenses)}
                         </div>
                         {metrics?.expenseGrowth !== undefined && (
                           <p className="text-xs text-muted-foreground mt-1">
@@ -201,9 +199,7 @@ export default function Accounting() {
                             (metrics?.netIncome || 0) >= 0 ? 'text-green-600' : 'text-red-600'
                           }`}
                         >
-                          ${metrics?.netIncome?.toLocaleString('en-US', {
-                            minimumFractionDigits: 2,
-                          }) || '0.00'}
+                          {formatMoney(metrics?.netIncome)}
                         </div>
                         {metrics?.netIncome !== undefined && metrics?.totalRevenue !== undefined && (
                           <p className="text-xs text-muted-foreground mt-1">
@@ -232,9 +228,7 @@ export default function Accounting() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold text-purple-600">
-                          ${metrics?.cashBalance?.toLocaleString('en-US', {
-                            minimumFractionDigits: 2,
-                          }) || '0.00'}
+                          {formatMoney(metrics?.cashBalance)}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Available cash</p>
                       </CardContent>
@@ -255,9 +249,7 @@ export default function Accounting() {
                           <div>
                             <p className="text-sm text-muted-foreground">Total Assets</p>
                             <p className="text-2xl font-bold text-green-600">
-                              ${metrics?.totalAssets?.toLocaleString('en-US', {
-                                minimumFractionDigits: 2,
-                              }) || '0.00'}
+                              {formatMoney(metrics?.totalAssets)}
                             </p>
                           </div>
                           <IndianRupee className="h-8 w-8 text-green-600" />
@@ -266,9 +258,7 @@ export default function Accounting() {
                           <div>
                             <p className="text-sm text-muted-foreground">Total Liabilities</p>
                             <p className="text-2xl font-bold text-red-600">
-                              ${metrics?.totalLiabilities?.toLocaleString('en-US', {
-                                minimumFractionDigits: 2,
-                              }) || '0.00'}
+                              {formatMoney(metrics?.totalLiabilities)}
                             </p>
                           </div>
                           <CreditCard className="h-8 w-8 text-red-600" />
@@ -277,10 +267,7 @@ export default function Accounting() {
                           <div>
                             <p className="text-sm text-muted-foreground">Net Worth (Equity)</p>
                             <p className="text-2xl font-bold text-blue-600">
-                              ${((metrics?.totalAssets || 0) - (metrics?.totalLiabilities || 0)).toLocaleString(
-                                'en-US',
-                                { minimumFractionDigits: 2 }
-                              )}
+                              {formatMoney((metrics?.totalAssets || 0) - (metrics?.totalLiabilities || 0))}
                             </p>
                           </div>
                           <Scale className="h-8 w-8 text-blue-600" />
@@ -300,9 +287,7 @@ export default function Accounting() {
                           <div>
                             <p className="text-sm text-muted-foreground">Accounts Receivable</p>
                             <p className="text-2xl font-bold text-emerald-600">
-                              ${metrics?.accountsReceivable?.toLocaleString('en-US', {
-                                minimumFractionDigits: 2,
-                              }) || '0.00'}
+                              {formatMoney(metrics?.accountsReceivable)}
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">Amount owed to us</p>
                           </div>
@@ -312,9 +297,7 @@ export default function Accounting() {
                           <div>
                             <p className="text-sm text-muted-foreground">Accounts Payable</p>
                             <p className="text-2xl font-bold text-orange-600">
-                              ${metrics?.accountsPayable?.toLocaleString('en-US', {
-                                minimumFractionDigits: 2,
-                              }) || '0.00'}
+                              {formatMoney(metrics?.accountsPayable)}
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">Amount we owe</p>
                           </div>
@@ -324,10 +307,7 @@ export default function Accounting() {
                           <div>
                             <p className="text-sm text-muted-foreground">Working Capital</p>
                             <p className="text-2xl font-bold text-violet-600">
-                              ${((metrics?.accountsReceivable || 0) - (metrics?.accountsPayable || 0)).toLocaleString(
-                                'en-US',
-                                { minimumFractionDigits: 2 }
-                              )}
+                              {formatMoney((metrics?.accountsReceivable || 0) - (metrics?.accountsPayable || 0))}
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">Net difference</p>
                           </div>

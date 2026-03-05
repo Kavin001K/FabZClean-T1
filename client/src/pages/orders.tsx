@@ -884,7 +884,7 @@ function OrdersComponent() {
       <body>
         <div class="header">
           <h1>Orders Report</h1>
-          <div class="subtitle">Generated on: ${new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })}</div>
+          <div class="subtitle">Generated on: ${new Date().toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short' })}</div>
         </div>
 
         <div class="stats">

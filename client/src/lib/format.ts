@@ -12,7 +12,7 @@ export function formatCurrency(
   } = {}
 ): string {
   const {
-    locale = 'en-US',
+    locale = 'en-IN',
     minimumFractionDigits = 2,
     maximumFractionDigits = 2,
   } = options;
@@ -53,14 +53,11 @@ export function formatINR(value: number | string | undefined | null): string {
 }
 
 /**
- * Format USD
+ * Backward-compatible currency formatter.
+ * Legacy call sites still invoke formatUSD; map them to INR.
  */
 export function formatUSD(value: number | string | undefined | null): string {
-  return formatCurrency(value, {
-    locale: 'en-US',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  return formatINR(value);
 }
 
 /**

@@ -106,7 +106,7 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
 
       {/* Mobile: show current page title instead of breadcrumbs */}
       {isMobile && (
-        <h1 className="min-w-0 truncate text-sm font-semibold">
+        <h1 className="min-w-0 max-w-[40vw] truncate text-sm font-semibold">
           {paths[paths.length - 1] || 'Dashboard'}
         </h1>
       )}
@@ -117,7 +117,7 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
       </div>
 
       {/* Action buttons */}
-      <div className="flex shrink-0 items-center gap-1 md:gap-2">
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1 md:gap-2">
         {/* Keyboard shortcuts — hide on mobile */}
         {!isMobile && (
           <Button
@@ -130,16 +130,18 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
             <Keyboard className="h-4 w-4" />
           </Button>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="h-8 w-8"
-          title="Refresh app (F5)"
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-        </Button>
+        {!isMobile && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="h-8 w-8"
+            title="Refresh app (F5)"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
+        )}
         <NotificationCenter />
         <UserMenu />
       </div>

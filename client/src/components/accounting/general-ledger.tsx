@@ -10,7 +10,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { formatUSD } from '@/lib/format';
+import { formatINR } from '@/lib/format';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -284,7 +284,7 @@ export function GeneralLedger() {
                         <TableCell className="text-right">
                           {entry.debit && entry.debit > 0 ? (
                             <span className="font-medium text-green-600">
-                              ${formatUSD(entry.debit)}
+                              ₹{formatINR(entry.debit)}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">-</span>
@@ -293,14 +293,14 @@ export function GeneralLedger() {
                         <TableCell className="text-right">
                           {entry.credit && entry.credit > 0 ? (
                             <span className="font-medium text-red-600">
-                              ${formatUSD(entry.credit)}
+                              ₹{formatINR(entry.credit)}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          ${formatUSD(entry.balance)}
+                          ₹{formatINR(entry.balance)}
                         </TableCell>
                       </TableRow>
                     ))
@@ -318,19 +318,19 @@ export function GeneralLedger() {
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Total Debit</p>
                       <p className="text-lg font-bold text-green-600">
-                        ${formatUSD(totals.debit)}
+                        ₹{formatINR(totals.debit)}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Total Credit</p>
                       <p className="text-lg font-bold text-red-600">
-                        ${formatUSD(totals.credit)}
+                        ₹{formatINR(totals.credit)}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Difference</p>
                       <p className="text-lg font-bold">
-                        ${formatUSD(Math.abs(totals.debit - totals.credit))}
+                        ₹{formatINR(Math.abs(totals.debit - totals.credit))}
                       </p>
                     </div>
                   </div>

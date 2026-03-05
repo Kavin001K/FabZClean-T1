@@ -69,7 +69,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
-import { formatUSD } from '@/lib/format';
+import { formatINR } from '@/lib/format';
 
 interface Expense {
   id: string;
@@ -261,7 +261,7 @@ export function ExpenseTracker() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${summary?.totalExpenses ? formatUSD(summary.totalExpenses) : '0.00'}
+              ₹{summary?.totalExpenses ? formatINR(summary.totalExpenses) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -272,7 +272,7 @@ export function ExpenseTracker() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              ${summary?.thisMonth ? formatUSD(summary.thisMonth) : '0.00'}
+              ₹{summary?.thisMonth ? formatINR(summary.thisMonth) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -283,7 +283,7 @@ export function ExpenseTracker() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-600">
-              ${summary?.lastMonth ? formatUSD(summary.lastMonth) : '0.00'}
+              ₹{summary?.lastMonth ? formatINR(summary.lastMonth) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -294,7 +294,7 @@ export function ExpenseTracker() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              ${summary?.pendingApproval ? formatUSD(summary.pendingApproval) : '0.00'}
+              ₹{summary?.pendingApproval ? formatINR(summary.pendingApproval) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -323,7 +323,7 @@ export function ExpenseTracker() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => `$${formatUSD(value)}`} />
+                <Tooltip formatter={(value: number) => `₹${formatINR(value)}`} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -340,7 +340,7 @@ export function ExpenseTracker() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="category" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => `$${formatUSD(value)}`} />
+                <Tooltip formatter={(value: number) => `₹${formatINR(value)}`} />
                 <Bar dataKey="amount" fill="#3b82f6" />
               </BarChart>
             </ResponsiveContainer>
@@ -475,7 +475,7 @@ export function ExpenseTracker() {
                         <TableCell>{expense.vendor}</TableCell>
                         <TableCell className="max-w-xs truncate">{expense.description}</TableCell>
                         <TableCell className="text-right font-medium">
-                          ${formatUSD(expense.amount)}
+                          ₹{formatINR(expense.amount)}
                         </TableCell>
                         <TableCell>{expense.paymentMethod}</TableCell>
                         <TableCell>{getStatusBadge(expense.status)}</TableCell>

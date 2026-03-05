@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { exportBalanceSheet } from '@/lib/enhanced-pdf-export';
-import { formatUSD } from '@/lib/format';
+import { formatINR } from '@/lib/format';
 
 interface BalanceSheetAccount {
   accountId: string;
@@ -209,7 +209,7 @@ export function BalanceSheet() {
               {account.accountName}
             </TableCell>
             <TableCell className="text-right font-medium">
-              ${formatUSD(account.balance)}
+              ₹{formatINR(account.balance)}
             </TableCell>
           </TableRow>
         ))}
@@ -219,7 +219,7 @@ export function BalanceSheet() {
               Total {section.title}
             </TableCell>
             <TableCell className="text-right">
-              ${formatUSD(section.subtotal)}
+              ₹{formatINR(section.subtotal)}
             </TableCell>
           </TableRow>
         )}
@@ -296,7 +296,7 @@ export function BalanceSheet() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">
-                    ${formatUSD(data.assets?.totalAssets || 0)}
+                    ₹{formatINR(data.assets?.totalAssets || 0)}
                   </div>
                 </CardContent>
               </Card>
@@ -307,7 +307,7 @@ export function BalanceSheet() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-600">
-                    ${formatUSD(data.liabilities?.totalLiabilities || 0)}
+                    ₹{formatINR(data.liabilities?.totalLiabilities || 0)}
                   </div>
                 </CardContent>
               </Card>
@@ -318,7 +318,7 @@ export function BalanceSheet() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-blue-600">
-                    ${formatUSD(data.equity?.totalEquity || 0)}
+                    ₹{formatINR(data.equity?.totalEquity || 0)}
                   </div>
                 </CardContent>
               </Card>
@@ -346,7 +346,7 @@ export function BalanceSheet() {
                   <TableRow className="bg-primary/20 font-bold border-t-2">
                     <TableCell>TOTAL ASSETS</TableCell>
                     <TableCell className="text-right text-green-600">
-                      ${formatUSD(data.assets?.totalAssets || 0)}
+                      ₹{formatINR(data.assets?.totalAssets || 0)}
                     </TableCell>
                   </TableRow>
 
@@ -366,7 +366,7 @@ export function BalanceSheet() {
                   <TableRow className="bg-muted/50 font-bold border-t">
                     <TableCell>TOTAL LIABILITIES</TableCell>
                     <TableCell className="text-right text-red-600">
-                      ${formatUSD(data.liabilities?.totalLiabilities || 0)}
+                      ₹{formatINR(data.liabilities?.totalLiabilities || 0)}
                     </TableCell>
                   </TableRow>
 
@@ -382,7 +382,7 @@ export function BalanceSheet() {
                   <TableRow className="bg-muted/50 font-bold border-t">
                     <TableCell>TOTAL EQUITY</TableCell>
                     <TableCell className="text-right text-blue-600">
-                      ${formatUSD(data.equity?.totalEquity || 0)}
+                      ₹{formatINR(data.equity?.totalEquity || 0)}
                     </TableCell>
                   </TableRow>
 
@@ -390,7 +390,7 @@ export function BalanceSheet() {
                   <TableRow className="bg-primary/20 font-bold border-t-2">
                     <TableCell>TOTAL LIABILITIES AND EQUITY</TableCell>
                     <TableCell className="text-right">
-                      ${formatUSD(data.totalLiabilitiesAndEquity ?? 0)}
+                      ₹{formatINR(data.totalLiabilitiesAndEquity ?? 0)}
                     </TableCell>
                   </TableRow>
                 </TableBody>

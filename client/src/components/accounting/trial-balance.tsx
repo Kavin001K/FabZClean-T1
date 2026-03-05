@@ -28,7 +28,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
-import { formatUSD } from '@/lib/format';
+import { formatINR } from '@/lib/format';
 
 interface TrialBalanceAccount {
   accountId: string;
@@ -188,7 +188,7 @@ export function TrialBalance() {
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Difference</p>
                     <p className="text-lg font-bold text-red-600">
-                      ${formatUSD(Math.abs((data.totalDebit ?? 0) - (data.totalCredit ?? 0)))}
+                      ₹{formatINR(Math.abs((data.totalDebit ?? 0) - (data.totalCredit ?? 0)))}
                     </p>
                   </div>
                 )}
@@ -234,7 +234,7 @@ export function TrialBalance() {
                             <TableCell className="text-right font-medium">
                               {account.debit > 0 ? (
                                 <span className="text-green-600">
-                                  ${formatUSD(account.debit)}
+                                  ₹{formatINR(account.debit)}
                                 </span>
                               ) : (
                                 <span className="text-muted-foreground">-</span>
@@ -243,7 +243,7 @@ export function TrialBalance() {
                             <TableCell className="text-right font-medium">
                               {account.credit > 0 ? (
                                 <span className="text-red-600">
-                                  ${formatUSD(account.credit)}
+                                  ₹{formatINR(account.credit)}
                                 </span>
                               ) : (
                                 <span className="text-muted-foreground">-</span>
@@ -258,10 +258,10 @@ export function TrialBalance() {
                             {type.charAt(0).toUpperCase() + type.slice(1)} Subtotal:
                           </TableCell>
                           <TableCell className="text-right">
-                            ${formatUSD(typeDebit)}
+                            ₹{formatINR(typeDebit)}
                           </TableCell>
                           <TableCell className="text-right">
-                            ${formatUSD(typeCredit)}
+                            ₹{formatINR(typeCredit)}
                           </TableCell>
                         </TableRow>
                       </React.Fragment>
@@ -274,10 +274,10 @@ export function TrialBalance() {
                       TOTAL:
                     </TableCell>
                     <TableCell className="text-right text-green-600">
-                    ${formatUSD(data.totalDebit ?? 0)}
+                    ₹{formatINR(data.totalDebit ?? 0)}
                     </TableCell>
                     <TableCell className="text-right text-red-600">
-                    ${formatUSD(data.totalCredit ?? 0)}
+                    ₹{formatINR(data.totalCredit ?? 0)}
                     </TableCell>
                   </TableRow>
                 </TableBody>
@@ -292,7 +292,7 @@ export function TrialBalance() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">
-                                          ${formatUSD(data.totalDebit ?? 0)}                  </div>
+                                          ₹{formatINR(data.totalDebit ?? 0)}                  </div>
                 </CardContent>
               </Card>
 
@@ -302,7 +302,7 @@ export function TrialBalance() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-600">
-                                          ${formatUSD(data.totalCredit ?? 0)}                  </div>
+                                          ₹{formatINR(data.totalCredit ?? 0)}                  </div>
                 </CardContent>
               </Card>
 
@@ -316,7 +316,7 @@ export function TrialBalance() {
                       data.isBalanced ? 'text-green-600' : 'text-red-600'
                     }`}
                   >
-                    ${formatUSD(Math.abs((data.totalDebit ?? 0) - (data.totalCredit ?? 0)))}
+                    ₹{formatINR(Math.abs((data.totalDebit ?? 0) - (data.totalCredit ?? 0)))}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     {data.isBalanced ? 'Books are balanced' : 'Books need adjustment'}

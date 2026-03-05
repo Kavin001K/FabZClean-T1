@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { BottomNav } from './bottom-nav';
+import { Footer } from './footer';
 import ErrorBoundary from '@/components/ui/error-boundary';
 import { SessionTimeoutWarning } from '@/components/session-timeout-warning';
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { cn } from '@/lib/utils';
+import { useLocation } from 'wouter';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -21,6 +23,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [location] = useLocation();
 
   // Detect mobile viewport
   useEffect(() => {
@@ -37,6 +40,13 @@ export function MainLayout({ children }: MainLayoutProps) {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Ensure drawer closes after route transitions on mobile/tablet.
+  useEffect(() => {
+    if (isMobile) {
+      setIsMobileMenuOpen(false);
+    }
+  }, [location, isMobile]);
 
   const toggleSidebar = () => {
     if (isMobile) {
@@ -80,6 +90,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 {children}
               </div>
             </ErrorBoundary>
+            <Footer isMobile={isMobile} />
           </main>
         </div>
       </div>

@@ -42,7 +42,7 @@ import {
 } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { exportIncomeStatement } from '@/lib/enhanced-pdf-export';
-import { formatUSD } from '@/lib/format';
+import { formatINR } from '@/lib/format';
 
 interface IncomeStatementAccount {
   accountId: string;
@@ -290,7 +290,7 @@ export function IncomeStatement() {
               {account.accountName}
             </TableCell>
             <TableCell className="text-right font-medium">
-              ${formatUSD(account.amount)}
+              ₹{formatINR(account.amount)}
             </TableCell>
           </TableRow>
         ))}
@@ -397,7 +397,7 @@ export function IncomeStatement() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-bold text-green-600">
-                    ${formatUSD(data.revenue?.totalRevenue || 0)}
+                    ₹{formatINR(data.revenue?.totalRevenue || 0)}
                   </div>
                 </CardContent>
               </Card>
@@ -408,7 +408,7 @@ export function IncomeStatement() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-bold text-blue-600">
-                    ${formatUSD(data.grossProfit || 0)}
+                    ₹{formatINR(data.grossProfit || 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     Margin: {(data.grossProfitMargin || 0).toFixed(1)}%
@@ -422,7 +422,7 @@ export function IncomeStatement() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl font-bold text-purple-600">
-                    ${formatUSD(data.operatingIncome || 0)}
+                    ₹{formatINR(data.operatingIncome || 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     Margin: {(data.operatingMargin || 0).toFixed(1)}%
@@ -440,7 +440,7 @@ export function IncomeStatement() {
                       (data.netIncome || 0) >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}
                   >
-                    ${formatUSD(data.netIncome || 0)}
+                    ₹{formatINR(data.netIncome || 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     Margin: {(data.netProfitMargin || 0).toFixed(1)}%
@@ -470,7 +470,7 @@ export function IncomeStatement() {
                   <TableRow className="bg-primary/20 font-bold border-t">
                     <TableCell>Total Revenue</TableCell>
                     <TableCell className="text-right text-green-600">
-                      ${formatUSD(data.revenue?.totalRevenue || 0)}
+                      ₹{formatINR(data.revenue?.totalRevenue || 0)}
                     </TableCell>
                   </TableRow>
 
@@ -491,14 +491,14 @@ export function IncomeStatement() {
                       <TableRow className="bg-muted/50 font-bold border-t">
                         <TableCell>Total Cost of Goods Sold</TableCell>
                         <TableCell className="text-right text-red-600">
-                          ${formatUSD(data.costOfGoodsSold?.totalCOGS || 0)}
+                          ₹{formatINR(data.costOfGoodsSold?.totalCOGS || 0)}
                         </TableCell>
                       </TableRow>
 
                       <TableRow className="bg-blue-50 dark:bg-blue-950 font-bold border-t-2">
                         <TableCell>GROSS PROFIT</TableCell>
                         <TableCell className="text-right text-blue-600">
-                          ${formatUSD(data.grossProfit || 0)}{' '}
+                          ₹{formatINR(data.grossProfit || 0)}{' '}
                           <span className="text-sm">({(data.grossProfitMargin || 0).toFixed(1)}%)</span>
                         </TableCell>
                       </TableRow>
@@ -520,14 +520,14 @@ export function IncomeStatement() {
                   <TableRow className="bg-muted/50 font-bold border-t">
                     <TableCell>Total Operating Expenses</TableCell>
                     <TableCell className="text-right text-red-600">
-                      ${formatUSD(data.operatingExpenses?.totalOperatingExpenses || 0)}
+                      ₹{formatINR(data.operatingExpenses?.totalOperatingExpenses || 0)}
                     </TableCell>
                   </TableRow>
 
                   <TableRow className="bg-purple-50 dark:bg-purple-950 font-bold border-t-2">
                     <TableCell>OPERATING INCOME</TableCell>
                     <TableCell className="text-right text-purple-600">
-                      ${formatUSD(data.operatingIncome || 0)}{' '}
+                      ₹{formatINR(data.operatingIncome || 0)}{' '}
                       <span className="text-sm">({(data.operatingMargin || 0).toFixed(1)}%)</span>
                     </TableCell>
                   </TableRow>
@@ -556,7 +556,7 @@ export function IncomeStatement() {
                         (data.netIncome || 0) >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}
                     >
-                      ${formatUSD(data.netIncome || 0)}{' '}
+                      ₹{formatINR(data.netIncome || 0)}{' '}
                       <span className="text-sm">({(data.netProfitMargin || 0).toFixed(1)}%)</span>
                     </TableCell>
                   </TableRow>

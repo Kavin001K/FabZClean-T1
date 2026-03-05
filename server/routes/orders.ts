@@ -680,7 +680,11 @@ router.patch('/:id/tags-printed', async (req, res) => {
       return res.status(404).json(createErrorResponse('Order not found', 404));
     }
 
-    await (storage as any).markTagsPrinted(orderId);
+    if (typeof (storage as any).markTagsPrinted === 'function') {
+      await (storage as any).markTagsPrinted(orderId);
+    } else {
+      await storage.updateOrder(orderId, { tagsPrinted: true } as any);
+    }
 
     if (req.employee) {
       await AuthService.logAction(

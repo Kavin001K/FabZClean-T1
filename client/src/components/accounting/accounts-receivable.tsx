@@ -48,7 +48,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { formatUSD } from '@/lib/format';
+import { formatINR } from '@/lib/format';
 
 interface AccountsReceivable {
   id: string;
@@ -203,7 +203,7 @@ export function AccountsReceivable() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${agingReport?.total ? formatUSD(agingReport.total) : '0.00'}
+              ₹{agingReport?.total ? formatINR(agingReport.total) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -214,7 +214,7 @@ export function AccountsReceivable() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              ${agingReport?.current ? formatUSD(agingReport.current) : '0.00'}
+              ₹{agingReport?.current ? formatINR(agingReport.current) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -225,7 +225,7 @@ export function AccountsReceivable() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">
-              ${agingReport?.days30 ? formatUSD(agingReport.days30) : '0.00'}
+              ₹{agingReport?.days30 ? formatINR(agingReport.days30) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -236,7 +236,7 @@ export function AccountsReceivable() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              ${agingReport?.days90Plus ? formatUSD(agingReport.days90Plus) : '0.00'}
+              ₹{agingReport?.days90Plus ? formatINR(agingReport.days90Plus) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -327,13 +327,13 @@ export function AccountsReceivable() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          ${formatUSD(item.amount)}
+                          ₹{formatINR(item.amount)}
                         </TableCell>
                         <TableCell className="text-right text-green-600">
-                          ${formatUSD(item.amountPaid)}
+                          ₹{formatINR(item.amountPaid)}
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          ${formatUSD(item.amountDue)}
+                          ₹{formatINR(item.amountDue)}
                         </TableCell>
                         <TableCell>{getStatusBadge(item.status)}</TableCell>
                         <TableCell>
@@ -383,32 +383,32 @@ export function AccountsReceivable() {
               <div className="p-4 border rounded-lg bg-green-50 dark:bg-green-950">
                 <p className="text-sm text-muted-foreground">Current</p>
                 <p className="text-2xl font-bold text-green-600">
-                  ${formatUSD(agingReport.current)}
+                  ₹{formatINR(agingReport.current)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">0-30 days</p>
               </div>
               <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950">
                 <p className="text-sm text-muted-foreground">31-60 Days</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  ${formatUSD(agingReport.days30)}
+                  ₹{formatINR(agingReport.days30)}
                 </p>
               </div>
               <div className="p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-950">
                 <p className="text-sm text-muted-foreground">61-90 Days</p>
                 <p className="text-2xl font-bold text-yellow-600">
-                  ${formatUSD(agingReport.days60)}
+                  ₹{formatINR(agingReport.days60)}
                 </p>
               </div>
               <div className="p-4 border rounded-lg bg-orange-50 dark:bg-orange-950">
                 <p className="text-sm text-muted-foreground">91-120 Days</p>
                 <p className="text-2xl font-bold text-orange-600">
-                  ${formatUSD(agingReport.days90)}
+                  ₹{formatINR(agingReport.days90)}
                 </p>
               </div>
               <div className="p-4 border rounded-lg bg-red-50 dark:bg-red-950">
                 <p className="text-sm text-muted-foreground">120+ Days</p>
                 <p className="text-2xl font-bold text-red-600">
-                  ${formatUSD(agingReport.days90Plus)}
+                  ₹{formatINR(agingReport.days90Plus)}
                 </p>
               </div>
             </div>
@@ -477,13 +477,13 @@ function PaymentDialog({ open, onOpenChange, invoice, onSubmit }: PaymentDialogP
               <div>
                 <p className="text-sm text-muted-foreground">Invoice Amount</p>
                 <p className="font-medium">
-                  ${formatUSD(invoice.amount)}
+                  ₹{formatINR(invoice.amount)}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Amount Due</p>
                 <p className="font-medium text-red-600">
-                  ${formatUSD(invoice.amountDue)}
+                  ₹{formatINR(invoice.amountDue)}
                 </p>
               </div>
             </div>

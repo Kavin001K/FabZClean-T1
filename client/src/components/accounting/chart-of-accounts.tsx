@@ -50,7 +50,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { formatUSD, formatINR } from '@/lib/format';
+import { formatINR } from '@/lib/format';
 
 interface Account {
   id: string;

@@ -61,7 +61,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { formatUSD } from '@/lib/format';
+import { formatINR } from '@/lib/format';
 
 interface BudgetLine {
   id: string;
@@ -273,7 +273,7 @@ export function BudgetTracker() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  ${formatUSD(budget.totalBudgeted)}
+                  ₹{formatINR(budget.totalBudgeted)}
                 </div>
               </CardContent>
             </Card>
@@ -284,7 +284,7 @@ export function BudgetTracker() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600">
-                  ${formatUSD(budget.totalActual)}
+                  ₹{formatINR(budget.totalActual)}
                 </div>
               </CardContent>
             </Card>
@@ -295,7 +295,7 @@ export function BudgetTracker() {
               </CardHeader>
               <CardContent>
                 <div className={`text-2xl font-bold ${getVarianceColor(budget.totalVariance)}`}>
-                  ${formatUSD(Math.abs(budget.totalVariance))}
+                  ₹{formatINR(Math.abs(budget.totalVariance))}
                   {budget.totalVariance > 0 ? (
                     <TrendingDown className="inline h-5 w-5 ml-2" />
                   ) : budget.totalVariance < 0 ? (
@@ -334,7 +334,7 @@ export function BudgetTracker() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="category" />
                     <YAxis />
-                    <Tooltip formatter={(value: number) => `$${formatUSD(value)}`} />
+                    <Tooltip formatter={(value: number) => `₹${formatINR(value)}`} />
                     <Legend />
                     <Bar dataKey="budgeted" fill="#3b82f6" name="Budgeted" />
                     <Bar dataKey="actual" fill="#10b981" name="Actual" />
@@ -402,13 +402,13 @@ export function BudgetTracker() {
                         <TableCell className="font-medium">{line.category}</TableCell>
                         <TableCell>{line.accountName}</TableCell>
                         <TableCell className="text-right">
-                          ${formatUSD(line.budgeted)}
+                          ₹{formatINR(line.budgeted)}
                         </TableCell>
                         <TableCell className="text-right">
-                          ${formatUSD(line.actual)}
+                          ₹{formatINR(line.actual)}
                         </TableCell>
                         <TableCell className={`text-right ${getVarianceColor(line.variance)}`}>
-                          ${formatUSD(Math.abs(line.variance))}
+                          ₹{formatINR(Math.abs(line.variance))}
                         </TableCell>
                         <TableCell className={`text-right ${getVarianceColor(line.variance)}`}>
                           {line.variancePercent.toFixed(1)}%
@@ -433,13 +433,13 @@ export function BudgetTracker() {
                     <TableRow className="font-bold bg-muted/50 border-t-2">
                       <TableCell colSpan={2}>TOTAL</TableCell>
                       <TableCell className="text-right">
-                        ${formatUSD(budget.totalBudgeted)}
+                        ₹{formatINR(budget.totalBudgeted)}
                       </TableCell>
                       <TableCell className="text-right">
-                        ${formatUSD(budget.totalActual)}
+                        ₹{formatINR(budget.totalActual)}
                       </TableCell>
                       <TableCell className={`text-right ${getVarianceColor(budget.totalVariance)}`}>
-                        ${formatUSD(Math.abs(budget.totalVariance))}
+                        ₹{formatINR(Math.abs(budget.totalVariance))}
                       </TableCell>
                       <TableCell colSpan={3}></TableCell>
                     </TableRow>
@@ -608,13 +608,13 @@ function EditBudgetLineDialog({ open, onOpenChange, line, onSubmit }: EditBudget
               <div>
                 <p className="text-sm text-muted-foreground">Current Actual</p>
                 <p className="text-lg font-semibold">
-                  ${formatUSD(line.actual)}
+                  ₹{formatINR(line.actual)}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Current Variance</p>
                 <p className="text-lg font-semibold">
-                  ${formatUSD(Math.abs(line.variance))}
+                  ₹{formatINR(Math.abs(line.variance))}
                 </p>
               </div>
             </div>

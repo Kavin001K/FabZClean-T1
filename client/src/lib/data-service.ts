@@ -183,10 +183,24 @@ export const ordersApi = {
       if (response && typeof response === 'object' && Array.isArray((response as any).data)) {
         return (response as any).data;
       }
-      return [];
+      const allOrders = await ordersApi.getAll();
+      return allOrders
+        .filter((o: any) => !o?.tagsPrinted && o?.status !== 'cancelled')
+        .sort((a: any, b: any) => {
+          const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
+        });
     } catch (error) {
       console.error('Failed to fetch print queue:', error);
-      return [];
+      const allOrders = await ordersApi.getAll();
+      return allOrders
+        .filter((o: any) => !o?.tagsPrinted && o?.status !== 'cancelled')
+        .sort((a: any, b: any) => {
+          const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
+        });
     }
   },
 

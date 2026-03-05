@@ -55,7 +55,7 @@ import {
 } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { formatUSD } from '@/lib/format';
+import { formatINR } from '@/lib/format';
 
 interface JournalEntry {
   id: string;
@@ -286,10 +286,10 @@ export function JournalEntries() {
                         </TableCell>
                         <TableCell>{entry.description}</TableCell>
                         <TableCell className="text-right font-medium">
-                          ${formatUSD(totalDebit)}
+                          ₹{formatINR(totalDebit)}
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          ${formatUSD(totalCredit)}
+                          ₹{formatINR(totalCredit)}
                         </TableCell>
                         <TableCell>
                           <Badge
