@@ -576,6 +576,32 @@ INSERT INTO "employees" ("id", "franchise_id", "first_name", "last_name", "role"
 ('admin-user-id', 'franchise-pollachi', 'System', 'Admin', 'admin', 'admin@myfabclean.com', '$2b$10$A7eMtBNk3B8YkTz9LfVRPOII.W815gVpb8DP2W0He8WNzURAoDSxa', 'myfabclean', '9999999999', 'Administrator', 'Management', NOW(), 100000.00, 'active')
 ON CONFLICT DO NOTHING;
 
+-- Seed Services (FabZClean Catalog)
+INSERT INTO "services" ("name", "category", "description", "price", "duration", "status") VALUES
+-- Wash Service
+('Shirt (Wash + Starch)',       'Wash Service',      'WS001 | White/Color | Wash + Starch',  45.00,  '2 hours', 'Active'),
+('Pant (Wash + Starch)',        'Wash Service',      'WS002 | White/Color | Wash + Starch',  50.00,  '2 hours', 'Active'),
+('Dhoti (Wash + Starch)',       'Wash Service',      'WS003 | White/Color | Wash + Starch',  50.00,  '2 hours', 'Active'),
+('Shirt (Wash + Iron)',         'Wash Service',      'WS004 | Wash + Iron',                  45.00,  '2 hours', 'Active'),
+('Pant (Wash + Iron)',          'Wash Service',      'WS005 | Wash + Iron',                  45.00,  '2 hours', 'Active'),
+('Jeans (Wash + Iron)',         'Wash Service',      'WS006 | Wash + Iron',                  45.00,  '2 hours', 'Active'),
+-- Premium Clothing
+('Shirt / T-Shirt (Premium)',   'Premium Clothing',  'PC001 | Premium dry clean',             90.00,  '2 hours', 'Active'),
+('Dhoti (Premium)',             'Premium Clothing',  'PC002 | Premium dry clean',             90.00,  '2 hours', 'Active'),
+('Silk Shirt / Silk Dhoti',     'Premium Clothing',  'PC003 | Premium silk care',            120.00,  '2 hours', 'Active'),
+('Coat / Blazer',               'Premium Clothing',  'PC004 | Premium dry clean',            255.00,  '2 hours', 'Active'),
+('Sherwani',                    'Premium Clothing',  'PC005 | Premium dry clean',            400.00,  '2 hours', 'Active'),
+-- Regular Clothing
+('Shirt / T-Shirt (Regular)',   'Regular Clothing',  'RC001 | Regular dry clean',             75.00,  '2 hours', 'Active'),
+('Pant / Shorts',               'Regular Clothing',  'RC002 | Regular dry clean',             75.00,  '2 hours', 'Active'),
+('Dhoti (Regular)',             'Regular Clothing',  'RC003 | Regular dry clean',             75.00,  '2 hours', 'Active'),
+-- Household Items
+('Bed Sheet (Single)',          'Household Items',   'HH001 | Household cleaning',            90.00,  '2 hours', 'Active'),
+('Bed Sheet (Double)',          'Household Items',   'HH002 | Household cleaning',           140.00,  '2 hours', 'Active'),
+('Sports Shoes / Sneakers',     'Household Items',   'HH003 | Shoe cleaning',                300.00,  '2 hours', 'Active'),
+('Leather Shoe',                'Household Items',   'HH004 | Premium shoe cleaning',        400.00,  '2 hours', 'Active')
+ON CONFLICT DO NOTHING;
+
 COMMIT;
 -- =====================================================================
 -- SETUP COMPLETE! 

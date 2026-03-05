@@ -70,10 +70,10 @@ import { ServiceImportDialog } from '@/components/services/service-import-dialog
 // Service icon mapping
 const getServiceIcon = (category: string) => {
   const icons: Record<string, typeof Package> = {
-    'Cleaning': Sparkles,
-    'Maintenance': Package,
-    'Repair': Package,
-    'Installation': Package,
+    'Wash Service': Sparkles,
+    'Premium Clothing': Star,
+    'Regular Clothing': ShoppingCart,
+    'Household Items': Package,
     'default': Package
   };
   return icons[category] || icons.default;

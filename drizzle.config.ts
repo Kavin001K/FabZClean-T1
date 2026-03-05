@@ -9,6 +9,6 @@ export default defineConfig({
   dialect: "postgresql", // Changed to match schema definition (pg-core)
   dbCredentials: {
     // Direct connection to DB (no pooler)
-    url: process.env.SUPABASE_DB_URL || "postgres://postgres:Durai%402025@db.rxyatfvjjnvjxwyhhhqn.supabase.co:5432/postgres",
+    url: process.env.SUPABASE_DB_URL || "postgresql://postgres:badxit-mewjyw-kaDga9@db.pxhydxsqtqpewmjfhhoh.supabase.co:5432/postgres",
   },
 });

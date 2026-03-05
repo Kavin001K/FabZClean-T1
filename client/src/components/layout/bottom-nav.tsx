@@ -4,7 +4,7 @@ import {
     ShoppingCart,
     PlusCircle,
     Users2,
-    Printer,
+    Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -13,7 +13,7 @@ const BOTTOM_NAV_ITEMS = [
     { to: "/orders", label: "Orders", icon: ShoppingCart },
     { to: "/create-order", label: "New", icon: PlusCircle },
     { to: "/customers", label: "Customers", icon: Users2 },
-    { to: "/print-queue", label: "Tags", icon: Printer },
+    { to: "/services", label: "Services", icon: Settings },
 ];
 
 export function BottomNav() {

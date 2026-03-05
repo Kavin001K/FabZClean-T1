@@ -95,6 +95,8 @@
 @layer base {
   * {
     @apply border-border;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
@@ -419,6 +421,7 @@ html {
   ::-webkit-scrollbar {
     display: none;
   }
+
   html {
     scrollbar-width: none;
   }
@@ -529,11 +532,11 @@ html.density-compact table th {
   padding: 0.5rem 0.75rem;
 }
 
-html.density-compact .space-y-4 > * + * {
+html.density-compact .space-y-4>*+* {
   margin-top: 0.75rem;
 }
 
-html.density-compact .space-y-6 > * + * {
+html.density-compact .space-y-6>*+* {
   margin-top: 1rem;
 }
 
