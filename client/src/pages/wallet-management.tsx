@@ -69,7 +69,7 @@ const fetchCustomers = async (): Promise<WalletCustomer[]> => {
 };
 
 const walletApi = {
-  recharge: async (customerId: string, payload: { amount: number; paymentMethod: string; notes?: string }) => {
+  recharge: async (customerId: string, payload: { amount: number; paymentMethod: string; referenceNumber?: string; notes?: string }) => {
     const res = await authorizedFetch(`/credits/${customerId}/payment`, {
       method: "POST",
       body: JSON.stringify(payload),
@@ -109,9 +109,11 @@ export default function WalletManagementPage() {
   const [rechargeOpen, setRechargeOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [referenceNumber, setReferenceNumber] = useState("");
 
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
@@ -123,6 +125,18 @@ export default function WalletManagementPage() {
     queryKey: ["wallet-management", "customers"],
     queryFn: fetchCustomers,
     staleTime: 15000,
+  });
+
+  const { data: customerHistory = [], isLoading: historyLoading } = useQuery({
+    queryKey: ["customer-credits", selectedCustomer?.id],
+    queryFn: async () => {
+      if (!selectedCustomer) return [];
+      const res = await authorizedFetch(`/credits/${selectedCustomer.id}`);
+      if (!res.ok) throw new Error("Failed to load history");
+      const payload = await res.json();
+      return Array.isArray(payload.data?.history) ? payload.data.history : [];
+    },
+    enabled: !!selectedCustomer && historyOpen,
   });
 
   const { data: customerOrders = [], isLoading: ordersLoading } = useQuery({
@@ -148,6 +162,7 @@ export default function WalletManagementPage() {
   const resetDialogState = () => {
     setAmount("");
     setPaymentMethod("cash");
+    setReferenceNumber("");
     setReason("");
     setNotes("");
     setSelectedOrderId("");
@@ -157,6 +172,7 @@ export default function WalletManagementPage() {
     mutationFn: () => walletApi.recharge(selectedCustomer!.id, {
       amount: toNumber(amount, 0),
       paymentMethod,
+      referenceNumber,
       notes: `Recharge by ${employee?.fullName || employee?.username} (${employee?.employeeId}). ${notes || ""}`.trim(),
     }),
     onSuccess: () => {
@@ -286,28 +302,47 @@ export default function WalletManagementPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-          <Card>
-            <CardContent className="pt-5">
-              <p className="text-sm text-muted-foreground">Customers</p>
-              <p className="text-2xl font-bold">{totals.customers}</p>
+          <Card className="overflow-hidden border-none shadow-premium bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
+            <CardContent className="relative p-6">
+              <div className="absolute top-4 right-4 h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center backdrop-blur-sm shadow-inner">
+                <Search className="h-6 w-6 text-blue-500/70" />
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500/80">Customers</p>
+              <p className="mt-1 text-4xl font-black tracking-tight text-slate-900 dark:text-white">{totals.customers}</p>
+              <div className="mt-2 text-[10px] text-slate-400 font-medium">Active managed wallets</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-5">
-              <p className="text-sm text-muted-foreground">Outstanding</p>
-              <p className="text-2xl font-bold text-amber-500">₹{totals.totalOutstanding.toFixed(2)}</p>
+
+          <Card className="overflow-hidden border-none shadow-premium bg-gradient-to-br from-amber-50 to-white dark:from-amber-950/20 dark:to-slate-950">
+            <CardContent className="relative p-6">
+              <div className="absolute top-4 right-4 h-12 w-12 rounded-full bg-amber-500/10 flex items-center justify-center backdrop-blur-sm shadow-inner">
+                <IndianRupee className="h-6 w-6 text-amber-500/70" />
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-amber-600/80">Outstanding</p>
+              <p className="mt-1 text-4xl font-black tracking-tight text-amber-600">₹{totals.totalOutstanding.toFixed(0)}</p>
+              <div className="mt-2 text-[10px] text-amber-500/60 font-medium">Total receivables from credit</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-5">
-              <p className="text-sm text-muted-foreground">Prepaid Wallet</p>
-              <p className="text-2xl font-bold text-emerald-500">₹{totals.totalPrepaid.toFixed(2)}</p>
+
+          <Card className="overflow-hidden border-none shadow-premium bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/20 dark:to-slate-950">
+            <CardContent className="relative p-6">
+              <div className="absolute top-4 right-4 h-12 w-12 rounded-full bg-emerald-500/10 flex items-center justify-center backdrop-blur-sm shadow-inner">
+                <Wallet className="h-6 w-6 text-emerald-500/70" />
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600/80">Prepaid Wallet</p>
+              <p className="mt-1 text-4xl font-black tracking-tight text-emerald-600">₹{totals.totalPrepaid.toFixed(0)}</p>
+              <div className="mt-2 text-[10px] text-emerald-500/60 font-medium">Available customer balances</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-5">
-              <p className="text-sm text-muted-foreground">Limit Exceeded</p>
-              <p className="text-2xl font-bold text-red-500">{totals.exceededCount}</p>
+
+          <Card className="overflow-hidden border-none shadow-premium bg-gradient-to-br from-rose-50 to-white dark:from-rose-950/20 dark:to-slate-950">
+            <CardContent className="relative p-6">
+              <div className="absolute top-4 right-4 h-12 w-12 rounded-full bg-rose-500/10 flex items-center justify-center backdrop-blur-sm shadow-inner">
+                <AlertTriangle className="h-6 w-6 text-rose-500/70" />
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-rose-600/80">Limit Exceeded</p>
+              <p className="mt-1 text-4xl font-black tracking-tight text-rose-600">{totals.exceededCount}</p>
+              <div className="mt-2 text-[10px] text-rose-500/60 font-medium text-destructive">High risk accounts detected</div>
             </CardContent>
           </Card>
         </div>
@@ -414,6 +449,14 @@ export default function WalletManagementPage() {
                               }}>
                                 <Wallet className="mr-2 h-4 w-4" /> Recharge Wallet
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                resetDialogState();
+                                setSelectedCustomer(row);
+                                setHistoryOpen(true);
+                              }}>
+                                <RefreshCw className="mr-2 h-4 w-4" /> View History
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               {canAdjust && (
                                 <DropdownMenuItem onClick={() => {
                                   resetDialogState();
@@ -473,9 +516,20 @@ export default function WalletManagementPage() {
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="upi">UPI</SelectItem>
-                  <SelectItem value="credit">Credit</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="net_banking">Net Banking</SelectItem>
+                  <SelectItem value="cheque">Cheque</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Reference Number (Optional)</Label>
+              <Input placeholder="e.g. Transaction ID / Cheque No" value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Internal Note</Label>
+              <Input placeholder="Additional context..." value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
@@ -622,6 +676,86 @@ export default function WalletManagementPage() {
               Apply Adjustment
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
+          <div className="p-6 pb-4 bg-gradient-to-r from-slate-900 to-slate-800 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-xl text-white">Transaction History</DialogTitle>
+              <DialogDescription className="text-slate-300">
+                Wallet activity for <span className="text-white font-semibold">{selectedCustomer?.name}</span>
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-0">
+            {historyLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+                <RefreshCw className="h-8 w-8 text-slate-300 animate-spin mb-3" />
+                <p className="text-sm text-slate-400">Loading ledger data...</p>
+              </div>
+            ) : customerHistory.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+                <div className="h-16 w-16 rounded-full bg-slate-50 dark:bg-slate-900 flex items-center justify-center mb-4">
+                  <Wallet className="h-8 w-8 text-slate-300" />
+                </div>
+                <h3 className="text-lg font-medium">No Transactions Found</h3>
+                <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+                  This customer hasn't had any wallet activity yet.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {customerHistory.map((tx: any) => {
+                  const isCredit = tx.type === 'payment' || tx.type === 'deposit' || toNumber(tx.amount) < 0;
+                  return (
+                    <div key={tx.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors group">
+                      <div className="flex justify-between items-start mb-1">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "h-9 w-9 rounded-full flex items-center justify-center",
+                            isCredit ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"
+                          )}>
+                            {isCredit ? <CheckCircle2 className="h-5 w-5" /> : <IndianRupee className="h-5 w-5" />}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm capitalize">{tx.type}</p>
+                            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                              {new Date(tx.createdAt || tx.transactionDate).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={cn("font-bold", isCredit ? "text-emerald-600" : "text-amber-600")}>
+                            {isCredit ? "+" : "-"}₹{Math.abs(toNumber(tx.amount)).toFixed(2)}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">Balance: ₹{toNumber(tx.balanceAfter).toFixed(2)}</p>
+                        </div>
+                      </div>
+                      {(tx.description || tx.notes || tx.referenceNumber) && (
+                        <div className="ml-12 mt-2 p-2.5 rounded-md bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
+                          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                            {tx.description || tx.notes}
+                          </p>
+                          {tx.referenceNumber && (
+                            <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">
+                              Ref: {tx.referenceNumber}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 border-t bg-slate-50 dark:bg-slate-900/20 flex justify-end">
+            <Button variant="outline" onClick={() => setHistoryOpen(false)}>Close Statement</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </PageTransition>

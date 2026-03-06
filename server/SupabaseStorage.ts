@@ -963,14 +963,18 @@ export class SupabaseStorage {
         return true;
     }
 
-    async getEmployees(): Promise<Employee[]> {
-        const { data, error } = await this.supabase.from('employees').select('*');
+    async getEmployees(franchiseId?: string, factoryId?: string): Promise<Employee[]> {
+        let query = this.supabase.from('employees').select('*');
+        if (franchiseId) query = query.eq('franchise_id', franchiseId);
+        if (factoryId) query = query.eq('factory_id', factoryId);
+
+        const { data, error } = await query;
         if (error) throw error;
         return data.map(item => this.mapDates(item));
     }
 
-    async listEmployees(): Promise<Employee[]> {
-        return this.getEmployees();
+    async listEmployees(franchiseId?: string, factoryId?: string): Promise<Employee[]> {
+        return this.getEmployees(franchiseId, factoryId);
     }
 
     // ======= BARCODES =======

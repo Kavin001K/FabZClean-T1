@@ -79,6 +79,10 @@ export interface IStorage {
   // Employee methods
   getEmployee(id: string): Promise<any | undefined>;
   getEmployeeByEmail(email: string): Promise<any | undefined>;
+  createEmployee(data: any): Promise<any>;
+  updateEmployee(id: string, data: any): Promise<any | undefined>;
+  deleteEmployee(id: string, requesterId?: string, hardDelete?: boolean): Promise<boolean>;
+  listEmployees(franchiseId?: string, factoryId?: string): Promise<any[]>;
 
   // Order methods
   listOrders(): Promise<any[]>;

@@ -229,7 +229,6 @@ export class AuthService {
 
         const newEmployee = await storage.createEmployee({
             // Basic Info
-            name: data.fullName || `${firstName} ${lastName}`,
             email: data.email || `${data.username.toLowerCase()}@fabzclean.com`,
             phone: data.phone,
             employeeId: generatedEmployeeId,
@@ -579,9 +578,11 @@ export class AuthService {
         return {
             id: localEmployee.id,
             employeeId: localEmployee.employeeId || localEmployee.employee_id || localEmployee.email,
-            username: localEmployee.employeeId || localEmployee.employee_id || localEmployee.email || localEmployee.name,
+            username: localEmployee.employeeId || localEmployee.employee_id || localEmployee.email,
             role: normalizedRole as any,
-            fullName: `${localEmployee.firstName || localEmployee.first_name || ''} ${localEmployee.lastName || localEmployee.last_name || ''}`.trim() || localEmployee.name || localEmployee.fullName,
+            firstName: localEmployee.firstName || localEmployee.first_name || '',
+            lastName: localEmployee.lastName || localEmployee.last_name || '',
+            fullName: `${localEmployee.firstName || localEmployee.first_name || ''} ${localEmployee.lastName || localEmployee.last_name || ''}`.trim() || 'User',
             email: localEmployee.email,
             phone: localEmployee.phone,
             isActive: localEmployee.status === 'active' || localEmployee.status === null || localEmployee.status === undefined,
@@ -603,23 +604,29 @@ export class AuthService {
     /**
      * List employees - local storage only
      */
-    static async listEmployees(requesterRole: string): Promise<AuthEmployee[]> {
-        const localEmployees = await storage.listEmployees();
+    static async listEmployees(requesterRole: string, franchiseId?: string, factoryId?: string): Promise<AuthEmployee[]> {
+        const localEmployees = await storage.listEmployees(franchiseId, factoryId);
 
-        return localEmployees.map(emp => ({
-            id: emp.id,
-            employeeId: emp.employeeId || emp.email || emp.id,
-            username: emp.employeeId || emp.email || emp.name,
-            role: emp.role as any,
-            fullName: emp.name || 'Unknown',
-            email: emp.email,
-            phone: emp.phone,
-            isActive: emp.status === 'active' || emp.status === null || emp.status === undefined,
-            status: emp.status || 'active',
-            position: emp.role,
-            department: undefined,
-            hireDate: emp.createdAt ? new Date(emp.createdAt) : undefined,
-        }));
+        return localEmployees.map(emp => {
+            const firstName = emp.firstName || emp.first_name || '';
+            const lastName = emp.lastName || emp.last_name || '';
+            return {
+                id: emp.id,
+                employeeId: emp.employeeId || emp.email || emp.id,
+                username: emp.employeeId || emp.email || emp.id,
+                role: emp.role as any,
+                firstName: firstName,
+                lastName: lastName,
+                fullName: `${firstName} ${lastName}`.trim() || 'Unknown',
+                email: emp.email,
+                phone: emp.phone,
+                isActive: emp.status === 'active' || emp.status === null || emp.status === undefined,
+                status: emp.status || 'active',
+                position: emp.role || emp.position,
+                department: emp.department,
+                hireDate: emp.createdAt || emp.created_at ? new Date(emp.createdAt || emp.created_at) : undefined,
+            };
+        });
     }
 
     /**

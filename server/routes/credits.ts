@@ -109,7 +109,7 @@ router.post('/:customerId/add', requireRole(CREDIT_MANAGE_ROLES), async (req, re
             'credit',
             description,
             orderId,
-            req.employee?.employeeId
+            req.employee?.id
         );
 
         // Log the action
@@ -177,7 +177,7 @@ router.post('/:customerId/payment', requireRole(CREDIT_MANAGE_ROLES), async (req
             'payment',
             description,
             referenceNumber,
-            req.employee?.employeeId,
+            req.employee?.id,
             paymentMethod
         );
 
@@ -250,7 +250,7 @@ router.post('/:customerId/adjust', requireRole(ADMIN_ONLY), async (req, res) => 
             'adjustment',
             description,
             undefined,
-            req.employee?.employeeId
+            req.employee?.id
         );
 
         // Log the action (important for admin adjustments)
