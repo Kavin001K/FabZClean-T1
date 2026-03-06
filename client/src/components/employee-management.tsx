@@ -15,6 +15,10 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeesApi } from '@/lib/data-service';
 import { useAuth } from '@/contexts/auth-context';
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CustomCalendar } from "@/components/ui/calendar";
 import {
   Plus,
   User,
@@ -31,7 +35,7 @@ import {
   Lock,
   Unlock,
   MoreVertical,
-  Calendar,
+  Calendar as CalendarIcon,
   Building,
   Briefcase,
   AlertTriangle
@@ -548,13 +552,37 @@ export default function EmployeeManagement() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                      <Input
-                        id="dateOfBirth"
-                        type="date"
-                        value={employeeForm.dateOfBirth}
-                        onChange={(e) => setEmployeeForm({ ...employeeForm, dateOfBirth: e.target.value })}
-                      />
+                      <Label>Date of Birth</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !employeeForm.dateOfBirth && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {employeeForm.dateOfBirth ? format(new Date(employeeForm.dateOfBirth), "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="w-auto p-0 z-[100]" autoFocus={false}>
+                          <CustomCalendar
+                            mode="single"
+                            captionLayout="dropdown-buttons"
+                            fromYear={1950}
+                            toYear={new Date().getFullYear()}
+                            selected={employeeForm.dateOfBirth ? new Date(employeeForm.dateOfBirth) : undefined}
+                            onSelect={(date) => {
+                              if (date) {
+                                // Add timezone offset so the date isn't shifted by UTC serialization
+                                const adjustedDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+                                setEmployeeForm({ ...employeeForm, dateOfBirth: adjustedDate.toISOString().split('T')[0] });
+                              }
+                            }}
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
 
@@ -681,13 +709,36 @@ export default function EmployeeManagement() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="hireDate">Hire Date *</Label>
-                      <Input
-                        id="hireDate"
-                        type="date"
-                        value={employeeForm.hireDate}
-                        onChange={(e) => setEmployeeForm({ ...employeeForm, hireDate: e.target.value })}
-                      />
+                      <Label>Hire Date *</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !employeeForm.hireDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {employeeForm.hireDate ? format(new Date(employeeForm.hireDate), "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="w-auto p-0 z-[100]" autoFocus={false}>
+                          <CustomCalendar
+                            mode="single"
+                            captionLayout="dropdown-buttons"
+                            fromYear={2000}
+                            toYear={new Date().getFullYear() + 20}
+                            selected={employeeForm.hireDate ? new Date(employeeForm.hireDate) : undefined}
+                            onSelect={(date) => {
+                              if (date) {
+                                const adjustedDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+                                setEmployeeForm({ ...employeeForm, hireDate: adjustedDate.toISOString().split('T')[0] });
+                              }
+                            }}
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
                 </TabsContent>
