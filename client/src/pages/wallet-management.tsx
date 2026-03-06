@@ -115,6 +115,7 @@ export default function WalletManagementPage() {
 
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
+  const [selectedOrderId, setSelectedOrderId] = useState<string>("");
 
   const canAdjust = employee?.role === "admin";
 
@@ -123,6 +124,20 @@ export default function WalletManagementPage() {
     queryFn: fetchCustomers,
     staleTime: 15000,
   });
+
+  const { data: customerOrders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ["customer-orders", selectedCustomer?.id],
+    queryFn: async () => {
+      if (!selectedCustomer) return [];
+      const res = await authorizedFetch(`/orders/customer/${selectedCustomer.id}`);
+      if (!res.ok) throw new Error("Failed to load customer orders");
+      const payload = await res.json();
+      return Array.isArray(payload.data) ? payload.data : [];
+    },
+    enabled: !!selectedCustomer && refundOpen,
+  });
+
+  const selectedOrder = customerOrders.find((o: any) => o.id === selectedOrderId);
 
   const refreshData = () => {
     refetch();
@@ -135,13 +150,14 @@ export default function WalletManagementPage() {
     setPaymentMethod("cash");
     setReason("");
     setNotes("");
+    setSelectedOrderId("");
   };
 
   const rechargeMutation = useMutation({
     mutationFn: () => walletApi.recharge(selectedCustomer!.id, {
       amount: toNumber(amount, 0),
       paymentMethod,
-      notes: notes || undefined,
+      notes: `Recharge by ${employee?.fullName || employee?.username} (${employee?.employeeId}). ${notes || ""}`.trim(),
     }),
     onSuccess: () => {
       toast({ title: "Wallet recharged", description: "Customer wallet recharge recorded." });
@@ -156,9 +172,9 @@ export default function WalletManagementPage() {
 
   const refundMutation = useMutation({
     mutationFn: () => walletApi.refund(selectedCustomer!.id, {
-      amount: toNumber(amount, 0),
-      reason: reason || "Wallet refund",
-      notes: notes || undefined,
+      amount: -Math.abs(toNumber(amount, 0)), // Ensure debit for refund
+      reason: `Refund for Order ${selectedOrder?.orderNumber || "manual"}: ${reason}`,
+      notes: `Refund issued by ${employee?.fullName || employee?.username} (${employee?.employeeId}). Link: ${selectedOrderId || "N/A"}. ${notes || ""}`.trim(),
     }),
     onSuccess: () => {
       toast({ title: "Refund recorded", description: "Refund entry has been posted." });
@@ -175,7 +191,7 @@ export default function WalletManagementPage() {
     mutationFn: () => walletApi.adjust(selectedCustomer!.id, {
       amount: toNumber(amount, 0),
       reason: reason || "Manual adjustment",
-      notes: notes || undefined,
+      notes: `Adjustment by ${employee?.fullName || employee?.username} (${employee?.employeeId}). ${notes || ""}`.trim(),
     }),
     onSuccess: () => {
       toast({ title: "Wallet adjusted", description: "Manual adjustment posted successfully." });
@@ -487,25 +503,83 @@ export default function WalletManagementPage() {
               {employee?.fullName || employee?.username} ({employee?.employeeId})
             </span>
           </div>
-          <div className="space-y-3 py-2">
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Select Old Order (Refund Target)</Label>
+              <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={ordersLoading ? "Loading orders..." : "Select an order"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {customerOrders.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground">No orders found</div>
+                  ) : (
+                    customerOrders.map((order: any) => (
+                      <SelectItem key={order.id} value={order.id}>
+                        {order.orderNumber} - ₹{parseFloat(order.totalAmount || "0").toFixed(2)} ({new Date(order.createdAt).toLocaleDateString()})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {selectedOrder && (
+                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                  Max Refund: ₹{parseFloat(selectedOrder.totalAmount || "0").toFixed(2)}
+                </p>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label>Amount</Label>
-              <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+              />
+              {selectedOrder && toNumber(amount) > parseFloat(selectedOrder.totalAmount || "0") && (
+                <p className="text-xs text-red-500 font-medium">Amount exceeds order value!</p>
+              )}
             </div>
+
             <div className="space-y-2">
-              <Label>Reason</Label>
-              <Input value={reason} onChange={(e) => setReason(e.target.value)} />
+              <Label>Reason (Required)</Label>
+              <Select value={reason} onValueChange={setReason}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Order Cancelled">Order Cancelled</SelectItem>
+                  <SelectItem value="Double Payment">Double Payment</SelectItem>
+                  <SelectItem value="Service Unsatisfactory">Service Unsatisfactory</SelectItem>
+                  <SelectItem value="Promotional Adjustment">Promotional Adjustment</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
             <div className="space-y-2">
-              <Label>Notes</Label>
-              <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <Label>Additional Notes</Label>
+              <Input
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional details..."
+              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRefundOpen(false)}>Cancel</Button>
             <Button
               onClick={() => refundMutation.mutate()}
-              disabled={refundMutation.isPending || toNumber(amount, 0) <= 0}
+              disabled={
+                refundMutation.isPending ||
+                toNumber(amount, 0) <= 0 ||
+                !reason ||
+                !selectedOrderId ||
+                (selectedOrder && toNumber(amount) > parseFloat(selectedOrder.totalAmount || "0"))
+              }
             >
               Post Refund
             </Button>
@@ -519,6 +593,12 @@ export default function WalletManagementPage() {
             <DialogTitle>Manual Wallet Adjustment</DialogTitle>
             <DialogDescription>{selectedCustomer?.name}</DialogDescription>
           </DialogHeader>
+          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+            <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Adjustment by:</span>
+            <span className="text-xs font-semibold text-blue-900 dark:text-blue-100">
+              {employee?.fullName || employee?.username} ({employee?.employeeId})
+            </span>
+          </div>
           <div className="space-y-3 py-2">
             <div className="space-y-2">
               <Label>Amount (+/-)</Label>

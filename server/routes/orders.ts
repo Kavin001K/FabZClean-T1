@@ -234,6 +234,28 @@ router.get('/print-queue', async (req, res) => {
   }
 });
 
+// Get orders for a specific customer
+router.get('/customer/:customerId', async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const allOrders = await storage.listOrders();
+    const customerOrders = allOrders.filter((order: Order) => order.customerId === customerId);
+
+    // Sort by newest first
+    customerOrders.sort((a: Order, b: Order) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    const serializedOrders = customerOrders.map(order => serializeOrder(order));
+    res.json(createSuccessResponse(serializedOrders));
+  } catch (error) {
+    console.error('Fetch customer orders error:', error);
+    res.status(500).json(createErrorResponse('Failed to fetch customer orders', 500));
+  }
+});
+
 // Get single order
 router.get('/:id', async (req, res) => {
   try {
