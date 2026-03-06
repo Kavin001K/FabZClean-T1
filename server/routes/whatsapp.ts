@@ -1,3 +1,4 @@
+
 // server/routes/whatsapp.ts
 import { Router } from "express";
 import {
@@ -7,6 +8,7 @@ import {
     MAX_RESENDS,
 } from "../services/whatsapp.service";
 import { smartItemSummary } from "../utils/item-summarizer";
+import { storage } from "../storage";
 
 const router = Router();
 
@@ -37,7 +39,7 @@ router.post("/send-invoice", async (req, res) => {
         if (sendCount >= MAX_RESENDS) {
             return res.status(400).json({
                 success: false,
-                error: `Maximum messages (${MAX_RESENDS}) already sent for this order`,
+                error: `Maximum messages(${ MAX_RESENDS }) already sent for this order`,
                 canResendAgain: false,
             });
         }
@@ -45,12 +47,12 @@ router.post("/send-invoice", async (req, res) => {
         // Get template based on send count
         const templateType = getTemplateForSendCount(sendCount);
 
-        console.log(`[WhatsApp] Send #${sendCount + 1} using template: ${templateType}`);
+        console.log(`[WhatsApp] Send #${ sendCount + 1 } using template: ${ templateType }`);
 
         const result = await sendInvoiceWhatsApp({
             phoneNumber,
             pdfUrl,
-            filename: filename || `Invoice-${invoiceNumber || 'order'}.pdf`,
+            filename: filename || `Invoice - ${ invoiceNumber || 'order' }.pdf`,
             customerName: customerName || "Valued Customer",
             invoiceNumber: invoiceNumber || "N/A",
             amount: String(amount || "0.00"),
@@ -101,7 +103,7 @@ router.post("/send-bill", async (req, res) => {
         if (sendCount >= MAX_RESENDS) {
             return res.status(400).json({
                 success: false,
-                error: `Maximum messages (${MAX_RESENDS}) already sent for this order`,
+                error: `Maximum messages(${ MAX_RESENDS }) already sent for this order`,
                 canResendAgain: false,
                 newSendCount: sendCount,
             });
@@ -109,64 +111,110 @@ router.post("/send-bill", async (req, res) => {
 
         // Smart Item Summary
         const itemSummary = mainItem || smartItemSummary(items) || "Laundry Items";
-        console.log(`[WhatsApp] Bill for order ${orderId}, sendCount: ${sendCount}, item: "${itemSummary}"`);
+        console.log(`[WhatsApp] Bill for order ${ orderId }, sendCount: ${ sendCount }, item: "${itemSummary}"`);
 
         // Get template based on send count
         const templateType = getTemplateForSendCount(sendCount);
-        console.log(`[WhatsApp] Using template: ${templateType}`);
+        console.log(`[WhatsApp] Using template: ${ templateType } `);
 
         // If no PDF URL, send text message instead
         if (!pdfUrl) {
             const itemText = itemSummary !== "Laundry Items"
-                ? `This includes your ${itemSummary}.`
+                ? `This includes your ${ itemSummary }.`
                 : "";
 
             const appBaseUrl = process.env.APP_BASE_URL || 'https://acedigital.myfabclean.com';
-            const message = `Hi ${customerName}! 👋 Your laundry order is Processing! 🧺\n\nWe have generated Invoice ${orderId} for ₹${amount || '0.00'}.${itemText ? ` ${itemText}` : ''}\n\nPayment Options: Scan the QR in the invoice or use UPI / Google Pay / PhonePe.\n📄 Terms: ${appBaseUrl}/terms\n\nThanks for choosing Fab Clean!`;
+            const message = `Hi ${ customerName } ! 👋 Your laundry order is Processing! 🧺\n\nWe have generated Invoice ${ orderId } for ₹${ amount || '0.00' }.${ itemText ? ` ${itemText}` : '' } \n\nPayment Options: Scan the QR in the invoice or use UPI / Google Pay / PhonePe.\n📄 Terms: ${ appBaseUrl }/terms\n\nThanks for choosing Fab Clean!`;
 
-            const textResult = await sendTextWhatsApp({
-                phoneNumber: customerPhone,
-                message,
-            });
+const textResult = await sendTextWhatsApp({
+    phoneNumber: customerPhone,
+    message,
+});
 
-            const newSendCount = sendCount + 1;
+const newSendCount = sendCount + 1;
 
-            return res.json({
-                success: textResult.success,
-                error: textResult.error,
-                message: "WhatsApp text message sent",
-                newSendCount,
-                canResendAgain: newSendCount < MAX_RESENDS,
-            });
+// Update database with text message success
+try {
+    // Find order by orderNumber to get internal id
+    const allOrders = await storage.listOrders();
+    const matchedOrder = allOrders.find(o => o.orderNumber === orderId);
+
+    if (matchedOrder) {
+        await storage.updateOrder(matchedOrder.id, {
+            lastWhatsappStatus: textResult.success ? `Text Sent - Count: ${newSendCount}` : `Text Failed: ${textResult.error}`,
+            lastWhatsappSentAt: new Date(),
+            whatsappMessageCount: newSendCount,
+        });
+    }
+} catch (dbErr) {
+    console.warn("[WhatsApp] Failed to update DB status for text send:", dbErr);
+}
+
+return res.json({
+    success: textResult.success,
+    error: textResult.error,
+    message: "WhatsApp text message sent",
+    newSendCount,
+    canResendAgain: newSendCount < MAX_RESENDS,
+});
         }
 
-        // Send with PDF attachment using appropriate template
-        const result = await sendInvoiceWhatsApp({
-            phoneNumber: customerPhone,
-            pdfUrl,
-            filename: `Invoice-${orderId}.pdf`,
-            customerName,
-            invoiceNumber: orderId,
-            amount: String(amount || "0.00"),
-            itemName: itemSummary,
-            templateType,
-        });
+// Send with PDF attachment using appropriate template
+const result = await sendInvoiceWhatsApp({
+    phoneNumber: customerPhone,
+    pdfUrl,
+    filename: `Invoice-${orderId}.pdf`,
+    customerName,
+    invoiceNumber: orderId,
+    amount: String(amount || "0.00"),
+    itemName: itemSummary,
+    templateType,
+});
 
-        const newSendCount = sendCount + 1;
+const newSendCount = sendCount + 1;
 
-        res.json({
-            success: result.success,
-            error: result.error,
-            message: "WhatsApp bill sent successfully",
-            templateUsed: result.templateUsed,
-            newSendCount,
-            canResendAgain: newSendCount < MAX_RESENDS,
-            remainingSends: MAX_RESENDS - newSendCount,
-        });
-    } catch (error) {
-        console.error("[WhatsApp] Bill Error:", error);
-        res.status(500).json({ success: false, error: "Failed to send WhatsApp message" });
+// Sync real pdfUrl and WhatsApp status back to the order table
+try {
+    if (result.success && pdfUrl) {
+        // Find order internal ID via the orderNumber
+        const allOrders = await storage.listOrders();
+        const matchedOrder = allOrders.find(o => o.orderNumber === orderId);
+
+        if (matchedOrder) {
+            await storage.updateOrder(matchedOrder.id, {
+                invoiceUrl: pdfUrl,
+                lastWhatsappStatus: `Bill Sent - Count: ${newSendCount}`,
+                lastWhatsappSentAt: new Date(),
+                whatsappMessageCount: newSendCount,
+            });
+        }
+    } else if (!result.success && pdfUrl) {
+        const allOrders = await storage.listOrders();
+        const matchedOrder = allOrders.find(o => o.orderNumber === orderId);
+
+        if (matchedOrder) {
+            await storage.updateOrder(matchedOrder.id, {
+                lastWhatsappStatus: `Bill Failed: ${result.error}`,
+            });
+        }
     }
+} catch (dbErr) {
+    console.warn("[WhatsApp] Failed to update DB tracking post bill send:", dbErr);
+}
+
+res.json({
+    success: result.success,
+    error: result.error,
+    message: "WhatsApp bill sent successfully",
+    templateUsed: result.templateUsed,
+    newSendCount,
+    canResendAgain: newSendCount < MAX_RESENDS,
+    remainingSends: MAX_RESENDS - newSendCount,
+});
+    } catch (error) {
+    console.error("[WhatsApp] Bill Error:", error);
+    res.status(500).json({ success: false, error: "Failed to send WhatsApp message" });
+}
 });
 
 /**

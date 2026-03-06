@@ -158,6 +158,7 @@ CREATE TABLE "orders" (
     "last_whatsapp_status" TEXT,
     "last_whatsapp_sent_at" TIMESTAMP WITH TIME ZONE,
     "whatsapp_message_count" INTEGER DEFAULT 0,
+    "invoice_url" TEXT,
     "tags_printed" BOOLEAN DEFAULT false,
     "created_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

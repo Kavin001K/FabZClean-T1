@@ -80,6 +80,8 @@ export const orders = pgTable("orders", {
   lastWhatsappStatus: text("last_whatsapp_status"),
   lastWhatsappSentAt: timestamp("last_whatsapp_sent_at"),
   whatsappMessageCount: integer("whatsapp_message_count").default(0),
+  // Bill / Invoice URL tracking
+  invoiceUrl: text("invoice_url"),
   // Tag printing tracking
   tagsPrinted: boolean("tags_printed").default(false),
   createdAt: timestamp("created_at").defaultNow(),
@@ -258,6 +260,7 @@ export const insertOrderSchema = z.object({
   lastWhatsappStatus: z.string().optional().nullable(),
   lastWhatsappSentAt: z.coerce.date().optional().nullable(),
   whatsappMessageCount: z.number().optional().default(0),
+  invoiceUrl: z.string().optional().nullable(),
   tagsPrinted: z.coerce.boolean().optional().default(false),
   createdAt: z.coerce.date().optional(),
   updatedAt: z.coerce.date().optional(),

@@ -351,40 +351,9 @@ router.post(
       // Notify real-time clients
       realtimeServer.triggerUpdate('order', 'created', order);
 
-      // Send WhatsApp notification for order creation (async, don't await)
-      if (order.customerPhone) {
-        const formattedAmount = `Rs.${parseFloat(order.totalAmount || '0').toFixed(0)}`;
-        sendOrderCreatedNotification({
-          phoneNumber: order.customerPhone,
-          customerName: order.customerName,
-          orderNumber: order.orderNumber,
-          amount: formattedAmount,
-        }).then(async (result) => {
-          if (result.success) {
-            console.log(`✅ [WhatsApp] Order created notification sent for ${order.orderNumber}`);
-            try {
-              await storage.updateOrder(order.id, {
-                lastWhatsappStatus: 'Order Created - Sent',
-                lastWhatsappSentAt: new Date(),
-                whatsappMessageCount: 1,
-              });
-            } catch (updateErr) {
-              console.warn('Failed to update WhatsApp status:', updateErr);
-            }
-          } else {
-            console.warn(`⚠️ [WhatsApp] Failed to send order created notification: ${result.error}`);
-            try {
-              await storage.updateOrder(order.id, {
-                lastWhatsappStatus: `Order Created - Failed: ${result.error}`,
-              });
-            } catch (updateErr) {
-              console.warn('Failed to update WhatsApp status:', updateErr);
-            }
-          }
-        }).catch(err => {
-          console.error(`❌ [WhatsApp] Error sending order created notification:`, err);
-        });
-      }
+      // Note: We no longer send WhatsApp automatically on order creation from here.
+      // The frontend handles generating the PDF bill and calling /api/whatsapp/send-bill
+      // to ensure the real PDF link is sent rather than a static placeholder.
 
       const serializedOrder = serializeOrder(order);
       res.status(201).json(createSuccessResponse(serializedOrder, 'Order created successfully'));
