@@ -169,11 +169,10 @@ export async function sendOrderCreatedNotification({
                     {
                         to: [cleanPhone],
                         components: {
-                            // Header: Document (Required by template 'v')
+                            // Header: Image (Required by template 'v')
                             header_1: {
-                                filename: "Order-Confirmation.pdf",
-                                type: "document",
-                                value: process.env.DEFAULT_INVOICE_URL || "https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/pdfs/bill-1766141946654-106714533.pdf",
+                                type: "image",
+                                value: process.env.WHATSAPP_PROCESSING_IMAGE_URL || "https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/Templates/Screenshot%202025-12-27%20at%2010.32.31%20PM.png",
                             },
                             // Body parameters
                             body_1: {
@@ -765,19 +764,21 @@ export async function sendInvoiceWhatsApp({
             }
         };
     } else {
-        // "order" template (v): The user has indicated this is a full Invoice template
-        // Includes: Document Header, 4 Body Params, 2 URL Buttons
-        // Mapping corrected as per user request:
+        // "order" template (v): The user is using Template (v) which expects an Image header
+        // Includes: Image Header, 4 Body Params, 1 URL Button
+        // Mapping:
         // {{1}} = Customer Name
         // {{2}} = Order/Invoice Number
         // {{3}} = Item Name
         // {{4}} = Amount
+        const orderImageUrl = process.env.WHATSAPP_STATUS_IMAGE_URL ||
+            'https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/Templates/Screenshot%202025-12-27%20at%2010.32.31%20PM.png';
+
         components = {
-            // Header: Document format (PDF)
+            // Header: Image
             header_1: {
-                filename: filename,
-                type: "document",
-                value: pdfUrl,
+                type: "image",
+                value: orderImageUrl,
             },
             body_1: {
                 type: "text",
