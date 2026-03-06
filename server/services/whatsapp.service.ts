@@ -171,42 +171,33 @@ export async function sendOrderCreatedNotification({
                         components: {
                             // Header: Document (Required by template 'v')
                             header_1: {
+                                filename: "Order-Confirmation.pdf",
                                 type: "document",
                                 value: process.env.DEFAULT_INVOICE_URL || "https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/pdfs/bill-1766141946654-106714533.pdf",
-                                filename: "Order-Confirmation.pdf",
                             },
-                            // Body 1: Customer Name
+                            // Body parameters
                             body_1: {
                                 type: "text",
                                 value: customerName,
                             },
-                            // Body 2: Order Number
                             body_2: {
                                 type: "text",
                                 value: orderNumber,
                             },
-                            // Body 3: Item/Description (e.g. "Laundry Order")
                             body_3: {
                                 type: "text",
                                 value: "Laundry Order",
                             },
-                            // Body 4: Amount
                             body_4: {
                                 type: "text",
                                 value: amount,
                             },
-                            // Button 1: Track Order - dynamic URL suffix
+                            // Button 1: Track Order (Only 1 dynamic button in template 'v')
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                value: `${APP_BASE_URL}/trackorder/${cleanOrderNumber}`,
-                            },
-                            // Button 2: Terms & Conditions - dynamic URL suffix
-                            button_2: {
-                                subtype: "url",
-                                type: "text",
-                                value: `${APP_BASE_URL}/terms`,
-                            },
+                                value: orderNumber.replace(/[#]/g, '').trim(),
+                            }
                         },
                     },
                 ],
@@ -327,14 +318,12 @@ export async function sendOrderProcessingNotification({
                     {
                         to: [cleanPhone],
                         components: {
-                            // Header: IMAGE (not document!)
+                            // Header: IMAGE
                             header_1: {
                                 type: "image",
                                 value: processingImageUrl,
                             },
                             // Body: Only 2 params for "bill" template
-                            // {{1}} = Customer Name
-                            // {{2}} = Order Number
                             body_1: {
                                 type: "text",
                                 value: customerName,
@@ -343,18 +332,18 @@ export async function sendOrderProcessingNotification({
                                 type: "text",
                                 value: orderNumber,
                             },
-                            // Button 1: Track Order - Full URL
+                            // Button 1: Track Order
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                value: `${APP_BASE_URL}/trackorder/${cleanOrderNumber}`,
+                                value: orderNumber.replace(/[#]/g, '').trim(),
                             },
-                            // Button 2: Terms & Conditions - Full URL
+                            // Button 2: Terms
                             button_2: {
                                 subtype: "url",
                                 type: "text",
-                                value: `${APP_BASE_URL}/terms`,
-                            },
+                                value: "terms",
+                            }
                         },
                     },
                 ],
@@ -477,17 +466,12 @@ export async function sendOrderStatusUpdateNotification({
                     {
                         to: [cleanPhone],
                         components: {
-                            // Header image component (required by template)
-                            // MSG91 format: FLAT structure with type and value
+                            // Header: Image
                             header_1: {
                                 type: "image",
                                 value: statusImageUrl,
                             },
-                            // Body Variables Mapping:
-                            // {{1}} = Customer Name
-                            // {{2}} = Order Number
-                            // {{3}} = Status
-                            // {{4}} = Additional Info
+                            // Body
                             body_1: {
                                 type: "text",
                                 value: customerName,
@@ -504,18 +488,12 @@ export async function sendOrderStatusUpdateNotification({
                                 type: "text",
                                 value: additionalInfo,
                             },
-                            // Button 1: Track Order - Full URL
+                            // Button 1: Track Order (Only 1 dynamic button in template 'invoice_fabzclean')
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                value: `${APP_BASE_URL}/trackorder/${cleanOrderNumber}`,
-                            },
-                            // Button 2: Terms & Conditions - Full URL
-                            button_2: {
-                                subtype: "url",
-                                type: "text",
-                                value: `${APP_BASE_URL}/terms`,
-                            },
+                                value: orderNumber.replace(/[#]/g, '').trim(),
+                            }
                         },
                     },
                 ],
@@ -738,17 +716,17 @@ export async function sendInvoiceWhatsApp({
                 type: "text",
                 value: invoiceNumber,
             },
-            // Button 1: Track Order - Full URL
+            // Button 1: Track Order (Dynamic suffix)
             button_1: {
                 subtype: "url",
                 type: "text",
-                value: `${APP_BASE_URL}/trackorder/${cleanOrderNumber}`,
+                value: cleanOrderNumber,
             },
-            // Button 2: Terms & Conditions - Full URL
+            // Button 2: Terms & Conditions (Dynamic suffix)
             button_2: {
                 subtype: "url",
                 type: "text",
-                value: `${APP_BASE_URL}/terms`,
+                value: "terms",
             },
         };
     } else if (templateType === 'invoice') {
@@ -779,18 +757,12 @@ export async function sendInvoiceWhatsApp({
                 type: "text",
                 value: itemName,
             },
-            // Button 1: Track Order - Full URL
+            // Button 1: Track Order (Only 1 dynamic button)
             button_1: {
                 subtype: "url",
                 type: "text",
-                value: `${APP_BASE_URL}/trackorder/${cleanOrderNumber}`,
-            },
-            // Button 2: Terms & Conditions - Full URL
-            button_2: {
-                subtype: "url",
-                type: "text",
-                value: `${APP_BASE_URL}/terms`,
-            },
+                value: cleanOrderNumber,
+            }
         };
     } else {
         // "order" template (v): The user has indicated this is a full Invoice template
@@ -803,9 +775,9 @@ export async function sendInvoiceWhatsApp({
         components = {
             // Header: Document format (PDF)
             header_1: {
+                filename: filename,
                 type: "document",
                 value: pdfUrl,
-                filename: filename,
             },
             body_1: {
                 type: "text",
@@ -823,18 +795,12 @@ export async function sendInvoiceWhatsApp({
                 type: "text",
                 value: amount,
             },
-            // Button 1: Track Order - Full URL
+            // Button 1: Track Order (Only 1 dynamic button)
             button_1: {
                 subtype: "url",
                 type: "text",
-                value: `${APP_BASE_URL}/trackorder/${cleanOrderNumber}`,
-            },
-            // Button 2: Terms & Conditions - Full URL
-            button_2: {
-                subtype: "url",
-                type: "text",
-                value: `${APP_BASE_URL}/terms`,
-            },
+                value: cleanOrderNumber,
+            }
         };
     }
 
