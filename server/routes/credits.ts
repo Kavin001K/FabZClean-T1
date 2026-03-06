@@ -19,7 +19,9 @@ const router = Router();
 
 // Roles that can manage credits
 const CREDIT_VIEW_ROLES: UserRole[] = ['admin', 'franchise_manager', 'employee'];
-const CREDIT_MANAGE_ROLES: UserRole[] = ['admin', 'franchise_manager'];
+// Staff should be able to post verified wallet payments/recharges.
+// High-risk balance corrections remain admin-only via ADMIN_ONLY.
+const CREDIT_MANAGE_ROLES: UserRole[] = ['admin', 'franchise_manager', 'employee'];
 const ADMIN_ONLY: UserRole[] = ['admin'];
 
 // Apply JWT authentication to all routes

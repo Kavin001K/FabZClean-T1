@@ -215,6 +215,10 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   const totalOrders = selectedCustomer?.totalOrders || 0;
   const customerSince = selectedCustomer ? new Date(selectedCustomer.createdAt || new Date()) : new Date();
   const daysSinceJoined = Math.max(1, Math.floor((Date.now() - customerSince.getTime()) / (1000 * 60 * 60 * 24)));
+  const selectedOutstanding = selectedCustomer ? parseFloat(selectedCustomer.creditBalance || '0') : 0;
+  const selectedCreditLimitAbs = selectedCustomer ? Math.abs(parseFloat((selectedCustomer as any).creditLimit || '-500')) : 500;
+  const selectedLimitExceeded = selectedOutstanding > selectedCreditLimitAbs;
+  const selectedOutstandingClass = selectedLimitExceeded ? 'text-red-500' : selectedOutstanding === 0 ? 'text-emerald-500' : 'text-amber-500';
 
   // Filter orders for the selected customer
   const customerOrders = React.useMemo(() => {
@@ -231,7 +235,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
     <>
       {/* View Customer Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={onCloseViewDialog}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-4xl max-h-[90dvh] overflow-y-auto">
           {selectedCustomer ? (
             <motion.div
               initial={{ opacity: 0, x: 20 }}
@@ -297,14 +301,19 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="p-4 bg-muted/50 rounded-lg">
-                        <div className="text-lg font-bold text-red-500">
-                          ₹{parseFloat(selectedCustomer.creditBalance || '0').toLocaleString('en-IN')}
+                        <div className={cn("text-lg font-bold", selectedOutstandingClass)}>
+                          ₹{selectedOutstanding.toLocaleString('en-IN')}
                         </div>
                         <div className="text-sm text-muted-foreground">Outstanding Credit</div>
+                        {selectedLimitExceeded && (
+                          <div className="text-xs font-medium text-red-500 mt-1">
+                            Exceeded by ₹{(selectedOutstanding - selectedCreditLimitAbs).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                          </div>
+                        )}
                       </div>
                       <div className="p-4 bg-muted/50 rounded-lg">
-                        <div className="text-lg font-bold text-emerald-500">
-                          ₹{Math.abs(parseFloat((selectedCustomer as any).creditLimit || '-500')).toLocaleString('en-IN')}
+                        <div className={cn("text-lg font-bold", selectedLimitExceeded ? "text-red-500" : "text-emerald-500")}>
+                          ₹{selectedCreditLimitAbs.toLocaleString('en-IN')}
                         </div>
                         <div className="text-sm text-muted-foreground">Credit Limit</div>
                       </div>
@@ -445,7 +454,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
 
       {/* Edit Customer Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={onCloseEditDialog}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-3xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6">
           {selectedCustomer ? (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -649,9 +658,16 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                         value={selectedCustomer?.creditBalance || '0'}
                         placeholder="0"
                         readOnly
-                        className="bg-muted"
+                        className={cn(
+                          "bg-muted",
+                          selectedLimitExceeded ? "border-red-500 text-red-500" : selectedOutstanding === 0 ? "border-emerald-500 text-emerald-500" : "border-amber-500 text-amber-500",
+                        )}
                       />
-                      <p className="text-xs text-muted-foreground">Current outstanding credit amount</p>
+                      <p className={cn("text-xs", selectedLimitExceeded ? "text-red-500" : "text-muted-foreground")}>
+                        {selectedLimitExceeded
+                          ? `Current outstanding credit exceeds limit by ₹${(selectedOutstanding - selectedCreditLimitAbs).toFixed(2)}`
+                          : "Current outstanding credit amount"}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -717,7 +733,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
 
       {/* Create Customer Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={onCloseCreateDialog}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-3xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}

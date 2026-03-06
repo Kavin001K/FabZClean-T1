@@ -7,6 +7,8 @@ import {
   PlusCircle,
   ListOrdered,
   Scissors,
+  Wallet,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -26,6 +28,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/create-order", label: "New Order", icon: PlusCircle },
   { to: "/orders", label: "Active Orders", icon: ListOrdered },
   { to: "/customers", label: "Customers", icon: Users2 },
+  { to: "/wallet-management", label: "Wallet", icon: Wallet },
+  { to: "/user-management", label: "Users", icon: ShieldCheck, adminOnly: true },
   { to: "/services", label: "Services", icon: Scissors },
   { to: "/print-queue", label: "Print Tags", icon: Printer },
 ];
@@ -44,14 +48,13 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
   };
 
   return (
-    <aside className={cn("flex h-full w-60 min-w-0 flex-col border-r bg-background", className)}>
+    <aside className={cn("sticky top-0 flex h-[100dvh] min-h-0 w-60 min-w-0 flex-col border-r bg-background", className)}>
       <div className="flex h-16 items-center justify-between border-b px-6">
         <Link href="/" onClick={handleLinkClick} className="flex min-w-0 items-center gap-2 font-semibold">
           <img src="/assets/logo.webp" alt="FabzClean Logo" className="h-9 w-auto" />
-          <span className="truncate text-lg font-bold tracking-tight text-primary">FabZClean</span>
         </Link>
       </div>
-      <nav className="scrollbar-thin flex flex-1 flex-col gap-1 overflow-y-auto p-4 font-medium">
+      <nav className="scrollbar-thin flex flex-1 min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain scroll-smooth p-4 font-medium">
         {filteredNav.map((item) => {
           const isActive = item.to === "/"
             ? location === "/" || location === "/dashboard"

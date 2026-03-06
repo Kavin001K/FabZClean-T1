@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import { useWebSocket } from '@/hooks/use-websocket';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { getWebSocketUrl } from '@/lib/data-service';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useRealtime as useSupabaseRealtime } from '@/hooks/use-realtime';
 import { useAuth } from './auth-context';
 
@@ -18,6 +19,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const { employee } = useAuth();
   const [analyticsData, setAnalyticsData] = useState(null);
+  const appRealtimeChannelRef = useRef<any>(null);
 
   // Get WebSocket URL that automatically handles production (wss://) vs development (ws://)
   // On Vercel, this will use wss:// automatically when on HTTPS
@@ -121,6 +123,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         toast({ title: 'Services updated', description: 'The list of services has been updated in real-time.' });
       }
 
+      if (type.startsWith('credit_') || type.startsWith('wallet_')) {
+        queryClient.invalidateQueries({ queryKey: ['customers'] });
+        queryClient.invalidateQueries({ queryKey: ['credits'] });
+        queryClient.invalidateQueries({ queryKey: ['wallet-management'] });
+      }
+
       if (type.startsWith('invoice_')) {
         queryClient.invalidateQueries({ queryKey: ['invoices'] });
         queryClient.invalidateQueries({ queryKey: ['invoice', data?.id] });
@@ -208,9 +216,63 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       'posTransaction_created', 'posTransaction_updated', 'posTransaction_deleted',
       'setting_updated',
       'analytics_update',
-      'driver_locations', 'driver_assigned', 'driver_status_update'
+      'driver_locations', 'driver_assigned', 'driver_status_update',
+      'credit_created', 'credit_updated', 'credit_deleted',
+      'wallet_created', 'wallet_updated', 'wallet_deleted'
     ]);
   }, [subscribe]);
+
+  useEffect(() => {
+    if (!employee || !isSupabaseConfigured) return;
+
+    const invalidateByTable = (table: string) => {
+      if (table === 'orders') {
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        queryClient.invalidateQueries({ queryKey: ['print-queue'] });
+        return;
+      }
+      if (table === 'customers') {
+        queryClient.invalidateQueries({ queryKey: ['customers'] });
+        queryClient.invalidateQueries({ queryKey: ['credits'] });
+        queryClient.invalidateQueries({ queryKey: ['wallet-management'] });
+        return;
+      }
+      if (table === 'services') {
+        queryClient.invalidateQueries({ queryKey: ['services'] });
+        return;
+      }
+      if (table === 'employees') {
+        queryClient.invalidateQueries({ queryKey: ['employees'] });
+        return;
+      }
+      if (table === 'wallet_transactions') {
+        queryClient.invalidateQueries({ queryKey: ['customers'] });
+        queryClient.invalidateQueries({ queryKey: ['credits'] });
+        queryClient.invalidateQueries({ queryKey: ['wallet-management'] });
+      }
+    };
+
+    const watchedTables = ['orders', 'customers', 'services', 'employees', 'wallet_transactions'];
+    const channel = supabase.channel('app_entity_live_updates');
+
+    watchedTables.forEach((tableName) => {
+      channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: tableName },
+        () => invalidateByTable(tableName),
+      );
+    });
+
+    channel.subscribe();
+    appRealtimeChannelRef.current = channel;
+
+    return () => {
+      if (appRealtimeChannelRef.current) {
+        supabase.removeChannel(appRealtimeChannelRef.current);
+        appRealtimeChannelRef.current = null;
+      }
+    };
+  }, [employee, queryClient]);
 
   return (
     <RealtimeContext.Provider value={{ analyticsData, driverLocations }}>

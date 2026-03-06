@@ -16,6 +16,8 @@ const capitalize = (s: string) => {
   if (s === 'employee-dashboard') return 'Employee Dashboard';
   if (s === 'create-order') return 'New Order';
   if (s === 'print-queue') return 'Print Tags';
+  if (s === 'wallet-management') return 'Wallet Management';
+  if (s === 'user-management') return 'User Management';
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
 

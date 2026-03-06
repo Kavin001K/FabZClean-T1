@@ -1979,7 +1979,16 @@ export default function CreateOrder() {
                               <CreditCard className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                               <span className="text-[10px] uppercase tracking-wider font-medium text-red-600 dark:text-red-400">Credit Due</span>
                             </div>
-                            <p className="text-xl font-bold text-red-700 dark:text-red-300">₹{(foundCustomer?.creditBalance ? Number(foundCustomer.creditBalance) : 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                            {(() => {
+                              const due = foundCustomer?.creditBalance ? Number(foundCustomer.creditBalance) : 0;
+                              const limit = Math.abs(Number((foundCustomer as any)?.creditLimit ?? -500));
+                              const dueClass = due > limit ? "text-red-700 dark:text-red-300" : due === 0 ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300";
+                              return (
+                                <p className={`text-xl font-bold ${dueClass}`}>
+                                  ₹{due.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                </p>
+                              );
+                            })()}
                           </div>
 
                           <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/30 dark:to-amber-900/20 p-3 rounded-lg border border-amber-200/50 dark:border-amber-800/50">

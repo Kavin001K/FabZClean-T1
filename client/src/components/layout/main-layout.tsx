@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { BottomNav } from './bottom-nav';
-import { Footer } from './footer';
 import ErrorBoundary from '@/components/ui/error-boundary';
 import { SessionTimeoutWarning } from '@/components/session-timeout-warning';
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -60,7 +59,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     <>
       <SessionTimeoutWarning />
 
-      <div className="flex min-h-[100dvh] w-full bg-background">
+      <div className="flex h-[100dvh] w-full overflow-hidden bg-background">
         {/* Desktop Sidebar */}
         {!isMobile && isSidebarOpen && <Sidebar className="w-64 shrink-0" />}
 
@@ -73,7 +72,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
         <div
           className={cn(
-            "flex min-w-0 flex-1 flex-col transition-all duration-300 ease-in-out"
+            "flex min-w-0 min-h-0 flex-1 flex-col transition-all duration-300 ease-in-out"
           )}
         >
           <Header
@@ -82,7 +81,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             isMobile={isMobile}
           />
           <main className={cn(
-            "flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 md:p-6",
+            "scrollbar-thin flex-1 min-h-0 overflow-x-hidden overflow-y-auto overscroll-y-contain scroll-smooth p-3 sm:p-4 md:p-6",
             isMobile ? "pb-[calc(5.75rem+env(safe-area-inset-bottom))]" : "pb-6"
           )}>
             <ErrorBoundary>
@@ -90,7 +89,6 @@ export function MainLayout({ children }: MainLayoutProps) {
                 {children}
               </div>
             </ErrorBoundary>
-            <Footer isMobile={isMobile} />
           </main>
         </div>
       </div>

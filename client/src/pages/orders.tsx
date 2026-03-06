@@ -1743,7 +1743,7 @@ function OrdersComponent() {
                     </div>
                   ) : (
                     <div className="rounded-lg border bg-background overflow-hidden h-[600px] flex flex-col">
-                      <div className="h-full overflow-x-auto">
+                      <div className="h-full overflow-x-auto scroll-smooth overscroll-x-contain">
                         <div className={cn(ordersTableMinWidth, "h-full flex flex-col")}>
                           {OrderHeaders}
                           <div className="flex-1">

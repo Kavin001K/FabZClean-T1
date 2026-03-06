@@ -709,6 +709,12 @@ export default function Customers() {
                   const outstandingCredit = parseFloat(customer.creditBalance || '0');
                   const customerCreditLimit = Math.abs(parseFloat((customer as any).creditLimit || '-500'));
                   const availableCredit = Math.max(0, customerCreditLimit - outstandingCredit);
+                  const isCreditLimitExceeded = outstandingCredit > customerCreditLimit;
+                  const outstandingColorClass = isCreditLimitExceeded
+                    ? 'text-red-500'
+                    : outstandingCredit === 0
+                      ? 'text-emerald-500'
+                      : 'text-amber-500';
                   const lastOrderDate = customer.lastOrder
                     ? new Date(customer.lastOrder).toLocaleDateString()
                     : 'No orders';
@@ -782,13 +788,17 @@ export default function Customers() {
                           <div className="space-y-2 py-2 px-3 bg-white/5 rounded-md border border-white/5">
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-muted-foreground font-medium">Outstanding Credit</span>
-                              <span className={`font-bold ${outstandingCredit > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                              <span className={`font-bold ${outstandingColorClass}`}>
                                 ₹{outstandingCredit.toFixed(2)}
                               </span>
                             </div>
                             <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>Limit ₹{customerCreditLimit.toFixed(0)}</span>
-                              <span>Available ₹{availableCredit.toFixed(0)}</span>
+                              <span className={isCreditLimitExceeded ? "text-red-500 font-semibold" : ""}>Limit ₹{customerCreditLimit.toFixed(0)}</span>
+                              <span className={isCreditLimitExceeded ? "text-red-500 font-semibold" : ""}>
+                                {isCreditLimitExceeded
+                                  ? `Exceeded ₹${(outstandingCredit - customerCreditLimit).toFixed(0)}`
+                                  : `Available ₹${availableCredit.toFixed(0)}`}
+                              </span>
                             </div>
                           </div>
 

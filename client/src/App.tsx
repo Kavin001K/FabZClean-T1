@@ -31,6 +31,8 @@ const CreateOrder = lazy(() => retryDynamicImport(() => import("@/pages/create-o
 const Customers = lazy(() => retryDynamicImport(() => import("@/pages/customers")));
 const Services = lazy(() => retryDynamicImport(() => import("@/pages/services")));
 const PrintQueue = lazy(() => retryDynamicImport(() => import("@/pages/print-queue")));
+const UserManagement = lazy(() => retryDynamicImport(() => import("@/pages/user-management")));
+const WalletManagement = lazy(() => retryDynamicImport(() => import("@/pages/wallet-management")));
 
 const Settings = lazy(() => retryDynamicImport(() => import("@/pages/settings")));
 const PerformanceAnalytics = lazy(() => retryDynamicImport(() => import("@/components/analytics")));
@@ -115,10 +117,34 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/wallet-management">
+        <ProtectedRoute>
+          <MainLayout>
+            <WalletManagement />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/credits">
+        <ProtectedRoute>
+          <MainLayout>
+            <WalletManagement />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
       <Route path="/services">
         <ProtectedRoute>
           <MainLayout>
             <Services />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/user-management">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <MainLayout>
+            <UserManagement />
           </MainLayout>
         </ProtectedRoute>
       </Route>
