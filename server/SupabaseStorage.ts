@@ -83,7 +83,13 @@ export class SupabaseStorage {
             'gst_enabled': 'gstEnabled',
             'gst_rate': 'gstRate',
             'gst_amount': 'gstAmount',
+            'qualifications': 'qualifications',
+            'salary_type': 'salaryType',
+            'bank_name': 'bankName',
+            'account_number': 'accountNumber',
+            'ifsc_code': 'ifscCode',
             'pan_number': 'panNumber',
+            'aadhar_number': 'aadharNumber',
             'gst_number': 'gstNumber',
             'special_instructions': 'specialInstructions',
             'order_id': 'orderId',
@@ -227,7 +233,13 @@ export class SupabaseStorage {
             'gstEnabled': 'gst_enabled',
             'gstRate': 'gst_rate',
             'gstAmount': 'gst_amount',
+            'qualifications': 'qualifications',
+            'salaryType': 'salary_type',
+            'bankName': 'bank_name',
+            'accountNumber': 'account_number',
+            'ifscCode': 'ifsc_code',
             'panNumber': 'pan_number',
+            'aadharNumber': 'aadhar_number',
             'gstNumber': 'gst_number',
             'specialInstructions': 'special_instructions',
             'orderId': 'order_id',
@@ -1561,6 +1573,41 @@ export class SupabaseStorage {
             details: JSON.stringify(details),
             ipAddress,
             userAgent
+        });
+    }
+    async getGlobalCreditHistory(limit: number = 50): Promise<any[]> {
+        const { data, error } = await this.supabase
+            .from('wallet_transactions')
+            .select('*, customers(name)')
+            .order('entry_no', { ascending: false })
+            .limit(limit);
+
+        if (error) {
+            console.error('getGlobalCreditHistory error:', error);
+            return [];
+        }
+
+        return data.map((row: any) => {
+            const mapped = this.mapDates(row);
+            const walletAmount = parseFloat(row.amount || mapped.amount || '0');
+            const walletBalanceAfter = parseFloat(row.balance_after || mapped.balanceAfter || '0');
+            const referenceType = row.reference_type || mapped.referenceType;
+
+            let legacyType = 'adjustment';
+            if (mapped.transactionType === 'DEBIT') {
+                legacyType = 'credit';
+            } else if (mapped.transactionType === 'CREDIT') {
+                legacyType = referenceType === 'PAYMENT' ? 'payment' : 'deposit';
+            }
+
+            return {
+                ...mapped,
+                customerName: row.customers?.name || 'Unknown',
+                type: legacyType,
+                amount: (-walletAmount).toFixed(2),
+                balanceAfter: walletBalanceAfter.toFixed(2),
+                description: row.note || mapped.note || mapped.notes || '',
+            };
         });
     }
 }

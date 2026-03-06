@@ -18,9 +18,13 @@ import {
   CheckCircle,
   AlertCircle,
   Receipt,
-  Calculator
+  Calculator,
+  Wallet,
+  RefreshCw
 } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
+import { useQuery } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 
 interface OrderPaymentModalProps {
   order: {
@@ -32,6 +36,8 @@ interface OrderPaymentModalProps {
     paymentStatus: 'pending' | 'paid' | 'partial' | 'failed';
     items: any[];
   };
+  isOpen: boolean;
+  onClose: () => void;
   onPaymentUpdate?: (orderId: string, paymentData: any) => void;
 }
 
@@ -44,38 +50,55 @@ interface PaymentMethod {
 
 const paymentMethods: PaymentMethod[] = [
   {
-    id: 'cash',
+    id: 'CASH',
     name: 'Cash',
     icon: <Banknote className="w-5 h-5" />,
     type: 'cash'
   },
   {
-    id: 'card',
+    id: 'CARD',
     name: 'Credit/Debit Card',
     icon: <CreditCard className="w-5 h-5" />,
     type: 'card'
   },
   {
-    id: 'upi',
-    name: 'UPI',
+    id: 'UPI',
+    name: 'UPI / PhonePe / GPay',
     icon: <Smartphone className="w-5 h-5" />,
     type: 'upi'
   },
   {
-    id: 'bank_transfer',
-    name: 'Bank Transfer',
+    id: 'NET_BANKING',
+    name: 'Net Banking',
     icon: <Banknote className="w-5 h-5" />,
     type: 'bank_transfer'
+  },
+  {
+    id: 'CHEQUE',
+    name: 'Cheque',
+    icon: <CheckCircle className="w-5 h-5" />,
+    type: 'cash'
+  },
+  {
+    id: 'OTHER',
+    name: 'Other',
+    icon: <Receipt className="w-5 h-5" />,
+    type: 'cash'
+  },
+  {
+    id: 'WALLET',
+    name: 'Customer Wallet',
+    icon: <Wallet className="w-5 h-5" />,
+    type: 'cash'
   }
 ];
 
-export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPaymentModalProps) {
+export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpdate }: OrderPaymentModalProps) {
   const { toast } = useToast();
   const { addNotification } = useNotifications();
 
-  const [isOpen, setIsOpen] = useState(false);
   const [paymentType, setPaymentType] = useState<'advance' | 'delivery' | 'full'>('advance');
-  const [selectedMethod, setSelectedMethod] = useState<string>('cash');
+  const [selectedMethod, setSelectedMethod] = useState<string>('CASH');
   const [amount, setAmount] = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [notes, setNotes] = useState('');
@@ -84,6 +107,15 @@ export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPayme
   const totalAmount = parseFloat(order.totalAmount);
   const advancePaid = parseFloat(order.advancePaid || '0');
   const remainingAmount = totalAmount - advancePaid;
+
+  // New: Fetch wallet balance if needed
+  const { data: walletDetails, isLoading: isLoadingWalletBalance } = useQuery({
+    queryKey: ['/api/credits', (order as any).customerId],
+    enabled: selectedMethod === 'WALLET' && !!(order as any).customerId,
+  });
+
+  const walletBalance = (walletDetails as any)?.creditBalance || 0;
+  const hasInsufficientWalletBalance = selectedMethod === 'WALLET' && walletBalance < parseFloat(amount || '0');
 
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
@@ -170,7 +202,7 @@ export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPayme
       setAmount('');
       setTransactionId('');
       setNotes('');
-      setIsOpen(false);
+      onClose();
 
     } catch (error) {
       toast({
@@ -206,22 +238,20 @@ export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPayme
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <IndianRupee className="w-4 h-4 mr-2" />
-          Payment
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Receipt className="w-5 h-5" />
-            Payment for Order {order.orderNumber}
-          </DialogTitle>
-          <DialogDescription>
-            Process payment for order #{order.orderNumber}. Choose payment type and method.
-          </DialogDescription>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden gap-0">
+        <DialogHeader className="p-6 pb-2 bg-gradient-to-r from-primary to-accent text-white">
+          <div className="flex justify-between items-start">
+            <div>
+              <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                <CreditCard className="w-6 h-6" />
+                Process Payment
+              </DialogTitle>
+              <DialogDescription className="text-white/80 mt-1">
+                Order #{order.orderNumber} • {order.customerName}
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -395,27 +425,41 @@ export default function OrderPaymentModal({ order, onPaymentUpdate }: OrderPayme
             </Card>
           )}
 
+          {/* Wallet Balance Display */}
+          {selectedMethod === 'WALLET' && (
+            <div className={cn(
+              "mt-4 p-3 rounded-md border flex items-center justify-between",
+              hasInsufficientWalletBalance ? "bg-red-50 border-red-200 text-red-600" : "bg-emerald-50 border-emerald-200 text-emerald-600"
+            )}>
+              <div className="flex items-center gap-2">
+                <Wallet className="w-4 h-4" />
+                <span className="text-sm font-medium">Available Balance:</span>
+              </div>
+              <span className="text-lg font-bold">{isLoadingWalletBalance ? 'Loading...' : formatCurrency(walletBalance)}</span>
+            </div>
+          )}
+
           {/* Action Buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-3 justify-end mt-8">
+            <Button variant="outline" onClick={() => onClose()}>
+              Cancel
+            </Button>
             <Button
+              disabled={!amount || isProcessing || hasInsufficientWalletBalance || (selectedMethod !== 'CASH' && selectedMethod !== 'WALLET' && !transactionId)}
               onClick={handlePayment}
-              className="flex-1"
-              disabled={isProcessing || !amount}
+              className="gap-2 px-8"
             >
               {isProcessing ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
                   Processing...
                 </>
               ) : (
                 <>
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Process Payment
+                  <CheckCircle className="w-4 h-4" />
+                  Complete Payment
                 </>
               )}
-            </Button>
-            <Button variant="outline" onClick={() => setIsOpen(false)}>
-              Cancel
             </Button>
           </div>
         </div>

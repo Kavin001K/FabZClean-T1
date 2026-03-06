@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, timestamp, boolean, jsonb, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, timestamp, boolean, jsonb, uuid, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -190,6 +190,18 @@ export const employees = pgTable("employees", {
   profileImage: text("profile_image"),
   orderLetter: text("order_letter"),
   settings: jsonb("settings"),
+  qualifications: text("qualifications"),
+  salaryType: text("salary_type").default("monthly"),
+  bankName: text("bank_name"),
+  accountNumber: text("account_number"),
+  ifscCode: text("ifsc_code"),
+  panNumber: text("pan_number"),
+  aadharNumber: text("aadhar_number"),
+  dateOfBirth: date("date_of_birth"),
+  gender: text("gender"),
+  bloodGroup: text("blood_group"),
+  workingHours: integer("working_hours").default(8),
+  notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

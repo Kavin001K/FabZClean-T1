@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, Wallet, RefreshCw, IndianRupee, AlertTriangle, CheckCircle2, HandCoins } from "lucide-react";
+import { Search, Wallet, RefreshCw, IndianRupee, AlertTriangle, CheckCircle2, HandCoins, Users, Banknote, Smartphone, CreditCard, Building, FileText } from "lucide-react";
 import { PageTransition } from "@/components/ui/page-transition";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -287,72 +287,77 @@ export default function WalletManagementPage() {
 
   return (
     <PageTransition>
-      <div className="container-desktop min-h-screen space-y-6 py-4 sm:space-y-8 sm:py-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="container-desktop min-h-screen space-y-6 py-4 sm:space-y-8 sm:py-8 animate-in fade-in duration-500">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-1">
           <div>
-            <h1 className="text-2xl font-bold sm:text-3xl">Wallet Management</h1>
-            <p className="text-sm text-muted-foreground sm:text-base">
-              Recharge wallets, issue refunds, and monitor credit-limit risk in real time.
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
+              Wallet & Ledger
+            </h1>
+            <p className="text-sm text-muted-foreground sm:text-base mt-1 font-medium">
+              Manage customer balances, monitor credit risks, and process transactions.
             </p>
           </div>
-          <Button variant="outline" onClick={refreshData} className="w-full sm:w-auto">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={refreshData} className="flex-1 sm:w-auto shadow-sm hover:shadow-md transition-all">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Sync Data
+            </Button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-          <Card className="overflow-hidden border-none shadow-premium bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
+        {/* Dashboard Summary Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-1">
+          <Card className="overflow-hidden border-none shadow-sm bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
             <CardContent className="relative p-6">
-              <div className="absolute top-4 right-4 h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center backdrop-blur-sm shadow-inner">
-                <Search className="h-6 w-6 text-blue-500/70" />
+              <div className="absolute top-4 right-4 h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                <Users className="h-5 w-5 text-blue-500" />
               </div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500/80">Customers</p>
-              <p className="mt-1 text-4xl font-black tracking-tight text-slate-900 dark:text-white">{totals.customers}</p>
-              <div className="mt-2 text-[10px] text-slate-400 font-medium">Active managed wallets</div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Customers</p>
+              <p className="mt-1 text-3xl font-black tracking-tight text-slate-900 dark:text-white">{totals.customers}</p>
+              <div className="mt-2 text-[10px] text-slate-400 font-medium italic">Active managed wallets</div>
             </CardContent>
           </Card>
 
-          <Card className="overflow-hidden border-none shadow-premium bg-gradient-to-br from-amber-50 to-white dark:from-amber-950/20 dark:to-slate-950">
+          <Card className="overflow-hidden border-none shadow-sm bg-gradient-to-br from-amber-50 to-white dark:from-amber-950/20 dark:to-slate-950">
             <CardContent className="relative p-6">
-              <div className="absolute top-4 right-4 h-12 w-12 rounded-full bg-amber-500/10 flex items-center justify-center backdrop-blur-sm shadow-inner">
-                <IndianRupee className="h-6 w-6 text-amber-500/70" />
+              <div className="absolute top-4 right-4 h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center">
+                <IndianRupee className="h-5 w-5 text-amber-500" />
               </div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-amber-600/80">Outstanding</p>
-              <p className="mt-1 text-4xl font-black tracking-tight text-amber-600">₹{totals.totalOutstanding.toFixed(0)}</p>
-              <div className="mt-2 text-[10px] text-amber-500/60 font-medium">Total receivables from credit</div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">Outstanding</p>
+              <p className="mt-1 text-3xl font-black tracking-tight text-amber-600">₹{totals.totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+              <div className="mt-2 text-[10px] text-amber-500/60 font-medium italic">Total receivables</div>
             </CardContent>
           </Card>
 
-          <Card className="overflow-hidden border-none shadow-premium bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/20 dark:to-slate-950">
+          <Card className="overflow-hidden border-none shadow-sm bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/20 dark:to-slate-950">
             <CardContent className="relative p-6">
-              <div className="absolute top-4 right-4 h-12 w-12 rounded-full bg-emerald-500/10 flex items-center justify-center backdrop-blur-sm shadow-inner">
-                <Wallet className="h-6 w-6 text-emerald-500/70" />
+              <div className="absolute top-4 right-4 h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                <Wallet className="h-5 w-5 text-emerald-500" />
               </div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600/80">Prepaid Wallet</p>
-              <p className="mt-1 text-4xl font-black tracking-tight text-emerald-600">₹{totals.totalPrepaid.toFixed(0)}</p>
-              <div className="mt-2 text-[10px] text-emerald-500/60 font-medium">Available customer balances</div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Prepaid</p>
+              <p className="mt-1 text-3xl font-black tracking-tight text-emerald-600">₹{totals.totalPrepaid.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+              <div className="mt-2 text-[10px] text-emerald-500/60 font-medium italic">Available balances</div>
             </CardContent>
           </Card>
 
-          <Card className="overflow-hidden border-none shadow-premium bg-gradient-to-br from-rose-50 to-white dark:from-rose-950/20 dark:to-slate-950">
+          <Card className="overflow-hidden border-none shadow-sm bg-gradient-to-br from-rose-50 to-white dark:from-rose-950/20 dark:to-slate-950">
             <CardContent className="relative p-6">
-              <div className="absolute top-4 right-4 h-12 w-12 rounded-full bg-rose-500/10 flex items-center justify-center backdrop-blur-sm shadow-inner">
-                <AlertTriangle className="h-6 w-6 text-rose-500/70" />
+              <div className="absolute top-4 right-4 h-10 w-10 rounded-full bg-rose-500/10 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-rose-500" />
               </div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-rose-600/80">Limit Exceeded</p>
-              <p className="mt-1 text-4xl font-black tracking-tight text-rose-600">{totals.exceededCount}</p>
-              <div className="mt-2 text-[10px] text-rose-500/60 font-medium text-destructive">High risk accounts detected</div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-rose-600">Risk</p>
+              <p className="mt-1 text-3xl font-black tracking-tight text-rose-600">{totals.exceededCount}</p>
+              <div className="mt-2 text-[10px] text-rose-500/60 font-medium italic">Over-limit accounts</div>
             </CardContent>
           </Card>
         </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Wallet Operations</CardTitle>
-            <CardDescription>All customers with live wallet and credit status.</CardDescription>
+        <Card className="border-none shadow-sm">
+          <CardHeader className="pb-3 border-b">
+            <CardTitle className="text-xl font-bold">Ledger Operations</CardTitle>
+            <CardDescription>Live search and transaction management for all customer wallets.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pt-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -487,7 +492,7 @@ export default function WalletManagementPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </div >
 
       <Dialog open={rechargeOpen} onOpenChange={setRechargeOpen}>
         <DialogContent className="w-[calc(100vw-1rem)] max-w-md">
@@ -507,25 +512,42 @@ export default function WalletManagementPage() {
               <Label>Amount</Label>
               <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
-            <div className="space-y-2">
-              <Label>Payment Method</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="upi">UPI</SelectItem>
-                  <SelectItem value="card">Card</SelectItem>
-                  <SelectItem value="net_banking">Net Banking</SelectItem>
-                  <SelectItem value="cheque">Cheque</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="space-y-4">
+              <Label className="text-sm font-semibold">Payment Method</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'cash', name: 'Cash', icon: <Banknote className="w-4 h-4" /> },
+                  { id: 'upi', name: 'UPI', icon: <Smartphone className="w-4 h-4" /> },
+                  { id: 'card', name: 'Card', icon: <CreditCard className="w-4 h-4" /> },
+                  { id: 'net_banking', name: 'Net Banking', icon: <Building className="w-4 h-4" /> },
+                  { id: 'cheque', name: 'Cheque', icon: <FileText className="w-4 h-4" /> },
+                  { id: 'other', name: 'Other', icon: <Search className="w-4 h-4" /> }
+                ].map((method) => (
+                  <Button
+                    key={method.id}
+                    type="button"
+                    variant={paymentMethod === method.id ? "default" : "outline"}
+                    className={cn(
+                      "justify-start gap-2 h-10 transition-all duration-200",
+                      paymentMethod === method.id ? "ring-2 ring-primary ring-offset-1" : "hover:bg-accent/50"
+                    )}
+                    onClick={() => setPaymentMethod(method.id)}
+                  >
+                    {method.icon}
+                    <span className="text-sm">{method.name}</span>
+                  </Button>
+                ))}
+              </div>
             </div>
+
             <div className="space-y-2">
-              <Label>Reference Number (Optional)</Label>
-              <Input placeholder="e.g. Transaction ID / Cheque No" value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} />
+              <Label>Reference (Optional)</Label>
+              <Input
+                placeholder="Transaction ID / Receipt #"
+                className="bg-muted/50"
+                value={referenceNumber}
+                onChange={(e) => setReferenceNumber(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label>Internal Note</Label>
@@ -551,11 +573,16 @@ export default function WalletManagementPage() {
             <DialogDescription>{selectedCustomer?.name}</DialogDescription>
           </DialogHeader>
           {/* Transaction performed by */}
-          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
-            <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Refund issued by:</span>
-            <span className="text-xs font-semibold text-blue-900 dark:text-blue-100">
-              {employee?.fullName || employee?.username} ({employee?.employeeId})
-            </span>
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 dark:bg-primary/10 border border-primary/20">
+            <div className="bg-primary/20 p-2 rounded-full">
+              <Users className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Processed By</p>
+              <p className="text-sm font-semibold text-primary">
+                {employee?.fullName || employee?.username} <span className="text-muted-foreground text-xs">({employee?.employeeId})</span>
+              </p>
+            </div>
           </div>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
@@ -758,6 +785,6 @@ export default function WalletManagementPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </PageTransition>
+    </PageTransition >
   );
 }

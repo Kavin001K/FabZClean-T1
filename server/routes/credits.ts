@@ -18,11 +18,11 @@ import type { UserRole } from '../../shared/supabase';
 const router = Router();
 
 // Roles that can manage credits
-const CREDIT_VIEW_ROLES: UserRole[] = ['admin', 'franchise_manager', 'employee'];
+const CREDIT_VIEW_ROLES: string[] = ['admin', 'staff'];
 // Staff should be able to post verified wallet payments/recharges.
 // High-risk balance corrections remain admin-only via ADMIN_ONLY.
-const CREDIT_MANAGE_ROLES: UserRole[] = ['admin', 'franchise_manager', 'employee'];
-const ADMIN_ONLY: UserRole[] = ['admin'];
+const CREDIT_MANAGE_ROLES: string[] = ['admin', 'staff'];
+const ADMIN_ONLY: string[] = ['admin'];
 
 // Apply JWT authentication to all routes
 router.use(jwtRequired);
@@ -296,9 +296,8 @@ router.get('/report/outstanding', requireRole(CREDIT_VIEW_ROLES), async (req, re
         let franchiseId: string | undefined = undefined;
 
         // Apply franchise isolation for non-admin users
-        // Note: factory_manager is excluded because they don't have access to this route
         if (employee && employee.role !== 'admin') {
-            franchiseId = employee.franchiseId;
+            franchiseId = (employee as any).franchiseId;
         }
 
 
@@ -333,6 +332,20 @@ router.get('/report/outstanding', requireRole(CREDIT_VIEW_ROLES), async (req, re
     } catch (error: any) {
         console.error('Get outstanding credit report error:', error);
         res.status(500).json(createErrorResponse('Failed to get credit report', 500));
+    }
+});
+
+/**
+ * GET /credits/history
+ * Get recent credit activity across all customers
+ */
+router.get('/history', requireRole(CREDIT_VIEW_ROLES), async (req, res) => {
+    try {
+        const history = await storage.getGlobalCreditHistory(50);
+        res.json(createSuccessResponse(history));
+    } catch (error: any) {
+        console.error('Get global credit history error:', error);
+        res.status(500).json(createErrorResponse('Failed to get credit history', 500));
     }
 });
 

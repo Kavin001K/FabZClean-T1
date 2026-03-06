@@ -97,6 +97,10 @@ export interface IStorage {
   getTransitOrdersByStatus(status: string, franchiseId?: string): Promise<any[]>;
   updateTransitStatus(id: string, status: string, notes?: string, location?: string, updatedBy?: string): Promise<any>;
 
+  // Credit methods
+  getCustomerCreditHistory(customerId: string): Promise<any[]>;
+  getGlobalCreditHistory(limit?: number): Promise<any[]>;
+
   // Audit Log methods
   createAuditLog(data: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(params: any): Promise<{ data: AuditLog[]; count: number }>;

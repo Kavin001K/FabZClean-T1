@@ -47,6 +47,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import OrderDetailsDialog from "@/components/orders/order-details-dialog";
 import EditOrderDialog from "@/components/orders/edit-order-dialog";
+import OrderPaymentModal from "@/components/order-payment-modal";
 import * as LoadingSkeleton from "@/components/ui/loading-skeleton";
 
 // Icons
@@ -143,6 +144,8 @@ function OrdersComponent() {
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedPaymentOrder, setSelectedPaymentOrder] = useState<Order | null>(null);
 
   // Data Fetching with React Query
   const {
@@ -1082,19 +1085,25 @@ function OrdersComponent() {
                 <Printer className="mr-2 h-4 w-4" /> Print Invoice
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              {order.status === 'pending' && <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'processing')}>Mark as Processing</DropdownMenuItem>}
-              {order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit' && <DropdownMenuItem onClick={() => handleMarkAsPaid(order.id)}>Mark as Paid</DropdownMenuItem>}
-              {order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit' && (
-                <DropdownMenuItem onClick={() => handleMarkAsCredit(order.id, order)} className="text-orange-600 focus:text-orange-600">
-                  💳 Mark as Credit
-                </DropdownMenuItem>
+              {order.status === 'processing' && <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>Mark as Completed</DropdownMenuItem>}
+              {order.paymentStatus !== 'paid' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedPaymentOrder(order); setIsPaymentModalOpen(true); }}>
+                    <IndianRupee className="mr-2 h-4 w-4" /> Process Payment
+                  </DropdownMenuItem>
+                  {order.paymentStatus !== 'credit' && (
+                    <DropdownMenuItem onClick={() => handleMarkAsCredit(order.id, order)} className="text-orange-600 focus:text-orange-600">
+                      💳 Debit from Wallet (Credit)
+                    </DropdownMenuItem>
+                  )}
+                </>
               )}
               {order.paymentStatus === 'credit' && (
                 <DropdownMenuItem onClick={() => handleMarkAsPaid(order.id)} className="text-green-600 focus:text-green-600">
-                  ✅ Clear Credit (Mark Paid)
+                  ✅ Clear Ledger (Mark Paid)
                 </DropdownMenuItem>
               )}
-              {order.status === 'processing' && <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>Mark as Completed</DropdownMenuItem>}
               {order.status !== 'completed' && order.status !== 'cancelled' && (
                 <DropdownMenuItem onClick={() => handleCancelOrder(order)} className="text-red-600 focus:text-red-600">
                   <X className="mr-2 h-4 w-4" /> Cancel Order
@@ -1105,7 +1114,7 @@ function OrdersComponent() {
         </div>
       </div>
     );
-  }, [selectedOrders, ordersGridColumns, getStatusColor, getStatusIcon, getPaymentStatusColor, handleSelectOrder, handleViewOrder, handleEditOrder, handlePrintInvoice, handleUpdateStatus, handleMarkAsPaid, handleMarkAsCredit, handleCancelOrder]);
+  }, [selectedOrders, ordersGridColumns, getStatusColor, getStatusIcon, getPaymentStatusColor, handleSelectOrder, handleViewOrder, handleEditOrder, handlePrintInvoice, handleUpdateStatus, handleMarkAsPaid, handleMarkAsCredit, handleCancelOrder, setIsPaymentModalOpen, setSelectedPaymentOrder]);
 
   const OrderHeaders = (
     <div className={`grid ${ordersGridColumns} gap-4 items-center px-4 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase select-none`}>
@@ -2051,6 +2060,22 @@ function OrdersComponent() {
         }}
         isLoading={updateOrderMutation.isPending}
       />
+
+      {selectedPaymentOrder && (
+        <OrderPaymentModal
+          order={selectedPaymentOrder as any}
+          isOpen={isPaymentModalOpen}
+          onClose={() => {
+            setIsPaymentModalOpen(false);
+            setSelectedPaymentOrder(null);
+          }}
+          onPaymentUpdate={(id, data) => {
+            queryClient.invalidateQueries({ queryKey: ["orders"] });
+            setIsPaymentModalOpen(false);
+            setSelectedPaymentOrder(null);
+          }}
+        />
+      )}
     </PageTransition>
   );
 }
