@@ -348,6 +348,7 @@ export default function Customers() {
       email: customerData.email || undefined,
       address: addressObj.street ? addressObj : undefined,
       creditLimit: normalizedCreditLimit,
+      status: customerData.status || 'active',
     };
 
     editCustomerMutation.mutate({

@@ -1761,9 +1761,7 @@ export default function CreateOrder() {
                       <SelectContent>
                         <SelectItem value="cash">Cash</SelectItem>
                         <SelectItem value="credit">Credit</SelectItem>
-                        <SelectItem value="card">Credit/Debit Card</SelectItem>
                         <SelectItem value="upi">UPI</SelectItem>
-                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1779,7 +1777,7 @@ export default function CreateOrder() {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
-            className="sticky top-6"
+            className="sticky top-20 z-10"
           >
             <Card>
               <CardHeader>

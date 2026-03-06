@@ -1,6 +1,7 @@
 import { Express } from 'express';
 import ordersRouter from './orders';
 import customersRouter from './customers';
+import employeesRouter from './employees';
 import deliveriesRouter from './deliveries';
 import productsRouter from './products';
 import servicesRouter from './services';
@@ -180,6 +181,7 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/deliveries', deliveriesRouter);
   app.use('/api/products', productsRouter);
   app.use('/api/services', servicesRouter);
+  app.use('/api/employees', employeesRouter);
 
   // Legacy search and algorithm routes
   app.use('/api/search', searchRouter);

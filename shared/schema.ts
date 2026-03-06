@@ -122,6 +122,7 @@ export const customers = pgTable("customers", {
   creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }).default("-500"),
   walletBalanceCache: decimal("wallet_balance_cache", { precision: 10, scale: 2 }).default("0"),
   creditBalance: decimal("credit_balance", { precision: 10, scale: 2 }).default("0"),
+  status: text("status", { enum: ["active", "inactive"] }).default("active"),
   lastOrder: timestamp("last_order"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

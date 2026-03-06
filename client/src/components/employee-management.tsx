@@ -470,29 +470,30 @@ export default function EmployeeManagement() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="min-w-0">
           <h2 className="text-2xl font-bold tracking-tight">User Management</h2>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Manage system users, employees, and their access roles
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsExportDialogOpen(true)}>
-            <Download className="w-4 h-4 mr-2" />
-            Export Data
+        <div className="flex gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={() => setIsExportDialogOpen(true)}>
+            <Download className="w-4 h-4 mr-1.5" />
+            <span className="hidden sm:inline">Export Data</span>
+            <span className="sm:hidden">Export</span>
           </Button>
           <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
             setIsCreateDialogOpen(open);
             if (open) setActiveTab("personal");
           }}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
+              <Button size="sm">
+                <Plus className="w-4 h-4 mr-1.5" />
                 Add User
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="w-[calc(100vw-1rem)] max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <User className="w-5 h-5" />
@@ -514,7 +515,7 @@ export default function EmployeeManagement() {
 
                 {/* Personal Information Tab */}
                 <TabsContent value="personal" className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="name">Full Name *</Label>
                       <Input
@@ -536,7 +537,7 @@ export default function EmployeeManagement() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="phone">Phone Number *</Label>
                       <Input
@@ -557,7 +558,7 @@ export default function EmployeeManagement() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="gender">Gender</Label>
                       <Select value={employeeForm.gender} onValueChange={(value) => setEmployeeForm({ ...employeeForm, gender: value })}>
@@ -613,7 +614,7 @@ export default function EmployeeManagement() {
 
                 {/* Work Details Tab */}
                 <TabsContent value="work" className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Franchise Selection (Admin Only) */}
                     {currentUser?.role === 'admin' && (
                       <div className="space-y-2">
@@ -665,7 +666,7 @@ export default function EmployeeManagement() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="position">Position *</Label>
                       <Select value={employeeForm.position} onValueChange={(value) => setEmployeeForm({ ...employeeForm, position: value })}>
@@ -733,7 +734,7 @@ export default function EmployeeManagement() {
 
                 {/* Banking & ID Tab */}
                 <TabsContent value="banking" className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="bankName">Bank Name</Label>
                       <Input
@@ -754,7 +755,7 @@ export default function EmployeeManagement() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="bankIfsc">IFSC Code</Label>
                       <Input
@@ -807,7 +808,7 @@ export default function EmployeeManagement() {
 
                 {/* Security Tab */}
                 <TabsContent value="security" className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="password">Password *</Label>
                       <Input
@@ -870,7 +871,7 @@ export default function EmployeeManagement() {
                 </div>
               ) : (
                 employees.map((employee: any) => (
-                  <div key={employee.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <div key={employee.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors gap-3">
                     <div className="flex items-center gap-4">
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center ${employee.status === 'active' ? 'bg-primary' : 'bg-muted'
                         }`}>
@@ -880,14 +881,14 @@ export default function EmployeeManagement() {
                         </span>
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <h3 className="font-semibold">{employee.fullName}</h3>
-                          <Badge variant="outline" className="ml-2">
+                          <Badge variant="outline" className="text-xs">
                             <Shield className="w-3 h-3 mr-1" />
                             {employee.role}
                           </Badge>
                           {employee.orderLetter && (
-                            <Badge variant="secondary" className="font-mono bg-blue-100 text-blue-800 border-blue-200" title="Order Isolation Letter">
+                            <Badge variant="secondary" className="font-mono bg-blue-100 text-blue-800 border-blue-200 text-xs" title="Order Isolation Letter">
                               Code: {employee.orderLetter}
                             </Badge>
                           )}
@@ -898,20 +899,20 @@ export default function EmployeeManagement() {
                         <p className="text-sm text-muted-foreground">
                           {employee.position} • {employee.department} • {employee.employeeId}
                         </p>
-                        <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
-                            <Mail className="w-3 h-3" />
-                            {employee.email}
+                            <Mail className="w-3 h-3 shrink-0" />
+                            <span className="truncate max-w-[180px]">{employee.email}</span>
                           </span>
                           <span className="flex items-center gap-1">
-                            <Phone className="w-3 h-3" />
+                            <Phone className="w-3 h-3 shrink-0" />
                             {employee.phone}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 shrink-0 self-end sm:self-center">
                       {/* Quick action buttons */}
                       <Button variant="ghost" size="sm" onClick={() => handleViewEmployee(employee)} title="View Details">
                         <Eye className="w-4 h-4" />
@@ -990,7 +991,7 @@ export default function EmployeeManagement() {
 
             {/* Personal Information Tab */}
             <TabsContent value="personal" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-name">Full Name *</Label>
                   <Input
@@ -1012,7 +1013,7 @@ export default function EmployeeManagement() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-phone">Phone Number *</Label>
                   <Input
@@ -1046,7 +1047,7 @@ export default function EmployeeManagement() {
 
             {/* Work Details Tab */}
             <TabsContent value="work" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-role">System Role *</Label>
                   <Select value={employeeForm.role} onValueChange={(value) => setEmployeeForm({ ...employeeForm, role: value })}>
@@ -1075,7 +1076,7 @@ export default function EmployeeManagement() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-position">Position *</Label>
                   <Select value={employeeForm.position} onValueChange={(value) => setEmployeeForm({ ...employeeForm, position: value })}>

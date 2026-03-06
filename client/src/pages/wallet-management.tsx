@@ -69,7 +69,7 @@ const fetchCustomers = async (): Promise<WalletCustomer[]> => {
 };
 
 const walletApi = {
-  recharge: async (customerId: string, payload: { amount: number; paymentMethod: string; referenceNumber?: string; notes?: string }) => {
+  recharge: async (customerId: string, payload: { amount: number; paymentMethod: string; notes?: string }) => {
     const res = await authorizedFetch(`/credits/${customerId}/payment`, {
       method: "POST",
       body: JSON.stringify(payload),
@@ -112,7 +112,7 @@ export default function WalletManagementPage() {
 
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [referenceNumber, setReferenceNumber] = useState("");
+
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -133,7 +133,6 @@ export default function WalletManagementPage() {
   const resetDialogState = () => {
     setAmount("");
     setPaymentMethod("cash");
-    setReferenceNumber("");
     setReason("");
     setNotes("");
   };
@@ -142,7 +141,6 @@ export default function WalletManagementPage() {
     mutationFn: () => walletApi.recharge(selectedCustomer!.id, {
       amount: toNumber(amount, 0),
       paymentMethod,
-      referenceNumber: referenceNumber || undefined,
       notes: notes || undefined,
     }),
     onSuccess: () => {
@@ -439,6 +437,13 @@ export default function WalletManagementPage() {
             <DialogDescription>{selectedCustomer?.name}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
+            {/* Transaction performed by */}
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+              <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Transaction by:</span>
+              <span className="text-xs font-semibold text-blue-900 dark:text-blue-100">
+                {employee?.fullName || employee?.username} ({employee?.employeeId})
+              </span>
+            </div>
             <div className="space-y-2">
               <Label>Amount</Label>
               <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
@@ -452,15 +457,9 @@ export default function WalletManagementPage() {
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="upi">UPI</SelectItem>
-                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                  <SelectItem value="card">Card</SelectItem>
-                  <SelectItem value="cheque">Cheque</SelectItem>
+                  <SelectItem value="credit">Credit</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Reference</Label>
-              <Input value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
@@ -481,6 +480,13 @@ export default function WalletManagementPage() {
             <DialogTitle>Issue Refund</DialogTitle>
             <DialogDescription>{selectedCustomer?.name}</DialogDescription>
           </DialogHeader>
+          {/* Transaction performed by */}
+          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+            <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Refund issued by:</span>
+            <span className="text-xs font-semibold text-blue-900 dark:text-blue-100">
+              {employee?.fullName || employee?.username} ({employee?.employeeId})
+            </span>
+          </div>
           <div className="space-y-3 py-2">
             <div className="space-y-2">
               <Label>Amount</Label>

@@ -1387,6 +1387,12 @@ export class SupabaseStorage {
             const walletBalance = parseFloat(walletTx.balance_after || mapped.balanceAfter || '0');
             const legacyCreditBalance = walletBalance < 0 ? Math.abs(walletBalance) : 0;
 
+            // Sync legacy credit_balance column to prevent double-counting
+            await this.supabase
+                .from('customers')
+                .update({ credit_balance: legacyCreditBalance })
+                .eq('id', customerId);
+
             return {
                 ...mapped,
                 type: normalizedType || 'adjustment',
