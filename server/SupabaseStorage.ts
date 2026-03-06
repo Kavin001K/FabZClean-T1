@@ -55,12 +55,23 @@ export class SupabaseStorage {
             'customer_email': 'customerEmail',
             'customer_phone': 'customerPhone',
             'credit_balance': 'creditBalance',
+            'credit_limit': 'creditLimit',
+            'wallet_balance_cache': 'walletBalanceCache',
             'total_orders': 'totalOrders',
             'total_spent': 'totalSpent',
             'last_order': 'lastOrder',
             'order_number': 'orderNumber',
             'payment_status': 'paymentStatus',
             'total_amount': 'totalAmount',
+            'balance_after': 'balanceAfter',
+            'transaction_type': 'transactionType',
+            'reference_type': 'referenceType',
+            'reference_id': 'referenceId',
+            'verified_by_staff': 'verifiedByStaff',
+            'entry_no': 'entryNo',
+            'recorded_by': 'recordedBy',
+            'reference_number': 'referenceNumber',
+            'transaction_date': 'transactionDate',
             'shipping_address': 'shippingAddress',
             'pickup_date': 'pickupDate',
             'advance_paid': 'advancePaid',
@@ -188,12 +199,23 @@ export class SupabaseStorage {
             'customerEmail': 'customer_email',
             'customerPhone': 'customer_phone',
             'creditBalance': 'credit_balance',
+            'creditLimit': 'credit_limit',
+            'walletBalanceCache': 'wallet_balance_cache',
             'totalOrders': 'total_orders',
             'totalSpent': 'total_spent',
             'lastOrder': 'last_order',
             'orderNumber': 'order_number',
             'paymentStatus': 'payment_status',
             'totalAmount': 'total_amount',
+            'balanceAfter': 'balance_after',
+            'transactionType': 'transaction_type',
+            'referenceType': 'reference_type',
+            'referenceId': 'reference_id',
+            'verifiedByStaff': 'verified_by_staff',
+            'entryNo': 'entry_no',
+            'recordedBy': 'recorded_by',
+            'referenceNumber': 'reference_number',
+            'transactionDate': 'transaction_date',
             'shippingAddress': 'shipping_address',
             'pickupDate': 'pickup_date',
             'advancePaid': 'advance_paid',
@@ -1286,13 +1308,25 @@ export class SupabaseStorage {
     }
 
     // ======= CUSTOMER CREDIT SYSTEM =======
+    private isWalletInfraMissing(error: any): boolean {
+        const code = error?.code;
+        if (code && ['42P01', '42703', '42883', '42704'].includes(code)) return true;
+        const message = String(error?.message || '').toLowerCase();
+        return message.includes('wallet_transactions') && (
+            message.includes('does not exist') ||
+            message.includes('relation') ||
+            message.includes('column')
+        );
+    }
+
     async addCustomerCredit(
         customerId: string,
         amount: number,
         type: string,
         description: string,
         referenceId?: string,
-        employeeId?: string
+        employeeId?: string,
+        paymentMethod?: string
     ): Promise<any> {
         const { data: customer, error: custError } = await this.supabase
             .from('customers')
@@ -1306,26 +1340,88 @@ export class SupabaseStorage {
         }
 
         const currentBalance = parseFloat(customer.credit_balance || '0');
+        const normalizedType = String(type || '').toLowerCase();
+
+        // Preferred path: immutable wallet ledger.
+        // Legacy credit_balance semantics are opposite to wallet semantics:
+        // credit balance +X (customer owes more) == wallet amount -X.
+        const walletAmount = -amount;
+
+        let walletTransactionType: 'CREDIT' | 'DEBIT' | 'ADJUSTMENT' = walletAmount >= 0 ? 'CREDIT' : 'DEBIT';
+        if (normalizedType === 'adjustment') {
+            walletTransactionType = 'ADJUSTMENT';
+        }
+
+        let referenceType: 'PAYMENT' | 'ORDER' | 'ADJUSTMENT' | 'MANUAL' = 'MANUAL';
+        if (normalizedType === 'payment' || normalizedType === 'deposit') {
+            referenceType = 'PAYMENT';
+        } else if (normalizedType === 'credit' || normalizedType === 'usage') {
+            referenceType = 'ORDER';
+        } else if (normalizedType === 'adjustment') {
+            referenceType = 'ADJUSTMENT';
+        }
+
+        const normalizedPaymentMethod = paymentMethod
+            ? String(paymentMethod).trim().toUpperCase().replace(/\s+/g, '_')
+            : null;
+
+        const { data: walletTx, error: walletError } = await this.supabase
+            .from('wallet_transactions')
+            .insert({
+                customer_id: customerId,
+                franchise_id: customer.franchise_id || null,
+                transaction_type: walletTransactionType,
+                amount: walletAmount,
+                payment_method: normalizedPaymentMethod,
+                verified_by_staff: employeeId || null,
+                reference_type: referenceType,
+                reference_id: referenceId || null,
+                note: description || null,
+                created_by: employeeId || null,
+            })
+            .select('*')
+            .single();
+
+        if (!walletError && walletTx) {
+            const mapped = this.mapDates(walletTx);
+            const walletBalance = parseFloat(walletTx.balance_after || mapped.balanceAfter || '0');
+            const legacyCreditBalance = walletBalance < 0 ? Math.abs(walletBalance) : 0;
+
+            return {
+                ...mapped,
+                type: normalizedType || 'adjustment',
+                amount: amount.toString(),
+                balanceAfter: legacyCreditBalance.toFixed(2),
+                previousBalance: currentBalance,
+                newBalance: legacyCreditBalance
+            };
+        }
+
+        // If wallet infra is unavailable, fallback to legacy table to keep app functional.
+        if (walletError && !this.isWalletInfraMissing(walletError)) {
+            console.error('Add Credit: Wallet transaction insert failed', walletError);
+            throw walletError;
+        }
+
+        // Legacy fallback path
         const newBalance = currentBalance + amount;
 
-        // Determine if referenceId is an orderId or payment reference
-        // For 'credit' type coming from orders, it's an orderId
         let orderId = null;
         let referenceNumber = null;
 
-        if (type === 'credit' && referenceId) {
+        if ((normalizedType === 'credit' || normalizedType === 'usage') && referenceId) {
             orderId = referenceId;
         } else {
             referenceNumber = referenceId;
         }
 
-        // Insert transaction
-        const transactionData = {
+        const legacyTxData = {
             customer_id: customerId,
             franchise_id: customer.franchise_id,
-            type,
+            type: normalizedType || 'adjustment',
             amount,
             balance_after: newBalance,
+            payment_method: paymentMethod || null,
             notes: description,
             reason: description,
             order_id: orderId,
@@ -1333,38 +1429,75 @@ export class SupabaseStorage {
             recorded_by: employeeId
         };
 
-        const snakeCaseData = this.toSnakeCase(transactionData);
-
         const { data: transaction, error: txError } = await this.supabase
             .from('credit_transactions')
-            .insert(snakeCaseData)
+            .insert(this.toSnakeCase(legacyTxData))
             .select()
             .single();
 
         if (txError) {
-            console.error('Add Credit: Transaction insert failed', txError);
+            console.error('Add Credit: Legacy transaction insert failed', txError);
             throw txError;
         }
 
-        // Update customer balance
         const { error: updateError } = await this.supabase
             .from('customers')
             .update({ credit_balance: newBalance })
             .eq('id', customerId);
 
         if (updateError) {
-            console.error('Add Credit: Balance update failed', updateError);
+            console.error('Add Credit: Legacy balance update failed', updateError);
             throw updateError;
         }
 
         return {
             ...this.mapDates(transaction),
             previousBalance: currentBalance,
-            newBalance: newBalance
+            newBalance
         };
     }
 
     async getCustomerCreditHistory(customerId: string): Promise<any[]> {
+        // Preferred path: wallet ledger mapped to legacy credit view model.
+        const { data: walletData, error: walletError } = await this.supabase
+            .from('wallet_transactions')
+            .select('*')
+            .eq('customer_id', customerId)
+            .order('entry_no', { ascending: false });
+
+        if (!walletError && walletData) {
+            return walletData.map((row: any) => {
+                const mapped = this.mapDates(row);
+                const walletAmount = parseFloat(row.amount || mapped.amount || '0');
+                const walletBalanceAfter = parseFloat(row.balance_after || mapped.balanceAfter || '0');
+                const referenceType = row.reference_type || mapped.referenceType;
+
+                let legacyType = 'adjustment';
+                if (mapped.transactionType === 'DEBIT') {
+                    legacyType = 'credit';
+                } else if (mapped.transactionType === 'CREDIT') {
+                    legacyType = referenceType === 'PAYMENT' ? 'payment' : 'deposit';
+                }
+
+                return {
+                    ...mapped,
+                    type: legacyType,
+                    // Legacy credit amount: + means customer owes more, - means customer paid.
+                    amount: (-walletAmount).toFixed(2),
+                    balanceAfter: (walletBalanceAfter < 0 ? Math.abs(walletBalanceAfter) : 0).toFixed(2),
+                    orderId: referenceType === 'ORDER' ? (row.reference_id || mapped.referenceId) : undefined,
+                    referenceNumber: referenceType !== 'ORDER' ? (row.reference_id || mapped.referenceId) : undefined,
+                    description: row.note || mapped.note || mapped.notes || '',
+                };
+            });
+        }
+
+        if (walletError && !this.isWalletInfraMissing(walletError)) {
+            console.error('Get Credit History from wallet ledger failed', walletError);
+            return [];
+        }
+
+        // Legacy fallback path
         const { data, error } = await this.supabase
             .from('credit_transactions')
             .select('*')
@@ -1376,6 +1509,25 @@ export class SupabaseStorage {
             return [];
         }
         return data.map(item => this.mapDates(item));
+    }
+
+    async getCustomersWithOutstandingCredit(franchiseId?: string): Promise<Customer[]> {
+        let query = this.supabase
+            .from('customers')
+            .select('*')
+            .gt('credit_balance', 0);
+
+        if (franchiseId) {
+            query = query.eq('franchise_id', franchiseId);
+        }
+
+        const { data, error } = await query.order('credit_balance', { ascending: false });
+        if (error) {
+            console.error('Get outstanding customers failed', error);
+            return [];
+        }
+
+        return data.map((item: any) => this.mapDates(item));
     }
 
     close() { }

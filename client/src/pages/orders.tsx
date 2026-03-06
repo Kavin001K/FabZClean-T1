@@ -1022,12 +1022,16 @@ function OrdersComponent() {
       filters.amountMax;
   }, [filters]);
 
+  const ordersGridColumns = "grid-cols-[48px_170px_minmax(220px,1fr)_140px_150px_130px_130px_130px_130px_90px]";
+  const ordersTableMinWidth = "min-w-[1360px]";
+  const virtualTableBodyHeight = 548;
+
   const renderOrderRow = useCallback((order: Order, index: number) => {
     return (
       <div
         key={order.id}
         className={cn(
-          "grid grid-cols-[48px_140px_minmax(0,1fr)_120px_140px_120px_100px_120px_120px_80px] gap-4 items-center px-4 h-full border-b hover:bg-muted/50 transition-colors text-sm w-full",
+          `grid ${ordersGridColumns} gap-4 items-center px-4 h-full border-b hover:bg-muted/50 transition-colors text-sm`,
           selectedOrders.includes(order.id) && "bg-muted"
         )}
         onClick={() => handleViewOrder(order)}
@@ -1035,7 +1039,7 @@ function OrdersComponent() {
         <div onClick={(e) => e.stopPropagation()}>
           <Checkbox checked={selectedOrders.includes(order.id)} onCheckedChange={() => handleSelectOrder(order.id)} />
         </div>
-        <div className="font-mono font-medium flex items-center gap-2">
+        <div className="min-w-0 truncate font-mono font-medium flex items-center gap-2">
           {order.orderNumber}
           {((order as any).isExpressOrder) && (
             <Badge className="bg-orange-500 text-white text-[9px] px-1.5 py-0 h-5">EXPRESS</Badge>
@@ -1101,10 +1105,10 @@ function OrdersComponent() {
         </div>
       </div>
     );
-  }, [selectedOrders, getStatusColor, getStatusIcon, getPaymentStatusColor, handleSelectOrder, handleViewOrder, handleEditOrder, handlePrintInvoice, handleUpdateStatus, handleMarkAsPaid, handleMarkAsCredit, handleCancelOrder]);
+  }, [selectedOrders, ordersGridColumns, getStatusColor, getStatusIcon, getPaymentStatusColor, handleSelectOrder, handleViewOrder, handleEditOrder, handlePrintInvoice, handleUpdateStatus, handleMarkAsPaid, handleMarkAsCredit, handleCancelOrder]);
 
   const OrderHeaders = (
-    <div className="grid grid-cols-[48px_140px_minmax(0,1fr)_120px_140px_120px_100px_120px_120px_80px] gap-4 items-center px-4 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase select-none sticky top-0 z-10 w-full">
+    <div className={`grid ${ordersGridColumns} gap-4 items-center px-4 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase select-none`}>
       <div><Checkbox checked={filteredOrders.length > 0 && selectedOrders.length === filteredOrders.length} onCheckedChange={handleSelectAll} /></div>
       <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('orderNumber')}>Order # <ArrowUpDown className="h-3 w-3" /></div>
       <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('customerName')}>Customer <ArrowUpDown className="h-3 w-3" /></div>
@@ -1580,7 +1584,7 @@ function OrdersComponent() {
                     )}
                   </AnimatePresence>
 
-                  <div className="flex-1" />
+                  <div className="hidden flex-1 sm:block" />
 
                   {/* Export Options */}
                   <DropdownMenu>
@@ -1739,16 +1743,20 @@ function OrdersComponent() {
                     </div>
                   ) : (
                     <div className="rounded-lg border bg-background overflow-hidden h-[600px] flex flex-col">
-                      {OrderHeaders}
-                      <div className="flex-1">
-                        <VirtualScroll
-                          items={filteredOrders}
-                          itemHeight={60}
-                          containerHeight={600}
-                          renderItem={renderOrderRow}
-                          emptyMessage="No orders found matching your criteria"
-                          className="scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent"
-                        />
+                      <div className="h-full overflow-x-auto">
+                        <div className={cn(ordersTableMinWidth, "h-full flex flex-col")}>
+                          {OrderHeaders}
+                          <div className="flex-1">
+                            <VirtualScroll
+                              items={filteredOrders}
+                              itemHeight={60}
+                              containerHeight={virtualTableBodyHeight}
+                              renderItem={renderOrderRow}
+                              emptyMessage="No orders found matching your criteria"
+                              className="overflow-y-auto scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent"
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}

@@ -400,27 +400,27 @@ export default function CreditsPage() {
 
     return (
         <PageTransition>
-            <div className="container-desktop min-h-screen py-8 space-y-8">
+            <div className="container-desktop min-h-screen py-4 space-y-6 sm:py-8 sm:space-y-8">
                 {/* Header */}
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center justify-between"
+                    className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                     <div>
-                        <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 bg-clip-text text-transparent">
+                        <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 bg-clip-text text-transparent sm:text-4xl">
                             Credit Management
                         </h1>
-                        <p className="text-muted-foreground mt-2 text-lg">
+                        <p className="text-muted-foreground mt-2 text-sm sm:text-lg">
                             Manage customer credit balances, payments, and outstanding dues
                         </p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <Button variant="outline" onClick={() => refetch()} disabled={isLoading}>
+                    <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center sm:gap-3">
+                        <Button variant="outline" onClick={() => refetch()} disabled={isLoading} className="w-full sm:w-auto">
                             <RefreshCw className={cn("h-4 w-4 mr-2", isLoading && "animate-spin")} />
                             Refresh
                         </Button>
-                        <Button onClick={handleExportReport} disabled={!filteredCustomers.length}>
+                        <Button onClick={handleExportReport} disabled={!filteredCustomers.length} className="w-full sm:w-auto">
                             <Download className="h-4 w-4 mr-2" />
                             Export Report
                         </Button>
@@ -542,8 +542,8 @@ export default function CreditsPage() {
 
                         <CardContent className="p-6">
                             {/* Search and Filters */}
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="relative flex-1 max-w-md">
+                            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                                <div className="relative flex-1 sm:max-w-md">
                                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                                     <Input
                                         placeholder="Search by name, phone, or email..."
@@ -553,7 +553,7 @@ export default function CreditsPage() {
                                     />
                                 </div>
                                 <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-                                    <SelectTrigger className="w-40">
+                                    <SelectTrigger className="w-full sm:w-40">
                                         <SelectValue placeholder="Sort by" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -566,6 +566,7 @@ export default function CreditsPage() {
                                     variant="outline"
                                     size="icon"
                                     onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                                    className="w-full sm:w-10"
                                 >
                                     <ArrowUpDown className="h-4 w-4" />
                                 </Button>
@@ -584,109 +585,111 @@ export default function CreditsPage() {
                                 </div>
                             ) : (
                                 <div className="rounded-lg border overflow-hidden">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow className="bg-muted/50">
-                                                <TableHead>Customer</TableHead>
-                                                <TableHead>Contact</TableHead>
-                                                <TableHead className="text-right">Credit Balance</TableHead>
-                                                <TableHead className="text-center">Orders</TableHead>
-                                                <TableHead className="text-center">Actions</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {filteredCustomers.map((customer: CreditCustomer) => (
-                                                <TableRow key={customer.id} className="hover:bg-muted/50">
-                                                    <TableCell>
-                                                        <div className="font-medium">{customer.name}</div>
-                                                        {customer.lastOrder && (
-                                                            <div className="text-xs text-muted-foreground">
-                                                                Last order: {format(new Date(customer.lastOrder), 'dd MMM yyyy')}
-                                                            </div>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex flex-col gap-1">
-                                                            <div className="flex items-center gap-1 text-sm">
-                                                                <Phone className="h-3 w-3" /> {customer.phone}
-                                                            </div>
-                                                            {customer.email && (
-                                                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                                    <Mail className="h-3 w-3" /> {customer.email}
+                                    <div className="overflow-x-auto">
+                                        <Table className="min-w-[820px]">
+                                            <TableHeader>
+                                                <TableRow className="bg-muted/50">
+                                                    <TableHead>Customer</TableHead>
+                                                    <TableHead>Contact</TableHead>
+                                                    <TableHead className="text-right">Credit Balance</TableHead>
+                                                    <TableHead className="text-center">Orders</TableHead>
+                                                    <TableHead className="text-center">Actions</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {filteredCustomers.map((customer: CreditCustomer) => (
+                                                    <TableRow key={customer.id} className="hover:bg-muted/50">
+                                                        <TableCell>
+                                                            <div className="font-medium">{customer.name}</div>
+                                                            {customer.lastOrder && (
+                                                                <div className="text-xs text-muted-foreground">
+                                                                    Last order: {format(new Date(customer.lastOrder), 'dd MMM yyyy')}
                                                                 </div>
                                                             )}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <Badge className={cn(
-                                                            "text-sm font-bold",
-                                                            customer.creditBalance > 5000
-                                                                ? "bg-red-100 text-red-700 dark:bg-red-900/50"
-                                                                : customer.creditBalance > 1000
-                                                                    ? "bg-orange-100 text-orange-700 dark:bg-orange-900/50"
-                                                                    : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50"
-                                                        )}>
-                                                            {formatCurrency(customer.creditBalance)}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-center">
-                                                        <span className="text-sm text-muted-foreground">
-                                                            {customer.totalOrders || 0}
-                                                        </span>
-                                                    </TableCell>
-                                                    <TableCell className="text-center">
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="sm">
-                                                                    Actions <ChevronDown className="h-4 w-4 ml-1" />
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end">
-                                                                <DropdownMenuLabel>Manage Credit</DropdownMenuLabel>
-                                                                <DropdownMenuSeparator />
-                                                                <DropdownMenuItem
-                                                                    onClick={() => {
-                                                                        setSelectedCustomer(customer);
-                                                                        setIsHistoryDialogOpen(true);
-                                                                    }}
-                                                                >
-                                                                    <FileText className="h-4 w-4 mr-2" />
-                                                                    View History
-                                                                </DropdownMenuItem>
-                                                                {canManageCredits && (
-                                                                    <>
-                                                                        <DropdownMenuItem
-                                                                            onClick={() => {
-                                                                                setSelectedCustomer(customer);
-                                                                                setPaymentAmount(customer.creditBalance.toString());
-                                                                                setIsPaymentDialogOpen(true);
-                                                                            }}
-                                                                            className="text-green-600"
-                                                                        >
-                                                                            <IndianRupee className="h-4 w-4 mr-2" />
-                                                                            Record Payment
-                                                                        </DropdownMenuItem>
-                                                                        {isAdmin && (
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex flex-col gap-1">
+                                                                <div className="flex items-center gap-1 text-sm">
+                                                                    <Phone className="h-3 w-3" /> {customer.phone}
+                                                                </div>
+                                                                {customer.email && (
+                                                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                                        <Mail className="h-3 w-3" /> {customer.email}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Badge className={cn(
+                                                                "text-sm font-bold",
+                                                                customer.creditBalance > 5000
+                                                                    ? "bg-red-100 text-red-700 dark:bg-red-900/50"
+                                                                    : customer.creditBalance > 1000
+                                                                        ? "bg-orange-100 text-orange-700 dark:bg-orange-900/50"
+                                                                        : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50"
+                                                            )}>
+                                                                {formatCurrency(customer.creditBalance)}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-center">
+                                                            <span className="text-sm text-muted-foreground">
+                                                                {customer.totalOrders || 0}
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell className="text-center">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="sm">
+                                                                        Actions <ChevronDown className="h-4 w-4 ml-1" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end">
+                                                                    <DropdownMenuLabel>Manage Credit</DropdownMenuLabel>
+                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuItem
+                                                                        onClick={() => {
+                                                                            setSelectedCustomer(customer);
+                                                                            setIsHistoryDialogOpen(true);
+                                                                        }}
+                                                                    >
+                                                                        <FileText className="h-4 w-4 mr-2" />
+                                                                        View History
+                                                                    </DropdownMenuItem>
+                                                                    {canManageCredits && (
+                                                                        <>
                                                                             <DropdownMenuItem
                                                                                 onClick={() => {
                                                                                     setSelectedCustomer(customer);
-                                                                                    setIsAdjustDialogOpen(true);
+                                                                                    setPaymentAmount(customer.creditBalance.toString());
+                                                                                    setIsPaymentDialogOpen(true);
                                                                                 }}
-                                                                                className="text-blue-600"
+                                                                                className="text-green-600"
                                                                             >
-                                                                                <Receipt className="h-4 w-4 mr-2" />
-                                                                                Adjust Balance
+                                                                                <IndianRupee className="h-4 w-4 mr-2" />
+                                                                                Record Payment
                                                                             </DropdownMenuItem>
-                                                                        )}
-                                                                    </>
-                                                                )}
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
+                                                                            {isAdmin && (
+                                                                                <DropdownMenuItem
+                                                                                    onClick={() => {
+                                                                                        setSelectedCustomer(customer);
+                                                                                        setIsAdjustDialogOpen(true);
+                                                                                    }}
+                                                                                    className="text-blue-600"
+                                                                                >
+                                                                                    <Receipt className="h-4 w-4 mr-2" />
+                                                                                    Adjust Balance
+                                                                                </DropdownMenuItem>
+                                                                            )}
+                                                                        </>
+                                                                    )}
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
                                 </div>
                             )}
                         </CardContent>

@@ -248,6 +248,18 @@ export class SerializationService {
         : serialized.creditBalance;
     }
 
+    if (serialized.creditLimit !== undefined) {
+      serialized.creditLimit = typeof serialized.creditLimit === 'string'
+        ? parseFloat(serialized.creditLimit)
+        : serialized.creditLimit;
+    }
+
+    if (serialized.walletBalanceCache !== undefined) {
+      serialized.walletBalanceCache = typeof serialized.walletBalanceCache === 'string'
+        ? parseFloat(serialized.walletBalanceCache)
+        : serialized.walletBalanceCache;
+    }
+
     // Handle loyalty points
     if (includeLoyalty && customer.loyaltyPoints !== undefined) {
       serialized.loyaltyPoints = parseInt(customer.loyaltyPoints) || 0;

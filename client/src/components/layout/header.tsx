@@ -8,6 +8,10 @@ import { NotificationCenter } from '@/components/notification-center';
 import { GlobalSearch } from '@/components/global-search';
 import { UserMenu } from '@/components/layout/user-menu';
 
+const isLikelyRecordId = (segment: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment) ||
+  /^[A-Za-z0-9_-]{20,}$/.test(segment);
+
 const capitalize = (s: string) => {
   if (s === 'employee-dashboard') return 'Employee Dashboard';
   if (s === 'create-order') return 'New Order';
@@ -23,16 +27,32 @@ interface HeaderProps {
 
 export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: HeaderProps) {
   const [location] = useLocation();
-  const [paths, setPaths] = useState(['Dashboard']);
+  const [breadcrumbs, setBreadcrumbs] = useState([{ label: 'Dashboard', href: '/dashboard' }]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { showShortcuts } = useShortcuts();
 
   useEffect(() => {
     const pathSegments = location.split('/').filter(p => p);
     if (pathSegments.length === 0) {
-      setPaths(['Dashboard']);
+      setBreadcrumbs([{ label: 'Dashboard', href: '/dashboard' }]);
     } else {
-      setPaths(pathSegments.map(capitalize));
+      const mapped = pathSegments.map((segment, index) => {
+        const previousSegment = pathSegments[index - 1];
+        let label = capitalize(segment);
+
+        if (isLikelyRecordId(segment)) {
+          if (previousSegment === 'orders') label = 'Order Details';
+          else if (previousSegment === 'customers') label = 'Customer Profile';
+          else if (previousSegment === 'services') label = 'Service Details';
+          else label = 'Details';
+        }
+
+        return {
+          label,
+          href: `/${pathSegments.slice(0, index + 1).join('/')}`,
+        };
+      });
+      setBreadcrumbs(mapped);
     }
   }, [location]);
 
@@ -86,15 +106,15 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
                 <Link href="/">Home</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
-            {paths.map((path, index) => (
-              <div key={path} className="flex items-center">
+            {breadcrumbs.map((crumb, index) => (
+              <div key={crumb.href} className="flex items-center">
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  {index === paths.length - 1 ? (
-                    <BreadcrumbPage>{path}</BreadcrumbPage>
+                  {index === breadcrumbs.length - 1 ? (
+                    <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                   ) : (
                     <BreadcrumbLink asChild>
-                      <Link href={`/${path.toLowerCase()}`}>{path}</Link>
+                      <Link href={crumb.href}>{crumb.label}</Link>
                     </BreadcrumbLink>
                   )}
                 </BreadcrumbItem>
@@ -107,7 +127,7 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
       {/* Mobile: show current page title instead of breadcrumbs */}
       {isMobile && (
         <h1 className="min-w-0 max-w-[40vw] truncate text-sm font-semibold">
-          {paths[paths.length - 1] || 'Dashboard'}
+          {breadcrumbs[breadcrumbs.length - 1]?.label || 'Dashboard'}
         </h1>
       )}
 

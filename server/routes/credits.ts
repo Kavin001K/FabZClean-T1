@@ -175,7 +175,8 @@ router.post('/:customerId/payment', requireRole(CREDIT_MANAGE_ROLES), async (req
             'payment',
             description,
             referenceNumber,
-            req.employee?.employeeId
+            req.employee?.employeeId,
+            paymentMethod
         );
 
         // Log the action

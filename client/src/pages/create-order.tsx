@@ -906,6 +906,27 @@ export default function CreateOrder() {
       return;
     }
 
+    // Credit limit guard (wallet-compatible): block order if projected due exceeds limit.
+    if (paymentMethod === 'credit' || paymentStatus === 'credit') {
+      const currentOutstanding = foundCustomer?.creditBalance
+        ? Number(foundCustomer.creditBalance)
+        : 0;
+      const configuredLimit = (foundCustomer as any)?.creditLimit !== undefined
+        ? Number((foundCustomer as any).creditLimit)
+        : -500;
+      const maxAllowedDue = Math.abs(configuredLimit <= 0 ? configuredLimit : -configuredLimit);
+      const futureOutstanding = currentOutstanding + totalAmount;
+
+      if (futureOutstanding > maxAllowedDue) {
+        toast({
+          title: "Credit Limit Exceeded",
+          description: `Future due ₹${futureOutstanding.toFixed(2)} exceeds allowed ₹${maxAllowedDue.toFixed(2)}.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     // Don't set orderNumber here - let server generate it with proper sequential format
     const orderData: any = {
       customerId: currentCustomerId,
@@ -1964,9 +1985,11 @@ export default function CreateOrder() {
                           <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/30 dark:to-amber-900/20 p-3 rounded-lg border border-amber-200/50 dark:border-amber-800/50">
                             <div className="flex items-center gap-2 mb-1">
                               <CheckCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                              <span className="text-[10px] uppercase tracking-wider font-medium text-amber-600 dark:text-amber-400">Completed</span>
+                              <span className="text-[10px] uppercase tracking-wider font-medium text-amber-600 dark:text-amber-400">Credit Limit</span>
                             </div>
-                            <p className="text-xl font-bold text-amber-700 dark:text-amber-300">{customerStats.completedOrders}</p>
+                            <p className="text-xl font-bold text-amber-700 dark:text-amber-300">
+                              ₹{Math.abs(Number((foundCustomer as any)?.creditLimit ?? -500)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                            </p>
                           </div>
                         </div>
 

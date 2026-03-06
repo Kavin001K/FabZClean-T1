@@ -307,11 +307,19 @@ export default function Customers() {
       pincode: customerData.addressPincode || '',
     });
 
+    const parsedCreditLimit = customerData.creditLimit !== undefined && customerData.creditLimit !== ''
+      ? Number(customerData.creditLimit)
+      : undefined;
+    const normalizedCreditLimit = parsedCreditLimit !== undefined && !Number.isNaN(parsedCreditLimit)
+      ? (-Math.abs(parsedCreditLimit)).toString()
+      : undefined;
+
     const transformedData: Partial<Customer> = {
       name: customerData.name,
       phone: customerData.phone,
       email: customerData.email || undefined,
       address: addressObj.street ? addressObj : undefined,
+      creditLimit: normalizedCreditLimit,
     };
 
     createCustomerMutation.mutate(transformedData);
@@ -327,11 +335,19 @@ export default function Customers() {
       pincode: customerData.addressPincode || '',
     });
 
+    const parsedCreditLimit = customerData.creditLimit !== undefined && customerData.creditLimit !== ''
+      ? Number(customerData.creditLimit)
+      : undefined;
+    const normalizedCreditLimit = parsedCreditLimit !== undefined && !Number.isNaN(parsedCreditLimit)
+      ? (-Math.abs(parsedCreditLimit)).toString()
+      : undefined;
+
     const transformedData: Partial<Customer> = {
       name: customerData.name,
       phone: customerData.phone,
       email: customerData.email || undefined,
       address: addressObj.street ? addressObj : undefined,
+      creditLimit: normalizedCreditLimit,
     };
 
     editCustomerMutation.mutate({
@@ -690,6 +706,9 @@ export default function Customers() {
                   const tier = getSpendingTier(parseFloat(customer.totalSpent || '0'));
                   const TierIcon = tier.icon;
                   const totalSpent = parseFloat(customer.totalSpent || '0');
+                  const outstandingCredit = parseFloat(customer.creditBalance || '0');
+                  const customerCreditLimit = Math.abs(parseFloat((customer as any).creditLimit || '-500'));
+                  const availableCredit = Math.max(0, customerCreditLimit - outstandingCredit);
                   const lastOrderDate = customer.lastOrder
                     ? new Date(customer.lastOrder).toLocaleDateString()
                     : 'No orders';
@@ -759,12 +778,18 @@ export default function Customers() {
                             )}
                           </div>
 
-                          {/* Credit Balance */}
-                          <div className="flex items-center justify-between text-sm py-2 px-3 bg-white/5 rounded-md border border-white/5">
-                            <span className="text-muted-foreground font-medium">Store Credit</span>
-                            <span className={`font-bold ${parseFloat(customer.creditBalance || '0') < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                              ₹{customer.creditBalance || '0.00'}
-                            </span>
+                          {/* Credit Wallet Summary */}
+                          <div className="space-y-2 py-2 px-3 bg-white/5 rounded-md border border-white/5">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground font-medium">Outstanding Credit</span>
+                              <span className={`font-bold ${outstandingCredit > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                ₹{outstandingCredit.toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>Limit ₹{customerCreditLimit.toFixed(0)}</span>
+                              <span>Available ₹{availableCredit.toFixed(0)}</span>
+                            </div>
                           </div>
 
                           {/* Stats */}

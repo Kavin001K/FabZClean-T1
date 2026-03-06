@@ -160,6 +160,8 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
       addressStreet: existingAddress.street,
       addressCity: existingAddress.city,
       addressPincode: existingAddress.pincode,
+      creditLimit: (selectedCustomer as any)?.creditLimit || '-500',
+      creditBalance: selectedCustomer?.creditBalance || '0',
       notes: '',
     },
   });
@@ -173,6 +175,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
       addressStreet: '',
       addressCity: '',
       addressPincode: '',
+      creditLimit: '-500',
       notes: '',
     },
   });
@@ -184,9 +187,14 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
         name: selectedCustomer.name,
         email: selectedCustomer.email || '',
         phone: selectedCustomer.phone || '',
+        addressStreet: existingAddress.street,
+        addressCity: existingAddress.city,
+        addressPincode: existingAddress.pincode,
+        creditLimit: (selectedCustomer as any)?.creditLimit || '-500',
+        creditBalance: selectedCustomer.creditBalance || '0',
       });
     }
-  }, [isEditDialogOpen, selectedCustomer, editForm]);
+  }, [isEditDialogOpen, selectedCustomer, editForm, existingAddress.street, existingAddress.city, existingAddress.pincode]);
 
   React.useEffect(() => {
     if (isCreateDialogOpen) {
@@ -255,7 +263,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
 
               <div className="space-y-6">
                 {/* Customer Info */}
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div className="space-y-4">
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Email</Label>
@@ -284,6 +292,21 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                           ₹{totalSpent.toLocaleString('en-IN')}
                         </div>
                         <div className="text-sm text-muted-foreground">Total Spent</div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <div className="text-lg font-bold text-red-500">
+                          ₹{parseFloat(selectedCustomer.creditBalance || '0').toLocaleString('en-IN')}
+                        </div>
+                        <div className="text-sm text-muted-foreground">Outstanding Credit</div>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <div className="text-lg font-bold text-emerald-500">
+                          ₹{Math.abs(parseFloat((selectedCustomer as any).creditLimit || '-500')).toLocaleString('en-IN')}
+                        </div>
+                        <div className="text-sm text-muted-foreground">Credit Limit</div>
                       </div>
                     </div>
 
@@ -353,60 +376,61 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                 {/* Recent Orders */}
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Order #</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Services</TableHead>
-                        <TableHead>Total</TableHead>
-                        <TableHead>Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {customerOrders.length > 0 ? (
-                        customerOrders.map((order) => {
-                          // Parse items to get service names
-                          const serviceNames = Array.isArray(order.items)
-                            ? (order.items as any[]).map(item => item.productName || item.serviceName || 'Service').slice(0, 2)
-                            : ['Services'];
-
-                          return (
-                            <TableRow key={order.id}>
-                              <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                              <TableCell>
-                                <Badge className={getStatusColor(order.status)}>
-                                  {order.status ? order.status.replace('_', ' ') : 'Unknown'}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-wrap gap-1">
-                                  {serviceNames.map((service, i) => (
-                                    <Badge key={i} variant="outline" className="text-xs">
-                                      {service}
-                                    </Badge>
-                                  ))}
-                                  {Array.isArray(order.items) && (order.items as any[]).length > 2 && (
-                                    <Badge variant="outline" className="text-xs">+{(order.items as any[]).length - 2}</Badge>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="font-medium">{formatCurrency(parseFloat(order.totalAmount))}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {formatDate(order.createdAt ? new Date(order.createdAt).toISOString() : '')}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      ) : (
+                  <div className="overflow-x-auto">
+                    <Table className="min-w-[680px]">
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
-                            No orders found for this customer.
-                          </TableCell>
+                          <TableHead>Order #</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Services</TableHead>
+                          <TableHead>Total</TableHead>
+                          <TableHead>Date</TableHead>
                         </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {customerOrders.length > 0 ? (
+                          customerOrders.map((order) => {
+                            const serviceNames = Array.isArray(order.items)
+                              ? (order.items as any[]).map(item => item.productName || item.serviceName || 'Service').slice(0, 2)
+                              : ['Services'];
+
+                            return (
+                              <TableRow key={order.id}>
+                                <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                                <TableCell>
+                                  <Badge className={getStatusColor(order.status)}>
+                                    {order.status ? order.status.replace('_', ' ') : 'Unknown'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-wrap gap-1">
+                                    {serviceNames.map((service, i) => (
+                                      <Badge key={i} variant="outline" className="text-xs">
+                                        {service}
+                                      </Badge>
+                                    ))}
+                                    {Array.isArray(order.items) && (order.items as any[]).length > 2 && (
+                                      <Badge variant="outline" className="text-xs">+{(order.items as any[]).length - 2}</Badge>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="font-medium">{formatCurrency(parseFloat(order.totalAmount))}</TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {formatDate(order.createdAt ? new Date(order.createdAt).toISOString() : '')}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
+                              No orders found for this customer.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               </div>
 
@@ -500,7 +524,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="edit-city">City</Label>
                       <Input
@@ -554,7 +578,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                 <div className="space-y-4 border-t pt-4">
                   <h4 className="font-semibold text-sm text-muted-foreground">Business Information (Optional)</h4>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="edit-company">Company Name</Label>
                       <Input
@@ -574,7 +598,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="edit-dob">Date of Birth</Label>
                       <Input
@@ -605,7 +629,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                 <div className="space-y-4 border-t pt-4">
                   <h4 className="font-semibold text-sm text-muted-foreground">Credit Management</h4>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="edit-credit-limit">Credit Limit (₹)</Label>
                       <Input
@@ -622,7 +646,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                       <Input
                         id="edit-credit-balance"
                         type="number"
-                        {...editForm.register('creditBalance')}
+                        value={selectedCustomer?.creditBalance || '0'}
                         placeholder="0"
                         readOnly
                         className="bg-muted"
@@ -774,7 +798,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="create-city">City</Label>
                     <Input
@@ -804,6 +828,19 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
 
                 <p className="text-xs text-muted-foreground">
                   State: Tamil Nadu, Country: India (default)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-credit-limit">Credit Limit (₹)</Label>
+                <Input
+                  id="create-credit-limit"
+                  type="number"
+                  {...createForm.register('creditLimit')}
+                  placeholder="-500"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use negative value (example: -500) to set max allowed due.
                 </p>
               </div>
 

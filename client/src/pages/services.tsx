@@ -410,7 +410,7 @@ export default function Services() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-        className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
+        className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
       >
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Service Catalog</h1>
@@ -418,18 +418,19 @@ export default function Services() {
             Browse and manage your premium service offerings
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:justify-end">
           <Button
             variant="outline"
             size="sm"
             onClick={handlePrintPriceList}
+            className="w-full sm:w-auto"
           >
             <Printer className="h-4 w-4 mr-2" />
             Print Price List
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="w-full sm:w-auto">
                 <Download className="h-4 w-4 mr-2" />
                 Export Catalog
               </Button>
@@ -449,11 +450,12 @@ export default function Services() {
             variant="outline"
             size="sm"
             onClick={() => setIsImportDialogOpen(true)}
+            className="w-full sm:w-auto"
           >
             <Upload className="h-4 w-4 mr-2" />
             Import Service
           </Button>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <Button onClick={() => setIsCreateDialogOpen(true)} className="w-full sm:w-auto">
             <PlusCircle className="h-4 w-4 mr-2" />
             Add Service
           </Button>
@@ -545,7 +547,7 @@ export default function Services() {
                   aria-label="Search services by name, description, or category"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                   <SelectTrigger className="w-full sm:w-[180px]" aria-label="Filter by category">
                     <SelectValue placeholder="All Categories" />
@@ -581,12 +583,12 @@ export default function Services() {
                   </SelectContent>
                 </Select>
 
-                <div className="flex border rounded-md">
+                <div className="flex w-full border rounded-md sm:w-auto">
                   <Button
                     variant={viewMode === 'grid' ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => setViewMode('grid')}
-                    className="rounded-r-none"
+                    className="flex-1 rounded-r-none sm:flex-none"
                   >
                     <Grid3x3 className="h-4 w-4" />
                   </Button>
@@ -594,7 +596,7 @@ export default function Services() {
                     variant={viewMode === 'list' ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => setViewMode('list')}
-                    className="rounded-l-none"
+                    className="flex-1 rounded-l-none sm:flex-none"
                   >
                     <List className="h-4 w-4" />
                   </Button>
@@ -811,7 +813,7 @@ export default function Services() {
                   <Card className="hover:shadow-md transition-shadow"
                   >
                     <CardContent className="pt-6">
-                      <div className="flex items-center gap-6">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-6">
                         <div className="p-4 rounded-lg bg-lime-100 text-lime-600">
                           <ServiceIcon className="h-8 w-8" />
                         </div>
@@ -844,14 +846,14 @@ export default function Services() {
                           </div>
                         </div>
 
-                        <div className="text-right">
+                        <div className="text-left lg:text-right">
                           <p className="text-sm text-muted-foreground mb-1">Service Price</p>
                           <p className="text-3xl font-bold text-lime-600">
                             {formatCurrency(service.price)}
                           </p>
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2 lg:justify-end">
                           <Button
                             variant="outline"
                             onClick={(e) => {
