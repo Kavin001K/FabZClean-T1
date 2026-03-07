@@ -45,6 +45,7 @@ const RefundPage = lazy(() => retryDynamicImport(() => import("@/pages/refund"))
 const CookiesPage = lazy(() => retryDynamicImport(() => import("@/pages/cookies")));
 const PublicOrderTracking = lazy(() => retryDynamicImport(() => import("@/pages/public-order-tracking")));
 const ProfilePage = lazy(() => retryDynamicImport(() => import("@/pages/profile")));
+const DeliveriesManagement = lazy(() => retryDynamicImport(() => import("@/pages/deliveries-management")));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -154,6 +155,14 @@ function Router() {
         <ProtectedRoute>
           <MainLayout>
             <PrintQueue />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/deliveries">
+        <ProtectedRoute>
+          <MainLayout>
+            <DeliveriesManagement />
           </MainLayout>
         </ProtectedRoute>
       </Route>

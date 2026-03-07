@@ -65,80 +65,15 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { PageTransition, FadeIn } from '@/components/ui/page-transition';
 
+import { useAuth } from '@/contexts/auth-context';
+
 // Import child components
 import WorkerDeliveryList from '@/components/worker-portal/worker-delivery-list';
 import WorkerRouteOptimizer from '@/components/worker-portal/worker-route-optimizer';
 import WorkerQRScanner from '@/components/worker-portal/worker-qr-scanner';
 import WorkerStatusUpdater from '@/components/worker-portal/worker-status-updater';
 
-// Mock data services for development
-const deliveriesApi = {
-  getByDriver: async (driverId: string) => {
-    // Mock deliveries data
-    return [
-      {
-        id: 'delivery-1',
-        orderId: 'ORDER-123',
-        driverId: driverId,
-        status: 'assigned',
-        pickupAddress: '123 Main Street, Bangalore',
-        deliveryAddress: '456 Park Avenue, Bangalore',
-        scheduledPickup: '2024-01-15T10:00:00Z',
-        scheduledDelivery: '2024-01-15T14:00:00Z',
-        customerName: 'John Doe',
-        customerPhone: '9876543210',
-        specialInstructions: 'Handle with care',
-        priority: 'medium',
-        estimatedTime: 30,
-        distance: 5.2,
-        createdAt: '2024-01-15T09:00:00Z',
-        updatedAt: '2024-01-15T09:00:00Z'
-      },
-      {
-        id: 'delivery-2',
-        orderId: 'ORDER-456',
-        driverId: driverId,
-        status: 'picked_up',
-        pickupAddress: '789 Oak Street, Bangalore',
-        deliveryAddress: '321 Pine Street, Bangalore',
-        scheduledPickup: '2024-01-15T11:00:00Z',
-        scheduledDelivery: '2024-01-15T15:00:00Z',
-        customerName: 'Jane Smith',
-        customerPhone: '9876543211',
-        specialInstructions: 'Express delivery',
-        priority: 'high',
-        estimatedTime: 45,
-        distance: 8.5,
-        createdAt: '2024-01-15T10:00:00Z',
-        updatedAt: '2024-01-15T10:00:00Z'
-      }
-    ];
-  }
-};
-
-const driversApi = {
-  getById: async (driverId: string) => {
-    // Mock driver data
-    return {
-      id: driverId,
-      name: 'Rajesh Kumar',
-      phone: '9876543210',
-      email: 'rajesh.kumar@fabzclean.com',
-      licenseNumber: 'DL123456789',
-      vehicleNumber: 'KA01AB1234',
-      vehicleType: 'Two Wheeler',
-      status: 'active',
-      currentLatitude: 12.9716,
-      currentLongitude: 77.5946,
-      lastActive: new Date().toISOString(),
-      rating: 4.8,
-      totalDeliveries: 245,
-      totalEarnings: '45000',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-  }
-};
+// (Mocks removed)
 
 // Temporary type definitions
 interface Delivery {
@@ -184,57 +119,61 @@ interface Driver {
 export default function WorkerPortal() {
   const [activeTab, setActiveTab] = useState('deliveries');
   const [searchQuery, setSearchQuery] = useState('');
-  const [driverId] = useState('driver123'); // In a real app, this would come from auth
+  const { employee, signOut } = useAuth();
 
-  // Fetch driver data
+  // Fetch orders data
   const {
-    data: driverData,
-    isLoading: driverLoading,
-    isError: driverError,
-    error: driverErrorDetails,
-  } = useQuery({
-    queryKey: ['driver', driverId],
-    queryFn: () => driversApi.getById(driverId),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 3,
-  });
-
-  // Fetch deliveries data
-  const {
-    data: deliveries = [],
+    data: ordersData = [],
     isLoading: deliveriesLoading,
     error: deliveriesError,
   } = useQuery({
-    queryKey: ['driver-deliveries', driverId],
-    queryFn: () => deliveriesApi.getByDriver(driverId),
-    staleTime: 30 * 1000, // 30 seconds for real-time updates
-    retry: 3,
+    queryKey: ['/api/orders'],
   });
 
-  // Mock driver data for development
-  const currentDriver: Driver = driverData || {
-    id: driverId,
-    name: 'Rajesh Kumar',
-    phone: '9876543210',
-    email: 'rajesh.kumar@fabzclean.com',
-    licenseNumber: 'DL123456789',
-    vehicleNumber: 'KA01AB1234',
-    vehicleType: 'Two Wheeler',
-    status: 'active',
-    currentLatitude: 12.9716,
-    currentLongitude: 77.5946,
-    lastActive: new Date().toISOString(),
-    rating: 4.8,
-    totalDeliveries: 245,
-    totalEarnings: '45000',
+  const ordersList = (ordersData as any)?.data || ordersData || [];
+
+  // Map authenticated employee to Driver shape
+  const currentDriver: Driver = {
+    id: employee?.id || '',
+    name: employee?.fullName || 'Driver',
+    phone: employee?.phone || '',
+    email: employee?.email || '',
+    licenseNumber: employee?.employeeId || '',
+    vehicleNumber: 'N/A',
+    vehicleType: 'Delivery',
+    status: employee?.isActive ? 'active' : 'inactive',
+    rating: parseFloat((employee as any)?.performanceRating || '0'),
+    totalDeliveries: 0,
+    totalEarnings: '0',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
-  // Filter deliveries by current driver
+  // Filter deliveries by current driver and shape them for the UI
   const currentDeliveries = useMemo(() => {
-    return deliveries.filter((delivery: any) => delivery.driverId === currentDriver.id);
-  }, [deliveries, currentDriver]);
+    return ordersList
+      .filter((order: any) => order.deliveryPartnerId === employee?.id)
+      .map((order: any) => ({
+        id: order.id,
+        orderId: order.orderNumber,
+        driverId: order.deliveryPartnerId,
+        status: order.status,
+        pickupAddress: 'Store Location', // Or franchise address if available
+        deliveryAddress: order.deliveryAddress ? `${order.deliveryAddress.street || ''}, ${order.deliveryAddress.city || ''}` : 'Address saved',
+        scheduledPickup: order.pickupDate || new Date().toISOString(),
+        scheduledDelivery: order.pickupDate || new Date().toISOString(),
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        specialInstructions: order.specialInstructions || '',
+        priority: order.priority || 'normal',
+        estimatedTime: 30, // Default estimate
+        distance: 0, // Default estimate
+        createdAt: order.createdAt || new Date().toISOString(),
+        updatedAt: order.updatedAt || new Date().toISOString(),
+        // Pass original order object to ensure we can capture payment details too
+        _original: order
+      }));
+  }, [ordersList, employee]);
 
   // Calculate driver metrics
   const driverMetrics = {
@@ -268,33 +207,7 @@ export default function WorkerPortal() {
     }
   };
 
-  // Error state
-  if (driverError) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-8">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <div className="text-destructive text-lg font-semibold">
-                Failed to load driver data
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {driverErrorDetails?.message || 'An unexpected error occurred'}
-              </p>
-              <Button
-                onClick={() => window.location.reload()}
-                variant="outline"
-              >
-                Try Again
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (driverLoading) {
+  if (deliveriesLoading) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
         <Card className="w-full max-w-md">
@@ -352,7 +265,7 @@ export default function WorkerPortal() {
                     View Profile
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => signOut()}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Logout
                   </DropdownMenuItem>

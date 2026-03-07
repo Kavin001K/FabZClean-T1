@@ -322,7 +322,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
       title: "Total Revenue",
       value: metrics.totalRevenue,
       change: `${(metrics.revenueGrowth || 0) > 0 ? '+' : ''}${metrics.revenueGrowth || 0}% from last month`,
-      changeType: (metrics.revenueGrowth || 0) >= 0 ? "positive" : "negative",
+      changeType: ((metrics.revenueGrowth || 0) >= 0 ? "positive" : "negative") as "positive" | "negative",
       icon: <IndianRupee className="h-4 w-4" />,
       description: "Total revenue generated from all orders",
       details: (
@@ -345,7 +345,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
       title: "Total Orders",
       value: metrics.totalOrders,
       change: `${(metrics.ordersGrowth || 0) > 0 ? '+' : ''}${metrics.ordersGrowth || 0}% from last month`,
-      changeType: (metrics.ordersGrowth || 0) >= 0 ? "positive" : "negative",
+      changeType: ((metrics.ordersGrowth || 0) >= 0 ? "positive" : "negative") as "positive" | "negative",
       icon: <Package className="h-4 w-4" />,
       description: "Total number of orders received",
       details: (
@@ -368,7 +368,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
       title: "New Customers",
       value: metrics.newCustomers,
       change: `${(metrics.customersGrowth || 0) > 0 ? '+' : ''}${metrics.customersGrowth || 0}% from last month`,
-      changeType: (metrics.customersGrowth || 0) >= 0 ? "positive" : "negative",
+      changeType: ((metrics.customersGrowth || 0) >= 0 ? "positive" : "negative") as "positive" | "negative",
       icon: <Users className="h-4 w-4" />,
       description: "New customers registered this month",
       details: (

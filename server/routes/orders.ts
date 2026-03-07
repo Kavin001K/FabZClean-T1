@@ -725,6 +725,116 @@ router.post('/:id/log-print', async (req, res) => {
   }
 });
 
+// Assign delivery partner to order
+router.patch('/:id/assign-delivery', async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { deliveryPartnerId } = req.body;
+
+    if (!deliveryPartnerId) {
+      return res.status(400).json(createErrorResponse('Delivery Partner ID is required', 400));
+    }
+
+    // Verify employee exists and is a delivery partner
+    const employees = await storage.listEmployees();
+    const employee = employees.find(e => e.id === deliveryPartnerId || e.employeeId === deliveryPartnerId);
+
+    if (!employee || employee.position !== 'delivery') {
+      return res.status(400).json(createErrorResponse('Invalid delivery partner selected', 400));
+    }
+
+    // Update the order
+    const updatedOrder = await storage.updateOrder(orderId, {
+      deliveryPartnerId: employee.id, // Ensure we use the UUID from the DB
+      status: 'assigned'
+    });
+
+    // Notify real-time clients
+    realtimeServer.triggerUpdate('order', 'updated', updatedOrder);
+
+    // Log action
+    if (req.employee) {
+      await AuthService.logAction(
+        req.employee.employeeId,
+        req.employee.username,
+        'assign_delivery',
+        'order',
+        orderId,
+        { deliveryPartnerId: employee.employeeId, deliveryPartnerName: employee.firstName },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
+
+    res.json(createSuccessResponse(serializeOrder(updatedOrder), 'Delivery partner assigned successfully'));
+  } catch (error) {
+    console.error('Assign delivery error:', error);
+    res.status(500).json(createErrorResponse('Failed to assign delivery partner', 500));
+  }
+});
+
+// Delivery Partner Completes Order & Collects Payment
+router.patch('/:id/delivery-complete', async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { paymentCollected, paymentMethod } = req.body;
+
+    const order = await storage.getOrder(orderId);
+    if (!order) return res.status(404).json(createErrorResponse('Order not found', 404));
+
+    const updates: any = { status: 'delivered' };
+
+    if (paymentCollected) {
+      updates.paymentStatus = 'paid';
+      if (paymentMethod) updates.paymentMethod = paymentMethod;
+    }
+
+    const updatedOrder = await storage.updateOrder(orderId, updates);
+
+    // If payment was collected, map to wallet credit reductions or standard logging
+    if (paymentCollected && req.employee) {
+      await AuthService.logAction(
+        req.employee.employeeId,
+        req.employee.username,
+        'payment_received_delivery',
+        'order',
+        orderId,
+        { amount: updatedOrder?.totalAmount, method: updates.paymentMethod || order.paymentMethod },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+
+      // Credit processing hook if originally credit but now paid cash on delivery
+      if (order.paymentStatus === 'credit' && order.customerId) {
+        try {
+          const orderAmount = parseFloat(order.totalAmount || "0");
+          await storage.addCustomerCredit(
+            order.customerId,
+            -orderAmount,
+            'payment',
+            `Payment collected strictly upon delivery for order ${order.orderNumber}`,
+            orderId,
+            req.employee?.employeeId
+          );
+        } catch (creditError) {
+          console.warn('Failed to reduce customer credit after cash on delivery:', creditError);
+        }
+      }
+    }
+
+    realtimeServer.triggerUpdate('order', 'status_changed' as any, {
+      orderId: orderId,
+      status: 'delivered',
+      previousStatus: order.status
+    });
+
+    res.json(createSuccessResponse(serializeOrder(updatedOrder), 'Order delivered successfully'));
+  } catch (error) {
+    console.error('Complete delivery error:', error);
+    res.status(500).json(createErrorResponse('Failed to complete delivery', 500));
+  }
+});
+
 // Delete order
 router.delete('/:id', async (req, res) => {
   try {

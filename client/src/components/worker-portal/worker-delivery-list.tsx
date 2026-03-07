@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Truck,
   MapPin,
@@ -70,6 +71,7 @@ interface Delivery {
   distance: number;
   createdAt: string;
   updatedAt: string;
+  _original?: any;
 }
 
 interface Driver {
@@ -99,50 +101,50 @@ interface WorkerDeliveryListProps {
 const getStatusInfo = (status: string) => {
   switch (status) {
     case 'assigned':
-      return { 
-        label: 'Assigned', 
-        icon: Clock, 
-        color: 'text-blue-500', 
+      return {
+        label: 'Assigned',
+        icon: Clock,
+        color: 'text-blue-500',
         bgColor: 'bg-blue-50',
         description: 'Ready for pickup'
       };
     case 'picked_up':
-      return { 
-        label: 'Picked Up', 
-        icon: Package, 
-        color: 'text-orange-500', 
+      return {
+        label: 'Picked Up',
+        icon: Package,
+        color: 'text-orange-500',
         bgColor: 'bg-orange-50',
         description: 'In transit to delivery location'
       };
     case 'in_transit':
-      return { 
-        label: 'In Transit', 
-        icon: Truck, 
-        color: 'text-purple-500', 
+      return {
+        label: 'In Transit',
+        icon: Truck,
+        color: 'text-purple-500',
         bgColor: 'bg-purple-50',
         description: 'On the way to delivery'
       };
     case 'delivered':
-      return { 
-        label: 'Delivered', 
-        icon: CheckCircle2, 
-        color: 'text-green-500', 
+      return {
+        label: 'Delivered',
+        icon: CheckCircle2,
+        color: 'text-green-500',
         bgColor: 'bg-green-50',
         description: 'Successfully delivered'
       };
     case 'failed':
-      return { 
-        label: 'Failed', 
-        icon: AlertTriangle, 
-        color: 'text-red-500', 
+      return {
+        label: 'Failed',
+        icon: AlertTriangle,
+        color: 'text-red-500',
         bgColor: 'bg-red-50',
         description: 'Delivery failed'
       };
     default:
-      return { 
-        label: 'Unknown', 
-        icon: Clock, 
-        color: 'text-gray-500', 
+      return {
+        label: 'Unknown',
+        icon: Clock,
+        color: 'text-gray-500',
         bgColor: 'bg-gray-50',
         description: 'Status unknown'
       };
@@ -169,6 +171,7 @@ const WorkerDeliveryList: React.FC<WorkerDeliveryListProps> = ({ deliveries, dri
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
   const [isDeliveryDetailsOpen, setIsDeliveryDetailsOpen] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Filter and search deliveries
   const filteredDeliveries = useMemo(() => {
@@ -196,11 +199,11 @@ const WorkerDeliveryList: React.FC<WorkerDeliveryListProps> = ({ deliveries, dri
       const priorityOrder = { high: 3, medium: 2, low: 1 };
       const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
       const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
-      
+
       if (aPriority !== bPriority) {
         return bPriority - aPriority;
       }
-      
+
       return new Date(a.scheduledDelivery).getTime() - new Date(b.scheduledDelivery).getTime();
     });
 
@@ -214,7 +217,7 @@ const WorkerDeliveryList: React.FC<WorkerDeliveryListProps> = ({ deliveries, dri
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedData = filteredDeliveries.slice(startIndex, endIndex);
-  
+
   const goToPage = (page: number) => setCurrentPage(page);
   const nextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
   const prevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
@@ -226,29 +229,58 @@ const WorkerDeliveryList: React.FC<WorkerDeliveryListProps> = ({ deliveries, dri
     setIsDeliveryDetailsOpen(true);
   };
 
-  const handleUpdateStatus = async (deliveryId: string, newStatus: string) => {
-    try {
-      // In a real app, this would call the API
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ deliveryId, newStatus, isDeliveryComplete = false }: { deliveryId: string, newStatus: string, isDeliveryComplete?: boolean }) => {
+      // Find original order for backend ID reference since deliveryId in the UI mapped to orderNumber for display
+      const delivery = deliveries.find(d => d.id === deliveryId);
+      if (!delivery) throw new Error("Order not found");
+
+      const endpoint = isDeliveryComplete
+        ? `/api/orders/${delivery.id}/delivery-complete`
+        : `/api/orders/${delivery.id}/status`;
+
+      const payload = isDeliveryComplete
+        ? { paymentCollected: true, paymentMethod: 'cash' }
+        : { status: newStatus };
+
+      const response = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
       toast({
         title: "Status Updated",
-        description: `Delivery status updated to ${newStatus}`,
+        description: `Delivery status strongly updated to ${variables.newStatus}`,
       });
-    } catch (error) {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      setIsDeliveryDetailsOpen(false);
+    },
+    onError: (err) => {
       toast({
         title: "Error",
         description: "Failed to update delivery status",
         variant: "destructive",
       });
     }
+  });
+
+  const handleUpdateStatus = (deliveryId: string, newStatus: string) => {
+    updateStatusMutation.mutate({
+      deliveryId,
+      newStatus,
+      isDeliveryComplete: newStatus === 'delivered'
+    });
   };
 
   const handleStartNavigation = (delivery: Delivery) => {
-    // In a real app, this would open the device's navigation app
     const address = delivery.status === 'assigned' ? delivery.pickupAddress : delivery.deliveryAddress;
-    toast({
-      title: "Navigation Started",
-      description: `Opening navigation to ${address}`,
-    });
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank');
   };
 
   const handleCallCustomer = (phone: string) => {
@@ -308,7 +340,7 @@ const WorkerDeliveryList: React.FC<WorkerDeliveryListProps> = ({ deliveries, dri
                 )}
               </AnimatePresence>
             </div>
-            
+
             <div className="flex gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-32">
@@ -344,7 +376,7 @@ const WorkerDeliveryList: React.FC<WorkerDeliveryListProps> = ({ deliveries, dri
               const statusInfo = getStatusInfo(delivery.status);
               const priorityInfo = getPriorityInfo(delivery.priority);
               const StatusIcon = statusInfo.icon;
-              
+
               return (
                 <motion.div
                   key={delivery.id}
@@ -376,7 +408,7 @@ const WorkerDeliveryList: React.FC<WorkerDeliveryListProps> = ({ deliveries, dri
                             {delivery.status === 'assigned' ? delivery.pickupAddress : delivery.deliveryAddress}
                           </span>
                         </div>
-                        
+
                         <div className="flex items-center gap-2 text-sm">
                           <Clock className="h-4 w-4 text-muted-foreground" />
                           <span>
@@ -502,7 +534,7 @@ const WorkerDeliveryList: React.FC<WorkerDeliveryListProps> = ({ deliveries, dri
               Complete information for delivery #{selectedDelivery?.orderId}
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedDelivery && (
             <div className="space-y-6">
               {/* Customer Information */}

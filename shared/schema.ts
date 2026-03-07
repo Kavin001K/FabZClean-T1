@@ -71,6 +71,7 @@ export const orders = pgTable("orders", {
   gstNumber: text("gst_number"),
   specialInstructions: text("special_instructions"),
   // Delivery-related fields
+  deliveryPartnerId: varchar("delivery_partner_id").references(() => employees.id),
   fulfillmentType: text("fulfillment_type", { enum: ["pickup", "delivery"] }).default("pickup"),
   deliveryCharges: decimal("delivery_charges", { precision: 10, scale: 2 }).default("0"),
   deliveryAddress: jsonb("delivery_address").$type<ShippingAddress>(),
@@ -272,6 +273,7 @@ export const insertOrderSchema = z.object({
   panNumber: z.string().optional().nullable(),
   gstNumber: z.string().optional().nullable(),
   specialInstructions: z.string().optional().nullable(),
+  deliveryPartnerId: z.string().optional().nullable(),
   fulfillmentType: z.enum(["pickup", "delivery"]).optional().default("pickup"),
   deliveryCharges: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
   deliveryAddress: z.any().optional().nullable(),
