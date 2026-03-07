@@ -124,6 +124,14 @@ const getStatusInfo = (status: string) => {
         bgColor: 'bg-purple-50',
         description: 'On the way to delivery'
       };
+    case 'out_for_delivery':
+      return {
+        label: 'Out for Delivery',
+        icon: Truck,
+        color: 'text-orange-500',
+        bgColor: 'bg-orange-50',
+        description: 'Currently on the way to the customer'
+      };
     case 'delivered':
       return {
         label: 'Delivered',
@@ -270,11 +278,11 @@ const WorkerDeliveryList: React.FC<WorkerDeliveryListProps> = ({ deliveries, dri
     }
   });
 
-  const handleUpdateStatus = (deliveryId: string, newStatus: string) => {
+  const handleUpdateStatus = (deliveryId: string, newStatus: string, isDeliveryComplete: boolean = false) => {
     updateStatusMutation.mutate({
       deliveryId,
       newStatus,
-      isDeliveryComplete: newStatus === 'delivered'
+      isDeliveryComplete: isDeliveryComplete || newStatus === 'delivered'
     });
   };
 
@@ -653,22 +661,17 @@ const WorkerDeliveryList: React.FC<WorkerDeliveryListProps> = ({ deliveries, dri
                   <Navigation className="h-4 w-4" />
                   Start Navigation
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleUpdateStatus(selectedDelivery.id, 'picked_up')}
-                  className="gap-2"
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  Mark Picked Up
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleUpdateStatus(selectedDelivery.id, 'delivered')}
-                  className="gap-2"
-                >
-                  <Package className="h-4 w-4" />
-                  Mark Delivered
-                </Button>
+                {selectedDelivery.status === 'out_for_delivery' && (
+                  <Button
+                    variant="default"
+                    onClick={() => handleUpdateStatus(selectedDelivery.id, 'delivered', true)}
+                    disabled={updateStatusMutation.isPending}
+                    className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Package className="h-4 w-4" />
+                    Mark Delivered & Collect Payment
+                  </Button>
+                )}
               </div>
             </div>
           )}

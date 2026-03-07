@@ -151,7 +151,7 @@ export default function OrderDetailPage() {
     );
   }
 
-  const nextStatus = getNextStatus(order.status);
+  const nextStatus = getNextStatus(order.status, order.fulfillmentType);
 
   return (
     <div className="flex-1 gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">

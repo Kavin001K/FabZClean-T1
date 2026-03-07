@@ -52,6 +52,7 @@ const formatStatusDisplay = (status: string) => {
     'processing': 'Processing',
     'ready_for_transit': 'Ready to Ship',
     'ready_for_pickup': 'Ready for Pickup',
+    'ready_for_delivery': 'Ready for Delivery',
     'out_for_delivery': 'Out for Delivery',
     'completed': 'Completed',
     'delivered': 'Delivered',
@@ -89,6 +90,7 @@ const getStatusColor = (status: Order['status']) => {
     case 'in_transit': return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800';
     case 'ready_for_transit': return 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800';
     case 'ready_for_pickup': return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800';
+    case 'ready_for_delivery': return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800';
     case 'out_for_delivery': return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800';
     case 'in_store': return 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-800';
     default: return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -140,8 +142,8 @@ export default React.memo(function OrderDetailsDialog({
 
   if (!order) return null;
 
-  const nextStatus = getNextStatus(order.status);
   const anyOrder = order as any; // Helper casting for dynamic fields
+  const nextStatus = getNextStatus(order.status, anyOrder.fulfillmentType);
 
   // Parse Address Helper
   const formatAddress = (addr: any) => {

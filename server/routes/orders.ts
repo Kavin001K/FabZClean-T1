@@ -586,6 +586,16 @@ router.patch(
         ));
       }
 
+      // Enforce Home Delivery Flow strict rules
+      if (status === 'delivered') {
+        if (req.employee?.id !== order.deliveryPartnerId) {
+          return res.status(403).json(createErrorResponse(
+            'Only the assigned delivery captain can manually mark an order as delivered.',
+            403
+          ));
+        }
+      }
+
       const updatedOrder = await storage.updateOrder(orderId, { status });
 
       // Log status change
@@ -746,7 +756,7 @@ router.patch('/:id/assign-delivery', async (req, res) => {
     // Update the order
     const updatedOrder = await storage.updateOrder(orderId, {
       deliveryPartnerId: employee.id, // Ensure we use the UUID from the DB
-      status: 'assigned'
+      status: 'out_for_delivery'
     });
 
     // Notify real-time clients
@@ -781,6 +791,13 @@ router.patch('/:id/delivery-complete', async (req, res) => {
 
     const order = await storage.getOrder(orderId);
     if (!order) return res.status(404).json(createErrorResponse('Order not found', 404));
+
+    // Security Check: Ensure the user marking it completed is actually the assigned driver
+    if (req.employee && req.employee.id !== order.deliveryPartnerId) {
+      if (req.employee.role !== 'admin') {
+        return res.status(403).json(createErrorResponse('Only the assigned captain can mark this order as delivered', 403));
+      }
+    }
 
     const updates: any = { status: 'delivered' };
 

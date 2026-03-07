@@ -42,8 +42,7 @@ export default function DeliveriesManagement() {
     // Filter explicitly for home delivery orders
     const deliveryOrders = ordersList.filter((order: any) =>
         order.fulfillmentType === 'delivery' &&
-        order.status !== 'completed' &&
-        order.status !== 'cancelled'
+        ['ready_for_delivery', 'out_for_delivery'].includes(order.status)
     );
 
     // Filter exclusively for Employees with the "delivery" position
@@ -148,9 +147,7 @@ export default function DeliveriesManagement() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Statuses</SelectItem>
-                                    <SelectItem value="pending">Pending</SelectItem>
-                                    <SelectItem value="ready">Ready to Assign</SelectItem>
-                                    <SelectItem value="assigned">Assigned</SelectItem>
+                                    <SelectItem value="ready_for_delivery">Ready for Delivery</SelectItem>
                                     <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -242,12 +239,12 @@ export default function DeliveriesManagement() {
                                                     </td>
                                                     <td className="p-4 text-right">
                                                         <Button
-                                                            variant={(order.status === 'ready' || !order.deliveryPartnerId) ? "default" : "outline"}
+                                                            variant={(order.status === 'ready_for_delivery' || !order.deliveryPartnerId) ? "default" : "outline"}
                                                             size="sm"
                                                             className="w-full max-w-[120px]"
                                                             onClick={() => handleAssignClick(order)}
                                                         >
-                                                            {assignee ? 'Reassign' : 'Assign Captain'}
+                                                            {assignee ? 'Reassign Captain' : 'Assign Captain'}
                                                         </Button>
                                                     </td>
                                                 </tr>

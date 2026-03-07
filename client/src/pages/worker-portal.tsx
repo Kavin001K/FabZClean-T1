@@ -180,7 +180,7 @@ export default function WorkerPortal() {
     totalDeliveries: currentDriver.totalDeliveries || 0,
     totalEarnings: parseFloat(currentDriver.totalEarnings || '0'),
     rating: currentDriver.rating || 0,
-    activeDeliveries: currentDeliveries.filter((delivery: any) => delivery.status === 'in_transit' || delivery.status === 'assigned').length,
+    activeDeliveries: currentDeliveries.filter((delivery: any) => delivery.status === 'out_for_delivery').length,
     completedToday: currentDeliveries.filter((delivery: any) => {
       const today = new Date().toDateString();
       return delivery.status === 'delivered' && new Date(delivery.actualDelivery || '').toDateString() === today;
@@ -192,12 +192,8 @@ export default function WorkerPortal() {
   // Get status icon and color
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'assigned':
-        return { icon: Clock, color: 'text-blue-500', bgColor: 'bg-blue-50' };
-      case 'picked_up':
-        return { icon: Package, color: 'text-orange-500', bgColor: 'bg-orange-50' };
-      case 'in_transit':
-        return { icon: Truck, color: 'text-purple-500', bgColor: 'bg-purple-50' };
+      case 'out_for_delivery':
+        return { icon: Truck, color: 'text-orange-500', bgColor: 'bg-orange-50' };
       case 'delivered':
         return { icon: CheckCircle2, color: 'text-green-500', bgColor: 'bg-green-50' };
       case 'failed':

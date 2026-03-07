@@ -762,37 +762,51 @@ export const getStockStatusText = (quantity: number, reorderLevel: number = 10):
 };
 
 // Order workflow helpers - Extended for laundry workflow
-export const orderWorkflow = [
-  'pending',      // Just created
-  'in_transit',   // Being sent to factory
-  'processing',   // At factory being cleaned
-  'ready_for_transit', // Processed, ready to return to store
-  'ready_for_pickup',  // Returned to store, waiting for customer
-  'out_for_delivery',  // Being delivered to customer (if delivery type)
-  'completed'     // Customer received
-] as const;
-
-export const getNextStatus = (currentStatus: Order['status']): Order['status'] | null => {
-  const statusMap: Record<string, Order['status'] | null> = {
-    'pending': 'processing',
-    'processing': 'ready_for_transit',
-    'ready_for_transit': 'ready_for_pickup',
-    'ready_for_pickup': 'out_for_delivery',
-    'out_for_delivery': 'completed',
-    'in_transit': 'processing',
-    'completed': null,
-    'cancelled': null,
-    'delivered': null
-  };
-  return statusMap[currentStatus] || null;
+export const getNextStatus = (currentStatus: Order['status'], fulfillmentType?: string): Order['status'] | null => {
+  if (fulfillmentType === 'delivery') {
+    const statusMap: Record<string, Order['status'] | null> = {
+      'pending': 'processing',
+      'in_transit': 'processing',
+      'processing': 'ready_for_delivery',
+      'ready_for_delivery': 'out_for_delivery',
+      // out_for_delivery normally transitioned via captain, not admin button
+      'out_for_delivery': null,
+      'delivered': null,
+      'completed': null,
+      'cancelled': null
+    };
+    return statusMap[currentStatus] || null;
+  } else {
+    // Store Pickup Flow
+    const statusMap: Record<string, Order['status'] | null> = {
+      'pending': 'processing',
+      'in_transit': 'processing',
+      'processing': 'ready_for_pickup',
+      'ready_for_pickup': 'completed',
+      'completed': null,
+      'cancelled': null
+    };
+    return statusMap[currentStatus] || null;
+  }
 };
 
-export const getPreviousStatus = (currentStatus: Order['status']): Order['status'] | null => {
-  const currentIndex = orderWorkflow.indexOf(currentStatus as any);
-  if (currentIndex <= 0) {
-    return null;
+export const getPreviousStatus = (currentStatus: Order['status'], fulfillmentType?: string): Order['status'] | null => {
+  if (fulfillmentType === 'delivery') {
+    const reverseMap: Record<string, Order['status'] | null> = {
+      'processing': 'pending',
+      'ready_for_delivery': 'processing',
+      'out_for_delivery': 'ready_for_delivery',
+      'delivered': 'out_for_delivery'
+    };
+    return reverseMap[currentStatus] || null;
+  } else {
+    const reverseMap: Record<string, Order['status'] | null> = {
+      'processing': 'pending',
+      'ready_for_pickup': 'processing',
+      'completed': 'ready_for_pickup'
+    };
+    return reverseMap[currentStatus] || null;
   }
-  return orderWorkflow[currentIndex - 1] as Order['status'];
 };
 
 // Services API
