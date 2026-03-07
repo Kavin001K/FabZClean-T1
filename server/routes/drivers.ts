@@ -1,15 +1,15 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db as storage } from '../db';
-import { 
-  adminLoginRequired, 
+import {
+  adminLoginRequired,
   validateInput,
-  rateLimit 
+  rateLimit
 } from '../middleware/auth';
-import { 
-  createPaginatedResponse, 
+import {
+  createPaginatedResponse,
   createErrorResponse,
-  createSuccessResponse 
+  createSuccessResponse
 } from '../services/serialization';
 import { realtimeServer } from '../websocket-server';
 
@@ -34,9 +34,9 @@ const driverSchema = z.object({
 // Get drivers
 router.get('/', adminLoginRequired, async (req, res) => {
   try {
-    const { 
-      cursor, 
-      limit = 20, 
+    const {
+      cursor,
+      limit = 20,
       status,
       vehicleType,
       sortBy = 'createdAt',
@@ -59,7 +59,7 @@ router.get('/', adminLoginRequired, async (req, res) => {
     drivers.sort((a, b) => {
       const aValue = a[sortBy as string];
       const bValue = b[sortBy as string];
-      
+
       if (sortOrder === 'asc') {
         return aValue > bValue ? 1 : -1;
       } else {
@@ -71,7 +71,7 @@ router.get('/', adminLoginRequired, async (req, res) => {
     const limitNum = parseInt(limit as string) || 20;
     const startIndex = cursor ? drivers.findIndex(d => d.id === cursor) + 1 : 0;
     const endIndex = startIndex + limitNum;
-    
+
     const paginatedDrivers = drivers.slice(startIndex, endIndex);
     const hasMore = endIndex < drivers.length;
     const nextCursor = hasMore ? paginatedDrivers[paginatedDrivers.length - 1]?.id : undefined;
@@ -95,7 +95,7 @@ router.get('/', adminLoginRequired, async (req, res) => {
 router.get('/:id', adminLoginRequired, async (req, res) => {
   try {
     const driver = await storage.getDriver(req.params.id);
-    
+
     if (!driver) {
       return res.status(404).json(createErrorResponse('Driver not found', 404));
     }
@@ -213,7 +213,7 @@ router.patch('/:id/status', adminLoginRequired, async (req, res) => {
       return res.status(404).json(createErrorResponse('Driver not found', 404));
     }
 
-    const updatedDriver = await storage.updateDriver(driverId, { 
+    const updatedDriver = await storage.updateDriver(driverId, {
       status,
       lastActive: new Date().toISOString()
     });
@@ -244,7 +244,7 @@ router.delete('/:id', adminLoginRequired, async (req, res) => {
 
     // Check if driver has active deliveries
     const deliveries = await storage.listDeliveries();
-    const activeDeliveries = deliveries.filter(d => d.driverId === driverId && d.status !== 'delivered');
+    const activeDeliveries = deliveries.filter(d => (d as any).driverId === driverId && d.status !== 'delivered');
 
     if (activeDeliveries.length > 0) {
       return res.status(400).json(createErrorResponse('Cannot delete driver with active deliveries', 400));
@@ -273,7 +273,7 @@ router.get('/status/:status', adminLoginRequired, async (req, res) => {
     const { limit = 50 } = req.query;
 
     const drivers = await storage.getDriversByStatus(status);
-    
+
     // Apply limit
     const limitNum = parseInt(limit as string) || 50;
     const limitedDrivers = drivers.slice(0, limitNum);
@@ -301,8 +301,8 @@ router.get('/analytics/overview', adminLoginRequired, async (req, res) => {
         acc[driver.vehicleType] = (acc[driver.vehicleType] || 0) + 1;
         return acc;
       }, {} as Record<string, number>),
-      averageRating: drivers.length > 0 
-        ? drivers.reduce((sum, driver) => sum + driver.rating, 0) / drivers.length 
+      averageRating: drivers.length > 0
+        ? drivers.reduce((sum, driver) => sum + driver.rating, 0) / drivers.length
         : 0,
       totalDeliveries: drivers.reduce((sum, driver) => sum + driver.totalDeliveries, 0),
       totalEarnings: drivers.reduce((sum, driver) => sum + driver.totalEarnings, 0),
@@ -336,15 +336,21 @@ router.get('/:id/performance', adminLoginRequired, async (req, res) => {
       return res.status(404).json(createErrorResponse('Driver not found', 404));
     }
 
+    // Get deliveries for this driver
     const deliveries = await storage.listDeliveries();
-    const driverDeliveries = deliveries.filter(d => d.driverId === id);
+    const driverDeliveries = deliveries.filter(d => (d as any).driverId === id);
+
+    // Calculate pending deliveries
+    const activeDeliveries = driverDeliveries.filter(d => ['pending', 'assigned', 'in_transit'].includes(d.status));
+    const pendingDeliveries = driverDeliveries.filter(d => d.status === 'pending').sort((a, b) => new Date((a as any).scheduledDate).getTime() - new Date((b as any).scheduledDate).getTime());
+    const completedDeliveries = driverDeliveries.filter(d => d.status === 'delivered');
 
     // Calculate performance metrics
     const daysNum = parseInt(days as string) || 30;
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysNum);
 
-    const recentDeliveries = driverDeliveries.filter(d => 
+    const recentDeliveries = driverDeliveries.filter(d =>
       new Date(d.createdAt) >= cutoffDate
     );
 
@@ -355,20 +361,29 @@ router.get('/:id/performance', adminLoginRequired, async (req, res) => {
       totalDeliveries: recentDeliveries.length,
       completedDeliveries: recentDeliveries.filter(d => d.status === 'delivered').length,
       failedDeliveries: recentDeliveries.filter(d => d.status === 'failed').length,
-      completionRate: recentDeliveries.length > 0 
-        ? (recentDeliveries.filter(d => d.status === 'delivered').length / recentDeliveries.length) * 100 
+      completionRate: recentDeliveries.length > 0
+        ? (recentDeliveries.filter(d => d.status === 'delivered').length / recentDeliveries.length) * 100
         : 0,
-      averageDeliveryTime: driver.totalDeliveries > 0 
-        ? driver.totalEarnings / driver.totalDeliveries 
+      averageDeliveryTime: driver.totalDeliveries > 0
+        ? driver.totalEarnings / driver.totalDeliveries
         : 0,
       currentRating: driver.rating,
       totalEarnings: driver.totalEarnings,
       recentActivity: recentDeliveries.slice(-10).map(d => ({
         id: d.id,
         status: d.status,
-        scheduledDate: d.scheduledDate,
-        statusUpdatedAt: d.statusUpdatedAt
-      }))
+        scheduledDate: (d as any).scheduledDate,
+        statusUpdatedAt: (d as any).statusUpdatedAt
+      })),
+      activeDeliveries: activeDeliveries.length,
+      pendingDeliveries: pendingDeliveries.length,
+      allCompletedDeliveries: completedDeliveries.length,
+      nextDelivery: pendingDeliveries.length > 0 ? {
+        id: pendingDeliveries[0].id,
+        orderId: pendingDeliveries[0].orderId,
+        scheduledDate: (pendingDeliveries[0] as any).scheduledDate,
+        statusUpdatedAt: (pendingDeliveries[0] as any).statusUpdatedAt
+      } : null
     };
 
     res.json(createSuccessResponse(performance));

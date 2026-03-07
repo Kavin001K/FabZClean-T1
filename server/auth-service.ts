@@ -23,6 +23,8 @@ export interface EmployeeJWTPayload {
     role: string;
     email?: string;
     exp?: number;
+    franchiseId?: string;
+    factoryId?: string;
 }
 
 export interface AuthEmployee {
@@ -210,22 +212,25 @@ export class AuthService {
         const firstName = names[0];
         const lastName = names.slice(1).join(' ') || 'Staff';
 
-        // Auto-generate employee_id based on franchise and role
-        const roleCodeMap: Record<string, string> = {
-            'admin': 'AD',
-            'franchise_manager': 'MG',
-            'factory_manager': 'FM',
-            'staff': 'ST',
-            'employee': 'ST',
-            'driver': 'DR'
-        };
-        const roleCode = roleCodeMap[data.role] || 'XX';
-
-        // Count existing employees for sequence
+        // Auto-generate employee_id matching: FZCEM001, FZCEM002...
         const localEmployees = await storage.listEmployees();
-        const sameRoleCount = localEmployees.filter(e => e.role === data.role).length;
-        const sequenceNum = String(sameRoleCount + 1).padStart(2, '0');
-        const generatedEmployeeId = `FZC01${roleCode}${sequenceNum}`;
+
+        // Find highest existing FZCEM number
+        let maxSequence = 0;
+        for (const emp of localEmployees) {
+            const empId = emp.employeeId || emp.employee_id || '';
+            if (empId.startsWith('FZCEM')) {
+                const numStr = empId.substring(5);
+                const num = parseInt(numStr, 10);
+                if (!isNaN(num) && num > maxSequence) {
+                    maxSequence = num;
+                }
+            }
+        }
+
+        const nextSequence = maxSequence + 1;
+        const sequenceNum = String(nextSequence).padStart(3, '0');
+        const generatedEmployeeId = `FZCEM${sequenceNum}`;
 
         const newEmployee = await storage.createEmployee({
             // Basic Info

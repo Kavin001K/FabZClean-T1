@@ -27,17 +27,17 @@ router.get('/check-user', async (req: Request, res: Response) => {
             return res.json({ status: 'not_found', message: 'User not found' });
         }
 
-        const passwordMatch = emp.password ? await bcrypt.compare('admin123', emp.password) : false;
+        const passwordMatch = (emp as any).password ? await bcrypt.compare('admin123', (emp as any).password) : false;
 
         return res.json({
             status: 'found',
             user: {
                 id: emp.id,
-                username: emp.username || emp.employeeId,
+                username: (emp as any).username || (emp as any).employeeId,
                 email: emp.email,
                 isActive: emp.status === 'active',
-                role: emp.role,
-                hasPasswordHash: !!emp.password,
+                role: (emp as any).role,
+                hasPasswordHash: !!(emp as any).password,
                 passwordMatchWithAdmin123: passwordMatch
             }
         });

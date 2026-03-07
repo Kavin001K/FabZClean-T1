@@ -42,12 +42,12 @@ export class HybridLogger {
 
         try {
             // 1. Write to SQL (Critical Path - Maintain Relation)
-            await db.insert(auditLogs).values({
+            await (db as any).createAuditLog({
                 action,
-                userId,
-                details,
+                employeeId: userId.toString(),
+                details: typeof details === 'string' ? { message: details } : details,
                 entityType: resourceType,
-                entityId: resourceId ? parseInt(resourceId, 10) : undefined,
+                entityId: resourceId,
                 ipAddress: (flexibleData?.ip as string) || undefined,
             });
 
@@ -253,7 +253,7 @@ export class HybridLogger {
                     .sort({ timestamp: -1 })
                     .limit(limit)
                     .lean();
-                return logs;
+                return logs as unknown as Array<Record<string, unknown>>;
             } else {
                 return SqliteAnalytics.getUserAuditLogs(userId, limit);
             }

@@ -271,8 +271,8 @@ export default function AuditLogsPage() {
         // Admins see all
         if (currentUser.role === 'admin') return '';
         // Franchise managers see their franchise only
-        if (currentUser.role === 'franchise_manager' && currentUser.franchiseId) {
-            return currentUser.franchiseId;
+        if (currentUser.role === 'franchise_manager' && (currentUser as any).franchiseId) {
+            return (currentUser as any).franchiseId;
         }
         // Others see only their own actions
         return `user:${currentUser.employeeId}`;
@@ -330,7 +330,7 @@ export default function AuditLogsPage() {
 
     useEffect(() => {
         if (data?.data) {
-            const currentIds = new Set(data.data.map((log: AuditLog) => log.id));
+            const currentIds = new Set<string>(data.data.map((log: AuditLog) => String(log.id)));
             const newIds = new Set<string>();
 
             currentIds.forEach((id: string) => {

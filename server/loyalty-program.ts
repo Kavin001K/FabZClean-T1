@@ -172,15 +172,15 @@ class LoyaltyProgram {
   private async loadCustomerData() {
     try {
       const customers = await storage.getCustomers();
-      const orders = await storage.getOrders();
+      const orders = await storage.listOrders();
 
       customers.forEach(customer => {
         const customerOrders = orders.filter(order => order.customerId === customer.id);
         const totalSpent = customerOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
-        
+
         // Calculate points based on orders
         const earnedPoints = this.calculatePointsFromOrders(customerOrders);
-        
+
         this.customerPoints.set(customer.id, {
           customerId: customer.id,
           totalPoints: earnedPoints,
@@ -351,7 +351,7 @@ class LoyaltyProgram {
     const customer = this.customerPoints.get(customerId);
     if (!customer) return [];
 
-    return this.rewards.filter(reward => 
+    return this.rewards.filter(reward =>
       reward.isActive && customer.availablePoints >= reward.pointsRequired
     );
   }
@@ -386,12 +386,12 @@ class LoyaltyProgram {
     const customer = this.customerPoints.get(customerId);
     if (!customer) return;
 
-    const orders = await storage.getOrders();
+    const orders = await storage.listOrders();
     const customerOrders = orders.filter(order => order.customerId === customerId);
     const totalSpent = customerOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount), 0);
 
     const newBadges = this.calculateBadges(customerId, customerOrders, totalSpent);
-    
+
     // Add new badges that customer doesn't already have
     newBadges.forEach(newBadge => {
       const existingBadge = customer.badges.find(badge => badge.id === newBadge.id);

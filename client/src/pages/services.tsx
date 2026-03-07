@@ -935,7 +935,7 @@ function EditServiceDialog({
     description: service?.description || '',
     price: service?.price || '',
     duration: service?.duration || '',
-    status: (service?.status || 'Active') as const,
+    status: (service?.status as 'Active' | 'Inactive') || 'Active',
   });
 
   React.useEffect(() => {
@@ -1091,7 +1091,7 @@ function CreateServiceDialog({
     description: '',
     price: '',
     duration: '',
-    status: 'Active' as const,
+    status: 'Active' as 'Active' | 'Inactive',
   });
 
   const handleSubmit = (e: React.FormEvent) => {

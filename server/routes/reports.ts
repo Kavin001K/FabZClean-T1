@@ -208,9 +208,9 @@ router.get("/employee-performance", async (req, res) => {
             filteredEmployees = allEmployees.filter(e => e.franchiseId === targetFranchiseId);
         }
 
-        const employeePerformance = filteredEmployees.map(emp => {
+        const employeePerformance = filteredEmployees.map((emp: any) => {
             // Match orders by employeeId or createdBy
-            const empOrders = allOrders.filter(o => o.employeeId === emp.employeeId || o.createdBy === emp.employeeId);
+            const empOrders = allOrders.filter((o: any) => o.employeeId === emp.employeeId || o.createdBy === emp.employeeId);
             const revenue = empOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount || "0") || 0), 0);
 
             return {

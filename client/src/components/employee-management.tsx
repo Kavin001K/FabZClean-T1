@@ -74,6 +74,8 @@ export default function EmployeeManagement() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("personal");
@@ -196,6 +198,23 @@ export default function EmployeeManagement() {
     },
     onError: (error) => {
       toast({ title: "Error", description: error.message || "Failed to update access", variant: "destructive" });
+    }
+  });
+
+  // Reset password mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: ({ id, newPassword }: { id: string; newPassword: string }) =>
+      employeesApi.resetPassword(id, newPassword),
+    onSuccess: () => {
+      setIsResetPasswordDialogOpen(false);
+      setResetPasswordValue("");
+      toast({
+        title: "Password Reset",
+        description: "The user's password has been reset successfully."
+      });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message || "Failed to reset password", variant: "destructive" });
     }
   });
 
@@ -1005,6 +1024,17 @@ export default function EmployeeManagement() {
                               </>
                             )}
                           </DropdownMenuItem>
+                          {currentUser?.role === 'admin' && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedEmployee(employee);
+                                setIsResetPasswordDialogOpen(true);
+                              }}
+                            >
+                              <Lock className="w-4 h-4 mr-2" />
+                              Reset Password
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => handleDeleteEmployee(employee)}
@@ -1382,6 +1412,52 @@ export default function EmployeeManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={isResetPasswordDialogOpen} onOpenChange={setIsResetPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5" />
+              Reset User Password
+            </DialogTitle>
+            <DialogDescription>
+              Set a new secure password for <strong>{selectedEmployee?.fullName}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="Enter new password (min. 8 characters)"
+                value={resetPasswordValue}
+                onChange={(e) => setResetPasswordValue(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsResetPasswordDialogOpen(false);
+              setResetPasswordValue("");
+            }}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!selectedEmployee) return;
+                if (resetPasswordValue.length < 8) {
+                  toast({ title: "Error", description: "Password must be at least 8 characters", variant: "destructive" });
+                  return;
+                }
+                resetPasswordMutation.mutate({ id: selectedEmployee.id, newPassword: resetPasswordValue });
+              }}
+              disabled={resetPasswordMutation.isPending || resetPasswordValue.length < 8}
+            >
+              {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

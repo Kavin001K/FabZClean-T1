@@ -35,25 +35,46 @@ router.get('/invoice/:orderNumber', async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Order not found' });
         }
 
+        const o: any = order;
+        const mappedOrder: any = {
+            ...o,
+            orderNumber: o.order_number || o.orderNumber,
+            customerName: o.customer_name || o.customerName,
+            customerPhone: o.customer_phone || o.customerPhone,
+            customerAddress: o.customerAddress || o.customer_address,
+            createdAt: o.created_at || o.createdAt,
+            items: (o.items || []).map((item: any) => ({
+                ...item,
+                name: item.name || item.service_name || item.serviceName,
+                price: item.price || item.unit_price || item.unitPrice
+            })),
+            subtotal: o.subtotal || o.totalAmount || o.total_amount,
+            deliveryCharges: o.delivery_charges || o.deliveryCharges || 0,
+            totalAmount: o.total_amount || o.totalAmount,
+            paymentStatus: o.payment_status || o.paymentStatus,
+            fulfillmentType: o.fulfillment_type || o.fulfillmentType,
+            isExpressOrder: o.is_express_order || o.isExpressOrder
+        };
+
         // Extract order data
         const orderData = {
-            orderNumber: order.orderNumber || order.order_number,
-            customerName: order.customerName || order.customer_name || 'Customer',
-            customerPhone: order.customerPhone || order.customer_phone || '',
-            customerAddress: order.customerAddress || order.customer_address || '',
-            createdAt: order.createdAt || order.created_at,
-            items: (order.items || []).map((item: any) => ({
-                description: item.serviceName || item.service_name || item.name || item.productName || 'Service',
+            orderNumber: mappedOrder.orderNumber,
+            customerName: mappedOrder.customerName || 'Customer',
+            customerPhone: mappedOrder.customerPhone || '',
+            customerAddress: mappedOrder.customerAddress || '',
+            createdAt: mappedOrder.createdAt,
+            items: (mappedOrder.items || []).map((item: any) => ({
+                description: item.name || item.productName || 'Service',
                 quantity: item.quantity || 1,
                 unitPrice: parseFloat(item.price || item.unitPrice || item.unit_price || 0),
-                total: parseFloat(item.price || item.unitPrice || item.unit_price || 0) * (item.quantity || 1),
+                total: parseFloat(item.price || item.unitPrice || item.unit_price || 0) * (item.quantity || 1)
             })),
-            subtotal: parseFloat(order.subtotal || order.totalAmount || order.total_amount || 0),
-            deliveryCharges: parseFloat(order.deliveryCharges || order.delivery_charges || 0),
-            total: parseFloat(order.totalAmount || order.total_amount || 0),
-            paymentStatus: order.paymentStatus || order.payment_status || 'pending',
-            fulfillmentType: order.fulfillmentType || order.fulfillment_type || 'pickup',
-            isExpressOrder: order.isExpressOrder || order.is_express_order || false,
+            subtotal: parseFloat(mappedOrder.subtotal || 0),
+            deliveryCharges: parseFloat(mappedOrder.deliveryCharges || 0),
+            total: parseFloat(mappedOrder.totalAmount || 0),
+            paymentStatus: mappedOrder.paymentStatus || 'pending',
+            fulfillmentType: mappedOrder.fulfillmentType || 'pickup',
+            isExpressOrder: mappedOrder.isExpressOrder || false
         };
 
         // Calculate totals if not available

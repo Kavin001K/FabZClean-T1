@@ -14,7 +14,7 @@ import { generateUPIUrl } from '@/lib/franchise-config';
 
 export default function BillView() {
     const [, params] = useRoute("/bill/:orderNumber");
-    const orderNumber = params?.orderNumber;
+    const orderNumber = (params as Record<string, string> | null)?.orderNumber;
     const barcodeRef = useRef<SVGSVGElement>(null);
     const qrcodeRef = useRef<HTMLCanvasElement>(null);
     const [qrCodeUrl, setQrCodeUrl] = useState<string>('');

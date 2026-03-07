@@ -187,8 +187,7 @@ router.post('/upload-profile-image', authMiddleware, upload.single('image'), asy
         path: imageUrl
       },
       req.ip || req.connection.remoteAddress,
-      req.get('user-agent'),
-      req.employee!.franchiseId
+      req.get('user-agent')
     );
 
     console.log(`✅ Profile image saved for ${req.employee?.employeeId}: ${imageUrl}`);

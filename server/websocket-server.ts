@@ -281,7 +281,7 @@ class RealtimeServer {
   }
 
   // Method to manually trigger updates (called when orders/customers are modified)
-  public async triggerUpdate(type: 'order' | 'customer' | 'delivery' | 'driver', action: 'created' | 'updated' | 'deleted', data: any) {
+  public async triggerUpdate(type: 'order' | 'customer' | 'delivery' | 'driver' | 'transit_batches' | 'transit_orders' | 'drivers' | 'deliveries' | string, action: 'created' | 'updated' | 'deleted' | 'initiated' | 'completed' | string, data: any) {
     this.broadcastToSubscribers(`${type}_${action}`, {
       type,
       action,

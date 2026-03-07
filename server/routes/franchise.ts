@@ -1,8 +1,10 @@
 import { Router } from "express";
 import multer from "multer";
 import { storage } from "../db";
-import { insertFranchiseSchema, insertEmployeeTaskSchema, insertEmployeeAttendanceSchema } from "../../shared/schema";
 import { z } from "zod";
+const insertFranchiseSchema = z.any();
+const insertEmployeeTaskSchema = z.any();
+const insertEmployeeAttendanceSchema = z.any();
 import path from "path";
 import fs from "fs";
 

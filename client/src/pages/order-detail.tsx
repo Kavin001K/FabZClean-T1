@@ -201,16 +201,14 @@ export default function OrderDetailPage() {
             <Button
               variant="outline"
               size="sm"
-              className="w-full bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 sm:w-auto"
-              onClick={() => handleStatusChange('ready_for_delivery')}
-              disabled={updateOrderMutation.isPending}
+              onClick={() => handleStatusChange('out_for_delivery')}
             >
               <Package className="h-4 w-4 mr-2" />
               Ready for Delivery
             </Button>
           )}
 
-          {order.status === 'ready_for_delivery' && (
+          {order.status === 'out_for_delivery' && (
             <Button
               variant="outline"
               size="sm"

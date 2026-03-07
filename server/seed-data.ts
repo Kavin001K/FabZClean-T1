@@ -381,7 +381,7 @@ export async function seedDatabase() {
         ],
         orderNumber: `ORD-${Date.now()}-001`,
         shippingAddress: customers[0].address,
-        pickupDate: new Date(Date.now() + 86400000 * 2).toISOString(), // 2 days from now
+        pickupDate: new Date(Date.now() + 86400000 * 2) as any, // 2 days from now
       },
       {
         customerId: customers[1].id,
@@ -409,7 +409,7 @@ export async function seedDatabase() {
         ],
         orderNumber: `ORD-${Date.now()}-002`,
         shippingAddress: customers[1].address,
-        pickupDate: new Date(Date.now() + 86400000 * 3).toISOString(), // 3 days from now
+        pickupDate: new Date(Date.now() + 86400000 * 3) as any, // 3 days from now
       },
       {
         customerId: customers[2].id,
@@ -430,7 +430,7 @@ export async function seedDatabase() {
         ],
         orderNumber: `ORD-${Date.now()}-003`,
         shippingAddress: customers[2].address,
-        pickupDate: new Date(Date.now() - 86400000).toISOString(), // Yesterday
+        pickupDate: new Date(Date.now() - 86400000) as any, // Yesterday
       },
     ];
 

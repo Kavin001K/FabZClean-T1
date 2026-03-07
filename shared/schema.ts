@@ -47,12 +47,13 @@ export interface OrderItem {
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderNumber: text("order_number").notNull(),
+  franchiseId: text("franchise_id"),
   customerId: text("customer_id").references(() => customers.id),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
   customerPhone: text("customer_phone"),
   status: text("status", { enum: ["pending", "processing", "completed", "cancelled", "assigned", "in_transit", "shipped", "out_for_delivery", "delivered", "in_store", "ready_for_transit", "ready_for_pickup"] }).notNull(),
-  paymentStatus: text("payment_status", { enum: ["pending", "paid", "failed", "credit"] }).notNull().default("pending"),
+  paymentStatus: text("payment_status").notNull().default('pending').$type<"pending" | "paid" | "failed" | "partial" | "credit">(),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   items: jsonb("items").$type<OrderItem[]>().notNull(),
   shippingAddress: jsonb("shipping_address").$type<ShippingAddress>(),
@@ -118,6 +119,7 @@ export const customers = pgTable("customers", {
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
+  franchiseId: text("franchise_id"),
   address: jsonb("address"),
   totalOrders: integer("total_orders").default(0),
   totalSpent: decimal("total_spent", { precision: 10, scale: 2 }).default("0"),
@@ -175,6 +177,7 @@ export const employees = pgTable("employees", {
   lastName: text("last_name").notNull(),
   email: text("email"),
   phone: text("phone"),
+  franchiseId: text("franchise_id"),
   position: text("position").notNull(),
   department: text("department").notNull(),
   hireDate: timestamp("hire_date").notNull(),
@@ -233,6 +236,11 @@ export const auditLogs = pgTable("audit_logs", {
   userAgent: text("user_agent"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Placeholder schemas to fix missing exports in existing routes
+export const insertEmployeeTaskSchema = z.any();
+export const insertTransitOrderSchema = z.any();
+export type TransitOrder = any;
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users);

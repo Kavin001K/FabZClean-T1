@@ -20,7 +20,7 @@ export interface DueTodayOrder {
   customerPhone?: string;
   customerEmail?: string;
   status: string;
-  paymentStatus: 'pending' | 'paid' | 'partial' | 'failed';
+  paymentStatus: 'pending' | 'paid' | 'partial' | 'failed' | 'credit';
   total: number;
   service?: string;
   pickupDate: string;

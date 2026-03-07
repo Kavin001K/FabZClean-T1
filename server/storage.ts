@@ -60,6 +60,27 @@ export interface IStorage {
   getDriversByStatus(status: string): Promise<Driver[]>;
   updateDriverLocation(id: string, latitude: number, longitude: number): Promise<Driver | null>;
 
+  // Customer methods
+  createCustomer(data: any): Promise<any>;
+  getCustomer(id: string): Promise<any | undefined>;
+  updateCustomer(id: string, data: any): Promise<any | undefined>;
+  deleteCustomer(id: string): Promise<boolean>;
+  getCustomers(franchiseId?: string): Promise<any[]>;
+
+  // Product methods
+  createProduct(data: any): Promise<any>;
+  getProduct(id: string): Promise<any | undefined>;
+  updateProduct(id: string, data: any): Promise<any | undefined>;
+  deleteProduct(id: string): Promise<boolean>;
+  getProducts(): Promise<any[]>;
+
+  // Service methods
+  createService(data: any): Promise<any>;
+  getService(id: string): Promise<any | undefined>;
+  updateService(id: string, data: any): Promise<any | undefined>;
+  deleteService(id: string): Promise<boolean>;
+  getServices(franchiseId?: string): Promise<any[]>;
+
   // Franchise methods
   createFranchise(data: any): Promise<any>;
   listFranchises(): Promise<any[]>;
@@ -86,6 +107,9 @@ export interface IStorage {
 
   // Order methods
   listOrders(): Promise<any[]>;
+  getOrder(id: string): Promise<any | undefined>;
+  createOrder(data: any): Promise<any>;
+  updateOrder(id: string, data: any): Promise<any | undefined>;
   getActiveOrders(): Promise<any[]>;
   getAnalyticsSummary(): Promise<any>;
   searchGlobal(query: string): Promise<any>;

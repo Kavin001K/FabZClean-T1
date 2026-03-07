@@ -25,17 +25,17 @@ export function createComponentWrapper<T extends BaseComponentProps>(
 ) {
   const WrappedComponent = forwardRef<any, T>((props, ref) => {
     const { className, 'data-testid': testId, ...rest } = props;
-    
+
     return (
       <Component
         ref={ref}
         className={cn(defaultClassName, className)}
         data-testid={testId}
-        {...rest}
+        {...(rest as any)}
       />
     );
   });
-  
+
   WrappedComponent.displayName = displayName;
   return WrappedComponent;
 }
@@ -52,7 +52,7 @@ export const COMPONENT_PATTERNS = {
     content: 'p-6 pt-0',
     footer: 'flex items-center p-6 pt-0',
   },
-  
+
   // Button patterns
   BUTTON: {
     base: 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
@@ -63,7 +63,7 @@ export const COMPONENT_PATTERNS = {
     ghost: 'hover:bg-accent hover:text-accent-foreground',
     link: 'text-primary underline-offset-4 hover:underline',
   },
-  
+
   // Form patterns
   FORM: {
     container: 'space-y-6',
@@ -73,7 +73,7 @@ export const COMPONENT_PATTERNS = {
     error: 'text-sm font-medium text-destructive',
     help: 'text-sm text-muted-foreground',
   },
-  
+
   // Table patterns
   TABLE: {
     container: 'w-full overflow-auto',
@@ -84,7 +84,7 @@ export const COMPONENT_PATTERNS = {
     head: 'h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0',
     cell: 'p-4 align-middle [&:has([role=checkbox])]:pr-0',
   },
-  
+
   // Modal patterns
   MODAL: {
     overlay: 'fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
@@ -93,14 +93,14 @@ export const COMPONENT_PATTERNS = {
     title: 'text-lg font-semibold leading-none tracking-tight',
     footer: 'flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2',
   },
-  
+
   // Loading patterns
   LOADING: {
     spinner: 'animate-spin rounded-full border-2 border-gray-300 border-t-blue-600',
     skeleton: 'animate-pulse bg-gray-200 rounded',
     overlay: 'fixed inset-0 z-50 flex items-center justify-center bg-black/50',
   },
-  
+
   // Status patterns
   STATUS: {
     badge: 'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
@@ -118,7 +118,7 @@ export const COMPONENT_PATTERNS = {
 export function createStatusBadge(status: string, variant?: 'success' | 'warning' | 'error' | 'info' | 'neutral') {
   const baseClasses = COMPONENT_PATTERNS.STATUS.badge;
   const variantClasses = variant ? COMPONENT_PATTERNS.STATUS[variant] : COMPONENT_PATTERNS.STATUS.neutral;
-  
+
   return cn(baseClasses, variantClasses);
 }
 
@@ -184,7 +184,7 @@ export function createResponsiveGrid(
     cols.lg && `lg:grid-cols-${cols.lg}`,
     cols.xl && `xl:grid-cols-${cols.xl}`,
   ].filter(Boolean).join(' ');
-  
+
   return gridClasses;
 }
 
@@ -210,7 +210,7 @@ export function createLoadingState(isLoading: boolean, children: ReactNode, fall
       </div>
     );
   }
-  
+
   return children;
 }
 
@@ -246,7 +246,7 @@ export function createErrorState(
       </div>
     );
   }
-  
+
   return null;
 }
 
@@ -270,6 +270,6 @@ export function createEmptyState(
       </div>
     );
   }
-  
+
   return null;
 }

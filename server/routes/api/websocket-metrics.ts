@@ -11,7 +11,7 @@ const router = Router();
 router.get('/metrics', adminLoginRequired, async (req, res) => {
   try {
     const metrics = realtimeServer.getMetrics();
-    
+
     res.json({
       success: true,
       data: metrics,
@@ -34,7 +34,7 @@ router.get('/metrics', adminLoginRequired, async (req, res) => {
 router.post('/process-batch', adminLoginRequired, async (req, res) => {
   try {
     realtimeServer.processBatchNow();
-    
+
     res.json({
       success: true,
       message: 'Batch processing triggered',
@@ -57,7 +57,7 @@ router.post('/process-batch', adminLoginRequired, async (req, res) => {
 router.post('/broadcast', adminLoginRequired, async (req, res) => {
   try {
     const { type, data, priority = 'medium', portalType, userId } = req.body;
-    
+
     if (!type || !data) {
       return res.status(400).json({
         success: false,
@@ -68,13 +68,13 @@ router.post('/broadcast', adminLoginRequired, async (req, res) => {
     const message = { type, data };
 
     if (portalType) {
-      realtimeServer.broadcastToPortal(portalType, message);
+      realtimeServer.broadcastToPortalPublic(portalType, message);
     } else if (userId) {
-      realtimeServer.broadcastToUser(userId, message);
+      realtimeServer.broadcastToUserPublic(userId, message);
     } else {
       realtimeServer.broadcast(message, priority);
     }
-    
+
     res.json({
       success: true,
       message: 'Message broadcasted successfully',

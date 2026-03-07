@@ -474,6 +474,23 @@ export const employeesApi = {
       throw error;
     }
   },
+
+  async resetPassword(id: string, newPassword: string): Promise<boolean> {
+    try {
+      const response = await authorizedFetch(`/employees/${id}/reset-password`, {
+        method: "POST",
+        body: JSON.stringify({ newPassword }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to reset password: ${response.status}`);
+      }
+      return true;
+    } catch (error) {
+      console.error(`Failed to reset password for ${id}:`, error);
+      throw error;
+    }
+  },
 };
 
 // Inventory API

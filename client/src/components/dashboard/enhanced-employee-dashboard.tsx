@@ -472,10 +472,7 @@ export default function EnhancedEmployeeDashboard() {
           </div>
 
           {/* Quick Actions - Settings Controlled */}
-          <DashboardQuickActions
-            employeeId={employeeData.employeeId}
-            employeeName={employeeData.name}
-          />
+          <DashboardQuickActions />
 
           {/* Ready for Pickup/Delivery - DISABLED UNTIL COMPONENT FIXED
           <DashboardReadyOrders />

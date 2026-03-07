@@ -10,7 +10,7 @@ import type { UserRole } from "../../shared/supabase";
 
 const router = Router();
 
-const AUDIT_VIEW_ROLES: UserRole[] = ["admin", "franchise_manager"];
+const AUDIT_VIEW_ROLES = ["admin", "manager"] as any[];
 
 // Get audit logs with pagination, filtering, and role-based isolation
 router.get('/', jwtRequired, requireRole(AUDIT_VIEW_ROLES), async (req, res) => {

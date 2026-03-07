@@ -7,7 +7,7 @@ const router = express.Router();
 router.get('/suggestions', async (req: Request, res: Response) => {
     try {
         const { type } = req.query;
-        const allOrders = await storage.getOrders();
+        const allOrders = await storage.listOrders();
 
         let suggestions = [];
 

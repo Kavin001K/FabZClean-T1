@@ -20,12 +20,12 @@ import type { UserRole } from "../../shared/supabase";
 
 const router = Router();
 
-const CUSTOMER_EDITOR_ROLES: UserRole[] = [
+const CUSTOMER_EDITOR_ROLES: string[] = [
   "admin",
   "employee",
   "franchise_manager",
 ];
-const CUSTOMER_ADMIN_ROLES: UserRole[] = ["admin", "franchise_manager"];
+const CUSTOMER_ADMIN_ROLES: string[] = ["admin", "franchise_manager"];
 
 // Apply rate limiting
 router.use(rateLimit(60000, 100));
@@ -72,7 +72,6 @@ router.get('/', async (req, res) => {
       });
     }
 
-    // Apply sorting
     // Apply sorting
     customers.sort((a: any, b: any) => {
       const aValue = a[sortBy as string];
@@ -321,7 +320,6 @@ router.get('/analytics/overview', async (req, res) => {
     const orders = await storage.listOrders();
 
     // Calculate customer segments
-    // Calculate customer segments
     const segments: Record<string, number> = {};
     customers.forEach((customer: Customer) => {
       const segmentsData = (customer as any).segments;
@@ -466,6 +464,25 @@ router.post('/:id/credit', requireRole(CUSTOMER_EDITOR_ROLES), async (req, res) 
     }
 
     const transaction = await storage.addCustomerCredit(customerId, parseFloat(amount), type, description, referenceId, createdBy);
+
+    // Track credit actions for Audit Log
+    if ((req as any).employee) {
+      await AuthService.logAction(
+        (req as any).employee.employeeId,
+        (req as any).employee.username,
+        type === 'refund' ? 'wallet_refund' : 'wallet_adjustment',
+        'wallet',
+        customerId,
+        {
+          amount: parseFloat(amount),
+          type,
+          description,
+          referenceId
+        },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
 
     res.json(createSuccessResponse(transaction, 'Credit updated successfully'));
   } catch (error: any) {

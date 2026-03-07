@@ -253,13 +253,13 @@ export default function ProfilePage() {
 
     const getRoleBadgeColor = (role: string) => {
         const colors: Record<string, string> = {
-            admin: 'bg-red-500',
-            franchise_manager: 'bg-blue-500',
-            factory_manager: 'bg-green-500',
-            employee: 'bg-yellow-500',
-            driver: 'bg-purple-500',
+            admin: 'bg-destructive',
+            franchise_manager: 'bg-primary',
+            factory_manager: 'bg-secondary',
+            employee: 'bg-accent',
+            driver: 'bg-muted text-foreground',
         };
-        return colors[role] || 'bg-gray-500';
+        return colors[role] || 'bg-muted text-foreground';
     };
 
     const getRoleDisplayName = (role: string) => {
@@ -336,7 +336,7 @@ export default function ProfilePage() {
                                 <h3 className="text-xl font-semibold">{employee?.fullName || employee?.username}</h3>
                                 <p className="text-sm text-muted-foreground">@{employee?.username || employee?.employeeId}</p>
                             </div>
-                            <Badge className={`${getRoleBadgeColor(employee?.role || '')} text-white`}>
+                            <Badge className={`${getRoleBadgeColor(employee?.role || '')}`}>
                                 {getRoleDisplayName(employee?.role || '')}
                             </Badge>
                         </div>

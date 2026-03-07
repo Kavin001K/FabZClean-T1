@@ -491,7 +491,7 @@ export default function CustomerPortal() {
                         {currentOrders.slice(0, 3).map((order: any, index: number) => {
                           const statusInfo = getStatusIcon(order.status);
                           const StatusIcon = statusInfo.icon;
-                          
+
                           return (
                             <motion.div
                               key={order.id}
@@ -584,22 +584,22 @@ export default function CustomerPortal() {
 
               {/* Orders Tab */}
               <TabsContent value="orders">
-                <CustomerOrderTracking orders={currentOrders} customer={currentCustomer} />
+                <CustomerOrderTracking orders={currentOrders as any} customer={currentCustomer as any} />
               </TabsContent>
 
               {/* Booking Tab */}
               <TabsContent value="booking">
-                <CustomerServiceBooking customer={currentCustomer} />
+                <CustomerServiceBooking customer={currentCustomer as any} />
               </TabsContent>
 
               {/* Account Tab */}
               <TabsContent value="account">
-                <CustomerAccountManagement customer={currentCustomer} />
+                <CustomerAccountManagement customer={currentCustomer as any} />
               </TabsContent>
 
               {/* Notifications Tab */}
               <TabsContent value="notifications">
-                <CustomerNotifications customer={currentCustomer} />
+                <CustomerNotifications customer={currentCustomer as any} />
               </TabsContent>
             </Tabs>
           </FadeIn>

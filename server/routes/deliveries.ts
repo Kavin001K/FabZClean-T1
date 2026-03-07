@@ -1,16 +1,16 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db as storage } from '../db';
-import { 
-  adminLoginRequired, 
+import {
+  adminLoginRequired,
   validateInput,
-  rateLimit 
+  rateLimit
 } from '../middleware/auth';
-import { 
-  serializeDelivery, 
-  createPaginatedResponse, 
+import {
+  serializeDelivery,
+  createPaginatedResponse,
   createErrorResponse,
-  createSuccessResponse 
+  createSuccessResponse
 } from '../services/serialization';
 import { realtimeServer } from '../websocket-server';
 
@@ -32,14 +32,21 @@ const deliverySchema = z.object({
 // Get deliveries
 router.get('/', adminLoginRequired, async (req, res) => {
   try {
-    const { 
-      cursor, 
-      limit = 20, 
+    const {
+      cursor,
+      limit = 20,
       status,
       driverId,
       sortBy = 'scheduledDate',
       sortOrder = 'asc'
-    } = req.query;
+    } = req.query as {
+      cursor?: string;
+      limit?: string;
+      status?: string;
+      driverId?: string;
+      sortBy?: string;
+      sortOrder?: string;
+    };
 
     let deliveries = await storage.listDeliveries();
 
@@ -50,14 +57,14 @@ router.get('/', adminLoginRequired, async (req, res) => {
 
     // Apply driver filter
     if (driverId) {
-      deliveries = deliveries.filter(delivery => delivery.driverId === driverId);
+      deliveries = deliveries.filter(delivery => (delivery as any).driverId === driverId);
     }
 
     // Apply sorting
     deliveries.sort((a, b) => {
-      const aValue = a[sortBy as string];
-      const bValue = b[sortBy as string];
-      
+      const aValue = (a as any)[sortBy as string];
+      const bValue = (b as any)[sortBy as string];
+
       if (sortOrder === 'asc') {
         return aValue > bValue ? 1 : -1;
       } else {
@@ -69,13 +76,13 @@ router.get('/', adminLoginRequired, async (req, res) => {
     const limitNum = parseInt(limit as string) || 20;
     const startIndex = cursor ? deliveries.findIndex(d => d.id === cursor) + 1 : 0;
     const endIndex = startIndex + limitNum;
-    
+
     const paginatedDeliveries = deliveries.slice(startIndex, endIndex);
     const hasMore = endIndex < deliveries.length;
     const nextCursor = hasMore ? paginatedDeliveries[paginatedDeliveries.length - 1]?.id : undefined;
 
     // Serialize deliveries
-    const serializedDeliveries = paginatedDeliveries.map(delivery => 
+    const serializedDeliveries = paginatedDeliveries.map(delivery =>
       serializeDelivery(delivery, true, false)
     );
 
@@ -98,7 +105,7 @@ router.get('/', adminLoginRequired, async (req, res) => {
 router.get('/:id', adminLoginRequired, async (req, res) => {
   try {
     const delivery = await storage.getDelivery(req.params.id);
-    
+
     if (!delivery) {
       return res.status(404).json(createErrorResponse('Delivery not found', 404));
     }
@@ -122,17 +129,17 @@ router.post('/', adminLoginRequired, validateInput(deliverySchema), async (req, 
       return res.status(404).json(createErrorResponse('Order not found', 404));
     }
 
-    if (order.status !== 'Ready for Delivery') {
+    if (order.status !== 'ready_for_transit') {
       return res.status(400).json(createErrorResponse('Order is not ready for delivery', 400));
     }
 
     const delivery = await storage.createDelivery({
       ...deliveryData,
-      status: 'scheduled'
+      status: 'pending'
     });
 
     // Update order status
-    await storage.updateOrder(deliveryData.orderId, { status: 'Out for Delivery' });
+    await storage.updateOrder(deliveryData.orderId, { status: 'out_for_delivery' });
 
     // Notify real-time clients
     realtimeServer.triggerUpdate('deliveries', 'created', delivery);
@@ -195,7 +202,7 @@ router.patch('/:id/assign-driver', adminLoginRequired, async (req, res) => {
     }
 
     // Update delivery with driver assignment
-    const updatedDelivery = await storage.updateDelivery(deliveryId, { 
+    const updatedDelivery = await storage.updateDelivery(deliveryId, {
       driverId,
       status: 'assigned',
       assignedAt: new Date().toISOString()
@@ -234,21 +241,22 @@ router.patch('/:id/status', adminLoginRequired, async (req, res) => {
       return res.status(404).json(createErrorResponse('Delivery not found', 404));
     }
 
-    const updatedDelivery = await storage.updateDelivery(deliveryId, { 
+    const updatedDelivery = await storage.updateDelivery(deliveryId, {
       status,
       statusUpdatedAt: new Date().toISOString()
     });
 
     // Update order status based on delivery status
     if (status === 'delivered') {
-      await storage.updateOrder(delivery.orderId, { status: 'Delivered' });
+      await storage.updateOrder(delivery.orderId, { status: 'delivered' });
     } else if (status === 'failed') {
-      await storage.updateOrder(delivery.orderId, { status: 'Delivery Failed' });
+      await storage.updateOrder(delivery.orderId, { status: 'cancelled' });
     }
 
     // Update driver status if delivery completed
-    if (delivery.driverId && (status === 'delivered' || status === 'failed')) {
-      await storage.updateDriver(delivery.driverId, { status: 'available' });
+    const d = delivery as any;
+    if (d.driverId && (status === 'delivered' || status === 'failed')) {
+      await storage.updateDriver(d.driverId, { status: 'available' });
     }
 
     // Notify real-time clients
@@ -276,9 +284,9 @@ router.delete('/:id', adminLoginRequired, async (req, res) => {
       return res.status(404).json(createErrorResponse('Delivery not found', 404));
     }
 
-    // Only allow deletion of scheduled deliveries
-    if (delivery.status !== 'scheduled') {
-      return res.status(400).json(createErrorResponse('Only scheduled deliveries can be deleted', 400));
+    // Only allow deletion of pending deliveries
+    if (delivery.status !== 'pending') {
+      return res.status(400).json(createErrorResponse('Only pending deliveries can be deleted', 400));
     }
 
     const deleted = await storage.deleteDelivery(deliveryId);
@@ -288,7 +296,7 @@ router.delete('/:id', adminLoginRequired, async (req, res) => {
     }
 
     // Reset order status
-    await storage.updateOrder(delivery.orderId, { status: 'Ready for Delivery' });
+    await storage.updateOrder(delivery.orderId, { status: 'ready_for_transit' });
 
     // Notify real-time clients
     realtimeServer.triggerUpdate('deliveries', 'deleted', { deliveryId });
@@ -316,11 +324,13 @@ router.get('/analytics/overview', adminLoginRequired, async (req, res) => {
       availableDrivers: drivers.filter(d => d.status === 'available').length,
       deliveriesToday: deliveries.filter(delivery => {
         const today = new Date().toISOString().split('T')[0];
-        return delivery.scheduledDate.startsWith(today);
+        return (delivery as any).scheduledDate?.startsWith(today) ||
+          new Date(delivery.createdAt).toISOString().startsWith(today);
       }).length,
       completedToday: deliveries.filter(delivery => {
+        const d = delivery as any;
         const today = new Date().toISOString().split('T')[0];
-        return delivery.statusUpdatedAt && delivery.statusUpdatedAt.startsWith(today) && delivery.status === 'delivered';
+        return d.statusUpdatedAt && d.statusUpdatedAt.startsWith(today) && delivery.status === 'delivered';
       }).length
     };
 
@@ -338,7 +348,7 @@ router.get('/driver/:driverId', async (req, res) => {
     const { status, limit = 20 } = req.query;
 
     const deliveries = await storage.listDeliveries();
-    let driverDeliveries = deliveries.filter(delivery => delivery.driverId === driverId);
+    let driverDeliveries = deliveries.filter(delivery => (delivery as any).driverId === driverId);
 
     // Apply status filter
     if (status && status !== 'all') {
@@ -346,14 +356,14 @@ router.get('/driver/:driverId', async (req, res) => {
     }
 
     // Sort by scheduled date
-    driverDeliveries.sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime());
+    driverDeliveries.sort((a, b) => new Date((a as any).scheduledDate || 0).getTime() - new Date((b as any).scheduledDate || 0).getTime());
 
     // Apply limit
     const limitNum = parseInt(limit as string) || 20;
     driverDeliveries = driverDeliveries.slice(0, limitNum);
 
     // Serialize deliveries
-    const serializedDeliveries = driverDeliveries.map(delivery => 
+    const serializedDeliveries = driverDeliveries.map(delivery =>
       serializeDelivery(delivery, false, true)
     );
 

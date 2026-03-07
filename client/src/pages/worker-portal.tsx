@@ -426,11 +426,11 @@ export default function WorkerPortal() {
             </TabsList>
 
             <TabsContent value="deliveries" className="mt-6">
-              <WorkerDeliveryList deliveries={currentDeliveries} driver={currentDriver} />
+              <WorkerDeliveryList deliveries={currentDeliveries as Delivery[]} driver={currentDriver as Driver} />
             </TabsContent>
 
             <TabsContent value="route" className="mt-6">
-              <WorkerRouteOptimizer deliveries={currentDeliveries} driver={currentDriver} />
+              <WorkerRouteOptimizer deliveries={currentDeliveries as Delivery[]} driver={currentDriver as Driver} />
             </TabsContent>
 
             <TabsContent value="scanner" className="mt-6">

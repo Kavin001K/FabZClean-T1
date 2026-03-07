@@ -137,7 +137,7 @@ class CacheService {
     options?: CacheOptions
   ): Promise<T> {
     const key = keyGenerator();
-    
+
     // Check cache first
     const cached = this.get<T>(cacheName, key);
     if (cached !== null) {
@@ -182,7 +182,7 @@ class CacheService {
     // For now, we'll implement a simple key-based invalidation
     if (cache.keys) {
       const keys = Array.from(cache.keys());
-      for (const key of keys) {
+      for (const key of keys as string[]) {
         if (pattern.test(key)) {
           cache.delete(key);
           invalidated++;
@@ -278,7 +278,7 @@ class CacheService {
     invalidatePattern: (pattern: RegExp) => number;
   } {
     const cacheName = `${entityType}_cache`;
-    
+
     return {
       get: <T>(key: string) => this.get<T>(cacheName, key),
       set: <T>(key: string, value: T) => this.set(cacheName, key, value, options),
@@ -293,7 +293,7 @@ class CacheService {
    */
   batchSet<T>(cacheName: string, entries: Array<{ key: string; value: T }>, options?: CacheOptions): void {
     const cache = this.getCache(cacheName, options);
-    
+
     for (const { key, value } of entries) {
       cache.set(key, value);
     }
@@ -304,7 +304,7 @@ class CacheService {
    */
   batchGet<T>(cacheName: string, keys: string[]): Array<{ key: string; value: T | null }> {
     const cache = this.getCache(cacheName);
-    
+
     return keys.map(key => ({
       key,
       value: cache.get(key)

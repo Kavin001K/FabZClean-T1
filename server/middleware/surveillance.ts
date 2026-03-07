@@ -58,7 +58,7 @@ export const surveillanceMiddleware = (req: Request, res: Response, next: NextFu
     const startTime = Date.now();
 
     // @ts-ignore - Overriding end function signature
-    res.end = function (chunk?: any, encoding?: BufferEncoding | (() => void), callback?: () => void) {
+    res.end = function (...args: any[]) {
         // Only log authenticated requests to avoid noise
         if ((req as any).employee) {
             const duration = Date.now() - startTime;
@@ -93,10 +93,7 @@ export const surveillanceMiddleware = (req: Request, res: Response, next: NextFu
         }
 
         // Call original end with proper signature handling
-        if (typeof encoding === 'function') {
-            return originalEnd.call(this, chunk, encoding);
-        }
-        return originalEnd.call(this, chunk, encoding, callback);
+        return originalEnd.apply(this, args as any);
     };
 
     next();

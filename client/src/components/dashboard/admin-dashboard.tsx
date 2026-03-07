@@ -12,6 +12,7 @@ import { ordersApi } from "@/lib/data-service";
 import DashboardDueToday from "./components/dashboard-due-today";
 import DashboardRecentOrders from "./components/dashboard-recent-orders";
 import DashboardQuickActions from "./components/dashboard-quick-actions";
+import WeatherWidget from "./components/weather-widget";
 
 import { useQuery } from "@tanstack/react-query";
 
@@ -83,7 +84,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Key Metrics */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                 <Card className="glass hover:shadow-lg transition-all duration-300 border-t-primary/50">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -146,6 +147,8 @@ export default function AdminDashboard() {
                         </p>
                     </CardContent>
                 </Card>
+
+                <WeatherWidget />
             </div>
 
             {/* Quick Actions */}

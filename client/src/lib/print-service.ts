@@ -342,13 +342,13 @@ export function printInventoryReport(inventory: any[]): void {
     'Stock': item.stockQuantity || item.quantity || 0,
     'Min Stock': item.minStockLevel || item.reorderPoint || 'N/A',
     'Unit Price': `₹${parseFloat(item.price || item.unitPrice || 0).toFixed(2)}`,
-    'Total Value': `₹${parseFloat((item.stockQuantity || 0) * (item.price || 0)).toFixed(2)}`,
+    'Total Value': `₹${(Number(item.stockQuantity || 0) * Number(item.price || item.unitPrice || 0)).toFixed(2)}`,
     'Status': (item.stockQuantity || 0) <= (item.minStockLevel || 0) ? 'Low Stock' : 'OK',
   }));
 
   const totalItems = inventory.length;
   const totalValue = inventory.reduce((sum, item) => {
-    return sum + (item.stockQuantity || 0) * (item.price || item.unitPrice || 0);
+    return sum + Number(item.stockQuantity || 0) * Number(item.price || item.unitPrice || 0);
   }, 0);
   const lowStockItems = inventory.filter(item =>
     (item.stockQuantity || 0) <= (item.minStockLevel || item.reorderPoint || 0)

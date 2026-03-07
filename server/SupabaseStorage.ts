@@ -139,6 +139,7 @@ export class SupabaseStorage {
             'user_agent': 'userAgent',
             'created_at': 'createdAt',
             'updated_at': 'updatedAt',
+            'profile_image': 'profileImage',
             // Transit mappings
             'transit_id': 'transitId',
             'transit_order_id': 'transitOrderId',
@@ -294,6 +295,7 @@ export class SupabaseStorage {
             'userAgent': 'user_agent',
             'createdAt': 'created_at',
             'updatedAt': 'updated_at',
+            'profileImage': 'profile_image',
             // Transit-related mappings
             'transitId': 'transit_id',
             'transitOrderId': 'transit_order_id',
@@ -439,9 +441,27 @@ export class SupabaseStorage {
 
     // ======= CUSTOMERS =======
     async createCustomer(data: InsertCustomer): Promise<Customer> {
+        // Generate FZCMY sequence logic
+        const customers = await this.listCustomers();
+        let maxSequence = 0;
+        for (const c of customers) {
+            if (c.id.startsWith('FZCMY')) {
+                const numStr = c.id.substring(5);
+                const num = parseInt(numStr, 10);
+                if (!isNaN(num) && num > maxSequence) {
+                    maxSequence = num;
+                }
+            }
+        }
+        const nextSequence = maxSequence + 1;
+        const sequenceNum = String(nextSequence).padStart(4, '0');
+        const generatedId = `FZCMY${sequenceNum}`;
+
+        const dataWithId = { ...data, id: generatedId };
+
         const { data: customer, error } = await this.supabase
             .from('customers')
-            .insert(this.toSnakeCase(data))
+            .insert(this.toSnakeCase(dataWithId))
             .select()
             .single();
         if (error) throw error;
@@ -867,6 +887,15 @@ export class SupabaseStorage {
         return data.map(item => this.mapDates(item));
     }
 
+    async listDeliveries(): Promise<Delivery[]> {
+        return this.getDeliveries();
+    }
+
+    async deleteDelivery(id: string): Promise<boolean> {
+        const { error } = await this.supabase.from('deliveries').delete().eq('id', id);
+        return !error;
+    }
+
     // ======= DRIVERS =======
     async createDriver(data: InsertDriver): Promise<Driver> {
         const { data: driver, error } = await this.supabase.from('drivers').insert(this.toSnakeCase(data)).select().single();
@@ -1249,6 +1278,40 @@ export class SupabaseStorage {
             .order('created_at', { ascending: false });
         if (error) return [];
         return data.map(item => this.mapDates(item));
+    }
+
+    async getTransitBatch(id: string): Promise<any> {
+        const { data, error } = await this.supabase.from('transit_batches').select('*').eq('id', id).single();
+        if (error) return undefined;
+        return this.mapDates(data);
+    }
+
+    async listTransitBatches(): Promise<any[]> {
+        const { data, error } = await this.supabase.from('transit_batches').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        return data.map(item => this.mapDates(item));
+    }
+
+    async createTransitBatch(data: any): Promise<any> {
+        const { data: batch, error } = await this.supabase.from('transit_batches').insert(this.toSnakeCase(data)).select().single();
+        if (error) throw error;
+        return this.mapDates(batch);
+    }
+
+    async updateTransitBatch(id: string, data: any): Promise<any> {
+        const { data: batch, error } = await this.supabase.from('transit_batches').update(this.toSnakeCase(data)).eq('id', id).select().single();
+        if (error) return undefined;
+        return this.mapDates(batch);
+    }
+
+    async deleteTransitBatch(id: string): Promise<boolean> {
+        const { error } = await this.supabase.from('transit_batches').delete().eq('id', id);
+        return !error;
+    }
+
+    async deleteTransitOrder(id: string): Promise<boolean> {
+        const { error } = await this.supabase.from('transit_orders').delete().eq('id', id);
+        return !error;
     }
 
     // ======= DOCUMENTS =======

@@ -3,7 +3,7 @@
 // File: server/services/id-generator.ts
 // ========================================
 
-import { storage } from '../SupabaseStorage';
+import { storage } from '../storage';
 
 /**
  * ID Generator Service
@@ -16,7 +16,7 @@ export class IDGeneratorService {
      * Format: FZC[NN]
      */
     static async generateFranchiseCode(): Promise<string> {
-        const { data, error } = await storage.supabase
+        const { data, error } = await (storage as any).supabase
             .rpc('generate_franchise_code');
 
         if (error) throw new Error(`Failed to generate franchise code: ${error.message}`);
@@ -32,7 +32,7 @@ export class IDGeneratorService {
         franchiseId: string,
         role: string
     ): Promise<string> {
-        const { data, error } = await storage.supabase
+        const { data, error } = await (storage as any).supabase
             .rpc('generate_employee_code', {
                 p_franchise_id: franchiseId,
                 p_role: role
@@ -51,7 +51,7 @@ export class IDGeneratorService {
         employeeId: string,
         franchiseId: string
     ): Promise<string> {
-        const { data, error } = await storage.supabase
+        const { data, error } = await (storage as any).supabase
             .rpc('generate_order_code', {
                 p_employee_id: employeeId,
                 p_franchise_id: franchiseId
@@ -67,7 +67,7 @@ export class IDGeneratorService {
      * Example: FZC01CU0001
      */
     static async generateCustomerCode(franchiseId: string): Promise<string> {
-        const { data, error } = await storage.supabase
+        const { data, error } = await (storage as any).supabase
             .rpc('generate_customer_code', {
                 p_franchise_id: franchiseId
             });
@@ -82,7 +82,7 @@ export class IDGeneratorService {
      * Example: FZC01SV0001
      */
     static async generateServiceCode(franchiseId: string): Promise<string> {
-        const { data, error } = await storage.supabase
+        const { data, error } = await (storage as any).supabase
             .rpc('generate_service_code', {
                 p_franchise_id: franchiseId
             });

@@ -1152,13 +1152,13 @@ export default function Inventory() {
         onCloseCreateDialog={() => setIsCreateDialogOpen(false)}
         onEditItem={(data) => handleUpdateItem({
           ...data,
-          price: data.price.toString(),
+          price: parseFloat(data.price.toString()),
           stock: parseInt(data.stock.toString()),
           reorderLevel: parseInt(data.reorderLevel.toString())
         })}
         onCreateItem={(data) => handleCreateItem({
           ...data,
-          price: data.price.toString(),
+          price: parseFloat(data.price.toString()),
           stock: parseInt(data.stock.toString()),
           reorderLevel: parseInt(data.reorderLevel.toString())
         })}

@@ -53,10 +53,11 @@ router.get('/track/:orderNumber', async (req, res) => {
             return res.status(404).json(createErrorResponse('Order not found', 404));
         }
 
-        console.log(`[Track] Found order: ${order.orderNumber || order.order_number} (${order.id})`);
+        const o: any = order;
+        console.log(`[Track] Found order: ${o.orderNumber || o.order_number} (${o.id})`);
 
         // Try to find invoice/bill document for this order
-        let invoiceUrl = order.invoiceUrl || order.invoice_url || order.billUrl || order.bill_url || order.pdfUrl || order.pdf_url;
+        let invoiceUrl = o.invoiceUrl || o.invoice_url || o.billUrl || o.bill_url || o.pdfUrl || o.pdf_url;
 
         if (!invoiceUrl) {
             try {
@@ -66,11 +67,11 @@ router.get('/track/:orderNumber', async (req, res) => {
                     limit: 100
                 });
 
-                const orderNum = order.orderNumber || order.order_number;
+                const orderNum = o.orderNumber || o.order_number;
                 const orderDoc = documents.find((doc: any) =>
                     doc.orderNumber === orderNum ||
                     doc.order_number === orderNum ||
-                    (doc.metadata && (doc.metadata.orderNumber === orderNum || doc.metadata.orderId === order.id))
+                    (doc.metadata && (doc.metadata.orderNumber === orderNum || doc.metadata.orderId === o.id))
                 );
 
                 if (orderDoc) {
@@ -84,27 +85,28 @@ router.get('/track/:orderNumber', async (req, res) => {
 
         // Return sanitized order data (exclude sensitive info)
         // Handle both camelCase and snake_case field names for Supabase compatibility
+        // Handle both camelCase and snake_case field names for Supabase compatibility
         const trackingData = {
-            id: order.id,
-            orderNumber: order.orderNumber || order.order_number,
-            customerName: order.customerName || order.customer_name,
-            status: order.status,
-            paymentStatus: order.paymentStatus || order.payment_status,
-            totalAmount: order.totalAmount || order.total_amount,
-            items: (order.items || []).map((item: any) => ({
+            id: o.id,
+            orderNumber: o.order_number || o.orderNumber,
+            customerName: o.customerName || o.customer_name,
+            status: o.status,
+            paymentStatus: o.payment_status || o.paymentStatus,
+            totalAmount: o.total_amount || o.totalAmount,
+            items: (o.items || []).map((item: any) => ({
                 serviceName: item.serviceName || item.service_name || item.name || item.productName || 'Service',
                 quantity: item.quantity,
                 price: item.price || item.unitPrice || item.unit_price,
             })),
-            fulfillmentType: order.fulfillmentType || order.fulfillment_type || 'pickup',
-            createdAt: order.createdAt || order.created_at,
-            updatedAt: order.updatedAt || order.updated_at,
-            pickupDate: order.pickupDate || order.pickup_date,
+            fulfillmentType: o.fulfillmentType || o.fulfillment_type || 'pickup',
+            createdAt: o.createdAt || o.created_at,
+            updatedAt: o.updatedAt || o.updated_at,
+            pickupDate: o.pickupDate || o.pickup_date,
             // Invoice/Bill URL for download (from order or documents table)
             invoiceUrl: invoiceUrl || null,
             // WhatsApp notification info
-            lastWhatsappStatus: order.lastWhatsappStatus || order.last_whatsapp_status,
-            lastWhatsappSentAt: order.lastWhatsappSentAt || order.last_whatsapp_sent_at,
+            lastWhatsappStatus: o.lastWhatsappStatus || o.last_whatsapp_status,
+            lastWhatsappSentAt: o.lastWhatsappSentAt || o.last_whatsapp_sent_at,
         };
 
         res.json(createSuccessResponse(trackingData));

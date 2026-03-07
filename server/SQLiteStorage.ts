@@ -1425,7 +1425,28 @@ export class SQLiteStorage implements IStorage {
 
   // ======= CUSTOMERS =======
   async createCustomer(data: InsertCustomer): Promise<Customer> {
-    const id = this.insertRecord("customers", data);
+    // Generate FZCMY sequence
+    const customers = await this.listCustomers();
+    let maxSequence = 0;
+    for (const c of customers) {
+      if (c.id.startsWith('FZCMY')) {
+        const numStr = c.id.substring(5);
+        const num = parseInt(numStr, 10);
+        if (!isNaN(num) && num > maxSequence) {
+          maxSequence = num;
+        }
+      }
+    }
+    const nextSequence = maxSequence + 1;
+    const sequenceNum = String(nextSequence).padStart(4, '0');
+    const generatedId = `FZCMY${sequenceNum}`;
+
+    // Assign proper id before insertion
+    const dataWithId = { ...data, id: generatedId };
+
+    // SQLite overrides 'id' internally if we pass it, but normally insertRecord might auto-gen uuid.
+    // Ensure insertRecord handles forcing the ID.
+    const id = this.insertRecord("customers", dataWithId);
     return this.getRecord<Customer>("customers", id)!;
   }
 
@@ -1491,6 +1512,14 @@ export class SQLiteStorage implements IStorage {
 
   async getCustomerCreditHistory(customerId: string): Promise<any[]> {
     return this.db.prepare('SELECT * FROM customer_credit_history WHERE customerId = ? ORDER BY createdAt DESC').all(customerId) as any[];
+  }
+
+  async getGlobalCreditHistory(limit?: number): Promise<any[]> {
+    let query = 'SELECT * FROM customer_credit_history ORDER BY createdAt DESC';
+    if (limit) {
+      query += ` LIMIT ${limit}`;
+    }
+    return this.db.prepare(query).all() as any[];
   }
 
   // ======= ORDER NUMBER GENERATION =======

@@ -73,17 +73,17 @@ const getCustomerSegment = (customer: Customer) => {
   const totalSpent = parseFloat(customer.totalSpent || '0');
   const totalOrders = customer.totalOrders || 0;
 
-  if (totalSpent >= 50000) return { label: 'VIP', color: 'bg-yellow-500', variant: 'default' as const };
-  if (totalSpent >= 20000 || totalOrders >= 10) return { label: 'Premium', color: 'bg-purple-500', variant: 'secondary' as const };
-  if (totalOrders > 0) return { label: 'Regular', color: 'bg-blue-500', variant: 'outline' as const };
-  return { label: 'Inactive', color: 'bg-gray-400', variant: 'outline' as const };
+  if (totalSpent >= 50000) return { label: 'VIP', color: 'bg-primary', variant: 'default' as const };
+  if (totalSpent >= 20000 || totalOrders >= 10) return { label: 'Premium', color: 'bg-accent', variant: 'secondary' as const };
+  if (totalOrders > 0) return { label: 'Regular', color: 'bg-secondary', variant: 'outline' as const };
+  return { label: 'Inactive', color: 'bg-muted', variant: 'outline' as const };
 };
 
 const getSpendingTier = (totalSpent: number) => {
-  if (totalSpent >= 50000) return { label: 'Elite', icon: Award, color: 'text-yellow-600' };
-  if (totalSpent >= 20000) return { label: 'Gold', icon: TrendingUp, color: 'text-purple-600' };
-  if (totalSpent >= 10000) return { label: 'Silver', icon: ShoppingBag, color: 'text-blue-600' };
-  return { label: 'Bronze', icon: Users, color: 'text-gray-600' };
+  if (totalSpent >= 50000) return { label: 'Elite', icon: Award, color: 'text-primary' };
+  if (totalSpent >= 20000) return { label: 'Gold', icon: TrendingUp, color: 'text-accent' };
+  if (totalSpent >= 10000) return { label: 'Silver', icon: ShoppingBag, color: 'text-secondary' };
+  return { label: 'Bronze', icon: Users, color: 'text-muted-foreground' };
 };
 
 export default function Customers() {
@@ -488,53 +488,53 @@ export default function Customers() {
               <CardContent>
                 <div className="text-3xl font-bold text-foreground">{metrics.totalCustomers}</div>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
-                  <span className="text-red-500 font-medium">{metrics.inactiveCustomers}</span> inactive accounts
+                  <span className="text-destructive font-medium">{metrics.inactiveCustomers}</span> inactive accounts
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="glass border-none shadow-xl hover:shadow-green-500/10 transition-all duration-300">
+            <Card className="glass border-none shadow-xl hover:shadow-primary/10 transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Total Revenue
                 </CardTitle>
-                <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                  <IndianRupee className="h-5 w-5 text-green-500" />
+                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                  <IndianRupee className="h-5 w-5 text-primary" />
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-foreground">₹{metrics.totalRevenue.toFixed(0)}</div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2 text-green-500 font-medium">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2 text-primary font-medium">
                   <TrendingUp className="h-3 w-3" />
                   ₹{metrics.avgOrderValue.toFixed(0)} avg/order
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="glass border-none shadow-xl hover:shadow-yellow-500/10 transition-all duration-300">
+            <Card className="glass border-none shadow-xl hover:shadow-accent/10 transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   VIP Club
                 </CardTitle>
-                <div className="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
-                  <Award className="h-5 w-5 text-yellow-500" />
+                <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
+                  <Award className="h-5 w-5 text-accent" />
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-foreground">{metrics.vipCustomers}</div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  <span className="text-yellow-600 font-medium">{metrics.premiumCustomers}</span> premium tier
+                  <span className="text-accent font-medium">{metrics.premiumCustomers}</span> premium tier
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="glass border-none shadow-xl hover:shadow-blue-500/10 transition-all duration-300">
+            <Card className="glass border-none shadow-xl hover:shadow-secondary/10 transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Total Orders
                 </CardTitle>
-                <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                  <ShoppingBag className="h-5 w-5 text-blue-500" />
+                <div className="w-10 h-10 rounded-lg bg-secondary/20 flex items-center justify-center">
+                  <ShoppingBag className="h-5 w-5 text-secondary" />
                 </div>
               </CardHeader>
               <CardContent>
@@ -813,7 +813,7 @@ export default function Customers() {
                             </div>
                             <div>
                               <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">LTV</div>
-                              <div className="text-2xl font-bold text-emerald-500">
+                              <div className="text-2xl font-bold text-primary">
                                 ₹{totalSpent.toFixed(0)}
                               </div>
                             </div>

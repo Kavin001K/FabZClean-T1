@@ -17,7 +17,7 @@ export interface Order {
   customerEmail?: string;
   date: string;
   status: string; // Relaxed to string to support all statuses like 'assigned', 'in_transit'
-  paymentStatus: 'pending' | 'paid' | 'partial' | 'failed';
+  paymentStatus: 'pending' | 'paid' | 'partial' | 'failed' | 'credit';
   total: number;
   service?: string;
   createdAt: string;

@@ -33,6 +33,7 @@ const Services = lazy(() => retryDynamicImport(() => import("@/pages/services"))
 const PrintQueue = lazy(() => retryDynamicImport(() => import("@/pages/print-queue")));
 const UserManagement = lazy(() => retryDynamicImport(() => import("@/pages/user-management")));
 const WalletManagement = lazy(() => retryDynamicImport(() => import("@/pages/wallet-management")));
+const SystemLogs = lazy(() => retryDynamicImport(() => import("@/pages/system-logs")));
 
 const Settings = lazy(() => retryDynamicImport(() => import("@/pages/settings")));
 const PerformanceAnalytics = lazy(() => retryDynamicImport(() => import("@/components/analytics")));
@@ -44,6 +45,7 @@ const PrivacyPage = lazy(() => retryDynamicImport(() => import("@/pages/privacy"
 const RefundPage = lazy(() => retryDynamicImport(() => import("@/pages/refund")));
 const CookiesPage = lazy(() => retryDynamicImport(() => import("@/pages/cookies")));
 const PublicOrderTracking = lazy(() => retryDynamicImport(() => import("@/pages/public-order-tracking")));
+const ProfilePage = lazy(() => retryDynamicImport(() => import("@/pages/profile")));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -157,10 +159,26 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/logs">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <MainLayout>
+            <SystemLogs />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
       <Route path="/settings">
         <ProtectedRoute>
           <MainLayout>
             <Settings />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/profile">
+        <ProtectedRoute>
+          <MainLayout>
+            <ProfilePage />
           </MainLayout>
         </ProtectedRoute>
       </Route>

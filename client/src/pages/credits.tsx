@@ -156,7 +156,7 @@ const creditsApi = {
 export default function CreditsPage() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
-    const { user } = useAuth();
+    const { employee: currentUser } = useAuth();
 
     // State
     const [searchQuery, setSearchQuery] = useState("");
@@ -174,8 +174,8 @@ export default function CreditsPage() {
     const [adjustNotes, setAdjustNotes] = useState("");
 
     // Check role access
-    const canManageCredits = user?.role && ['admin'].includes(user.role);
-    const isAdmin = user?.role === 'admin';
+    const canManageCredits = currentUser?.role && ['admin'].includes(currentUser.role);
+    const isAdmin = currentUser?.role === 'admin';
 
     // Fetch outstanding credits
     const { data: outstandingData, isLoading, refetch } = useQuery({

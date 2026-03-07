@@ -3,11 +3,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  MoreHorizontal, 
-  Edit, 
-  Trash2, 
-  Plus, 
+import {
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Plus,
   Minus,
   Package,
   TrendingUp,
@@ -64,12 +64,12 @@ interface InventoryRowProps {
   isDeleting?: boolean;
 }
 
-const InventoryRow: React.FC<InventoryRowProps> = React.memo(({ 
-  item, 
-  isSelected, 
-  onSelect, 
-  onEdit, 
-  onDelete, 
+const InventoryRow: React.FC<InventoryRowProps> = React.memo(({
+  item,
+  isSelected,
+  onSelect,
+  onEdit,
+  onDelete,
   onUpdateStock,
   isUpdatingStock = false,
   isDeleting = false
@@ -109,7 +109,7 @@ const InventoryRow: React.FC<InventoryRowProps> = React.memo(({
           onCheckedChange={() => onSelect(item.id)}
         />
       </TableCell>
-      
+
       <TableCell>
         <div className="space-y-1">
           <div className="font-medium">{item.name}</div>
@@ -121,7 +121,7 @@ const InventoryRow: React.FC<InventoryRowProps> = React.memo(({
           )}
         </div>
       </TableCell>
-      
+
       <TableCell>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
@@ -152,29 +152,29 @@ const InventoryRow: React.FC<InventoryRowProps> = React.memo(({
           )}
         </div>
       </TableCell>
-      
+
       <TableCell>
         <Badge className={cn("text-xs", getStatusColor(item.status))}>
           {item.status}
         </Badge>
       </TableCell>
-      
+
       <TableCell>
         {item.price ? formatCurrency(item.price) : 'N/A'}
       </TableCell>
-      
+
       <TableCell>
         {item.supplier || 'N/A'}
       </TableCell>
-      
+
       <TableCell>
         <div onClick={(e) => e.stopPropagation()}>
           <AlertDialog>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="h-8 w-8"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -190,7 +190,7 @@ const InventoryRow: React.FC<InventoryRowProps> = React.memo(({
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <AlertDialogTrigger asChild>
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     className="text-red-600 focus:text-red-600"
                     onSelect={(e) => e.preventDefault()}
                   >
@@ -200,19 +200,19 @@ const InventoryRow: React.FC<InventoryRowProps> = React.memo(({
                 </AlertDialogTrigger>
               </DropdownMenuContent>
             </DropdownMenu>
-            
+
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete Inventory Item</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to delete <strong>{item.name}</strong>? 
-                  This action cannot be undone and will permanently remove the item 
+                  Are you sure you want to delete <strong>{item.name}</strong>?
+                  This action cannot be undone and will permanently remove the item
                   from your inventory.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
+                <AlertDialogAction
                   onClick={() => onDelete(item.id)}
                   disabled={isDeleting}
                   className="bg-red-600 hover:bg-red-700"
@@ -254,8 +254,8 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
 
   const getSortIcon = (field: string) => {
     if (sortField !== field) return null;
-    return sortDirection === 'asc' ? 
-      <TrendingUp className="h-4 w-4 ml-1" /> : 
+    return sortDirection === 'asc' ?
+      <TrendingUp className="h-4 w-4 ml-1" /> :
       <TrendingDown className="h-4 w-4 ml-1" />;
   };
 
@@ -327,14 +327,11 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
         <TableRow>
           <TableHead className="w-12">
             <Checkbox
-              checked={allSelected}
-              ref={(el) => {
-                if (el) el.indeterminate = someSelected;
-              }}
+              checked={allSelected ? true : someSelected ? "indeterminate" : false}
               onCheckedChange={(checked) => onSelectAll(!!checked)}
             />
           </TableHead>
-          <TableHead 
+          <TableHead
             className="cursor-pointer hover:text-primary"
             onClick={() => handleSort('name')}
           >
@@ -343,7 +340,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
               {getSortIcon('name')}
             </div>
           </TableHead>
-          <TableHead 
+          <TableHead
             className="cursor-pointer hover:text-primary"
             onClick={() => handleSort('stock')}
           >
@@ -352,7 +349,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
               {getSortIcon('stock')}
             </div>
           </TableHead>
-          <TableHead 
+          <TableHead
             className="cursor-pointer hover:text-primary"
             onClick={() => handleSort('status')}
           >
@@ -361,7 +358,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
               {getSortIcon('status')}
             </div>
           </TableHead>
-          <TableHead 
+          <TableHead
             className="cursor-pointer hover:text-primary"
             onClick={() => handleSort('price')}
           >
@@ -370,7 +367,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = React.memo(({
               {getSortIcon('price')}
             </div>
           </TableHead>
-          <TableHead 
+          <TableHead
             className="cursor-pointer hover:text-primary"
             onClick={() => handleSort('supplier')}
           >

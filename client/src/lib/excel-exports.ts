@@ -6,7 +6,7 @@ import type { InventoryItem } from './data-service';
 
 // ==================== ORDERS EXPORT ====================
 export function exportOrdersToExcel(
-  orders: Order[],
+  orders: any[],
   filters?: {
     status?: string[];
     paymentStatus?: string[];
@@ -75,7 +75,7 @@ export function exportOrdersToExcel(
 }
 
 // ==================== CUSTOMERS EXPORT ====================
-export function exportCustomersToExcel(customers: Customer[], filters?: { segment?: string; search?: string }) {
+export function exportCustomersToExcel(customers: any[], filters?: { segment?: string; search?: string }) {
   const columns: ExcelColumn[] = [
     { header: 'Customer ID', key: 'id', width: 15, align: 'left' },
     { header: 'Name', key: 'name', width: 25, align: 'left' },
@@ -129,7 +129,7 @@ export function exportCustomersToExcel(customers: Customer[], filters?: { segmen
 }
 
 // ==================== SERVICES EXPORT ====================
-export function exportServicesToExcel(services: Service[], filters?: { category?: string; status?: string }) {
+export function exportServicesToExcel(services: any[], filters?: { category?: string; status?: string }) {
   const columns: ExcelColumn[] = [
     { header: 'Service ID', key: 'id', width: 15, align: 'left' },
     { header: 'Service Name', key: 'name', width: 30, align: 'left' },

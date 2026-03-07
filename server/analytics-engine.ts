@@ -535,7 +535,7 @@ export interface BusinessAnalytics {
 export async function generateBusinessAnalytics(): Promise<BusinessAnalytics> {
   const orders = await storage.listOrders();
   const customers = await storage.listCustomers();
-  const services = await storage.listServices();
+  const allServices = await storage.getServices();
 
   // Overview metrics
   const totalRevenue = orders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || '0'), 0);

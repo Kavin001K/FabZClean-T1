@@ -1,5 +1,5 @@
-import { 
-  TSPSolver, 
+import {
+  TSPSolver,
   VRPSolver,
   RealTimeRouteOptimizer as RouteOptimizer,
   FabZCleanRouteOptimizer as VRPOptimizer,
@@ -8,7 +8,7 @@ import {
 
 // Helper functions
 function calculateDistance(point1: { latitude: number; longitude: number }, point2: { latitude: number; longitude: number }): number {
-  return DistanceCalculator.haversineDistance(point1, point2);
+  return DistanceCalculator.haversineDistance({ id: '', ...point1 }, { id: '', ...point2 });
 }
 
 function calculateRouteDistance(points: any[]): number {
@@ -184,8 +184,16 @@ class RouteOptimizationService {
     const allLocations = [startLocation, ...deliveries];
     const optimizedOrder = this.tspSolver.solve(allLocations);
 
-    // Build route with timing information
-    const route = this.buildRouteWithTiming(optimizedOrder, driver);
+    // Route timing info
+    const route = this.buildRouteWithTiming(
+      optimizedOrder.map(pt => ({
+        id: pt.id,
+        address: pt.address || '',
+        latitude: pt.latitude,
+        longitude: pt.longitude
+      })),
+      driver
+    );
 
     const totalDistance = calculateRouteDistance(optimizedOrder);
     const estimatedTime = this.estimateRouteTime(totalDistance, deliveries.length);
@@ -230,8 +238,8 @@ class RouteOptimizationService {
       };
     }
 
-    const averageTimePerDelivery = deliveries.length > 0 
-      ? route.estimatedTime / deliveries.length 
+    const averageTimePerDelivery = deliveries.length > 0
+      ? route.estimatedTime / deliveries.length
       : 0;
 
     return {
@@ -253,7 +261,7 @@ class RouteOptimizationService {
     newDeliveries: DeliveryLocation[]
   ): Promise<OptimizedRoute> {
     const allDeliveries = [...existingRoute.deliveries, ...newDeliveries];
-    
+
     // Get driver info (assuming we have access to driver data)
     const driver: Driver = {
       id: existingRoute.driverId,
@@ -336,7 +344,7 @@ class RouteOptimizationService {
       // Take up to maxDeliveriesPerDriver deliveries
       const driverDeliveries = remainingDeliveries.splice(0, maxDeliveriesPerDriver);
       const route = await this.optimizeSingleDriverRoute(driverDeliveries, driver);
-      
+
       if (route) {
         routes.push(route);
       }
@@ -354,7 +362,7 @@ class RouteOptimizationService {
       considerCapacity: boolean;
     }
   ): Promise<OptimizedRoute[]> {
-    return this.vrpOptimizer.optimize(deliveries, drivers, options);
+    return (this.vrpOptimizer as any).optimize(deliveries, drivers, options);
   }
 
   private async optimizeWithGeneticAlgorithm(
@@ -410,23 +418,18 @@ class RouteOptimizationService {
 
     for (let i = 0; i < locations.length; i++) {
       const location = locations[i];
-      const distance = calculateDistance(
-        previousLocation.latitude,
-        previousLocation.longitude,
-        location.latitude,
-        location.longitude
-      );
+      const distance = calculateDistance(previousLocation, location);
 
       // Estimate travel time (assuming 30 km/h average speed)
       const travelTimeMinutes = (distance / 1000) * 2; // 2 minutes per km
       currentTime = new Date(currentTime.getTime() + travelTimeMinutes * 60 * 1000);
 
       const arrivalTime = currentTime.toISOString();
-      
+
       // Estimate service time
       const serviceTimeMinutes = location.estimatedDuration || 5; // 5 minutes default
       currentTime = new Date(currentTime.getTime() + serviceTimeMinutes * 60 * 1000);
-      
+
       const departureTime = currentTime.toISOString();
 
       route.push({
@@ -447,10 +450,10 @@ class RouteOptimizationService {
     // Estimate based on distance and number of deliveries
     const averageSpeed = 30; // km/h
     const averageServiceTime = 5; // minutes per delivery
-    
+
     const travelTime = (totalDistanceKm / averageSpeed) * 60; // minutes
     const serviceTime = deliveryCount * averageServiceTime;
-    
+
     return Math.round(travelTime + serviceTime);
   }
 }

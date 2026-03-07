@@ -9,6 +9,7 @@ import {
   Scissors,
   Wallet,
   ShieldCheck,
+  ActivitySquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -30,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/customers", label: "Customers", icon: Users2 },
   { to: "/wallet-management", label: "Wallet", icon: Wallet },
   { to: "/user-management", label: "Users", icon: ShieldCheck, adminOnly: true },
+  { to: "/logs", label: "System Logs", icon: ActivitySquare, adminOnly: true },
   { to: "/services", label: "Services", icon: Scissors },
   { to: "/print-queue", label: "Print Tags", icon: Printer },
 ];
@@ -66,7 +68,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
               href={item.to}
               onClick={handleLinkClick}
               className={cn(
-                "flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all hover:bg-accent hover:text-accent-foreground",
+                "flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all hover:bg-primary/5 hover:text-primary",
                 isActive ? "bg-primary/10 font-semibold text-primary" : "text-muted-foreground"
               )}
             >
@@ -102,7 +104,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         <Link
           href="/settings"
           onClick={handleLinkClick}
-          className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all hover:bg-accent hover:text-accent-foreground"
+          className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary"
         >
           <Settings className="h-4 w-4" />
           <span>Settings</span>

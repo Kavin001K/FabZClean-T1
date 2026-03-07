@@ -57,7 +57,7 @@ export class DatabaseQueryOptimizer {
       query: normalizedQuery,
       estimatedCost: this.estimateCost(analysis),
       executionTime,
-      indexes,
+      indexes: indexes.map(i => i.table + ':' + i.columns.join(',')),
       optimizations
     };
   }

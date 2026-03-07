@@ -31,8 +31,8 @@ const ORDER_STEPS = [
 ];
 
 export default function OrderTracking() {
-    const params = useParams();
-    const orderId = params.id;
+    const params = useParams() as { id?: string };
+    const orderId = params?.id;
 
     const { data: order, isLoading, error } = useQuery({
         queryKey: ['order-tracking', orderId],

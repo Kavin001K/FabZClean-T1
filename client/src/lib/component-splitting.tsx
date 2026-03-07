@@ -295,13 +295,13 @@ export function createComponentSplitter<T extends BaseComponentProps>(
   splitter: (props: T) => { [key: string]: any }
 ) {
   return forwardRef<any, T>((props, ref) => {
-    const splitProps = splitter(props);
+    const splitProps = splitter(props as any);
 
     return (
       <Component
         ref={ref}
-        {...props}
-        {...splitProps}
+        {...(props as any)}
+        {...(splitProps as any)}
       />
     );
   });
@@ -424,7 +424,7 @@ export function createComponentWithParts<T extends BaseComponentProps>(
   MainComponent: ComponentType<T>
 ) {
   const ComponentWithParts = forwardRef<any, T>((props, ref) => {
-    return <MainComponent ref={ref as any} {...props} />;
+    return <MainComponent ref={ref as any} {...(props as any)} />;
   });
 
   ComponentWithParts.displayName = name;

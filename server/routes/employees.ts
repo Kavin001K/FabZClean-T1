@@ -179,7 +179,7 @@ router.put(
                     hourlyRate: hourlyRate ? parseFloat(hourlyRate) : undefined,
                     workingHours: workingHours ? parseInt(workingHours) : undefined,
                     emergencyContact, qualifications, notes, address
-                },
+                } as any,
                 req.employee!.employeeId
             );
 

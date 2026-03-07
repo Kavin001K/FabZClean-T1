@@ -177,7 +177,7 @@ export default function DateRangeFilter({
             selected={dateRange}
             onSelect={(range) => {
               if (range?.from && range?.to) {
-                onDateRangeChange(range);
+                onDateRangeChange({ from: range.from, to: range.to });
                 setIsCalendarOpen(false);
               }
             }}
