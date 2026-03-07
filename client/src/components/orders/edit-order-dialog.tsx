@@ -54,27 +54,8 @@ export default React.memo(function EditOrderDialog({
     if (order && formData) {
       const updates: any = { ...formData };
 
-      // Calculate unit price for the item
-      const quantity = parseInt(String(updates.quantity || 1));
-      const totalAmount = parseFloat(String(updates.totalAmount || 0));
-      const unitPrice = quantity > 0 ? totalAmount / quantity : 0;
-
-      // Construct items array if service is present
-      // This ensures that editing the "Service" field actually updates the order items
-      if (updates.service) {
-        updates.items = [{
-          serviceName: updates.service,
-          quantity: quantity,
-          price: unitPrice.toString(),
-          subtotal: totalAmount.toString(),
-          description: updates.notes || ''
-        }];
-      }
-
-      // Remove fields that don't exist in the orders table to prevent DB errors
-      delete updates.service;
-      delete updates.quantity;
-      delete updates.priority; // Priority is not currently in the DB schema
+      // Make sure we pass priority and paymentMethod even if they were manipulated
+      // We removed the code that deletes `priority`, so it will now be saved.
 
       // Ensure numeric fields are strings/numbers as expected by DB
       if (updates.totalAmount !== undefined && updates.totalAmount !== null) {
@@ -98,213 +79,218 @@ export default React.memo(function EditOrderDialog({
 
   if (!order) return null;
 
+  const isDelivery = (order as any).fulfillmentType === 'delivery';
+  const getValidStatuses = (currentStatus: string) => {
+    const list = isDelivery
+      ? ['pending', 'processing', 'ready_for_delivery', 'out_for_delivery', 'delivered', 'cancelled']
+      : ['pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled'];
+    if (currentStatus && !list.includes(currentStatus)) {
+      list.push(currentStatus);
+    }
+    return list;
+  };
+
+  const formatStatusDisplay = (status: string) => {
+    if (!status) return 'Unknown';
+    return status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Edit Order: {order.id}</DialogTitle>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-background border-none shadow-2xl rounded-xl">
+        <DialogHeader className="px-6 py-4 border-b bg-card">
+          <DialogTitle className="text-xl font-bold">Edit Order: {order.id.substring(0, 8).toUpperCase()}</DialogTitle>
           <DialogDescription>
-            Update order details and status.
+            Update order details and status. Check read-only info carefully.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            {/* Customer Information */}
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+          {/* Read-only Identity Section */}
+          <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="customerName">Customer Name</Label>
+              <Label htmlFor="customerName" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Customer Name</Label>
               <Input
                 id="customerName"
                 value={formData.customerName || ''}
-                onChange={(e) => handleInputChange('customerName', e.target.value)}
-                placeholder="Enter customer name"
+                readOnly
+                disabled
+                className="bg-muted/30 cursor-not-allowed font-medium shadow-none border-dashed"
               />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="orderNumber">Order Number</Label>
+              <Label htmlFor="orderNumber" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Order Number</Label>
               <Input
                 id="orderNumber"
                 value={formData.orderNumber || ''}
-                onChange={(e) => handleInputChange('orderNumber', e.target.value)}
-                placeholder="Enter order number"
-              />
-            </div>
-
-            {/* Service Information */}
-            <div className="space-y-2">
-              <Label htmlFor="service">Service</Label>
-              <Input
-                id="service"
-                value={(formData as any).service || ''}
-                onChange={(e) => handleInputChange('service', e.target.value)}
-                placeholder="Enter service type"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="quantity">Quantity</Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="1"
-                value={(formData as any).quantity || 1}
-                onChange={(e) => handleInputChange('quantity', e.target.value)}
-                placeholder="Enter quantity"
-              />
-            </div>
-
-            {/* Status and Priority */}
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={formData.status || 'pending'}
-                onValueChange={(value) => handleInputChange('status', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="processing">Processing</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="priority">Priority</Label>
-              <Select
-                value={(formData as any).priority || 'Normal'}
-                onValueChange={(value) => handleInputChange('priority', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Low">Low</SelectItem>
-                  <SelectItem value="Normal">Normal</SelectItem>
-                  <SelectItem value="High">High</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Financial Information */}
-            <div className="space-y-2">
-              <Label htmlFor="totalAmount">Total Amount</Label>
-              <Input
-                id="totalAmount"
-                type="number"
-                step="0.01"
-                min="0"
-                value={parseFloat(formData.totalAmount || '0')}
-                onChange={(e) => handleInputChange('totalAmount', e.target.value)}
-                placeholder="Enter total amount"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="paymentMethod">Payment Method</Label>
-              <Select
-                value={(formData as any).paymentMethod || 'Cash'}
-                onValueChange={(value) => handleInputChange('paymentMethod', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Cash">Cash</SelectItem>
-                  <SelectItem value="Card">Card</SelectItem>
-                  <SelectItem value="UPI">UPI</SelectItem>
-                  <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Payment Status */}
-            <div className="space-y-2">
-              <Label htmlFor="paymentStatus">Payment Status</Label>
-              <Select
-                value={(formData as any).paymentStatus || 'pending'}
-                onValueChange={(value) => handleInputChange('paymentStatus', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Dates */}
-            <div className="space-y-2">
-              <Label>Due Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !(formData as any).pickupDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {(formData as any).pickupDate ? (
-                      format(new Date((formData as any).pickupDate), "PPP")
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={(formData as any).pickupDate ? new Date((formData as any).pickupDate) : undefined}
-                    onSelect={(date) => handleInputChange('pickupDate', date ? date.toISOString() : '')}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="advancePaid">Advance Paid</Label>
-              <Input
-                id="advancePaid"
-                type="number"
-                step="0.01"
-                min="0"
-                value={(formData as any).advancePaid || 0}
-                onChange={(e) => handleInputChange('advancePaid', e.target.value)}
-                placeholder="Enter advance amount"
+                readOnly
+                disabled
+                className="bg-muted/30 cursor-not-allowed font-medium uppercase tracking-wider shadow-none border-dashed"
               />
             </div>
           </div>
 
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              value={(formData as any).notes || ''}
-              onChange={(e) => handleInputChange('notes', e.target.value)}
-              placeholder="Enter any additional notes..."
-              rows={3}
-            />
+          {/* Editable Section */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-semibold flex items-center text-foreground">
+              Update Details
+              <span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Editable</span>
+            </h4>
+            <div className="grid grid-cols-2 gap-6 p-5 rounded-xl bg-card border shadow-sm relative overflow-hidden">
+              <div className="absolute left-0 top-0 w-1 h-full bg-primary/80"></div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status" className="font-medium">Order Status</Label>
+                <Select
+                  value={formData.status || 'pending'}
+                  onValueChange={(value) => handleInputChange('status', value)}
+                >
+                  <SelectTrigger className="border-primary/20 hover:border-primary/50 focus:ring-primary/20 transition-all font-medium">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getValidStatuses(formData.status || 'pending').map(status => (
+                      <SelectItem key={status} value={status}>
+                        {formatStatusDisplay(status)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="priority" className="font-medium">Priority</Label>
+                <Select
+                  value={(formData as any).priority || 'normal'}
+                  onValueChange={(value) => handleInputChange('priority', value)}
+                >
+                  <SelectTrigger className="border-primary/20 hover:border-primary/50 focus:ring-primary/20 transition-all font-medium">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="paymentMethod" className="font-medium">Payment Method</Label>
+                <Select
+                  value={(formData as any).paymentMethod || 'Cash'}
+                  onValueChange={(value) => handleInputChange('paymentMethod', value)}
+                >
+                  <SelectTrigger className="border-primary/20 hover:border-primary/50 focus:ring-primary/20 transition-all font-medium">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                    <SelectItem value="Card">Card</SelectItem>
+                    <SelectItem value="UPI">UPI</SelectItem>
+                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-medium">Due Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal border-primary/20 hover:border-primary/50 focus:ring-primary/20 transition-all",
+                        !(formData as any).pickupDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
+                      {(formData as any).pickupDate ? (
+                        <span className="font-medium">{format(new Date((formData as any).pickupDate), "PPP")}</span>
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 z-[100]">
+                    <Calendar
+                      mode="single"
+                      selected={(formData as any).pickupDate ? new Date((formData as any).pickupDate) : undefined}
+                      onSelect={(date) => handleInputChange('pickupDate', date ? date.toISOString() : '')}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </div>
+
+          {/* Read-only Financials & Notes Section */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-semibold text-muted-foreground flex items-center">
+              Financial Information
+              <span className="ml-2 text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Read-only</span>
+            </h4>
+            <div className="grid grid-cols-2 gap-6 bg-muted/20 p-5 rounded-xl border border-dashed">
+              <div className="space-y-2">
+                <Label htmlFor="paymentStatus" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Payment Status</Label>
+                <Input
+                  id="paymentStatus"
+                  value={formatStatusDisplay((formData as any).paymentStatus || 'pending')}
+                  readOnly
+                  disabled
+                  className={cn(
+                    "cursor-not-allowed capitalize font-bold shadow-none border-transparent bg-background",
+                    (formData as any).paymentStatus === 'paid' ? "text-emerald-600" :
+                      (formData as any).paymentStatus === 'failed' ? "text-destructive" : "text-amber-500"
+                  )}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="totalAmount" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Amount (₹)</Label>
+                <Input
+                  id="totalAmount"
+                  value={parseFloat(formData.totalAmount || '0')}
+                  readOnly
+                  disabled
+                  className="cursor-not-allowed font-bold text-foreground text-lg shadow-none border-transparent bg-background"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="advancePaid" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Advance Paid (₹)</Label>
+                <Input
+                  id="advancePaid"
+                  value={(formData as any).advancePaid || 0}
+                  readOnly
+                  disabled
+                  className="cursor-not-allowed font-medium text-emerald-600 shadow-none border-transparent bg-background"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="notes" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notes</Label>
+                <Textarea
+                  id="notes"
+                  value={(formData as any).notes || ''}
+                  readOnly
+                  disabled
+                  className="cursor-not-allowed resize-none text-sm shadow-none border-transparent bg-background"
+                  placeholder={!(formData as any).notes ? "No notes available" : ""}
+                  rows={2}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+        <DialogFooter className="px-6 py-4 border-t bg-card/50">
+          <Button variant="outline" onClick={onClose} className="hover:bg-destructive hover:text-destructive-foreground transition-colors border-destructive/20 text-destructive">
             Cancel
           </Button>
           <Button
             onClick={handleSave}
             disabled={isLoading}
+            className="min-w-[140px] shadow-lg shadow-primary/20"
           >
             {isLoading ? 'Saving...' : 'Save Changes'}
           </Button>

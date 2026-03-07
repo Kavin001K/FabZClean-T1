@@ -286,7 +286,7 @@ export default React.memo(function OrderDetailsDialog({
 
           {/* Payment & Charges */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-4 rounded-lg bg-muted/30 space-y-3">
+            <div className="p-4 rounded-lg bg-muted/30 space-y-3 flex flex-col h-full">
               <div className="flex items-center gap-2 mb-2">
                 <IndianRupee className="h-4 w-4 text-muted-foreground" />
                 <p className="font-medium text-sm">Payment Details</p>
@@ -312,13 +312,13 @@ export default React.memo(function OrderDetailsDialog({
                 </div>
               )}
 
-              <div className="flex justify-between text-base font-bold pt-2 border-t">
+              <div className="flex justify-between text-base font-bold pt-2 border-t mt-auto">
                 <span>Total Amount</span>
                 <span className="text-primary">{formatCurrency(parseFloat(order.totalAmount || "0"))}</span>
               </div>
             </div>
 
-            <div className="p-4 rounded-lg bg-muted/30 space-y-3">
+            <div className="p-4 rounded-lg bg-muted/30 space-y-3 flex flex-col h-full">
               <div className="flex items-center gap-2 mb-2">
                 <MapPin className="h-4 w-4 text-muted-foreground" />
                 <p className="font-medium text-sm">Fulfillment</p>
