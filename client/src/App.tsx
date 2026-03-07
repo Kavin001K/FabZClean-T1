@@ -33,7 +33,6 @@ const Services = lazy(() => retryDynamicImport(() => import("@/pages/services"))
 const PrintQueue = lazy(() => retryDynamicImport(() => import("@/pages/print-queue")));
 const UserManagement = lazy(() => retryDynamicImport(() => import("@/pages/user-management")));
 const WalletManagement = lazy(() => retryDynamicImport(() => import("@/pages/wallet-management")));
-const SystemLogs = lazy(() => retryDynamicImport(() => import("@/pages/system-logs")));
 
 const Settings = lazy(() => retryDynamicImport(() => import("@/pages/settings")));
 const PerformanceAnalytics = lazy(() => retryDynamicImport(() => import("@/components/analytics")));
@@ -155,14 +154,6 @@ function Router() {
         <ProtectedRoute>
           <MainLayout>
             <PrintQueue />
-          </MainLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/logs">
-        <ProtectedRoute allowedRoles={["admin"]}>
-          <MainLayout>
-            <SystemLogs />
           </MainLayout>
         </ProtectedRoute>
       </Route>

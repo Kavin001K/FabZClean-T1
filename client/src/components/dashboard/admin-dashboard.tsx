@@ -25,17 +25,37 @@ export default function AdminDashboard() {
 
     // Calculate stats
     const stats = useMemo(() => {
+        const now = new Date();
+        const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+        const thisMonthOrders = orders.filter((o: any) => new Date(o.createdAt || now) >= startOfThisMonth);
+        const lastMonthOrders = orders.filter((o: any) => {
+            const d = new Date(o.createdAt || now);
+            return d >= startOfLastMonth && d < startOfThisMonth;
+        });
+
+        const thisMonthRevenue = thisMonthOrders.reduce((sum: number, order: any) => sum + parseFloat(order.totalAmount || 0), 0);
+        const lastMonthRevenue = lastMonthOrders.reduce((sum: number, order: any) => sum + parseFloat(order.totalAmount || 0), 0);
+
         const totalRevenue = orders.reduce((sum: number, order: any) => sum + parseFloat(order.totalAmount || 0), 0);
         const totalOrders = orders.length;
         const activeCustomers = new Set(orders.map((o: any) => o.customerId)).size;
 
+        const activeCustomersThisMonth = new Set(thisMonthOrders.map((o: any) => o.customerId)).size;
+        const activeCustomersLastMonth = new Set(lastMonthOrders.map((o: any) => o.customerId)).size;
+
+        const revenueGrowth = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
+        const ordersGrowth = lastMonthOrders.length > 0 ? ((thisMonthOrders.length - lastMonthOrders.length) / lastMonthOrders.length) * 100 : 0;
+        const customersGrowth = activeCustomersLastMonth > 0 ? ((activeCustomersThisMonth - activeCustomersLastMonth) / activeCustomersLastMonth) * 100 : 0;
+
         return {
             totalRevenue,
-            revenueGrowth: 12.5,
+            revenueGrowth: parseFloat(revenueGrowth.toFixed(1)),
             totalOrders,
-            ordersGrowth: 8.2,
+            ordersGrowth: parseFloat(ordersGrowth.toFixed(1)),
             activeCustomers,
-            customersGrowth: 5.4,
+            customersGrowth: parseFloat(customersGrowth.toFixed(1)),
         };
     }, [orders]);
 

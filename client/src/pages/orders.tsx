@@ -751,6 +751,29 @@ function OrdersComponent() {
     const processingOrders = filteredOrders.filter(o => o.status === 'processing').length;
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
+    const now = new Date();
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const thisMonthOrders = filteredOrders.filter(o => new Date(o.createdAt || now) >= startOfThisMonth);
+    const lastMonthOrders = filteredOrders.filter(o => {
+      const d = new Date(o.createdAt || now);
+      return d >= startOfLastMonth && d < startOfThisMonth;
+    });
+
+    const thisMonthRevenue = thisMonthOrders.reduce((sum, order) => sum + safeParseFloat(order.totalAmount), 0);
+    const lastMonthRevenue = lastMonthOrders.reduce((sum, order) => sum + safeParseFloat(order.totalAmount), 0);
+
+    const thisMonthCount = thisMonthOrders.length;
+    const lastMonthCount = lastMonthOrders.length;
+
+    const ordersChange = lastMonthCount > 0 ? ((thisMonthCount - lastMonthCount) / lastMonthCount) * 100 : 0;
+    const revenueChange = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
+
+    const thisAvg = thisMonthCount > 0 ? thisMonthRevenue / thisMonthCount : 0;
+    const lastAvg = lastMonthCount > 0 ? lastMonthRevenue / lastMonthCount : 0;
+    const avgChange = lastAvg > 0 ? ((thisAvg - lastAvg) / lastAvg) * 100 : 0;
+
     return {
       totalOrders,
       totalRevenue,
@@ -758,6 +781,9 @@ function OrdersComponent() {
       pendingOrders,
       processingOrders,
       avgOrderValue,
+      ordersChange,
+      revenueChange,
+      avgChange,
     };
   }, [filteredOrders]);
 
@@ -1194,10 +1220,14 @@ function OrdersComponent() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Orders</p>
                   <p className="text-xl sm:text-3xl font-bold mt-2 truncate">{stats.totalOrders}</p>
-                  <div className="flex items-center gap-1 mt-2 text-sm text-green-600">
-                    <TrendingUp className="h-4 w-4" />
-                    <span className="hidden sm:inline">+12.5% from last month</span>
-                    <span className="sm:hidden">+12.5%</span>
+                  <div className={cn("flex items-center gap-1 mt-2 text-sm", stats.ordersChange < 0 ? "text-red-500" : "text-green-600")}>
+                    {stats.ordersChange < 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+                    <span className="hidden sm:inline">
+                      {stats.ordersChange !== 0 ? `${stats.ordersChange > 0 ? '+' : ''}${stats.ordersChange.toFixed(1)}% from last month` : 'No change'}
+                    </span>
+                    <span className="sm:hidden">
+                      {stats.ordersChange !== 0 ? `${stats.ordersChange > 0 ? '+' : ''}${stats.ordersChange.toFixed(1)}%` : '-'}
+                    </span>
                   </div>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1213,10 +1243,14 @@ function OrdersComponent() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
                   <p className="text-xl sm:text-3xl font-bold mt-2 truncate">{formatCurrency(stats.totalRevenue)}</p>
-                  <div className="flex items-center gap-1 mt-2 text-sm text-green-600">
-                    <TrendingUp className="h-4 w-4" />
-                    <span className="hidden sm:inline">+18.2% from last month</span>
-                    <span className="sm:hidden">+18.2%</span>
+                  <div className={cn("flex items-center gap-1 mt-2 text-sm", stats.revenueChange < 0 ? "text-red-500" : "text-green-600")}>
+                    {stats.revenueChange < 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+                    <span className="hidden sm:inline">
+                      {stats.revenueChange !== 0 ? `${stats.revenueChange > 0 ? '+' : ''}${stats.revenueChange.toFixed(1)}% from last month` : 'No change'}
+                    </span>
+                    <span className="sm:hidden">
+                      {stats.revenueChange !== 0 ? `${stats.revenueChange > 0 ? '+' : ''}${stats.revenueChange.toFixed(1)}%` : '-'}
+                    </span>
                   </div>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-accent/10 flex items-center justify-center">
@@ -1232,10 +1266,14 @@ function OrdersComponent() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Avg Order Value</p>
                   <p className="text-xl sm:text-3xl font-bold mt-2 truncate">{formatCurrency(stats.avgOrderValue)}</p>
-                  <div className="flex items-center gap-1 mt-2 text-sm text-blue-600">
-                    <TrendingUp className="h-4 w-4" />
-                    <span className="hidden sm:inline">+5.4% from last month</span>
-                    <span className="sm:hidden">+5.4%</span>
+                  <div className={cn("flex items-center gap-1 mt-2 text-sm", stats.avgChange < 0 ? "text-red-500" : "text-blue-600")}>
+                    {stats.avgChange < 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+                    <span className="hidden sm:inline">
+                      {stats.avgChange !== 0 ? `${stats.avgChange > 0 ? '+' : ''}${stats.avgChange.toFixed(1)}% from last month` : 'No change'}
+                    </span>
+                    <span className="sm:hidden">
+                      {stats.avgChange !== 0 ? `${stats.avgChange > 0 ? '+' : ''}${stats.avgChange.toFixed(1)}%` : '-'}
+                    </span>
                   </div>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-blue-100 flex items-center justify-center">

@@ -409,7 +409,15 @@ export default function WalletManagementPage() {
                     </TableRow>
                   ) : (
                     filteredRows.map((row) => (
-                      <TableRow key={row.id}>
+                      <TableRow
+                        key={row.id}
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => {
+                          resetDialogState();
+                          setSelectedCustomer(row);
+                          setHistoryOpen(true);
+                        }}
+                      >
                         <TableCell>
                           <p className="font-medium">{row.name}</p>
                           <p className="text-xs text-muted-foreground">{row.phone || row.email || "No contact info"}</p>
@@ -442,9 +450,9 @@ export default function WalletManagementPage() {
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="sm">Manage</Button>
+                              <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>Manage</Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
+                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                               <DropdownMenuLabel>Wallet Actions</DropdownMenuLabel>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => {
@@ -742,34 +750,45 @@ export default function WalletManagementPage() {
                       <div className="flex justify-between items-start mb-1">
                         <div className="flex items-center gap-3">
                           <div className={cn(
-                            "h-9 w-9 rounded-full flex items-center justify-center",
+                            "h-9 w-9 rounded-full flex items-center justify-center shrink-0",
                             isCredit ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"
                           )}>
                             {isCredit ? <CheckCircle2 className="h-5 w-5" /> : <IndianRupee className="h-5 w-5" />}
                           </div>
                           <div>
-                            <p className="font-semibold text-sm capitalize">{tx.type}</p>
-                            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                            <p className="font-semibold text-sm capitalize flex items-center flex-wrap gap-2">
+                              {tx.type}
+                              {tx.orderId && (
+                                <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400">
+                                  Order: {typeof tx.orderId === 'string' ? tx.orderId.substring(0, 8) : tx.orderId}
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider mt-0.5">
                               {new Date(tx.createdAt || tx.transactionDate).toLocaleString()}
+                              {tx.recordedByName && ` • BY ${tx.recordedByName}`}
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className={cn("font-bold", isCredit ? "text-emerald-600" : "text-amber-600")}>
+                        <div className="text-right shrink-0">
+                          <p className={cn("font-bold text-base", isCredit ? "text-emerald-600" : "text-amber-600")}>
                             {isCredit ? "+" : "-"}₹{Math.abs(toNumber(tx.amount)).toFixed(2)}
                           </p>
-                          <p className="text-[10px] text-muted-foreground">Balance: ₹{toNumber(tx.balanceAfter).toFixed(2)}</p>
+                          <p className="text-[10px] font-medium text-slate-500 mt-0.5">Bal: ₹{toNumber(tx.balanceAfter).toFixed(2)}</p>
                         </div>
                       </div>
-                      {(tx.description || tx.notes || tx.referenceNumber) && (
-                        <div className="ml-12 mt-2 p-2.5 rounded-md bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
+                      {(tx.description || tx.notes || tx.referenceNumber || tx.reason) && (
+                        <div className="ml-12 mt-2.5 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800">
+                          {tx.reason && <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{tx.reason}</p>}
                           <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                             {tx.description || tx.notes}
                           </p>
                           {tx.referenceNumber && (
-                            <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">
-                              Ref: {tx.referenceNumber}
-                            </p>
+                            <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                <FileText className="h-3 w-3" /> Ref: {tx.referenceNumber}
+                              </p>
+                            </div>
                           )}
                         </div>
                       )}

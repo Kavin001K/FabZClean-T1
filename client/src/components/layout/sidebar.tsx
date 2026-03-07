@@ -31,7 +31,6 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/customers", label: "Customers", icon: Users2 },
   { to: "/wallet-management", label: "Wallet", icon: Wallet },
   { to: "/user-management", label: "Users", icon: ShieldCheck, adminOnly: true },
-  { to: "/logs", label: "System Logs", icon: ActivitySquare, adminOnly: true },
   { to: "/services", label: "Services", icon: Scissors },
   { to: "/print-queue", label: "Print Tags", icon: Printer },
 ];

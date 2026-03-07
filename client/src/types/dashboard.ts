@@ -7,6 +7,10 @@ export interface DashboardMetrics {
   averageOrderValue?: number;
   onTimeDelivery?: number;
   customerSatisfaction?: number;
+  revenueGrowth?: number;
+  ordersGrowth?: number;
+  customersGrowth?: number;
+  onTimeDeliveryGrowth?: number;
   dueDateStats?: {
     today: number;
     tomorrow: number;

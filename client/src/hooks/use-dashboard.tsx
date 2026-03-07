@@ -221,6 +221,31 @@ export function useDashboard() {
     const totalOrders = kpiMetrics.totalOrders || apiMetrics?.totalOrders || 0;
     const averageOrderValue = kpiMetrics.averageOrderValue || 0;
 
+    const now = new Date();
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const safeOrders = allOrders || [];
+    const thisMonthOrders = safeOrders.filter(o => new Date(o.createdAt || now) >= startOfThisMonth);
+    const lastMonthOrders = safeOrders.filter(o => {
+      const d = new Date(o.createdAt || now);
+      return d >= startOfLastMonth && d < startOfThisMonth;
+    });
+
+    const thisMonthRevenue = thisMonthOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount || '0'), 0);
+    const lastMonthRevenue = lastMonthOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount || '0'), 0);
+
+    const safeCustomers = customers || [];
+    const thisMonthCustomers = safeCustomers.filter(c => new Date(c.createdAt || now) >= startOfThisMonth);
+    const lastMonthCustomers = safeCustomers.filter(c => {
+      const d = new Date(c.createdAt || now);
+      return d >= startOfLastMonth && d < startOfThisMonth;
+    });
+
+    const revenueGrowth = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
+    const ordersGrowth = lastMonthOrders.length > 0 ? ((thisMonthOrders.length - lastMonthOrders.length) / lastMonthOrders.length) * 100 : 0;
+    const customersGrowth = lastMonthCustomers.length > 0 ? ((thisMonthCustomers.length - lastMonthCustomers.length) / lastMonthCustomers.length) * 100 : 0;
+
     return {
       totalRevenue,
       totalOrders,
@@ -229,6 +254,9 @@ export function useDashboard() {
       averageOrderValue: Math.round(averageOrderValue),
       onTimeDelivery: kpiMetrics.successRate || 0, // Use success rate as proxy for on-time delivery
       customerSatisfaction: 0, // Will be calculated from feedback data when available
+      revenueGrowth: Number(revenueGrowth.toFixed(1)),
+      ordersGrowth: Number(ordersGrowth.toFixed(1)),
+      customersGrowth: Number(customersGrowth.toFixed(1)),
       dueDateStats: apiMetrics?.dueDateStats || {
         today: 0,
         tomorrow: 0,
@@ -236,7 +264,7 @@ export function useDashboard() {
         upcoming: 0,
       },
     };
-  }, [dashboardMetrics, kpiMetrics]);
+  }, [dashboardMetrics, kpiMetrics, allOrders, customers]);
 
   // Processed data with fallbacks
   const processedSalesData = useMemo((): SalesData[] => {

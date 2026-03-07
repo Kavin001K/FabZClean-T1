@@ -486,13 +486,14 @@ export class SupabaseStorage {
     }
 
     async deleteCustomer(id: string): Promise<boolean> {
-        const { error } = await this.supabase.from('customers').delete().eq('id', id);
+        const { error } = await this.supabase.from('customers').update({ status: 'deleted' }).eq('id', id);
         return !error;
     }
 
     async listCustomers(franchiseId?: string): Promise<Customer[]> {
         let query = this.supabase.from('customers').select('*');
         if (franchiseId) query = query.eq('franchise_id', franchiseId);
+        query = query.neq('status', 'deleted');
         const { data, error } = await query;
         if (error) throw error;
         return data.map(item => this.mapDates(item));

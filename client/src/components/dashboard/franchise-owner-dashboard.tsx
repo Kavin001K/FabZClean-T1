@@ -321,8 +321,8 @@ export default React.memo(function FranchiseOwnerDashboard() {
     {
       title: "Total Revenue",
       value: metrics.totalRevenue,
-      change: "+12.5% from last month",
-      changeType: "positive" as const,
+      change: `${(metrics.revenueGrowth || 0) > 0 ? '+' : ''}${metrics.revenueGrowth || 0}% from last month`,
+      changeType: (metrics.revenueGrowth || 0) >= 0 ? "positive" : "negative",
       icon: <IndianRupee className="h-4 w-4" />,
       description: "Total revenue generated from all orders",
       details: (
@@ -344,8 +344,8 @@ export default React.memo(function FranchiseOwnerDashboard() {
     {
       title: "Total Orders",
       value: metrics.totalOrders,
-      change: "+8.2% from last month",
-      changeType: "positive" as const,
+      change: `${(metrics.ordersGrowth || 0) > 0 ? '+' : ''}${metrics.ordersGrowth || 0}% from last month`,
+      changeType: (metrics.ordersGrowth || 0) >= 0 ? "positive" : "negative",
       icon: <Package className="h-4 w-4" />,
       description: "Total number of orders received",
       details: (
@@ -367,8 +367,8 @@ export default React.memo(function FranchiseOwnerDashboard() {
     {
       title: "New Customers",
       value: metrics.newCustomers,
-      change: "+15.3% from last month",
-      changeType: "positive" as const,
+      change: `${(metrics.customersGrowth || 0) > 0 ? '+' : ''}${metrics.customersGrowth || 0}% from last month`,
+      changeType: (metrics.customersGrowth || 0) >= 0 ? "positive" : "negative",
       icon: <Users className="h-4 w-4" />,
       description: "New customers registered this month",
       details: (
@@ -407,8 +407,8 @@ export default React.memo(function FranchiseOwnerDashboard() {
     {
       title: "On-Time Delivery",
       value: `${metrics.onTimeDelivery || 95}%`,
-      change: "+2.1% from last month",
-      changeType: "positive" as const,
+      change: "No change",
+      changeType: "neutral" as const,
       icon: <Truck className="h-4 w-4" />,
       description: "Percentage of orders delivered on time",
       details: (
