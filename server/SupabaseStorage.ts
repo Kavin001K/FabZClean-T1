@@ -1638,7 +1638,6 @@ export class SupabaseStorage {
         userAgent?: string
     ) {
         return this.createAuditLog({
-            franchiseId: details.franchiseId || null,
             employeeId,
             action,
             entityType,
@@ -1646,7 +1645,7 @@ export class SupabaseStorage {
             details: JSON.stringify(details),
             ipAddress,
             userAgent
-        });
+        } as any);
     }
     async getGlobalCreditHistory(limit: number = 50): Promise<any[]> {
         const { data, error } = await this.supabase

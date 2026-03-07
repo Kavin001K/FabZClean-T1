@@ -37,7 +37,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
         const user = (req as any).employee;
 
         // Lookup full user details to get UUID for foreign key check
-        const fullUser = await AuthService.getEmployee(user.employeeId);
+        const fullUser = await AuthService.getEmployee(user.id);
         if (!fullUser) {
             return res.status(401).json({ error: 'User not found' });
         }
