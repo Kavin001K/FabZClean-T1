@@ -1557,7 +1557,10 @@ export class SupabaseStorage {
         // Preferred path: wallet ledger mapped to legacy credit view model.
         const { data: walletData, error: walletError } = await this.supabase
             .from('wallet_transactions')
-            .select('*')
+            .select(`
+                *,
+                staff:employees!verified_by_staff(first_name, last_name, employee_id)
+            `)
             .eq('customer_id', customerId)
             .order('entry_no', { ascending: false });
 
@@ -1584,6 +1587,8 @@ export class SupabaseStorage {
                     orderId: referenceType === 'ORDER' ? (row.reference_id || mapped.referenceId) : undefined,
                     referenceNumber: referenceType !== 'ORDER' ? (row.reference_id || mapped.referenceId) : undefined,
                     description: row.note || mapped.note || mapped.notes || '',
+                    recordedByName: row.staff ? `${row.staff.first_name} ${row.staff.last_name}`.trim() : (row.recorded_by_name || mapped.recordedByName),
+                    staffId: row.staff?.employee_id || null
                 };
             });
         }

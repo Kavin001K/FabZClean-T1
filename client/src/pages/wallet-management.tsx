@@ -764,9 +764,16 @@ export default function WalletManagementPage() {
                                 </span>
                               )}
                             </p>
-                            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider mt-0.5">
+                            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider mt-0.5 flex items-center flex-wrap gap-x-1">
                               {new Date(tx.createdAt || tx.transactionDate).toLocaleString()}
-                              {tx.recordedByName && ` • BY ${tx.recordedByName}`}
+                              {tx.recordedByName && (
+                                <>
+                                  <span className="opacity-50">•</span>
+                                  <span className="text-blue-600 dark:text-blue-400 font-bold">
+                                    {tx.staffId ? `[${tx.staffId}] ` : ''}{tx.recordedByName}
+                                  </span>
+                                </>
+                              )}
                             </p>
                           </div>
                         </div>
