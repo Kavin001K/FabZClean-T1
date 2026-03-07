@@ -343,7 +343,35 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 
 // ============================================================
-// CUSTOMER CREDIT SYSTEM
+// CENTRALIZED TRANSACTIONS LEDGER (Master Ledger)
+// ============================================================
+
+export const transactions = pgTable("transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  orderId: varchar("order_id").references(() => orders.id),
+
+  // Transaction type
+  type: text("type", { enum: ["WALLET_RECHARGE", "ORDER_PAYMENT", "ORDER_REFUND"] }).notNull(),
+
+  // Payment method
+  paymentMethod: text("payment_method", { enum: ["CASH", "CREDIT_WALLET", "UPI", "CARD", "BANK_TRANSFER"] }).notNull(),
+
+  // Amount
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+
+  // Status
+  status: text("status", { enum: ["SUCCESS", "FAILED", "PENDING"] }).notNull().default("SUCCESS"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTransactionSchema = createInsertSchema(transactions);
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+export type Transaction = typeof transactions.$inferSelect;
+
+// ============================================================
+// CUSTOMER CREDIT SYSTEM (Wallet History)
 // Tracks credit transactions - debits (orders on credit) and payments
 // ============================================================
 
@@ -353,7 +381,7 @@ export const creditTransactions = pgTable("credit_transactions", {
   orderId: varchar("order_id").references(() => orders.id),
 
   // Transaction type
-  type: text("type", { enum: ["credit", "payment", "adjustment", "refund"] }).notNull(),
+  type: text("type", { enum: ["credit", "payment", "adjustment", "refund", "CREDIT_IN", "CREDIT_OUT"] }).notNull(),
 
   // Amount (positive for credit given, negative for payment received)
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),

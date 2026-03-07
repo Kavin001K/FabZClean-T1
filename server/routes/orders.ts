@@ -30,6 +30,85 @@ const orderService = new OrderService();
 // Apply rate limiting to all order routes
 router.use(jwtRequired);
 
+/**
+ * POST /api/orders/:orderId/checkout
+ * Process a checkout/payment for an order, supporting Cash/Wallet splits
+ * Uses secure ACIDs RPC internally for wallet deductions
+ */
+router.post('/:id/checkout', async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { customerId, cashAmount = 0, walletAmount = 0 } = req.body;
+
+    const parsedCash = parseFloat(cashAmount);
+    const parsedWallet = parseFloat(walletAmount);
+
+    if (isNaN(parsedCash) || isNaN(parsedWallet) || (parsedCash <= 0 && parsedWallet <= 0)) {
+      return res.status(400).json(createErrorResponse('Valid cash or wallet amount is required', 400));
+    }
+
+    if (!customerId) {
+      return res.status(400).json(createErrorResponse('Customer ID is required for checkout', 400));
+    }
+
+    const order = await storage.getOrder(orderId);
+    if (!order) {
+      return res.status(404).json(createErrorResponse('Order not found', 404));
+    }
+
+    // Process the payment through our master ledger RPC
+    const recordedBy = req.employee?.id || 'system';
+    const recordedByName = req.employee?.username || 'system';
+
+    const result = await (storage as any).processOrderCheckout(
+      orderId,
+      customerId,
+      parsedCash,
+      parsedWallet,
+      recordedBy,
+      recordedByName
+    );
+
+    if (!result.success) {
+      return res.status(400).json(createErrorResponse(result.error || 'Payment processing failed. Check wallet balance.', 400));
+    }
+
+    // Now update the order's payment-tracking fields.
+    // The RPC handled the financial transaction (ledger & wallet).
+    // We only update the order's metadata here.
+    const totalPaid = parsedCash + parsedWallet;
+    const orderTotal = parseFloat(order.totalAmount || '0');
+    const previousAdvance = parseFloat(order.advancePaid || '0');
+    const cumulativePaid = previousAdvance + totalPaid;
+
+    const updates: any = {
+      paymentMethod: parsedWallet > 0 && parsedCash > 0 ? 'SPLIT' : (parsedWallet > 0 ? 'CREDIT_WALLET' : 'CASH'),
+    };
+
+    // Determine payment status based on cumulative payments
+    if (cumulativePaid >= orderTotal) {
+      updates.paymentStatus = 'paid';
+    } else if (cumulativePaid > 0) {
+      updates.paymentStatus = 'partial';
+      updates.advancePaid = cumulativePaid.toString();
+    }
+
+    // Only advance order status if it's in an early stage
+    const earlyStatuses = ['pending', 'processing', 'confirmed'];
+    if (cumulativePaid >= orderTotal && earlyStatuses.includes(order.status)) {
+      updates.status = 'completed';
+    }
+
+    const updatedOrder = await storage.updateOrder(orderId, updates);
+
+    // Provide the frontend with the newly updated order
+    res.json(createSuccessResponse(updatedOrder, 'Order checkout successful'));
+  } catch (error: any) {
+    console.error('Checkout error:', error);
+    res.status(500).json(createErrorResponse(`Failed to process checkout: ${error.message}`, 500));
+  }
+});
+
 // Get next order number preview (for display on order creation form)
 // Format: FAB260001 (FAB + Year + Sequence)
 router.get('/next-order-number', async (req, res) => {

@@ -25,6 +25,7 @@ import reportsRouter from './reports';
 import publicTrackingRouter from './public-tracking';
 import publicInvoiceRouter from './public-invoice';
 import businessSettingsRouter from './business-settings';
+import walletRouter from './wallet';
 import { jwtRequired } from '../middleware/auth';
 import { debugRouter } from './debug';
 import { db as storage } from '../db';
@@ -148,6 +149,7 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/audit-logs', auditLogsRouter);
   app.use('/api/analytics', analyticsRouter);
   app.use('/api/credits', creditsRouter);
+  app.use('/api/wallet', walletRouter);
   app.use('/api/reports', reportsRouter);
 
   app.use('/api/v1/deliveries', deliveriesRouter);

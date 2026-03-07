@@ -42,6 +42,10 @@ import { formatDate, formatCurrency } from '@/lib/data-service';
 import { cn } from '@/lib/utils';
 import type { Customer, Order } from '@shared/schema';
 
+// Import New Wallet Components
+import { WalletRechargeModal } from '../wallet-recharge-modal';
+import { CustomerWalletHistory } from '../customer-wallet-history';
+
 // Form validation schemas - with separate address fields
 const customerFormSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name must be less than 50 characters'),
@@ -150,6 +154,8 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
       pincode: parsed.pincode,
     };
   }, [selectedCustomer?.address]);
+
+  const [isRechargeModalOpen, setIsRechargeModalOpen] = React.useState(false);
 
   const editForm = useForm<CustomerFormData>({
     resolver: zodResolver(customerFormSchema),
@@ -306,7 +312,17 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                         <div className={cn("text-lg font-bold", selectedOutstandingClass)}>
                           ₹{selectedOutstanding.toLocaleString('en-IN')}
                         </div>
-                        <div className="text-sm text-muted-foreground">Outstanding Credit</div>
+                        <div className="text-sm text-muted-foreground flex justify-between items-center mt-1">
+                          <span>Outstanding Credit</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200"
+                            onClick={() => setIsRechargeModalOpen(true)}
+                          >
+                            Recharge
+                          </Button>
+                        </div>
                         {selectedLimitExceeded && (
                           <div className="text-xs font-medium text-red-500 mt-1">
                             Exceeded by ₹{(selectedOutstanding - selectedCreditLimitAbs).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
@@ -443,6 +459,13 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                     </Table>
                   </div>
                 </div>
+
+                <Separator />
+
+                {/* Customer Ledger */}
+                <div>
+                  <CustomerWalletHistory customerId={selectedCustomer.id} />
+                </div>
               </div>
 
               <DialogFooter>
@@ -453,6 +476,20 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
             </motion.div>) : null}
         </DialogContent>
       </Dialog>
+
+      {/* Wallet Recharge Modal (Overlays the View Dialog) */}
+      {selectedCustomer && (
+        <WalletRechargeModal
+          isOpen={isRechargeModalOpen}
+          onClose={() => setIsRechargeModalOpen(false)}
+          customerId={selectedCustomer.id}
+          customerName={selectedCustomer.name}
+          onRechargeSuccess={() => {
+            // Trigger partial refresh or just let websockets handle it
+            setIsRechargeModalOpen(false);
+          }}
+        />
+      )}
 
       {/* Edit Customer Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={onCloseEditDialog}>

@@ -84,14 +84,10 @@ const paymentMethods: PaymentMethod[] = [
     name: 'Other',
     icon: <Receipt className="w-5 h-5" />,
     type: 'cash'
-  },
-  {
-    id: 'WALLET',
-    name: 'Customer Wallet',
-    icon: <Wallet className="w-5 h-5" />,
-    type: 'cash'
   }
 ];
+
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpdate }: OrderPaymentModalProps) {
   const { toast } = useToast();
@@ -104,18 +100,24 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
   const [notes, setNotes] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const [useWallet, setUseWallet] = useState(false);
+
   const totalAmount = parseFloat(order.totalAmount);
   const advancePaid = parseFloat(order.advancePaid || '0');
   const remainingAmount = totalAmount - advancePaid;
 
-  // New: Fetch wallet balance if needed
+  // Fetch wallet balance
   const { data: walletDetails, isLoading: isLoadingWalletBalance } = useQuery({
     queryKey: ['/api/credits', (order as any).customerId],
-    enabled: selectedMethod === 'WALLET' && !!(order as any).customerId,
+    enabled: isOpen && !!(order as any).customerId,
   });
 
-  const walletBalance = (walletDetails as any)?.creditBalance || 0;
-  const hasInsufficientWalletBalance = selectedMethod === 'WALLET' && walletBalance < parseFloat(amount || '0');
+  const walletBalance = (walletDetails as any)?.creditBalance ? parseFloat((walletDetails as any).creditBalance) : 0;
+  const parsedAmount = parseFloat(amount || '0');
+
+  // Auto-calculation magic for Split Payments
+  const walletApplied = useWallet ? Math.min(parsedAmount, walletBalance) : 0;
+  const cashRequired = parsedAmount - walletApplied;
 
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
@@ -157,33 +159,26 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
     setIsProcessing(true);
 
     try {
-      // Update payment status
-      let newPaymentStatus: string;
-      if (paymentType === 'full' || (paymentType === 'delivery' && parseFloat(amount) >= remainingAmount)) {
-        newPaymentStatus = 'paid';
-      } else if (paymentType === 'advance' || (paymentType === 'delivery' && parseFloat(amount) < remainingAmount)) {
-        newPaymentStatus = 'partial';
+      if (paymentType === 'advance') {
+        // ADVANCE FLOW: Just record the advance amount via PUT. No ledger entry.
+        const updatedAdvancePaid = (advancePaid + parsedAmount).toString();
+        await apiRequest("PUT", `/api/orders/${order.id}`, {
+          paymentStatus: 'partial',
+          advancePaid: updatedAdvancePaid,
+        });
+        onPaymentUpdate?.(order.id, { ...order, advancePaid: updatedAdvancePaid, paymentStatus: 'partial' });
       } else {
-        newPaymentStatus = 'partial';
+        // FULL / DELIVERY FLOW: Use the checkout API which handles wallet + cash + ledger entries
+        const res = await apiRequest("POST", `/api/orders/${order.id}/checkout`, {
+          customerId: (order as any).customerId,
+          cashAmount: cashRequired,
+          walletAmount: walletApplied,
+        });
+
+        const responseData = await res.json();
+        const updatedOrder = responseData.data;
+        onPaymentUpdate?.(order.id, updatedOrder);
       }
-
-      const updatedAdvancePaid = paymentType === 'advance' ?
-        (advancePaid + parseFloat(amount)).toString() :
-        order.advancePaid;
-
-      // Call API
-      await apiRequest("PUT", `/api/orders/${order.id}`, {
-        paymentStatus: newPaymentStatus,
-        advancePaid: updatedAdvancePaid
-      });
-
-      const updatedOrder = {
-        ...order,
-        advancePaid: updatedAdvancePaid,
-        paymentStatus: newPaymentStatus
-      };
-
-      onPaymentUpdate?.(order.id, updatedOrder);
 
       addNotification({
         type: 'success',
@@ -397,47 +392,39 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
             />
           </div>
 
-          {/* Payment Summary */}
-          {amount && (
-            <Card className="bg-muted/50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Calculator className="w-4 h-4" />
-                  <span className="font-medium">Payment Summary</span>
+          {/* Split Payment / Wallet Section */}
+          <div className="space-y-4 pt-2 border-t mt-4">
+            <div className="flex items-center space-x-2 bg-slate-50 p-3 rounded-lg border">
+              <Checkbox
+                id="useWallet"
+                checked={useWallet}
+                onCheckedChange={(c) => setUseWallet(!!c)}
+                disabled={walletBalance <= 0 || !(order as any).customerId}
+              />
+              <div className="flex-1">
+                <Label htmlFor="useWallet" className="text-sm font-medium cursor-pointer">
+                  Apply Wallet Balance
+                </Label>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  Available: <span className="font-bold text-emerald-600">{isLoadingWalletBalance ? 'Loading...' : formatCurrency(walletBalance)}</span>
                 </div>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>Payment Amount:</span>
-                    <span className="font-medium">{formatCurrency(parseFloat(amount))}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Method:</span>
-                    <span className="font-medium">{paymentMethods.find(m => m.id === selectedMethod)?.name}</span>
-                  </div>
-                  {paymentType === 'advance' && (
-                    <div className="flex justify-between">
-                      <span>New Balance:</span>
-                      <span className="font-medium">{formatCurrency(remainingAmount - parseFloat(amount))}</span>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Wallet Balance Display */}
-          {selectedMethod === 'WALLET' && (
-            <div className={cn(
-              "mt-4 p-3 rounded-md border flex items-center justify-between",
-              hasInsufficientWalletBalance ? "bg-red-50 border-red-200 text-red-600" : "bg-emerald-50 border-emerald-200 text-emerald-600"
-            )}>
-              <div className="flex items-center gap-2">
-                <Wallet className="w-4 h-4" />
-                <span className="text-sm font-medium">Available Balance:</span>
               </div>
-              <span className="text-lg font-bold">{isLoadingWalletBalance ? 'Loading...' : formatCurrency(walletBalance)}</span>
             </div>
-          )}
+
+            {useWallet && amount && (
+              <div className="bg-emerald-50/50 p-3 rounded-lg text-sm border border-emerald-100 flex justify-between">
+                <span className="text-emerald-700">Wallet Deduction:</span>
+                <span className="font-bold text-emerald-700">-{formatCurrency(walletApplied)}</span>
+              </div>
+            )}
+
+            {amount && (
+              <div className="bg-amber-50/50 p-3 rounded-lg text-sm border border-amber-100 flex justify-between items-center">
+                <span className="text-amber-800 font-medium">Cash to Collect:</span>
+                <span className="font-extrabold text-amber-900 text-lg">{formatCurrency(cashRequired)}</span>
+              </div>
+            )}
+          </div>
 
           {/* Action Buttons */}
           <div className="flex gap-3 justify-end mt-8">
@@ -445,7 +432,7 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
               Cancel
             </Button>
             <Button
-              disabled={!amount || isProcessing || hasInsufficientWalletBalance || (selectedMethod !== 'CASH' && selectedMethod !== 'WALLET' && !transactionId)}
+              disabled={!amount || isProcessing || (cashRequired > 0 && selectedMethod === 'OTHER' && !transactionId)}
               onClick={handlePayment}
               className="gap-2 px-8"
             >

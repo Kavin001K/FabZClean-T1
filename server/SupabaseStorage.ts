@@ -800,6 +800,60 @@ export class SupabaseStorage {
         };
     }
 
+    // ======= WALLET & MASTER LEDGER RPC CALLS =======
+    // These methods call Postgres Stored Procedures to guarantee ACID transactions.
+
+    async processWalletRecharge(
+        customerId: string,
+        amount: number,
+        paymentMethod: string,
+        recordedBy: string,
+        recordedByName: string
+    ): Promise<{ success: boolean; newBalance?: number; error?: string }> {
+        try {
+            const { data, error } = await this.supabase.rpc('process_wallet_recharge', {
+                p_customer_id: customerId,
+                p_amount: amount,
+                p_payment_method: paymentMethod,
+                p_recorded_by: recordedBy,
+                p_recorded_by_name: recordedByName
+            });
+
+            if (error) throw error;
+            return { success: true, newBalance: data };
+        } catch (err: any) {
+            console.error('[SupabaseStorage] Recharging Wallet failed:', err);
+            return { success: false, error: err.message || 'Failed to recharge wallet due to a database exception.' };
+        }
+    }
+
+    async processOrderCheckout(
+        orderId: string,
+        customerId: string,
+        cashAmount: number,
+        walletAmount: number,
+        recordedBy: string,
+        recordedByName: string
+    ): Promise<{ success: boolean; error?: string }> {
+        try {
+            const { data, error } = await this.supabase.rpc('process_order_checkout', {
+                p_order_id: orderId,
+                p_customer_id: customerId,
+                p_cash_amount: cashAmount,
+                p_wallet_amount: walletAmount,
+                p_recorded_by: recordedBy,
+                p_recorded_by_name: recordedByName
+            });
+
+            if (error) throw error;
+            return { success: true };
+        } catch (err: any) {
+            console.error('[SupabaseStorage] Processing Checkout failed:', err);
+            // Will fail gracefully if creditBalance < walletAmount due to DB constraints
+            return { success: false, error: err.message || 'Payment processing failed.' };
+        }
+    }
+
     // ======= AUDIT LOGS =======
     async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
         const { data: auditLog, error } = await this.supabase
@@ -1085,7 +1139,21 @@ export class SupabaseStorage {
         return this.mapDates(shipment);
     }
 
-    // ======= ORDER TRANSACTIONS (Fixed Name) =======
+    // ======= TRANSACTIONS (Master Ledger) =======
+    async getOrderTransactions(orderId: string): Promise<any[]> {
+        const { data, error } = await this.supabase
+            .from('transactions')
+            .select('*')
+            .eq('order_id', orderId)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Failed to get transactions for order:', error);
+            throw error;
+        }
+
+        return (data || []).map((row: any) => this.mapDates(row));
+    }
     async getPosTransactions(): Promise<any[]> {
         const { data, error } = await this.supabase.from('order_transactions').select('*');
         if (error) throw error;
