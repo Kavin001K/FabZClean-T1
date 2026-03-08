@@ -313,13 +313,18 @@ export default function Customers() {
     const normalizedCreditLimit = parsedCreditLimit !== undefined && !Number.isNaN(parsedCreditLimit)
       ? (-Math.abs(parsedCreditLimit)).toString()
       : undefined;
-
     const transformedData: Partial<Customer> = {
       name: customerData.name,
       phone: customerData.phone,
       email: customerData.email || undefined,
       address: addressObj.street ? addressObj : undefined,
       creditLimit: normalizedCreditLimit,
+      notes: customerData.notes || undefined,
+      companyName: customerData.companyName || undefined,
+      taxId: customerData.taxId || undefined,
+      dateOfBirth: customerData.dateOfBirth || undefined,
+      paymentTerms: customerData.paymentTerms || undefined,
+      status: customerData.status || 'active',
     };
 
     createCustomerMutation.mutate(transformedData);
@@ -341,7 +346,6 @@ export default function Customers() {
     const normalizedCreditLimit = parsedCreditLimit !== undefined && !Number.isNaN(parsedCreditLimit)
       ? (-Math.abs(parsedCreditLimit)).toString()
       : undefined;
-
     const transformedData: Partial<Customer> = {
       name: customerData.name,
       phone: customerData.phone,
@@ -349,6 +353,11 @@ export default function Customers() {
       address: addressObj.street ? addressObj : undefined,
       creditLimit: normalizedCreditLimit,
       status: customerData.status || 'active',
+      notes: customerData.notes || undefined,
+      companyName: customerData.companyName || undefined,
+      taxId: customerData.taxId || undefined,
+      dateOfBirth: customerData.dateOfBirth || undefined,
+      paymentTerms: customerData.paymentTerms || undefined,
     };
 
     editCustomerMutation.mutate({

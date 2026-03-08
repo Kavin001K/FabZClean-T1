@@ -182,6 +182,11 @@ export const customers = pgTable("customers", {
   creditBalance: decimal("credit_balance", { precision: 10, scale: 2 }).default("0"),
   status: text("status", { enum: ["active", "inactive", "deleted"] }).default("active"),
   lastOrder: timestamp("last_order"),
+  notes: text("notes"),
+  companyName: text("company_name"),
+  taxId: text("tax_id"),
+  dateOfBirth: text("date_of_birth"),
+  paymentTerms: text("payment_terms"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

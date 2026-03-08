@@ -48,6 +48,8 @@ const ProfilePage = lazy(() => retryDynamicImport(() => import("@/pages/profile"
 const DeliveriesManagement = lazy(() => retryDynamicImport(() => import("@/pages/deliveries-management")));
 const DeliveryHome = lazy(() => retryDynamicImport(() => import("@/pages/delivery-home")));
 const DeliveryHistory = lazy(() => retryDynamicImport(() => import("@/pages/delivery-history")));
+const DeliveryProfile = lazy(() => retryDynamicImport(() => import("@/pages/delivery-profile")));
+import { DeliveryLayout } from "@/components/layout/delivery-layout";
 
 // Loading fallback component
 const PageLoader = () => (
@@ -172,13 +174,25 @@ function Router() {
       {/* Delivery Partner Routes (mobile-first, no sidebar) */}
       <Route path="/delivery-home">
         <ProtectedRoute>
-          <DeliveryHome />
+          <DeliveryLayout>
+            <DeliveryHome />
+          </DeliveryLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/delivery-history">
         <ProtectedRoute>
-          <DeliveryHistory />
+          <DeliveryLayout>
+            <DeliveryHistory />
+          </DeliveryLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/delivery-profile">
+        <ProtectedRoute>
+          <DeliveryLayout>
+            <DeliveryProfile />
+          </DeliveryLayout>
         </ProtectedRoute>
       </Route>
 
