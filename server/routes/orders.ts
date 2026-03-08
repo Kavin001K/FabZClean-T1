@@ -246,8 +246,20 @@ router.patch('/:id/deliver', async (req, res) => {
       orderUpdates.deliveryCashCollected = orderTotal;
     }
 
-    // 5. Save the order updates
-    const updatedOrder = await storage.updateOrder(orderId, orderUpdates);
+    // 5. Save the order updates (with fallback for missing delivery_cash_collected column)
+    let updatedOrder;
+    try {
+      updatedOrder = await storage.updateOrder(orderId, orderUpdates);
+    } catch (saveError: any) {
+      // If the error is about missing deliveryCashCollected column, retry without it
+      if (saveError.message?.includes('deliveryCashCollected') || saveError.message?.includes('delivery_cash_collected')) {
+        console.warn('⚠️ delivery_cash_collected column not found, retrying without it');
+        delete orderUpdates.deliveryCashCollected;
+        updatedOrder = await storage.updateOrder(orderId, orderUpdates);
+      } else {
+        throw saveError;
+      }
+    }
 
     // 6. Log the action
     if (req.employee) {
@@ -993,7 +1005,8 @@ router.patch('/:id/assign-delivery', async (req, res) => {
     const employees = await storage.listEmployees();
     const employee = employees.find(e => e.id === deliveryPartnerId || e.employeeId === deliveryPartnerId);
 
-    if (!employee || employee.position !== 'delivery') {
+    const empPos = (employee?.position || '').toLowerCase();
+    if (!employee || (empPos !== 'delivery' && empPos !== 'driver')) {
       return res.status(400).json(createErrorResponse('Invalid delivery partner selected', 400));
     }
 
