@@ -348,6 +348,24 @@ export class AuthService {
             notes: string;
             address: string;
             profileImage: string;
+            // RBAC fields
+            role: string;
+            systemRole: string;
+            franchiseId: string;
+            factoryId: string;
+            storeId: string;
+            // Personal fields
+            dateOfBirth: string;
+            gender: string;
+            bloodGroup: string;
+            // Banking fields
+            bankName: string;
+            accountNumber: string;
+            ifscCode: string;
+            panNumber: string;
+            aadharNumber: string;
+            // Delivery
+            perOrderSalary: number;
         }>,
         updatedBy: string
     ): Promise<AuthEmployee> {
@@ -368,32 +386,50 @@ export class AuthService {
         if (data.position !== undefined) updateData.position = data.position;
         if (data.department !== undefined) updateData.department = data.department;
         if (data.salary !== undefined) updateData.salary = String(data.salary);
-        if (data.hireDate !== undefined) updateData.hireDate = data.hireDate.toISOString();
+        if (data.hireDate !== undefined) updateData.hireDate = data.hireDate instanceof Date ? data.hireDate.toISOString() : data.hireDate;
         if (data.salaryType !== undefined) updateData.salaryType = data.salaryType;
         if (data.baseSalary !== undefined) updateData.baseSalary = String(data.baseSalary);
         if (data.hourlyRate !== undefined) updateData.hourlyRate = String(data.hourlyRate);
-        if (data.workingHours !== undefined) updateData.workingHours = String(data.workingHours);
+        if (data.workingHours !== undefined) updateData.workingHours = data.workingHours;
         if (data.emergencyContact !== undefined) updateData.emergencyContact = data.emergencyContact;
         if (data.qualifications !== undefined) updateData.qualifications = data.qualifications;
         if (data.notes !== undefined) updateData.notes = data.notes;
         if (data.address !== undefined) {
             updateData.address = typeof data.address === 'object' ? JSON.stringify(data.address) : data.address;
         }
-        if ((data as any).perOrderSalary !== undefined) {
-            updateData.perOrderSalary = (data as any).perOrderSalary;
-        }
+        // Delivery
+        if (data.perOrderSalary !== undefined) updateData.perOrderSalary = data.perOrderSalary;
+
+        // ===== RBAC fields (previously missing!) =====
+        if (data.role !== undefined) updateData.role = data.role;
+        if (data.systemRole !== undefined) updateData.systemRole = data.systemRole;
+        if (data.franchiseId !== undefined) updateData.franchiseId = data.franchiseId;
+        if (data.factoryId !== undefined) updateData.factoryId = data.factoryId;
+        if (data.storeId !== undefined) updateData.storeId = data.storeId;
+
+        // ===== Personal fields (previously missing!) =====
+        if (data.dateOfBirth !== undefined) updateData.dateOfBirth = data.dateOfBirth;
+        if (data.gender !== undefined) updateData.gender = data.gender;
+        if (data.bloodGroup !== undefined) updateData.bloodGroup = data.bloodGroup;
+
+        // ===== Banking fields (previously missing!) =====
+        if (data.bankName !== undefined) updateData.bankName = data.bankName;
+        if (data.accountNumber !== undefined) updateData.accountNumber = data.accountNumber;
+        if (data.ifscCode !== undefined) updateData.ifscCode = data.ifscCode;
+        if (data.panNumber !== undefined) updateData.panNumber = data.panNumber;
+        if (data.aadharNumber !== undefined) updateData.aadharNumber = data.aadharNumber;
 
         if (Object.keys(updateData).length === 0) {
             throw new Error('No fields to update');
         }
 
-        console.log('[AuthService] updateEmployee:', employeeId, updateData);
+        console.log('[AuthService] updateEmployee:', employeeId, Object.keys(updateData));
 
         // Local storage update - no fallback
         const updatedEmployee = await storage.updateEmployee(employeeId, updateData);
 
         if (!updatedEmployee) {
-            throw new Error('Employee not found');
+            throw new Error('Employee not found or update failed');
         }
 
         // Log the action
@@ -423,6 +459,8 @@ export class AuthService {
             isActive: updatedEmployee.status === 'active' || updatedEmployee.status === null,
             position: updatedEmployee.position,
             department: updatedEmployee.department,
+            storeId: (updatedEmployee as any).franchiseId,
+            factoryId: (updatedEmployee as any).factoryId,
         };
     }
 

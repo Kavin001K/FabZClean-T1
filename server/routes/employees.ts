@@ -72,7 +72,12 @@ router.post(
             const {
                 username, password, role, franchiseId, factoryId, fullName, email, phone,
                 position, department, hireDate, salaryType, baseSalary, hourlyRate,
-                workingHours, emergencyContact, qualifications, notes, address, perOrderSalary
+                workingHours, emergencyContact, qualifications, notes, address, perOrderSalary,
+                // Personal
+                dateOfBirth, gender, bloodGroup,
+                // Banking
+                bankName, accountNumber, bankAccountNumber, ifscCode, bankIfsc,
+                panNumber, aadharNumber,
             } = req.body;
 
             // Validation
@@ -85,7 +90,7 @@ router.post(
             }
 
             // Replace the hardcoded array with a robust check
-            const ALLOWED_ROLES = ['admin', 'franchise_manager', 'factory_manager', 'staff', 'employee', 'driver'] as const;
+            const ALLOWED_ROLES = ['admin', 'store_manager', 'franchise_manager', 'factory_manager', 'store_staff', 'staff', 'employee', 'driver', 'factory_staff'] as const;
 
             if (!ALLOWED_ROLES.includes(role as any)) {
                 return res.status(400).json({
@@ -112,7 +117,7 @@ router.post(
                     username,
                     password,
                     role,
-                    franchiseId: franchiseId || req.employee!.franchiseId, // Use current user's franchise if not provided
+                    franchiseId: franchiseId || req.employee!.franchiseId,
                     factoryId,
                     fullName,
                     email,
@@ -129,6 +134,13 @@ router.post(
                     notes,
                     address,
                     perOrderSalary: perOrderSalary ? parseInt(perOrderSalary) : undefined,
+                    // Personal
+                    dateOfBirth, gender, bloodGroup,
+                    // Banking
+                    bankName,
+                    accountNumber: accountNumber || bankAccountNumber,
+                    ifscCode: ifscCode || bankIfsc,
+                    panNumber, aadharNumber,
                 },
                 req.employee!.employeeId
             );
@@ -151,9 +163,16 @@ router.put(
     async (req: Request, res: Response) => {
         try {
             const {
-                fullName, email, phone, franchiseId, factoryId, isActive,
+                fullName, email, phone, franchiseId, factoryId, storeId, isActive,
                 position, department, hireDate, salaryType, baseSalary, hourlyRate,
-                workingHours, emergencyContact, qualifications, notes, address, perOrderSalary
+                workingHours, emergencyContact, qualifications, notes, address, perOrderSalary,
+                // RBAC fields
+                role, systemRole,
+                // Personal
+                dateOfBirth, gender, bloodGroup,
+                // Banking (handle both naming conventions from frontend)
+                bankName, accountNumber, bankAccountNumber, ifscCode, bankIfsc,
+                panNumber, aadharNumber,
             } = req.body;
 
             // Fetch employee to check permissions
@@ -163,7 +182,7 @@ router.put(
             }
 
             // Franchise managers can only update employees in their franchise
-            if (req.employee!.role === 'franchise_manager') {
+            if (req.employee!.role === 'franchise_manager' || req.employee!.role === 'store_manager') {
                 if (targetEmployee.franchiseId !== req.employee!.franchiseId) {
                     return res.status(403).json({ error: 'You can only update employees in your franchise' });
                 }
@@ -172,15 +191,24 @@ router.put(
             const employee = await AuthService.updateEmployee(
                 req.params.id,
                 {
-                    fullName, email, phone, franchiseId, factoryId, isActive,
+                    fullName, email, phone, franchiseId, factoryId, storeId, isActive,
                     position, department,
                     hireDate: hireDate ? new Date(hireDate) : undefined,
                     salaryType,
-                    baseSalary: baseSalary ? parseFloat(baseSalary) : undefined,
+                    baseSalary: baseSalary !== undefined ? parseFloat(baseSalary) : undefined,
                     hourlyRate: hourlyRate ? parseFloat(hourlyRate) : undefined,
-                    workingHours: workingHours ? parseInt(workingHours) : undefined,
+                    workingHours: workingHours !== undefined ? parseInt(workingHours) : undefined,
                     emergencyContact, qualifications, notes, address,
                     perOrderSalary: perOrderSalary !== undefined ? parseInt(perOrderSalary) : undefined,
+                    // RBAC
+                    role, systemRole,
+                    // Personal
+                    dateOfBirth, gender, bloodGroup,
+                    // Banking — map frontend names to DB-compatible camelCase
+                    bankName,
+                    accountNumber: accountNumber || bankAccountNumber,
+                    ifscCode: ifscCode || bankIfsc,
+                    panNumber, aadharNumber,
                 } as any,
                 req.employee!.employeeId
             );

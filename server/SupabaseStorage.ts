@@ -374,6 +374,9 @@ export class SupabaseStorage {
             // RBAC store/factory scoping
             'storeId': 'store_id',
             'systemRole': 'system_role',
+            'factoryId': 'factory_id',
+            // Employee: baseSalary maps to DB column 'salary'
+            'baseSalary': 'salary',
         };
 
         // If key exists in mappings, use snake_case. If not, preserve original (e.g. 'status', 'email', 'name')
@@ -507,13 +510,18 @@ export class SupabaseStorage {
     }
 
     async updateCustomer(id: string, data: Partial<InsertCustomer>): Promise<Customer | undefined> {
+        const snakeData = this.toSnakeCase(data);
+        console.log('[SupabaseStorage] updateCustomer:', id, snakeData);
         const { data: customer, error } = await this.supabase
             .from('customers')
-            .update(this.toSnakeCase(data))
+            .update(snakeData)
             .eq('id', id)
             .select()
             .single();
-        if (error) return undefined;
+        if (error) {
+            console.error('[SupabaseStorage] updateCustomer ERROR:', error.message, error.details);
+            throw new Error(`Failed to update customer: ${error.message}`);
+        }
         return this.mapDates(customer);
     }
 
@@ -676,13 +684,18 @@ export class SupabaseStorage {
     }
 
     async updateOrder(id: string, data: Partial<InsertOrder>): Promise<Order | undefined> {
+        const snakeData = this.toSnakeCase(data);
+        console.log('[SupabaseStorage] updateOrder:', id, Object.keys(snakeData));
         const { data: order, error } = await this.supabase
             .from('orders')
-            .update(this.toSnakeCase(data))
+            .update(snakeData)
             .eq('id', id)
             .select('*')
             .single();
-        if (error) return undefined;
+        if (error) {
+            console.error('[SupabaseStorage] updateOrder ERROR:', error.message, error.details);
+            throw new Error(`Failed to update order: ${error.message}`);
+        }
         return this.mapDates(order);
     }
 
@@ -1082,8 +1095,13 @@ export class SupabaseStorage {
     }
 
     async updateEmployee(id: string, data: Partial<InsertEmployee>): Promise<Employee | undefined> {
-        const { data: employee, error } = await this.supabase.from('employees').update(this.toSnakeCase(data)).eq('id', id).select().single();
-        if (error) return undefined;
+        const snakeData = this.toSnakeCase(data);
+        console.log('[SupabaseStorage] updateEmployee:', id, snakeData);
+        const { data: employee, error } = await this.supabase.from('employees').update(snakeData).eq('id', id).select().single();
+        if (error) {
+            console.error('[SupabaseStorage] updateEmployee ERROR:', error.message, error.details);
+            throw new Error(`Failed to update employee: ${error.message}`);
+        }
         return this.mapDates(employee);
     }
 
