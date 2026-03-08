@@ -357,7 +357,20 @@ export class SupabaseStorage {
             'totalEarnings': 'total_earnings',
             'currentLatitude': 'current_latitude',
             'currentLongitude': 'current_longitude',
-            'lastActive': 'last_active'
+            'lastActive': 'last_active',
+            // Delivery earnings & analytics mappings
+            'deliveryEarningsCalculated': 'delivery_earnings_calculated',
+            'isCreditOrder': 'is_credit_order',
+            'deliveredAt': 'delivered_at',
+            'deliveryPartnerId': 'delivery_partner_id',
+            'perOrderSalary': 'per_order_salary',
+            'orderLetter': 'order_letter',
+            'recordedByName': 'recorded_by_name',
+            'invoiceUrl': 'invoice_url',
+            'monthYear': 'month_year',
+            'metricType': 'metric_type',
+            'percentageChangeMoM': 'percentage_change_mom',
+            'lastComputedAt': 'last_computed_at'
         };
 
         // If key exists in mappings, use snake_case. If not, preserve original (e.g. 'status', 'email', 'name')
