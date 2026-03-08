@@ -238,6 +238,12 @@ router.patch('/:id/deliver', async (req, res) => {
 
       // Mark payment as paid
       orderUpdates.paymentStatus = 'paid';
+    } else if (order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit') {
+      // It's a regular order but not paid yet -> Cash collected on delivery
+      const orderTotal = parseFloat(order.totalAmount || '0');
+      orderUpdates.paymentStatus = 'paid';
+      orderUpdates.paymentMethod = 'cash';
+      orderUpdates.deliveryCashCollected = orderTotal;
     }
 
     // 5. Save the order updates

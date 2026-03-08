@@ -17,6 +17,9 @@ async function main() {
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS tax_id TEXT;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS date_of_birth TEXT;
       ALTER TABLE customers ADD COLUMN IF NOT EXISTS payment_terms TEXT;
+      
+      -- Add new column to orders table for cash collected on delivery tracking
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_cash_collected numeric(10, 2) DEFAULT 0;
     `);
         console.log('Columns added successfully.');
     } catch (error) {

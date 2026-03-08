@@ -136,6 +136,7 @@ export const orders = pgTable("orders", {
   tagsPrinted: boolean("tags_printed").default(false),
   // Delivery earnings & credit tracking
   deliveryEarningsCalculated: integer("delivery_earnings_calculated").default(0),
+  deliveryCashCollected: decimal("delivery_cash_collected", { precision: 10, scale: 2 }).default("0"),
   isCreditOrder: boolean("is_credit_order").default(false),
   deliveredAt: timestamp("delivered_at"),
   dispatchedAt: timestamp("dispatched_at"),
