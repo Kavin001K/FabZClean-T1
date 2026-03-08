@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '../../contexts/auth-context';
 import { Loader2 } from 'lucide-react';
+import { ROLE_NAV_ACCESS, LOGIN_ROLES } from '../../../../shared/schema';
+import type { SystemRole } from '../../../../shared/schema';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -46,12 +48,35 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       return;
     }
 
-    // Role-based routing: Delivery partners go to /delivery-home, not /dashboard
-    if (employee && (employee.position === 'delivery' || employee.position === 'driver' || employee.role === 'driver')) {
-      const adminPaths = ['/', '/dashboard', '/orders', '/customers', '/settings', '/user-management'];
-      if (adminPaths.includes(location)) {
-        setLocation('/delivery-home');
+    // ---- RBAC Role-Based Routing ----
+    if (employee) {
+      const role = employee.role as SystemRole;
+
+      // Factory Staff: NO LOGIN — redirect to unauthorized
+      if (role === 'factory_staff') {
+        setLocation('/unauthorized');
         return;
+      }
+
+      // Driver: Redirect from admin paths to /delivery-home
+      if (role === 'driver') {
+        const driverAllowed = ROLE_NAV_ACCESS.driver;
+        const isAllowed = driverAllowed.some(p => location === p || location.startsWith(p + '/'));
+        if (!isAllowed) {
+          setLocation('/delivery-home');
+          return;
+        }
+      }
+
+      // All other roles: Check nav access matrix
+      const allowed = ROLE_NAV_ACCESS[role];
+      if (allowed && allowed.length > 0) {
+        const isAllowed = allowed.some(p => location === p || location.startsWith(p + '/'));
+        if (!isAllowed) {
+          // Redirect to their default home
+          setLocation(allowed[0] || '/');
+          return;
+        }
       }
     }
   }, [requireAuth, isAuthenticated, location, setLocation, allowedRoles, hasRole, employee, loading]);
@@ -73,4 +98,3 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   return <>{children}</>;
 };
-

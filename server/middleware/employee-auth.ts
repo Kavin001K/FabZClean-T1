@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService, EmployeeJWTPayload } from '../auth-service';
+import { SystemRole, SYSTEM_ROLES, LOGIN_ROLES } from '../../shared/schema';
 
 // Extend Express Request to include employee info
 declare global {
@@ -50,17 +51,78 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 }
 
 /**
- * Middleware to check if employee has required role
- * In the simplified POS system, this is a passthrough — all logged-in users have full access.
+ * Middleware to check if employee has required role.
+ * STRICT enforcement — only listed roles are allowed through.
  */
 export function roleMiddleware(allowedRoles: string[]) {
     return (req: Request, res: Response, next: NextFunction) => {
         if (!req.employee) {
             return res.status(401).json({ error: 'Authentication required' });
         }
-        // Simplified: all authenticated users have access
+
+        const role = req.employee.role;
+
+        // Admin always has access
+        if (role === 'admin') return next();
+
+        if (!allowedRoles.includes(role)) {
+            return res.status(403).json({
+                error: 'Insufficient permissions',
+                required: allowedRoles,
+                current: role,
+            });
+        }
+
         next();
     };
+}
+
+/**
+ * Scope Guard middleware — ensures users only see data from their store/factory.
+ * Attaches `req.scopeFilter` with { storeId?, factoryId? } for downstream use.
+ * 
+ * Usage: router.get('/orders', authMiddleware, scopeGuard, handler)
+ * Then in handler: const filter = (req as any).scopeFilter;
+ */
+export function scopeGuard(req: Request, res: Response, next: NextFunction) {
+    if (!req.employee) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const role = req.employee.role as SystemRole;
+    const emp = req.employee as any;
+
+    // Build scope filter based on role
+    const scopeFilter: { storeId?: string; factoryId?: string; global: boolean } = { global: false };
+
+    switch (role) {
+        case 'admin':
+            // Admin sees everything
+            scopeFilter.global = true;
+            break;
+
+        case 'store_manager':
+        case 'store_staff':
+            // Scoped to their store
+            scopeFilter.storeId = emp.storeId || emp.franchiseId;
+            break;
+
+        case 'factory_manager':
+            // Factory manager can read all orders but only manage factory staff
+            scopeFilter.factoryId = emp.factoryId;
+            scopeFilter.global = true; // Can read all orders
+            break;
+
+        case 'driver':
+            // Driver only sees assigned orders (handled at route level)
+            break;
+
+        default:
+            return res.status(403).json({ error: 'Role not authorized for system access' });
+    }
+
+    (req as any).scopeFilter = scopeFilter;
+    next();
 }
 
 /**

@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { isSupabaseConfigured, SupabaseAuthService, AuthEmployee } from '../lib/supabase-auth';
+import { SystemRole, ROLE_NAV_ACCESS, LOGIN_ROLES } from '../../../shared/schema';
 
-// Define all valid roles
-export type EmployeeRole = 'admin' | 'staff';
+// Use the centralized SystemRole type
+export type EmployeeRole = SystemRole;
 
 interface Employee {
   id: string;
@@ -15,6 +16,8 @@ interface Employee {
   isActive: boolean;
   position?: string;
   department?: string;
+  storeId?: string;
+  factoryId?: string;
   hireDate?: string;
   salaryType?: 'hourly' | 'monthly';
   baseSalary?: number;
@@ -36,6 +39,12 @@ interface AuthContextType {
   refreshEmployee: () => Promise<void>;
   hasRole: (roles: string | string[]) => boolean;
   isAdmin: boolean;
+  isStoreManager: boolean;
+  isFactoryManager: boolean;
+  isStoreStaff: boolean;
+  isDriver: boolean;
+  /** Check if the current user can access a given route */
+  canAccess: (path: string) => boolean;
   sessionTimeRemaining: number;
   showSessionWarning: boolean;
   extendSession: () => void;
@@ -320,6 +329,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Role-specific computed properties
   const isAdmin = employee?.role === 'admin';
+  const isStoreManager = employee?.role === 'store_manager';
+  const isFactoryManager = employee?.role === 'factory_manager';
+  const isStoreStaff = employee?.role === 'store_staff';
+  const isDriver = employee?.role === 'driver';
+
+  // Route access check using the centralized nav access matrix
+  const canAccess = (path: string): boolean => {
+    if (!employee) return false;
+    const role = employee.role as SystemRole;
+    const allowed = ROLE_NAV_ACCESS[role];
+    if (!allowed) return false;
+    return allowed.some(prefix => path === prefix || path.startsWith(prefix + '/'));
+  };
 
   // Refresh employee data (for profile updates)
   const refreshEmployee = useCallback(async (): Promise<void> => {
@@ -337,6 +359,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshEmployee,
     hasRole,
     isAdmin,
+    isStoreManager,
+    isFactoryManager,
+    isStoreStaff,
+    isDriver,
+    canAccess,
     sessionTimeRemaining,
     showSessionWarning,
     extendSession,

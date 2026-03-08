@@ -4,25 +4,34 @@ import {
     ShoppingCart,
     PlusCircle,
     Users2,
-    Settings,
+    Printer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/auth-context";
 
+/** Bottom nav items with role restrictions */
 const BOTTOM_NAV_ITEMS = [
-    { to: "/", label: "Home", icon: Home },
+    { to: "/", label: "Home", icon: Home, allowedRoles: ["admin", "store_manager", "factory_manager", "store_staff"] },
     { to: "/orders", label: "Orders", icon: ShoppingCart },
-    { to: "/create-order", label: "New", icon: PlusCircle },
-    { to: "/customers", label: "Customers", icon: Users2 },
-    { to: "/services", label: "Services", icon: Settings },
+    { to: "/create-order", label: "New", icon: PlusCircle, allowedRoles: ["admin", "store_manager", "store_staff"] },
+    { to: "/customers", label: "Customers", icon: Users2, allowedRoles: ["admin", "store_manager", "store_staff"] },
+    { to: "/print-queue", label: "Tags", icon: Printer },
 ];
 
 export function BottomNav() {
     const [location] = useLocation();
+    const { employee } = useAuth();
+    const role = employee?.role || 'store_staff';
+
+    const filteredItems = BOTTOM_NAV_ITEMS.filter(item => {
+        if (!item.allowedRoles) return true;
+        return item.allowedRoles.includes(role);
+    });
 
     return (
         <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden">
             <div className="mx-auto flex h-16 w-full max-w-3xl items-center justify-around px-1.5 sm:px-2">
-                {BOTTOM_NAV_ITEMS.map((item) => {
+                {filteredItems.map((item) => {
                     const isActive = location === item.to;
                     const Icon = item.icon;
                     const isNewOrder = item.to === "/create-order";

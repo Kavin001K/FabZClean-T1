@@ -9,7 +9,6 @@ import {
   Scissors,
   Wallet,
   ShieldCheck,
-  ActivitySquare,
   Truck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,38 +16,47 @@ import { useAuth } from "@/contexts/auth-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
+import { ROLE_MAP } from "../../../../shared/schema";
+import type { SystemRole } from "../../../../shared/schema";
 
 interface NavItem {
   to: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  adminOnly?: boolean;
+  /** If set, only these roles see this item */
+  allowedRoles?: string[];
 }
 
 const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Dashboard", icon: Home },
-  { to: "/create-order", label: "New Order", icon: PlusCircle },
+  { to: "/create-order", label: "New Order", icon: PlusCircle, allowedRoles: ["admin", "store_manager", "store_staff"] },
   { to: "/orders", label: "Active Orders", icon: ListOrdered },
-  { to: "/deliveries", label: "Deliveries", icon: Truck },
-  { to: "/customers", label: "Customers", icon: Users2 },
-  { to: "/wallet-management", label: "Wallet", icon: Wallet },
-  { to: "/user-management", label: "Users", icon: ShieldCheck, adminOnly: true },
-  { to: "/services", label: "Services", icon: Scissors },
+  { to: "/deliveries", label: "Deliveries", icon: Truck, allowedRoles: ["admin", "store_manager", "factory_manager"] },
+  { to: "/customers", label: "Customers", icon: Users2, allowedRoles: ["admin", "store_manager", "store_staff"] },
+  { to: "/wallet-management", label: "Wallet", icon: Wallet, allowedRoles: ["admin", "store_manager", "store_staff"] },
+  { to: "/user-management", label: "Users", icon: ShieldCheck, allowedRoles: ["admin"] },
+  { to: "/services", label: "Services", icon: Scissors, allowedRoles: ["admin", "store_manager"] },
   { to: "/print-queue", label: "Print Tags", icon: Printer },
 ];
 
 export function Sidebar({ className, onClose }: { className?: string; onClose?: () => void }) {
   const { employee, isAdmin, signOut } = useAuth();
   const [location] = useLocation();
+  const role = (employee?.role || 'store_staff') as SystemRole;
 
+  // Filter nav items by role
   const filteredNav = NAV_ITEMS.filter((item) => {
-    if (item.adminOnly && !isAdmin) return false;
-    return true;
+    if (!item.allowedRoles) return true; // Visible to all logged-in users
+    return item.allowedRoles.includes(role);
   });
 
   const handleLinkClick = () => {
     if (onClose) onClose();
   };
+
+  // Friendly role label from ROLE_MAP
+  const roleInfo = ROLE_MAP[role];
+  const roleLabel = roleInfo?.position || (isAdmin ? 'Administrator' : 'Staff');
 
   return (
     <aside className={cn("sticky top-0 flex h-[100dvh] min-h-0 w-60 min-w-0 flex-col border-r bg-background", className)}>
@@ -99,13 +107,16 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         <div className="mt-3 flex items-center justify-between text-xs">
           <span className="text-muted-foreground">Role</span>
           <span className="font-medium text-primary">
-            {employee?.role === 'admin' ? 'Administrator' : 'Staff'}
+            {roleLabel}
           </span>
         </div>
         <Link
           href="/settings"
           onClick={handleLinkClick}
-          className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary"
+          className={cn(
+            "mt-2 flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary",
+            !["admin", "store_manager", "factory_manager"].includes(role) && "hidden"
+          )}
         >
           <Settings className="h-4 w-4" />
           <span>Settings</span>

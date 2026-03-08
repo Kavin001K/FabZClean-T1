@@ -370,7 +370,10 @@ export class SupabaseStorage {
             'monthYear': 'month_year',
             'metricType': 'metric_type',
             'percentageChangeMoM': 'percentage_change_mom',
-            'lastComputedAt': 'last_computed_at'
+            'lastComputedAt': 'last_computed_at',
+            // RBAC store/factory scoping
+            'storeId': 'store_id',
+            'systemRole': 'system_role',
         };
 
         // If key exists in mappings, use snake_case. If not, preserve original (e.g. 'status', 'email', 'name')

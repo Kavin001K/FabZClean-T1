@@ -3,6 +3,54 @@ import { pgTable, text, varchar, integer, decimal, timestamp, boolean, jsonb, uu
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// ============================================================
+// RBAC: System Roles, Departments & Auto-Mapping
+// ============================================================
+
+export const SYSTEM_ROLES = [
+  'admin',
+  'store_manager',
+  'factory_manager',
+  'store_staff',
+  'factory_staff',
+  'driver',
+] as const;
+export type SystemRole = (typeof SYSTEM_ROLES)[number];
+
+export const DEPARTMENTS = [
+  'Management',
+  'Staff & Faculty',
+  'Deliver',
+] as const;
+export type Department = (typeof DEPARTMENTS)[number];
+
+/** Auto-map: systemRole → { department, position } */
+export const ROLE_MAP: Record<SystemRole, { department: Department; position: string }> = {
+  admin: { department: 'Management', position: 'Admin' },
+  store_manager: { department: 'Management', position: 'Store Manager' },
+  factory_manager: { department: 'Management', position: 'Factory Manager' },
+  store_staff: { department: 'Staff & Faculty', position: 'Store Staff' },
+  factory_staff: { department: 'Staff & Faculty', position: 'Factory Staff' },
+  driver: { department: 'Deliver', position: 'Driver' },
+};
+
+/** Roles that can log in to the system */
+export const LOGIN_ROLES: SystemRole[] = ['admin', 'store_manager', 'factory_manager', 'store_staff', 'driver'];
+
+/** Maximum number of admin users allowed */
+export const MAX_ADMIN_COUNT = 5;
+
+/** Navigation access matrix: role → allowed route prefixes */
+export const ROLE_NAV_ACCESS: Record<SystemRole, string[]> = {
+  admin: ['/', '/dashboard', '/create-order', '/orders', '/deliveries', '/customers', '/wallet-management', '/credits', '/user-management', '/services', '/print-queue', '/settings', '/profile'],
+  store_manager: ['/', '/dashboard', '/create-order', '/orders', '/deliveries', '/customers', '/wallet-management', '/credits', '/services', '/print-queue', '/settings', '/profile'],
+  factory_manager: ['/', '/dashboard', '/orders', '/deliveries', '/print-queue', '/settings', '/profile'],
+  store_staff: ['/', '/dashboard', '/create-order', '/orders', '/customers', '/wallet-management', '/credits', '/print-queue', '/profile'],
+  factory_staff: [], // No login
+  driver: ['/delivery-home', '/delivery-history', '/profile'],
+};
+
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),

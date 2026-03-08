@@ -25,6 +25,7 @@ export interface EmployeeJWTPayload {
     exp?: number;
     franchiseId?: string;
     factoryId?: string;
+    storeId?: string;
 }
 
 export interface AuthEmployee {
@@ -104,15 +105,19 @@ export class AuthService {
                 throw new Error('Account is inactive');
             }
 
-            // Normalize role
+            // Normalize role — map legacy roles to new RBAC roles
             let normalizedRole = localEmployee.role;
-            if (normalizedRole === 'manager') normalizedRole = 'franchise_manager';
+            if (normalizedRole === 'manager') normalizedRole = 'store_manager';
+            if (normalizedRole === 'franchise_manager') normalizedRole = 'store_manager';
+            if (normalizedRole === 'staff' || normalizedRole === 'employee') normalizedRole = 'store_staff';
 
             const payload: EmployeeJWTPayload = {
                 id: localEmployee.id,
                 employeeId: localEmployee.employee_id || localEmployee.employeeId,
                 username: localEmployee.email || localEmployee.employee_id,
                 role: normalizedRole as any,
+                storeId: localEmployee.franchise_id || localEmployee.franchiseId,
+                factoryId: localEmployee.factory_id || localEmployee.factoryId,
             };
 
             const token = jwt.sign(payload, FINAL_SECRET, { expiresIn: JWT_EXPIRY });
@@ -126,6 +131,10 @@ export class AuthService {
                 email: localEmployee.email,
                 phone: localEmployee.phone,
                 isActive: localEmployee.status === 'active' || !localEmployee.status,
+                position: localEmployee.position,
+                department: localEmployee.department,
+                storeId: localEmployee.franchise_id || localEmployee.franchiseId,
+                factoryId: localEmployee.factory_id || localEmployee.factoryId,
             };
 
             // Log successful login
