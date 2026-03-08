@@ -244,9 +244,10 @@ export default function EmployeeManagement() {
   };
 
 
-  const departments = ['Operations', 'Logistics', 'Customer Service', 'Quality Control', 'Management'];
+  const departments = ['Management', 'Staff & Faculty', 'Deliver', 'Operations', 'Logistics', 'Customer Service', 'Quality Control'];
   const positions = [
-    'Dry Cleaning Specialist', 'Driver', 'Customer Service Representative',
+    'Admin', 'Store Manager', 'Factory Manager', 'Store Staff', 'Factory Staff', 'Driver',
+    'Dry Cleaning Specialist', 'Customer Service Representative',
     'Quality Inspector', 'Machine Operator', 'Supervisor', 'Manager'
   ];
 
@@ -254,13 +255,13 @@ export default function EmployeeManagement() {
   const getAvailableRoles = () => {
     if (!currentUser) return [];
     if (currentUser.role === 'admin') {
-      return ['admin', 'franchise_manager', 'factory_manager', 'staff', 'employee', 'driver'];
+      return ['admin', 'store_manager', 'factory_manager', 'store_staff', 'factory_staff', 'driver'];
     }
-    if (currentUser.role === 'franchise_manager') {
-      return ['factory_manager', 'staff', 'employee', 'driver'];
+    if (currentUser.role === 'store_manager' || currentUser.role === 'franchise_manager') {
+      return ['store_staff', 'driver'];
     }
     if (currentUser.role === 'factory_manager') {
-      return ['staff', 'employee', 'driver'];
+      return ['factory_staff'];
     }
     return [];
   };
@@ -387,13 +388,13 @@ export default function EmployeeManagement() {
       factoryId: emp.factoryId || '',
       // Compensation
       salaryType: emp.salaryType || 'monthly',
-      baseSalary: emp.salary?.toString() || emp.baseSalary?.toString() || '',
-      hourlyRate: employee.hourlyRate?.toString() || '',
-      workingHours: employee.workingHours?.toString() || '8',
-      // Banking & ID
+      baseSalary: emp.baseSalary?.toString() || emp.salary?.toString() || '',
+      hourlyRate: emp.hourlyRate?.toString() || employee.hourlyRate?.toString() || '',
+      workingHours: emp.workingHours?.toString() || employee.workingHours?.toString() || '8',
+      // Banking & ID — API returns accountNumber/ifscCode, form uses bankAccountNumber/bankIfsc
       bankName: emp.bankName || '',
-      bankAccountNumber: emp.bankAccountNumber || '',
-      bankIfsc: emp.bankIfsc || '',
+      bankAccountNumber: emp.accountNumber || emp.bankAccountNumber || '',
+      bankIfsc: emp.ifscCode || emp.bankIfsc || '',
       panNumber: emp.panNumber || '',
       aadharNumber: emp.aadharNumber || '',
       // Additional Info

@@ -658,8 +658,8 @@ export class AuthService {
     }
 
     /**
-     * List employees - local storage only
-     */
+ * List employees - local storage only
+ */
     static async listEmployees(requesterRole: string, franchiseId?: string, factoryId?: string): Promise<AuthEmployee[]> {
         const localEmployees = await storage.listEmployees(franchiseId, factoryId);
 
@@ -678,9 +678,36 @@ export class AuthService {
                 phone: emp.phone,
                 isActive: emp.status === 'active' || emp.status === null || emp.status === undefined,
                 status: emp.status || 'active',
-                position: emp.role || emp.position,
-                department: emp.department,
-                hireDate: emp.createdAt || emp.created_at ? new Date(emp.createdAt || emp.created_at) : undefined,
+                position: emp.position || '',
+                department: emp.department || '',
+                hireDate: emp.hireDate || emp.hire_date ? new Date(emp.hireDate || emp.hire_date) : undefined,
+                // Compensation
+                salary: emp.salary,
+                baseSalary: emp.salary ? parseFloat(emp.salary) : 0,
+                salaryType: emp.salaryType || emp.salary_type || 'monthly',
+                hourlyRate: emp.hourlyRate ? parseFloat(emp.hourlyRate) : undefined,
+                workingHours: emp.workingHours ? parseInt(emp.workingHours) : 8,
+                perOrderSalary: emp.perOrderSalary || emp.per_order_salary || 0,
+                // Personal
+                address: emp.address,
+                emergencyContact: emp.emergencyContact || emp.emergency_contact,
+                qualifications: emp.qualifications,
+                notes: emp.notes,
+                dateOfBirth: emp.dateOfBirth || emp.date_of_birth,
+                gender: emp.gender,
+                bloodGroup: emp.bloodGroup || emp.blood_group,
+                profileImage: emp.profileImage || emp.profile_image,
+                // Banking
+                bankName: emp.bankName || emp.bank_name,
+                accountNumber: emp.accountNumber || emp.account_number,
+                ifscCode: emp.ifscCode || emp.ifsc_code,
+                panNumber: emp.panNumber || emp.pan_number,
+                aadharNumber: emp.aadharNumber || emp.aadhar_number,
+                // RBAC
+                franchiseId: emp.franchiseId || emp.franchise_id,
+                factoryId: emp.factoryId || emp.factory_id,
+                storeId: emp.storeId || emp.store_id,
+                systemRole: emp.systemRole || emp.system_role,
             };
         });
     }
