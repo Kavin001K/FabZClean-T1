@@ -60,12 +60,12 @@ export function roleMiddleware(allowedRoles: string[]) {
             return res.status(401).json({ error: 'Authentication required' });
         }
 
-        const role = req.employee.role;
+        const role = String(req.employee.role || '').toLowerCase();
 
         // Admin always has access
         if (role === 'admin') return next();
 
-        if (!allowedRoles.includes(role)) {
+        if (!allowedRoles.map(r => r.toLowerCase()).includes(role)) {
             return res.status(403).json({
                 error: 'Insufficient permissions',
                 required: allowedRoles,

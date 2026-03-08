@@ -324,7 +324,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const hasRole = (roles: string | string[]): boolean => {
     if (!employee) return false;
     const roleArray = Array.isArray(roles) ? roles : [roles];
-    return roleArray.includes(employee.role);
+    const normalizedRole = String(employee.role).toLowerCase();
+    return roleArray.map(r => r.toLowerCase()).includes(normalizedRole);
   };
 
   // Role-specific computed properties

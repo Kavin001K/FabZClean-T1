@@ -530,7 +530,7 @@ export class AuthService {
         }
 
         // Authorization check
-        if (resetBy.role !== 'admin') {
+        if (String(resetBy.role).toLowerCase() !== 'admin') {
             throw new Error('Unauthorized: Only admins can reset passwords');
         }
 

@@ -1,12 +1,19 @@
 import React from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LogOut, User, Phone, Mail, MapPin, Calendar, Briefcase } from "lucide-react";
+import { LogOut, User, Phone, Mail, MapPin, Calendar, Briefcase, TrendingUp, Loader2, IndianRupee, Package } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 export default function DeliveryProfile() {
     const { employee, signOut } = useAuth();
+
+    const { data: response, isLoading } = useQuery({
+        queryKey: ['/api/deliveries/me/history'],
+    });
+
+    const stats = (response as any)?.data?.earnings;
 
     return (
         <div className="p-4 max-w-md mx-auto space-y-6 pt-6 animate-in fade-in zoom-in-95 duration-300">
@@ -87,6 +94,44 @@ export default function DeliveryProfile() {
                             </div>
                         )}
                     </div>
+                </CardContent>
+            </Card>
+
+            {/* Performance Stats */}
+            <Card className="border-slate-200 shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-50 border-b border-slate-100 pb-3 p-4">
+                    <CardTitle className="text-sm font-bold flex items-center text-slate-800">
+                        <TrendingUp className="w-4 h-4 mr-2 text-indigo-600" />
+                        This Month's Performance
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4">
+                    {isLoading ? (
+                        <div className="flex items-center justify-center p-4">
+                            <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-emerald-50 rounded-xl p-4 text-center border border-emerald-100">
+                                <div className="flex justify-center mb-1">
+                                    <IndianRupee className="w-5 h-5 text-emerald-600" />
+                                </div>
+                                <p className="text-2xl font-black text-emerald-700">
+                                    {stats?.totalEarnings?.toLocaleString('en-IN') || '0'}
+                                </p>
+                                <p className="text-[10px] uppercase tracking-wider font-semibold text-emerald-600 mt-1">Earnings</p>
+                            </div>
+                            <div className="bg-blue-50 rounded-xl p-4 text-center border border-blue-100">
+                                <div className="flex justify-center mb-1">
+                                    <Package className="w-5 h-5 text-blue-600" />
+                                </div>
+                                <p className="text-2xl font-black text-blue-700">
+                                    {stats?.totalDeliveries || '0'}
+                                </p>
+                                <p className="text-[10px] uppercase tracking-wider font-semibold text-blue-600 mt-1">Deliveries</p>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
