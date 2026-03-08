@@ -45,6 +45,15 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       setLocation('/account-inactive');
       return;
     }
+
+    // Role-based routing: Delivery partners go to /delivery-home, not /dashboard
+    if (employee && (employee.position === 'delivery' || employee.position === 'driver' || employee.role === 'driver')) {
+      const adminPaths = ['/', '/dashboard', '/orders', '/customers', '/settings', '/user-management'];
+      if (adminPaths.includes(location)) {
+        setLocation('/delivery-home');
+        return;
+      }
+    }
   }, [requireAuth, isAuthenticated, location, setLocation, allowedRoles, hasRole, employee, loading]);
 
   // ✅ NOW we can do conditional returns AFTER all hooks

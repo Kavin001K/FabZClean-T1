@@ -166,7 +166,23 @@ export class SupabaseStorage {
             'is_express_order': 'isExpressOrder',
             'priority': 'priority',
             // Print queue mappings
-            'tags_printed': 'tagsPrinted'
+            'tags_printed': 'tagsPrinted',
+            // Delivery earnings & analytics mappings
+            'delivery_earnings_calculated': 'deliveryEarningsCalculated',
+            'is_credit_order': 'isCreditOrder',
+            'delivered_at': 'deliveredAt',
+            'delivery_partner_id': 'deliveryPartnerId',
+            'per_order_salary': 'perOrderSalary',
+            'order_letter': 'orderLetter',
+            'recorded_by_name': 'recordedByName',
+            'month_year': 'monthYear',
+            'metric_type': 'metricType',
+            'percentage_change_mom': 'percentageChangeMoM',
+            'last_computed_at': 'lastComputedAt',
+            'invoice_url': 'invoiceUrl',
+            'last_whatsapp_status': 'lastWhatsappStatus',
+            'last_whatsapp_sent_at': 'lastWhatsappSentAt',
+            'whatsapp_message_count': 'whatsappMessageCount'
         };
 
         Object.entries(mappings).forEach(([snake, camel]) => {

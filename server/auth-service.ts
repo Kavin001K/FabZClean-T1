@@ -268,6 +268,7 @@ export class AuthService {
             skills: data.qualifications,
             qualifications: data.qualifications,
             notes: data.notes,
+            perOrderSalary: data.perOrderSalary !== undefined ? data.perOrderSalary : undefined,
         });
 
         if (!newEmployee) {
@@ -368,6 +369,9 @@ export class AuthService {
         if (data.notes !== undefined) updateData.notes = data.notes;
         if (data.address !== undefined) {
             updateData.address = typeof data.address === 'object' ? JSON.stringify(data.address) : data.address;
+        }
+        if ((data as any).perOrderSalary !== undefined) {
+            updateData.perOrderSalary = (data as any).perOrderSalary;
         }
 
         if (Object.keys(updateData).length === 0) {

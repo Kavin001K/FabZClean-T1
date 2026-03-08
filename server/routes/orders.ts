@@ -109,6 +109,165 @@ router.post('/:id/checkout', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/orders/delivery-queue
+ * Returns orders that are ready for delivery or out for delivery.
+ * Used by admin delivery assignment page.
+ */
+router.get('/delivery-queue', async (req, res) => {
+  try {
+    const allOrders = await storage.listOrders();
+
+    // Only delivery orders in active delivery statuses
+    const deliveryStatuses = ['ready_for_delivery', 'out_for_delivery', 'assigned'];
+    const queue = allOrders.filter((order: any) =>
+      order.fulfillmentType === 'delivery' &&
+      deliveryStatuses.includes(order.status) &&
+      order.status !== 'cancelled' &&
+      order.status !== 'completed'
+    );
+
+    res.json(createSuccessResponse(queue, `${queue.length} orders in delivery queue`));
+  } catch (error: any) {
+    console.error('Delivery queue error:', error);
+    res.status(500).json(createErrorResponse('Failed to fetch delivery queue', 500));
+  }
+});
+
+/**
+ * PATCH /api/orders/:id/deliver
+ * The Delivery Completion Engine — atomic transaction that:
+ * 1. Sets order status to 'delivered' with timestamp
+ * 2. Snapshots delivery partner's perOrderSalary → order.deliveryEarningsCalculated
+ * 3. If credit order: deducts from customer wallet, writes to credit_transactions ledger
+ */
+router.patch('/:id/deliver', async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const recordedBy = req.employee?.id || 'system';
+    const recordedByName = req.employee?.username || 'system';
+
+    // 1. Fetch the order
+    const order = await storage.getOrder(orderId);
+    if (!order) {
+      return res.status(404).json(createErrorResponse('Order not found', 404));
+    }
+
+    if (order.status === 'delivered') {
+      return res.status(400).json(createErrorResponse('Order is already delivered', 400));
+    }
+
+    // 2. Fetch delivery partner to get perOrderSalary
+    let earningsSnapshot = 0;
+    if (order.deliveryPartnerId) {
+      const employees = await storage.listEmployees();
+      const deliveryPartner = employees.find((e: any) => e.id === order.deliveryPartnerId);
+      if (deliveryPartner) {
+        earningsSnapshot = (deliveryPartner as any).perOrderSalary || (deliveryPartner as any).per_order_salary || 0;
+      }
+    }
+
+    // 3. Build order updates
+    const orderUpdates: any = {
+      status: 'delivered',
+      deliveredAt: new Date().toISOString(),
+      deliveryEarningsCalculated: earningsSnapshot,
+    };
+
+    // 4. Handle Credit Order logic
+    const isCreditOrder = (order as any).isCreditOrder || (order as any).is_credit_order;
+    if (isCreditOrder && order.customerId) {
+      const orderTotal = parseFloat(order.totalAmount || '0');
+
+      // Use Supabase RPC for atomic credit deduction
+      const supabase = (storage as any).supabase;
+
+      // Fetch customer balance
+      const { data: customer, error: custErr } = await supabase
+        .from('customers')
+        .select('credit_balance')
+        .eq('id', order.customerId)
+        .single();
+
+      if (custErr || !customer) {
+        return res.status(400).json(createErrorResponse('Customer not found for credit deduction', 400));
+      }
+
+      const currentBalance = parseFloat(customer.credit_balance || '0');
+      if (currentBalance < orderTotal) {
+        return res.status(400).json(createErrorResponse(
+          `Insufficient wallet balance (₹${currentBalance}) for order total (₹${orderTotal})`, 400
+        ));
+      }
+
+      // Atomic: Deduct balance
+      const newBalance = currentBalance - orderTotal;
+      const { error: updateErr } = await supabase
+        .from('customers')
+        .update({ credit_balance: newBalance.toString() })
+        .eq('id', order.customerId)
+        .gte('credit_balance', orderTotal.toString()); // Concurrency guard
+
+      if (updateErr) {
+        return res.status(400).json(createErrorResponse('Failed to deduct wallet balance (possible race condition)', 400));
+      }
+
+      // Insert ledger entry into credit_transactions
+      await supabase.from('credit_transactions').insert({
+        customer_id: order.customerId,
+        order_id: orderId,
+        type: 'CREDIT_OUT',
+        amount: (-orderTotal).toString(),
+        balance_after: newBalance.toString(),
+        payment_method: 'CREDIT_WALLET',
+        recorded_by: recordedBy,
+        recorded_by_name: recordedByName,
+        notes: `Credit deduction for delivered order ${order.orderNumber}`,
+        transaction_date: new Date().toISOString(),
+      });
+
+      // Insert into master ledger
+      await supabase.from('transactions').insert({
+        customer_id: order.customerId,
+        order_id: orderId,
+        type: 'ORDER_PAYMENT',
+        payment_method: 'CREDIT_WALLET',
+        amount: orderTotal.toString(),
+        status: 'SUCCESS',
+      });
+
+      // Mark payment as paid
+      orderUpdates.paymentStatus = 'paid';
+    }
+
+    // 5. Save the order updates
+    const updatedOrder = await storage.updateOrder(orderId, orderUpdates);
+
+    // 6. Log the action
+    if (req.employee) {
+      await AuthService.logAction(
+        req.employee.employeeId,
+        req.employee.username,
+        'delivery_completed',
+        'order',
+        orderId,
+        {
+          earningsSnapshot,
+          isCreditOrder,
+          customerId: order.customerId,
+        },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
+
+    res.json(createSuccessResponse(updatedOrder, 'Delivery marked as complete'));
+  } catch (error: any) {
+    console.error('Deliver error:', error);
+    res.status(500).json(createErrorResponse(`Failed to complete delivery: ${error.message}`, 500));
+  }
+});
+
 // Get next order number preview (for display on order creation form)
 // Format: FAB260001 (FAB + Year + Sequence)
 router.get('/next-order-number', async (req, res) => {

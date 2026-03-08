@@ -46,6 +46,8 @@ const CookiesPage = lazy(() => retryDynamicImport(() => import("@/pages/cookies"
 const PublicOrderTracking = lazy(() => retryDynamicImport(() => import("@/pages/public-order-tracking")));
 const ProfilePage = lazy(() => retryDynamicImport(() => import("@/pages/profile")));
 const DeliveriesManagement = lazy(() => retryDynamicImport(() => import("@/pages/deliveries-management")));
+const DeliveryHome = lazy(() => retryDynamicImport(() => import("@/pages/delivery-home")));
+const DeliveryHistory = lazy(() => retryDynamicImport(() => import("@/pages/delivery-history")));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -164,6 +166,19 @@ function Router() {
           <MainLayout>
             <DeliveriesManagement />
           </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Delivery Partner Routes (mobile-first, no sidebar) */}
+      <Route path="/delivery-home">
+        <ProtectedRoute>
+          <DeliveryHome />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/delivery-history">
+        <ProtectedRoute>
+          <DeliveryHistory />
         </ProtectedRoute>
       </Route>
 

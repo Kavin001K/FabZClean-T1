@@ -26,10 +26,12 @@ import publicTrackingRouter from './public-tracking';
 import publicInvoiceRouter from './public-invoice';
 import businessSettingsRouter from './business-settings';
 import walletRouter from './wallet';
+import deliveriesApiRouter from './deliveries-api';
 import { jwtRequired } from '../middleware/auth';
 import { debugRouter } from './debug';
 import { db as storage } from '../db';
 import { Order, Product } from '../../shared/schema';
+import { initAnalyticsCron } from '../scripts/monthly-analytics-cron';
 
 /**
  * Register all route modules with the Express app
@@ -151,6 +153,10 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/credits', creditsRouter);
   app.use('/api/wallet', walletRouter);
   app.use('/api/reports', reportsRouter);
+  app.use('/api/deliveries', deliveriesApiRouter);
+
+  // Initialize the autonomous analytics cron job
+  initAnalyticsCron();
 
   app.use('/api/v1/deliveries', deliveriesRouter);
   app.use('/api/v1/products', productsRouter);

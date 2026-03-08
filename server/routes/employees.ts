@@ -72,7 +72,7 @@ router.post(
             const {
                 username, password, role, franchiseId, factoryId, fullName, email, phone,
                 position, department, hireDate, salaryType, baseSalary, hourlyRate,
-                workingHours, emergencyContact, qualifications, notes, address
+                workingHours, emergencyContact, qualifications, notes, address, perOrderSalary
             } = req.body;
 
             // Validation
@@ -127,7 +127,8 @@ router.post(
                     emergencyContact,
                     qualifications,
                     notes,
-                    address
+                    address,
+                    perOrderSalary: perOrderSalary ? parseInt(perOrderSalary) : undefined,
                 },
                 req.employee!.employeeId
             );
@@ -152,7 +153,7 @@ router.put(
             const {
                 fullName, email, phone, franchiseId, factoryId, isActive,
                 position, department, hireDate, salaryType, baseSalary, hourlyRate,
-                workingHours, emergencyContact, qualifications, notes, address
+                workingHours, emergencyContact, qualifications, notes, address, perOrderSalary
             } = req.body;
 
             // Fetch employee to check permissions
@@ -178,7 +179,8 @@ router.put(
                     baseSalary: baseSalary ? parseFloat(baseSalary) : undefined,
                     hourlyRate: hourlyRate ? parseFloat(hourlyRate) : undefined,
                     workingHours: workingHours ? parseInt(workingHours) : undefined,
-                    emergencyContact, qualifications, notes, address
+                    emergencyContact, qualifications, notes, address,
+                    perOrderSalary: perOrderSalary !== undefined ? parseInt(perOrderSalary) : undefined,
                 } as any,
                 req.employee!.employeeId
             );

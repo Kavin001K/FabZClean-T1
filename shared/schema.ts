@@ -86,6 +86,11 @@ export const orders = pgTable("orders", {
   invoiceUrl: text("invoice_url"),
   // Tag printing tracking
   tagsPrinted: boolean("tags_printed").default(false),
+  // Delivery earnings & credit tracking
+  deliveryEarningsCalculated: integer("delivery_earnings_calculated").default(0),
+  isCreditOrder: boolean("is_credit_order").default(false),
+  deliveredAt: timestamp("delivered_at"),
+  dispatchedAt: timestamp("dispatched_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -206,6 +211,8 @@ export const employees = pgTable("employees", {
   bloodGroup: text("blood_group"),
   workingHours: integer("working_hours").default(8),
   notes: text("notes"),
+  // Delivery partner per-order salary
+  perOrderSalary: integer("per_order_salary").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -284,6 +291,10 @@ export const insertOrderSchema = z.object({
   whatsappMessageCount: z.number().optional().default(0),
   invoiceUrl: z.string().optional().nullable(),
   tagsPrinted: z.coerce.boolean().optional().default(false),
+  deliveryEarningsCalculated: z.number().optional().default(0),
+  isCreditOrder: z.coerce.boolean().optional().default(false),
+  deliveredAt: z.coerce.date().optional().nullable(),
+  dispatchedAt: z.coerce.date().optional().nullable(),
   createdAt: z.coerce.date().optional(),
   updatedAt: z.coerce.date().optional(),
 }).passthrough();
@@ -411,3 +422,22 @@ export const creditTransactions = pgTable("credit_transactions", {
 export const insertCreditTransactionSchema = createInsertSchema(creditTransactions);
 export type InsertCreditTransaction = z.infer<typeof insertCreditTransactionSchema>;
 export type CreditTransaction = typeof creditTransactions.$inferSelect;
+
+// ============================================================
+// MONTHLY PERFORMANCE METRICS (Autonomous Analytics)
+// ============================================================
+
+export const monthlyPerformanceMetrics = pgTable("monthly_performance_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  monthYear: varchar("month_year", { length: 7 }).notNull(), // e.g. "2026-03"
+  metricType: text("metric_type", {
+    enum: ["total_deliveries", "avg_delivery_time", "total_delivery_payouts", "revenue"]
+  }).notNull(),
+  value: decimal("value", { precision: 14, scale: 2 }).notNull().default("0"),
+  percentageChangeMoM: decimal("percentage_change_mom", { precision: 8, scale: 2 }).default("0"),
+  lastComputedAt: timestamp("last_computed_at").defaultNow(),
+});
+
+export const insertMonthlyPerformanceMetricSchema = createInsertSchema(monthlyPerformanceMetrics);
+export type InsertMonthlyPerformanceMetric = z.infer<typeof insertMonthlyPerformanceMetricSchema>;
+export type MonthlyPerformanceMetric = typeof monthlyPerformanceMetrics.$inferSelect;

@@ -111,4 +111,51 @@ router.get("/overview", authMiddleware, async (req, res) => {
     }
 });
 
+/**
+ * GET /api/analytics/monthly-metrics
+ * Returns pre-computed monthly performance metrics from the autonomous stats engine.
+ * Query params: ?month=2026-03 (optional, defaults to current month)
+ */
+router.get("/monthly-metrics", authMiddleware, async (req, res) => {
+    try {
+        const supabase = (storage as any).supabase;
+        if (!supabase) {
+            return res.status(500).json({ message: "Database not available" });
+        }
+
+        const now = new Date();
+        const requestedMonth = (req.query.month as string) ||
+            `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+        const { data: metrics, error } = await supabase
+            .from('monthly_performance_metrics')
+            .select('*')
+            .eq('month_year', requestedMonth);
+
+        if (error) {
+            console.error("Monthly metrics fetch error:", error);
+            return res.status(500).json({ message: "Failed to fetch metrics" });
+        }
+
+        // Transform into a keyed object for easy frontend consumption
+        const metricsMap: Record<string, { value: number; change: number; lastComputed: string }> = {};
+        for (const m of (metrics || [])) {
+            metricsMap[m.metric_type] = {
+                value: parseFloat(m.value || '0'),
+                change: parseFloat(m.percentage_change_mom || '0'),
+                lastComputed: m.last_computed_at,
+            };
+        }
+
+        res.json({
+            monthYear: requestedMonth,
+            metrics: metricsMap,
+        });
+    } catch (error) {
+        console.error("Monthly metrics error:", error);
+        res.status(500).json({ message: "Failed to fetch monthly metrics" });
+    }
+});
+
 export default router;
+
