@@ -879,9 +879,9 @@ export class SupabaseStorage {
         walletAmount: number,
         recordedBy: string,
         recordedByName: string
-    ): Promise<{ success: boolean; error?: string }> {
+    ): Promise<{ success: boolean; data?: any; error?: string }> {
         try {
-            const { data, error } = await this.supabase.rpc('process_order_checkout', {
+            const { data, error } = await this.supabase.rpc('process_payment_checkout', {
                 p_order_id: orderId,
                 p_customer_id: customerId,
                 p_cash_amount: cashAmount,
@@ -891,11 +891,34 @@ export class SupabaseStorage {
             });
 
             if (error) throw error;
-            return { success: true };
+            return { success: true, data };
         } catch (err: any) {
             console.error('[SupabaseStorage] Processing Checkout failed:', err);
-            // Will fail gracefully if creditBalance < walletAmount due to DB constraints
             return { success: false, error: err.message || 'Payment processing failed.' };
+        }
+    }
+
+    async processCreditRepayment(
+        customerId: string,
+        amount: number,
+        paymentMethod: string,
+        recordedBy: string,
+        recordedByName: string
+    ): Promise<{ success: boolean; balanceAfter?: number; error?: string }> {
+        try {
+            const { data, error } = await this.supabase.rpc('process_credit_repayment', {
+                p_customer_id: customerId,
+                p_amount: amount,
+                p_payment_method: paymentMethod,
+                p_recorded_by: recordedBy,
+                p_recorded_by_name: recordedByName
+            });
+
+            if (error) throw error;
+            return { success: true, balanceAfter: data.balance_after };
+        } catch (err: any) {
+            console.error('[SupabaseStorage] Credit repayment failed:', err);
+            return { success: false, error: err.message || 'Credit repayment failed.' };
         }
     }
 

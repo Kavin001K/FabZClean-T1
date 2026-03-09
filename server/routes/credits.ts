@@ -171,15 +171,21 @@ router.post('/:customerId/payment', requireRole(CREDIT_MANAGE_ROLES), async (req
         // Use negative amount to reduce credit balance
         const description = `Payment received${paymentMethod ? ` via ${paymentMethod}` : ''}${referenceNumber ? ` (Ref: ${referenceNumber})` : ''}`;
 
-        const result = await storage.addCustomerCredit(
+        // Process the repayment using the robust RPC
+        const recordedBy = req.employee?.id || null;
+        const recordedByName = req.employee?.username || 'system';
+
+        const result = await (storage as any).processCreditRepayment(
             customerId,
-            -paymentAmount, // Negative to reduce balance
-            'payment',
-            description,
-            referenceNumber,
-            req.employee?.id,
-            paymentMethod
+            paymentAmount, // Positive amount expected by RPC
+            paymentMethod || 'CASH',
+            recordedBy,
+            recordedByName
         );
+
+        if (!result.success) {
+            throw new Error(result.error);
+        }
 
         // Log the action
         if (req.employee) {
@@ -205,7 +211,7 @@ router.post('/:customerId/payment', requireRole(CREDIT_MANAGE_ROLES), async (req
             message: 'Payment recorded successfully',
             previousBalance: currentBalance,
             amountPaid: paymentAmount,
-            newBalance: currentBalance - paymentAmount,
+            newBalance: result.balanceAfter,
             transaction: result
         }));
     } catch (error: any) {

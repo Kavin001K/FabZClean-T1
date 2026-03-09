@@ -30,7 +30,7 @@ router.post('/recharge', requireRole(WALLET_MANAGE_ROLES), async (req, res) => {
         }
 
         const rechargeAmount = parseFloat(amount);
-        const recordedBy = req.employee?.id || 'system';
+        const recordedBy = req.employee?.id || null;
         const recordedByName = req.employee?.username || 'system';
 
         // Using ACID-compliant RPC method in SupabaseStorage

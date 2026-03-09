@@ -138,6 +138,8 @@ export const orders = pgTable("orders", {
   deliveryEarningsCalculated: integer("delivery_earnings_calculated").default(0),
   deliveryCashCollected: decimal("delivery_cash_collected", { precision: 10, scale: 2 }).default("0"),
   isCreditOrder: boolean("is_credit_order").default(false),
+  walletUsed: decimal("wallet_used", { precision: 10, scale: 2 }).default("0"),
+  creditUsed: decimal("credit_used", { precision: 10, scale: 2 }).default("0"),
   deliveredAt: timestamp("delivered_at"),
   dispatchedAt: timestamp("dispatched_at"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -347,6 +349,8 @@ export const insertOrderSchema = z.object({
   tagsPrinted: z.coerce.boolean().optional().default(false),
   deliveryEarningsCalculated: z.number().optional().default(0),
   isCreditOrder: z.coerce.boolean().optional().default(false),
+  walletUsed: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+  creditUsed: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
   deliveredAt: z.coerce.date().optional().nullable(),
   dispatchedAt: z.coerce.date().optional().nullable(),
   createdAt: z.coerce.date().optional(),
@@ -434,6 +438,73 @@ export const transactions = pgTable("transactions", {
 export const insertTransactionSchema = createInsertSchema(transactions);
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
+
+// ============================================================
+// WALLETS (Core Payment System)
+// ============================================================
+
+export const wallets = pgTable("wallets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => customers.id).notNull().unique(),
+  balance: decimal("balance", { precision: 10, scale: 2 }).notNull().default("0"),
+  status: text("status", { enum: ["active", "inactive", "frozen"] }).default("active"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertWalletSchema = createInsertSchema(wallets);
+export type InsertWallet = z.infer<typeof insertWalletSchema>;
+export type Wallet = typeof wallets.$inferSelect;
+
+export const walletTransactions = pgTable("wallet_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  transactionId: varchar("transaction_id").notNull().unique(),
+  customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  type: text("type", { enum: ["credit", "debit"] }).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  balanceBefore: decimal("balance_before", { precision: 10, scale: 2 }).notNull(),
+  balanceAfter: decimal("balance_after", { precision: 10, scale: 2 }).notNull(),
+  referenceOrderId: varchar("reference_order_id").references(() => orders.id),
+  verifiedByStaff: varchar("verified_by_staff").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWalletTransactionSchema = createInsertSchema(walletTransactions);
+export type InsertWalletTransaction = z.infer<typeof insertWalletTransactionSchema>;
+export type WalletTransaction = typeof walletTransactions.$inferSelect;
+
+// ============================================================
+// CREDIT ACCOUNTS AND LEDGER
+// ============================================================
+
+export const creditAccounts = pgTable("credit_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => customers.id).notNull().unique(),
+  totalCredit: decimal("total_credit", { precision: 10, scale: 2 }).notNull().default("0"),
+  creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }).notNull().default("500"),
+  status: text("status", { enum: ["active", "suspended"] }).default("active"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCreditAccountSchema = createInsertSchema(creditAccounts);
+export type InsertCreditAccount = z.infer<typeof insertCreditAccountSchema>;
+export type CreditAccount = typeof creditAccounts.$inferSelect;
+
+export const creditLedger = pgTable("credit_ledger", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  transactionId: varchar("transaction_id").notNull().unique(),
+  customerId: varchar("customer_id").references(() => customers.id).notNull(),
+  orderId: varchar("order_id").references(() => orders.id),
+  type: text("type", { enum: ["credit", "debit"] }).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  balanceAfter: decimal("balance_after", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCreditLedgerSchema = createInsertSchema(creditLedger);
+export type InsertCreditLedger = z.infer<typeof insertCreditLedgerSchema>;
+export type CreditLedger = typeof creditLedger.$inferSelect;
 
 // ============================================================
 // CUSTOMER CREDIT SYSTEM (Wallet History)

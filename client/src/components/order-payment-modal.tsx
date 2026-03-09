@@ -100,7 +100,8 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
   const [notes, setNotes] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const [useWallet, setUseWallet] = useState(false);
+  const [useWallet, setUseWallet] = useState(true); // Default to true based on req
+  const [cashCollected, setCashCollected] = useState(''); // New explicit cash input
 
   const totalAmount = parseFloat(order.totalAmount);
   const advancePaid = parseFloat(order.advancePaid || '0');
@@ -113,11 +114,17 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
   });
 
   const walletBalance = (walletDetails as any)?.creditBalance ? parseFloat((walletDetails as any).creditBalance) : 0;
-  const parsedAmount = parseFloat(amount || '0');
+  const parsedCash = parseFloat(cashCollected || '0');
 
   // Auto-calculation magic for Split Payments
-  const walletApplied = useWallet ? Math.min(parsedAmount, walletBalance) : 0;
-  const cashRequired = parsedAmount - walletApplied;
+  // If useWallet is true, we apply as much wallet as possible to the remaining amount.
+  const walletApplied = useWallet ? Math.min(remainingAmount, walletBalance) : 0;
+
+  // The amount still owed after wallet is applied
+  const remainingAfterWallet = remainingAmount - walletApplied;
+
+  // The credit required is whatever is not covered by wallet and cash
+  const creditRequired = Math.max(0, remainingAfterWallet - parsedCash);
 
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
@@ -129,16 +136,19 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
   };
 
   const handlePayment = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
+    // If it's a full payment process, they don't necessarily need to enter cash if they are putting it all on credit or wallet!
+    const effectivePayment = parsedCash + walletApplied;
+
+    if (paymentType === 'advance' && parsedCash <= 0 && walletApplied <= 0) {
       toast({
         title: "Invalid Amount",
-        description: "Please enter a valid payment amount.",
+        description: "Please enter a valid cash amount or apply wallet for advance.",
         variant: "destructive",
       });
       return;
     }
 
-    if (paymentType === 'advance' && parseFloat(amount) >= totalAmount) {
+    if (paymentType === 'advance' && effectivePayment >= totalAmount) {
       toast({
         title: "Invalid Amount",
         description: "Advance payment cannot be equal to or greater than total amount.",
@@ -147,7 +157,7 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
       return;
     }
 
-    if (paymentType === 'delivery' && parseFloat(amount) > remainingAmount) {
+    if (paymentType === 'delivery' && effectivePayment > remainingAmount) {
       toast({
         title: "Invalid Amount",
         description: "Payment amount cannot exceed remaining balance.",
@@ -161,7 +171,7 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
     try {
       if (paymentType === 'advance') {
         // ADVANCE FLOW: Just record the advance amount via PUT. No ledger entry.
-        const updatedAdvancePaid = (advancePaid + parsedAmount).toString();
+        const updatedAdvancePaid = (advancePaid + effectivePayment).toString();
         await apiRequest("PUT", `/api/orders/${order.id}`, {
           paymentStatus: 'partial',
           advancePaid: updatedAdvancePaid,
@@ -171,8 +181,9 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
         // FULL / DELIVERY FLOW: Use the checkout API which handles wallet + cash + ledger entries
         const res = await apiRequest("POST", `/api/orders/${order.id}/checkout`, {
           customerId: (order as any).customerId,
-          cashAmount: cashRequired,
+          cashAmount: parsedCash,
           walletAmount: walletApplied,
+
         });
 
         const responseData = await res.json();
@@ -183,17 +194,18 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
       addNotification({
         type: 'success',
         title: 'Payment Processed Successfully!',
-        message: `${formatCurrency(parseFloat(amount))} ${paymentType} payment received via ${paymentMethods.find(m => m.id === selectedMethod)?.name}`,
+        message: `${formatCurrency(effectivePayment)} ${paymentType} payment received`,
         actionUrl: '/orders',
         actionText: 'View Orders'
       });
 
       toast({
         title: "Payment Successful",
-        description: `${formatCurrency(parseFloat(amount))} payment processed successfully.`,
+        description: `Payment processed successfully.`,
       });
 
       // Reset form
+      setCashCollected('');
       setAmount('');
       setTransactionId('');
       setNotes('');
@@ -219,13 +231,9 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
           { label: '75%', value: (totalAmount * 0.75).toString() }
         ];
       case 'delivery':
-        return [
-          { label: 'Remaining', value: remainingAmount.toString() },
-          { label: '50% of Remaining', value: (remainingAmount * 0.5).toString() }
-        ];
       case 'full':
         return [
-          { label: 'Full Amount', value: totalAmount.toString() }
+          { label: 'Remaining Cash', value: remainingAfterWallet.toString() }
         ];
       default:
         return [];
@@ -311,14 +319,14 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
 
           {/* Quick Amount Selection */}
           <div className="space-y-3">
-            <Label>Quick Amount Selection</Label>
+            <Label>Quick Cash Amount</Label>
             <div className="flex gap-2 flex-wrap">
               {calculateQuickAmounts().map((quickAmount, index) => (
                 <Button
                   key={index}
                   variant="outline"
                   size="sm"
-                  onClick={() => setAmount(quickAmount.value)}
+                  onClick={() => setCashCollected(quickAmount.value)}
                 >
                   {quickAmount.label} ({formatCurrency(parseFloat(quickAmount.value))})
                 </Button>
@@ -344,26 +352,26 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
             </div>
           </div>
 
-          {/* Amount Input */}
+          {/* Cash Amount Input */}
           <div className="space-y-2">
-            <Label htmlFor="amount">
-              Amount {paymentType === 'advance' ? '(Advance)' : paymentType === 'delivery' ? '(Delivery)' : '(Full)'}
+            <Label htmlFor="cashCollected">
+              Cash / Manual Payment Collected
             </Label>
             <div className="relative">
               <IndianRupee className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                id="amount"
+                id="cashCollected"
                 type="number"
                 placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                value={cashCollected}
+                onChange={(e) => setCashCollected(e.target.value)}
                 className="pl-10"
-                max={paymentType === 'delivery' ? remainingAmount : totalAmount}
+                max={remainingAfterWallet}
               />
             </div>
-            {paymentType === 'delivery' && parseFloat(amount) > remainingAmount && (
+            {parsedCash > remainingAfterWallet && (
               <p className="text-sm text-red-600">
-                Amount cannot exceed remaining balance of {formatCurrency(remainingAmount)}
+                Amount cannot exceed remaining balance after wallet.
               </p>
             )}
           </div>
@@ -394,6 +402,10 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
 
           {/* Split Payment / Wallet Section */}
           <div className="space-y-4 pt-2 border-t mt-4">
+            <div className="flex justify-between items-center text-sm mb-2">
+              <span className="font-semibold text-lg">Final Payment Split</span>
+            </div>
+
             <div className="flex items-center space-x-2 bg-slate-50 p-3 rounded-lg border">
               <Checkbox
                 id="useWallet"
@@ -411,17 +423,24 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
               </div>
             </div>
 
-            {useWallet && amount && (
+            {useWallet && walletApplied > 0 && (
               <div className="bg-emerald-50/50 p-3 rounded-lg text-sm border border-emerald-100 flex justify-between">
-                <span className="text-emerald-700">Wallet Deduction:</span>
+                <span className="text-emerald-700">Wallet Usage:</span>
                 <span className="font-bold text-emerald-700">-{formatCurrency(walletApplied)}</span>
               </div>
             )}
 
-            {amount && (
+            {parsedCash > 0 && (
               <div className="bg-amber-50/50 p-3 rounded-lg text-sm border border-amber-100 flex justify-between items-center">
-                <span className="text-amber-800 font-medium">Cash to Collect:</span>
-                <span className="font-extrabold text-amber-900 text-lg">{formatCurrency(cashRequired)}</span>
+                <span className="text-amber-800 font-medium">Cash Collected:</span>
+                <span className="font-extrabold text-amber-900">{formatCurrency(parsedCash)}</span>
+              </div>
+            )}
+
+            {creditRequired > 0 && (
+              <div className="bg-red-50 p-3 rounded-lg text-sm border border-red-200 flex justify-between items-center">
+                <span className="text-red-800 font-medium">Credit Required:</span>
+                <span className="font-extrabold text-red-900">{formatCurrency(creditRequired)}</span>
               </div>
             )}
           </div>
@@ -432,7 +451,7 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
               Cancel
             </Button>
             <Button
-              disabled={!amount || isProcessing || (cashRequired > 0 && selectedMethod === 'OTHER' && !transactionId)}
+              disabled={isProcessing || (parsedCash > 0 && selectedMethod === 'OTHER' && !transactionId)}
               onClick={handlePayment}
               className="gap-2 px-8"
             >

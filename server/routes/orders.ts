@@ -57,7 +57,7 @@ router.post('/:id/checkout', async (req, res) => {
     }
 
     // Process the payment through our master ledger RPC
-    const recordedBy = req.employee?.id || 'system';
+    const recordedBy = req.employee?.id || null;
     const recordedByName = req.employee?.username || 'system';
 
     const result = await (storage as any).processOrderCheckout(
@@ -73,29 +73,17 @@ router.post('/:id/checkout', async (req, res) => {
       return res.status(400).json(createErrorResponse(result.error || 'Payment processing failed. Check wallet balance.', 400));
     }
 
-    // Now update the order's payment-tracking fields.
-    // The RPC handled the financial transaction (ledger & wallet).
-    // We only update the order's metadata here.
-    const totalPaid = parsedCash + parsedWallet;
-    const orderTotal = parseFloat(order.totalAmount || '0');
-    const previousAdvance = parseFloat(order.advancePaid || '0');
-    const cumulativePaid = previousAdvance + totalPaid;
+    // The RPC handled the financial transaction (ledger & wallet), 
+    // AND it updated the order's paymentStatus, advancePaid, walletUsed, and creditUsed!
 
     const updates: any = {
       paymentMethod: parsedWallet > 0 && parsedCash > 0 ? 'SPLIT' : (parsedWallet > 0 ? 'CREDIT_WALLET' : 'CASH'),
     };
 
-    // Determine payment status based on cumulative payments
-    if (cumulativePaid >= orderTotal) {
-      updates.paymentStatus = 'paid';
-    } else if (cumulativePaid > 0) {
-      updates.paymentStatus = 'partial';
-      updates.advancePaid = cumulativePaid.toString();
-    }
-
-    // Only advance order status if it's in an early stage
+    // Only advance overall order fulfillment status if it's fully paid and in an early stage
+    const rpcPaymentStatus = result.data?.payment_status;
     const earlyStatuses = ['pending', 'processing', 'confirmed'];
-    if (cumulativePaid >= orderTotal && earlyStatuses.includes(order.status)) {
+    if (rpcPaymentStatus === 'paid' && earlyStatuses.includes(order.status)) {
       updates.status = 'completed';
     }
 
