@@ -27,7 +27,7 @@ import { OrderConfirmationDialog } from "@/components/orders/order-confirmation-
 import OrderDetailsDialog from "@/components/orders/order-details-dialog";
 import { useAuth } from "@/contexts/auth-context";
 import { generateOrderNumberSync } from "@/lib/franchise-config";
-import { createAddressObject, parseAndFormatAddress, parseAddress } from "@/lib/address-utils";
+import { createAddressObject, parseAndFormatAddress } from "@/lib/address-utils";
 import { formatCurrencyWithSettings, roundInvoiceAmount } from "@/lib/settings-utils";
 
 interface ServiceItem {
@@ -147,16 +147,8 @@ export default function CreateOrder() {
     }
   }, [paymentMethod, paymentStatus]);
 
-  // Express Order - Priority with 50% extra charge and 2-day delivery
+  // Express Order - Priority with 50% extra charge and 2-day turnaround
   const [isExpressOrder, setIsExpressOrder] = useState(false);
-
-  // Fulfillment type (pickup or delivery)
-  const [fulfillmentType, setFulfillmentType] = useState<'pickup' | 'delivery'>('pickup');
-  const [deliveryCharges, setDeliveryCharges] = useState(50); // Default ₹50 delivery charges
-  const [deliveryStreet, setDeliveryStreet] = useState('');
-  const [deliveryCity, setDeliveryCity] = useState('');
-  const [deliveryZip, setDeliveryZip] = useState('');
-  const [savedAddresses, setSavedAddresses] = useState<Array<{ street: string, city: string, zip: string, label?: string }>>([]);
 
   // Calculation state
   const [subtotal, setSubtotal] = useState(0);
@@ -170,7 +162,8 @@ export default function CreateOrder() {
   const [selectedHistoryOrder, setSelectedHistoryOrder] = useState<Order | null>(null);
   const [isHistoryDetailsOpen, setIsHistoryDetailsOpen] = useState(false);
 
-
+  // Credit Limit Error Dialog
+  const [creditLimitError, setCreditLimitError] = useState<{ message: string, customerId: string } | null>(null);
 
   // Fetch services - only active ones
   const { data: servicesData, isLoading: servicesLoading, isError: servicesError } = useQuery<Service[]>({
@@ -282,43 +275,9 @@ export default function CreateOrder() {
         const formattedAddress = parseAndFormatAddress(customer.address);
         setCustomerAddress(formattedAddress === 'Address not provided' ? '' : formattedAddress);
 
-        // Extract addresses for delivery selection
-        const extractedAddresses: Array<{ street: string, city: string, zip: string, label?: string }> = [];
-        if (customer.address) {
-          try {
-            const rawAddr = customer.address;
-            const addrObj = typeof rawAddr === 'string' && rawAddr.startsWith('{')
-              ? JSON.parse(rawAddr)
-              : rawAddr;
-
-            if (typeof addrObj === 'object' && addrObj !== null) {
-              if (Array.isArray(addrObj)) {
-                addrObj.forEach((addr: any, idx: number) => {
-                  extractedAddresses.push({
-                    street: addr.street || addr.line1 || '',
-                    city: addr.city || '',
-                    zip: addr.zip || addr.pincode || '',
-                    label: addr.label || `Address ${idx + 1}`
-                  });
-                });
-              } else {
-                extractedAddresses.push({
-                  street: addrObj.street || addrObj.line1 || '',
-                  city: addrObj.city || '',
-                  zip: addrObj.zip || addrObj.pincode || '',
-                  label: 'Primary Address'
-                });
-              }
-            }
-          } catch (e) {
-            // Ignore parse errors for delivery addresses
-          }
-        }
-        setSavedAddresses(extractedAddresses.filter(a => a.street));
-
         toast({
           title: "Customer Found!",
-          description: `Auto-filled data for ${customer.name}${extractedAddresses.length > 0 ? ` (${extractedAddresses.length} saved address${extractedAddresses.length > 1 ? 'es' : ''})` : ''}`,
+          description: `Auto-filled data for ${customer.name}`,
         });
       } else {
         setFoundCustomer(null);
@@ -536,10 +495,8 @@ export default function CreateOrder() {
   const gstAmount = React.useMemo(() => {
     if (!enableGST) return 0;
     const afterDiscount = subtotal - discountAmount;
-    const afterExtra = afterDiscount + extraCharges;
-    const afterDelivery = fulfillmentType === 'delivery' ? afterExtra + deliveryCharges : afterExtra;
-    return afterDelivery * 0.18;
-  }, [enableGST, subtotal, discountAmount, extraCharges, fulfillmentType, deliveryCharges]);
+    return (afterDiscount + extraCharges) * 0.18;
+  }, [enableGST, subtotal, discountAmount, extraCharges]);
 
   // Calculate total with discounts and charges
   useEffect(() => {
@@ -551,11 +508,6 @@ export default function CreateOrder() {
     // Add extra charges
     calculatedTotal += extraCharges;
 
-    // Add delivery charges if applicable
-    if (fulfillmentType === 'delivery') {
-      calculatedTotal += deliveryCharges;
-    }
-
     // Apply GST if enabled (18%)
     if (enableGST) {
       calculatedTotal += gstAmount;
@@ -563,7 +515,7 @@ export default function CreateOrder() {
 
     // Ensure total is not negative and Apply Rounding
     setTotalAmount(roundInvoiceAmount(Math.max(0, calculatedTotal)));
-  }, [subtotal, discountAmount, extraCharges, enableGST, fulfillmentType, deliveryCharges, gstAmount]);
+  }, [subtotal, discountAmount, extraCharges, enableGST, gstAmount]);
 
   // Create order mutation
   const createOrderMutation = useMutation({
@@ -641,38 +593,13 @@ export default function CreateOrder() {
         queryClient.invalidateQueries({ queryKey: ["customers"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard/metrics"] });
 
-        // Save new delivery address to customer if it's a delivery order with a new address
-        if (fulfillmentType === 'delivery' && deliveryStreet && foundCustomer?.id) {
-          const isNewAddress = !savedAddresses.some(
-            addr => addr.street.toLowerCase() === deliveryStreet.toLowerCase()
-          );
-
-          if (isNewAddress) {
-            try {
-              // Update customer with new address added to their saved addresses
-              const newAddressList = [
-                ...savedAddresses,
-                { street: deliveryStreet, city: deliveryCity, zip: deliveryZip, label: `Delivery Address ${savedAddresses.length + 1}` }
-              ];
-
-              await customersApi.update(foundCustomer.id, {
-                address: newAddressList
-              });
-
-              console.log('✅ Saved new delivery address to customer');
-            } catch (e) {
-              console.warn('Could not save new address:', e);
-            }
-          }
-        }
-
         // Add notification - highlight express orders
         const isExpress = (newOrder as any).isExpressOrder;
         addNotification({
           type: isExpress ? 'warning' : 'success',
           title: isExpress ? '⚡ EXPRESS Order Created!' : 'Order Created Successfully!',
           message: isExpress
-            ? `PRIORITY: Order ${newOrder.orderNumber} for ${newOrder.customerName} - 2 day delivery`
+            ? `PRIORITY: Order ${newOrder.orderNumber} for ${newOrder.customerName} - 2 day turnaround`
             : `Order ${newOrder.orderNumber} has been created for ${newOrder.customerName}`,
           actionUrl: '/orders',
           actionText: 'View Orders'
@@ -692,7 +619,7 @@ export default function CreateOrder() {
         toast({
           title: isExpress ? "⚡ Express Order Created!" : "Order Created Successfully!",
           description: isExpress
-            ? `Priority order ${newOrder.orderNumber} - 50% surcharge applied, 2-day delivery`
+            ? `Priority order ${newOrder.orderNumber} - 50% surcharge applied, 2-day turnaround`
             : `Order ${newOrder.orderNumber} has been created and saved.`,
         });
 
@@ -771,11 +698,21 @@ export default function CreateOrder() {
         resetForm();
       }
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Failed to create order:', error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to create order. Please try again.";
+
+      if (errorMessage.includes("Credit Limit Exceeded")) {
+        setCreditLimitError({
+          message: errorMessage,
+          customerId: foundCustomer?.id || ''
+        });
+        return;
+      }
+
       toast({
         title: "Error",
-        description: "Failed to create order. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -807,11 +744,6 @@ export default function CreateOrder() {
     setPanNumber('');
     // Reset express order and fulfillment
     setIsExpressOrder(false);
-    setFulfillmentType('pickup');
-    setDeliveryCharges(0);
-    setDeliveryStreet('');
-    setDeliveryCity('');
-    setDeliveryZip('');
   };
 
   // Validate phone number - flexible to accept various international formats
@@ -968,15 +900,10 @@ export default function CreateOrder() {
       ).toFixed(2) : "0.00",
       gstNumber: enableGST ? gstNumber : undefined,
       panNumber: enableGST ? panNumber : undefined,
-      // Fulfillment & Delivery
-      fulfillmentType: fulfillmentType,
-      deliveryCharges: fulfillmentType === 'delivery' ? deliveryCharges.toFixed(2) : "0",
-      deliveryAddress: fulfillmentType === 'delivery' && deliveryStreet ? {
-        street: deliveryStreet,
-        city: deliveryCity || 'Unknown',
-        zip: deliveryZip || '000000',
-        country: 'India'
-      } : undefined,
+      // Delivery is disabled for new orders: pickup-only.
+      fulfillmentType: 'pickup',
+      deliveryCharges: "0",
+      deliveryAddress: undefined,
       // Express/Priority Order
       isExpressOrder: isExpressOrder,
       priority: isExpressOrder ? 'high' : 'normal',
@@ -1412,7 +1339,7 @@ export default function CreateOrder() {
             </Card>
           </motion.div>
 
-          {/* Fulfillment Type - Pickup or Delivery */}
+          {/* Fulfillment Type */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1426,152 +1353,9 @@ export default function CreateOrder() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Pickup or Delivery Toggle */}
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    type="button"
-                    variant={fulfillmentType === 'pickup' ? 'default' : 'outline'}
-                    className={cn(
-                      "h-16 flex flex-col gap-1",
-                      fulfillmentType === 'pickup' && "bg-green-600 hover:bg-green-700"
-                    )}
-                    onClick={() => setFulfillmentType('pickup')}
-                  >
-                    <User className="h-5 w-5" />
-                    <span>Self Pickup</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={fulfillmentType === 'delivery' ? 'default' : 'outline'}
-                    className={cn(
-                      "h-16 flex flex-col gap-1",
-                      fulfillmentType === 'delivery' && "bg-blue-600 hover:bg-blue-700"
-                    )}
-                    onClick={() => setFulfillmentType('delivery')}
-                  >
-                    <Truck className="h-5 w-5" />
-                    <span>Home Delivery</span>
-                  </Button>
+                <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+                  Pickup only. Delivery workflows are disabled.
                 </div>
-
-                {/* Delivery Options - Only show when delivery is selected */}
-                {fulfillmentType === 'delivery' && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="space-y-4 pt-4 border-t"
-                  >
-                    {/* Delivery Charges */}
-                    <div className="space-y-2">
-                      <Label>Delivery Charges (₹)</Label>
-                      <Input
-                        type="number"
-                        placeholder="50"
-                        value={deliveryCharges}
-                        onChange={(e) => setDeliveryCharges(parseFloat(e.target.value) || 0)}
-                        className="bg-background"
-                        min={0}
-                      />
-                      <p className="text-xs text-muted-foreground">Default: ₹50 (editable)</p>
-                    </div>
-
-                    {/* Saved Addresses Dropdown */}
-                    {savedAddresses.length > 0 && (
-                      <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          Saved Addresses ({savedAddresses.length})
-                        </Label>
-                        <Select
-                          onValueChange={(value) => {
-                            const addr = savedAddresses[parseInt(value)];
-                            if (addr) {
-                              setDeliveryStreet(addr.street);
-                              setDeliveryCity(addr.city);
-                              setDeliveryZip(addr.zip);
-                              toast({
-                                title: "Address Selected",
-                                description: `Using ${addr.label || 'saved address'}`,
-                              });
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="bg-background">
-                            <SelectValue placeholder="Select a saved address..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {savedAddresses.map((addr, idx) => (
-                              <SelectItem key={idx} value={String(idx)}>
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{addr.label || `Address ${idx + 1}`}</span>
-                                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                    {addr.street}{addr.city ? `, ${addr.city}` : ''}{addr.zip ? ` - ${addr.zip}` : ''}
-                                  </span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-
-                    {/* Use Registered Address Button */}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => {
-                        // Parse the customer address to extract city and pincode
-                        const parsedAddr = parseAddress(foundCustomer?.address);
-                        setDeliveryStreet(parsedAddr.street || customerAddress);
-                        setDeliveryCity(parsedAddr.city || '');
-                        setDeliveryZip(parsedAddr.pincode || '');
-                        toast({
-                          title: "Address Copied",
-                          description: "Customer's registered address used for delivery",
-                        });
-                      }}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Use Customer's Registered Address
-                    </Button>
-
-                    {/* Delivery Address Fields */}
-                    <div className="space-y-3">
-                      <div className="space-y-2">
-                        <Label>Street / Building / Area</Label>
-                        <Input
-                          placeholder="Enter delivery address"
-                          value={deliveryStreet}
-                          onChange={(e) => setDeliveryStreet(e.target.value)}
-                          className="bg-background"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label>City</Label>
-                          <Input
-                            placeholder="City"
-                            value={deliveryCity}
-                            onChange={(e) => setDeliveryCity(e.target.value)}
-                            className="bg-background"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>PIN Code</Label>
-                          <Input
-                            placeholder="000000"
-                            value={deliveryZip}
-                            onChange={(e) => setDeliveryZip(e.target.value)}
-                            className="bg-background"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -1610,8 +1394,8 @@ export default function CreateOrder() {
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {isExpressOrder
-                        ? "🔥 50% surcharge applied • 2-day delivery • Fast tracked transit"
-                        : "Enable for priority processing (+50% charge, 2-day delivery)"
+                        ? "🔥 50% surcharge applied • 2-day turnaround • Fast tracked transit"
+                        : "Enable for priority processing (+50% charge, 2-day turnaround)"
                       }
                     </p>
                   </div>
@@ -1851,22 +1635,6 @@ export default function CreateOrder() {
                       >
                         <span>{extraChargesLabel || 'Extra Charges'}</span>
                         <span>+₹{extraCharges.toFixed(2)}</span>
-                      </motion.div>
-                    )}
-
-                    {/* Delivery Charges */}
-                    {fulfillmentType === 'delivery' && deliveryCharges > 0 && (
-                      <motion.div
-                        key="delivery-charges-summary"
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="flex justify-between text-sm text-purple-600 dark:text-purple-400"
-                      >
-                        <span className="flex items-center gap-1">
-                          <Truck className="h-3.5 w-3.5" /> Delivery Charges
-                        </span>
-                        <span>+₹{deliveryCharges.toFixed(2)}</span>
                       </motion.div>
                     )}
 
@@ -2205,7 +1973,34 @@ export default function CreateOrder() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog >
+      </Dialog>
+
+
+      {/* Credit Limit Error Dialog */}
+      <Dialog open={!!creditLimitError} onOpenChange={(open) => !open && setCreditLimitError(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              Credit Limit Exceeded
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-base">
+              {creditLimitError?.message}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setCreditLimitError(null)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              setCreditLimitError(null);
+              setLocation('/credits');
+            }}>
+              Go to Credit Management
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Success Modal */}
       < OrderConfirmationDialog
@@ -2230,6 +2025,6 @@ export default function CreateOrder() {
         onPrintInvoice={() => { }}
         onUpdatePaymentStatus={() => { }}
       />
-    </div >
+    </div>
   );
 }

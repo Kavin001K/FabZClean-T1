@@ -878,23 +878,49 @@ export class SupabaseStorage {
         cashAmount: number,
         walletAmount: number,
         recordedBy: string,
-        recordedByName: string
+        recordedByName: string,
+        options?: {
+            useWallet?: boolean;
+            walletDebitRequested?: number;
+            paymentMethod?: string;
+        }
     ): Promise<{ success: boolean; data?: any; error?: string }> {
+        const useWallet = options?.useWallet ?? walletAmount > 0;
+        const walletDebitRequested = options?.walletDebitRequested ?? walletAmount;
+        const normalizedPaymentMethod = options?.paymentMethod || 'CASH';
+
         try {
-            const { data, error } = await this.supabase.rpc('process_payment_checkout', {
+            const { data, error } = await this.supabase.rpc('process_payment_checkout_v2', {
                 p_order_id: orderId,
                 p_customer_id: customerId,
                 p_cash_amount: cashAmount,
-                p_wallet_amount: walletAmount,
+                p_use_wallet: useWallet,
+                p_wallet_debit_requested: walletDebitRequested,
+                p_payment_method: normalizedPaymentMethod,
                 p_recorded_by: recordedBy,
                 p_recorded_by_name: recordedByName
             });
 
             if (error) throw error;
             return { success: true, data };
-        } catch (err: any) {
-            console.error('[SupabaseStorage] Processing Checkout failed:', err);
-            return { success: false, error: err.message || 'Payment processing failed.' };
+        } catch (primaryErr: any) {
+            console.warn('[SupabaseStorage] V2 checkout RPC unavailable, falling back to legacy RPC:', primaryErr?.message || primaryErr);
+            try {
+                const { data, error } = await this.supabase.rpc('process_payment_checkout', {
+                    p_order_id: orderId,
+                    p_customer_id: customerId,
+                    p_cash_amount: cashAmount,
+                    p_wallet_amount: walletDebitRequested,
+                    p_recorded_by: recordedBy,
+                    p_recorded_by_name: recordedByName
+                });
+
+                if (error) throw error;
+                return { success: true, data };
+            } catch (legacyErr: any) {
+                console.error('[SupabaseStorage] Processing Checkout failed:', legacyErr);
+                return { success: false, error: legacyErr.message || 'Payment processing failed.' };
+            }
         }
     }
 
@@ -1711,6 +1737,14 @@ export class SupabaseStorage {
                 const walletAmount = parseFloat(row.amount || mapped.amount || '0');
                 const walletBalanceAfter = parseFloat(row.balance_after || mapped.balanceAfter || '0');
                 const referenceType = row.reference_type || mapped.referenceType;
+                const note = String(row.note || mapped.note || mapped.notes || '');
+                const extractedTransactionId = (() => {
+                    const match = note.match(/\[(WLT-[^\]]+|CRD-[^\]]+)\]/);
+                    if (match?.[1]) return match[1];
+                    const entryNo = row.entry_no || mapped.entryNo;
+                    const baseId = entryNo || row.id || mapped.id;
+                    return baseId ? `TXN-${baseId}` : `TXN-${Date.now()}`;
+                })();
 
                 let legacyType = 'adjustment';
                 if (mapped.transactionType === 'DEBIT') {
@@ -1728,6 +1762,8 @@ export class SupabaseStorage {
                     orderId: referenceType === 'ORDER' ? (row.reference_id || mapped.referenceId) : undefined,
                     referenceNumber: referenceType !== 'ORDER' ? (row.reference_id || mapped.referenceId) : undefined,
                     description: row.note || mapped.note || mapped.notes || '',
+                    transactionId: extractedTransactionId,
+                    creditId: row.customer_id || mapped.customerId || customerId,
                     recordedByName: row.staff ? `${row.staff.first_name} ${row.staff.last_name}`.trim() : (row.recorded_by_name || mapped.recordedByName),
                     staffId: row.staff?.employee_id || null
                 };
@@ -1811,6 +1847,14 @@ export class SupabaseStorage {
             const walletAmount = parseFloat(row.amount || mapped.amount || '0');
             const walletBalanceAfter = parseFloat(row.balance_after || mapped.balanceAfter || '0');
             const referenceType = row.reference_type || mapped.referenceType;
+            const note = String(row.note || mapped.note || mapped.notes || '');
+            const extractedTransactionId = (() => {
+                const match = note.match(/\[(WLT-[^\]]+|CRD-[^\]]+)\]/);
+                if (match?.[1]) return match[1];
+                const entryNo = row.entry_no || mapped.entryNo;
+                const baseId = entryNo || row.id || mapped.id;
+                return baseId ? `TXN-${baseId}` : `TXN-${Date.now()}`;
+            })();
 
             let legacyType = 'adjustment';
             if (mapped.transactionType === 'DEBIT') {
@@ -1826,6 +1870,8 @@ export class SupabaseStorage {
                 amount: (-walletAmount).toFixed(2),
                 balanceAfter: walletBalanceAfter.toFixed(2),
                 description: row.note || mapped.note || mapped.notes || '',
+                transactionId: extractedTransactionId,
+                creditId: row.customer_id || mapped.customerId,
             };
         });
     }

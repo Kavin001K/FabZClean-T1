@@ -12,8 +12,8 @@ import { AuthService } from '../auth-service';
 
 const router = Router();
 
-// Only staff and admins can perform external top-ups
-const WALLET_MANAGE_ROLES = ['admin', 'staff'];
+// Only authenticated store/admin roles can perform external top-ups
+const WALLET_MANAGE_ROLES = ['admin', 'store_manager', 'store_staff'];
 
 router.use(jwtRequired);
 

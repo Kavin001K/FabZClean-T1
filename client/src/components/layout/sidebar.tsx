@@ -9,7 +9,6 @@ import {
   Scissors,
   Wallet,
   ShieldCheck,
-  Truck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -31,7 +30,6 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Dashboard", icon: Home },
   { to: "/create-order", label: "New Order", icon: PlusCircle, allowedRoles: ["admin", "store_manager", "store_staff"] },
   { to: "/orders", label: "Active Orders", icon: ListOrdered },
-  { to: "/deliveries", label: "Deliveries", icon: Truck, allowedRoles: ["admin", "store_manager", "factory_manager"] },
   { to: "/customers", label: "Customers", icon: Users2, allowedRoles: ["admin", "store_manager", "store_staff"] },
   { to: "/wallet-management", label: "Wallet", icon: Wallet, allowedRoles: ["admin", "store_manager", "store_staff"] },
   { to: "/user-management", label: "Users", icon: ShieldCheck, allowedRoles: ["admin"] },

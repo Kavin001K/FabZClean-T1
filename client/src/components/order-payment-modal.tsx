@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { apiRequest } from "@/lib/queryClient";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,14 +16,11 @@ import {
   Smartphone,
   Banknote,
   CheckCircle,
-  AlertCircle,
   Receipt,
-  Calculator,
-  Wallet,
   RefreshCw
 } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 interface OrderPaymentModalProps {
@@ -31,9 +28,10 @@ interface OrderPaymentModalProps {
     id: string;
     orderNumber: string;
     customerName: string;
+    customerId?: string;
     totalAmount: string;
     advancePaid?: string;
-    paymentStatus: 'pending' | 'paid' | 'partial' | 'failed';
+    paymentStatus: 'pending' | 'paid' | 'partial' | 'failed' | 'credit';
     items: any[];
   };
   isOpen: boolean;
@@ -92,33 +90,65 @@ import { Checkbox } from "@/components/ui/checkbox";
 export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpdate }: OrderPaymentModalProps) {
   const { toast } = useToast();
   const { addNotification } = useNotifications();
+  const queryClient = useQueryClient();
 
   const [paymentType, setPaymentType] = useState<'advance' | 'delivery' | 'full'>('advance');
   const [selectedMethod, setSelectedMethod] = useState<string>('CASH');
-  const [amount, setAmount] = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [notes, setNotes] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [engineResult, setEngineResult] = useState<{
+    paymentStatus: string;
+    split: { cashApplied: number; walletDebited: number; creditAssigned: number };
+    transactionIds: { walletTransactionId?: string | null; creditTransactionId?: string | null };
+    creditId?: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setEngineResult(null);
+    }
+  }, [isOpen, order.id]);
 
   const [useWallet, setUseWallet] = useState(true); // Default to true based on req
   const [cashCollected, setCashCollected] = useState(''); // New explicit cash input
 
   const totalAmount = parseFloat(order.totalAmount);
   const advancePaid = parseFloat(order.advancePaid || '0');
-  const remainingAmount = totalAmount - advancePaid;
+  const remainingAmount = Math.max(0, totalAmount - advancePaid);
 
-  // Fetch wallet balance
-  const { data: walletDetails, isLoading: isLoadingWalletBalance } = useQuery({
-    queryKey: ['/api/credits', (order as any).customerId],
-    enabled: isOpen && !!(order as any).customerId,
+  const customerId = order.customerId || (order as any).customerId;
+
+  // Fetch wallet and credit summaries (separate sources)
+  const { data: creditDetails, isLoading: isLoadingCredit } = useQuery({
+    queryKey: ["credits", customerId],
+    enabled: isOpen && !!customerId,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/credits/${customerId}`);
+      const payload = await res.json();
+      return payload?.data || null;
+    },
   });
 
-  const walletBalance = (walletDetails as any)?.creditBalance ? parseFloat((walletDetails as any).creditBalance) : 0;
+  const { data: customerDetails, isLoading: isLoadingCustomer } = useQuery({
+    queryKey: ["customer", customerId],
+    enabled: isOpen && !!customerId,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/customers/${customerId}`);
+      const payload = await res.json();
+      return payload?.data || null;
+    },
+  });
+
+  const walletBalance = Number((customerDetails as any)?.walletBalanceCache || 0);
+  const outstandingCredit = Number((creditDetails as any)?.summary?.pendingBalance || (customerDetails as any)?.creditBalance || 0);
+  const isLoadingWalletBalance = isLoadingCredit || isLoadingCustomer;
   const parsedCash = parseFloat(cashCollected || '0');
 
   // Auto-calculation magic for Split Payments
   // If useWallet is true, we apply as much wallet as possible to the remaining amount.
-  const walletApplied = useWallet ? Math.min(remainingAmount, walletBalance) : 0;
+  const walletDebitRequested = useWallet ? remainingAmount : 0;
+  const walletApplied = useWallet ? Math.min(walletDebitRequested, walletBalance) : 0;
 
   // The amount still owed after wallet is applied
   const remainingAfterWallet = remainingAmount - walletApplied;
@@ -136,31 +166,19 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
   };
 
   const handlePayment = async () => {
-    // If it's a full payment process, they don't necessarily need to enter cash if they are putting it all on credit or wallet!
-    const effectivePayment = parsedCash + walletApplied;
-
-    if (paymentType === 'advance' && parsedCash <= 0 && walletApplied <= 0) {
+    if (parsedCash < 0 || Number.isNaN(parsedCash)) {
       toast({
         title: "Invalid Amount",
-        description: "Please enter a valid cash amount or apply wallet for advance.",
+        description: "Enter a valid cash amount.",
         variant: "destructive",
       });
       return;
     }
 
-    if (paymentType === 'advance' && effectivePayment >= totalAmount) {
+    if (parsedCash > remainingAfterWallet) {
       toast({
         title: "Invalid Amount",
-        description: "Advance payment cannot be equal to or greater than total amount.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (paymentType === 'delivery' && effectivePayment > remainingAmount) {
-      toast({
-        title: "Invalid Amount",
-        description: "Payment amount cannot exceed remaining balance.",
+        description: "Cash amount exceeds remaining amount after wallet debit.",
         variant: "destructive",
       });
       return;
@@ -169,32 +187,40 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
     setIsProcessing(true);
 
     try {
-      if (paymentType === 'advance') {
-        // ADVANCE FLOW: Just record the advance amount via PUT. No ledger entry.
-        const updatedAdvancePaid = (advancePaid + effectivePayment).toString();
-        await apiRequest("PUT", `/api/orders/${order.id}`, {
-          paymentStatus: 'partial',
-          advancePaid: updatedAdvancePaid,
-        });
-        onPaymentUpdate?.(order.id, { ...order, advancePaid: updatedAdvancePaid, paymentStatus: 'partial' });
-      } else {
-        // FULL / DELIVERY FLOW: Use the checkout API which handles wallet + cash + ledger entries
-        const res = await apiRequest("POST", `/api/orders/${order.id}/checkout`, {
-          customerId: (order as any).customerId,
-          cashAmount: parsedCash,
-          walletAmount: walletApplied,
+      // Canonical flow: all payment operations go through checkout engine.
+      const res = await apiRequest("POST", `/api/orders/${order.id}/checkout`, {
+        customerId,
+        cashAmount: parsedCash,
+        useWallet,
+        walletDebitRequested,
+        walletAmount: walletDebitRequested, // legacy compatibility alias
+        paymentMethod: selectedMethod,
+      });
 
-        });
+      const responseData = await res.json();
+      const data = responseData?.data || {};
+      const updatedOrder = data.order || data;
 
-        const responseData = await res.json();
-        const updatedOrder = responseData.data;
-        onPaymentUpdate?.(order.id, updatedOrder);
-      }
+      setEngineResult({
+        paymentStatus: data.paymentStatus || data.payment_status || updatedOrder.paymentStatus || 'pending',
+        split: {
+          cashApplied: Number(data.split?.cashApplied || 0),
+          walletDebited: Number(data.split?.walletDebited || 0),
+          creditAssigned: Number(data.split?.creditAssigned || 0),
+        },
+        transactionIds: data.transactionIds || {},
+        creditId: data.creditId || customerId || null,
+      });
+
+      onPaymentUpdate?.(order.id, updatedOrder);
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["credits", customerId] });
+      queryClient.invalidateQueries({ queryKey: ["customer", customerId] });
 
       addNotification({
         type: 'success',
         title: 'Payment Processed Successfully!',
-        message: `${formatCurrency(effectivePayment)} ${paymentType} payment received`,
+        message: `${formatCurrency(Number(data.split?.cashApplied || 0) + Number(data.split?.walletDebited || 0))} settled`,
         actionUrl: '/orders',
         actionText: 'View Orders'
       });
@@ -206,15 +232,13 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
 
       // Reset form
       setCashCollected('');
-      setAmount('');
       setTransactionId('');
       setNotes('');
-      onClose();
 
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Payment Failed",
-        description: "There was an error processing the payment. Please try again.",
+        description: error?.message || "There was an error processing the payment. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -243,21 +267,21 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden gap-0">
-        <DialogHeader className="p-6 pb-2 bg-gradient-to-r from-primary to-accent text-white">
+        <DialogHeader className="p-6 pb-4 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shrink-0 border-b">
           <div className="flex justify-between items-start">
             <div>
-              <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+              <DialogTitle className="text-2xl flex items-center gap-2">
                 <CreditCard className="w-6 h-6" />
                 Process Payment
               </DialogTitle>
-              <DialogDescription className="text-white/80 mt-1">
+              <DialogDescription className="text-primary-foreground/80 mt-1">
                 Order #{order.orderNumber} • {order.customerName}
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="p-6 pt-4 space-y-6 overflow-y-auto max-h-[calc(100vh-140px)]">
           {/* Order Summary */}
           <Card>
             <CardHeader className="pb-3">
@@ -287,6 +311,21 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
                   {order.paymentStatus.toUpperCase()}
                 </Badge>
               </div>
+              {customerId && (
+                <>
+                  <Separator />
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Wallet Available</span>
+                    <span className="font-medium text-emerald-600">
+                      {isLoadingWalletBalance ? 'Loading...' : formatCurrency(walletBalance)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Outstanding Credit</span>
+                    <span className="font-medium text-amber-600">{formatCurrency(outstandingCredit)}</span>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -306,7 +345,7 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
                 onClick={() => setPaymentType('delivery')}
                 disabled={remainingAmount <= 0}
               >
-                Delivery Payment
+                Balance Payment
               </Button>
               <Button
                 variant={paymentType === 'full' ? 'default' : 'outline'}
@@ -377,7 +416,7 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
           </div>
 
           {/* Transaction ID (for non-cash payments) */}
-          {selectedMethod !== 'cash' && (
+          {selectedMethod !== 'CASH' && (
             <div className="space-y-2">
               <Label htmlFor="transactionId">Transaction ID</Label>
               <Input
@@ -401,48 +440,63 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
           </div>
 
           {/* Split Payment / Wallet Section */}
-          <div className="space-y-4 pt-2 border-t mt-4">
-            <div className="flex justify-between items-center text-sm mb-2">
-              <span className="font-semibold text-lg">Final Payment Split</span>
-            </div>
+          <div className="space-y-3 pt-2">
+            <Label className="text-base">Wallet & Credit Split</Label>
 
-            <div className="flex items-center space-x-2 bg-slate-50 p-3 rounded-lg border">
-              <Checkbox
-                id="useWallet"
-                checked={useWallet}
-                onCheckedChange={(c) => setUseWallet(!!c)}
-                disabled={walletBalance <= 0 || !(order as any).customerId}
-              />
+            <div className={cn(
+              "flex items-start space-x-3 p-4 rounded-xl border transition-all",
+              useWallet
+                ? "bg-emerald-50/50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900"
+                : "bg-slate-50 border-border dark:bg-slate-900"
+            )}>
+                <Checkbox
+                  id="useWallet"
+                  checked={useWallet}
+                  onCheckedChange={(c) => setUseWallet(!!c)}
+                  disabled={walletBalance <= 0 || !customerId}
+                  className="mt-1"
+                />
               <div className="flex-1">
-                <Label htmlFor="useWallet" className="text-sm font-medium cursor-pointer">
+                <Label htmlFor="useWallet" className="text-base font-medium cursor-pointer">
                   Apply Wallet Balance
                 </Label>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  Available: <span className="font-bold text-emerald-600">{isLoadingWalletBalance ? 'Loading...' : formatCurrency(walletBalance)}</span>
+                <div className="text-sm text-muted-foreground mt-1">
+                  Available: <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                    {isLoadingWalletBalance ? 'Loading...' : formatCurrency(walletBalance)}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {useWallet && walletApplied > 0 && (
-              <div className="bg-emerald-50/50 p-3 rounded-lg text-sm border border-emerald-100 flex justify-between">
-                <span className="text-emerald-700">Wallet Usage:</span>
-                <span className="font-bold text-emerald-700">-{formatCurrency(walletApplied)}</span>
-              </div>
-            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+              {useWallet && walletApplied > 0 && (
+                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex flex-col justify-center dark:bg-emerald-950/30 dark:border-emerald-900/50">
+                  <span className="text-emerald-700 dark:text-emerald-400 text-sm font-medium mb-1">Wallet Deduction</span>
+                  <span className="font-bold text-emerald-800 dark:text-emerald-300 text-xl">-{formatCurrency(walletApplied)}</span>
+                </div>
+              )}
 
-            {parsedCash > 0 && (
-              <div className="bg-amber-50/50 p-3 rounded-lg text-sm border border-amber-100 flex justify-between items-center">
-                <span className="text-amber-800 font-medium">Cash Collected:</span>
-                <span className="font-extrabold text-amber-900">{formatCurrency(parsedCash)}</span>
-              </div>
-            )}
+              {parsedCash > 0 && (
+                <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 flex flex-col justify-center dark:bg-amber-950/30 dark:border-amber-900/50">
+                  <span className="text-amber-800 dark:text-amber-400 text-sm font-medium mb-1">Received Now</span>
+                  <span className="font-bold text-amber-900 dark:text-amber-300 text-xl">{formatCurrency(parsedCash)}</span>
+                </div>
+              )}
 
-            {creditRequired > 0 && (
-              <div className="bg-red-50 p-3 rounded-lg text-sm border border-red-200 flex justify-between items-center">
-                <span className="text-red-800 font-medium">Credit Required:</span>
-                <span className="font-extrabold text-red-900">{formatCurrency(creditRequired)}</span>
-              </div>
-            )}
+              {creditRequired > 0 && (
+                <div className={cn(
+                  "p-4 rounded-xl border flex flex-col justify-center",
+                  useWallet && walletApplied > 0 && parsedCash > 0 ? "sm:col-span-2" : "",
+                  "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900/50"
+                )}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-red-800 dark:text-red-400 text-sm font-medium">Auto-Credit (Added to Dues)</span>
+                    <Badge variant="outline" className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border-red-200">Pending</Badge>
+                  </div>
+                  <span className="font-bold text-red-900 dark:text-red-300 text-xl">{formatCurrency(creditRequired)}</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Action Buttons */}
@@ -468,6 +522,53 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
               )}
             </Button>
           </div>
+
+          {engineResult && (
+            <Card className="border-emerald-200 bg-emerald-50/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Engine Result</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Final Status</span>
+                  <Badge>{engineResult.paymentStatus}</Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span>Cash Applied</span>
+                  <span>{formatCurrency(engineResult.split.cashApplied)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Wallet Debited</span>
+                  <span>{formatCurrency(engineResult.split.walletDebited)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Credit Assigned</span>
+                  <span>{formatCurrency(engineResult.split.creditAssigned)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Credit ID</span>
+                  <span className="font-mono text-xs">{engineResult.creditId || customerId || "-"}</span>
+                </div>
+                {(engineResult.transactionIds.walletTransactionId || engineResult.transactionIds.creditTransactionId) && (
+                  <>
+                    <Separator />
+                    {engineResult.transactionIds.walletTransactionId && (
+                      <div className="flex justify-between">
+                        <span>Wallet Txn ID</span>
+                        <span className="font-mono text-xs">{engineResult.transactionIds.walletTransactionId}</span>
+                      </div>
+                    )}
+                    {engineResult.transactionIds.creditTransactionId && (
+                      <div className="flex justify-between">
+                        <span>Credit Txn ID</span>
+                        <span className="font-mono text-xs">{engineResult.transactionIds.creditTransactionId}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </DialogContent>
     </Dialog>

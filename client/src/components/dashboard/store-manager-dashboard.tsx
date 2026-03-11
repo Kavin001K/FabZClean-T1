@@ -7,7 +7,6 @@ import {
     IndianRupee,
     ShoppingBag,
     Users,
-    Truck,
     Clock,
     TrendingUp,
     TrendingDown,
@@ -130,7 +129,7 @@ export default function StoreManagerDashboard() {
                                 <p className="text-2xl font-bold mt-1">{readyForDispatch.length}</p>
                             </div>
                             <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                                <Truck className="h-5 w-5 text-purple-600" />
+                                <Package className="h-5 w-5 text-purple-600" />
                             </div>
                         </div>
                     </CardContent>
@@ -230,12 +229,6 @@ export default function StoreManagerDashboard() {
                             <Button variant="outline" className="w-full h-16 flex-col gap-1">
                                 <Banknote className="h-5 w-5" />
                                 <span className="text-xs">Wallet</span>
-                            </Button>
-                        </Link>
-                        <Link href="/deliveries">
-                            <Button variant="outline" className="w-full h-16 flex-col gap-1">
-                                <Truck className="h-5 w-5" />
-                                <span className="text-xs">Deliveries</span>
                             </Button>
                         </Link>
                     </div>

@@ -66,6 +66,275 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
+-- 4. Canonical Checkout Engine (v2)
+-- Uses immutable wallet ledger model and supports idempotent retries.
+CREATE OR REPLACE FUNCTION process_payment_checkout_v2(
+    p_order_id TEXT,
+    p_customer_id TEXT,
+    p_cash_amount NUMERIC(10, 2) DEFAULT 0,
+    p_use_wallet BOOLEAN DEFAULT TRUE,
+    p_wallet_debit_requested NUMERIC(10, 2) DEFAULT NULL,
+    p_payment_method TEXT DEFAULT 'CASH',
+    p_recorded_by TEXT DEFAULT NULL,
+    p_recorded_by_name TEXT DEFAULT NULL
+)
+RETURNS JSON AS $$
+DECLARE
+    v_order_total NUMERIC(10, 2);
+    v_advance_paid NUMERIC(10, 2);
+    v_remaining_amount NUMERIC(10, 2);
+    v_order_payment_status TEXT;
+    v_order_customer_id TEXT;
+
+    v_wallet_balance_before NUMERIC(10, 2) := 0;
+    v_wallet_balance_after NUMERIC(10, 2) := 0;
+    v_credit_balance_after NUMERIC(10, 2) := 0;
+
+    v_wallet_debited NUMERIC(10, 2) := 0;
+    v_cash_applied NUMERIC(10, 2) := 0;
+    v_credit_assigned NUMERIC(10, 2) := 0;
+
+    v_new_advance_paid NUMERIC(10, 2) := 0;
+    v_new_payment_status TEXT;
+
+    v_wallet_tx_code TEXT := NULL;
+    v_credit_tx_code TEXT := NULL;
+    v_payment_method_normalized TEXT := NULL;
+    v_request_key TEXT;
+
+    v_existing_order_id TEXT;
+BEGIN
+    -- 1) Lock order and get current payment context.
+    SELECT
+        id,
+        total_amount,
+        COALESCE(advance_paid, 0),
+        COALESCE(payment_status, 'pending'),
+        customer_id
+    INTO
+        v_existing_order_id,
+        v_order_total,
+        v_advance_paid,
+        v_order_payment_status,
+        v_order_customer_id
+    FROM orders
+    WHERE id = p_order_id
+    FOR UPDATE;
+
+    IF v_existing_order_id IS NULL THEN
+        RAISE EXCEPTION 'Order not found';
+    END IF;
+
+    IF p_customer_id IS NULL OR btrim(p_customer_id) = '' THEN
+        p_customer_id := v_order_customer_id;
+    END IF;
+
+    IF p_customer_id IS NULL OR btrim(p_customer_id) = '' THEN
+        RAISE EXCEPTION 'Customer ID is required for checkout';
+    END IF;
+
+    IF v_order_customer_id IS NOT NULL AND v_order_customer_id <> p_customer_id THEN
+        RAISE EXCEPTION 'Order customer mismatch';
+    END IF;
+
+    SELECT COALESCE(wallet_balance_cache, 0)
+    INTO v_wallet_balance_before
+    FROM customers
+    WHERE id = p_customer_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Customer not found';
+    END IF;
+
+    v_remaining_amount := GREATEST(v_order_total - v_advance_paid, 0);
+
+    IF v_remaining_amount <= 0 THEN
+        RETURN json_build_object(
+            'success', true,
+            'payment_status', 'paid',
+            'split', json_build_object(
+                'cashApplied', 0,
+                'walletDebited', 0,
+                'creditAssigned', 0
+            ),
+            'transaction_ids', json_build_object(
+                'wallet_transaction_id', NULL,
+                'credit_transaction_id', NULL
+            ),
+            'credit_id', p_customer_id,
+            'idempotent', true
+        );
+    END IF;
+
+    -- 2) Short idempotency guard for duplicate submissions.
+    v_request_key := md5(
+        concat_ws(
+            '|',
+            p_order_id,
+            COALESCE(p_cash_amount, 0)::TEXT,
+            COALESCE(p_use_wallet, FALSE)::TEXT,
+            COALESCE(p_wallet_debit_requested, -1)::TEXT,
+            COALESCE(p_payment_method, '')
+        )
+    );
+
+    IF EXISTS (
+        SELECT 1
+        FROM wallet_transactions wt
+        WHERE wt.reference_id = p_order_id
+          AND wt.note ILIKE '%' || v_request_key || '%'
+          AND wt.created_at > (NOW() - INTERVAL '30 seconds')
+    ) THEN
+        v_credit_assigned := GREATEST(v_order_total - v_advance_paid, 0);
+
+        RETURN json_build_object(
+            'success', true,
+            'payment_status', CASE WHEN v_credit_assigned > 0 THEN 'credit' ELSE 'paid' END,
+            'split', json_build_object(
+                'cashApplied', 0,
+                'walletDebited', 0,
+                'creditAssigned', v_credit_assigned
+            ),
+            'transaction_ids', json_build_object(
+                'wallet_transaction_id', NULL,
+                'credit_transaction_id', NULL
+            ),
+            'credit_id', p_customer_id,
+            'idempotent', true
+        );
+    END IF;
+
+    -- 3) Compute deterministic split: wallet first, then cash, rest as credit.
+    IF COALESCE(p_use_wallet, FALSE) THEN
+        IF COALESCE(p_wallet_debit_requested, 0) > 0 THEN
+            v_wallet_debited := LEAST(
+                v_remaining_amount,
+                GREATEST(v_wallet_balance_before, 0),
+                p_wallet_debit_requested
+            );
+        ELSE
+            v_wallet_debited := LEAST(
+                v_remaining_amount,
+                GREATEST(v_wallet_balance_before, 0)
+            );
+        END IF;
+    END IF;
+
+    v_cash_applied := LEAST(
+        GREATEST(v_remaining_amount - v_wallet_debited, 0),
+        GREATEST(COALESCE(p_cash_amount, 0), 0)
+    );
+
+    -- 4) Persist ledger entries (single source of truth).
+    -- For first posting, create one ORDER debit for current remainder.
+    IF v_order_payment_status <> 'credit' THEN
+        v_credit_tx_code := 'CRD-' || TO_CHAR(CLOCK_TIMESTAMP(), 'YYYYMMDDHH24MISSMS') || '-' || SUBSTRING(md5(random()::TEXT), 1, 6);
+
+        INSERT INTO wallet_transactions (
+            customer_id,
+            transaction_type,
+            amount,
+            verified_by_staff,
+            reference_type,
+            reference_id,
+            note,
+            created_by
+        ) VALUES (
+            p_customer_id,
+            'DEBIT',
+            -v_remaining_amount,
+            p_recorded_by,
+            'ORDER',
+            p_order_id,
+            '[' || v_credit_tx_code || '] Auto order debit | req=' || v_request_key || ' | by=' || COALESCE(p_recorded_by_name, 'system'),
+            p_recorded_by
+        );
+    END IF;
+
+    -- Apply current payment as a PAYMENT credit entry.
+    IF v_cash_applied > 0 THEN
+        v_payment_method_normalized := UPPER(REPLACE(COALESCE(p_payment_method, 'CASH'), ' ', '_'));
+        IF v_payment_method_normalized NOT IN ('CASH', 'UPI', 'BANK_TRANSFER', 'CARD', 'CHEQUE') THEN
+            v_payment_method_normalized := 'CASH';
+        END IF;
+
+        v_wallet_tx_code := 'WLT-' || TO_CHAR(CLOCK_TIMESTAMP(), 'YYYYMMDDHH24MISSMS') || '-' || SUBSTRING(md5(random()::TEXT), 1, 6);
+
+        INSERT INTO wallet_transactions (
+            customer_id,
+            transaction_type,
+            amount,
+            payment_method,
+            verified_by_staff,
+            reference_type,
+            reference_id,
+            note,
+            created_by
+        ) VALUES (
+            p_customer_id,
+            'CREDIT',
+            v_cash_applied,
+            v_payment_method_normalized,
+            p_recorded_by,
+            'PAYMENT',
+            p_order_id,
+            '[' || v_wallet_tx_code || '] Order payment received | req=' || v_request_key || ' | by=' || COALESCE(p_recorded_by_name, 'system'),
+            p_recorded_by
+        );
+    END IF;
+
+    -- 5) Derive post-state from ledger-updated customer balances.
+    SELECT
+        COALESCE(wallet_balance_cache, 0),
+        COALESCE(credit_balance, 0)
+    INTO
+        v_wallet_balance_after,
+        v_credit_balance_after
+    FROM customers
+    WHERE id = p_customer_id;
+
+    v_new_advance_paid := LEAST(v_order_total, v_advance_paid + v_wallet_debited + v_cash_applied);
+    v_credit_assigned := GREATEST(v_order_total - v_new_advance_paid, 0);
+    v_new_payment_status := CASE WHEN v_credit_assigned > 0 THEN 'credit' ELSE 'paid' END;
+
+    UPDATE orders
+    SET
+        customer_id = COALESCE(customer_id, p_customer_id),
+        advance_paid = v_new_advance_paid,
+        wallet_used = LEAST(v_order_total, COALESCE(wallet_used, 0) + v_wallet_debited),
+        credit_used = v_credit_assigned,
+        payment_status = v_new_payment_status,
+        payment_method = CASE
+            WHEN v_wallet_debited > 0 AND v_cash_applied > 0 THEN 'SPLIT'
+            WHEN v_wallet_debited > 0 THEN 'CREDIT_WALLET'
+            WHEN v_cash_applied > 0 THEN COALESCE(v_payment_method_normalized, 'CASH')
+            ELSE payment_method
+        END,
+        updated_at = NOW()
+    WHERE id = p_order_id;
+
+    RETURN json_build_object(
+        'success', true,
+        'payment_status', v_new_payment_status,
+        'split', json_build_object(
+            'cashApplied', v_cash_applied,
+            'walletDebited', v_wallet_debited,
+            'creditAssigned', v_credit_assigned
+        ),
+        'wallet_used', v_wallet_debited,
+        'credit_used', v_credit_assigned,
+        'transaction_ids', json_build_object(
+            'wallet_transaction_id', v_wallet_tx_code,
+            'credit_transaction_id', v_credit_tx_code
+        ),
+        'credit_id', p_customer_id,
+        'idempotent', false
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
 -- 2. Process Payment Checkout (Wallet + Cash Split + Credit Allocation)
 -- Handles the automated split logic.
 CREATE OR REPLACE FUNCTION process_payment_checkout(

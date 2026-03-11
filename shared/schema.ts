@@ -42,12 +42,12 @@ export const MAX_ADMIN_COUNT = 5;
 
 /** Navigation access matrix: role → allowed route prefixes */
 export const ROLE_NAV_ACCESS: Record<SystemRole, string[]> = {
-  admin: ['/', '/dashboard', '/create-order', '/orders', '/deliveries', '/customers', '/wallet-management', '/credits', '/user-management', '/services', '/print-queue', '/settings', '/profile'],
-  store_manager: ['/', '/dashboard', '/create-order', '/orders', '/deliveries', '/customers', '/wallet-management', '/credits', '/services', '/print-queue', '/settings', '/profile'],
-  factory_manager: ['/', '/dashboard', '/orders', '/deliveries', '/print-queue', '/settings', '/profile'],
+  admin: ['/', '/dashboard', '/create-order', '/orders', '/customers', '/wallet-management', '/credits', '/user-management', '/services', '/print-queue', '/settings', '/profile'],
+  store_manager: ['/', '/dashboard', '/create-order', '/orders', '/customers', '/wallet-management', '/credits', '/services', '/print-queue', '/settings', '/profile'],
+  factory_manager: ['/', '/dashboard', '/orders', '/print-queue', '/settings', '/profile'],
   store_staff: ['/', '/dashboard', '/create-order', '/orders', '/customers', '/wallet-management', '/credits', '/print-queue', '/profile'],
   factory_staff: [], // No login
-  driver: ['/delivery-home', '/delivery-history', '/profile'],
+  driver: ['/profile'],
 };
 
 
@@ -481,7 +481,7 @@ export const creditAccounts = pgTable("credit_accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id").references(() => customers.id).notNull().unique(),
   totalCredit: decimal("total_credit", { precision: 10, scale: 2 }).notNull().default("0"),
-  creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }).notNull().default("500"),
+  creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }).notNull().default("1000"),
   status: text("status", { enum: ["active", "suspended"] }).default("active"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

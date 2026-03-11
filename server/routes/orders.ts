@@ -18,7 +18,6 @@ import { barcodeService } from "../barcode-service";
 import { OrderService } from "../services/order.service";
 import { AuthService } from "../auth-service";
 import {
-  sendOrderCreatedNotification,
   handleOrderStatusChange,
   type OrderStatus,
   type FulfillmentType,
@@ -26,252 +25,140 @@ import {
 
 const router = Router();
 const orderService = new OrderService();
+const DELIVERY_DISABLED_MESSAGE = 'Delivery operations are disabled in this build.';
+const DELIVERY_DISABLED_STATUSES = new Set(['assigned', 'ready_for_delivery', 'out_for_delivery', 'delivered']);
+const FINANCIAL_MUTATION_FIELDS = new Set(['paymentStatus', 'advancePaid', 'walletUsed', 'creditUsed', 'paymentMethod']);
 
 // Apply rate limiting to all order routes
 router.use(jwtRequired);
 
+const parseAmount = (value: unknown): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, parsed);
+};
+
+const parseBoolean = (value: unknown, fallback = false): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    if (value.toLowerCase() === 'true') return true;
+    if (value.toLowerCase() === 'false') return false;
+  }
+  return fallback;
+};
+
+const getCheckoutSplit = (data: any) => {
+  const split = data?.split || {};
+  return {
+    cashApplied: Number(split.cashApplied ?? data?.cash_applied ?? 0),
+    walletDebited: Number(split.walletDebited ?? data?.wallet_used ?? 0),
+    creditAssigned: Number(split.creditAssigned ?? data?.credit_used ?? 0),
+  };
+};
+
+const getCheckoutTransactionIds = (data: any) => {
+  const transactionIds = data?.transaction_ids || {};
+  return {
+    walletTransactionId: transactionIds.wallet_transaction_id || null,
+    creditTransactionId: transactionIds.credit_transaction_id || null,
+  };
+};
+
 /**
- * POST /api/orders/:orderId/checkout
- * Process a checkout/payment for an order, supporting Cash/Wallet splits
- * Uses secure ACIDs RPC internally for wallet deductions
+ * POST /api/orders/:id/checkout
+ * Canonical payment engine entrypoint (wallet first, then cash, remainder -> credit).
  */
 router.post('/:id/checkout', async (req, res) => {
   try {
     const orderId = req.params.id;
-    const { customerId, cashAmount = 0, walletAmount = 0 } = req.body;
-
-    const parsedCash = parseFloat(cashAmount);
-    const parsedWallet = parseFloat(walletAmount);
-
-    if (isNaN(parsedCash) || isNaN(parsedWallet) || (parsedCash <= 0 && parsedWallet <= 0)) {
-      return res.status(400).json(createErrorResponse('Valid cash or wallet amount is required', 400));
-    }
-
-    if (!customerId) {
-      return res.status(400).json(createErrorResponse('Customer ID is required for checkout', 400));
-    }
+    const {
+      customerId,
+      cashAmount = 0,
+      walletAmount = 0, // legacy alias
+      useWallet,
+      walletDebitRequested,
+      paymentMethod = 'CASH',
+    } = req.body || {};
 
     const order = await storage.getOrder(orderId);
     if (!order) {
       return res.status(404).json(createErrorResponse('Order not found', 404));
     }
 
-    // Process the payment through our master ledger RPC
+    const resolvedCustomerId = customerId || order.customerId;
+    if (!resolvedCustomerId) {
+      return res.status(400).json(createErrorResponse('Customer ID is required for checkout', 400));
+    }
+
+    const parsedCash = parseAmount(cashAmount);
+    const parsedWalletLegacy = parseAmount(walletAmount);
+    const parsedWalletRequested = parseAmount(
+      walletDebitRequested !== undefined ? walletDebitRequested : parsedWalletLegacy
+    );
+    const shouldUseWallet = parseBoolean(
+      useWallet,
+      parsedWalletRequested > 0 || parsedWalletLegacy > 0
+    );
+
     const recordedBy = req.employee?.id || null;
     const recordedByName = req.employee?.username || 'system';
 
     const result = await (storage as any).processOrderCheckout(
       orderId,
-      customerId,
+      resolvedCustomerId,
       parsedCash,
-      parsedWallet,
+      parsedWalletRequested,
       recordedBy,
-      recordedByName
+      recordedByName,
+      {
+        useWallet: shouldUseWallet,
+        walletDebitRequested: parsedWalletRequested,
+        paymentMethod,
+      }
     );
 
     if (!result.success) {
-      return res.status(400).json(createErrorResponse(result.error || 'Payment processing failed. Check wallet balance.', 400));
+      return res.status(400).json(createErrorResponse(result.error || 'Payment processing failed', 400));
     }
 
-    // The RPC handled the financial transaction (ledger & wallet), 
-    // AND it updated the order's paymentStatus, advancePaid, walletUsed, and creditUsed!
+    let updatedOrder = await storage.getOrder(orderId);
+    if (!updatedOrder) {
+      return res.status(404).json(createErrorResponse('Order not found after checkout', 404));
+    }
 
-    const updates: any = {
-      paymentMethod: parsedWallet > 0 && parsedCash > 0 ? 'SPLIT' : (parsedWallet > 0 ? 'CREDIT_WALLET' : 'CASH'),
+    const paymentStatus = result.data?.payment_status || (updatedOrder as any).paymentStatus || 'pending';
+    const creditId = result.data?.credit_id || resolvedCustomerId;
+
+    // Maintain backward behavior: auto-complete early-stage orders when fully paid.
+    const earlyStatuses = ['pending', 'processing', 'confirmed'];
+    if (paymentStatus === 'paid' && earlyStatuses.includes(updatedOrder.status)) {
+      updatedOrder = await storage.updateOrder(orderId, { status: 'completed' }) || updatedOrder;
+    }
+    const serializedOrder = serializeOrder(updatedOrder);
+
+    const responsePayload: any = {
+      ...serializedOrder,
+      paymentStatus,
+      split: getCheckoutSplit(result.data),
+      transactionIds: getCheckoutTransactionIds(result.data),
+      creditId,
+      order: serializedOrder,
+      idempotent: Boolean(result.data?.idempotent),
     };
 
-    // Only advance overall order fulfillment status if it's fully paid and in an early stage
-    const rpcPaymentStatus = result.data?.payment_status;
-    const earlyStatuses = ['pending', 'processing', 'confirmed'];
-    if (rpcPaymentStatus === 'paid' && earlyStatuses.includes(order.status)) {
-      updates.status = 'completed';
-    }
-
-    const updatedOrder = await storage.updateOrder(orderId, updates);
-
-    // Provide the frontend with the newly updated order
-    res.json(createSuccessResponse(updatedOrder, 'Order checkout successful'));
+    res.json(createSuccessResponse(responsePayload, 'Order checkout successful'));
   } catch (error: any) {
     console.error('Checkout error:', error);
     res.status(500).json(createErrorResponse(`Failed to process checkout: ${error.message}`, 500));
   }
 });
 
-/**
- * GET /api/orders/delivery-queue
- * Returns orders that are ready for delivery or out for delivery.
- * Used by admin delivery assignment page.
- */
 router.get('/delivery-queue', async (req, res) => {
-  try {
-    const allOrders = await storage.listOrders();
-
-    // Only delivery orders in active delivery statuses
-    const deliveryStatuses = ['ready_for_delivery', 'out_for_delivery', 'assigned'];
-    const queue = allOrders.filter((order: any) =>
-      order.fulfillmentType === 'delivery' &&
-      deliveryStatuses.includes(order.status) &&
-      order.status !== 'cancelled' &&
-      order.status !== 'completed'
-    );
-
-    res.json(createSuccessResponse(queue, `${queue.length} orders in delivery queue`));
-  } catch (error: any) {
-    console.error('Delivery queue error:', error);
-    res.status(500).json(createErrorResponse('Failed to fetch delivery queue', 500));
-  }
+  return res.status(410).json(createErrorResponse(DELIVERY_DISABLED_MESSAGE, 410));
 });
 
-/**
- * PATCH /api/orders/:id/deliver
- * The Delivery Completion Engine — atomic transaction that:
- * 1. Sets order status to 'delivered' with timestamp
- * 2. Snapshots delivery partner's perOrderSalary → order.deliveryEarningsCalculated
- * 3. If credit order: deducts from customer wallet, writes to credit_transactions ledger
- */
 router.patch('/:id/deliver', async (req, res) => {
-  try {
-    const orderId = req.params.id;
-    const recordedBy = req.employee?.id || 'system';
-    const recordedByName = req.employee?.username || 'system';
-
-    // 1. Fetch the order
-    const order = await storage.getOrder(orderId);
-    if (!order) {
-      return res.status(404).json(createErrorResponse('Order not found', 404));
-    }
-
-    if (order.status === 'delivered') {
-      return res.status(400).json(createErrorResponse('Order is already delivered', 400));
-    }
-
-    // 2. Fetch delivery partner to get perOrderSalary
-    let earningsSnapshot = 0;
-    if (order.deliveryPartnerId) {
-      const employees = await storage.listEmployees();
-      const deliveryPartner = employees.find((e: any) => e.id === order.deliveryPartnerId);
-      if (deliveryPartner) {
-        earningsSnapshot = (deliveryPartner as any).perOrderSalary || (deliveryPartner as any).per_order_salary || 0;
-      }
-    }
-
-    // 3. Build order updates
-    const orderUpdates: any = {
-      status: 'delivered',
-      deliveredAt: new Date().toISOString(),
-      deliveryEarningsCalculated: earningsSnapshot,
-    };
-
-    // 4. Handle Credit Order logic
-    const isCreditOrder = (order as any).isCreditOrder || (order as any).is_credit_order;
-    if (isCreditOrder && order.customerId) {
-      const orderTotal = parseFloat(order.totalAmount || '0');
-
-      // Use Supabase RPC for atomic credit deduction
-      const supabase = (storage as any).supabase;
-
-      // Fetch customer balance
-      const { data: customer, error: custErr } = await supabase
-        .from('customers')
-        .select('credit_balance')
-        .eq('id', order.customerId)
-        .single();
-
-      if (custErr || !customer) {
-        return res.status(400).json(createErrorResponse('Customer not found for credit deduction', 400));
-      }
-
-      const currentBalance = parseFloat(customer.credit_balance || '0');
-      if (currentBalance < orderTotal) {
-        return res.status(400).json(createErrorResponse(
-          `Insufficient wallet balance (₹${currentBalance}) for order total (₹${orderTotal})`, 400
-        ));
-      }
-
-      // Atomic: Deduct balance
-      const newBalance = currentBalance - orderTotal;
-      const { error: updateErr } = await supabase
-        .from('customers')
-        .update({ credit_balance: newBalance.toString() })
-        .eq('id', order.customerId)
-        .gte('credit_balance', orderTotal.toString()); // Concurrency guard
-
-      if (updateErr) {
-        return res.status(400).json(createErrorResponse('Failed to deduct wallet balance (possible race condition)', 400));
-      }
-
-      // Insert ledger entry into credit_transactions
-      await supabase.from('credit_transactions').insert({
-        customer_id: order.customerId,
-        order_id: orderId,
-        type: 'CREDIT_OUT',
-        amount: (-orderTotal).toString(),
-        balance_after: newBalance.toString(),
-        payment_method: 'CREDIT_WALLET',
-        recorded_by: recordedBy,
-        recorded_by_name: recordedByName,
-        notes: `Credit deduction for delivered order ${order.orderNumber}`,
-        transaction_date: new Date().toISOString(),
-      });
-
-      // Insert into master ledger
-      await supabase.from('transactions').insert({
-        customer_id: order.customerId,
-        order_id: orderId,
-        type: 'ORDER_PAYMENT',
-        payment_method: 'CREDIT_WALLET',
-        amount: orderTotal.toString(),
-        status: 'SUCCESS',
-      });
-
-      // Mark payment as paid
-      orderUpdates.paymentStatus = 'paid';
-    } else if (order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit') {
-      // It's a regular order but not paid yet -> Cash collected on delivery
-      const orderTotal = parseFloat(order.totalAmount || '0');
-      orderUpdates.paymentStatus = 'paid';
-      orderUpdates.paymentMethod = 'cash';
-      orderUpdates.deliveryCashCollected = orderTotal;
-    }
-
-    // 5. Save the order updates (with fallback for missing delivery_cash_collected column)
-    let updatedOrder;
-    try {
-      updatedOrder = await storage.updateOrder(orderId, orderUpdates);
-    } catch (saveError: any) {
-      // If the error is about missing deliveryCashCollected column, retry without it
-      if (saveError.message?.includes('deliveryCashCollected') || saveError.message?.includes('delivery_cash_collected')) {
-        console.warn('⚠️ delivery_cash_collected column not found, retrying without it');
-        delete orderUpdates.deliveryCashCollected;
-        updatedOrder = await storage.updateOrder(orderId, orderUpdates);
-      } else {
-        throw saveError;
-      }
-    }
-
-    // 6. Log the action
-    if (req.employee) {
-      await AuthService.logAction(
-        req.employee.employeeId,
-        req.employee.username,
-        'delivery_completed',
-        'order',
-        orderId,
-        {
-          earningsSnapshot,
-          isCreditOrder,
-          customerId: order.customerId,
-        },
-        req.ip || req.connection.remoteAddress,
-        req.get('user-agent')
-      );
-    }
-
-    res.json(createSuccessResponse(updatedOrder, 'Delivery marked as complete'));
-  } catch (error: any) {
-    console.error('Deliver error:', error);
-    res.status(500).json(createErrorResponse(`Failed to complete delivery: ${error.message}`, 500));
-  }
+  return res.status(410).json(createErrorResponse(DELIVERY_DISABLED_MESSAGE, 410));
 });
 
 // Get next order number preview (for display on order creation form)
@@ -522,15 +409,101 @@ router.post(
   validateInput(insertOrderSchema),
   async (req, res) => {
     try {
-      const orderData = req.body;
+      const orderData: any = { ...(req.body || {}) };
+
+      // Delivery is disabled for new orders in this build.
+      orderData.fulfillmentType = 'pickup';
+      orderData.deliveryCharges = '0';
+      orderData.deliveryAddress = null;
+      orderData.deliveryPartnerId = null;
+      if (DELIVERY_DISABLED_STATUSES.has(orderData.status)) {
+        orderData.status = 'pending';
+      }
+
+      // Financial posting is now canonical via checkout engine only.
+      orderData.paymentStatus = 'pending';
 
       // Add employee ID for order tracking
       if (req.employee) {
         orderData.employeeId = req.employee.employeeId;
       }
 
+      const requestedCashAtCreate = parseAmount(orderData.advancePaid);
+      const requestedWalletDebitAtCreate = parseAmount(
+        orderData.walletDebitRequested ?? orderData.walletAmount ?? orderData.walletUsed
+      );
+      const useWalletAtCreate = parseBoolean(
+        orderData.useWallet,
+        requestedWalletDebitAtCreate > 0
+      );
+      orderData.advancePaid = '0';
+      orderData.walletUsed = '0';
+      orderData.creditUsed = '0';
+
+      // Credit limit guard for automatic-credit mode
+      if (orderData.customerId) {
+        const customer = await storage.getCustomer(orderData.customerId);
+        if (customer) {
+          const totalAmount = parseAmount(orderData.totalAmount);
+          const walletBalance = parseAmount((customer as any).walletBalanceCache || '0');
+          const projectedWalletCover = useWalletAtCreate
+            ? Math.min(walletBalance, requestedWalletDebitAtCreate || walletBalance)
+            : 0;
+          const projectedCreditRequired = Math.max(
+            0,
+            totalAmount - requestedCashAtCreate - projectedWalletCover
+          );
+
+          if (projectedCreditRequired > 0) {
+            const currentCredit = parseAmount(customer.creditBalance || "0");
+            const rawLimit = Number((customer as any).creditLimit ?? -500);
+            const creditLimit = Math.abs(Number.isFinite(rawLimit) ? rawLimit : 500);
+            if (creditLimit > 0 && currentCredit + projectedCreditRequired > creditLimit) {
+              return res.status(400).json(
+                createErrorResponse(
+                  `Credit limit exceeded. Required ₹${projectedCreditRequired.toFixed(2)}, available ₹${Math.max(0, creditLimit - currentCredit).toFixed(2)}.`,
+                  400
+                )
+              );
+            }
+          }
+        }
+      }
+
       // Use OrderService to create order
-      const order = await orderService.createOrder(orderData);
+      let order = await orderService.createOrder(orderData);
+      let checkoutData: any = null;
+
+      // Canonical payment engine run: auto-ledger unpaid remainder as credit.
+      if (order.customerId) {
+        const recordedBy = req.employee?.id || null;
+        const recordedByName = req.employee?.username || 'system';
+        const checkoutResult = await (storage as any).processOrderCheckout(
+          order.id,
+          order.customerId,
+          requestedCashAtCreate,
+          requestedWalletDebitAtCreate,
+          recordedBy,
+          recordedByName,
+          {
+            useWallet: useWalletAtCreate,
+            walletDebitRequested: requestedWalletDebitAtCreate,
+            paymentMethod: orderData.paymentMethod || 'CASH',
+          }
+        );
+
+        if (!checkoutResult.success) {
+          try {
+            await storage.deleteOrder(order.id);
+          } catch (rollbackError) {
+            console.error('Automatic checkout failed and rollback delete also failed:', rollbackError);
+          }
+          throw new Error(checkoutResult.error || 'Failed to run automatic checkout');
+        }
+
+        checkoutData = checkoutResult.data;
+        order = await storage.getOrder(order.id) || order;
+      }
 
       // Log order creation
       if (req.employee) {
@@ -560,29 +533,6 @@ router.post(
         } catch (loyaltyError) {
           console.warn('Failed to process loyalty rewards:', loyaltyError);
         }
-
-        // Handle credit payment - add to customer's credit balance
-        if (order.paymentStatus === 'credit') {
-          try {
-            const totalAmount = parseFloat(order.totalAmount || "0");
-            const advancePaid = parseFloat(order.advancePaid || "0");
-            const creditAmount = Math.max(0, totalAmount - advancePaid);
-
-            if (creditAmount > 0) {
-              await storage.addCustomerCredit(
-                order.customerId,
-                creditAmount,
-                'credit',
-                `Order ${order.orderNumber} placed on credit (Total: ${totalAmount}, Advance: ${advancePaid})`,
-                order.id,
-                req.employee?.employeeId
-              );
-              console.log(`💳 [Credit] Added ₹${creditAmount} to customer ${order.customerId} credit for order ${order.orderNumber}`);
-            }
-          } catch (creditError) {
-            console.warn('Failed to add customer credit:', creditError);
-          }
-        }
       }
 
       // Generate QR code
@@ -600,7 +550,16 @@ router.post(
       // to ensure the real PDF link is sent rather than a static placeholder.
 
       const serializedOrder = serializeOrder(order);
-      res.status(201).json(createSuccessResponse(serializedOrder, 'Order created successfully'));
+      const responsePayload = {
+        ...serializedOrder,
+        paymentStatus: checkoutData?.payment_status || (serializedOrder as any).paymentStatus || 'pending',
+        split: getCheckoutSplit(checkoutData),
+        transactionIds: getCheckoutTransactionIds(checkoutData),
+        creditId: checkoutData?.credit_id || order.customerId || null,
+        order: serializedOrder,
+      };
+
+      res.status(201).json(createSuccessResponse(responsePayload, 'Order created successfully'));
     } catch (error) {
       console.error('Create order error:', error);
 
@@ -622,8 +581,31 @@ router.post(
 router.put('/:id', async (req, res) => {
   try {
     const orderId = req.params.id;
-    const updateData = req.body;
+    const updateData = req.body || {};
     console.log(`[UPDATE ORDER] ID: ${orderId}`, JSON.stringify(updateData, null, 2));
+
+    const attemptedFinancialMutations = Object.keys(updateData).filter((field) =>
+      FINANCIAL_MUTATION_FIELDS.has(field)
+    );
+    if (attemptedFinancialMutations.length > 0) {
+      return res.status(400).json(createErrorResponse(
+        `Direct mutation blocked for financial fields: ${attemptedFinancialMutations.join(', ')}. Use checkout/credit APIs.`,
+        400
+      ));
+    }
+
+    if (updateData.status && DELIVERY_DISABLED_STATUSES.has(String(updateData.status))) {
+      return res.status(410).json(createErrorResponse(DELIVERY_DISABLED_MESSAGE, 410));
+    }
+
+    if (
+      updateData.fulfillmentType === 'delivery' ||
+      updateData.deliveryAddress !== undefined ||
+      updateData.deliveryCharges !== undefined ||
+      updateData.deliveryPartnerId !== undefined
+    ) {
+      return res.status(410).json(createErrorResponse(DELIVERY_DISABLED_MESSAGE, 410));
+    }
 
     const order = await storage.getOrder(orderId);
     if (!order) {
@@ -641,63 +623,6 @@ router.put('/:id', async (req, res) => {
           from: order.totalAmount,
           to: updateData.totalAmount
         };
-      }
-
-      if (updateData.paymentStatus && updateData.paymentStatus !== order.paymentStatus) {
-        changes.payment_status_changed = {
-          from: order.paymentStatus,
-          to: updateData.paymentStatus
-        };
-
-        if (updateData.paymentStatus === 'paid') {
-          await AuthService.logAction(
-            req.employee.employeeId,
-            req.employee.username,
-            'payment_received',
-            'order',
-            orderId,
-            {
-              amount: updatedOrder?.totalAmount,
-              method: updatedOrder?.paymentMethod
-            },
-            req.ip || req.connection.remoteAddress,
-            req.get('user-agent')
-          );
-
-          if (order.paymentStatus === 'credit' && order.customerId) {
-            try {
-              const orderAmount = parseFloat(order.totalAmount || "0");
-              await storage.addCustomerCredit(
-                order.customerId,
-                -orderAmount,
-                'payment',
-                `Payment received for order ${order.orderNumber}`,
-                orderId,
-                req.employee?.employeeId
-              );
-              console.log(`💳 [Credit] Reduced ₹${orderAmount} from customer ${order.customerId} credit - order ${order.orderNumber} paid`);
-            } catch (creditError) {
-              console.warn('Failed to reduce customer credit:', creditError);
-            }
-          }
-        }
-
-        if (updateData.paymentStatus === 'credit' && order.paymentStatus !== 'credit' && order.customerId) {
-          try {
-            const orderAmount = parseFloat(order.totalAmount || "0");
-            await storage.addCustomerCredit(
-              order.customerId,
-              orderAmount,
-              'credit',
-              `Order ${order.orderNumber} marked as credit`,
-              orderId,
-              req.employee?.employeeId
-            );
-            console.log(`💳 [Credit] Added ₹${orderAmount} to customer ${order.customerId} credit for order ${order.orderNumber}`);
-          } catch (creditError) {
-            console.warn('Failed to add customer credit:', creditError);
-          }
-        }
       }
 
       await AuthService.logAction(
@@ -781,6 +706,10 @@ router.patch(
         return res.status(400).json(createErrorResponse('Status is required', 400));
       }
 
+      if (DELIVERY_DISABLED_STATUSES.has(status)) {
+        return res.status(410).json(createErrorResponse(DELIVERY_DISABLED_MESSAGE, 410));
+      }
+
       const order = await storage.getOrder(orderId);
       if (!order) {
         return res.status(404).json(createErrorResponse('Order not found', 404));
@@ -823,21 +752,11 @@ router.patch(
         }
       }
 
-      if ((status === 'completed' || status === 'delivered') && order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit') {
+      if (status === 'completed' && order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit') {
         return res.status(400).json(createErrorResponse(
-          'Payment must be marked as paid or credit before completing or delivering the order',
+          'Payment must be marked as paid or credit before completing the order',
           400
         ));
-      }
-
-      // Enforce Home Delivery Flow strict rules
-      if (status === 'delivered') {
-        if (req.employee?.id !== order.deliveryPartnerId) {
-          return res.status(403).json(createErrorResponse(
-            'Only the assigned delivery captain can manually mark an order as delivered.',
-            403
-          ));
-        }
       }
 
       const updatedOrder = await storage.updateOrder(orderId, { status });
@@ -981,120 +900,12 @@ router.post('/:id/log-print', async (req, res) => {
 
 // Assign delivery partner to order
 router.patch('/:id/assign-delivery', async (req, res) => {
-  try {
-    const orderId = req.params.id;
-    const { deliveryPartnerId } = req.body;
-
-    if (!deliveryPartnerId) {
-      return res.status(400).json(createErrorResponse('Delivery Partner ID is required', 400));
-    }
-
-    // Verify employee exists and is a delivery partner
-    const employees = await storage.listEmployees();
-    const employee = employees.find(e => e.id === deliveryPartnerId || e.employeeId === deliveryPartnerId);
-
-    const empPos = (employee?.position || '').toLowerCase();
-    if (!employee || (empPos !== 'delivery' && empPos !== 'driver')) {
-      return res.status(400).json(createErrorResponse('Invalid delivery partner selected', 400));
-    }
-
-    // Update the order
-    const updatedOrder = await storage.updateOrder(orderId, {
-      deliveryPartnerId: employee.id, // Ensure we use the UUID from the DB
-      status: 'out_for_delivery'
-    });
-
-    // Notify real-time clients
-    realtimeServer.triggerUpdate('order', 'updated', updatedOrder);
-
-    // Log action
-    if (req.employee) {
-      await AuthService.logAction(
-        req.employee.employeeId,
-        req.employee.username,
-        'assign_delivery',
-        'order',
-        orderId,
-        { deliveryPartnerId: employee.employeeId, deliveryPartnerName: employee.firstName },
-        req.ip || req.connection.remoteAddress,
-        req.get('user-agent')
-      );
-    }
-
-    res.json(createSuccessResponse(serializeOrder(updatedOrder), 'Delivery partner assigned successfully'));
-  } catch (error) {
-    console.error('Assign delivery error:', error);
-    res.status(500).json(createErrorResponse('Failed to assign delivery partner', 500));
-  }
+  return res.status(410).json(createErrorResponse(DELIVERY_DISABLED_MESSAGE, 410));
 });
 
 // Delivery Partner Completes Order & Collects Payment
 router.patch('/:id/delivery-complete', async (req, res) => {
-  try {
-    const orderId = req.params.id;
-    const { paymentCollected, paymentMethod } = req.body;
-
-    const order = await storage.getOrder(orderId);
-    if (!order) return res.status(404).json(createErrorResponse('Order not found', 404));
-
-    // Security Check: Ensure the user marking it completed is actually the assigned driver
-    if (req.employee && req.employee.id !== order.deliveryPartnerId) {
-      if (req.employee.role !== 'admin') {
-        return res.status(403).json(createErrorResponse('Only the assigned captain can mark this order as delivered', 403));
-      }
-    }
-
-    const updates: any = { status: 'delivered' };
-
-    if (paymentCollected) {
-      updates.paymentStatus = 'paid';
-      if (paymentMethod) updates.paymentMethod = paymentMethod;
-    }
-
-    const updatedOrder = await storage.updateOrder(orderId, updates);
-
-    // If payment was collected, map to wallet credit reductions or standard logging
-    if (paymentCollected && req.employee) {
-      await AuthService.logAction(
-        req.employee.employeeId,
-        req.employee.username,
-        'payment_received_delivery',
-        'order',
-        orderId,
-        { amount: updatedOrder?.totalAmount, method: updates.paymentMethod || order.paymentMethod },
-        req.ip || req.connection.remoteAddress,
-        req.get('user-agent')
-      );
-
-      // Credit processing hook if originally credit but now paid cash on delivery
-      if (order.paymentStatus === 'credit' && order.customerId) {
-        try {
-          const orderAmount = parseFloat(order.totalAmount || "0");
-          await storage.addCustomerCredit(
-            order.customerId,
-            -orderAmount,
-            'payment',
-            `Payment collected strictly upon delivery for order ${order.orderNumber}`,
-            orderId,
-            req.employee?.employeeId
-          );
-        } catch (creditError) {
-          console.warn('Failed to reduce customer credit after cash on delivery:', creditError);
-        }
-      }
-    }
-
-    realtimeServer.triggerUpdate('order', 'status_changed' as any, {
-      orderId: orderId,
-      status: 'delivered',
-      previousStatus: order.status
-    });
-
-    res.json(createSuccessResponse(serializeOrder(updatedOrder), 'Order delivered successfully'));
-  } catch (error) {
-    console.error('Complete delivery error:', error);
-    res.status(500).json(createErrorResponse('Failed to complete delivery', 500));
-  }
+  return res.status(410).json(createErrorResponse(DELIVERY_DISABLED_MESSAGE, 410));
 });
 
 // Delete order

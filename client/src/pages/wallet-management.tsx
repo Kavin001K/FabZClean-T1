@@ -70,9 +70,15 @@ const fetchCustomers = async (): Promise<WalletCustomer[]> => {
 
 const walletApi = {
   recharge: async (customerId: string, payload: { amount: number; paymentMethod: string; referenceNumber?: string; notes?: string }) => {
-    const res = await authorizedFetch(`/credits/${customerId}/payment`, {
+    const res = await authorizedFetch(`/wallet/recharge`, {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        customerId,
+        amount: payload.amount,
+        paymentMethod: payload.paymentMethod,
+        referenceNumber: payload.referenceNumber,
+        notes: payload.notes,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.message || "Failed to recharge wallet");
@@ -85,6 +91,15 @@ const walletApi = {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.message || "Failed to issue refund");
+    return data;
+  },
+  payCredit: async (customerId: string, payload: { amount: number; paymentMethod: string; referenceNumber?: string; notes?: string }) => {
+    const res = await authorizedFetch(`/credits/${customerId}/payment`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.message || "Failed to record credit payment");
     return data;
   },
   adjust: async (customerId: string, payload: { amount: number; reason: string; notes?: string }) => {
@@ -107,6 +122,7 @@ export default function WalletManagementPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [selectedCustomer, setSelectedCustomer] = useState<WalletCustomer | null>(null);
   const [rechargeOpen, setRechargeOpen] = useState(false);
+  const [creditPaymentOpen, setCreditPaymentOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -200,6 +216,24 @@ export default function WalletManagementPage() {
     },
     onError: (error: Error) => {
       toast({ title: "Refund failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const creditPaymentMutation = useMutation({
+    mutationFn: () => walletApi.payCredit(selectedCustomer!.id, {
+      amount: toNumber(amount, 0),
+      paymentMethod,
+      referenceNumber,
+      notes: `Credit payment by ${employee?.fullName || employee?.username} (${employee?.employeeId}). ${notes || ""}`.trim(),
+    }),
+    onSuccess: () => {
+      toast({ title: "Credit payment recorded", description: "Outstanding credit has been reduced." });
+      setCreditPaymentOpen(false);
+      resetDialogState();
+      refreshData();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Payment failed", description: error.message, variant: "destructive" });
     },
   });
 
@@ -465,6 +499,13 @@ export default function WalletManagementPage() {
                               <DropdownMenuItem onClick={() => {
                                 resetDialogState();
                                 setSelectedCustomer(row);
+                                setCreditPaymentOpen(true);
+                              }}>
+                                <IndianRupee className="mr-2 h-4 w-4" /> Receive Credit Payment
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                resetDialogState();
+                                setSelectedCustomer(row);
                                 setHistoryOpen(true);
                               }}>
                                 <RefreshCw className="mr-2 h-4 w-4" /> View History
@@ -676,6 +717,76 @@ export default function WalletManagementPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={creditPaymentOpen} onOpenChange={setCreditPaymentOpen}>
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-md">
+          <DialogHeader>
+            <DialogTitle>Receive Credit Payment</DialogTitle>
+            <DialogDescription>{selectedCustomer?.name}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+              <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Processed by:</span>
+              <span className="text-xs font-semibold text-blue-900 dark:text-blue-100">
+                {employee?.fullName || employee?.username} ({employee?.employeeId})
+              </span>
+            </div>
+            <div className="space-y-2">
+              <Label>Amount</Label>
+              <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
+            <div className="space-y-4">
+              <Label className="text-sm font-semibold">Payment Method</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'cash', name: 'Cash', icon: <Banknote className="w-4 h-4" /> },
+                  { id: 'upi', name: 'UPI', icon: <Smartphone className="w-4 h-4" /> },
+                  { id: 'card', name: 'Card', icon: <CreditCard className="w-4 h-4" /> },
+                  { id: 'net_banking', name: 'Net Banking', icon: <Building className="w-4 h-4" /> },
+                  { id: 'cheque', name: 'Cheque', icon: <FileText className="w-4 h-4" /> },
+                  { id: 'other', name: 'Other', icon: <Search className="w-4 h-4" /> }
+                ].map((method) => (
+                  <Button
+                    key={method.id}
+                    type="button"
+                    variant={paymentMethod === method.id ? "default" : "outline"}
+                    className={cn(
+                      "justify-start gap-2 h-10 transition-all duration-200",
+                      paymentMethod === method.id ? "ring-2 ring-primary ring-offset-1" : "hover:bg-accent/50"
+                    )}
+                    onClick={() => setPaymentMethod(method.id)}
+                  >
+                    {method.icon}
+                    <span className="text-sm">{method.name}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Reference (Optional)</Label>
+              <Input
+                placeholder="Transaction ID / Receipt #"
+                className="bg-muted/50"
+                value={referenceNumber}
+                onChange={(e) => setReferenceNumber(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Internal Note</Label>
+              <Input placeholder="Additional context..." value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreditPaymentOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => creditPaymentMutation.mutate()}
+              disabled={creditPaymentMutation.isPending || toNumber(amount, 0) <= 0}
+            >
+              Record Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
         <DialogContent className="w-[calc(100vw-1rem)] max-w-md">
           <DialogHeader>
@@ -774,6 +885,10 @@ export default function WalletManagementPage() {
                                   </span>
                                 </>
                               )}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-1 font-mono">
+                              Credit ID: {tx.creditId || selectedCustomer?.id || "-"}
+                              {tx.transactionId ? ` • Txn: ${tx.transactionId}` : ""}
                             </p>
                           </div>
                         </div>

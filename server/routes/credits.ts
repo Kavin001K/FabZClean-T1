@@ -13,15 +13,12 @@ import { db as storage } from '../db';
 import { jwtRequired, requireRole } from '../middleware/auth';
 import { createSuccessResponse, createErrorResponse } from '../services/serialization';
 import { AuthService } from '../auth-service';
-import type { UserRole } from '../../shared/supabase';
 
 const router = Router();
 
 // Roles that can manage credits
-const CREDIT_VIEW_ROLES: string[] = ['admin', 'staff'];
-// Staff should be able to post verified wallet payments/recharges.
-// High-risk balance corrections remain admin-only via ADMIN_ONLY.
-const CREDIT_MANAGE_ROLES: string[] = ['admin', 'staff'];
+const CREDIT_VIEW_ROLES: string[] = ['admin', 'store_manager', 'factory_manager', 'store_staff'];
+const CREDIT_MANAGE_ROLES: string[] = ['admin', 'store_manager', 'store_staff'];
 const ADMIN_ONLY: string[] = ['admin'];
 
 // Apply JWT authentication to all routes
@@ -61,6 +58,7 @@ router.get('/:customerId', requireRole(CREDIT_VIEW_ROLES), async (req, res) => {
                 phone: customer.phone,
                 email: customer.email,
             },
+            creditId: customer.id,
             creditBalance: pendingBalance,
             summary: {
                 totalCredited,
@@ -133,6 +131,7 @@ router.post('/:customerId/add', requireRole(CREDIT_MANAGE_ROLES), async (req, re
 
         res.json(createSuccessResponse({
             message: 'Credit added successfully',
+            creditId: customerId,
             newBalance: result.balanceAfter,
             transaction: result
         }));
@@ -209,6 +208,7 @@ router.post('/:customerId/payment', requireRole(CREDIT_MANAGE_ROLES), async (req
 
         res.json(createSuccessResponse({
             message: 'Payment recorded successfully',
+            creditId: customerId,
             previousBalance: currentBalance,
             amountPaid: paymentAmount,
             newBalance: result.balanceAfter,
@@ -281,6 +281,7 @@ router.post('/:customerId/adjust', requireRole(ADMIN_ONLY), async (req, res) => 
 
         res.json(createSuccessResponse({
             message: 'Credit adjusted successfully',
+            creditId: customerId,
             previousBalance: currentBalance,
             adjustment: adjustmentAmount,
             newBalance: currentBalance + adjustmentAmount,

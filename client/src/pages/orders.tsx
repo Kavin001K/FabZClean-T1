@@ -85,7 +85,7 @@ import {
 } from "lucide-react";
 
 // Data Service
-import { ordersApi, formatCurrency, formatDate } from '@/lib/data-service';
+import { ordersApi, formatCurrency, formatDate, authorizedFetch } from '@/lib/data-service';
 import { exportOrdersToCSV } from '@/lib/export-utils';
 import { exportOrdersEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportOrdersToExcel } from '@/lib/excel-exports';
@@ -505,35 +505,64 @@ function OrdersComponent() {
     updateOrderStatusMutation.mutate({ orderId, newStatus });
   }, [updateOrderStatusMutation, orders, toast]);
 
-  const handleMarkAsPaid = useCallback((orderId: string) => {
-    updateOrderMutation.mutate({
-      orderId,
-      updates: { paymentStatus: 'paid' }
-    });
-  }, [updateOrderMutation]);
+  const handleDebitFromWallet = useCallback(async (order: Order) => {
+    const customerId = (order as any).customerId;
+    if (!customerId) {
+      toast({
+        title: "Customer missing",
+        description: "Cannot run wallet debit without a linked customer.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  const handleMarkAsCredit = useCallback((orderId: string, order: Order) => {
-    // Confirm credit action with user
-    const customerName = order.customerName || 'Customer';
-    const amount = parseFloat(order.totalAmount || '0').toLocaleString('en-IN', { maximumFractionDigits: 2 });
+    const total = parseFloat(order.totalAmount || "0");
+    const advance = parseFloat((order as any).advancePaid || "0");
+    const remaining = Math.max(0, total - advance);
 
-    if (window.confirm(`Mark order as Credit?\n\n₹${amount} will be added to ${customerName}'s credit balance.\n\nThe customer will need to pay this amount later.`)) {
-      updateOrderMutation.mutate({
-        orderId,
-        updates: {
-          paymentStatus: 'credit',
-          paymentMethod: 'credit'
-        }
-      }, {
-        onSuccess: () => {
-          toast({
-            title: "Order Marked as Credit",
-            description: `₹${amount} added to ${customerName}'s credit balance`,
-          });
-        }
+    if (remaining <= 0) {
+      toast({
+        title: "Nothing due",
+        description: "Order is already fully settled.",
+      });
+      return;
+    }
+
+    try {
+      const res = await authorizedFetch(`/orders/${order.id}/checkout`, {
+        method: "POST",
+        body: JSON.stringify({
+          customerId,
+          cashAmount: 0,
+          useWallet: true,
+          walletDebitRequested: remaining,
+          walletAmount: remaining, // legacy alias
+          paymentMethod: "CREDIT_WALLET",
+        }),
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload?.error?.message || payload?.message || "Failed to debit wallet");
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["credits", customerId] });
+      queryClient.invalidateQueries({ queryKey: ["customer", customerId] });
+
+      const split = payload?.data?.split || {};
+      toast({
+        title: "Wallet debit processed",
+        description: `Wallet: ₹${Number(split.walletDebited || 0).toFixed(2)} • Credit: ₹${Number(split.creditAssigned || 0).toFixed(2)}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Wallet debit failed",
+        description: error?.message || "Unable to process wallet debit.",
+        variant: "destructive",
       });
     }
-  }, [updateOrderMutation, toast]);
+  }, [queryClient, toast]);
 
   const handleBulkStatusUpdate = useCallback(async (newStatus: string) => {
     if (selectedOrders.length === 0) {
@@ -1118,16 +1147,14 @@ function OrdersComponent() {
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedPaymentOrder(order); setIsPaymentModalOpen(true); }}>
                     <IndianRupee className="mr-2 h-4 w-4" /> Process Payment
                   </DropdownMenuItem>
-                  {order.paymentStatus !== 'credit' && (
-                    <DropdownMenuItem onClick={() => handleMarkAsCredit(order.id, order)} className="text-orange-600 focus:text-orange-600">
-                      💳 Debit from Wallet (Credit)
-                    </DropdownMenuItem>
-                  )}
+                  <DropdownMenuItem onClick={() => handleDebitFromWallet(order)} className="text-orange-600 focus:text-orange-600">
+                    💳 Debit from Wallet
+                  </DropdownMenuItem>
                 </>
               )}
               {order.paymentStatus === 'credit' && (
-                <DropdownMenuItem onClick={() => handleMarkAsPaid(order.id)} className="text-green-600 focus:text-green-600">
-                  ✅ Clear Ledger (Mark Paid)
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedPaymentOrder(order); setIsPaymentModalOpen(true); }} className="text-green-600 focus:text-green-600">
+                  ✅ Process Credit Payment
                 </DropdownMenuItem>
               )}
               {order.status !== 'completed' && order.status !== 'cancelled' && (
@@ -1140,7 +1167,7 @@ function OrdersComponent() {
         </div>
       </div>
     );
-  }, [selectedOrders, ordersGridColumns, getStatusColor, getStatusIcon, getPaymentStatusColor, handleSelectOrder, handleViewOrder, handleEditOrder, handlePrintInvoice, handleUpdateStatus, handleMarkAsPaid, handleMarkAsCredit, handleCancelOrder, setIsPaymentModalOpen, setSelectedPaymentOrder]);
+  }, [selectedOrders, ordersGridColumns, getStatusColor, getStatusIcon, getPaymentStatusColor, handleSelectOrder, handleViewOrder, handleEditOrder, handlePrintInvoice, handleUpdateStatus, handleDebitFromWallet, handleCancelOrder, setIsPaymentModalOpen, setSelectedPaymentOrder]);
 
   const OrderHeaders = (
     <div className={`grid ${ordersGridColumns} gap-4 items-center px-4 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase select-none`}>
@@ -1998,9 +2025,17 @@ function OrdersComponent() {
                                               Mark as In Progress
                                             </DropdownMenuItem>
                                             {order.paymentStatus !== 'paid' && (
-                                              <DropdownMenuItem onClick={() => handleMarkAsPaid(order.id)}>
-                                                Mark as Paid
-                                              </DropdownMenuItem>
+                                              <>
+                                                <DropdownMenuItem onClick={() => {
+                                                  setSelectedPaymentOrder(order);
+                                                  setIsPaymentModalOpen(true);
+                                                }}>
+                                                  Process Payment
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleDebitFromWallet(order)}>
+                                                  Debit from Wallet
+                                                </DropdownMenuItem>
+                                              </>
                                             )}
                                             <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>
                                               Mark as Completed
@@ -2077,13 +2112,7 @@ function OrdersComponent() {
         onCancel={handleCancelOrder}
         onNextStep={handleNextStep}
         onPrintInvoice={handlePrintInvoice}
-        onUpdatePaymentStatus={(order, status) => {
-          if (status === 'paid') {
-            handleMarkAsPaid(order.id);
-          } else {
-            handleMarkAsCredit(order.id, order);
-          }
-        }}
+        onUpdatePaymentStatus={() => {}}
       />
 
       <EditOrderDialog
@@ -2109,8 +2138,7 @@ function OrdersComponent() {
           }}
           onPaymentUpdate={(id, data) => {
             queryClient.invalidateQueries({ queryKey: ["orders"] });
-            setIsPaymentModalOpen(false);
-            setSelectedPaymentOrder(null);
+            setSelectedPaymentOrder(data as any);
           }}
         />
       )}

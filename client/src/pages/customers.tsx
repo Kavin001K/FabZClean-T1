@@ -311,7 +311,7 @@ export default function Customers() {
       ? Number(customerData.creditLimit)
       : undefined;
     const normalizedCreditLimit = parsedCreditLimit !== undefined && !Number.isNaN(parsedCreditLimit)
-      ? (-Math.abs(parsedCreditLimit)).toString()
+      ? Math.abs(parsedCreditLimit).toString()
       : undefined;
     const transformedData: Partial<Customer> = {
       name: customerData.name,
@@ -344,7 +344,7 @@ export default function Customers() {
       ? Number(customerData.creditLimit)
       : undefined;
     const normalizedCreditLimit = parsedCreditLimit !== undefined && !Number.isNaN(parsedCreditLimit)
-      ? (-Math.abs(parsedCreditLimit)).toString()
+      ? Math.abs(parsedCreditLimit).toString()
       : undefined;
     const transformedData: Partial<Customer> = {
       name: customerData.name,

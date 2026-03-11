@@ -140,9 +140,7 @@ export class PDFCompressor {
         let iteration = 0;
         let bestResult: { blob: Blob; quality: number; size: number } | null = null;
 
-        console.log('🔄 Starting smart PDF compression...');
-        console.log(`📊 Canvas size: ${canvas.width}x${canvas.height}`);
-        console.log(`🎯 Target size: ${this.config.targetSizeKB} KB`);
+        // Smart PDF compression started
 
         while (iteration < this.config.maxIterations) {
             iteration++;

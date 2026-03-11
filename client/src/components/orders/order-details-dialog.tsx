@@ -41,7 +41,7 @@ export interface OrderDetailsDialogProps {
   onCancel: (order: Order) => void;
   onNextStep: (order: Order) => void;
   onPrintInvoice: (order: Order) => void;
-  onUpdatePaymentStatus: (order: Order, status: 'paid' | 'credit') => void;
+  onUpdatePaymentStatus?: (order: Order, status: 'paid' | 'credit') => void;
 }
 
 // Format status for display
@@ -113,8 +113,7 @@ export default React.memo(function OrderDetailsDialog({
   onEdit,
   onCancel,
   onNextStep,
-  onPrintInvoice,
-  onUpdatePaymentStatus
+  onPrintInvoice
 }: OrderDetailsDialogProps) {
   const { printInvoice } = useInvoicePrint({
     onSuccess: (invoiceData) => {
@@ -305,10 +304,24 @@ export default React.memo(function OrderDetailsDialog({
                 <span className="font-medium">{anyOrder.paymentMethod || 'Cash'}</span>
               </div>
 
-              {anyOrder.advancePaid && (
+              {anyOrder.walletUsed && parseFloat(anyOrder.walletUsed) > 0 && (
                 <div className="flex justify-between text-sm pt-2 border-t">
-                  <span className="text-muted-foreground">Advance Paid</span>
-                  <span className="text-green-600 font-medium">{formatCurrency(anyOrder.advancePaid)}</span>
+                  <span className="text-muted-foreground">Wallet Used</span>
+                  <span className="text-emerald-600 font-medium">-{formatCurrency(anyOrder.walletUsed)}</span>
+                </div>
+              )}
+
+              {anyOrder.advancePaid && parseFloat(anyOrder.advancePaid) > 0 && (
+                <div className="flex justify-between text-sm pt-2 border-t">
+                  <span className="text-muted-foreground">Advance/Cash Paid</span>
+                  <span className="text-amber-600 font-medium">{formatCurrency(anyOrder.advancePaid)}</span>
+                </div>
+              )}
+
+              {anyOrder.creditUsed && parseFloat(anyOrder.creditUsed) > 0 && (
+                <div className="flex justify-between text-sm pt-2 border-t">
+                  <span className="text-muted-foreground">Credit Assigned</span>
+                  <span className="text-red-600 font-medium">{formatCurrency(anyOrder.creditUsed)}</span>
                 </div>
               )}
 
@@ -351,41 +364,6 @@ export default React.memo(function OrderDetailsDialog({
 
         {/* Footer Actions */}
         <div className="flex flex-col gap-4 pt-4 border-t mt-2">
-          {/* WARNING: UNPAID COMPLETION */}
-          {(order.status === 'ready_for_pickup' || order.status === 'out_for_delivery') &&
-            anyOrder.paymentStatus !== 'paid' && anyOrder.paymentStatus !== 'credit' && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-900/20 dark:border-amber-800">
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
-                    <AlertCircle className="h-4 w-4" />
-                    <span className="font-bold text-sm">Payment Required to Complete</span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-3 items-center justify-between ml-6">
-                    <p className="text-xs text-amber-700 dark:text-amber-300">
-                      Settle payment to complete this order.
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        className="h-7 bg-green-600 hover:bg-green-700 text-white border-0"
-                        onClick={() => onUpdatePaymentStatus(order, 'paid')}
-                      >
-                        Mark Paid
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 border-amber-300 text-amber-800 hover:bg-amber-100"
-                        onClick={() => onUpdatePaymentStatus(order, 'credit')}
-                      >
-                        Mark Credit
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
           <div className="flex justify-end gap-2 flex-wrap">
             {order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'delivered' && (
               <Button variant="ghost" onClick={() => onCancel(order)} className="text-red-600 hover:text-red-700 hover:bg-red-50">

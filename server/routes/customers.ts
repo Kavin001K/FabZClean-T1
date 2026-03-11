@@ -446,6 +446,81 @@ router.get('/segments/list', async (req, res) => {
   }
 });
 
+// Update customer credit limit
+router.patch(
+  "/:id/credit-limit",
+  requireRole(CUSTOMER_ADMIN_ROLES),
+  async (req, res) => {
+    try {
+      const customerId = req.params.id;
+      const { creditLimit } = req.body;
+      const employee = (req as any).employee || (req as any).user;
+      const createdBy = employee?.employeeId || 'system';
+
+      if (creditLimit === undefined || isNaN(creditLimit) || creditLimit > 0) {
+        return res.status(400).json(createErrorResponse('Valid negative credit limit is required', 400));
+      }
+
+      const customer = await storage.getCustomer(customerId);
+      if (!customer) {
+        return res.status(404).json(createErrorResponse('Customer not found', 404));
+      }
+
+      const oldLimit = customer.creditLimit || -500;
+      const updatedCustomer = await storage.updateCustomer(customerId, { creditLimit });
+
+      // Notify real-time clients
+      realtimeServer.broadcast({
+        type: 'customer_updated',
+        data: updatedCustomer
+      });
+
+      const description = `Credit limit updated from ₹${Math.abs(Number(oldLimit))} to ₹${Math.abs(Number(creditLimit))}`;
+
+      // Log in wallet/credit transactions as a 0 amount adjustment just for history
+      try {
+        await storage.addCustomerCredit(
+          customerId,
+          0,
+          'adjustment',
+          description,
+          undefined,
+          createdBy
+        );
+      } catch (err) {
+        console.error('Failed to log credit limit adjustment to ledger:', err);
+      }
+
+      // Track for Audit Log
+      if (employee) {
+        try {
+          await AuthService.logAction(
+            employee.employeeId,
+            employee.username,
+            'update_credit_limit',
+            'customer',
+            customerId,
+            {
+              oldLimit,
+              newLimit: creditLimit
+            },
+            req.ip || req.connection.remoteAddress,
+            req.get('user-agent')
+          );
+        } catch (err) {
+          console.error("Failed to log audit action", err);
+        }
+      }
+
+      const serializedCustomer = serializeCustomer(updatedCustomer);
+      res.json(createSuccessResponse(serializedCustomer, 'Customer credit limit updated successfully'));
+    } catch (error) {
+      console.error('Update credit limit error:', error);
+      res.status(500).json(createErrorResponse('Failed to update credit limit', 500));
+    }
+  }
+);
+
 
 // ======= CREDIT ROUTES =======
 

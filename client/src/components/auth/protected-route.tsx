@@ -58,14 +58,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         return;
       }
 
-      // Driver: Redirect from admin paths to /delivery-home
+      // Driver role is disabled in active UI flow.
       if (role === 'driver') {
-        const driverAllowed = ROLE_NAV_ACCESS.driver;
-        const isAllowed = driverAllowed.some(p => location === p || location.startsWith(p + '/'));
-        if (!isAllowed) {
-          setLocation('/delivery-home');
-          return;
-        }
+        setLocation('/unauthorized');
+        return;
       }
 
       // All other roles: Check nav access matrix

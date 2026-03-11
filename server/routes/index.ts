@@ -1,8 +1,7 @@
-import { Express } from 'express';
+import { Express, Router } from 'express';
 import ordersRouter from './orders';
 import customersRouter from './customers';
 import employeesRouter from './employees';
-import deliveriesRouter from './deliveries';
 import productsRouter from './products';
 import servicesRouter from './services';
 import searchRouter from './api/search';
@@ -26,7 +25,6 @@ import publicTrackingRouter from './public-tracking';
 import publicInvoiceRouter from './public-invoice';
 import businessSettingsRouter from './business-settings';
 import walletRouter from './wallet';
-import deliveriesApiRouter from './deliveries-api';
 import { jwtRequired } from '../middleware/auth';
 import { debugRouter } from './debug';
 import { db as storage } from '../db';
@@ -37,6 +35,16 @@ import { initAnalyticsCron } from '../scripts/monthly-analytics-cron';
  * Register all route modules with the Express app
  */
 export function registerAllRoutes(app: Express): void {
+  const deliveryDisabledRouter = Router();
+  deliveryDisabledRouter.use((_req, res) => {
+    res.status(410).json({
+      success: false,
+      error: 'Delivery module is disabled in this build.',
+      message: 'Delivery routes have been removed from active operations.',
+      statusCode: 410,
+    });
+  });
+
   // Due Date Orders endpoint
   app.get("/api/due-date-orders", jwtRequired, async (req, res) => {
     try {
@@ -153,12 +161,12 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/credits', creditsRouter);
   app.use('/api/wallet', walletRouter);
   app.use('/api/reports', reportsRouter);
-  app.use('/api/deliveries', deliveriesApiRouter);
+  app.use('/api/deliveries', deliveryDisabledRouter);
 
   // Initialize the autonomous analytics cron job
   initAnalyticsCron();
 
-  app.use('/api/v1/deliveries', deliveriesRouter);
+  app.use('/api/v1/deliveries', deliveryDisabledRouter);
   app.use('/api/v1/products', productsRouter);
   app.use('/api/v1/services', servicesRouter);
 
@@ -186,7 +194,7 @@ export function registerAllRoutes(app: Express): void {
   // Legacy API routes (for backward compatibility)
   app.use('/api/orders', ordersRouter);
   app.use('/api/customers', customersRouter);
-  app.use('/api/deliveries', deliveriesRouter);
+  app.use('/api/deliveries', deliveryDisabledRouter);
   app.use('/api/products', productsRouter);
   app.use('/api/services', servicesRouter);
   app.use('/api/employees', employeesRouter);

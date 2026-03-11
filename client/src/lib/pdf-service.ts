@@ -187,6 +187,7 @@ export class PDFService {
             const response = await fetch('/api/upload-pdf', {
                 method: 'POST',
                 body: formData,
+                credentials: 'include',
             });
 
             if (!response.ok) {
