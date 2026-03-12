@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type KeyboardEvent } from 'react';
 import { Search, X, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import type { Customer } from '@shared/schema';
 
 interface CustomerAutocompleteProps {
-    customers: Customer[];
+    customers?: Customer[];
     onSelect: (customer: Customer) => void;
     onCreateNew?: (query: string) => void;
+    searchCustomers?: (query: string) => Promise<Customer[]>;
     placeholder?: string;
     className?: string;
 }
@@ -71,46 +72,80 @@ function calculateRelevance(customer: Customer, query: string): number {
 }
 
 export function CustomerAutocomplete({
-    customers,
+    customers = [],
     onSelect,
     onCreateNew,
+    searchCustomers,
     placeholder = 'Search by name, phone, or email...',
     className = ''
 }: CustomerAutocompleteProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [isOpen, setIsOpen] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
     const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
     const [highlightedIndex, setHighlightedIndex] = useState(0);
     const wrapperRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const requestIdRef = useRef(0);
 
-    // Debug: Log customers when they change
-    React.useEffect(() => {
-        console.log('[Autocomplete] Total customers:', customers.length);
-    }, [customers]);
-
-    // Filter and sort customers based on search query
+    // Filter and sort customers based on search query.
+    // Remote search is used for the New Order flow to avoid loading the entire
+    // customer list up front.
     useEffect(() => {
         if (!searchQuery.trim()) {
             setFilteredCustomers([]);
             setIsOpen(false);
+            setIsSearching(false);
             return;
         }
 
-        const matches = customers
-            .map(customer => ({
-                customer,
-                score: calculateRelevance(customer, searchQuery)
-            }))
-            .filter(({ score }) => score > 0)
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 10) // Show top 10 matches
-            .map(({ customer }) => customer);
+        let isCancelled = false;
+        const requestId = ++requestIdRef.current;
 
-        setFilteredCustomers(matches);
-        setIsOpen(true); // Always open if there is a query, to show "Create New" option
-        setHighlightedIndex(0);
-    }, [searchQuery, customers]);
+        const applyMatches = (matches: Customer[]) => {
+            if (isCancelled || requestId !== requestIdRef.current) return;
+            setFilteredCustomers(matches.slice(0, 10));
+            setIsOpen(true);
+            setHighlightedIndex(0);
+        };
+
+        const runSearch = async () => {
+            if (searchCustomers) {
+                setIsSearching(true);
+                try {
+                    const matches = await searchCustomers(searchQuery.trim());
+                    applyMatches(Array.isArray(matches) ? matches : []);
+                } catch (error) {
+                    console.error('[Autocomplete] Customer search failed:', error);
+                    applyMatches([]);
+                } finally {
+                    if (!isCancelled && requestId === requestIdRef.current) {
+                        setIsSearching(false);
+                    }
+                }
+                return;
+            }
+
+            const matches = customers
+                .map(customer => ({
+                    customer,
+                    score: calculateRelevance(customer, searchQuery)
+                }))
+                .filter(({ score }) => score > 0)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 10)
+                .map(({ customer }) => customer);
+
+            applyMatches(matches);
+        };
+
+        const timer = window.setTimeout(runSearch, searchCustomers ? 250 : 0);
+
+        return () => {
+            isCancelled = true;
+            window.clearTimeout(timer);
+        };
+    }, [searchQuery, customers, searchCustomers]);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -125,7 +160,7 @@ export function CustomerAutocomplete({
     }, []);
 
     // Keyboard navigation
-    const handleKeyDown = (e: React.KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
         if (!isOpen) return;
 
         // If we have results, navigation includes them. If we have "Create New", it's the last item.
@@ -203,20 +238,29 @@ export function CustomerAutocomplete({
                     placeholder={placeholder}
                     className="pl-9 pr-9"
                 />
-                {searchQuery && (
+                {isSearching ? (
+                    <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                ) : searchQuery ? (
                     <button
                         onClick={handleClear}
                         className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                         <X className="h-4 w-4" />
                     </button>
-                )}
+                ) : null}
             </div>
 
             {/* Dropdown */}
             {isOpen && searchQuery && (
                 <Card className="absolute z-[9999] w-full mt-1 max-h-80 overflow-y-auto shadow-xl border bg-popover text-popover-foreground">
                     <div className="p-2">
+                        {isSearching && (
+                            <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Searching customers...
+                            </div>
+                        )}
+
                         {filteredCustomers.map((customer, index) => (
                             <button
                                 key={customer.id}
@@ -255,6 +299,12 @@ export function CustomerAutocomplete({
                                 </div>
                             </button>
                         ))}
+
+                        {!isSearching && filteredCustomers.length === 0 && !onCreateNew && (
+                            <div className="px-3 py-3 text-sm text-muted-foreground">
+                                No matching customers found.
+                            </div>
+                        )}
 
                         {/* Create New Option */}
                         {onCreateNew && (

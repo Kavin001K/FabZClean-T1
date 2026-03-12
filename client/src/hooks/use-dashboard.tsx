@@ -2,9 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { analyticsApi, ordersApi, customersApi } from '@/lib/data-service';
-import { useAnalyticsEngine } from '@/hooks/use-analytics-engine';
 import {
-  DashboardState,
   DashboardFilters,
   DateRange,
   QuickActionForm,
@@ -14,18 +12,45 @@ import {
   ServicePopularityData
 } from '@/types/dashboard';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
+import type { Order } from '@shared/schema';
 
-// Default date range (last 30 days)
+const STATUS_COLORS: Record<string, string> = {
+  pending: '#f59e0b',
+  processing: '#3b82f6',
+  completed: '#10b981',
+  delivered: '#059669',
+  cancelled: '#ef4444',
+  ready_for_pickup: '#8b5cf6',
+  ready_for_delivery: '#6366f1',
+};
+
+const SERVICE_COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#14b8a6'];
+const ACTIVE_ORDER_STATUSES = ['pending', 'processing', 'ready', 'assigned', 'in_transit', 'ready_for_pickup', 'ready_for_delivery'];
+const COMPLETED_ORDER_STATUSES = ['completed', 'delivered'];
+
 const getDefaultDateRange = (): DateRange => ({
   from: startOfDay(subDays(new Date(), 29)),
   to: endOfDay(new Date()),
 });
 
+const toAmount = (value: unknown): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const isWithinSelectedRange = (value: string | Date | null | undefined, range: DateRange): boolean => {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  return date >= range.from && date <= range.to;
+};
+
+const isNonCancelledOrder = (order: Order) => order.status !== 'cancelled';
+
 export function useDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // State management
   const [filters, setFilters] = useState<DashboardFilters>({
     dateRange: getDefaultDateRange(),
   });
@@ -36,61 +61,16 @@ export function useDashboard() {
     employee: { name: '', phone: '', email: '', position: '', salary: '' },
   });
 
-  // Data fetching with React Query
   const {
     data: dashboardMetrics,
     isLoading: metricsLoading,
     error: metricsError,
   } = useQuery({
-    queryKey: ['dashboard/metrics', filters.dateRange],
+    queryKey: ['dashboard/metrics'],
     queryFn: () => analyticsApi.getDashboardMetrics(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
     retry: 3,
   });
-
-  // ✅ Use the central analytics engine for realtime data processing
-  const {
-    statusDistribution: rawOrderStatusData,
-    servicePerformance: rawServicePopularityData,
-    kpiMetrics,
-    isLoading: analyticsLoading,
-    error: analyticsError,
-  } = useAnalyticsEngine();
-
-  // Sales data is now handled by RevenueChartRealtime component
-  // Keep this for backward compatibility but it will be empty
-  const salesData: SalesData[] = [];
-  const salesLoading = false;
-  const salesError = null;
-
-  const orderStatusLoading = analyticsLoading;
-  const orderStatusError = analyticsError;
-
-  const serviceLoading = analyticsLoading;
-  const serviceError = analyticsError;
-
-  // Convert analytics engine output to expected format
-  const orderStatusData = useMemo(() => {
-    if (!Array.isArray(rawOrderStatusData)) return [];
-    return rawOrderStatusData.map(item => ({
-      status: item.status,
-      value: item.value,
-      name: item.name,
-      color: item.color,
-      percentage: item.percentage,
-    }));
-  }, [rawOrderStatusData]);
-
-  const servicePopularityData = useMemo(() => {
-    if (!Array.isArray(rawServicePopularityData)) return [];
-    return rawServicePopularityData.map(item => ({
-      name: item.name,
-      value: item.revenue, // Use revenue as the main value
-      orders: item.count,
-      revenue: item.revenue,
-      fill: item.fill,
-    }));
-  }, [rawServicePopularityData]);
 
   const {
     data: allOrders,
@@ -99,47 +79,9 @@ export function useDashboard() {
   } = useQuery({
     queryKey: ['dashboard/all-orders'],
     queryFn: () => ordersApi.getAll(),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 2 * 60 * 1000,
     retry: 3,
   });
-
-  // Due today orders - filter from all orders
-  const dueTodayOrders = useMemo(() => {
-    if (!allOrders) return [];
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    return allOrders.filter(order => {
-      if (!order.pickupDate) return false;
-      const pickup = new Date(order.pickupDate);
-      pickup.setHours(0, 0, 0, 0);
-      return pickup <= today; // Include overdue and due today
-    }).map(order => ({
-      ...order,
-      total: parseFloat(order.totalAmount || '0'),
-      customerPhone: order.customerPhone || undefined,
-      customerEmail: order.customerEmail || undefined,
-      pickupDate: order.pickupDate ? new Date(order.pickupDate).toISOString() : '',
-      createdAt: order.createdAt ? new Date(order.createdAt).toISOString() : '',
-    }));
-  }, [allOrders]);
-
-  // Orders created today
-  const ordersTodayCount = useMemo(() => {
-    if (!allOrders) return 0;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    return allOrders.filter(order => {
-      if (!order.createdAt) return false;
-      const created = new Date(order.createdAt);
-      return created >= today && created < tomorrow;
-    }).length;
-  }, [allOrders]);
 
   const {
     data: customers,
@@ -152,153 +94,177 @@ export function useDashboard() {
     retry: 3,
   });
 
-  // Revenue today
-  const revenueToday = useMemo(() => {
-    if (!allOrders) return 0;
+  const safeOrders = useMemo(() => Array.isArray(allOrders) ? [...allOrders] : [], [allOrders]);
+  const safeCustomers = useMemo(() => Array.isArray(customers) ? [...customers] : [], [customers]);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  const filteredOrders = useMemo(() => {
+    return safeOrders.filter((order) => {
+      if (!isWithinSelectedRange(order.createdAt, filters.dateRange)) return false;
+      if (filters.status && order.status !== filters.status) return false;
+      if (filters.serviceType) {
+        const items = Array.isArray(order.items) ? order.items : [];
+        const hasRequestedService = items.some((item: any) =>
+          String(item?.serviceName || item?.customName || '').toLowerCase().includes(filters.serviceType!.toLowerCase())
+        );
+        if (!hasRequestedService) return false;
+      }
+      return true;
+    });
+  }, [safeOrders, filters.dateRange, filters.status, filters.serviceType]);
+
+  const activeFilteredOrders = useMemo(
+    () => filteredOrders.filter(isNonCancelledOrder),
+    [filteredOrders]
+  );
+
+  const filteredCustomers = useMemo(() => {
+    return safeCustomers.filter((customer) => isWithinSelectedRange(customer.createdAt, filters.dateRange));
+  }, [safeCustomers, filters.dateRange]);
+
+  const dueDateStats = useMemo(() => {
+    const today = startOfDay(new Date());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfterTomorrow = new Date(tomorrow);
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
+
+    return safeOrders.filter(isNonCancelledOrder).reduce((stats, order) => {
+      if (!order.pickupDate) return stats;
+      const pickupDate = startOfDay(new Date(order.pickupDate));
+
+      if (pickupDate < today) stats.overdue += 1;
+      else if (pickupDate.getTime() === today.getTime()) stats.today += 1;
+      else if (pickupDate.getTime() === tomorrow.getTime()) stats.tomorrow += 1;
+      else if (pickupDate >= dayAfterTomorrow) stats.upcoming += 1;
+
+      return stats;
+    }, {
+      today: 0,
+      tomorrow: 0,
+      overdue: 0,
+      upcoming: 0,
+    });
+  }, [safeOrders]);
+
+  const ordersTodayCount = useMemo(() => {
+    const today = startOfDay(new Date());
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    return allOrders.filter(order => {
-      if (!order.createdAt) return false;
-      const created = new Date(order.createdAt);
-      return created >= today && created < tomorrow;
-    }).reduce((sum, order) => sum + (parseFloat(order.totalAmount || '0')), 0);
-  }, [allOrders]);
+    return safeOrders.filter((order) =>
+      isNonCancelledOrder(order) &&
+      order.createdAt &&
+      new Date(order.createdAt) >= today &&
+      new Date(order.createdAt) < tomorrow
+    ).length;
+  }, [safeOrders]);
+
+  const revenueToday = useMemo(() => {
+    const today = startOfDay(new Date());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return safeOrders.reduce((sum, order) => {
+      if (!isNonCancelledOrder(order) || !order.createdAt) return sum;
+      const createdAt = new Date(order.createdAt);
+      if (createdAt < today || createdAt >= tomorrow) return sum;
+      return sum + toAmount(order.totalAmount);
+    }, 0);
+  }, [safeOrders]);
 
   const ordersCompletedToday = useMemo(() => {
-    if (!allOrders) return 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = startOfDay(new Date());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
-    return allOrders.filter(order => {
-      const dateStr = order.updatedAt || order.createdAt;
-      if (!dateStr) return false;
-      const date = new Date(dateStr);
-      return date >= today && ['completed', 'delivered'].includes(order.status);
+    return safeOrders.filter((order) => {
+      if (!COMPLETED_ORDER_STATUSES.includes(order.status)) return false;
+      const timestamp = order.deliveredAt || order.updatedAt || order.createdAt;
+      if (!timestamp) return false;
+      const date = new Date(timestamp);
+      return date >= today && date < tomorrow;
     }).length;
-  }, [allOrders]);
+  }, [safeOrders]);
 
   const pendingOrdersCount = useMemo(() => {
-    if (!allOrders) return 0;
-    return allOrders.filter(order => ['pending', 'processing', 'ready', 'assigned', 'in_transit'].includes(order.status)).length;
-  }, [allOrders]);
+    return safeOrders.filter((order) => ACTIVE_ORDER_STATUSES.includes(order.status)).length;
+  }, [safeOrders]);
 
   const newCustomersToday = useMemo(() => {
-    if (!customers) return 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = startOfDay(new Date());
+    return safeCustomers.filter((customer) =>
+      customer.createdAt && new Date(customer.createdAt) >= today
+    ).length;
+  }, [safeCustomers]);
 
-    return customers.filter(customer => {
-      if (!customer.createdAt) return false;
-      const created = new Date(customer.createdAt);
-      return created >= today;
-    }).length;
-  }, [customers]);
+  const orderStatusData = useMemo((): OrderStatusData[] => {
+    const total = filteredOrders.length;
+    const counts = filteredOrders.reduce<Record<string, number>>((acc, order) => {
+      acc[order.status] = (acc[order.status] || 0) + 1;
+      return acc;
+    }, {});
 
-  // Computed state
-  const isLoading = useMemo(() =>
-    metricsLoading || salesLoading || orderStatusLoading || serviceLoading || ordersLoading || customersLoading,
-    [metricsLoading, salesLoading, orderStatusLoading, serviceLoading, ordersLoading, customersLoading]
-  );
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([status, value]) => ({
+        status,
+        value,
+        color: STATUS_COLORS[status] || '#64748b',
+        percentage: total > 0 ? Math.round((value / total) * 100) : 0,
+      } as OrderStatusData & { percentage: number }));
+  }, [filteredOrders]);
 
-  const error = useMemo(() => {
-    const errors = [metricsError, salesError, orderStatusError, serviceError, ordersError, customersError];
-    const firstError = errors.find(err => err !== null && err !== undefined);
-    return firstError || null;
-  }, [metricsError, salesError, orderStatusError, serviceError, ordersError, customersError]);
+  const servicePopularityData = useMemo((): ServicePopularityData[] => {
+    const serviceMap = activeFilteredOrders.reduce<Record<string, number>>((acc, order) => {
+      const items = Array.isArray(order.items) ? order.items : [];
+      items.forEach((item: any) => {
+        const serviceName = String(item?.serviceName || item?.customName || 'Unknown Service');
+        acc[serviceName] = (acc[serviceName] || 0) + toAmount(item?.subtotal || item?.price);
+      });
+      return acc;
+    }, {});
 
-  // Enhanced metrics with calculations
-  // ✅ Use KPI metrics from analytics engine as primary source
-  const enhancedMetrics = useMemo((): DashboardMetrics => {
-    // Merge API metrics with analytics engine KPIs
-    const apiMetrics = dashboardMetrics && typeof dashboardMetrics === 'object' ? dashboardMetrics : null;
+    const total = Object.values(serviceMap).reduce((sum, value) => sum + value, 0);
 
-    // Use analytics engine KPIs (realtime) as primary source
-    const totalRevenue = kpiMetrics.totalRevenue || apiMetrics?.totalRevenue || 0;
-    const totalOrders = kpiMetrics.totalOrders || apiMetrics?.totalOrders || 0;
-    const averageOrderValue = kpiMetrics.averageOrderValue || 0;
+    return Object.entries(serviceMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name, value], index) => ({
+        name,
+        value,
+        fill: SERVICE_COLORS[index % SERVICE_COLORS.length],
+        percentage: total > 0 ? Math.round((value / total) * 100) : 0,
+      }));
+  }, [activeFilteredOrders]);
 
-    const now = new Date();
-    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-
-    const safeOrders = allOrders || [];
-    const thisMonthOrders = safeOrders.filter(o => new Date(o.createdAt || now) >= startOfThisMonth);
-    const lastMonthOrders = safeOrders.filter(o => {
-      const d = new Date(o.createdAt || now);
-      return d >= startOfLastMonth && d < startOfThisMonth;
-    });
-
-    const thisMonthRevenue = thisMonthOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount || '0'), 0);
-    const lastMonthRevenue = lastMonthOrders.reduce((sum, order) => sum + parseFloat(order.totalAmount || '0'), 0);
-
-    const safeCustomers = customers || [];
-    const thisMonthCustomers = safeCustomers.filter(c => new Date(c.createdAt || now) >= startOfThisMonth);
-    const lastMonthCustomers = safeCustomers.filter(c => {
-      const d = new Date(c.createdAt || now);
-      return d >= startOfLastMonth && d < startOfThisMonth;
-    });
-
-    const revenueGrowth = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
-    const ordersGrowth = lastMonthOrders.length > 0 ? ((thisMonthOrders.length - lastMonthOrders.length) / lastMonthOrders.length) * 100 : 0;
-    const customersGrowth = lastMonthCustomers.length > 0 ? ((thisMonthCustomers.length - lastMonthCustomers.length) / lastMonthCustomers.length) * 100 : 0;
-
-    return {
-      totalRevenue,
-      totalOrders,
-      newCustomers: apiMetrics?.newCustomers || 0,
-      inventoryItems: apiMetrics?.inventoryItems || 0,
-      averageOrderValue: Math.round(averageOrderValue),
-      onTimeDelivery: kpiMetrics.successRate || 0, // Use success rate as proxy for on-time delivery
-      customerSatisfaction: 0, // Will be calculated from feedback data when available
-      revenueGrowth: Number(revenueGrowth.toFixed(1)),
-      ordersGrowth: Number(ordersGrowth.toFixed(1)),
-      customersGrowth: Number(customersGrowth.toFixed(1)),
-      dueDateStats: apiMetrics?.dueDateStats || {
-        today: 0,
-        tomorrow: 0,
-        overdue: 0,
-        upcoming: 0,
-      },
-    };
-  }, [dashboardMetrics, kpiMetrics, allOrders, customers]);
-
-  // Processed data with fallbacks
   const processedSalesData = useMemo((): SalesData[] => {
-    if (!salesData || !Array.isArray(salesData)) return [];
-    return salesData.map(item => ({
-      month: item.month || item.date || '',
-      revenue: item.revenue || 0,
-      orders: item.orders || 0,
-    }));
-  }, [salesData]);
+    const groupedByDay = activeFilteredOrders.reduce<Record<string, { label: string; revenue: number; orders: number }>>((acc, order) => {
+      const createdAt = order.createdAt ? new Date(order.createdAt) : null;
+      if (!createdAt || Number.isNaN(createdAt.getTime())) return acc;
+      const key = createdAt.toISOString().slice(0, 10);
+      if (!acc[key]) {
+        acc[key] = {
+          label: createdAt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+          revenue: 0,
+          orders: 0,
+        };
+      }
+      acc[key].revenue += toAmount(order.totalAmount);
+      acc[key].orders += 1;
+      return acc;
+    }, {});
 
-  const processedOrderStatusData = useMemo((): OrderStatusData[] => {
-    if (!orderStatusData || !Array.isArray(orderStatusData)) return [];
-    return orderStatusData.map(item => ({
-      status: item.status || '',
-      value: item.value || 0,
-      color: item.color,
-    }));
-  }, [orderStatusData]);
-
-  const processedServiceData = useMemo((): ServicePopularityData[] => {
-    if (!servicePopularityData || !Array.isArray(servicePopularityData)) return [];
-    const total = servicePopularityData.reduce((sum, item) => sum + (item.value || 0), 0);
-    return servicePopularityData.map(item => ({
-      name: item.name || '',
-      value: item.value || 0,
-      fill: item.fill || '#8884d8',
-      percentage: total > 0 ? Math.round((item.value / total) * 100) : 0,
-    }));
-  }, [servicePopularityData]);
+    return Object.entries(groupedByDay)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, values]) => ({
+        month: values.label,
+        revenue: Number(values.revenue.toFixed(2)),
+        orders: values.orders,
+      }));
+  }, [activeFilteredOrders]);
 
   const processedRecentOrders = useMemo(() => {
-    if (!allOrders || !Array.isArray(allOrders)) return [];
-    return allOrders
+    return [...safeOrders]
       .sort((a, b) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -308,20 +274,107 @@ export function useDashboard() {
       .map(order => ({
         ...order,
         date: order.createdAt ? new Date(order.createdAt).toISOString() : '',
-        total: parseFloat(order.totalAmount || '0'),
+        total: toAmount(order.totalAmount),
         customerPhone: order.customerPhone || undefined,
         customerEmail: order.customerEmail || undefined,
         createdAt: order.createdAt ? new Date(order.createdAt).toISOString() : '',
       }));
-  }, [allOrders]);
+  }, [safeOrders]);
 
-  // Actions
+  const dueTodayOrders = useMemo(() => {
+    const today = startOfDay(new Date());
+    return safeOrders
+      .filter((order) => {
+        if (!isNonCancelledOrder(order) || !order.pickupDate) return false;
+        const pickupDate = startOfDay(new Date(order.pickupDate));
+        return pickupDate <= today;
+      })
+      .map((order) => ({
+        ...order,
+        total: toAmount(order.totalAmount),
+        customerPhone: order.customerPhone || undefined,
+        customerEmail: order.customerEmail || undefined,
+        pickupDate: order.pickupDate ? new Date(order.pickupDate).toISOString() : '',
+        createdAt: order.createdAt ? new Date(order.createdAt).toISOString() : '',
+      }));
+  }, [safeOrders]);
+
+  const enhancedMetrics = useMemo((): DashboardMetrics => {
+    const now = new Date();
+    const startOfThisMonth = startOfDay(new Date(now.getFullYear(), now.getMonth(), 1));
+    const startOfLastMonth = startOfDay(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+
+    const thisMonthOrders = safeOrders.filter((order) =>
+      isNonCancelledOrder(order) && isWithinSelectedRange(order.createdAt, { from: startOfThisMonth, to: endOfDay(now) })
+    );
+    const lastMonthOrders = safeOrders.filter((order) => {
+      if (!isNonCancelledOrder(order) || !order.createdAt) return false;
+      const createdAt = new Date(order.createdAt);
+      return createdAt >= startOfLastMonth && createdAt < startOfThisMonth;
+    });
+
+    const thisMonthRevenue = thisMonthOrders.reduce((sum, order) => sum + toAmount(order.totalAmount), 0);
+    const lastMonthRevenue = lastMonthOrders.reduce((sum, order) => sum + toAmount(order.totalAmount), 0);
+
+    const thisMonthCustomers = safeCustomers.filter((customer) =>
+      isWithinSelectedRange(customer.createdAt, { from: startOfThisMonth, to: endOfDay(now) })
+    );
+    const lastMonthCustomers = safeCustomers.filter((customer) => {
+      if (!customer.createdAt) return false;
+      const createdAt = new Date(customer.createdAt);
+      return createdAt >= startOfLastMonth && createdAt < startOfThisMonth;
+    });
+
+    const totalRevenue = activeFilteredOrders.reduce((sum, order) => sum + toAmount(order.totalAmount), 0);
+    const totalOrders = activeFilteredOrders.length;
+    const outstandingCredit = safeCustomers.reduce((sum, customer) => sum + Math.max(0, toAmount(customer.creditBalance)), 0);
+    const completedOrders = activeFilteredOrders.filter((order) => COMPLETED_ORDER_STATUSES.includes(order.status)).length;
+    const deliveredOrdersWithDueDates = activeFilteredOrders.filter((order) => order.deliveredAt && order.pickupDate);
+    const onTimeDeliveries = deliveredOrdersWithDueDates.filter((order) =>
+      new Date(order.deliveredAt as Date | string) <= new Date(order.pickupDate as Date | string)
+    ).length;
+
+    const revenueGrowth = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
+    const ordersGrowth = lastMonthOrders.length > 0 ? ((thisMonthOrders.length - lastMonthOrders.length) / lastMonthOrders.length) * 100 : 0;
+    const customersGrowth = lastMonthCustomers.length > 0 ? ((thisMonthCustomers.length - lastMonthCustomers.length) / lastMonthCustomers.length) * 100 : 0;
+
+    return {
+      totalRevenue,
+      totalOrders,
+      newCustomers: filteredCustomers.length,
+      inventoryItems: dashboardMetrics?.inventoryItems || 0,
+      bookedRevenue: totalRevenue,
+      outstandingCredit,
+      averageOrderValue: totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0,
+      successRate: totalOrders > 0 ? Number(((completedOrders / totalOrders) * 100).toFixed(1)) : 0,
+      onTimeDelivery: deliveredOrdersWithDueDates.length > 0
+        ? Number(((onTimeDeliveries / deliveredOrdersWithDueDates.length) * 100).toFixed(1))
+        : undefined,
+      revenueGrowth: Number(revenueGrowth.toFixed(1)),
+      ordersGrowth: Number(ordersGrowth.toFixed(1)),
+      customersGrowth: Number(customersGrowth.toFixed(1)),
+      dueDateStats,
+    };
+  }, [activeFilteredOrders, dashboardMetrics?.inventoryItems, dueDateStats, filteredCustomers.length, safeCustomers, safeOrders]);
+
+  const isLoading = useMemo(
+    () => metricsLoading || ordersLoading || customersLoading,
+    [metricsLoading, ordersLoading, customersLoading]
+  );
+
+  const error = useMemo(() => {
+    const errors = [metricsError, ordersError, customersError];
+    return errors.find((entry) => entry !== null && entry !== undefined) || null;
+  }, [metricsError, ordersError, customersError]);
+
   const updateFilters = useCallback((newFilters: Partial<DashboardFilters>) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
   }, []);
 
   const refreshData = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard/metrics'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard/all-orders'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard/customers'] });
     toast({
       title: "Data Refreshed",
       description: "Dashboard data has been updated successfully.",
@@ -346,7 +399,6 @@ export function useDashboard() {
     }));
   }, []);
 
-  // Error handling
   useEffect(() => {
     if (error) {
       console.error('Dashboard data fetch error:', error);
@@ -359,50 +411,39 @@ export function useDashboard() {
   }, [error, toast]);
 
   return {
-    // State
     filters,
     quickActionForms,
-
-    // Data
     metrics: enhancedMetrics,
     salesData: processedSalesData,
-    orderStatusData: processedOrderStatusData,
-    servicePopularityData: processedServiceData,
+    orderStatusData,
+    servicePopularityData,
     recentOrders: processedRecentOrders,
     dueTodayOrders: dueTodayOrders || [],
-    customers: customers || [],
+    customers: safeCustomers,
     ordersTodayCount,
     revenueToday,
     ordersCompletedToday,
     pendingOrdersCount,
     newCustomersToday,
-    allOrders: allOrders || [],
-
-    // Loading states
+    allOrders: safeOrders,
     isLoading,
     metricsLoading,
-    salesLoading,
-    orderStatusLoading,
-    serviceLoading,
+    salesLoading: false,
+    orderStatusLoading: ordersLoading,
+    serviceLoading: ordersLoading,
     ordersLoading,
     customersLoading,
-
-    // Error states
     error,
     metricsError,
-    salesError,
-    orderStatusError,
-    serviceError,
+    salesError: null,
+    orderStatusError: ordersError,
+    serviceError: ordersError,
     ordersError,
     customersError,
-
-    // Actions
     updateFilters,
     refreshData,
     updateQuickActionForm,
     resetQuickActionForm,
-
-    // Computed
     hasData: !isLoading && !error,
     lastUpdated: new Date(),
   };

@@ -19,7 +19,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
 import { ordersApi, customersApi, servicesApi } from '@/lib/data-service';
 import { useInvoicePrint } from '@/hooks/use-invoice-print';
-import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CustomerAutocomplete } from "@/components/customer-autocomplete";
@@ -47,7 +46,6 @@ interface ServiceItem {
 export default function CreateOrder() {
   const { toast } = useToast();
   const { addNotification } = useNotifications();
-  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { printInvoice } = useInvoicePrint();
   const { employee: currentUser } = useAuth();
@@ -163,7 +161,14 @@ export default function CreateOrder() {
   const [isHistoryDetailsOpen, setIsHistoryDetailsOpen] = useState(false);
 
   // Credit Limit Error Dialog
-  const [creditLimitError, setCreditLimitError] = useState<{ message: string, customerId: string } | null>(null);
+  const [creditOverridePrompt, setCreditOverridePrompt] = useState<{
+    message: string;
+    customerId: string;
+    outstandingBefore: number;
+    creditLimit: number;
+    projectedCreditRequired: number;
+    pendingOrderData: Partial<Order>;
+  } | null>(null);
 
   // Fetch services - only active ones
   const { data: servicesData, isLoading: servicesLoading, isError: servicesError } = useQuery<Service[]>({
@@ -180,13 +185,11 @@ export default function CreateOrder() {
   // Ensure services is always an array
   const services = Array.isArray(servicesData) ? servicesData : [];
 
-  // Fetch all customers for autocomplete
-  const { data: customersData } = useQuery<Customer[]>({
-    queryKey: ["customers"],
-    queryFn: () => customersApi.getAll(),
-  });
-
-  const customers = Array.isArray(customersData) ? customersData : [];
+  const searchCustomers = React.useCallback(async (query: string) => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) return [];
+    return customersApi.getAll({ search: trimmed, limit: 10 });
+  }, []);
 
   // Fetch customer's order history when a customer is selected
   const { data: customerOrdersData, isLoading: customerOrdersLoading } = useQuery<Order[]>({
@@ -698,14 +701,18 @@ export default function CreateOrder() {
         resetForm();
       }
     },
-    onError: (error: any) => {
+    onError: (error: any, variables: Partial<Order>) => {
       console.error('Failed to create order:', error);
       const errorMessage = error instanceof Error ? error.message : "Failed to create order. Please try again.";
 
-      if (errorMessage.includes("Credit Limit Exceeded")) {
-        setCreditLimitError({
-          message: errorMessage,
-          customerId: foundCustomer?.id || ''
+      if (error?.requiresCreditOverride && error?.creditOverride) {
+        setCreditOverridePrompt({
+          message: error.creditOverride.message || errorMessage,
+          customerId: error.creditOverride.customerId || foundCustomer?.id || '',
+          outstandingBefore: Number(error.creditOverride.outstandingBefore || 0),
+          creditLimit: Number(error.creditOverride.creditLimit || 1000),
+          projectedCreditRequired: Number(error.creditOverride.projectedCreditRequired || 0),
+          pendingOrderData: variables,
         });
         return;
       }
@@ -744,6 +751,7 @@ export default function CreateOrder() {
     setPanNumber('');
     // Reset express order and fulfillment
     setIsExpressOrder(false);
+    setCreditOverridePrompt(null);
   };
 
   // Validate phone number - flexible to accept various international formats
@@ -836,27 +844,6 @@ export default function CreateOrder() {
         variant: "destructive",
       });
       return;
-    }
-
-    // Credit limit guard (wallet-compatible): block order if projected due exceeds limit.
-    if (paymentMethod === 'credit' || paymentStatus === 'credit') {
-      const currentOutstanding = foundCustomer?.creditBalance
-        ? Number(foundCustomer.creditBalance)
-        : 0;
-      const configuredLimit = (foundCustomer as any)?.creditLimit !== undefined
-        ? Number((foundCustomer as any).creditLimit)
-        : -500;
-      const maxAllowedDue = Math.abs(configuredLimit <= 0 ? configuredLimit : -configuredLimit);
-      const futureOutstanding = currentOutstanding + totalAmount;
-
-      if (futureOutstanding > maxAllowedDue) {
-        toast({
-          title: "Credit Limit Exceeded",
-          description: `Future due ₹${futureOutstanding.toFixed(2)} exceeds allowed ₹${maxAllowedDue.toFixed(2)}.`,
-          variant: "destructive",
-        });
-        return;
-      }
     }
 
     // Don't set orderNumber here - let server generate it with proper sequential format
@@ -982,7 +969,7 @@ export default function CreateOrder() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <CustomerAutocomplete
-                  customers={customers}
+                  searchCustomers={searchCustomers}
                   onSelect={handleSelectCustomer}
                   onCreateNew={(query) => {
                     // Pre-fill based on query type (phone or name)
@@ -1747,7 +1734,7 @@ export default function CreateOrder() {
                             </div>
                             {(() => {
                               const due = foundCustomer?.creditBalance ? Number(foundCustomer.creditBalance) : 0;
-                              const limit = Math.abs(Number((foundCustomer as any)?.creditLimit ?? -500));
+                              const limit = Math.max(0, Number((foundCustomer as any)?.creditLimit ?? 1000));
                               const dueClass = due > limit ? "text-red-700 dark:text-red-300" : due === 0 ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300";
                               return (
                                 <p className={`text-xl font-bold ${dueClass}`}>
@@ -1763,7 +1750,7 @@ export default function CreateOrder() {
                               <span className="text-[10px] uppercase tracking-wider font-medium text-amber-600 dark:text-amber-400">Credit Limit</span>
                             </div>
                             <p className="text-xl font-bold text-amber-700 dark:text-amber-300">
-                              ₹{Math.abs(Number((foundCustomer as any)?.creditLimit ?? -500)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                              ₹{Math.max(0, Number((foundCustomer as any)?.creditLimit ?? 1000)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                             </p>
                           </div>
                         </div>
@@ -1976,27 +1963,54 @@ export default function CreateOrder() {
       </Dialog>
 
 
-      {/* Credit Limit Error Dialog */}
-      <Dialog open={!!creditLimitError} onOpenChange={(open) => !open && setCreditLimitError(null)}>
+      {/* Credit Override Dialog */}
+      <Dialog open={!!creditOverridePrompt} onOpenChange={(open) => !open && setCreditOverridePrompt(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="text-destructive flex items-center">
               <AlertCircle className="h-5 w-5 mr-2" />
-              Credit Limit Exceeded
+              Customer Payment Recommended
             </DialogTitle>
             <DialogDescription className="pt-2 text-base">
-              {creditLimitError?.message}
+              {creditOverridePrompt?.message}
             </DialogDescription>
           </DialogHeader>
+          {creditOverridePrompt && (
+            <div className="rounded-lg border bg-muted/40 p-4 text-sm space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Existing unpaid dues</span>
+                <span className="font-semibold">₹{creditOverridePrompt.outstandingBefore.toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Allowed credit limit</span>
+                <span className="font-semibold">₹{creditOverridePrompt.creditLimit.toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">New unpaid amount on this order</span>
+                <span className="font-semibold">₹{creditOverridePrompt.projectedCreditRequired.toFixed(2)}</span>
+              </div>
+              <p className="text-muted-foreground pt-1">
+                Ask the customer for payment if possible. You can still continue and create the order, and the outstanding amount will be updated.
+              </p>
+            </div>
+          )}
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setCreditLimitError(null)}>
+            <Button variant="outline" onClick={() => setCreditOverridePrompt(null)}>
               Cancel
             </Button>
-            <Button onClick={() => {
-              setCreditLimitError(null);
-              setLocation('/credits');
-            }}>
-              Go to Credit Management
+            <Button
+              onClick={() => {
+                if (!creditOverridePrompt?.pendingOrderData) return;
+                const pendingOrderData = {
+                  ...creditOverridePrompt.pendingOrderData,
+                  creditOverrideApproved: true,
+                };
+                setCreditOverridePrompt(null);
+                createOrderMutation.mutate(pendingOrderData);
+              }}
+              disabled={createOrderMutation.isPending}
+            >
+              {createOrderMutation.isPending ? "Creating..." : "Continue & Create Order"}
             </Button>
           </DialogFooter>
         </DialogContent>

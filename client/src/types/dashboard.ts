@@ -4,7 +4,11 @@ export interface DashboardMetrics {
   totalOrders: number;
   newCustomers: number;
   inventoryItems: number;
+  bookedRevenue?: number;
+  collectedRevenue?: number;
+  outstandingCredit?: number;
   averageOrderValue?: number;
+  successRate?: number;
   onTimeDelivery?: number;
   customerSatisfaction?: number;
   revenueGrowth?: number;

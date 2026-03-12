@@ -316,6 +316,9 @@ export default React.memo(function FranchiseOwnerDashboard() {
     }
   }, [taskForm, toast, isSubmittingTask]);
 
+  const onTimeDeliveryValue = metrics.onTimeDelivery !== undefined ? `${metrics.onTimeDelivery}%` : 'N/A';
+  const satisfactionValue = metrics.customerSatisfaction !== undefined ? `${metrics.customerSatisfaction}/5` : 'Not tracked';
+
   // Memoized KPI cards with proper data
   const kpiCards = useMemo(() => [
     {
@@ -406,8 +409,8 @@ export default React.memo(function FranchiseOwnerDashboard() {
     },
     {
       title: "On-Time Delivery",
-      value: `${metrics.onTimeDelivery || 95}%`,
-      change: "No change",
+      value: onTimeDeliveryValue,
+      change: metrics.onTimeDelivery !== undefined ? "Measured from delivered vs due timestamps" : "Requires delivery timestamp data",
       changeType: "neutral" as const,
       icon: <Truck className="h-4 w-4" />,
       description: "Percentage of orders delivered on time",
@@ -416,18 +419,18 @@ export default React.memo(function FranchiseOwnerDashboard() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-muted-foreground">This Month</p>
-              <p className="text-2xl font-bold">{metrics.onTimeDelivery || 95}%</p>
+              <p className="text-2xl font-bold">{onTimeDeliveryValue}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Customer Satisfaction</p>
-              <p className="text-2xl font-bold">{metrics.customerSatisfaction || 4.2}/5</p>
+              <p className="text-2xl font-bold">{satisfactionValue}</p>
             </div>
           </div>
           <ServicePopularityChart data={servicePopularityData} />
         </div>
       ),
     },
-  ], [metrics, salesData, orderStatusData, servicePopularityData, customers]);
+  ], [metrics, onTimeDeliveryValue, satisfactionValue, salesData, orderStatusData, servicePopularityData, customers]);
 
   return (
     <PageTransition>

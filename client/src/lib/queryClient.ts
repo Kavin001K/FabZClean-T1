@@ -1,6 +1,25 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { isElectron } from "./utils";
 
+function getAccessToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("employee_token") ||
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("supabase.auth.token");
+}
+
+function buildHeaders(data?: unknown): HeadersInit {
+  const headers: Record<string, string> = {};
+  if (data !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+  const token = getAccessToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -15,7 +34,7 @@ export async function apiRequest(
 ): Promise<Response> {
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: buildHeaders(data),
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -31,6 +50,7 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
     async ({ queryKey }) => {
       const res = await fetch(`/api/${queryKey.join("/")}` as string, {
+        headers: buildHeaders(),
         credentials: "include",
       });
 
@@ -108,4 +128,3 @@ export async function prefetchCommonData() {
     }
   }
 }
-

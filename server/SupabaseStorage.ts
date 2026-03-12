@@ -492,7 +492,11 @@ export class SupabaseStorage {
         const sequenceNum = String(nextSequence).padStart(4, '0');
         const generatedId = `FZCMY${sequenceNum}`;
 
-        const dataWithId = { ...data, id: generatedId };
+        const dataWithId = {
+            ...data,
+            id: generatedId,
+            creditLimit: (data as any)?.creditLimit ?? "1000",
+        };
 
         const { data: customer, error } = await this.supabase
             .from('customers')
@@ -530,10 +534,50 @@ export class SupabaseStorage {
         return !error;
     }
 
-    async listCustomers(franchiseId?: string): Promise<Customer[]> {
+    async listCustomers(
+        franchiseId?: string,
+        options: {
+            search?: string;
+            phone?: string;
+            limit?: number;
+            sortBy?: string;
+            sortOrder?: 'asc' | 'desc';
+        } = {}
+    ): Promise<Customer[]> {
         let query = this.supabase.from('customers').select('*');
         if (franchiseId) query = query.eq('franchise_id', franchiseId);
         query = query.neq('status', 'deleted');
+
+        const search = String(options.search || '').trim();
+        if (search) {
+            const safeSearch = search.replace(/[%_]/g, '');
+            query = query.or(`name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%,phone.ilike.%${safeSearch}%`);
+        }
+
+        const phone = String(options.phone || '').trim();
+        if (phone) {
+            query = query.eq('phone', phone);
+        }
+
+        const sortMap: Record<string, string> = {
+            createdAt: 'created_at',
+            updatedAt: 'updated_at',
+            name: 'name',
+            email: 'email',
+            phone: 'phone',
+            totalOrders: 'total_orders',
+            totalSpent: 'total_spent',
+            creditBalance: 'credit_balance',
+            creditLimit: 'credit_limit',
+        };
+
+        const sortColumn = sortMap[options.sortBy || 'createdAt'] || 'created_at';
+        query = query.order(sortColumn, { ascending: options.sortOrder === 'asc' });
+
+        if (options.limit && Number.isFinite(options.limit) && options.limit > 0) {
+            query = query.limit(options.limit);
+        }
+
         const { data, error } = await query;
         if (error) throw error;
         return data.map(item => this.mapDates(item));
@@ -903,24 +947,9 @@ export class SupabaseStorage {
 
             if (error) throw error;
             return { success: true, data };
-        } catch (primaryErr: any) {
-            console.warn('[SupabaseStorage] V2 checkout RPC unavailable, falling back to legacy RPC:', primaryErr?.message || primaryErr);
-            try {
-                const { data, error } = await this.supabase.rpc('process_payment_checkout', {
-                    p_order_id: orderId,
-                    p_customer_id: customerId,
-                    p_cash_amount: cashAmount,
-                    p_wallet_amount: walletDebitRequested,
-                    p_recorded_by: recordedBy,
-                    p_recorded_by_name: recordedByName
-                });
-
-                if (error) throw error;
-                return { success: true, data };
-            } catch (legacyErr: any) {
-                console.error('[SupabaseStorage] Processing Checkout failed:', legacyErr);
-                return { success: false, error: legacyErr.message || 'Payment processing failed.' };
-            }
+        } catch (err: any) {
+            console.error('[SupabaseStorage] Processing checkout via canonical RPC failed:', err);
+            return { success: false, error: err.message || 'Payment processing failed.' };
         }
     }
 
@@ -1587,7 +1616,7 @@ export class SupabaseStorage {
     ): Promise<any> {
         const { data: customer, error: custError } = await this.supabase
             .from('customers')
-            .select('id, credit_balance, franchise_id')
+            .select('id, credit_balance, wallet_balance_cache, franchise_id')
             .eq('id', customerId)
             .single();
 
@@ -1644,12 +1673,6 @@ export class SupabaseStorage {
             const walletBalance = parseFloat(walletTx.balance_after || mapped.balanceAfter || '0');
             const legacyCreditBalance = walletBalance < 0 ? Math.abs(walletBalance) : 0;
 
-            // Sync legacy credit_balance column to prevent double-counting
-            await this.supabase
-                .from('customers')
-                .update({ credit_balance: legacyCreditBalance })
-                .eq('id', customerId);
-
             return {
                 ...mapped,
                 type: normalizedType || 'adjustment',
@@ -1666,57 +1689,56 @@ export class SupabaseStorage {
             throw walletError;
         }
 
-        // Legacy fallback path
-        const newBalance = currentBalance + amount;
-
-        let orderId = null;
-        let referenceNumber = null;
-
-        if ((normalizedType === 'credit' || normalizedType === 'usage') && referenceId) {
-            orderId = referenceId;
-        } else {
-            referenceNumber = referenceId;
-        }
+        // Compatibility fallback for pre-migration environments that still have the
+        // older wallet_transactions shape but not the unified ledger columns.
+        const currentWalletBalance = parseFloat((customer as any).wallet_balance_cache || (currentBalance > 0 ? (-currentBalance).toString() : '0'));
+        const legacyWalletBalanceAfter = currentWalletBalance + walletAmount;
+        const legacyCreditBalance = legacyWalletBalanceAfter < 0 ? Math.abs(legacyWalletBalanceAfter) : 0;
+        const legacyTransactionId = `WLT-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
         const legacyTxData = {
+            transaction_id: legacyTransactionId,
             customer_id: customerId,
-            franchise_id: customer.franchise_id,
-            type: normalizedType || 'adjustment',
-            amount,
-            balance_after: newBalance,
-            payment_method: paymentMethod || null,
-            notes: description,
-            reason: description,
-            order_id: orderId,
-            reference_number: referenceNumber,
-            recorded_by: employeeId
+            type: walletAmount >= 0 ? 'credit' : 'debit',
+            amount: Math.abs(walletAmount),
+            balance_before: currentWalletBalance,
+            balance_after: legacyWalletBalanceAfter,
+            reference_order_id: referenceType === 'ORDER' ? (referenceId || null) : null,
+            verified_by_staff: employeeId || null,
         };
 
         const { data: transaction, error: txError } = await this.supabase
-            .from('credit_transactions')
-            .insert(this.toSnakeCase(legacyTxData))
+            .from('wallet_transactions')
+            .insert(legacyTxData)
             .select()
             .single();
 
         if (txError) {
-            console.error('Add Credit: Legacy transaction insert failed', txError);
+            console.error('Add Credit: Legacy wallet transaction insert failed', txError);
             throw txError;
         }
 
+        // Keep cached balances in sync only for the compatibility fallback path.
         const { error: updateError } = await this.supabase
             .from('customers')
-            .update({ credit_balance: newBalance })
+            .update({
+                credit_balance: legacyCreditBalance,
+                wallet_balance_cache: legacyWalletBalanceAfter,
+            })
             .eq('id', customerId);
 
         if (updateError) {
-            console.error('Add Credit: Legacy balance update failed', updateError);
+            console.error('Add Credit: Compatibility cache sync failed', updateError);
             throw updateError;
         }
 
         return {
             ...this.mapDates(transaction),
             previousBalance: currentBalance,
-            newBalance
+            type: normalizedType || 'adjustment',
+            amount: amount.toString(),
+            balanceAfter: legacyCreditBalance.toFixed(2),
+            newBalance: legacyCreditBalance
         };
     }
 

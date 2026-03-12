@@ -244,7 +244,7 @@ export default function WalletManagementPage() {
       notes: `Adjustment by ${employee?.fullName || employee?.username} (${employee?.employeeId}). ${notes || ""}`.trim(),
     }),
     onSuccess: () => {
-      toast({ title: "Wallet adjusted", description: "Manual adjustment posted successfully." });
+      toast({ title: "Balance adjusted", description: "Manual adjustment posted successfully." });
       setAdjustOpen(false);
       resetDialogState();
       refreshData();
@@ -257,15 +257,15 @@ export default function WalletManagementPage() {
   const mappedRows = useMemo(() => {
     return customers.map((customer) => {
       const outstanding = Math.max(0, toNumber(customer.creditBalance, 0));
-      const creditLimitAbs = Math.abs(toNumber(customer.creditLimit, -500));
-      const walletBalance = toNumber(customer.walletBalanceCache, -outstanding);
+      const creditLimit = Math.max(0, toNumber(customer.creditLimit, 1000));
+      const walletBalance = Math.max(0, toNumber(customer.walletBalanceCache, 0));
       const isClear = outstanding === 0;
-      const isExceeded = outstanding > creditLimitAbs;
+      const isExceeded = outstanding > creditLimit;
 
       return {
         ...customer,
         outstanding,
-        creditLimitAbs,
+        creditLimit,
         walletBalance,
         isClear,
         isExceeded,
@@ -462,7 +462,7 @@ export default function WalletManagementPage() {
                         )}>
                           ₹{row.outstanding.toFixed(2)}
                         </TableCell>
-                        <TableCell className="text-right">₹{row.creditLimitAbs.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">₹{row.creditLimit.toFixed(2)}</TableCell>
                         <TableCell className={cn("text-right font-medium", row.walletBalance >= 0 ? "text-emerald-500" : "text-amber-500")}>
                           ₹{row.walletBalance.toFixed(2)}
                         </TableCell>
@@ -790,7 +790,7 @@ export default function WalletManagementPage() {
       <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
         <DialogContent className="w-[calc(100vw-1rem)] max-w-md">
           <DialogHeader>
-            <DialogTitle>Manual Wallet Adjustment</DialogTitle>
+            <DialogTitle>Manual Balance Adjustment</DialogTitle>
             <DialogDescription>{selectedCustomer?.name}</DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">

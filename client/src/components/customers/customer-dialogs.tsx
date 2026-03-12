@@ -166,7 +166,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
       addressStreet: existingAddress.street,
       addressCity: existingAddress.city,
       addressPincode: existingAddress.pincode,
-      creditLimit: (selectedCustomer as any)?.creditLimit || '-500',
+      creditLimit: String((selectedCustomer as any)?.creditLimit ?? '1000'),
       creditBalance: selectedCustomer?.creditBalance || '0',
       notes: '',
     },
@@ -181,7 +181,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
       addressStreet: '',
       addressCity: '',
       addressPincode: '',
-      creditLimit: '-500',
+      creditLimit: '1000',
       notes: '',
     },
   });
@@ -196,7 +196,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
         addressStreet: existingAddress.street,
         addressCity: existingAddress.city,
         addressPincode: existingAddress.pincode,
-        creditLimit: (selectedCustomer as any)?.creditLimit || '-500',
+        creditLimit: String((selectedCustomer as any)?.creditLimit ?? '1000'),
         creditBalance: selectedCustomer.creditBalance || '0',
       });
     }
@@ -224,7 +224,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   const monthsSinceJoin = Math.max(1, Math.ceil(daysSinceJoined / 30));
   const orderFrequency = totalOrders > 0 ? (totalOrders / monthsSinceJoin).toFixed(1) : '0';
   const selectedOutstanding = selectedCustomer ? parseFloat(selectedCustomer.creditBalance || '0') : 0;
-  const selectedCreditLimitAbs = selectedCustomer ? Math.abs(parseFloat((selectedCustomer as any).creditLimit || '-500')) : 500;
+  const selectedCreditLimitAbs = selectedCustomer ? Math.max(0, parseFloat((selectedCustomer as any).creditLimit || '1000')) : 1000;
   const selectedLimitExceeded = selectedOutstanding > selectedCreditLimitAbs;
   const selectedOutstandingClass = selectedLimitExceeded ? 'text-red-500' : selectedOutstanding === 0 ? 'text-emerald-500' : 'text-amber-500';
 
@@ -892,10 +892,10 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   id="create-credit-limit"
                   type="number"
                   {...createForm.register('creditLimit')}
-                  placeholder="-500"
+                  placeholder="1000"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Use negative value (example: -500) to set max allowed due.
+                  Set the maximum unpaid amount allowed before staff are asked to collect payment.
                 </p>
               </div>
 

@@ -38,23 +38,20 @@ router.get('/', async (req, res) => {
       cursor,
       limit = 20,
       search,
+      phone,
       segment,
       sortBy = 'createdAt',
       sortOrder = 'desc'
     } = req.query;
 
-    // Customers are common for all franchises - no isolation needed
-    let customers = await storage.listCustomers();
-
-    // Apply search filter
-    if (search && typeof search === 'string') {
-      const searchTerm = search.toLowerCase();
-      customers = customers.filter((customer: Customer) =>
-        customer.name?.toLowerCase().includes(searchTerm) ||
-        customer.email?.toLowerCase().includes(searchTerm) ||
-        customer.phone?.toLowerCase().includes(searchTerm)
-      );
-    }
+    // Use database-level filtering for search-heavy paths to avoid loading the
+    // entire customer base into the UI during order creation/autocomplete.
+    let customers = await storage.listCustomers(undefined, {
+      search: typeof search === 'string' ? search : undefined,
+      phone: typeof phone === 'string' ? phone : undefined,
+      sortBy: typeof sortBy === 'string' ? sortBy : undefined,
+      sortOrder: sortOrder === 'asc' ? 'asc' : 'desc',
+    });
 
     // Apply segment filter
     if (segment && segment !== 'all') {
@@ -71,19 +68,6 @@ router.get('/', async (req, res) => {
         }
       });
     }
-
-    // Apply sorting
-    customers.sort((a: any, b: any) => {
-      const aValue = a[sortBy as string];
-      const bValue = b[sortBy as string];
-
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
-
     // Apply pagination
     const limitNum = parseInt(limit as string) || 20;
     const startIndex = cursor ? customers.findIndex((c: Customer) => c.id === cursor) + 1 : 0;
@@ -457,8 +441,10 @@ router.patch(
       const employee = (req as any).employee || (req as any).user;
       const createdBy = employee?.employeeId || 'system';
 
-      if (creditLimit === undefined || isNaN(creditLimit) || creditLimit > 0) {
-        return res.status(400).json(createErrorResponse('Valid negative credit limit is required', 400));
+      const normalizedCreditLimit = Number(creditLimit);
+
+      if (creditLimit === undefined || Number.isNaN(normalizedCreditLimit) || normalizedCreditLimit < 0) {
+        return res.status(400).json(createErrorResponse('Valid positive credit limit is required', 400));
       }
 
       const customer = await storage.getCustomer(customerId);
@@ -466,8 +452,8 @@ router.patch(
         return res.status(404).json(createErrorResponse('Customer not found', 404));
       }
 
-      const oldLimit = customer.creditLimit || -500;
-      const updatedCustomer = await storage.updateCustomer(customerId, { creditLimit });
+      const oldLimit = Number(customer.creditLimit || 1000);
+      const updatedCustomer = await storage.updateCustomer(customerId, { creditLimit: normalizedCreditLimit });
 
       // Notify real-time clients
       realtimeServer.broadcast({
@@ -475,7 +461,7 @@ router.patch(
         data: updatedCustomer
       });
 
-      const description = `Credit limit updated from ₹${Math.abs(Number(oldLimit))} to ₹${Math.abs(Number(creditLimit))}`;
+      const description = `Credit limit updated from ₹${Number(oldLimit).toFixed(2)} to ₹${normalizedCreditLimit.toFixed(2)}`;
 
       // Log in wallet/credit transactions as a 0 amount adjustment just for history
       try {
@@ -502,7 +488,7 @@ router.patch(
             customerId,
             {
               oldLimit,
-              newLimit: creditLimit
+              newLimit: normalizedCreditLimit
             },
             req.ip || req.connection.remoteAddress,
             req.get('user-agent')

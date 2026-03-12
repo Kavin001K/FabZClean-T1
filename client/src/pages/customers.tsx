@@ -717,7 +717,7 @@ export default function Customers() {
                   const TierIcon = tier.icon;
                   const totalSpent = parseFloat(customer.totalSpent || '0');
                   const outstandingCredit = parseFloat(customer.creditBalance || '0');
-                  const customerCreditLimit = Math.abs(parseFloat((customer as any).creditLimit || '-500'));
+                  const customerCreditLimit = Math.max(0, parseFloat((customer as any).creditLimit || '1000'));
                   const availableCredit = Math.max(0, customerCreditLimit - outstandingCredit);
                   const isCreditLimitExceeded = outstandingCredit > customerCreditLimit;
                   const outstandingColorClass = isCreditLimitExceeded

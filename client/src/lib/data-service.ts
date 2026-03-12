@@ -144,26 +144,65 @@ async function fetchData<T>(endpoint: string, init: RequestInit = {}): Promise<T
   }
 }
 
+async function fetchAllPaginated<T>(
+  endpoint: string,
+  params: Record<string, any> = {},
+  pageSize = 200,
+  maxPages = 50
+): Promise<T[]> {
+  const allRows: T[] = [];
+  let cursor: string | undefined;
+
+  for (let page = 0; page < maxPages; page++) {
+    const queryParams = new URLSearchParams({
+      limit: String(pageSize),
+      ...params,
+    });
+
+    if (cursor) {
+      queryParams.set("cursor", cursor);
+    }
+
+    const response = await fetchData<{ data?: T[]; pagination?: { hasMore?: boolean; cursor?: string } } | T[]>(
+      `${endpoint}?${queryParams.toString()}`
+    );
+
+    if (Array.isArray(response)) {
+      return response;
+    }
+
+    const rows = Array.isArray(response?.data) ? response.data : [];
+    allRows.push(...rows);
+
+    if (!response?.pagination?.hasMore || !response?.pagination?.cursor) {
+      break;
+    }
+
+    cursor = response.pagination.cursor;
+  }
+
+  return allRows;
+}
+
 // Orders API
 export const ordersApi = {
   async getAll(params: Record<string, any> = {}): Promise<Order[]> {
     try {
-      // Build query string from params
-      const queryParams = new URLSearchParams({
-        limit: '100', // Default lower limit
-        ...params
-      });
+      const hasExplicitPagination = params.page !== undefined || params.cursor !== undefined || params.limit !== undefined;
+      if (hasExplicitPagination) {
+        const queryParams = new URLSearchParams({
+          ...Object.fromEntries(
+            Object.entries(params).map(([key, value]) => [key, String(value)])
+          ),
+        });
+        const response = await fetchData<{ data: Order[]; pagination?: any } | Order[]>(`/orders?${queryParams.toString()}`);
+        if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
+          return response.data;
+        }
+        return Array.isArray(response) ? response : [];
+      }
 
-      const response = await fetchData<{ data: Order[]; pagination?: any } | Order[]>(`/orders?${queryParams.toString()}`);
-      // Handle paginated response
-      if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
-        return response.data;
-      }
-      // Handle direct array response
-      if (Array.isArray(response)) {
-        return response;
-      }
-      return [];
+      return await fetchAllPaginated<Order>('/orders', params);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
       return [];
@@ -242,7 +281,26 @@ export const ordersApi = {
         }
       }
 
-      throw new Error(errorMessage);
+      const error = new Error(errorMessage) as Error & {
+        code?: string;
+        requiresCreditOverride?: boolean;
+        creditOverride?: any;
+      };
+      error.code = errorData.code || errorData.details?.code;
+      error.requiresCreditOverride = Boolean(
+        errorData.requiresCreditOverride || errorData.details?.requiresCreditOverride
+      );
+      if (error.requiresCreditOverride) {
+        error.creditOverride = {
+          message: errorMessage,
+          customerId: errorData.customerId || errorData.details?.customerId,
+          outstandingBefore: errorData.outstandingBefore ?? errorData.details?.outstandingBefore ?? 0,
+          creditLimit: errorData.creditLimit ?? errorData.details?.creditLimit ?? 1000,
+          projectedCreditRequired: errorData.projectedCreditRequired ?? errorData.details?.projectedCreditRequired ?? 0,
+        };
+      }
+
+      throw error;
     }
 
     const result = await response.json();
@@ -310,18 +368,21 @@ export const ordersApi = {
 
 // Customers API
 export const customersApi = {
-  async getAll(): Promise<Customer[]> {
+  async getAll(params: Record<string, any> = {}): Promise<Customer[]> {
     try {
-      const response = await fetchData<{ data: Customer[] } | Customer[]>('/customers');
-      // Handle paginated response structure
-      if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
-        return response.data;
+      const hasExplicitPagination = params.page !== undefined || params.cursor !== undefined || params.limit !== undefined;
+      if (hasExplicitPagination) {
+        const queryParams = new URLSearchParams(
+          Object.fromEntries(Object.entries(params).map(([key, value]) => [key, String(value)]))
+        );
+        const response = await fetchData<{ data: Customer[] } | Customer[]>(`/customers?${queryParams.toString()}`);
+        if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
+          return response.data;
+        }
+        return Array.isArray(response) ? response : [];
       }
-      // Handle direct array response
-      if (Array.isArray(response)) {
-        return response;
-      }
-      return [];
+
+      return await fetchAllPaginated<Customer>('/customers', params);
     } catch (error) {
       console.error('Failed to fetch customers:', error);
       return [];
@@ -330,7 +391,11 @@ export const customersApi = {
 
   async getById(id: string): Promise<Customer | null> {
     try {
-      return await fetchData<Customer>(`/customers/${id}`);
+      const response = await fetchData<{ data?: Customer } | Customer>(`/customers/${id}`);
+      if (response && typeof response === 'object' && 'data' in response) {
+        return response.data || null;
+      }
+      return response as Customer;
     } catch (error) {
       console.error(`Failed to fetch customer ${id}:`, error);
       return null;
@@ -347,7 +412,8 @@ export const customersApi = {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to create customer");
       }
-      return await response.json();
+      const payload = await response.json();
+      return payload?.data || payload;
     } catch (error) {
       console.error("Failed to create customer:", error);
       throw error; // Propagate error to caller
@@ -361,7 +427,8 @@ export const customersApi = {
         body: JSON.stringify(customer),
       });
       if (!response.ok) throw new Error("Failed to update customer");
-      return await response.json();
+      const payload = await response.json();
+      return payload?.data || payload;
     } catch (error) {
       console.error(`Failed to update customer ${id}:`, error);
       return null;
@@ -382,7 +449,7 @@ export const customersApi = {
 
   async searchByPhone(phone: string): Promise<Customer | null> {
     try {
-      const customers = await fetchData<Customer[]>(`/customers?phone=${phone}`);
+      const customers = await this.getAll({ phone, limit: 25 });
       return customers.length > 0 ? customers[0] : null;
     } catch (error) {
       console.error(`Failed to search customer by phone ${phone}:`, error);
@@ -633,25 +700,21 @@ export const inventoryApi = {
 };
 
 // Analytics API
-// ✅ Note: Analytics data is now provided by useAnalyticsEngine hook
-// These functions are kept for backward compatibility but return empty arrays
-// The realtime analytics engine handles all data processing
+// The dashboard now derives operational metrics from backend order/customer data.
+// These array endpoints remain as lightweight compatibility shims.
 export const analyticsApi = {
   async getSalesData(): Promise<SalesData[]> {
-    // ✅ Removed mock data - use RevenueChartRealtime component instead
-    // This function is kept for backward compatibility
+    // This function is kept for backward compatibility.
     return [];
   },
 
   async getOrderStatusData(): Promise<OrderStatusData[]> {
-    // ✅ Removed mock data - use useAnalyticsEngine hook instead
-    // This function is kept for backward compatibility
+    // This function is kept for backward compatibility.
     return [];
   },
 
   async getServicePopularityData(): Promise<ServicePopularityData[]> {
-    // ✅ Removed mock data - use useAnalyticsEngine hook instead
-    // This function is kept for backward compatibility
+    // This function is kept for backward compatibility.
     return [];
   },
 
@@ -660,6 +723,11 @@ export const analyticsApi = {
     totalOrders: number;
     newCustomers: number;
     inventoryItems: number;
+    bookedRevenue?: number;
+    outstandingCredit?: number;
+    averageOrderValue?: number;
+    successRate?: number;
+    ordersToday?: number;
     dueDateStats?: {
       today: number;
       tomorrow: number;

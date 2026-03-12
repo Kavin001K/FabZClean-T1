@@ -64,6 +64,39 @@ const getCheckoutTransactionIds = (data: any) => {
   };
 };
 
+const normalizeCreditLimit = (value: unknown, fallback = 1000): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, parsed);
+};
+
+const schedulePostCreateTasks = (order: any) => {
+  setImmediate(async () => {
+    if (order.customerId) {
+      try {
+        await loyaltyProgram.processOrderRewards(
+          order.customerId,
+          parseFloat(order.totalAmount || "0")
+        );
+      } catch (loyaltyError) {
+        console.warn('Failed to process loyalty rewards:', loyaltyError);
+      }
+    }
+
+    try {
+      await barcodeService.generateOrderBarcode(order.id);
+    } catch (barcodeError) {
+      console.warn('Failed to generate barcode:', barcodeError);
+    }
+
+    try {
+      realtimeServer.triggerUpdate('order', 'created', order);
+    } catch (realtimeError) {
+      console.warn('Failed to broadcast order creation:', realtimeError);
+    }
+  });
+};
+
 /**
  * POST /api/orders/:id/checkout
  * Canonical payment engine entrypoint (wallet first, then cash, remainder -> credit).
@@ -436,11 +469,22 @@ router.post(
         orderData.useWallet,
         requestedWalletDebitAtCreate > 0
       );
+      const creditOverrideApproved = parseBoolean(orderData.creditOverrideApproved, false);
       orderData.advancePaid = '0';
       orderData.walletUsed = '0';
       orderData.creditUsed = '0';
+      delete orderData.creditOverrideApproved;
 
-      // Credit limit guard for automatic-credit mode
+      let creditOverrideMetadata: {
+        customerId: string;
+        outstandingBefore: number;
+        creditLimit: number;
+        projectedCreditRequired: number;
+      } | null = null;
+
+      // Credit override guard:
+      // allow new customers / customers without past due,
+      // enforce only when an existing unpaid balance is already above the configured limit.
       if (orderData.customerId) {
         const customer = await storage.getCustomer(orderData.customerId);
         if (customer) {
@@ -456,15 +500,36 @@ router.post(
 
           if (projectedCreditRequired > 0) {
             const currentCredit = parseAmount(customer.creditBalance || "0");
-            const rawLimit = Number((customer as any).creditLimit ?? -500);
-            const creditLimit = Math.abs(Number.isFinite(rawLimit) ? rawLimit : 500);
-            if (creditLimit > 0 && currentCredit + projectedCreditRequired > creditLimit) {
-              return res.status(400).json(
-                createErrorResponse(
-                  `Credit limit exceeded. Required ₹${projectedCreditRequired.toFixed(2)}, available ₹${Math.max(0, creditLimit - currentCredit).toFixed(2)}.`,
-                  400
-                )
-              );
+            const creditLimit = normalizeCreditLimit((customer as any).creditLimit, 1000);
+
+            creditOverrideMetadata = {
+              customerId: customer.id,
+              outstandingBefore: currentCredit,
+              creditLimit,
+              projectedCreditRequired,
+            };
+
+            if (currentCredit > creditLimit && !creditOverrideApproved) {
+              const message =
+                `This customer already has unpaid dues of ₹${currentCredit.toFixed(2)}, ` +
+                `which exceeds the allowed credit limit of ₹${creditLimit.toFixed(2)}. ` +
+                `Ask the customer for payment before proceeding.`;
+
+              return res.status(409).json({
+                ...createErrorResponse(message, 409, {
+                  code: 'CREDIT_OVERRIDE_REQUIRED',
+                  requiresCreditOverride: true,
+                  customerId: customer.id,
+                  outstandingBefore: currentCredit,
+                  creditLimit,
+                  projectedCreditRequired,
+                }),
+                requiresCreditOverride: true,
+                customerId: customer.id,
+                outstandingBefore: currentCredit,
+                creditLimit,
+                projectedCreditRequired,
+              });
             }
           }
         }
@@ -521,33 +586,26 @@ router.post(
           req.ip || req.connection.remoteAddress,
           req.get('user-agent')
         );
-      }
 
-      // Award loyalty points (only if customerId exists)
-      if (order.customerId) {
-        try {
-          await loyaltyProgram.processOrderRewards(
-            order.customerId,
-            parseFloat(order.totalAmount || "0")
+        if (creditOverrideApproved && creditOverrideMetadata) {
+          await AuthService.logAction(
+            req.employee.employeeId,
+            req.employee.username,
+            'approve_credit_override',
+            'customer',
+            creditOverrideMetadata.customerId,
+            {
+              orderId: order.id,
+              orderNumber: order.orderNumber,
+              outstandingBefore: creditOverrideMetadata.outstandingBefore,
+              creditLimit: creditOverrideMetadata.creditLimit,
+              projectedCreditRequired: creditOverrideMetadata.projectedCreditRequired,
+            },
+            req.ip || req.connection.remoteAddress,
+            req.get('user-agent')
           );
-        } catch (loyaltyError) {
-          console.warn('Failed to process loyalty rewards:', loyaltyError);
         }
       }
-
-      // Generate QR code
-      try {
-        await barcodeService.generateOrderBarcode(order.id);
-      } catch (barcodeError) {
-        console.warn('Failed to generate barcode:', barcodeError);
-      }
-
-      // Notify real-time clients
-      realtimeServer.triggerUpdate('order', 'created', order);
-
-      // Note: We no longer send WhatsApp automatically on order creation from here.
-      // The frontend handles generating the PDF bill and calling /api/whatsapp/send-bill
-      // to ensure the real PDF link is sent rather than a static placeholder.
 
       const serializedOrder = serializeOrder(order);
       const responsePayload = {
@@ -557,9 +615,11 @@ router.post(
         transactionIds: getCheckoutTransactionIds(checkoutData),
         creditId: checkoutData?.credit_id || order.customerId || null,
         order: serializedOrder,
+        creditOverrideApplied: creditOverrideApproved,
       };
 
       res.status(201).json(createSuccessResponse(responsePayload, 'Order created successfully'));
+      schedulePostCreateTasks(order);
     } catch (error) {
       console.error('Create order error:', error);
 
