@@ -87,6 +87,7 @@ export function CustomerAutocomplete({
     const wrapperRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const requestIdRef = useRef(0);
+    const ignoreNextSearchRef = useRef(false);
 
     // Filter and sort customers based on search query.
     // Remote search is used for the New Order flow to avoid loading the entire
@@ -96,6 +97,17 @@ export function CustomerAutocomplete({
             setFilteredCustomers([]);
             setIsOpen(false);
             setIsSearching(false);
+            return;
+        }
+
+        // If selection was just made, ignore this trigger
+        if (ignoreNextSearchRef.current) {
+            ignoreNextSearchRef.current = false;
+            return;
+        }
+
+        if (isOpen === false && searchQuery.trim().length > 0) {
+            // Dropdown is closed, likely just selected or cleared
             return;
         }
 
@@ -113,6 +125,10 @@ export function CustomerAutocomplete({
             if (searchCustomers) {
                 setIsSearching(true);
                 try {
+                    // Debounce logic
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    if (isCancelled || requestId !== requestIdRef.current) return;
+                    
                     const matches = await searchCustomers(searchQuery.trim());
                     applyMatches(Array.isArray(matches) ? matches : []);
                 } catch (error) {
@@ -194,6 +210,7 @@ export function CustomerAutocomplete({
     };
 
     const handleSelect = (customer: Customer) => {
+        ignoreNextSearchRef.current = true;
         onSelect(customer);
         setSearchQuery(customer.name || customer.phone || '');
         setIsOpen(false);

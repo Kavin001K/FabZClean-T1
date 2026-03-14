@@ -778,7 +778,14 @@ router.patch(
       const STATUS_ORDER: Record<string, number> = {
         'pending': 1,
         'processing': 2,
+        'in_store': 2,
+        'ready_for_transit': 3,
         'ready': 3,
+        'ready_for_pickup': 3,
+        'ready_for_delivery': 3,
+        'assigned': 4,
+        'in_transit': 4,
+        'shipped': 4,
         'out_for_delivery': 4,
         'delivered': 5,
         'completed': 5,
@@ -797,9 +804,9 @@ router.patch(
           ));
         }
       } else if (status === 'cancelled') {
-        if (!['pending', 'processing'].includes(order.status)) {
+        if (!['pending', 'processing', 'ready_for_pickup', 'ready_for_delivery', 'ready'].includes(order.status)) {
           return res.status(400).json(createErrorResponse(
-            `Cannot cancel an order with status '${order.status}'. Orders can only be cancelled when pending or processing.`,
+            `Cannot cancel an order with status '${order.status}'. Orders can only be cancelled when pending, processing, or ready.`,
             400
           ));
         }

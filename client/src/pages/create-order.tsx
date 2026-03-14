@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Switch } from "@/components/ui/switch";
-import { PlusCircle, User, Calendar as CalendarIcon, Truck, IndianRupee, Search, CheckCircle, X, Loader2, AlertCircle, History, Package, TrendingUp, Clock, ShoppingBag, Zap, CreditCard } from "lucide-react";
+import { PlusCircle, User, Calendar as CalendarIcon, Truck, IndianRupee, Search, CheckCircle, X, Loader2, AlertCircle, History, Package, TrendingUp, Clock, ShoppingBag, Zap, CreditCard, Phone, Mail, TrendingDown, ShoppingCart, List } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -22,6 +22,7 @@ import { useInvoicePrint } from '@/hooks/use-invoice-print';
 import { motion, AnimatePresence } from "framer-motion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CustomerAutocomplete } from "@/components/customer-autocomplete";
+import { ServiceCombobox } from "@/components/orders/service-combobox";
 import { OrderConfirmationDialog } from "@/components/orders/order-confirmation-dialog";
 import OrderDetailsDialog from "@/components/orders/order-details-dialog";
 import { useAuth } from "@/contexts/auth-context";
@@ -42,6 +43,11 @@ interface ServiceItem {
   // Unique barcode for tracking lifecycle
   garmentBarcode?: string;
 }
+
+const safeParseFloat = (val: any) => {
+  const parsed = parseFloat(val);
+  return isNaN(parsed) ? 0 : parsed;
+};
 
 export default function CreateOrder() {
   const { toast } = useToast();
@@ -139,18 +145,17 @@ export default function CreateOrder() {
   // Sync payment status with payment method
   useEffect(() => {
     if (paymentMethod === 'credit') {
-      setPaymentStatus('credit');
-    } else if (paymentStatus === 'credit' && paymentMethod !== 'credit') {
-      setPaymentStatus('pending'); // Revert to pending if user switches away from credit
+      if (paymentStatus !== 'credit') {
+        setPaymentStatus('credit');
+      }
+    } else if (paymentStatus === 'credit') {
+      // Revert from credit if user switches to something else (cash/upi/etc)
+      setPaymentStatus('pending');
     }
-  }, [paymentMethod, paymentStatus]);
+  }, [paymentMethod]); // ONLY depend on paymentMethod to avoid loops
 
   // Express Order - Priority with 50% extra charge and 2-day turnaround
   const [isExpressOrder, setIsExpressOrder] = useState(false);
-
-  // Calculation state
-  const [subtotal, setSubtotal] = useState(0);
-  const [totalAmount, setTotalAmount] = useState(0);
 
   // Success modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -170,15 +175,64 @@ export default function CreateOrder() {
     pendingOrderData: Partial<Order>;
   } | null>(null);
 
+  // Calculation state - using useMemo for derived values
+  const baseSubtotal = useMemo(() => {
+    return selectedServices.reduce((sum, item) => sum + item.subtotal, 0);
+  }, [selectedServices]);
+
+  const expressSurcharge = useMemo(() => {
+    return isExpressOrder ? baseSubtotal * 0.5 : 0;
+  }, [baseSubtotal, isExpressOrder]);
+
+  const subtotal = useMemo(() => {
+    return (baseSubtotal + expressSurcharge);
+  }, [baseSubtotal, expressSurcharge]);
+
+  const discountAmount = useMemo(() => {
+    if (discountType === 'percentage') {
+      return (subtotal * discountValue) / 100;
+    } else if (discountType === 'fixed') {
+      return discountValue;
+    }
+    return 0;
+  }, [subtotal, discountType, discountValue]);
+
+  const gstAmount = useMemo(() => {
+    if (!enableGST) return 0;
+    const afterDiscount = subtotal - discountAmount;
+    return (afterDiscount + extraCharges) * 0.18;
+  }, [enableGST, subtotal, discountAmount, extraCharges]);
+
+  const totalAmount = useMemo(() => {
+    let calculatedTotal = subtotal - discountAmount + extraCharges;
+    if (enableGST) {
+      calculatedTotal += gstAmount;
+    }
+    return roundInvoiceAmount(Math.max(0, calculatedTotal));
+  }, [subtotal, discountAmount, extraCharges, enableGST, gstAmount]);
+
   // Fetch services - only active ones
   const { data: servicesData, isLoading: servicesLoading, isError: servicesError } = useQuery<Service[]>({
     queryKey: ["services"],
     queryFn: async () => {
       const allServices = await servicesApi.getAll();
-      // Filter to only show Active services (case-insensitive)
-      return allServices.filter(service =>
-        service.status?.toLowerCase() === 'active'
-      );
+      if (!allServices || !Array.isArray(allServices)) return [];
+
+      // Map and filter services to ensure they have the expected structure
+      return allServices
+        .map(s => {
+          // Normalization: Ensure price field exists (fallback to price_per_unit)
+          const priceStr = s.price || (s as any).price_per_unit || "0";
+          return {
+            ...s,
+            price: priceStr,
+            status: s.status || "Active" // Fallback to Active
+          };
+        })
+        .filter(service =>
+          // Case-insensitive active check, or assume active if status is missing
+          !service.status || service.status.toLowerCase() === 'active'
+        );
     },
   });
 
@@ -461,21 +515,6 @@ export default function CreateOrder() {
     setSelectedServices(selectedServices.filter(s => s.service.id !== serviceId));
   };
 
-  // Calculate base subtotal (without express surcharge - for display purposes)
-  const baseSubtotal = React.useMemo(() => {
-    return selectedServices.reduce((sum, item) => sum + item.subtotal, 0);
-  }, [selectedServices]);
-
-  // Calculate express surcharge amount (50% of base subtotal)
-  const expressSurcharge = React.useMemo(() => {
-    return isExpressOrder ? baseSubtotal * 0.5 : 0;
-  }, [baseSubtotal, isExpressOrder]);
-
-  // Calculate subtotal including express surcharge
-  useEffect(() => {
-    setSubtotal(baseSubtotal + expressSurcharge);
-  }, [baseSubtotal, expressSurcharge]);
-
   // Auto-set due date: 2 days for express, 7 days for regular
   useEffect(() => {
     const today = new Date();
@@ -484,41 +523,40 @@ export default function CreateOrder() {
     setPickupDate(dueDate);
   }, [isExpressOrder]);
 
-  // Calculate discount amount for display
-  const discountAmount = React.useMemo(() => {
-    if (discountType === 'percentage') {
-      return (subtotal * discountValue) / 100;
-    } else if (discountType === 'fixed') {
-      return discountValue;
+  // Mutation for updating order status from history
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: ({ orderId, newStatus }: { orderId: string; newStatus: string }) =>
+      ordersApi.update(orderId, { status: newStatus as any }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customer-orders", foundCustomer?.id] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      toast({
+        title: "Order Updated",
+        description: "Status successfully changed.",
+      });
+    },
+    onError: (error) => {
+      console.error("Order status update failed:", error);
+      toast({
+        title: "Update Failed",
+        description: "Failed to update order status.",
+        variant: "destructive",
+      });
     }
-    return 0;
-  }, [subtotal, discountType, discountValue]);
+  });
 
-  // Calculate GST amount for display
-  const gstAmount = React.useMemo(() => {
-    if (!enableGST) return 0;
-    const afterDiscount = subtotal - discountAmount;
-    return (afterDiscount + extraCharges) * 0.18;
-  }, [enableGST, subtotal, discountAmount, extraCharges]);
-
-  // Calculate total with discounts and charges
-  useEffect(() => {
-    let calculatedTotal = subtotal;
-
-    // Apply discount
-    calculatedTotal -= discountAmount;
-
-    // Add extra charges
-    calculatedTotal += extraCharges;
-
-    // Apply GST if enabled (18%)
-    if (enableGST) {
-      calculatedTotal += gstAmount;
+  // Mutation for updating generic order fields
+  const updateOrderMutation = useMutation({
+    mutationFn: ({ id, ...updates }: { id: string } & Partial<Order>) =>
+      ordersApi.update(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customer-orders", foundCustomer?.id] });
+      toast({
+        title: "Order Updated",
+        description: "Order information updated.",
+      });
     }
-
-    // Ensure total is not negative and Apply Rounding
-    setTotalAmount(roundInvoiceAmount(Math.max(0, calculatedTotal)));
-  }, [subtotal, discountAmount, extraCharges, enableGST, gstAmount]);
+  });
 
   // Create order mutation
   const createOrderMutation = useMutation({
@@ -968,49 +1006,69 @@ export default function CreateOrder() {
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                <CustomerAutocomplete
-                  searchCustomers={searchCustomers}
-                  onSelect={handleSelectCustomer}
-                  onCreateNew={(query) => {
-                    // Pre-fill based on query type (phone or name)
-                    const isPhone = /^\d+$/.test(query.replace(/[\s\-\(\)]/g, ''));
-                    if (isPhone) {
-                      setNewCustomerPhone(query);
-                      setNewCustomerName('');
-                    } else {
-                      setNewCustomerName(query);
-                      setNewCustomerPhone('');
-                    }
-                    setShowCustomerDialog(true);
-                  }}
-                  placeholder="Search by name, phone, or email..."
-                />
-
-                <AnimatePresence>
-                  {foundCustomer && (
-                    <motion.div
-                      key="customer-found"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                          <div>
-                            <p className="font-semibold text-green-800 dark:text-green-200">
-                              Customer Selected!
-                            </p>
-                            <p className="text-sm text-green-600 dark:text-green-400">
-                              {foundCustomer.name} - {foundCustomer.phone}
-                            </p>
-                          </div>
-                        </div>
+                {!foundCustomer ? (
+                  <CustomerAutocomplete
+                    searchCustomers={searchCustomers}
+                    onSelect={handleSelectCustomer}
+                    onCreateNew={(query) => {
+                      // Pre-fill based on query type (phone or name)
+                      const isPhone = /^\d+$/.test(query.replace(/[\s\-\(\)]/g, ''));
+                      if (isPhone) {
+                        setNewCustomerPhone(query);
+                        setNewCustomerName('');
+                      } else {
+                        setNewCustomerName(query);
+                        setNewCustomerPhone('');
+                      }
+                      setShowCustomerDialog(true);
+                    }}
+                    placeholder="Search by name, phone, or email..."
+                  />
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex items-center justify-between p-4 rounded-xl border-2 border-primary/20 bg-primary/5 shadow-sm"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                        <User className="h-6 w-6" />
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-lg leading-none">{foundCustomer.name}</h3>
+                          <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200 text-[10px] h-5 uppercase tracking-wider font-bold">
+                            Active Customer
+                          </Badge>
+                        </div>
+                        <p className="text-muted-foreground mt-1 flex items-center gap-1.5 text-sm">
+                          <Phone className="h-3.5 w-3.5" /> {foundCustomer.phone}
+                          {foundCustomer.email && (
+                            <>
+                              <span className="mx-1 opacity-30">•</span>
+                              <Mail className="h-3.5 w-3.5" /> {foundCustomer.email}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => {
+                        setFoundCustomer(null);
+                        setCustomerName('');
+                        setCustomerPhone('');
+                        setCustomerEmail('');
+                        setCustomerAddress('');
+                      }}
+                      className="text-muted-foreground hover:text-destructive hover:bg-destructive/5"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Change
+                    </Button>
+                  </motion.div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -1105,22 +1163,11 @@ export default function CreateOrder() {
                       <span className="text-sm">Failed to load services. Please refresh the page.</span>
                     </div>
                   ) : (
-                    <Select onValueChange={handleAddService} value="">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a service to add..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {services && services.length > 0 ? (
-                          services.map((service) => (
-                            <SelectItem key={service.id} value={service.id}>
-                              {service.name} - ₹{parseFloat(service.price).toFixed(2)}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="no-services" disabled>No services available</SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
+                  <ServiceCombobox 
+                    services={services} 
+                    onSelect={handleAddService} 
+                    disabled={servicesLoading} 
+                  />
                   )}
                 </div>
 
@@ -1542,97 +1589,104 @@ export default function CreateOrder() {
           </motion.div>
         </div>
 
-        {/* Right Column: Order Summary */}
-        <div className="lg:col-span-1">
+        {/* Right Column: Order Summary & Activity Tracker */}
+        <div className="lg:col-span-1 space-y-6">
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
-            className="sticky top-20 z-10"
+            className="sticky top-24 z-10"
           >
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Summary</CardTitle>
+            <Card className="border-none shadow-xl bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 overflow-hidden ring-1 ring-slate-200 dark:ring-slate-800">
+              <div className="h-1.5 w-full bg-primary" />
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <ShoppingBag className="h-5 w-5 text-primary" />
+                    Bill Summary
+                  </span>
+                  {selectedServices.length > 0 && (
+                    <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
+                      {selectedServices.length} {selectedServices.length === 1 ? 'Item' : 'Items'}
+                    </Badge>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <p className="font-semibold text-sm text-muted-foreground">Selected Services:</p>
+                <div className="space-y-3">
                   {selectedServices.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No services selected</p>
+                    <div className="text-center py-6 border-2 border-dashed rounded-lg bg-slate-50/50 dark:bg-slate-900/50">
+                      <ShoppingCart className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                      <p className="text-sm text-slate-400">Add services to see summary</p>
+                    </div>
                   ) : (
-                    <div className="space-y-1">
+                    <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 scrollbar-thin">
                       {selectedServices.map(item => (
-                        <div key={item.service.id} className="flex justify-between text-sm">
-                          <span>{item.service.name} x {item.quantity}</span>
-                          <span className="font-medium">₹{item.subtotal.toFixed(2)}</span>
+                        <div key={item.service.id} className="flex justify-between items-start text-sm group">
+                          <div className="flex-1">
+                            <p className="font-medium group-hover:text-primary transition-colors">{item.service.name}</p>
+                            <p className="text-[11px] text-muted-foreground whitespace-nowrap">₹{safeParseFloat(item.priceOverride).toFixed(2)} × {item.quantity}</p>
+                          </div>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">₹{item.subtotal.toFixed(2)}</span>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
 
-                <div className="border-t pt-4 space-y-2">
-                  {/* Base Subtotal (services only, before express) */}
-                  <div className="flex justify-between text-sm">
+                <div className="space-y-2.5 pt-4 border-t border-slate-200 dark:border-slate-800">
+                  <div className="flex justify-between text-sm text-slate-500">
                     <span>Services Subtotal</span>
                     <span className="font-medium">₹{baseSubtotal.toFixed(2)}</span>
                   </div>
 
                   <AnimatePresence>
-                    {/* Express Order Surcharge */}
-                    {isExpressOrder && expressSurcharge > 0 && (
+                    {isExpressOrder && (
                       <motion.div
-                        key="express-surcharge"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="flex justify-between text-sm text-orange-600 dark:text-orange-400"
+                        className="flex justify-between text-sm text-amber-600 dark:text-amber-400 font-medium"
                       >
                         <span className="flex items-center gap-1">
-                          <Zap className="h-3.5 w-3.5" /> Express Surcharge (50%)
+                          <Zap className="h-3.5 w-3.5" /> Express Charge (50%)
                         </span>
                         <span>+₹{expressSurcharge.toFixed(2)}</span>
                       </motion.div>
                     )}
 
-                    {/* Discount */}
-                    {discountType !== 'none' && discountValue > 0 && (
+                    {discountAmount > 0 && (
                       <motion.div
-                        key="discount-summary"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="flex justify-between text-sm text-red-600 dark:text-red-400"
+                        className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400 font-medium"
                       >
-                        <span>
+                        <span className="flex items-center gap-1">
+                          <TrendingDown className="h-3.5 w-3.5" /> 
                           Discount {discountType === 'percentage' ? `(${discountValue}%)` : '(Fixed)'}
                         </span>
                         <span>-₹{discountAmount.toFixed(2)}</span>
                       </motion.div>
                     )}
 
-                    {/* Extra/Custom Charges */}
                     {extraCharges > 0 && (
                       <motion.div
-                        key="extra-charges-summary"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="flex justify-between text-sm text-blue-600 dark:text-blue-400"
+                        className="flex justify-between text-sm text-slate-500"
                       >
-                        <span>{extraChargesLabel || 'Extra Charges'}</span>
+                        <span className="flex items-center gap-1 italic">
+                          <PlusCircle className="h-3.5 w-3.5 text-blue-500" />
+                          {extraChargesLabel || 'Extra Charges'}
+                        </span>
                         <span>+₹{extraCharges.toFixed(2)}</span>
                       </motion.div>
                     )}
 
-                    {/* GST */}
                     {enableGST && (
                       <motion.div
-                        key="gst-summary"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="flex justify-between text-sm text-amber-600 dark:text-amber-400"
+                        className="flex justify-between text-sm text-slate-400"
                       >
                         <span>GST (18%)</span>
                         <span>+₹{gstAmount.toFixed(2)}</span>
@@ -1640,44 +1694,75 @@ export default function CreateOrder() {
                     )}
                   </AnimatePresence>
 
-                  {/* Total Amount */}
-                  <div className="border-t pt-2 flex justify-between font-bold text-lg">
-                    <span>Total Amount</span>
-                    <span className={isExpressOrder ? "text-orange-600 dark:text-orange-400" : ""}>
-                      ₹{totalAmount.toFixed(2)}
-                    </span>
+                  <div className="mt-4 p-4 rounded-xl bg-slate-900 dark:bg-primary text-white shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                    <div className="flex justify-between items-center">
+                      <div>
+                         <span className="text-xs uppercase tracking-widest font-bold opacity-70">Payable Amount</span>
+                         {isExpressOrder && <p className="text-[10px] text-amber-300 font-bold uppercase">Express Order</p>}
+                      </div>
+                      <span className="text-2xl font-black">₹{totalAmount.toFixed(2)}</span>
+                    </div>
                   </div>
 
-                  {/* Payment Details */}
                   <AnimatePresence>
                     {advancePayment && parseFloat(advancePayment) > 0 && (
                       <motion.div
-                        key="advance-payment-summary"
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="space-y-2 pt-2 border-t"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/30 space-y-2"
                       >
-                        <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
-                          <span>Advance Paid ({paymentMethod.toUpperCase()})</span>
-                          <span>-₹{parseFloat(advancePayment || '0').toFixed(2)}</span>
+                        <div className="flex justify-between items-center">
+                          <p className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400">Advance Paid</p>
+                          <span className="text-lg font-bold text-emerald-600">₹{parseFloat(advancePayment).toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between font-semibold text-red-600 dark:text-red-400 text-lg">
-                          <span>Balance Due</span>
-                          <span>₹{Math.max(0, totalAmount - parseFloat(advancePayment || '0')).toFixed(2)}</span>
+                        <div className="flex justify-between items-center border-t border-emerald-100 dark:border-emerald-800 pt-1">
+                          <p className="text-xs font-bold text-red-600">Balance Due</p>
+                          <span className="text-sm font-bold text-red-600">₹{(totalAmount - parseFloat(advancePayment)).toFixed(2)}</span>
                         </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
 
-                {couponCode && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-                    <p className="text-xs text-blue-600 dark:text-blue-400">
-                      Coupon: <strong>{couponCode}</strong>
-                    </p>
+                <Button
+                  onClick={handleCreateOrder}
+                  disabled={createOrderMutation.isPending || selectedServices.length === 0 || !customerName || !customerPhone}
+                  className="w-full h-12 text-lg font-bold shadow-lg shadow-primary/20 mt-2 hover:scale-[1.01] active:scale-[0.98] transition-all"
+                >
+                  {createOrderMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="mr-2 h-5 w-5" />
+                      Place Order
+                    </>
+                  )}
+                </Button>
+                
+                <p className="text-[10px] text-center text-muted-foreground px-4 italic leading-relaxed">
+                  By placing this order, you agree to the service terms. A WhatsApp bill will be sent automatically.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Session Activity Tracker */}
+            <Card className="mt-6 border-slate-200 dark:border-slate-800 bg-transparent shadow-none border-dashed text-center">
+              <CardHeader className="py-4">
+                <CardTitle className="text-sm flex items-center justify-center gap-2">
+                  <Clock className="h-4 w-4 text-primary" />
+                  Session Activity
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                <div className="space-y-3">
+                  <div className="text-xs text-muted-foreground flex flex-col items-center justify-center py-6 opacity-60">
+                     <List className="h-5 w-5 mb-2 opacity-30" />
+                     <p>Completed orders will appear here</p>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           </motion.div>
@@ -2024,8 +2109,21 @@ export default function CreateOrder() {
         enableGST={enableGST}
         onClose={() => {
           setIsModalOpen(false);
-        }
-        }
+          // 🧹 CLEAR FORM After Successful Order
+          setSelectedServices([]);
+          setFoundCustomer(null);
+          setCustomerName('');
+          setCustomerPhone('');
+          setCustomerEmail('');
+          setCustomerAddress('');
+          setSpecialInstructions('');
+          setIsExpressOrder(false);
+          setDiscountValue(0);
+          setExtraCharges(0);
+          localStorage.removeItem(ABANDONED_CART_KEY);
+          // Show refreshing state briefly
+          toast({ title: "Form Cleared", description: "Ready for next order." });
+        }}
       />
 
       {/* History Order Details Dialog */}
@@ -2033,11 +2131,43 @@ export default function CreateOrder() {
         order={selectedHistoryOrder}
         isOpen={isHistoryDetailsOpen}
         onClose={() => setIsHistoryDetailsOpen(false)}
-        onEdit={() => { }}
-        onCancel={() => { }}
-        onNextStep={() => { }}
-        onPrintInvoice={() => { }}
-        onUpdatePaymentStatus={() => { }}
+        onEdit={(order) => {
+          // Future: Load order into form
+          setIsHistoryDetailsOpen(false);
+          toast({
+            title: "Edit Mode",
+            description: "Loading historical orders into the form is coming soon.",
+          });
+        }}
+        onCancel={(order) => {
+          if (window.confirm("Are you sure you want to cancel this order?")) {
+            updateOrderStatusMutation.mutate({
+              orderId: order.id,
+              newStatus: 'cancelled'
+            });
+            setIsHistoryDetailsOpen(false);
+          }
+        }}
+        onNextStep={(order) => {
+          const statusFlow = ['pending', 'processing', 'ready_for_pickup', 'completed'];
+          const currentIndex = statusFlow.indexOf(order.status);
+          const nextStatus = statusFlow[currentIndex + 1];
+          if (nextStatus) {
+            updateOrderStatusMutation.mutate({
+              orderId: order.id,
+              newStatus: nextStatus
+            });
+          }
+        }}
+        onPrintInvoice={(order) => {
+          // Printing is handled inside the dialog, but we could add extra logic here
+        }}
+        onUpdatePaymentStatus={(orderId, status) => {
+          updateOrderMutation.mutate({
+            id: orderId,
+            paymentStatus: status
+          } as any);
+        }}
       />
     </div>
   );
