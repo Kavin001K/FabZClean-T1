@@ -1022,7 +1022,7 @@ export default function CreateOrder() {
                       }
                       setShowCustomerDialog(true);
                     }}
-                    placeholder="Search by name, phone, or email..."
+                    placeholder="Search by name, ID, phone, or email..."
                   />
                 ) : (
                   <motion.div
@@ -1037,6 +1037,11 @@ export default function CreateOrder() {
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="font-bold text-lg leading-none">{foundCustomer.name}</h3>
+                          {foundCustomer.id && (
+                            <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0 h-4 bg-slate-100 text-slate-600 border-slate-200">
+                              {foundCustomer.id}
+                            </Badge>
+                          )}
                           <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200 text-[10px] h-5 uppercase tracking-wider font-bold">
                             Active Customer
                           </Badge>

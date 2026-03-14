@@ -551,7 +551,7 @@ export class SupabaseStorage {
         const search = String(options.search || '').trim();
         if (search) {
             const safeSearch = search.replace(/[%_]/g, '');
-            query = query.or(`name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%,phone.ilike.%${safeSearch}%`);
+            query = query.or(`id.ilike.%${safeSearch}%,name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%,phone.ilike.%${safeSearch}%`);
         }
 
         const phone = String(options.phone || '').trim();
@@ -719,13 +719,35 @@ export class SupabaseStorage {
     }
 
     async getOrder(id: string): Promise<Order | undefined> {
-        const { data: order, error } = await this.supabase
-            .from('orders')
-            .select('*, customers(name, email, phone)')
-            .eq('id', id)
-            .single();
-        if (error) return undefined;
-        return this.mapDates(order);
+        try {
+            const { data: order, error } = await this.supabase
+                .from('orders')
+                .select('*')
+                .eq('id', id)
+                .single();
+            
+            if (error || !order) {
+                console.warn(`[SupabaseStorage] Order ${id} not found:`, error?.message);
+                return undefined;
+            }
+
+            // Separately fetch customer data to avoid join issues
+            if (order.customer_id) {
+                const { data: customerData } = await this.supabase
+                    .from('customers')
+                    .select('name, email, phone')
+                    .eq('id', order.customer_id)
+                    .single();
+                if (customerData) {
+                    (order as any).customers = customerData;
+                }
+            }
+
+            return this.mapDates(order);
+        } catch (err) {
+            console.error('[SupabaseStorage] getOrder exception:', err);
+            return undefined;
+        }
     }
 
     async updateOrder(id: string, data: Partial<InsertOrder>): Promise<Order | undefined> {

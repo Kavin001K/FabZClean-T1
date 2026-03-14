@@ -59,11 +59,13 @@ function calculateRelevance(customer: Customer, query: string): number {
     if (customer.email?.toLowerCase().startsWith(queryLower)) score += 50;
 
     // Contains match gets medium score
+    if (customer.id?.toLowerCase().includes(queryLower)) score += 25;
     if (customer.name?.toLowerCase().includes(queryLower)) score += 25;
     if (normalizedCustomerPhone.includes(normalizedQuery)) score += 25;
     if (customer.email?.toLowerCase().includes(queryLower)) score += 25;
 
     // Fuzzy match gets low score
+    if (fuzzyMatch(customer.id || '', query)) score += 10;
     if (fuzzyMatch(customer.name || '', query)) score += 10;
     if (fuzzyMatch(normalizedCustomerPhone, normalizedQuery)) score += 10;
     if (fuzzyMatch(customer.email || '', query)) score += 10;
@@ -71,18 +73,20 @@ function calculateRelevance(customer: Customer, query: string): number {
     return score;
 }
 
+const EMPTY_CUSTOMERS: Customer[] = [];
+
 export function CustomerAutocomplete({
-    customers = [],
+    customers = EMPTY_CUSTOMERS,
     onSelect,
     onCreateNew,
     searchCustomers,
-    placeholder = 'Search by name, phone, or email...',
+    placeholder = 'Search by Name, ID, Phone, or Email...',
     className = ''
 }: CustomerAutocompleteProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [isOpen, setIsOpen] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
-    const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+    const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>(EMPTY_CUSTOMERS);
     const [highlightedIndex, setHighlightedIndex] = useState(0);
     const wrapperRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -94,9 +98,9 @@ export function CustomerAutocomplete({
     // customer list up front.
     useEffect(() => {
         if (!searchQuery.trim()) {
-            setFilteredCustomers([]);
-            setIsOpen(false);
-            setIsSearching(false);
+            setFilteredCustomers(EMPTY_CUSTOMERS);
+            if (isOpen) setIsOpen(false);
+            if (isSearching) setIsSearching(false);
             return;
         }
 
@@ -125,15 +129,14 @@ export function CustomerAutocomplete({
             if (searchCustomers) {
                 setIsSearching(true);
                 try {
-                    // Debounce logic
-                    await new Promise(resolve => setTimeout(resolve, 300));
+                    // Internal debounce already handled by outer wrapper
                     if (isCancelled || requestId !== requestIdRef.current) return;
                     
                     const matches = await searchCustomers(searchQuery.trim());
-                    applyMatches(Array.isArray(matches) ? matches : []);
+                    applyMatches(Array.isArray(matches) ? matches : EMPTY_CUSTOMERS);
                 } catch (error) {
                     console.error('[Autocomplete] Customer search failed:', error);
-                    applyMatches([]);
+                    applyMatches(EMPTY_CUSTOMERS);
                 } finally {
                     if (!isCancelled && requestId === requestIdRef.current) {
                         setIsSearching(false);
@@ -155,7 +158,7 @@ export function CustomerAutocomplete({
             applyMatches(matches);
         };
 
-        const timer = window.setTimeout(runSearch, searchCustomers ? 250 : 0);
+        const timer = window.setTimeout(runSearch, searchCustomers ? 150 : 50);
 
         return () => {
             isCancelled = true;
@@ -218,7 +221,7 @@ export function CustomerAutocomplete({
 
     const handleClear = () => {
         setSearchQuery('');
-        setFilteredCustomers([]);
+        setFilteredCustomers(EMPTY_CUSTOMERS);
         setIsOpen(false);
         inputRef.current?.focus();
     };
@@ -297,6 +300,12 @@ export function CustomerAutocomplete({
                                             {highlightMatch(customer.name || 'Unknown', searchQuery)}
                                         </div>
                                         <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                            {customer.id && (
+                                                <div className="flex items-center gap-1 text-primary/80 font-medium">
+                                                    <span>🆔</span>
+                                                    <span>{highlightMatch(customer.id, searchQuery)}</span>
+                                                </div>
+                                            )}
                                             {customer.phone && (
                                                 <div className="flex items-center gap-1">
                                                     <span>📞</span>

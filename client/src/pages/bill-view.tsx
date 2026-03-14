@@ -213,6 +213,7 @@ export default function BillView() {
                     logo: "/assets/logo.webp"
                 },
                 customer: {
+                    id: order.customerId,
                     name: order.customerName,
                     address: formattedAddress,
                     phone: order.customerPhone || "",
@@ -254,6 +255,7 @@ export default function BillView() {
                     logo: "/assets/logo.webp"
                 },
                 customer: {
+                    id: order.customerId,
                     name: order.customerName,
                     address: formattedAddress,
                     phone: order.customerPhone || "",

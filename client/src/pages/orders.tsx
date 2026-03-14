@@ -1103,7 +1103,10 @@ function OrdersComponent() {
             <Badge className="bg-orange-500 text-white text-[9px] px-1.5 py-0 h-5">EXPRESS</Badge>
           )}
         </div>
-        <div className="truncate font-medium">{order.customerName}</div>
+        <div className="truncate flex flex-col">
+          <span className="font-medium">{order.customerName}</span>
+          <span className="text-[10px] text-muted-foreground font-mono leading-tight">{order.customerId || (order as any).customers?.id}</span>
+        </div>
         <div className="truncate text-muted-foreground">{(order as any).service || 'Dry Cleaning'}</div>
         <div onClick={(e) => e.stopPropagation()}>
           <Badge className={cn("border gap-1.5 w-fit", getStatusColor(order.status))}>

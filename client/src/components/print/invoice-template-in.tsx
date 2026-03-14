@@ -21,6 +21,7 @@ interface InvoiceData {
     logo?: string;
   };
   customer: {
+    id?: string;
     name: string;
     address: string;
     phone: string;
@@ -127,6 +128,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
   const formattedAddress = parseAndFormatAddress(customer?.address);
 
   const safeCustomer = {
+    id: customer?.id || '',
     name: customer?.name || 'Customer',
     address: formattedAddress,
     phone: customer?.phone || 'N/A',
@@ -394,6 +396,21 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
             </h3>
             <p style={{ fontWeight: '700', fontSize: '16px', margin: '0 0 8px 0', color: colors.dark }}>
               {safeCustomer.name}
+              {safeCustomer.id && (
+                <span style={{ 
+                  fontSize: '10px', 
+                  fontWeight: '500', 
+                  color: colors.primary, 
+                  background: `${colors.primary}10`,
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  marginLeft: '8px',
+                  verticalAlign: 'middle',
+                  fontFamily: 'monospace'
+                }}>
+                  ID: {safeCustomer.id}
+                </span>
+              )}
             </p>
             <p style={{ margin: '0 0 4px 0', color: colors.textLight, fontSize: '12px', maxWidth: '250px' }}>
               {safeCustomer.address}

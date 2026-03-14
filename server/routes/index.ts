@@ -151,11 +151,13 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/whatsapp', whatsappRouter);
   app.use('/api/documents', documentsRouter);
 
-  // API v1 routes
+  // Core API routes (register early to prevent shadowing)
+  app.use('/api/orders', ordersRouter);
+  app.use('/api/customers', customersRouter);
   app.use('/api/v1/orders', ordersRouter);
   app.use('/api/v1/customers', customersRouter);
 
-  // Additional API routes
+  // API v1 routes
   app.use('/api/audit-logs', auditLogsRouter);
   app.use('/api/analytics', analyticsRouter);
   app.use('/api/credits', creditsRouter);

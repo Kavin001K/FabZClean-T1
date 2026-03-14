@@ -12,6 +12,7 @@ interface InvoiceData {
         logo?: string;
     };
     customer: {
+        id?: string;
         name: string;
         address: string;
         phone: string;
@@ -143,7 +144,20 @@ const SimpleInvoiceTemplate: React.FC<{ data: InvoiceData }> = ({ data }) => {
             {/* Bill To */}
             <div style={{ marginBottom: '40px', padding: '20px', backgroundColor: colors.light, borderRadius: '8px' }}>
                 <h3 style={{ fontSize: '12px', fontWeight: 'bold', color: colors.secondary, textTransform: 'uppercase', marginBottom: '8px' }}>Bill To</h3>
-                <p style={{ fontWeight: 'bold', fontSize: '16px' }}>{customer.name}</p>
+                <p style={{ fontWeight: 'bold', fontSize: '16px' }}>
+                    {customer.name}
+                    {customer.id && (
+                        <span style={{ 
+                            fontSize: '10px', 
+                            color: colors.secondary, 
+                            opacity: 0.7,
+                            marginLeft: '8px',
+                            fontFamily: 'monospace'
+                        }}>
+                            #{customer.id}
+                        </span>
+                    )}
+                </p>
                 <p>{customer.phone}</p>
                 {customer.address && <p style={{ whiteSpace: 'pre-line', fontSize: '13px' }}>{customer.address}</p>}
             </div>

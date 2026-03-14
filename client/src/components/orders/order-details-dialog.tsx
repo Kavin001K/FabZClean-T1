@@ -195,7 +195,14 @@ export default React.memo(function OrderDetailsDialog({
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Customer</p>
-                  <p className="font-semibold text-lg">{order.customerName || anyOrder.customers?.name || "Guest Customer"}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-lg">{order.customerName || anyOrder.customers?.name || "Guest Customer"}</p>
+                    {(order.customerId || anyOrder.customers?.id) && (
+                      <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0 h-4 bg-slate-100 text-slate-600 border-slate-200">
+                        {order.customerId || anyOrder.customers?.id}
+                      </Badge>
+                    )}
+                  </div>
                   {(anyOrder.customers?.phone || anyOrder.phone) && (
                     <div className="flex items-center text-sm text-muted-foreground mt-1">
                       <Phone className="h-3 w-3 mr-1" />
