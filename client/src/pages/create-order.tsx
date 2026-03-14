@@ -59,6 +59,7 @@ export default function CreateOrder() {
   // Customer state
   const [phoneNumber, setPhoneNumber] = useState('');
   const [searchingCustomer, setSearchingCustomer] = useState(false);
+  const serviceComboboxRef = React.useRef<HTMLButtonElement>(null);
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -368,6 +369,11 @@ export default function CreateOrder() {
       title: "Customer Selected!",
       description: `Details loaded for ${customer.name}`,
     });
+
+    // Auto-focus the services section to streamline the workflow
+    setTimeout(() => {
+      serviceComboboxRef.current?.focus();
+    }, 100);
   };
 
   // Create new customer mutation
@@ -1169,6 +1175,7 @@ export default function CreateOrder() {
                     </div>
                   ) : (
                   <ServiceCombobox 
+                    ref={serviceComboboxRef}
                     services={services} 
                     onSelect={handleAddService} 
                     disabled={servicesLoading} 

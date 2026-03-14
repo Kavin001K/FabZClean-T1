@@ -158,7 +158,7 @@ export function CustomerAutocomplete({
             applyMatches(matches);
         };
 
-        const timer = window.setTimeout(runSearch, searchCustomers ? 150 : 50);
+        const timer = window.setTimeout(runSearch, searchCustomers ? 400 : 50);
 
         return () => {
             isCancelled = true;
@@ -226,9 +226,50 @@ export function CustomerAutocomplete({
         inputRef.current?.focus();
     };
 
-    // Highlight matching text
-    const highlightMatch = (text: string, query: string) => {
+    // Highlight matching text with special handling for phone numbers
+    const highlightMatch = (text: string, query: string, isPhone: boolean = false) => {
         if (!query) return text;
+
+        const normalizedQuery = query.toLowerCase().replace(/[^\d]/g, '');
+        const normalizedText = text.toLowerCase().replace(/[^\d]/g, '');
+
+        // If it's a phone query and we're highlighting a phone number
+        if (isPhone && normalizedQuery && normalizedText.includes(normalizedQuery)) {
+            // Find the start and end of the matching sequence of digits in the original text
+            let queryIdx = 0;
+            let startIdx = -1;
+            let endIdx = -1;
+
+            for (let i = 0; i < text.length; i++) {
+                if (/[0-9]/.test(text[i])) {
+                    if (text[i] === normalizedQuery[queryIdx]) {
+                        if (startIdx === -1) startIdx = i;
+                        queryIdx++;
+                        if (queryIdx === normalizedQuery.length) {
+                            endIdx = i + 1;
+                            break;
+                        }
+                    } else if (queryIdx > 0) {
+                        // Reset if we broke the sequence
+                        queryIdx = 0;
+                        startIdx = -1;
+                        i--; // Re-check this digit
+                    }
+                }
+            }
+
+            if (startIdx !== -1 && endIdx !== -1) {
+                return (
+                    <>
+                        {text.substring(0, startIdx)}
+                        <span className="bg-primary/20 font-bold text-primary px-0.5 rounded">
+                            {text.substring(startIdx, endIdx)}
+                        </span>
+                        {text.substring(endIdx)}
+                    </>
+                );
+            }
+        }
 
         const index = text.toLowerCase().indexOf(query.toLowerCase());
         if (index === -1) return text;
@@ -236,7 +277,7 @@ export function CustomerAutocomplete({
         return (
             <>
                 {text.substring(0, index)}
-                <span className="bg-yellow-200 dark:bg-yellow-800 font-semibold">
+                <span className="bg-primary/20 font-bold text-primary px-0.5 rounded">
                     {text.substring(index, index + query.length)}
                 </span>
                 {text.substring(index + query.length)}
@@ -300,21 +341,19 @@ export function CustomerAutocomplete({
                                             {highlightMatch(customer.name || 'Unknown', searchQuery)}
                                         </div>
                                         <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                                            {customer.id && (
-                                                <div className="flex items-center gap-1 text-primary/80 font-medium">
-                                                    <span>🆔</span>
+                                                <div className="flex items-center gap-1.5 text-primary/80 font-medium">
+                                                    <span className="text-muted-foreground w-3.5 text-center">🆔</span>
                                                     <span>{highlightMatch(customer.id, searchQuery)}</span>
                                                 </div>
-                                            )}
                                             {customer.phone && (
-                                                <div className="flex items-center gap-1">
-                                                    <span>📞</span>
-                                                    <span>{highlightMatch(customer.phone, searchQuery)}</span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-muted-foreground w-3.5 text-center">📞</span>
+                                                    <span>{highlightMatch(customer.phone, searchQuery, true)}</span>
                                                 </div>
                                             )}
                                             {customer.email && (
-                                                <div className="flex items-center gap-1">
-                                                    <span>✉️</span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-muted-foreground w-3.5 text-center">✉️</span>
                                                     <span className="truncate">
                                                         {highlightMatch(customer.email, searchQuery)}
                                                     </span>

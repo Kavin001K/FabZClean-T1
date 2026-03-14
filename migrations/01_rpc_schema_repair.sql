@@ -163,7 +163,7 @@ BEGIN
     v_order_payment_status,
     v_order_customer_id
   FROM public.orders
-  WHERE id = p_order_id
+  WHERE id = p_order_id::uuid
   FOR UPDATE;
 
   IF v_existing_order_id IS NULL THEN
