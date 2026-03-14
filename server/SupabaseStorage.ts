@@ -550,12 +550,30 @@ export class SupabaseStorage {
 
         const search = String(options.search || '').trim();
         if (search) {
+            const hasDigits = /\d/.test(search);
+            const digitsOnly = search.replace(/\D/g, '');
             const safeSearch = search.replace(/[%_]/g, '');
-            query = query.or(`id.ilike.%${safeSearch}%,name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%,phone.ilike.%${safeSearch}%`);
+
+            // Base OR conditions: ID, Name, Email
+            let orQuery = `id.ilike.%${safeSearch}%,name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`;
+
+            // If query contains digits, search in normalized phone as well (if possible with ilike)
+            // or just the original phone field
+            if (hasDigits) {
+                orQuery += `,phone.ilike.%${digitsOnly}%,phone.ilike.%${safeSearch}%`;
+            } else {
+                orQuery += `,phone.ilike.%${safeSearch}%`;
+            }
+
+            // Also search in address (jsonb cast to text for simple search)
+            orQuery += `,address.ilike.%${safeSearch}%`;
+
+            query = query.or(orQuery);
         }
 
         const phone = String(options.phone || '').trim();
         if (phone) {
+            // Equality check for specific phone filtering
             query = query.eq('phone', phone);
         }
 
