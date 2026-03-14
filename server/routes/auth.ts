@@ -35,20 +35,24 @@ router.post('/login', async (req: Request, res: Response) => {
     const result = await AuthService.login(username, password, ipAddress);
 
     // LOGGING: Explicitly log login success with role context
-    await AuthService.logAction(
-      result.employee.id!,
-      result.employee.username,
-      'login_success',
-      'session',
-      'active',
-      {
-        role: result.employee.role,
-        franchiseId: result.employee.franchiseId,
-        loginMethod: 'password'
-      },
-      ipAddress,
-      req.get('user-agent')
-    );
+    try {
+      await AuthService.logAction(
+        result.employee.id!,
+        result.employee.username,
+        'login_success',
+        'session',
+        'active',
+        {
+          role: result.employee.role,
+          franchiseId: result.employee.franchiseId,
+          loginMethod: 'password'
+        },
+        ipAddress,
+        req.get('user-agent')
+      );
+    } catch (logErr) {
+      console.warn(`⚠️ Route audit log failed:`, (logErr as any).message);
+    }
 
     res.json({
       success: true,

@@ -62,17 +62,23 @@ export class AuthService {
         try {
             console.log(`🔍 Searching for user in local DB: ${username}`);
             const localEmployee = await storage.getEmployeeByEmail(username) as any;
+            
+            console.log(`🔍 Search result for ${username}:`, localEmployee ? 'Found' : 'Not Found');
 
             if (!localEmployee) {
-                // Log failed attempt
-                await (storage as any).logAction(
-                    'ANONYMOUS',
-                    'login_failed',
-                    'auth',
-                    username,
-                    { reason: 'User not found', ip: ipAddress },
-                    ipAddress
-                );
+                // Log failed attempt - catch error so it doesn't block reporting "User not found"
+                try {
+                    await (storage as any).logAction(
+                        'ANONYMOUS',
+                        'login_failed',
+                        'auth',
+                        username,
+                        { reason: 'User not found', ip: ipAddress },
+                        ipAddress
+                    );
+                } catch (logErr) {
+                    console.warn(`⚠️ Audit log failed (User not found):`, (logErr as any).message);
+                }
                 console.log(`❌ User not found: ${username}`);
                 throw new Error('Invalid username or password');
             }
@@ -87,16 +93,21 @@ export class AuthService {
             const isValidPassword = await bcrypt.compare(password, localEmployee.password);
 
             if (!isValidPassword) {
-                // Log failed attempt
-                await (storage as any).logAction(
-                    localEmployee.id,
-                    'login_failed',
-                    'auth',
-                    localEmployee.id,
-                    { reason: 'Invalid password', ip: ipAddress },
-                    ipAddress
-                );
+                // Log failed attempt - catch error
+                try {
+                    await (storage as any).logAction(
+                        localEmployee.id,
+                        'login_failed',
+                        'auth',
+                        localEmployee.id,
+                        { reason: 'Invalid password', ip: ipAddress },
+                        ipAddress
+                    );
+                } catch (logErr) {
+                    console.warn(`⚠️ Audit log failed (Invalid password):`, (logErr as any).message);
+                }
                 console.log(`❌ Password mismatch for user: ${username}`);
+                console.log(`DEBUG: Entered password length: ${password.length}`);
                 throw new Error('Invalid username or password');
             }
 
@@ -137,15 +148,19 @@ export class AuthService {
                 factoryId: localEmployee.factory_id || localEmployee.factoryId,
             };
 
-            // Log successful login
-            await (storage as any).logAction(
-                localEmployee.id,
-                'login_success',
-                'auth',
-                localEmployee.id,
-                { email: localEmployee.email, ip: ipAddress },
-                ipAddress
-            );
+            // Log successful login - catch error so it doesn't block the actual login
+            try {
+                await (storage as any).logAction(
+                    localEmployee.id,
+                    'login_success',
+                    'auth',
+                    localEmployee.id,
+                    { email: localEmployee.email, ip: ipAddress },
+                    ipAddress
+                );
+            } catch (logErr) {
+                console.warn(`⚠️ Audit log failed (Login success):`, (logErr as any).message);
+            }
 
             console.log(`✅ Login successful for: ${username}`);
             return { token, employee };

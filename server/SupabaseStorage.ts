@@ -666,7 +666,8 @@ export class SupabaseStorage {
                 'extra_charges', 'gst_enabled', 'gst_rate', 'gst_amount', 'pan_number',
                 'gst_number', 'franchise_id', 'created_at', 'updated_at', 'priority',
                 'is_express_order', 'fulfillment_type', 'delivery_charges', 'delivery_address',
-                'tag_note', 'barcode_id', 'assigned_to'
+                'tag_note', 'barcode_id', 'assigned_to', 'wallet_used', 'credit_used',
+                'is_credit_order', 'delivery_earnings_calculated', 'delivery_cash_collected'
             ];
             const safeData: any = {};
             for (const key of Object.keys(snakeCaseData)) {
