@@ -1110,13 +1110,32 @@ export class SupabaseStorage {
 
             // If this is a credit order, increment the customer's outstanding balance
             if (creditAssigned > 0 && customerId) {
-                try {
-                    const currentCredit = parseFloat(customer.credit_balance || '0');
-                    await this.supabase.from('customers').update({
-                        credit_balance: currentCredit + creditAssigned,
-                    }).eq('id', customerId);
-                } catch (creditErr) {
-                    console.error('[SupabaseStorage] Failed to update customer credit balance:', creditErr);
+                               if (creditAssigned > 0) {
+                    // LEGACY: Update credit balance (audited via triggers)
+                    // Instead of updating customers table directly (which is blocked by triggers),
+                    // we insert a DEBIT entry into wallet_transactions.
+                    // The DB trigger `trg_wallet_transactions_after_insert` will automatically
+                    // update customers.credit_balance and wallet_balance_cache.
+                    const { error: creditLedgerError } = await this.supabase
+                        .from('wallet_transactions')
+                        .insert({
+                            customer_id: customerId,
+                            type: 'debit',
+                            amount: -creditAssigned,
+                            reference_order_id: orderId,
+                            reference_id: orderId,
+                            reference_type: 'ORDER',
+                            transaction_type: 'ORDER',
+                            payment_method: 'CREDIT',
+                            note: `Auto-assigned credit for order ${order.order_number || orderId}`,
+                            created_at: new Date().toISOString()
+                        });
+
+                    if (creditLedgerError) {
+                        console.error('[SupabaseStorage] Failed to record credit in ledger:', creditLedgerError);
+                        // We continue because the order was already updated, but this is a serious sync issue.
+                        // In some cases, manual reconciliation might be needed.
+                    }
                 }
             }
 

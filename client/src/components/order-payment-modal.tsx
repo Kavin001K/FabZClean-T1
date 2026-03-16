@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from "@/lib/queryClient";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -265,8 +265,7 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden gap-0">
+      <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden gap-0 flex flex-col h-[90vh] sm:h-auto sm:max-h-[85vh]">
         <DialogHeader className="p-6 pb-4 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shrink-0 border-b">
           <div className="flex justify-between items-start">
             <div>
@@ -280,14 +279,14 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
             </div>
           </div>
         </DialogHeader>
-
-        <div className="p-6 pt-4 space-y-6 overflow-y-auto max-h-[calc(100vh-140px)]">
+        
+        <div className="p-6 pt-4 space-y-6 overflow-y-auto flex-1 scroll-smooth">
           {/* Order Summary */}
-          <Card>
-            <CardHeader className="pb-3">
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="pb-3 bg-slate-50/50">
               <CardTitle className="text-lg">Order Summary</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 pt-4">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Customer</span>
                 <span className="font-medium">{order.customerName}</span>
@@ -302,12 +301,12 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
               </div>
               <Separator />
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Remaining Balance</span>
-                <span className="font-bold text-red-600">{formatCurrency(remainingAmount)}</span>
+                <span className="text-muted-foreground text-sm uppercase tracking-wider font-semibold">Remaining Balance</span>
+                <span className="font-black text-red-600 text-xl">{formatCurrency(remainingAmount)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Payment Status</span>
-                <Badge className={getPaymentStatusColor(order.paymentStatus)}>
+                <Badge className={cn("px-3 py-1", getPaymentStatusColor(order.paymentStatus))}>
                   {order.paymentStatus.toUpperCase()}
                 </Badge>
               </div>
@@ -331,34 +330,37 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
 
           {/* Payment Type Selection */}
           <div className="space-y-3">
-            <Label>Payment Type</Label>
+            <Label className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Payment Type</Label>
             <div className="grid grid-cols-3 gap-2">
               <Button
                 variant={paymentType === 'advance' ? 'default' : 'outline'}
                 onClick={() => setPaymentType('advance')}
                 disabled={order.paymentStatus === 'paid'}
+                className="transition-all"
               >
-                Advance Payment
+                Advance
               </Button>
               <Button
                 variant={paymentType === 'delivery' ? 'default' : 'outline'}
                 onClick={() => setPaymentType('delivery')}
                 disabled={remainingAmount <= 0}
+                className="transition-all"
               >
-                Balance Payment
+                Balance
               </Button>
               <Button
                 variant={paymentType === 'full' ? 'default' : 'outline'}
                 onClick={() => setPaymentType('full')}
+                className="transition-all"
               >
-                Full Payment
+                Full
               </Button>
             </div>
           </div>
 
           {/* Quick Amount Selection */}
           <div className="space-y-3">
-            <Label>Quick Cash Amount</Label>
+            <Label className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Quick Cash Amount</Label>
             <div className="flex gap-2 flex-wrap">
               {calculateQuickAmounts().map((quickAmount, index) => (
                 <Button
@@ -366,6 +368,7 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
                   variant="outline"
                   size="sm"
                   onClick={() => setCashCollected(quickAmount.value)}
+                  className="rounded-full px-4 hover:bg-primary hover:text-primary-foreground transition-colors"
                 >
                   {quickAmount.label} ({formatCurrency(parseFloat(quickAmount.value))})
                 </Button>
@@ -375,17 +378,17 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
 
           {/* Payment Method */}
           <div className="space-y-3">
-            <Label>Payment Method</Label>
+            <Label className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Payment Method</Label>
             <div className="grid grid-cols-2 gap-2">
               {paymentMethods.map((method) => (
                 <Button
                   key={method.id}
                   variant={selectedMethod === method.id ? 'default' : 'outline'}
                   onClick={() => setSelectedMethod(method.id)}
-                  className="justify-start"
+                  className="justify-start h-12 shadow-sm transition-all"
                 >
                   {method.icon}
-                  <span className="ml-2">{method.name}</span>
+                  <span className="ml-2 font-medium">{method.name}</span>
                 </Button>
               ))}
             </div>
@@ -393,23 +396,23 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
 
           {/* Cash Amount Input */}
           <div className="space-y-2">
-            <Label htmlFor="cashCollected">
+            <Label htmlFor="cashCollected" className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
               Cash / Manual Payment Collected
             </Label>
             <div className="relative">
-              <IndianRupee className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <IndianRupee className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
               <Input
                 id="cashCollected"
                 type="number"
                 placeholder="0.00"
                 value={cashCollected}
                 onChange={(e) => setCashCollected(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-12 text-lg font-bold"
                 max={remainingAfterWallet}
               />
             </div>
             {parsedCash > remainingAfterWallet && (
-              <p className="text-sm text-red-600">
+              <p className="text-sm text-red-600 font-medium">
                 Amount cannot exceed remaining balance after wallet.
               </p>
             )}
@@ -417,13 +420,14 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
 
           {/* Transaction ID (for non-cash payments) */}
           {selectedMethod !== 'CASH' && (
-            <div className="space-y-2">
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
               <Label htmlFor="transactionId">Transaction ID</Label>
               <Input
                 id="transactionId"
                 placeholder="Enter transaction reference"
                 value={transactionId}
                 onChange={(e) => setTransactionId(e.target.value)}
+                className="h-10"
               />
             </div>
           )}
@@ -436,140 +440,129 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
               placeholder="Add any additional notes..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              className="h-10"
             />
           </div>
 
           {/* Split Payment / Wallet Section */}
-          <div className="space-y-3 pt-2">
-            <Label className="text-base">Wallet & Credit Split</Label>
+          <div className="space-y-4 pt-2">
+            <Label className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Wallet & Credit Split</Label>
 
             <div className={cn(
-              "flex items-start space-x-3 p-4 rounded-xl border transition-all",
+              "flex items-start space-x-3 p-5 rounded-2xl border-2 transition-all duration-300",
               useWallet
-                ? "bg-emerald-50/50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900"
-                : "bg-slate-50 border-border dark:bg-slate-900"
+                ? "bg-emerald-50/50 border-emerald-500/20 shadow-sm dark:bg-emerald-950/20 dark:border-emerald-500/10"
+                : "bg-slate-50 border-transparent dark:bg-slate-900"
             )}>
+              <div className="relative flex items-center h-6">
                 <Checkbox
                   id="useWallet"
                   checked={useWallet}
                   onCheckedChange={(c) => setUseWallet(!!c)}
                   disabled={walletBalance <= 0 || !customerId}
-                  className="mt-1"
+                  className="w-5 h-5 border-2"
                 />
+              </div>
               <div className="flex-1">
-                <Label htmlFor="useWallet" className="text-base font-medium cursor-pointer">
+                <Label htmlFor="useWallet" className="text-lg font-bold cursor-pointer block">
                   Apply Wallet Balance
                 </Label>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Available: <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                <div className="text-sm text-muted-foreground mt-1 font-medium">
+                  Available: <span className="text-emerald-600 dark:text-emerald-400">
                     {isLoadingWalletBalance ? 'Loading...' : formatCurrency(walletBalance)}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
               {useWallet && walletApplied > 0 && (
-                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex flex-col justify-center dark:bg-emerald-950/30 dark:border-emerald-900/50">
-                  <span className="text-emerald-700 dark:text-emerald-400 text-sm font-medium mb-1">Wallet Deduction</span>
-                  <span className="font-bold text-emerald-800 dark:text-emerald-300 text-xl">-{formatCurrency(walletApplied)}</span>
+                <div className="bg-emerald-50 p-5 rounded-2xl border-l-4 border-emerald-500 flex flex-col justify-center dark:bg-emerald-950/30">
+                  <span className="text-emerald-700 dark:text-emerald-400 text-xs font-bold uppercase tracking-widest mb-1">Wallet Deduction</span>
+                  <span className="font-black text-emerald-800 dark:text-emerald-300 text-2xl">-{formatCurrency(walletApplied)}</span>
                 </div>
               )}
 
               {parsedCash > 0 && (
-                <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 flex flex-col justify-center dark:bg-amber-950/30 dark:border-amber-900/50">
-                  <span className="text-amber-800 dark:text-amber-400 text-sm font-medium mb-1">Received Now</span>
-                  <span className="font-bold text-amber-900 dark:text-amber-300 text-xl">{formatCurrency(parsedCash)}</span>
+                <div className="bg-blue-50 p-5 rounded-2xl border-l-4 border-blue-500 flex flex-col justify-center dark:bg-blue-950/30">
+                  <span className="text-blue-700 dark:text-blue-400 text-xs font-bold uppercase tracking-widest mb-1">Received Now</span>
+                  <span className="font-black text-blue-800 dark:text-blue-300 text-2xl">{formatCurrency(parsedCash)}</span>
                 </div>
               )}
 
               {creditRequired > 0 && (
                 <div className={cn(
-                  "p-4 rounded-xl border flex flex-col justify-center",
+                  "p-5 rounded-2xl border-l-4 flex flex-col justify-center",
                   useWallet && walletApplied > 0 && parsedCash > 0 ? "sm:col-span-2" : "",
-                  "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900/50"
+                  "bg-orange-50 border-orange-500 dark:bg-orange-950/30 dark:border-orange-500"
                 )}>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-red-800 dark:text-red-400 text-sm font-medium">Auto-Credit (Added to Dues)</span>
-                    <Badge variant="outline" className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border-red-200">Pending</Badge>
+                    <span className="text-orange-800 dark:text-orange-400 text-xs font-bold uppercase tracking-widest">Auto-Credit (Added to Dues)</span>
+                    <Badge variant="outline" className="text-[10px] bg-white text-orange-700 border-orange-200 uppercase font-black px-2">Pending</Badge>
                   </div>
-                  <span className="font-bold text-red-900 dark:text-red-300 text-xl">{formatCurrency(creditRequired)}</span>
+                  <span className="font-black text-orange-900 dark:text-orange-300 text-2xl">{formatCurrency(creditRequired)}</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 justify-end mt-8">
-            <Button variant="outline" onClick={() => onClose()}>
+          {engineResult && (
+            <Card className="mt-6 border-emerald-200 bg-emerald-50/50 shadow-inner">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-emerald-600" />
+                  Transaction Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm font-medium">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Final Status</span>
+                  <Badge className="bg-emerald-600 font-bold px-3 uppercase">{engineResult.paymentStatus}</Badge>
+                </div>
+                <div className="flex justify-between border-t border-emerald-100 pt-2">
+                  <span className="text-muted-foreground">Cash Applied</span>
+                  <span>{formatCurrency(engineResult.split.cashApplied)}</span>
+                </div>
+                <div className="flex justify-between border-t border-emerald-100 pt-2">
+                  <span className="text-muted-foreground">Wallet Debited</span>
+                  <span>{formatCurrency(engineResult.split.walletDebited)}</span>
+                </div>
+                <div className="flex justify-between border-t border-emerald-100 pt-2 font-bold text-orange-700">
+                  <span>Credit Assigned</span>
+                  <span>{formatCurrency(engineResult.split.creditAssigned)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Extra padding at bottom of scroll to ensure buttons don't block last element */}
+          <div className="h-10 shrink-0" />
+        </div>
+
+        <DialogFooter className="p-6 bg-slate-50 dark:bg-slate-900 border-t shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+          <div className="flex w-full gap-3 sm:justify-end">
+            <Button variant="outline" onClick={() => onClose()} className="h-12 px-8 font-semibold flex-1 sm:flex-none border-2">
               Cancel
             </Button>
             <Button
               disabled={isProcessing || (parsedCash > 0 && selectedMethod === 'OTHER' && !transactionId)}
               onClick={handlePayment}
-              className="gap-2 px-8"
+              className="h-12 gap-2 px-10 font-bold flex-1 sm:flex-none bg-primary hover:bg-primary/95 shadow-lg shadow-primary/20 hover:shadow-xl hover:translate-y-[-2px] active:translate-y-[0] transition-all"
             >
               {isProcessing ? (
                 <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <RefreshCw className="w-5 h-5 animate-spin" />
                   Processing...
                 </>
               ) : (
                 <>
-                  <CheckCircle className="w-4 h-4" />
+                  <CheckCircle className="w-5 h-5" />
                   Complete Payment
                 </>
               )}
             </Button>
           </div>
-
-          {engineResult && (
-            <Card className="border-emerald-200 bg-emerald-50/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Engine Result</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>Final Status</span>
-                  <Badge>{engineResult.paymentStatus}</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span>Cash Applied</span>
-                  <span>{formatCurrency(engineResult.split.cashApplied)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Wallet Debited</span>
-                  <span>{formatCurrency(engineResult.split.walletDebited)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Credit Assigned</span>
-                  <span>{formatCurrency(engineResult.split.creditAssigned)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Credit ID</span>
-                  <span className="font-mono text-xs">{engineResult.creditId || customerId || "-"}</span>
-                </div>
-                {(engineResult.transactionIds.walletTransactionId || engineResult.transactionIds.creditTransactionId) && (
-                  <>
-                    <Separator />
-                    {engineResult.transactionIds.walletTransactionId && (
-                      <div className="flex justify-between">
-                        <span>Wallet Txn ID</span>
-                        <span className="font-mono text-xs">{engineResult.transactionIds.walletTransactionId}</span>
-                      </div>
-                    )}
-                    {engineResult.transactionIds.creditTransactionId && (
-                      <div className="flex justify-between">
-                        <span>Credit Txn ID</span>
-                        <span className="font-mono text-xs">{engineResult.transactionIds.creditTransactionId}</span>
-                      </div>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

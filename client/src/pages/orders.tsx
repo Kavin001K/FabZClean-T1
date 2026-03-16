@@ -1155,11 +1155,6 @@ function OrdersComponent() {
                   </DropdownMenuItem>
                 </>
               )}
-              {order.paymentStatus === 'credit' && (
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedPaymentOrder(order); setIsPaymentModalOpen(true); }} className="text-green-600 focus:text-green-600">
-                  ✅ Process Credit Payment
-                </DropdownMenuItem>
-              )}
               {order.status !== 'completed' && order.status !== 'cancelled' && (
                 <DropdownMenuItem onClick={() => handleCancelOrder(order)} className="text-red-600 focus:text-red-600">
                   <X className="mr-2 h-4 w-4" /> Cancel Order
