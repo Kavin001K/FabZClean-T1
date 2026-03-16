@@ -1103,8 +1103,7 @@ export class SupabaseStorage {
                 wallet_used: Math.min(orderTotal, parseFloat(order.wallet_used || '0') + walletDebited),
                 credit_used: creditAssigned,
                 payment_status: newPaymentStatus,
-                payment_method: finalPaymentMethod,
-                updated_at: new Date().toISOString()
+                payment_method: finalPaymentMethod
             }).eq('id', orderId);
 
             if (ordErr) throw ordErr;
