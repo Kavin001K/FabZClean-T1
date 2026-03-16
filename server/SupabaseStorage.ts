@@ -1108,6 +1108,18 @@ export class SupabaseStorage {
 
             if (ordErr) throw ordErr;
 
+            // If this is a credit order, increment the customer's outstanding balance
+            if (creditAssigned > 0 && customerId) {
+                try {
+                    const currentCredit = parseFloat(customer.credit_balance || '0');
+                    await this.supabase.from('customers').update({
+                        credit_balance: currentCredit + creditAssigned,
+                    }).eq('id', customerId);
+                } catch (creditErr) {
+                    console.error('[SupabaseStorage] Failed to update customer credit balance:', creditErr);
+                }
+            }
+
             const splitData = {
                 cashApplied,
                 walletDebited,

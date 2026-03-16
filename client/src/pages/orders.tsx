@@ -1144,7 +1144,7 @@ function OrdersComponent() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {order.status === 'processing' && <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>Mark as Completed</DropdownMenuItem>}
-              {order.paymentStatus !== 'paid' && (
+              {order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit' && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedPaymentOrder(order); setIsPaymentModalOpen(true); }}>
@@ -2027,7 +2027,7 @@ function OrdersComponent() {
                                             <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'in_progress')}>
                                               Mark as In Progress
                                             </DropdownMenuItem>
-                                            {order.paymentStatus !== 'paid' && (
+                                            {order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit' && (
                                               <>
                                                 <DropdownMenuItem onClick={() => {
                                                   setSelectedPaymentOrder(order);
