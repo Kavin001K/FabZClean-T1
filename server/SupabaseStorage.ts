@@ -991,21 +991,98 @@ export class SupabaseStorage {
         const normalizedPaymentMethod = options?.paymentMethod || 'CASH';
 
         try {
-            const { data, error } = await this.supabase.rpc('process_payment_checkout_v2', {
-                p_order_id: orderId,
-                p_customer_id: customerId,
-                p_cash_amount: cashAmount,
-                p_use_wallet: useWallet,
-                p_wallet_debit_requested: walletDebitRequested,
-                p_payment_method: normalizedPaymentMethod,
-                p_recorded_by: recordedBy,
-                p_recorded_by_name: recordedByName
-            });
+            // Bypass broken RPC entirely and implement canonical checkout in JS
+            const [orderRes, customerRes] = await Promise.all([
+                this.supabase.from('orders').select('*').eq('id', orderId).single(),
+                this.supabase.from('customers').select('*').eq('id', customerId).single()
+            ]);
 
-            if (error) throw error;
-            return { success: true, data };
+            if (orderRes.error || !orderRes.data) throw new Error('Order not found');
+            if (customerRes.error || !customerRes.data) throw new Error('Customer not found');
+
+            const order = orderRes.data;
+            const customer = customerRes.data;
+
+            const orderTotal = parseFloat(order.total_amount || '0');
+            const advancePaid = parseFloat(order.advance_paid || '0');
+            let walletBalance = parseFloat(customer.wallet_balance_cache || '0');
+            let remainingAmount = Math.max(0, orderTotal - advancePaid);
+
+            let walletDebited = 0;
+            if (useWallet && remainingAmount > 0) {
+                if (walletDebitRequested > 0) {
+                    walletDebited = Math.min(remainingAmount, Math.max(walletBalance, 0), walletDebitRequested);
+                } else {
+                    walletDebited = Math.min(remainingAmount, Math.max(walletBalance, 0));
+                }
+            }
+
+            let cashApplied = Math.min(
+                Math.max(remainingAmount - walletDebited, 0),
+                Math.max(cashAmount || 0, 0)
+            );
+
+            let walletTxId = null;
+            if (walletDebited > 0) {
+                walletBalance -= walletDebited;
+                const { data: wTx, error: wErr } = await this.supabase.from('wallet_transactions').insert({
+                    transaction_id: `WLT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                    customer_id: customerId,
+                    type: 'debit',
+                    amount: walletDebited,
+                    balance_before: walletBalance + walletDebited,
+                    balance_after: walletBalance,
+                    reference_order_id: orderId,
+                    verified_by_staff: recordedBy
+                }).select('id').single();
+                if (wErr) throw wErr;
+                walletTxId = wTx.id;
+
+                // Update customer wallet balance cache
+                await this.supabase.from('customers').update({ wallet_balance_cache: walletBalance }).eq('id', customerId);
+            }
+
+            // Note: We don't track CASH payments in wallet_transactions anymore as per simplified schema, 
+            // the cash total is implicitly tracked by advance_paid + the order metrics.
+            
+            const newAdvancePaid = Math.min(orderTotal, advancePaid + walletDebited + cashApplied);
+            const creditAssigned = Math.max(0, orderTotal - newAdvancePaid);
+            const newPaymentStatus = creditAssigned > 0 ? 'credit' : 'paid';
+
+            let finalPaymentMethod = order.payment_method;
+            if (walletDebited > 0 && cashApplied > 0) finalPaymentMethod = 'split';
+            else if (walletDebited > 0) finalPaymentMethod = 'credit_wallet';
+            else if (cashApplied > 0) finalPaymentMethod = normalizedPaymentMethod;
+
+            const { error: ordErr } = await this.supabase.from('orders').update({
+                advance_paid: newAdvancePaid,
+                wallet_used: Math.min(orderTotal, parseFloat(order.wallet_used || '0') + walletDebited),
+                credit_used: creditAssigned,
+                payment_status: newPaymentStatus,
+                payment_method: finalPaymentMethod,
+                updated_at: new Date().toISOString()
+            }).eq('id', orderId);
+
+            if (ordErr) throw ordErr;
+
+            const splitData = {
+                cashApplied,
+                walletDebited,
+                creditAssigned
+            };
+
+            return { 
+                success: true, 
+                data: {
+                    payment_status: newPaymentStatus,
+                    split: splitData,
+                    transaction_ids: {
+                        wallet_transaction_id: walletTxId
+                    }
+                } 
+            };
         } catch (err: any) {
-            console.error('[SupabaseStorage] Processing checkout via canonical RPC failed:', err);
+            console.error('[SupabaseStorage] JS Checkout processing failed:', err);
             return { success: false, error: err.message || 'Payment processing failed.' };
         }
     }
