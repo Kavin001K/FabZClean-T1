@@ -31,6 +31,45 @@ const CUSTOMER_ADMIN_ROLES: string[] = ["admin", "franchise_manager"];
 router.use(rateLimit(60000, 100));
 router.use(jwtRequired);
 
+// High-performance autocomplete endpoint (must be before /:id to avoid route conflicts)
+router.get('/autocomplete', async (req, res) => {
+  try {
+    const { q, limit = '10' } = req.query;
+    const limitNum = Math.min(Math.max(parseInt(limit as string) || 10, 1), 25);
+    const searchQuery = typeof q === 'string' ? q.trim() : '';
+
+    let results: Customer[];
+    
+    // If empty query, just return recent customers
+    if (searchQuery.length === 0) {
+      results = await storage.listCustomers(undefined, {
+        limit: limitNum,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      });
+      const serializedCustomers = results.map((customer: Customer) => serializeCustomer(customer));
+      return res.json(createSuccessResponse(serializedCustomers, 'Recent customers'));
+    }
+
+    // Use the optimized RPC-based autocomplete if available
+    if (typeof (storage as any).searchCustomersAutocomplete === 'function') {
+      results = await (storage as any).searchCustomersAutocomplete(searchQuery, limitNum);
+    } else {
+      // Fallback to standard search
+      results = await storage.listCustomers(undefined, {
+        search: searchQuery,
+        limit: limitNum,
+      });
+    }
+
+    const serializedCustomers = results.map((customer: Customer) => serializeCustomer(customer));
+    res.json(createSuccessResponse(serializedCustomers, 'Autocomplete results'));
+  } catch (error) {
+    console.error('Customer autocomplete error:', error);
+    res.status(500).json(createErrorResponse('Autocomplete search failed', 500));
+  }
+});
+
 // Get customers with pagination and search (shared across all franchises)
 router.get('/', async (req, res) => {
   try {
@@ -89,9 +128,9 @@ router.get('/', async (req, res) => {
     });
 
     res.json(response);
-  } catch (error) {
-    console.error('Get customers error:', error);
-    res.status(500).json(createErrorResponse('Failed to fetch customers', 500));
+  } catch (error: any) {
+    console.error('Get customers error:', error.message, error.stack);
+    res.status(500).json(createErrorResponse(`Failed to fetch customers: ${error.message}`, 500));
   }
 });
 

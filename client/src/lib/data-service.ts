@@ -457,6 +457,37 @@ export const customersApi = {
     }
   },
 
+  /**
+   * High-performance autocomplete search using dedicated endpoint.
+   * Uses PostgreSQL pg_trgm indexes and relevance scoring.
+   * Supports single-character queries for real-time typeahead.
+   */
+  async autocomplete(query: string, limit: number = 10): Promise<Customer[]> {
+    try {
+      const trimmed = query.trim();
+      if (!trimmed) return [];
+
+      const queryParams = new URLSearchParams({
+        q: trimmed,
+        limit: String(limit),
+      });
+
+      const response = await fetchData<{ data?: Customer[]; success?: boolean } | Customer[]>(
+        `/customers/autocomplete?${queryParams.toString()}`
+      );
+
+      if (Array.isArray(response)) return response;
+      if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
+        return response.data;
+      }
+      return [];
+    } catch (error) {
+      console.error('Customer autocomplete failed:', error);
+      // Fallback to standard search
+      return this.getAll({ search: query, limit });
+    }
+  },
+
   // Alias for getById to fix linter error
   get: async (id: string) => customersApi.getById(id),
 };

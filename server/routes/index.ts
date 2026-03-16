@@ -151,9 +151,12 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/whatsapp', whatsappRouter);
   app.use('/api/documents', documentsRouter);
 
-  // Core API routes (register early to prevent shadowing)
+  // Core API routes (registered once)
   app.use('/api/orders', ordersRouter);
   app.use('/api/customers', customersRouter);
+  app.use('/api/products', productsRouter);
+  app.use('/api/services', servicesRouter);
+  app.use('/api/employees', employeesRouter);
   app.use('/api/v1/orders', ordersRouter);
   app.use('/api/v1/customers', customersRouter);
 
@@ -192,15 +195,6 @@ export function registerAllRoutes(app: Express): void {
 
   // WhatsApp Flow endpoint (public - no auth for Meta webhooks)
   app.use('/api/whatsapp-flow', whatsappFlowRouter);
-
-  // Legacy API routes (for backward compatibility)
-  app.use('/api/orders', ordersRouter);
-  app.use('/api/customers', customersRouter);
-  app.use('/api/deliveries', deliveryDisabledRouter);
-  app.use('/api/products', productsRouter);
-  app.use('/api/services', servicesRouter);
-  app.use('/api/employees', employeesRouter);
-
   // Legacy search and algorithm routes
   app.use('/api/search', searchRouter);
   app.use('/api/algorithms', algorithmsRouter);

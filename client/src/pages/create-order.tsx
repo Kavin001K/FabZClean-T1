@@ -242,8 +242,8 @@ export default function CreateOrder() {
 
   const searchCustomers = React.useCallback(async (query: string) => {
     const trimmed = query.trim();
-    if (trimmed.length < 2) return [];
-    return customersApi.getAll({ search: trimmed, limit: 10 });
+    // Allow empty queries to fetch recent customers
+    return customersApi.autocomplete(trimmed, 10);
   }, []);
 
   // Fetch customer's order history when a customer is selected

@@ -243,7 +243,7 @@ export class AuthService {
         let maxSequence = 0;
         for (const emp of localEmployees) {
             const empId = emp.employeeId || emp.employee_id || '';
-            if (empId.startsWith('FZCEM')) {
+            if (empId && empId.startsWith('FZCEM')) {
                 const numStr = empId.substring(5);
                 const num = parseInt(numStr, 10);
                 if (!isNaN(num) && num > maxSequence) {
@@ -252,7 +252,8 @@ export class AuthService {
             }
         }
 
-        const nextSequence = maxSequence + 1;
+        // Generate next sequence. If maxSequence is 0 (no valid IDs found), we start at 1.
+        const nextSequence = maxSequence > 0 ? maxSequence + 1 : 1;
         const sequenceNum = String(nextSequence).padStart(3, '0');
         const generatedEmployeeId = `FZCEM${sequenceNum}`;
 

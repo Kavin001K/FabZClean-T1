@@ -25,6 +25,15 @@ class SearchService {
   private indexUpdateInterval = 5 * 60 * 1000; // 5 minutes
 
   /**
+   * Helper to normalize phone numbers for consistent searching
+   * Strips spaces, hyphens, parentheses, country codes (+91), and leading zeros
+   */
+  private normalizePhone(phone: string): string {
+    if (!phone) return '';
+    return phone.replace(/[\s\-\(\)]/g, '').replace(/^0+/, '').replace(/^\+91/, '');
+  }
+
+  /**
    * Simple fuzzy search implementation
    */
   private fuzzySearch<T>(
@@ -46,6 +55,12 @@ class SearchService {
           
           // Exact match
           if (valueLower === queryLower) {
+            bestScore = Math.max(bestScore, 1.0);
+          }
+          // Phone exact match (if field is likely phone)
+          else if ((field.toLowerCase().includes('phone') || field.toLowerCase().includes('mobile')) && 
+                   this.normalizePhone(valueLower) === this.normalizePhone(queryLower) && 
+                   this.normalizePhone(queryLower).length > 0) {
             bestScore = Math.max(bestScore, 1.0);
           }
           // Starts with
@@ -166,14 +181,20 @@ class SearchService {
         maxResults: limit
       });
     } else {
+      const normalizedQueryPhone = this.normalizePhone(searchTerm);
+      
       results = customers.filter(customer => {
+        const normalizedCustomerPhone = this.normalizePhone(customer.phone || '');
+        
         const searchableText = [
           customer.name || '',
           customer.email || '',
-          customer.phone || ''
+          customer.phone || '',
+          normalizedCustomerPhone
         ].join(' ').toLowerCase();
 
-        return searchableText.includes(searchTerm);
+        return searchableText.includes(searchTerm) || 
+               (normalizedQueryPhone.length > 3 && normalizedCustomerPhone.includes(normalizedQueryPhone));
       }).slice(0, limit);
     }
 
@@ -385,7 +406,17 @@ class SearchService {
 
     // Partial match in other fields gets lower score
     if (item.id?.toLowerCase().includes(queryLower)) score += 10;
-    if (item.phone?.toLowerCase().includes(queryLower)) score += 10;
+    
+    // Normalized phone checking
+    const normalizedQueryPhone = this.normalizePhone(query);
+    const normalizedItemPhone = this.normalizePhone(item.phone || '');
+    
+    if (normalizedItemPhone && normalizedQueryPhone && normalizedItemPhone === normalizedQueryPhone) {
+        score += 90; // High score for direct normalized phone match but slightly below name/email exact
+    } else if (item.phone?.toLowerCase().includes(queryLower) || 
+              (normalizedQueryPhone.length > 3 && normalizedItemPhone.includes(normalizedQueryPhone))) {
+        score += 25; // Boost phone partial matches
+    }
 
     return score;
   }

@@ -175,9 +175,20 @@ export default function Customers() {
   // Filtered and sorted customers
   const filteredCustomers = useMemo(() => {
     let filtered = customers.filter(customer => {
+      // Normalize phone number for search Helper
+      const normalizePhone = (phone: string | null | undefined) => {
+        if (!phone) return '';
+        return phone.replace(/[\s\-\(\)]/g, '').replace(/^0+/, '').replace(/^\+91/, '');
+      };
+      
+      const normalizedQuery = normalizePhone(searchQuery);
+      const normalizedCustomerPhone = normalizePhone(customer.phone);
+
       const matchesSearch = customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         customer.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        customer.phone?.includes(searchQuery);
+        customer.phone?.includes(searchQuery) ||
+        (normalizedQuery.length > 3 && normalizedCustomerPhone.includes(normalizedQuery)) ||
+        (normalizedCustomerPhone && normalizedQuery && normalizedCustomerPhone === normalizedQuery);
 
       if (!matchesSearch) return false;
 

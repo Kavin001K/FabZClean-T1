@@ -97,18 +97,13 @@ export function CustomerAutocomplete({
     // Remote search is used for the New Order flow to avoid loading the entire
     // customer list up front.
     useEffect(() => {
-        if (!searchQuery.trim()) {
-            setFilteredCustomers(EMPTY_CUSTOMERS);
-            if (isOpen) setIsOpen(false);
-            if (isSearching) setIsSearching(false);
-            return;
-        }
-
         // If selection was just made, ignore this trigger
         if (ignoreNextSearchRef.current) {
             ignoreNextSearchRef.current = false;
             return;
         }
+
+
 
         let isCancelled = false;
         const requestId = ++requestIdRef.current;
@@ -116,7 +111,8 @@ export function CustomerAutocomplete({
         const applyMatches = (matches: Customer[]) => {
             if (isCancelled || requestId !== requestIdRef.current) return;
             setFilteredCustomers(matches.slice(0, 10));
-            setIsOpen(true);
+            // Only force open if there's a search query or it was already opened via focus
+            if (searchQuery || isOpen) setIsOpen(true);
             setHighlightedIndex(0);
         };
 
@@ -153,7 +149,7 @@ export function CustomerAutocomplete({
             applyMatches(matches);
         };
 
-        const timer = window.setTimeout(runSearch, searchCustomers ? 400 : 50);
+        const timer = window.setTimeout(runSearch, searchCustomers ? 250 : 50);
 
         return () => {
             isCancelled = true;
@@ -290,7 +286,7 @@ export function CustomerAutocomplete({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    onFocus={() => searchQuery && setIsOpen(true)}
+                    onFocus={() => setIsOpen(true)}
                     placeholder={placeholder}
                     className="pl-9 pr-9"
                 />
@@ -307,7 +303,7 @@ export function CustomerAutocomplete({
             </div>
 
             {/* Dropdown */}
-            {isOpen && searchQuery && (
+            {isOpen && (
                 <Card className="absolute z-[9999] w-full mt-1 max-h-80 overflow-y-auto shadow-xl border bg-popover text-popover-foreground">
                     <div className="p-2">
                         {isSearching && (

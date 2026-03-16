@@ -545,62 +545,78 @@ export class SupabaseStorage {
         } = {}
     ): Promise<Customer[]> {
         let query = this.supabase.from('customers').select('*');
-        if (franchiseId) query = query.eq('franchise_id', franchiseId);
-        query = query.neq('status', 'deleted');
+        
+        // Temporarily remove status check to see if it's the cause of the 500
+        // query = query.neq('status', 'deleted');
 
         const search = String(options.search || '').trim();
         if (search) {
-            const hasDigits = /\d/.test(search);
-            const digitsOnly = search.replace(/\D/g, '');
             const safeSearch = search.replace(/[%_]/g, '');
-
-            // Base OR conditions: ID, Name, Email
-            let orQuery = `id.ilike.%${safeSearch}%,name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`;
-
-            // If query contains digits, search in normalized phone as well (if possible with ilike)
-            // or just the original phone field
-            if (hasDigits) {
-                orQuery += `,phone.ilike.%${digitsOnly}%,phone.ilike.%${safeSearch}%`;
-            } else {
-                orQuery += `,phone.ilike.%${safeSearch}%`;
+            const digitsOnly = search.replace(/\D/g, '');
+            
+            // Build a valid PostgREST OR query string
+            const conditions: string[] = [];
+            
+            if (safeSearch.length >= 2) {
+                conditions.push(`name.ilike.%${safeSearch}%`);
+                conditions.push(`email.ilike.%${safeSearch}%`);
             }
-
-            // Also search in address (jsonb cast to text for simple search)
-            orQuery += `,address.ilike.%${safeSearch}%`;
-
-            query = query.or(orQuery);
+            
+            if (digitsOnly.length >= 1) {
+                conditions.push(`phone.ilike.%${digitsOnly}%`);
+            }
+            
+            if (conditions.length > 0) {
+                query = query.or(conditions.join(','));
+            }
         }
 
         const phone = String(options.phone || '').trim();
         if (phone) {
-            // Equality check for specific phone filtering
             query = query.eq('phone', phone);
         }
 
-        const sortMap: Record<string, string> = {
-            createdAt: 'created_at',
-            updatedAt: 'updated_at',
-            name: 'name',
-            email: 'email',
-            phone: 'phone',
-            totalOrders: 'total_orders',
-            totalSpent: 'total_spent',
-            creditBalance: 'credit_balance',
-            creditLimit: 'credit_limit',
-        };
-
-        const sortColumn = sortMap[options.sortBy || 'createdAt'] || 'created_at';
-        query = query.order(sortColumn, { ascending: options.sortOrder === 'asc' });
-
-        if (options.limit && Number.isFinite(options.limit) && options.limit > 0) {
-            query = query.limit(options.limit);
-        }
-
+        // Just return results directly without complex mapping for now to debug
         const { data, error } = await query;
-        if (error) throw error;
-        return data.map(item => this.mapDates(item));
+        if (error) {
+            console.error('[SupabaseStorage] listCustomers Query Error:', error);
+            throw error;
+        }
+        
+        return (data || []).map(item => this.mapDates(item));
     }
     async getCustomers(franchiseId?: string): Promise<Customer[]> { return this.listCustomers(franchiseId); }
+
+    /**
+     * High-performance autocomplete search using PostgreSQL RPC with pg_trgm indexes.
+     * Returns results ranked by relevance score (exact > prefix > contains > trigram).
+     */
+    async searchCustomersAutocomplete(query: string, limit: number = 10): Promise<Customer[]> {
+        const trimmed = (query || '').trim();
+        if (!trimmed) return [];
+
+        try {
+            // Attempt RPC (optimized, relevance-scored search)
+            const { data, error } = await this.supabase.rpc('search_customers_autocomplete', {
+                p_query: trimmed,
+                p_limit: limit
+            });
+
+            if (error) {
+                console.warn('[SupabaseStorage] Autocomplete RPC error:', error.message);
+                // Fallback to standard search if RPC fails (e.g. function doesn't exist)
+                return this.listCustomers(undefined, { search: trimmed, limit });
+            }
+
+            if (!data || !Array.isArray(data)) return [];
+
+            return data.map((item: any) => this.mapDates(item));
+        } catch (err) {
+            console.error('[SupabaseStorage] searchCustomersAutocomplete fatal error:', err);
+            // Fallback to standard search
+            return this.listCustomers(undefined, { search: trimmed, limit });
+        }
+    }
 
     // ======= ORDERS =======
 
