@@ -545,9 +545,8 @@ export class SupabaseStorage {
         } = {}
     ): Promise<Customer[]> {
         let query = this.supabase.from('customers').select('*');
-        
-        // Temporarily remove status check to see if it's the cause of the 500
-        // query = query.neq('status', 'deleted');
+        if (franchiseId) query = query.eq('franchise_id', franchiseId);
+        query = query.neq('status', 'deleted');
 
         const search = String(options.search || '').trim();
         if (search) {
@@ -576,7 +575,27 @@ export class SupabaseStorage {
             query = query.eq('phone', phone);
         }
 
-        // Just return results directly without complex mapping for now to debug
+        // Apply sorting
+        if (options.sortBy) {
+            const isAscending = options.sortOrder !== 'desc';
+            const mappedSortBy = this.toSnakeCase({ [options.sortBy]: true });
+            const sortField = Object.keys(mappedSortBy)[0] || options.sortBy;
+            query = query.order(sortField, { ascending: isAscending });
+        } else {
+            // Default sort by relevance, then newest
+            if (search) {
+                // Without complex backend scoring, fall back to simple descending id/created
+                query = query.order('id', { ascending: false });
+            } else {
+                query = query.order('created_at', { ascending: false });
+            }
+        }
+
+        // Apply limit
+        const limitToApply = options.limit && options.limit > 0 ? options.limit : 50;
+        query = query.limit(limitToApply);
+
+        // Execute query
         const { data, error } = await query;
         if (error) {
             console.error('[SupabaseStorage] listCustomers Query Error:', error);
@@ -1041,6 +1060,31 @@ export class SupabaseStorage {
                 // Update customer wallet balance cache
                 await this.supabase.from('customers').update({ wallet_balance_cache: walletBalance }).eq('id', customerId);
             }
+
+            // --- RECALCULATE CUSTOMER ORDER METRICS (NATIVELY) ---
+            // Because we bypassed the `process_payment_checkout_v2` RPC, we must 
+            // natively recalculate the customer's total orders and total spent.
+            try {
+                const { data: ordCounts } = await this.supabase
+                    .from('orders')
+                    .select('total_amount, status')
+                    .eq('customer_id', customerId)
+                    .neq('status', 'cancelled');
+                
+                if (ordCounts && Array.isArray(ordCounts)) {
+                    const totalOrders = ordCounts.length;
+                    const totalSpent = ordCounts.reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0);
+
+                    await this.supabase.from('customers').update({
+                        total_orders: totalOrders,
+                        total_spent: totalSpent,
+                        last_order: new Date().toISOString()
+                    }).eq('id', customerId);
+                }
+            } catch (metricsErr) {
+                console.warn('[SupabaseStorage] Non-fatal error updating customer metrics in checkout:', metricsErr);
+            }
+
 
             // Note: We don't track CASH payments in wallet_transactions anymore as per simplified schema, 
             // the cash total is implicitly tracked by advance_paid + the order metrics.
