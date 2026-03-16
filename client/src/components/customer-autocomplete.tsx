@@ -110,11 +110,6 @@ export function CustomerAutocomplete({
             return;
         }
 
-        if (isOpen === false && searchQuery.trim().length > 0) {
-            // Dropdown is closed, likely just selected or cleared
-            return;
-        }
-
         let isCancelled = false;
         const requestId = ++requestIdRef.current;
 
@@ -324,7 +319,7 @@ export function CustomerAutocomplete({
 
                         {filteredCustomers.map((customer, index) => (
                             <button
-                                key={customer.id}
+                                key={customer.id || `search-result-${index}`}
                                 onClick={() => handleSelect(customer)}
                                 onMouseEnter={() => setHighlightedIndex(index)}
                                 className={`w-full text-left px-3 py-3 rounded-md transition-colors ${index === highlightedIndex
