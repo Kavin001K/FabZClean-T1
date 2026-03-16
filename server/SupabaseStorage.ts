@@ -717,7 +717,7 @@ export class SupabaseStorage {
                 'items', 'notes', 'special_instructions', 'shipping_address', 'pickup_date',
                 'advance_paid', 'discount_type', 'discount_value', 'coupon_code',
                 'extra_charges', 'gst_enabled', 'gst_rate', 'gst_amount', 'pan_number',
-                'gst_number', 'franchise_id', 'created_at', 'updated_at', 'priority',
+                'gst_number', 'franchise_id', 'created_at', 'priority',
                 'is_express_order', 'fulfillment_type', 'delivery_charges', 'delivery_address',
                 'tag_note', 'barcode_id', 'assigned_to', 'wallet_used', 'credit_used',
                 'is_credit_order', 'delivery_earnings_calculated', 'delivery_cash_collected'
