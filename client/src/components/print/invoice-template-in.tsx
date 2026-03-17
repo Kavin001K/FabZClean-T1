@@ -46,6 +46,8 @@ interface InvoiceData {
   qrCode?: string;
   signature?: string;
   isExpressOrder?: boolean;
+  fulfillmentType?: 'pickup' | 'delivery';
+  deliveryAddress?: string | any;
 }
 
 // Utility functions
@@ -122,6 +124,8 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
     enableGST = false,
     franchiseId,
     isExpressOrder = false,
+    fulfillmentType = 'pickup',
+    deliveryAddress: explicitDeliveryAddress,
   } = data;
 
   // Parse customer address
@@ -462,6 +466,48 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
               <span style={{ fontSize: '10px', color: colors.textLight, textTransform: 'uppercase', letterSpacing: '1px' }}>Supply Type</span>
               <p style={{ margin: '4px 0 0 0', fontWeight: '700', fontSize: '14px', color: colors.dark }}>
                 Intra-State (TN)
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Fulfillment Details Section */}
+        <div style={{
+          marginBottom: '25px',
+          padding: '15px 20px',
+          borderRadius: '10px',
+          border: `1px solid ${colors.border}`,
+          background: fulfillmentType === 'delivery' ? `${colors.accent}05` : `${colors.success}05`,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              background: fulfillmentType === 'delivery' ? colors.accent : colors.success,
+              color: colors.white,
+              padding: '8px',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '16px'
+            }}>
+              {fulfillmentType === 'delivery' ? '🚚' : '🏪'}
+            </div>
+            <div>
+              <p style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: colors.textLight, margin: '0' }}>Fulfillment Method</p>
+              <p style={{ fontSize: '15px', fontWeight: '800', color: colors.dark, margin: '0' }}>
+                {fulfillmentType === 'delivery' ? 'Home Delivery' : 'Store Pickup'}
+              </p>
+            </div>
+          </div>
+          
+          {fulfillmentType === 'delivery' && (
+            <div style={{ textAlign: 'right', maxWidth: '60%' }}>
+              <p style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: colors.textLight, margin: '0 0 4px 0' }}>Delivery Destination</p>
+              <p style={{ fontSize: '12px', fontWeight: '600', color: colors.text, margin: '0', lineHeight: '1.4' }}>
+                {explicitDeliveryAddress || safeCustomer.address}
               </p>
             </div>
           )}

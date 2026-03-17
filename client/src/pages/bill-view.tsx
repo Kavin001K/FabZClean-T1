@@ -235,7 +235,9 @@ export default function BillView() {
                 total: calculatedTotal,
                 paymentTerms: "Due on receipt",
                 qrCode: qrCodeUrl || undefined,
-                isExpressOrder: (order as any).isExpressOrder || (order as any).is_express_order || false
+                isExpressOrder: (order as any).isExpressOrder || (order as any).is_express_order || false,
+                fulfillmentType: order.fulfillmentType || 'pickup',
+                deliveryAddress: order.deliveryAddress || formattedAddress
             };
 
             return <InvoiceTemplateIN data={invoiceData} />;
@@ -273,7 +275,9 @@ export default function BillView() {
                 expressSurcharge: (order as any).expressSurcharge ? Number((order as any).expressSurcharge) : 0,
                 paymentTerms: "Due on receipt",
                 qrCode: qrCodeUrl || undefined,
-                isExpressOrder: (order as any).isExpressOrder || (order as any).is_express_order || false
+                isExpressOrder: (order as any).isExpressOrder || (order as any).is_express_order || false,
+                fulfillmentType: order.fulfillmentType || 'pickup',
+                deliveryAddress: order.deliveryAddress || formattedAddress
             };
 
             return <SimpleInvoiceTemplate data={invoiceData} />;

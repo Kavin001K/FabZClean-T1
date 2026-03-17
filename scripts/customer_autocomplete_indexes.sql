@@ -20,6 +20,7 @@ CREATE INDEX IF NOT EXISTS idx_customers_id_trgm
 CREATE INDEX IF NOT EXISTS idx_customers_email_trgm 
   ON public.customers USING gin (email gin_trgm_ops);
 
+
 -- 3. Create the autocomplete RPC function with relevance scoring
 CREATE OR REPLACE FUNCTION public.search_customers_autocomplete(
   p_query TEXT,

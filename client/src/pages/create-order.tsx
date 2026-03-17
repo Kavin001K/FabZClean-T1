@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Switch } from "@/components/ui/switch";
-import { PlusCircle, User, Calendar as CalendarIcon, Truck, IndianRupee, Search, CheckCircle, X, Loader2, AlertCircle, History, Package, TrendingUp, Clock, ShoppingBag, Zap, CreditCard, Phone, Mail, TrendingDown, ShoppingCart, List } from "lucide-react";
+import { PlusCircle, User, Calendar as CalendarIcon, Truck, IndianRupee, Search, CheckCircle, X, Loader2, AlertCircle, History, Package, TrendingUp, Clock, ShoppingBag, Zap, CreditCard, Phone, Mail, TrendingDown, ShoppingCart, List, Store, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Service, Order, Customer } from "@shared/schema";
@@ -131,6 +132,11 @@ export default function CreateOrder() {
   const [gstNumber, setGstNumber] = useState('');
   const [panNumber, setPanNumber] = useState('');
 
+  // Fulfillment state
+  const [fulfillmentType, setFulfillmentType] = useState<'pickup' | 'delivery'>('pickup');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryCharges, setDeliveryCharges] = useState(0);
+
   // Credit Balance Alert
   useEffect(() => {
     if (foundCustomer?.creditBalance && Number(foundCustomer.creditBalance) > 0) {
@@ -201,16 +207,16 @@ export default function CreateOrder() {
   const gstAmount = useMemo(() => {
     if (!enableGST) return 0;
     const afterDiscount = subtotal - discountAmount;
-    return (afterDiscount + extraCharges) * 0.18;
-  }, [enableGST, subtotal, discountAmount, extraCharges]);
+    return (afterDiscount + extraCharges + deliveryCharges) * 0.18;
+  }, [enableGST, subtotal, discountAmount, extraCharges, deliveryCharges]);
 
   const totalAmount = useMemo(() => {
-    let calculatedTotal = subtotal - discountAmount + extraCharges;
+    let calculatedTotal = subtotal - discountAmount + extraCharges + deliveryCharges;
     if (enableGST) {
       calculatedTotal += gstAmount;
     }
     return roundInvoiceAmount(Math.max(0, calculatedTotal));
-  }, [subtotal, discountAmount, extraCharges, enableGST, gstAmount]);
+  }, [subtotal, discountAmount, extraCharges, deliveryCharges, enableGST, gstAmount]);
 
   // Fetch services - only active ones
   const { data: servicesData, isLoading: servicesLoading, isError: servicesError } = useQuery<Service[]>({
@@ -795,6 +801,9 @@ export default function CreateOrder() {
     setPanNumber('');
     // Reset express order and fulfillment
     setIsExpressOrder(false);
+    setFulfillmentType('pickup');
+    setDeliveryAddress('');
+    setDeliveryCharges(0);
     setCreditOverridePrompt(null);
   };
 
@@ -927,14 +936,13 @@ export default function CreateOrder() {
       gstEnabled: enableGST,
       gstRate: enableGST ? "18.00" : "0.00",
       gstAmount: enableGST ? (
-        (subtotal - (discountType === 'percentage' ? (subtotal * discountValue) / 100 : discountType === 'fixed' ? discountValue : 0) + extraCharges) * 0.18
+        (subtotal - (discountType === 'percentage' ? (subtotal * discountValue) / 100 : discountType === 'fixed' ? discountValue : 0) + extraCharges + deliveryCharges) * 0.18
       ).toFixed(2) : "0.00",
       gstNumber: enableGST ? gstNumber : undefined,
       panNumber: enableGST ? panNumber : undefined,
-      // Delivery is disabled for new orders: pickup-only.
-      fulfillmentType: 'pickup',
-      deliveryCharges: "0",
-      deliveryAddress: undefined,
+      fulfillmentType: fulfillmentType,
+      deliveryCharges: deliveryCharges.toString(),
+      deliveryAddress: fulfillmentType === 'delivery' ? deliveryAddress : undefined,
       // Express/Priority Order
       isExpressOrder: isExpressOrder,
       priority: isExpressOrder ? 'high' : 'normal',
@@ -1391,17 +1399,99 @@ export default function CreateOrder() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.35 }}
           >
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Truck className="h-5 w-5 mr-2" />
+            <Card className="overflow-hidden border-2 transition-all duration-300">
+              <CardHeader className="bg-slate-50/50 dark:bg-slate-900/50 border-b pb-4">
+                <CardTitle className="flex items-center text-lg font-bold">
+                  <Truck className="h-5 w-5 mr-2 text-primary" />
                   Fulfillment Type
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
-                  Pickup only. Delivery workflows are disabled.
-                </div>
+              <CardContent className="p-6 space-y-6">
+                <Tabs 
+                  defaultValue="pickup" 
+                  value={fulfillmentType} 
+                  onValueChange={(v) => setFulfillmentType(v as 'pickup' | 'delivery')}
+                  className="w-full"
+                >
+                  <TabsList className="grid grid-cols-2 w-full h-12 p-1 bg-slate-100 dark:bg-slate-800">
+                    <TabsTrigger value="pickup" className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm font-bold gap-2">
+                      <Store className="h-4 w-4" /> Store Pickup
+                    </TabsTrigger>
+                    <TabsTrigger value="delivery" className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm font-bold gap-2">
+                      <MapPin className="h-4 w-4" /> Home Delivery
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="pickup" className="pt-4 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="rounded-xl border bg-emerald-50/30 border-emerald-100 p-4 flex items-start gap-3">
+                      <div className="bg-emerald-100 p-2 rounded-lg">
+                        <CheckCircle className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-emerald-900 text-sm">Customer will pick up from store</p>
+                        <p className="text-xs text-emerald-700/70 mt-0.5">No delivery charges apply for store pickup.</p>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="delivery" className="pt-4 space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Delivery Address</Label>
+                        <div className="relative">
+                          <Textarea 
+                            placeholder="Enter detailed delivery address..." 
+                            value={deliveryAddress}
+                            onChange={(e) => setDeliveryAddress(e.target.value)}
+                            className="min-h-[100px] bg-slate-50 border-slate-200 focus:ring-primary/20 transition-all text-sm leading-relaxed"
+                          />
+                          {foundCustomer?.address && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute bottom-2 right-2 h-7 text-[10px] font-bold bg-white/80 hover:bg-primary hover:text-white border shadow-sm transition-all text-slate-600"
+                              onClick={() => setDeliveryAddress(parseAndFormatAddress(foundCustomer.address))}
+                            >
+                              Use Customer Address
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Delivery Charges (₹)</Label>
+                        <div className="relative group">
+                          <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                          <Input 
+                            type="number" 
+                            min="0"
+                            placeholder="0.00"
+                            value={deliveryCharges || ''}
+                            onChange={(e) => setDeliveryCharges(safeParseFloat(e.target.value))}
+                            className="pl-9 h-12 bg-slate-50 border-slate-200 focus:ring-primary/20 transition-all font-bold text-lg"
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {[0, 20, 30, 50].map(amt => (
+                            <Button 
+                              key={amt}
+                              type="button"
+                              variant="outline" 
+                              size="sm" 
+                              className={cn(
+                                "h-7 px-3 text-[10px] font-bold transition-all",
+                                deliveryCharges === amt ? "bg-primary text-white border-primary" : "hover:border-primary hover:text-primary"
+                              )}
+                              onClick={() => setDeliveryCharges(amt)}
+                            >
+                              ₹{amt}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           </motion.div>

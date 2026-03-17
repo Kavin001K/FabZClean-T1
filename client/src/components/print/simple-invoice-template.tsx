@@ -1,4 +1,5 @@
 import React from 'react';
+import { parseAndFormatAddress } from '@/lib/address-utils';
 
 interface InvoiceData {
     invoiceNumber: string;
@@ -32,6 +33,8 @@ interface InvoiceData {
     notes?: string;
     qrCode?: string;
     isExpressOrder?: boolean;
+    fulfillmentType?: 'pickup' | 'delivery';
+    deliveryAddress?: string | any;
 }
 
 // Self-contained utility functions
@@ -51,6 +54,8 @@ const SimpleInvoiceTemplate: React.FC<{ data: InvoiceData }> = ({ data }) => {
         total,
         qrCode,
         isExpressOrder = false,
+        fulfillmentType = 'pickup',
+        deliveryAddress,
     } = data;
 
     // HARDCODED COMPANY DETAILS
@@ -160,6 +165,36 @@ const SimpleInvoiceTemplate: React.FC<{ data: InvoiceData }> = ({ data }) => {
                 </p>
                 <p>{customer.phone}</p>
                 {customer.address && <p style={{ whiteSpace: 'pre-line', fontSize: '13px' }}>{customer.address}</p>}
+            </div>
+
+            {/* Fulfillment Details */}
+            <div style={{ 
+                marginBottom: '30px', 
+                padding: '15px', 
+                border: `1px solid ${fulfillmentType === 'delivery' ? colors.primary : colors.gray}`,
+                borderRadius: '8px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: fulfillmentType === 'delivery' ? '#f7fee7' : 'white'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '20px' }}>{fulfillmentType === 'delivery' ? '🚚' : '🏪'}</span>
+                    <div>
+                        <p style={{ fontSize: '10px', fontWeight: 'bold', color: colors.gray, textTransform: 'uppercase', margin: 0 }}>Fulfillment</p>
+                        <p style={{ fontSize: '14px', fontWeight: 'bold', color: colors.secondary, margin: 0 }}>
+                            {fulfillmentType === 'delivery' ? 'Home Delivery' : 'Store Pickup'}
+                        </p>
+                    </div>
+                </div>
+                {fulfillmentType === 'delivery' && (
+                    <div style={{ textAlign: 'right', maxWidth: '60%' }}>
+                        <p style={{ fontSize: '10px', fontWeight: 'bold', color: colors.gray, textTransform: 'uppercase', margin: '0 0 4px 0' }}>Destination</p>
+                        <p style={{ fontSize: '12px', color: colors.text, margin: 0 }}>
+                            {typeof deliveryAddress === 'string' ? deliveryAddress : parseAndFormatAddress(deliveryAddress)}
+                        </p>
+                    </div>
+                )}
             </div>
 
             {/* Items Table */}
