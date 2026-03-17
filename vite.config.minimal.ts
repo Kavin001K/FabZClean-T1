@@ -18,6 +18,10 @@ function versionPlugin() {
       // Write to dist folder (output directory relative to root)
       const versionPath = path.resolve(__dirname, 'dist', 'version.json');
       try {
+        const dir = path.dirname(versionPath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
         fs.writeFileSync(versionPath, JSON.stringify(version, null, 2));
         console.log('📄 Generated version.json:', version.version);
       } catch (err) {

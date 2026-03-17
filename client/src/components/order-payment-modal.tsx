@@ -265,6 +265,7 @@ export default function OrderPaymentModal({ order, isOpen, onClose, onPaymentUpd
   };
 
   return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden gap-0 flex flex-col h-[90vh] sm:h-auto sm:max-h-[85vh]">
         <DialogHeader className="p-6 pb-4 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shrink-0 border-b">
           <div className="flex justify-between items-start">
