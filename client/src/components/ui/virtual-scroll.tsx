@@ -6,6 +6,7 @@ interface VirtualScrollProps<T> {
   itemHeight: number;
   containerHeight: number;
   renderItem: (item: T, index: number) => React.ReactNode;
+  header?: React.ReactNode;
   className?: string;
   overscan?: number;
   onScroll?: (scrollTop: number) => void;
@@ -18,6 +19,7 @@ export function VirtualScroll<T>({
   itemHeight,
   containerHeight,
   renderItem,
+  header,
   className = '',
   overscan = 5,
   onScroll,
@@ -26,6 +28,7 @@ export function VirtualScroll<T>({
 }: VirtualScrollProps<T>) {
   const [scrollTop, setScrollTop] = useState(0);
   const scrollElementRef = useRef<HTMLDivElement>(null);
+  const frameId = useRef<number>();
 
   // Calculate visible range
   const visibleRange = useMemo(() => {
@@ -42,13 +45,23 @@ export function VirtualScroll<T>({
     return items.slice(visibleRange.start, visibleRange.end);
   }, [items, visibleRange.start, visibleRange.end]);
 
-  // Handle scroll
+  // Handle scroll with requestAnimationFrame for performance
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLDivElement;
-    const newScrollTop = target.scrollTop;
-    setScrollTop(newScrollTop);
-    onScroll?.(newScrollTop);
+    if (frameId.current) cancelAnimationFrame(frameId.current);
+    
+    const target = e.currentTarget;
+    frameId.current = requestAnimationFrame(() => {
+      const newScrollTop = target.scrollTop;
+      setScrollTop(newScrollTop);
+      onScroll?.(newScrollTop);
+    });
   };
+
+  useEffect(() => {
+    return () => {
+      if (frameId.current) cancelAnimationFrame(frameId.current);
+    };
+  }, []);
 
   // Calculate total height and offset
   const totalHeight = items.length * itemHeight;
@@ -61,6 +74,13 @@ export function VirtualScroll<T>({
       style={{ height: containerHeight }}
       onScroll={handleScroll}
     >
+      {/* Sticky Header inside the scrollable area */}
+      {header && (
+        <div className="sticky top-0 z-30 w-full">
+          {header}
+        </div>
+      )}
+
       <div style={{ height: totalHeight, position: 'relative' }}>
         <div
           style={{

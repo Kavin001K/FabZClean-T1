@@ -30,6 +30,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { generateOrderNumberSync } from "@/lib/franchise-config";
 import { createAddressObject, parseAndFormatAddress } from "@/lib/address-utils";
 import { formatCurrencyWithSettings, roundInvoiceAmount } from "@/lib/settings-utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ServiceItem {
   service: Service;
@@ -56,6 +57,7 @@ export default function CreateOrder() {
   const queryClient = useQueryClient();
   const { printInvoice } = useInvoicePrint();
   const { employee: currentUser } = useAuth();
+  const isMobile = useIsMobile();
 
   // Customer state
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -176,10 +178,12 @@ export default function CreateOrder() {
   const [creditOverridePrompt, setCreditOverridePrompt] = useState<{
     message: string;
     customerId: string;
+    customerName: string;
+    walletBalance: number;
     outstandingBefore: number;
     creditLimit: number;
     projectedCreditRequired: number;
-    pendingOrderData: Partial<Order>;
+    pendingOrderData: any;
   } | null>(null);
 
   // Calculation state - using useMemo for derived values
@@ -774,6 +778,8 @@ export default function CreateOrder() {
         setCreditOverridePrompt({
           message: error.creditOverride.message || errorMessage,
           customerId: error.creditOverride.customerId || foundCustomer?.id || '',
+          customerName: customerName,
+          walletBalance: Number(foundCustomer?.walletBalanceCache || 0),
           outstandingBefore: Number(error.creditOverride.outstandingBefore || 0),
           creditLimit: Number(error.creditOverride.creditLimit || 1000),
           projectedCreditRequired: Number(error.creditOverride.projectedCreditRequired || 0),
@@ -1748,7 +1754,7 @@ export default function CreateOrder() {
             transition={{ duration: 0.3, delay: 0.2 }}
             className="sticky top-24 z-10"
           >
-            <Card className="border-none shadow-xl bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 overflow-hidden ring-1 ring-slate-200 dark:ring-slate-800">
+            <Card className="border-none shadow-xl bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 overflow-hidden ring-1 ring-slate-200 dark:ring-slate-800 rounded-2xl md:rounded-xl">
               <div className="h-1.5 w-full bg-primary" />
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center justify-between">
@@ -1785,10 +1791,10 @@ export default function CreateOrder() {
                   )}
                 </div>
 
-                <div className="space-y-2.5 pt-4 border-t border-slate-200 dark:border-slate-800">
-                    <div className="flex justify-between text-sm text-foreground/80 dark:text-slate-300">
-                      <span>Services Subtotal</span>
-                      <span className="font-semibold">₹{baseSubtotal.toFixed(2)}</span>
+                <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+                    <div className="flex justify-between text-sm text-slate-900 dark:text-slate-100 font-medium">
+                      <span className="opacity-70 dark:opacity-80">Services Subtotal</span>
+                      <span className="font-black">₹{baseSubtotal.toFixed(2)}</span>
                     </div>
   
                     <AnimatePresence>
@@ -1837,10 +1843,10 @@ export default function CreateOrder() {
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
-                          className="flex justify-between text-sm text-foreground/70 dark:text-slate-400"
+                          className="flex justify-between text-sm text-slate-900 dark:text-slate-100 font-medium"
                         >
-                          <span>GST (18%)</span>
-                          <span>+₹{gstAmount.toFixed(2)}</span>
+                          <span className="opacity-70 dark:opacity-80">GST (18%)</span>
+                          <span className="font-black">+₹{gstAmount.toFixed(2)}</span>
                         </motion.div>
                       )}
                   </AnimatePresence>
@@ -1875,27 +1881,40 @@ export default function CreateOrder() {
                   </AnimatePresence>
                 </div>
 
-                <Button
-                  onClick={handleCreateOrder}
-                  disabled={createOrderMutation.isPending || selectedServices.length === 0 || !customerName || !customerPhone}
-                  className="w-full h-12 text-lg font-bold shadow-lg shadow-primary/20 mt-2 hover:scale-[1.01] active:scale-[0.98] transition-all"
-                >
-                  {createOrderMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="mr-2 h-5 w-5" />
-                      Place Order
-                    </>
+                <div className={cn(
+                  "mt-2",
+                  isMobile && "fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-lg border-t z-50 shadow-[0_-8px_30px_rgb(0,0,0,0.12)]"
+                )}>
+                  <Button
+                    onClick={handleCreateOrder}
+                    disabled={createOrderMutation.isPending || selectedServices.length === 0 || !customerName || !customerPhone}
+                    className="w-full h-12 text-lg font-black shadow-lg shadow-primary/25 hover:scale-[1.01] active:scale-[0.98] transition-all bg-primary hover:bg-primary/90"
+                  >
+                    {createOrderMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Creating Order...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="mr-2 h-5 w-5" />
+                        Place Order • ₹{totalAmount.toFixed(0)}
+                      </>
+                    )}
+                  </Button>
+                  
+                  {isMobile && (
+                    <p className="text-[9px] text-center text-muted-foreground mt-2 italic leading-tight">
+                      Automatic WhatsApp bill will be sent.
+                    </p>
                   )}
-                </Button>
+                </div>
                 
-                <p className="text-[10px] text-center text-muted-foreground px-4 italic leading-relaxed">
-                  By placing this order, you agree to the service terms. A WhatsApp bill will be sent automatically.
-                </p>
+                {!isMobile && (
+                  <p className="text-[10px] text-center text-muted-foreground px-4 italic leading-relaxed">
+                    By placing this order, you agree to the service terms. A WhatsApp bill will be sent automatically.
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -2209,54 +2228,113 @@ export default function CreateOrder() {
 
       {/* Credit Override Dialog */}
       <Dialog open={!!creditOverridePrompt} onOpenChange={(open) => !open && setCreditOverridePrompt(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-destructive flex items-center">
-              <AlertCircle className="h-5 w-5 mr-2" />
-              Customer Payment Recommended
-            </DialogTitle>
-            <DialogDescription className="pt-2 text-base">
-              {creditOverridePrompt?.message}
-            </DialogDescription>
-          </DialogHeader>
-          {creditOverridePrompt && (
-            <div className="rounded-lg border bg-muted/40 p-4 text-sm space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">Existing unpaid dues</span>
-                <span className="font-semibold">₹{creditOverridePrompt.outstandingBefore.toFixed(2)}</span>
+        <DialogContent className="max-w-2xl border-none shadow-2xl p-0 overflow-hidden bg-slate-50 dark:bg-slate-950">
+          <div className="h-1.5 w-full bg-amber-500" />
+          
+          <div className="p-6 space-y-6">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black text-amber-600 dark:text-amber-500 flex items-center gap-2">
+                <AlertCircle className="h-6 w-6" />
+                Credit Limit Overview
+              </DialogTitle>
+              <DialogDescription className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                {creditOverridePrompt?.customerName} has reached their credit threshold. Review details before proceeding.
+              </DialogDescription>
+            </DialogHeader>
+
+            {creditOverridePrompt && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Financial Overview */}
+                <div className="space-y-4">
+                  <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <h4 className="text-[10px] uppercase tracking-wider font-black text-slate-400 mb-3">Balance Summary</h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Current Dues</span>
+                        <span className="font-bold text-red-600">₹{creditOverridePrompt.outstandingBefore.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Credit Limit</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-300">₹{creditOverridePrompt.creditLimit.toFixed(2)}</span>
+                      </div>
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-sm">
+                        <span className="text-amber-600 font-bold uppercase text-[10px]">Over Limit By</span>
+                        <span className="font-black text-amber-600 font-mono">₹{Math.max(0, creditOverridePrompt.outstandingBefore + creditOverridePrompt.projectedCreditRequired - creditOverridePrompt.creditLimit).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-xl p-4 border border-emerald-100 dark:border-emerald-900/50">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-[10px] uppercase font-black text-emerald-600 dark:text-emerald-400 tracking-wider">Wallet Balance</p>
+                        <p className="text-xs text-emerald-700 dark:text-emerald-500 opacity-70 mt-0.5">Available for partial payment</p>
+                      </div>
+                      <span className="text-xl font-black text-emerald-600">₹{creditOverridePrompt.walletBalance.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Orders Snapshot */}
+                <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm">
+                  <h4 className="text-[10px] uppercase tracking-wider font-black text-slate-400 mb-3">Recent Activity</h4>
+                  <div className="space-y-2.5">
+                    {customerOrders?.slice(0, 3).map((order: any) => (
+                      <div key={order.id} className="flex justify-between items-center text-[11px] border-b border-slate-50 dark:border-slate-800 pb-2 last:border-0 last:pb-0">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-slate-700 dark:text-slate-300 truncate">{order.orderNumber || 'Legacy Order'}</p>
+                          <p className="text-muted-foreground opacity-70">{format(new Date(order.createdAt), 'dd MMM')}</p>
+                        </div>
+                        <div className="text-right ml-2">
+                          <p className="font-black text-slate-600 dark:text-slate-400">₹{parseFloat(order.totalAmount).toFixed(0)}</p>
+                          <Badge variant="outline" className="text-[8px] h-3 px-1 bg-muted/50">{order.status}</Badge>
+                        </div>
+                      </div>
+                    ))}
+                    {customerOrders.length === 0 && (
+                      <div className="text-center py-4">
+                        <p className="text-xs text-muted-foreground opacity-50 italic">No recent order history</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">Allowed credit limit</span>
-                <span className="font-semibold">₹{creditOverridePrompt.creditLimit.toFixed(2)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">New unpaid amount on this order</span>
-                <span className="font-semibold">₹{creditOverridePrompt.projectedCreditRequired.toFixed(2)}</span>
-              </div>
-              <p className="text-muted-foreground pt-1">
-                Ask the customer for payment if possible. You can still continue and create the order, and the outstanding amount will be updated.
-              </p>
+            )}
+
+            <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-4 text-[11px] leading-relaxed text-amber-800 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/30">
+               <strong>POLICY:</strong> High outstanding balances can affect store cashflow. Please request the customer to clear some dues or use their wallet balance if possible. You can continue if the customer is trusted.
             </div>
-          )}
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setCreditOverridePrompt(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (!creditOverridePrompt?.pendingOrderData) return;
-                const pendingOrderData = {
-                  ...creditOverridePrompt.pendingOrderData,
-                  creditOverrideApproved: true,
-                };
-                setCreditOverridePrompt(null);
-                createOrderMutation.mutate(pendingOrderData);
-              }}
-              disabled={createOrderMutation.isPending}
-            >
-              {createOrderMutation.isPending ? "Creating..." : "Continue & Create Order"}
-            </Button>
-          </DialogFooter>
+
+            <DialogFooter className="flex flex-col sm:flex-row gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => setCreditOverridePrompt(null)}
+                className="w-full sm:w-auto font-bold border-slate-200 translate-y-0 active:translate-y-0.5 transition-transform"
+              >
+                Cancel Order
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!creditOverridePrompt?.pendingOrderData) return;
+                  const forceOrderData = {
+                    ...creditOverridePrompt.pendingOrderData,
+                    creditOverrideApproved: true,
+                  };
+                  setCreditOverridePrompt(null);
+                  createOrderMutation.mutate(forceOrderData);
+                }}
+                disabled={createOrderMutation.isPending}
+                className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white font-black shadow-lg shadow-amber-600/20 translate-y-0 active:translate-y-0.5 transition-transform"
+              >
+                {createOrderMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Zap className="h-4 w-4 mr-2" />
+                )}
+                Continue Anyway
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

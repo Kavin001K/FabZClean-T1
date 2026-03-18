@@ -92,6 +92,7 @@ import { exportOrdersToExcel } from '@/lib/excel-exports';
 import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { isElectron } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Types
 interface OrderFilters {
@@ -116,6 +117,7 @@ function OrdersComponent() {
   const { toast } = useToast();
   const { addNotification } = useNotifications();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   // State Management
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
@@ -1128,6 +1130,94 @@ function OrdersComponent() {
   const virtualTableBodyHeight = 548;
 
   const renderOrderRow = useCallback((order: Order, index: number) => {
+    if (isMobile) {
+      return (
+        <motion.div
+          key={order.id}
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.2, delay: index * 0.03 }}
+          className={cn(
+            "p-4 mb-3 rounded-2xl border bg-card shadow-sm active:scale-[0.98] transition-all",
+            selectedOrders.includes(order.id) && "ring-2 ring-primary bg-primary/5"
+          )}
+          onClick={() => handleViewOrder(order)}
+        >
+          <div className="flex justify-between items-start mb-3">
+            <div className="flex items-center gap-3">
+              <div onClick={(e) => e.stopPropagation()}>
+                <Checkbox checked={selectedOrders.includes(order.id)} onCheckedChange={() => handleSelectOrder(order.id)} />
+              </div>
+              <div>
+                <p className="font-mono font-bold text-primary text-sm">{order.orderNumber}</p>
+                <p className="text-[10px] text-muted-foreground">{formatDate((order.createdAt || new Date()).toString())}</p>
+              </div>
+            </div>
+            <Badge className={cn("text-[10px] h-5 px-2", getStatusColor(order.status))}>
+              {order.status}
+            </Badge>
+          </div>
+
+          <div className="space-y-2 mb-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-bold truncate pr-2">{order.customerName}</span>
+              <span className="text-base font-black text-slate-900 dark:text-slate-100">
+                {formatCurrency(parseFloat(order.totalAmount || "0"))}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <Package className="h-3 w-3" />
+              <span>{(order as any).service || 'Dry Cleaning'}</span>
+              <span className="mx-1">•</span>
+              <Badge variant="outline" className={cn("text-[9px] h-4 py-0", getPaymentStatusColor((order as any).paymentStatus || 'pending'))}>
+                {(order as any).paymentStatus || 'Pending'}
+              </Badge>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-3 border-t">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1 h-9 font-bold bg-slate-50 dark:bg-slate-900"
+              onClick={(e) => { e.stopPropagation(); handlePrintInvoice(order); }}
+            >
+              <Printer className="h-3.5 w-3.5 mr-2" /> Print
+            </Button>
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              className="px-3 h-9"
+              onClick={(e) => { e.stopPropagation(); handleEditOrder(order); }}
+            >
+              <Edit className="h-3.5 w-3.5" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={(e) => e.stopPropagation()}>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleViewOrder(order)}>
+                  <Eye className="mr-2 h-4 w-4" /> View Details
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {order.paymentStatus !== 'paid' && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedPaymentOrder(order); setIsPaymentModalOpen(true); }}>
+                    <IndianRupee className="mr-2 h-4 w-4" /> Payment
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => handleCancelOrder(order)} className="text-red-600">
+                  <XCircle className="mr-2 h-4 w-4" /> Cancel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </motion.div>
+      );
+    }
+
     return (
       <div
         key={order.id}
@@ -1208,7 +1298,7 @@ function OrdersComponent() {
         </div>
       </div>
     );
-  }, [selectedOrders, ordersGridColumns, getStatusColor, getStatusIcon, getPaymentStatusColor, handleSelectOrder, handleViewOrder, handleEditOrder, handlePrintInvoice, handleUpdateStatus, handleDebitFromWallet, handleCancelOrder, setIsPaymentModalOpen, setSelectedPaymentOrder]);
+  }, [isMobile, selectedOrders, ordersGridColumns, getStatusColor, getStatusIcon, getPaymentStatusColor, handleSelectOrder, handleViewOrder, handleEditOrder, handlePrintInvoice, handleUpdateStatus, handleDebitFromWallet, handleCancelOrder, setIsPaymentModalOpen, setSelectedPaymentOrder]);
 
   const OrderHeaders = (
     <div className={`grid ${ordersGridColumns} gap-4 items-center px-4 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase select-none`}>
@@ -1862,24 +1952,22 @@ function OrdersComponent() {
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-lg border bg-background overflow-hidden h-[600px] flex flex-col relative">
-                      <div className="flex-1 overflow-auto scroll-smooth overscroll-x-contain">
-                        <div className={cn(ordersTableMinWidth, "flex flex-col min-h-full")}>
-                          <div className="sticky top-0 z-20 bg-background shadow-sm">
-                            {OrderHeaders}
-                          </div>
-                          <div className="flex-1">
-                            <VirtualScroll
-                              items={filteredOrders}
-                              itemHeight={64}
-                              containerHeight={virtualTableBodyHeight}
-                              renderItem={renderOrderRow}
-                              emptyMessage="No orders found matching your criteria"
-                              className="scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent"
-                            />
-                          </div>
+                    <div className="rounded-lg border bg-background overflow-hidden h-[600px]">
+                      {!isMobile ? (
+                        <VirtualScroll
+                          items={filteredOrders}
+                          itemHeight={64}
+                          containerHeight={600}
+                          header={OrderHeaders}
+                          renderItem={renderOrderRow}
+                          emptyMessage="No orders found matching your criteria"
+                          className={cn("scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent h-full", ordersTableMinWidth)}
+                        />
+                      ) : (
+                        <div className="h-full overflow-y-auto p-2">
+                          {filteredOrders.map((order, idx) => renderOrderRow(order, idx))}
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
