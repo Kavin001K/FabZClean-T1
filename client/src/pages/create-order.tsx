@@ -139,6 +139,9 @@ export default function CreateOrder() {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryCharges, setDeliveryCharges] = useState(0);
 
+  // Wallet state
+  const [useWallet, setUseWallet] = useState(false);
+
   // Credit Balance Alert
   useEffect(() => {
     if (foundCustomer?.creditBalance && Number(foundCustomer.creditBalance) > 0) {
@@ -825,6 +828,7 @@ export default function CreateOrder() {
     setFulfillmentType('pickup');
     setDeliveryAddress('');
     setDeliveryCharges(0);
+    setUseWallet(false);
     setCreditOverridePrompt(null);
   };
 
@@ -991,6 +995,8 @@ export default function CreateOrder() {
       // Express/Priority Order
       isExpressOrder: isExpressOrder,
       priority: isExpressOrder ? 'high' : 'normal',
+      // Wallet usage
+      useWallet: useWallet,
     };
 
     createOrderMutation.mutate(orderData);
@@ -1695,6 +1701,47 @@ export default function CreateOrder() {
               </CardContent>
             </Card>
           </motion.div>
+          
+          {/* Wallet Balance Usage */}
+          <AnimatePresence>
+            {foundCustomer && (Number(foundCustomer.walletBalanceCache || 0) > 0 || useWallet) && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3, delay: 0.45 }}
+              >
+                <Card className={cn(
+                  "overflow-hidden border-2 transition-all duration-300",
+                  useWallet 
+                    ? "border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20" 
+                    : "border-slate-200 dark:border-slate-800"
+                )}>
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "p-2 rounded-lg transition-colors",
+                        useWallet ? "bg-emerald-500 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                      )}>
+                        <CreditCard className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold">Use Wallet Balance</p>
+                        <p className="text-xs text-muted-foreground">
+                          Available: <span className="font-bold text-emerald-600 dark:text-emerald-400">₹{parseFloat(String(foundCustomer.walletBalanceCache || 0)).toFixed(2)}</span>
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={useWallet}
+                      onCheckedChange={setUseWallet}
+                      className="data-[state=checked]:bg-emerald-500"
+                    />
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Advance Payment */}
           <motion.div
@@ -1948,7 +1995,7 @@ export default function CreateOrder() {
                     ) : customerStats ? (
                       <>
                         {/* Customer Stats Grid */}
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                           <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 p-3 rounded-lg border border-emerald-200/50 dark:border-emerald-800/50">
                             <div className="flex items-center gap-2 mb-1">
                               <ShoppingBag className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -1965,9 +2012,19 @@ export default function CreateOrder() {
                             <p className="text-xl font-bold text-blue-700 dark:text-blue-300">₹{customerStats.totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
                           </div>
 
+                          <div className="bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20 p-3 rounded-lg border border-green-200/50 dark:border-green-800/50">
+                            <div className="flex items-center gap-2 mb-1">
+                              <CreditCard className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                              <span className="text-[10px] uppercase tracking-wider font-medium text-green-600 dark:text-green-400">Wallet Balance</span>
+                            </div>
+                            <p className="text-xl font-bold text-green-700 dark:text-green-300">
+                              ₹{parseFloat(String(foundCustomer?.walletBalanceCache || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                            </p>
+                          </div>
+
                           <div className="bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 p-3 rounded-lg border border-red-200/50 dark:border-red-800/50">
                             <div className="flex items-center gap-2 mb-1">
-                              <CreditCard className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                              <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                               <span className="text-[10px] uppercase tracking-wider font-medium text-red-600 dark:text-red-400">Credit Due</span>
                             </div>
                             {(() => {
@@ -1992,6 +2049,7 @@ export default function CreateOrder() {
                             </p>
                           </div>
                         </div>
+
 
                         {/* Favorite Services */}
                         {customerStats.topServices.length > 0 && (

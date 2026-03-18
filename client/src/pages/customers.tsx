@@ -806,14 +806,20 @@ export default function Customers() {
                           </div>
 
                           {/* Credit Wallet Summary */}
-                          <div className="space-y-2 py-2 px-3 bg-white/5 rounded-md border border-white/5">
-                            <div className="flex items-center justify-between text-sm">
+                          <div className="space-y-2 py-2 px-3 bg-white/5 rounded-md border border-white/5 text-[11px]">
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground font-medium">Wallet Balance</span>
+                              <span className="font-bold text-emerald-500">
+                                ₹{parseFloat((customer as any).walletBalanceCache || '0').toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between border-t border-white/5 pt-1">
                               <span className="text-muted-foreground font-medium">Outstanding Credit</span>
                               <span className={`font-bold ${outstandingColorClass}`}>
                                 ₹{outstandingCredit.toFixed(2)}
                               </span>
                             </div>
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1">
                               <span className={isCreditLimitExceeded ? "text-red-500 font-semibold" : ""}>Limit ₹{customerCreditLimit.toFixed(0)}</span>
                               <span className={isCreditLimitExceeded ? "text-red-500 font-semibold" : ""}>
                                 {isCreditLimitExceeded

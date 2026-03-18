@@ -1009,170 +1009,38 @@ export class SupabaseStorage {
         }
     ): Promise<{ success: boolean; data?: any; error?: string }> {
         const useWallet = options?.useWallet ?? walletAmount > 0;
-        const walletDebitRequested = options?.walletDebitRequested ?? walletAmount;
-        const normalizedPaymentMethod = options?.paymentMethod || 'CASH';
+        const walletDebitRequested = options?.walletDebitRequested ?? (walletAmount > 0 ? walletAmount : null);
+        const paymentMethod = options?.paymentMethod || 'CASH';
 
         try {
-            // PERF: Use pre-fetched data if available, otherwise fetch in parallel
-            let order: any;
-            let customer: any;
-
-            if (options?.prefetchedOrder && options?.prefetchedCustomer) {
-                order = options.prefetchedOrder;
-                customer = options.prefetchedCustomer;
-            } else {
-                const [orderRes, customerRes] = await Promise.all([
-                    this.supabase.from('orders').select('*').eq('id', orderId).single(),
-                    this.supabase.from('customers').select('*').eq('id', customerId).single()
-                ]);
-
-                if (orderRes.error || !orderRes.data) throw new Error('Order not found');
-                if (customerRes.error || !customerRes.data) throw new Error('Customer not found');
-
-                order = orderRes.data;
-                customer = customerRes.data;
-            }
-
-            const orderTotal = parseFloat(order.total_amount || '0');
-            const advancePaid = parseFloat(order.advance_paid || '0');
-            let walletBalance = parseFloat(customer.wallet_balance_cache || '0');
-            let remainingAmount = Math.max(0, orderTotal - advancePaid);
-
-            let walletDebited = 0;
-            if (useWallet && remainingAmount > 0) {
-                if (walletDebitRequested > 0) {
-                    walletDebited = Math.min(remainingAmount, Math.max(walletBalance, 0), walletDebitRequested);
-                } else {
-                    walletDebited = Math.min(remainingAmount, Math.max(walletBalance, 0));
-                }
-            }
-
-            let cashApplied = Math.min(
-                Math.max(remainingAmount - walletDebited, 0),
-                Math.max(cashAmount || 0, 0)
-            );
-
-            let walletTxId = null;
-            if (walletDebited > 0) {
-                walletBalance -= walletDebited;
-                // PERF: Parallelize wallet transaction insert + customer balance update
-                const [wTxResult] = await Promise.all([
-                    this.supabase.from('wallet_transactions').insert({
-                        transaction_id: `WLT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-                        customer_id: customerId,
-                        type: 'debit',
-                        amount: walletDebited,
-                        balance_before: walletBalance + walletDebited,
-                        balance_after: walletBalance,
-                        reference_order_id: orderId,
-                        verified_by_staff: recordedBy
-                    }).select('id').single(),
-                    this.supabase.from('customers').update({ wallet_balance_cache: walletBalance }).eq('id', customerId)
-                ]);
-                if (wTxResult.error) throw wTxResult.error;
-                walletTxId = wTxResult.data.id;
-            }
-
-            // PERF: Defer customer order metrics recalculation — not needed for the response
-            const cId = customerId;
-            setImmediate(async () => {
-                try {
-                    const { data: ordCounts } = await this.supabase
-                        .from('orders')
-                        .select('total_amount, status')
-                        .eq('customer_id', cId)
-                        .neq('status', 'cancelled');
-                    
-                    if (ordCounts && Array.isArray(ordCounts)) {
-                        const totalOrders = ordCounts.length;
-                        const totalSpent = ordCounts.reduce((sum: number, o: any) => sum + parseFloat(o.total_amount || '0'), 0);
-
-                        await this.supabase.from('customers').update({
-                            total_orders: totalOrders,
-                            total_spent: totalSpent,
-                            last_order: new Date().toISOString()
-                        }).eq('id', cId);
-                    }
-                } catch (metricsErr) {
-                    console.warn('[SupabaseStorage] Deferred customer metrics update failed:', metricsErr);
-                }
+            // Use the canonical Database RPC v2 for atomic, trigger-compliant checkout
+            const { data, error } = await this.supabase.rpc('process_payment_checkout_v2', {
+                p_order_id: orderId,
+                p_customer_id: customerId,
+                p_cash_amount: cashAmount || 0,
+                p_use_wallet: useWallet,
+                p_wallet_debit_requested: walletDebitRequested,
+                p_payment_method: paymentMethod,
+                p_recorded_by: recordedBy,
+                p_recorded_by_name: recordedByName
             });
 
-
-            // Note: We don't track CASH payments in wallet_transactions anymore as per simplified schema, 
-            // the cash total is implicitly tracked by advance_paid + the order metrics.
-            
-            const newAdvancePaid = Math.min(orderTotal, advancePaid + walletDebited + cashApplied);
-            const creditAssigned = Math.max(0, orderTotal - newAdvancePaid);
-            const newPaymentStatus = creditAssigned > 0 ? 'credit' : 'paid';
-
-            let finalPaymentMethod = order.payment_method;
-            if (walletDebited > 0 && cashApplied > 0) finalPaymentMethod = 'split';
-            else if (walletDebited > 0) finalPaymentMethod = 'credit_wallet';
-            else if (cashApplied > 0) finalPaymentMethod = normalizedPaymentMethod;
-
-            const { error: ordErr } = await this.supabase.from('orders').update({
-                advance_paid: newAdvancePaid,
-                wallet_used: Math.min(orderTotal, parseFloat(order.wallet_used || '0') + walletDebited),
-                credit_used: creditAssigned,
-                payment_status: newPaymentStatus,
-                payment_method: finalPaymentMethod
-            }).eq('id', orderId);
-
-            if (ordErr) throw ordErr;
-
-            // If this is a credit order, increment the customer's outstanding balance
-            if (creditAssigned > 0 && customerId) {
-                               if (creditAssigned > 0) {
-                    // LEGACY: Update credit balance (audited via triggers)
-                    // Instead of updating customers table directly (which is blocked by triggers),
-                    // we insert a DEBIT entry into wallet_transactions.
-                    // The DB trigger `trg_wallet_transactions_after_insert` will automatically
-                    // update customers.credit_balance and wallet_balance_cache.
-                    const { error: creditLedgerError } = await this.supabase
-                        .from('wallet_transactions')
-                        .insert({
-                            customer_id: customerId,
-                            type: 'debit',
-                            amount: -creditAssigned,
-                            reference_order_id: orderId,
-                            reference_id: orderId,
-                            reference_type: 'ORDER',
-                            transaction_type: 'ORDER',
-                            payment_method: 'CREDIT',
-                            note: `Auto-assigned credit for order ${order.order_number || orderId}`,
-                            created_at: new Date().toISOString()
-                        });
-
-                    if (creditLedgerError) {
-                        console.error('[SupabaseStorage] Failed to record credit in ledger:', creditLedgerError);
-                        // We continue because the order was already updated, but this is a serious sync issue.
-                        // In some cases, manual reconciliation might be needed.
-                    }
-                }
+            if (error) {
+                console.error('[SupabaseStorage] RPC Checkout failed:', error.message, error.details);
+                return { success: false, error: error.message || 'Payment processing failed in database.' };
             }
 
-            const splitData = {
-                cashApplied,
-                walletDebited,
-                creditAssigned
-            };
-
-            return { 
-                success: true, 
-                data: {
-                    payment_status: newPaymentStatus,
-                    split: splitData,
-                    transaction_ids: {
-                        wallet_transaction_id: walletTxId
-                    }
-                } 
+            // The RPC returns { success, payment_status, split, transaction_ids, ... }
+            return {
+                success: true,
+                data: data
             };
         } catch (err: any) {
-            console.error('[SupabaseStorage] JS Checkout processing failed:', err);
-            return { success: false, error: err.message || 'Payment processing failed.' };
+            console.error('[SupabaseStorage] Checkout RPC exception:', err);
+            return { success: false, error: err.message || 'Fatal error during payment processing.' };
         }
     }
+
 
     async processCreditRepayment(
         customerId: string,

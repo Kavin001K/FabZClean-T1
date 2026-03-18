@@ -227,6 +227,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   const selectedCreditLimitAbs = selectedCustomer ? Math.max(0, parseFloat((selectedCustomer as any).creditLimit || '1000')) : 1000;
   const selectedLimitExceeded = selectedOutstanding > selectedCreditLimitAbs;
   const selectedOutstandingClass = selectedLimitExceeded ? 'text-red-500' : selectedOutstanding === 0 ? 'text-emerald-500' : 'text-amber-500';
+  const selectedWalletBalance = selectedCustomer ? parseFloat((selectedCustomer as any).walletBalanceCache || '0') : 0;
 
   // Filter orders for the selected customer
   const customerOrders = React.useMemo(() => {
@@ -307,13 +308,13 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                       <div className="p-4 bg-muted/50 rounded-lg">
-                        <div className={cn("text-lg font-bold", selectedOutstandingClass)}>
-                          ₹{selectedOutstanding.toLocaleString('en-IN')}
+                        <div className="text-lg font-bold text-emerald-500">
+                          ₹{selectedWalletBalance.toLocaleString('en-IN')}
                         </div>
                         <div className="text-sm text-muted-foreground flex justify-between items-center mt-1">
-                          <span>Outstanding Credit</span>
+                          <span>Wallet Balance</span>
                           <Button
                             variant="outline"
                             size="sm"
@@ -322,6 +323,14 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                           >
                             Recharge
                           </Button>
+                        </div>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <div className={cn("text-lg font-bold", selectedOutstandingClass)}>
+                          ₹{selectedOutstanding.toLocaleString('en-IN')}
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          Outstanding Credit
                         </div>
                         {selectedLimitExceeded && (
                           <div className="text-xs font-medium text-red-500 mt-1">
