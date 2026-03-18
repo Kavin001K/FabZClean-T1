@@ -7,6 +7,7 @@ import { useShortcuts } from '@/components/shortcuts-provider';
 import { NotificationCenter } from '@/components/notification-center';
 import { GlobalSearch } from '@/components/global-search';
 import { UserMenu } from '@/components/layout/user-menu';
+import { ThemeToggle } from '@/components/layout/theme-toggle';
 
 const isLikelyRecordId = (segment: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment) ||
@@ -164,6 +165,7 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </Button>
         )}
+        <ThemeToggle />
         <NotificationCenter />
         <UserMenu />
       </div>

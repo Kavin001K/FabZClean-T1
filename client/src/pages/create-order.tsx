@@ -903,20 +903,29 @@ export default function CreateOrder() {
         });
         return;
       }
-    } else {
-      // PERF: Fire-and-forget address update — don't block order creation
-      const existingFormattedAddress = foundCustomer ? parseAndFormatAddress(foundCustomer.address) : '';
+    } else if (foundCustomer) {
+      // PERF: Fire-and-forget profile update — don't block order creation
+      const existingFormattedAddress = parseAndFormatAddress(foundCustomer.address);
       const orderLevelAddress = deliveryAddress || customerAddress;
       
-      if (orderLevelAddress && orderLevelAddress !== existingFormattedAddress && orderLevelAddress !== 'Address not provided') {
-         customersApi.update(currentCustomerId, {
-           address: { line1: orderLevelAddress }
-         }).then(() => {
-           console.log("Customer address updated automatically for future use");
-           queryClient.invalidateQueries({ queryKey: ["customers"] });
-         }).catch((e) => {
-           console.warn("Soft fail: could not auto-update customer address", e);
-         });
+      const hasNameChanged = foundCustomer.name !== customerName;
+      const hasPhoneChanged = foundCustomer.phone !== customerPhone;
+      const hasEmailChanged = foundCustomer.email !== (customerEmail || null);
+      const hasAddressChanged = orderLevelAddress && orderLevelAddress !== existingFormattedAddress && orderLevelAddress !== 'Address not provided';
+
+      if (hasNameChanged || hasPhoneChanged || hasEmailChanged || hasAddressChanged) {
+        const updates: any = {};
+        if (hasNameChanged) updates.name = customerName;
+        if (hasPhoneChanged) updates.phone = customerPhone;
+        if (hasEmailChanged) updates.email = customerEmail || null;
+        if (hasAddressChanged) updates.address = { line1: orderLevelAddress };
+
+        customersApi.update(currentCustomerId, updates).then(() => {
+          console.log("Customer profile synchronized automatically");
+          queryClient.invalidateQueries({ queryKey: ["customers"] });
+        }).catch((e) => {
+          console.warn("Soft fail: could not auto-sync customer profile", e);
+        });
       }
     }
 
@@ -1440,7 +1449,15 @@ export default function CreateOrder() {
                 <Tabs 
                   defaultValue="pickup" 
                   value={fulfillmentType} 
-                  onValueChange={(v) => setFulfillmentType(v as 'pickup' | 'delivery')}
+                  onValueChange={(v) => {
+                    const type = v as 'pickup' | 'delivery';
+                    setFulfillmentType(type);
+                    if (type === 'delivery' && deliveryCharges === 0) {
+                      setDeliveryCharges(50);
+                    } else if (type === 'pickup') {
+                      setDeliveryCharges(0);
+                    }
+                  }}
                   className="w-full"
                 >
                   <TabsList className="grid grid-cols-2 w-full h-12 p-1 bg-slate-100 dark:bg-slate-800">
@@ -1453,42 +1470,41 @@ export default function CreateOrder() {
                   </TabsList>
 
                   <TabsContent value="pickup" className="pt-4 animate-in fade-in slide-in-from-top-1 duration-300">
-                    <div className="rounded-xl border bg-emerald-50/30 border-emerald-100 p-4 flex items-start gap-3">
-                      <div className="bg-emerald-100 p-2 rounded-lg">
-                        <CheckCircle className="h-4 w-4 text-emerald-600" />
+                    <div className="rounded-xl border bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/50 p-4 flex items-start gap-4">
+                      <div className="bg-emerald-100 dark:bg-emerald-900/50 p-3 rounded-lg shadow-sm">
+                        <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                       </div>
                       <div>
-                        <p className="font-bold text-emerald-900 text-sm">Customer will pick up from store</p>
-                        <p className="text-xs text-emerald-700/70 mt-0.5">No delivery charges apply for store pickup.</p>
+                        <p className="font-bold text-emerald-900 dark:text-emerald-300 text-sm">Customer will pick up from store</p>
+                        <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1 leading-relaxed">No delivery charges apply for store pickup.</p>
                       </div>
                     </div>
                   </TabsContent>
 
                   <TabsContent value="delivery" className="pt-4 space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Delivery Address</Label>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">Delivery Address</Label>
+                          {foundCustomer && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-[10px] gap-1 text-primary hover:text-primary hover:bg-primary/5 px-2"
+                              onClick={() => setDeliveryAddress(parseAndFormatAddress(foundCustomer.address))}
+                            >
+                              <User className="h-3 w-3" /> Use Profile Address
+                            </Button>
+                          )}
+                        </div>
                         <div className="relative group">
                           <Textarea 
                             placeholder="Enter detailed delivery address..." 
                             value={deliveryAddress}
                             onChange={(e) => setDeliveryAddress(e.target.value)}
-                            className="min-h-[100px] bg-slate-50 border-slate-200 focus:ring-primary/20 transition-all text-sm leading-relaxed pr-12"
+                            className="min-h-[100px] bg-white border-slate-200 focus:ring-primary/20 transition-all text-sm leading-relaxed shadow-sm lg:pr-1"
                           />
-                          <div className="absolute right-2 top-2 flex flex-col gap-2">
-                            {foundCustomer?.address && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8 rounded-full border-primary/20 bg-white hover:bg-primary hover:text-white transition-all shadow-sm"
-                                onClick={() => setDeliveryAddress(parseAndFormatAddress(foundCustomer.address))}
-                                title="Fetch from customer profile"
-                              >
-                                <User className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
                         </div>
                       </div>
                       <div className="space-y-2">
@@ -1770,72 +1786,72 @@ export default function CreateOrder() {
                 </div>
 
                 <div className="space-y-2.5 pt-4 border-t border-slate-200 dark:border-slate-800">
-                  <div className="flex justify-between text-sm text-slate-500">
-                    <span>Services Subtotal</span>
-                    <span className="font-medium">₹{baseSubtotal.toFixed(2)}</span>
-                  </div>
-
-                  <AnimatePresence>
-                    {isExpressOrder && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        className="flex justify-between text-sm text-amber-600 dark:text-amber-400 font-medium"
-                      >
-                        <span className="flex items-center gap-1">
-                          <Zap className="h-3.5 w-3.5" /> Express Charge (50%)
-                        </span>
-                        <span>+₹{expressSurcharge.toFixed(2)}</span>
-                      </motion.div>
-                    )}
-
-                    {discountAmount > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400 font-medium"
-                      >
-                        <span className="flex items-center gap-1">
-                          <TrendingDown className="h-3.5 w-3.5" /> 
-                          Discount {discountType === 'percentage' ? `(${discountValue}%)` : '(Fixed)'}
-                        </span>
-                        <span>-₹{discountAmount.toFixed(2)}</span>
-                      </motion.div>
-                    )}
-
-                    {extraCharges > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        className="flex justify-between text-sm text-slate-500"
-                      >
-                        <span className="flex items-center gap-1 italic">
-                          <PlusCircle className="h-3.5 w-3.5 text-blue-500" />
-                          {extraChargesLabel || 'Extra Charges'}
-                        </span>
-                        <span>+₹{extraCharges.toFixed(2)}</span>
-                      </motion.div>
-                    )}
-
-                    {enableGST && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        className="flex justify-between text-sm text-slate-400"
-                      >
-                        <span>GST (18%)</span>
-                        <span>+₹{gstAmount.toFixed(2)}</span>
-                      </motion.div>
-                    )}
+                    <div className="flex justify-between text-sm text-foreground/80 dark:text-slate-300">
+                      <span>Services Subtotal</span>
+                      <span className="font-semibold">₹{baseSubtotal.toFixed(2)}</span>
+                    </div>
+  
+                    <AnimatePresence>
+                      {isExpressOrder && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          className="flex justify-between text-sm text-amber-600 dark:text-amber-400 font-bold"
+                        >
+                          <span className="flex items-center gap-1">
+                            <Zap className="h-3.5 w-3.5" /> Express Charge (50%)
+                          </span>
+                          <span>+₹{expressSurcharge.toFixed(2)}</span>
+                        </motion.div>
+                      )}
+  
+                      {discountAmount > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400 font-bold"
+                        >
+                          <span className="flex items-center gap-1">
+                            <TrendingDown className="h-3.5 w-3.5" /> 
+                            Discount {discountType === 'percentage' ? `(${discountValue}%)` : '(Fixed)'}
+                          </span>
+                          <span>-₹{discountAmount.toFixed(2)}</span>
+                        </motion.div>
+                      )}
+  
+                      {extraCharges > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          className="flex justify-between text-sm text-foreground/80 dark:text-slate-300"
+                        >
+                          <span className="flex items-center gap-1 italic">
+                            <PlusCircle className="h-3.5 w-3.5 text-blue-500" />
+                            {extraChargesLabel || 'Extra Charges'}
+                          </span>
+                          <span>+₹{extraCharges.toFixed(2)}</span>
+                        </motion.div>
+                      )}
+  
+                      {enableGST && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          className="flex justify-between text-sm text-foreground/70 dark:text-slate-400"
+                        >
+                          <span>GST (18%)</span>
+                          <span>+₹{gstAmount.toFixed(2)}</span>
+                        </motion.div>
+                      )}
                   </AnimatePresence>
 
-                  <div className="mt-4 p-4 rounded-xl bg-slate-900 dark:bg-primary text-white shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                  <div className="mt-4 p-5 rounded-2xl bg-primary text-white shadow-2xl transition-all duration-300 hover:scale-[1.03] ring-4 ring-primary/10">
                     <div className="flex justify-between items-center">
                       <div>
-                         <span className="text-xs uppercase tracking-widest font-bold opacity-70">Payable Amount</span>
-                         {isExpressOrder && <p className="text-[10px] text-amber-300 font-bold uppercase">Express Order</p>}
+                         <span className="text-[10px] uppercase tracking-[0.2em] font-black opacity-80">Payable Amount</span>
+                         {isExpressOrder && <p className="text-[10px] text-amber-300 font-black uppercase mt-0.5 tracking-wider">Express Order</p>}
                       </div>
-                      <span className="text-2xl font-black">₹{totalAmount.toFixed(2)}</span>
+                      <span className="text-3xl font-black tabular-nums">₹{totalAmount.toFixed(2)}</span>
                     </div>
                   </div>
 

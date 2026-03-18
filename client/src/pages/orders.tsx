@@ -781,27 +781,70 @@ function OrdersComponent() {
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
     const now = new Date();
-    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    
+    // Growth calculation helper
+    const getGrowth = (current: number, period: 'month' | 'week' | 'day') => {
+      let pastDate = new Date();
+      let label = "";
+      
+      if (period === 'month') {
+        pastDate.setMonth(now.getMonth() - 1);
+        label = "from last month";
+      } else if (period === 'week') {
+        pastDate.setDate(now.getDate() - 7);
+        label = "from last week";
+      } else {
+        pastDate.setDate(now.getDate() - 1);
+        label = "from yesterday";
+      }
 
-    const thisMonthOrders = filteredOrders.filter(o => new Date(o.createdAt || now) >= startOfThisMonth);
-    const lastMonthOrders = filteredOrders.filter(o => {
-      const d = new Date(o.createdAt || now);
-      return d >= startOfLastMonth && d < startOfThisMonth;
-    });
+      const pastOrders = orders.filter(o => new Date(o.createdAt || now) < pastDate && new Date(o.createdAt || now) >= new Date(pastDate.getTime() - (now.getTime() - pastDate.getTime())));
+      
+      // Simplify: Let's use a more robust comparison logic similar to AdminDashboard
+      const getPeriodStats = (startDate: Date, endDate: Date) => {
+        const periodOrders = orders.filter(o => {
+          const d = new Date(o.createdAt || now);
+          return d >= startDate && d < endDate;
+        });
+        return {
+          count: periodOrders.length,
+          revenue: periodOrders.reduce((sum, o) => sum + safeParseFloat(o.totalAmount), 0)
+        };
+      };
 
-    const thisMonthRevenue = thisMonthOrders.reduce((sum, order) => sum + safeParseFloat(order.totalAmount), 0);
-    const lastMonthRevenue = lastMonthOrders.reduce((sum, order) => sum + safeParseFloat(order.totalAmount), 0);
+      // Current Period (Last 30 days, 7 days, or 1 day)
+      const currentMonth = getPeriodStats(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000), now);
+      const lastMonth = getPeriodStats(new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000), new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
+      
+      const currentWeek = getPeriodStats(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000), now);
+      const lastWeek = getPeriodStats(new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000), new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+      
+      const currentDay = getPeriodStats(new Date(now.getTime() - 24 * 60 * 60 * 1000), now);
+      const lastDay = getPeriodStats(new Date(now.getTime() - 48 * 24 * 60 * 60 * 1000), new Date(now.getTime() - 24 * 60 * 60 * 1000));
 
-    const thisMonthCount = thisMonthOrders.length;
-    const lastMonthCount = lastMonthOrders.length;
+      // Try Month -> Week -> Day
+      if (lastMonth.count > 0) return { 
+        orders: ((currentMonth.count - lastMonth.count) / lastMonth.count) * 100,
+        revenue: lastMonth.revenue > 0 ? ((currentMonth.revenue - lastMonth.revenue) / lastMonth.revenue) * 100 : 0,
+        label: "from last month"
+      };
+      
+      if (lastWeek.count > 0) return {
+        orders: ((currentWeek.count - lastWeek.count) / lastWeek.count) * 100,
+        revenue: lastWeek.revenue > 0 ? ((currentWeek.revenue - lastWeek.revenue) / lastWeek.revenue) * 100 : 0,
+        label: "from last week"
+      };
+      
+      if (lastDay.count > 0) return {
+        orders: ((currentDay.count - lastDay.count) / lastDay.count) * 100,
+        revenue: lastDay.revenue > 0 ? ((currentDay.revenue - lastDay.revenue) / lastDay.revenue) * 100 : 0,
+        label: "from yesterday"
+      };
 
-    const ordersChange = lastMonthCount > 0 ? ((thisMonthCount - lastMonthCount) / lastMonthCount) * 100 : 0;
-    const revenueChange = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
+      return null;
+    };
 
-    const thisAvg = thisMonthCount > 0 ? thisMonthRevenue / thisMonthCount : 0;
-    const lastAvg = lastMonthCount > 0 ? lastMonthRevenue / lastMonthCount : 0;
-    const avgChange = lastAvg > 0 ? ((thisAvg - lastAvg) / lastAvg) * 100 : 0;
+    const growth = getGrowth(totalOrders, 'month');
 
     return {
       totalOrders,
@@ -810,11 +853,11 @@ function OrdersComponent() {
       pendingOrders,
       processingOrders,
       avgOrderValue,
-      ordersChange,
-      revenueChange,
-      avgChange,
+      ordersChange: growth?.orders ?? null,
+      revenueChange: growth?.revenue ?? null,
+      comparisonLabel: growth?.label ?? "No comparison data"
     };
-  }, [filteredOrders]);
+  }, [filteredOrders, orders]);
 
   // ... (inside component)
 
@@ -1126,8 +1169,8 @@ function OrdersComponent() {
         <div onClick={(e) => e.stopPropagation()} className="flex justify-center">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <MoreHorizontal className="h-4 w-4" />
+              <Button variant="secondary" size="sm" className="h-9 w-9 p-0 shadow-sm border hover:bg-accent transition-colors">
+                <MoreHorizontal className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -1245,14 +1288,19 @@ function OrdersComponent() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Orders</p>
                   <p className="text-xl sm:text-3xl font-bold mt-2 truncate">{stats.totalOrders}</p>
-                  <div className={cn("flex items-center gap-1 mt-2 text-sm", stats.ordersChange < 0 ? "text-red-500" : "text-green-600")}>
-                    {stats.ordersChange < 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
-                    <span className="hidden sm:inline">
-                      {stats.ordersChange !== 0 ? `${stats.ordersChange > 0 ? '+' : ''}${stats.ordersChange.toFixed(1)}% from last month` : 'No change'}
-                    </span>
-                    <span className="sm:hidden">
-                      {stats.ordersChange !== 0 ? `${stats.ordersChange > 0 ? '+' : ''}${stats.ordersChange.toFixed(1)}%` : '-'}
-                    </span>
+                  <div className={cn("flex items-center gap-1 mt-2 text-sm", (stats.ordersChange ?? 0) < 0 ? "text-red-500" : "text-green-600")}>
+                    {stats.ordersChange !== null && (
+                      <>
+                        {(stats.ordersChange ?? 0) < 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+                        <span className="hidden sm:inline">
+                          {`${(stats.ordersChange ?? 0) > 0 ? '+' : ''}${(stats.ordersChange ?? 0).toFixed(1)}% ${stats.comparisonLabel}`}
+                        </span>
+                        <span className="sm:hidden">
+                          {`${(stats.ordersChange ?? 0) > 0 ? '+' : ''}${(stats.ordersChange ?? 0).toFixed(1)}%`}
+                        </span>
+                      </>
+                    )}
+                    {stats.ordersChange === null && <span className="text-muted-foreground italic">No comparison data</span>}
                   </div>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1268,14 +1316,19 @@ function OrdersComponent() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
                   <p className="text-xl sm:text-3xl font-bold mt-2 truncate">{formatCurrency(stats.totalRevenue)}</p>
-                  <div className={cn("flex items-center gap-1 mt-2 text-sm", stats.revenueChange < 0 ? "text-red-500" : "text-green-600")}>
-                    {stats.revenueChange < 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
-                    <span className="hidden sm:inline">
-                      {stats.revenueChange !== 0 ? `${stats.revenueChange > 0 ? '+' : ''}${stats.revenueChange.toFixed(1)}% from last month` : 'No change'}
-                    </span>
-                    <span className="sm:hidden">
-                      {stats.revenueChange !== 0 ? `${stats.revenueChange > 0 ? '+' : ''}${stats.revenueChange.toFixed(1)}%` : '-'}
-                    </span>
+                  <div className={cn("flex items-center gap-1 mt-2 text-sm", (stats.revenueChange ?? 0) < 0 ? "text-red-500" : "text-green-600")}>
+                    {stats.revenueChange !== null && (
+                      <>
+                        {(stats.revenueChange ?? 0) < 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+                        <span className="hidden sm:inline">
+                          {`${(stats.revenueChange ?? 0) > 0 ? '+' : ''}${(stats.revenueChange ?? 0).toFixed(1)}% ${stats.comparisonLabel}`}
+                        </span>
+                        <span className="sm:hidden">
+                          {`${(stats.revenueChange ?? 0) > 0 ? '+' : ''}${(stats.revenueChange ?? 0).toFixed(1)}%`}
+                        </span>
+                      </>
+                    )}
+                    {stats.revenueChange === null && <span className="text-muted-foreground italic">No comparison data</span>}
                   </div>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-accent/10 flex items-center justify-center">
@@ -1291,14 +1344,9 @@ function OrdersComponent() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Avg Order Value</p>
                   <p className="text-xl sm:text-3xl font-bold mt-2 truncate">{formatCurrency(stats.avgOrderValue)}</p>
-                  <div className={cn("flex items-center gap-1 mt-2 text-sm", stats.avgChange < 0 ? "text-red-500" : "text-blue-600")}>
-                    {stats.avgChange < 0 ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
-                    <span className="hidden sm:inline">
-                      {stats.avgChange !== 0 ? `${stats.avgChange > 0 ? '+' : ''}${stats.avgChange.toFixed(1)}% from last month` : 'No change'}
-                    </span>
-                    <span className="sm:hidden">
-                      {stats.avgChange !== 0 ? `${stats.avgChange > 0 ? '+' : ''}${stats.avgChange.toFixed(1)}%` : '-'}
-                    </span>
+                  <div className="flex items-center gap-1 mt-2 text-sm text-blue-600">
+                    <TrendingUp className="h-4 w-4" />
+                    <span>Per order average</span>
                   </div>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-blue-100 flex items-center justify-center">
@@ -1814,18 +1862,20 @@ function OrdersComponent() {
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-lg border bg-background overflow-hidden h-[600px] flex flex-col">
-                      <div className="h-full overflow-x-auto scroll-smooth overscroll-x-contain">
-                        <div className={cn(ordersTableMinWidth, "h-full flex flex-col")}>
-                          {OrderHeaders}
+                    <div className="rounded-lg border bg-background overflow-hidden h-[600px] flex flex-col relative">
+                      <div className="flex-1 overflow-auto scroll-smooth overscroll-x-contain">
+                        <div className={cn(ordersTableMinWidth, "flex flex-col min-h-full")}>
+                          <div className="sticky top-0 z-20 bg-background shadow-sm">
+                            {OrderHeaders}
+                          </div>
                           <div className="flex-1">
                             <VirtualScroll
                               items={filteredOrders}
-                              itemHeight={60}
+                              itemHeight={64}
                               containerHeight={virtualTableBodyHeight}
                               renderItem={renderOrderRow}
                               emptyMessage="No orders found matching your criteria"
-                              className="overflow-y-auto scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent"
+                              className="scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent"
                             />
                           </div>
                         </div>

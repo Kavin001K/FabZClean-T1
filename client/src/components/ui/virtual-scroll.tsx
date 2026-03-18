@@ -71,31 +71,25 @@ export function VirtualScroll<T>({
             right: 0
           }}
         >
-          <AnimatePresence>
-            {loading ? (
-              <div className="flex items-center justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          {loading ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : visibleItems.length === 0 ? (
+            <div className="flex items-center justify-center p-8 text-muted-foreground">
+              {emptyMessage}
+            </div>
+          ) : (
+            visibleItems.map((item, index) => (
+              <div
+                key={visibleRange.start + index}
+                style={{ height: itemHeight }}
+                className="flex items-center"
+              >
+                {renderItem(item, visibleRange.start + index)}
               </div>
-            ) : visibleItems.length === 0 ? (
-              <div className="flex items-center justify-center p-8 text-muted-foreground">
-                {emptyMessage}
-              </div>
-            ) : (
-              visibleItems.map((item, index) => (
-                <motion.div
-                  key={visibleRange.start + index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.2 }}
-                  style={{ height: itemHeight }}
-                  className="flex items-center"
-                >
-                  {renderItem(item, visibleRange.start + index)}
-                </motion.div>
-              ))
-            )}
-          </AnimatePresence>
+            ))
+          )}
         </div>
       </div>
     </div>
