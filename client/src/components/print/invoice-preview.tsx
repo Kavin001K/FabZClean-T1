@@ -177,6 +177,61 @@ export default function InvoicePreview({
           </div>
         )}
 
+        {/* Payment Breakdown (Wallet / Cash / Credit Split) */}
+        {invoiceData.paymentBreakdown && (invoiceData.paymentBreakdown.walletDeducted > 0 || invoiceData.paymentBreakdown.creditOutstanding > 0) && (
+          <div>
+            <h3 className="font-semibold text-lg mb-2">Payment Breakdown</h3>
+            <div className="space-y-2 rounded-lg border p-4 bg-muted/30">
+              {invoiceData.paymentBreakdown.walletDeducted > 0 && (
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-700">WALLET</Badge>
+                    <span className="text-sm">Deducted from Wallet</span>
+                  </div>
+                  <span className="font-semibold text-purple-600">−{formatCurrency(invoiceData.paymentBreakdown.walletDeducted)}</span>
+                </div>
+              )}
+              {invoiceData.paymentBreakdown.cashPaid > 0 && (
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="bg-green-100 text-green-700">{invoiceData.paymentBreakdown.paymentMethod || 'CASH'}</Badge>
+                    <span className="text-sm">Paid</span>
+                  </div>
+                  <span className="font-semibold text-green-600">−{formatCurrency(invoiceData.paymentBreakdown.cashPaid)}</span>
+                </div>
+              )}
+              {invoiceData.paymentBreakdown.creditOutstanding > 0 && (
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="bg-amber-100 text-amber-700">CREDIT</Badge>
+                    <span className="text-sm">Added to Outstanding</span>
+                  </div>
+                  <span className="font-bold text-amber-600">{formatCurrency(invoiceData.paymentBreakdown.creditOutstanding)}</span>
+                </div>
+              )}
+              {invoiceData.paymentBreakdown.creditOutstanding > 0 && (
+                <>
+                  <Separator />
+                  <div className="flex justify-between items-center bg-amber-50 rounded-md p-3 border border-amber-200">
+                    <div>
+                      <p className="text-xs font-semibold text-amber-800">CUSTOMER OUTSTANDING BALANCE</p>
+                      {invoiceData.paymentBreakdown.previousOutstanding > 0 && (
+                        <p className="text-xs text-amber-600">Previous: {formatCurrency(invoiceData.paymentBreakdown.previousOutstanding)}</p>
+                      )}
+                    </div>
+                    <span className="text-lg font-bold text-amber-800">{formatCurrency(invoiceData.paymentBreakdown.newOutstanding)}</span>
+                  </div>
+                </>
+              )}
+              {invoiceData.paymentBreakdown.creditOutstanding === 0 && (
+                <div className="flex justify-center p-2 bg-green-50 rounded-md border border-green-200">
+                  <span className="text-sm font-bold text-green-600">✅ FULLY PAID</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Notes */}
         {invoiceData.notes && (
           <div>

@@ -35,6 +35,14 @@ interface InvoiceData {
     isExpressOrder?: boolean;
     fulfillmentType?: 'pickup' | 'delivery';
     deliveryAddress?: string | any;
+    paymentBreakdown?: {
+        walletDeducted: number;
+        cashPaid: number;
+        creditOutstanding: number;
+        previousOutstanding: number;
+        newOutstanding: number;
+        paymentMethod: string;
+    };
 }
 
 // Self-contained utility functions
@@ -56,6 +64,7 @@ const SimpleInvoiceTemplate: React.FC<{ data: InvoiceData }> = ({ data }) => {
         isExpressOrder = false,
         fulfillmentType = 'pickup',
         deliveryAddress,
+        paymentBreakdown,
     } = data;
 
     // HARDCODED COMPANY DETAILS
@@ -271,6 +280,55 @@ const SimpleInvoiceTemplate: React.FC<{ data: InvoiceData }> = ({ data }) => {
                     </div>
                 </div>
             </div>
+
+            {/* Payment Summary Section */}
+            {paymentBreakdown && (paymentBreakdown.walletDeducted > 0 || paymentBreakdown.creditOutstanding > 0) && (
+                <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                    <h4 style={{ fontSize: '11px', fontWeight: 'bold', color: colors.secondary, textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '1px' }}>Payment Summary</h4>
+                    
+                    {paymentBreakdown.walletDeducted > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '12px' }}>
+                            <span style={{ color: '#6b7280' }}>💳 Wallet Deducted</span>
+                            <span style={{ fontWeight: '600', color: '#8b5cf6' }}>−{formatIndianCurrency(paymentBreakdown.walletDeducted)}</span>
+                        </div>
+                    )}
+                    {paymentBreakdown.cashPaid > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '12px' }}>
+                            <span style={{ color: '#6b7280' }}>💵 {paymentBreakdown.paymentMethod || 'Cash'} Paid</span>
+                            <span style={{ fontWeight: '600', color: '#16a34a' }}>−{formatIndianCurrency(paymentBreakdown.cashPaid)}</span>
+                        </div>
+                    )}
+                    {paymentBreakdown.creditOutstanding > 0 && (
+                        <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '12px' }}>
+                                <span style={{ color: '#6b7280' }}>📋 Outstanding (Credit)</span>
+                                <span style={{ fontWeight: '700', color: '#d97706' }}>{formatIndianCurrency(paymentBreakdown.creditOutstanding)}</span>
+                            </div>
+                            <div style={{
+                                marginTop: '8px',
+                                padding: '8px 10px',
+                                backgroundColor: '#fef3c7',
+                                borderRadius: '6px',
+                                border: '1px solid #fcd34d',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                fontSize: '11px',
+                            }}>
+                                <span style={{ color: '#92400e', fontWeight: '600' }}>Total Outstanding Balance</span>
+                                <span style={{ fontWeight: '800', color: '#92400e', fontSize: '14px', fontFamily: 'monospace' }}>
+                                    {formatIndianCurrency(paymentBreakdown.newOutstanding)}
+                                </span>
+                            </div>
+                        </>
+                    )}
+                    {paymentBreakdown.creditOutstanding === 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'center', padding: '6px', backgroundColor: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+                            <span style={{ fontSize: '12px', fontWeight: '700', color: '#16a34a' }}>✅ FULLY PAID</span>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Footer */}
             <div style={{ marginTop: '60px', textAlign: 'center', fontSize: '12px', color: colors.gray }}>

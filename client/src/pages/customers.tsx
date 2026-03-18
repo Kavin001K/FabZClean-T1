@@ -823,21 +823,23 @@ export default function Customers() {
                             </div>
                           </div>
 
-                          {/* Stats */}
-                          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
-                            <div>
-                              <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Orders</div>
-                              <div className="text-2xl font-bold text-primary">
-                                {customer.totalOrders || 0}
+                          {/* Stats - Only show if they have orders */}
+                          {(customer.totalOrders || 0) > 0 && (
+                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
+                              <div>
+                                <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Orders</div>
+                                <div className="text-2xl font-bold text-primary">
+                                  {customer.totalOrders || 0}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">LTV</div>
+                                <div className="text-2xl font-bold text-primary">
+                                  ₹{totalSpent.toFixed(0)}
+                                </div>
                               </div>
                             </div>
-                            <div>
-                              <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">LTV</div>
-                              <div className="text-2xl font-bold text-primary">
-                                ₹{totalSpent.toFixed(0)}
-                              </div>
-                            </div>
-                          </div>
+                          )}
 
                           <div className="flex items-center justify-between text-sm pt-3 border-t border-white/5">
                             <div className="flex items-center gap-2 text-muted-foreground">

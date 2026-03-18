@@ -48,6 +48,14 @@ interface InvoiceData {
   isExpressOrder?: boolean;
   fulfillmentType?: 'pickup' | 'delivery';
   deliveryAddress?: string | any;
+  paymentBreakdown?: {
+    walletDeducted: number;
+    cashPaid: number;
+    creditOutstanding: number;
+    previousOutstanding: number;
+    newOutstanding: number;
+    paymentMethod: string;
+  };
 }
 
 // Utility functions
@@ -126,6 +134,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
     isExpressOrder = false,
     fulfillmentType = 'pickup',
     deliveryAddress: explicitDeliveryAddress,
+    paymentBreakdown,
   } = data;
 
   // Parse customer address
@@ -746,6 +755,130 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
             </div>
           </div>
         </div>
+
+        {/* Payment Summary Section — shows wallet/cash/credit split */}
+        {paymentBreakdown && (paymentBreakdown.walletDeducted > 0 || paymentBreakdown.creditOutstanding > 0) && (
+          <div style={{
+            marginTop: '25px',
+            padding: '20px',
+            borderRadius: '10px',
+            border: `1px solid ${colors.border}`,
+            background: colors.background,
+          }}>
+            <h3 style={{
+              fontSize: '11px',
+              fontWeight: '700',
+              color: colors.primary,
+              textTransform: 'uppercase',
+              letterSpacing: '1.5px',
+              margin: '0 0 15px 0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}>
+              <span style={{ width: '4px', height: '12px', background: colors.accent, borderRadius: '2px' }}></span>
+              Payment Summary
+            </h3>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {/* Invoice Total */}
+              <div style={{
+                padding: '12px',
+                borderRadius: '8px',
+                border: `1px solid ${colors.border}`,
+                background: colors.white,
+              }}>
+                <p style={{ fontSize: '10px', color: colors.textLight, margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Invoice Total</p>
+                <p style={{ fontSize: '16px', fontWeight: '700', color: colors.dark, margin: 0, fontFamily: 'monospace' }}>
+                  {formatIndianCurrency(grandTotal)}
+                </p>
+              </div>
+
+              {/* Payment Status */}
+              <div style={{
+                padding: '12px',
+                borderRadius: '8px',
+                border: `1px solid ${paymentBreakdown.creditOutstanding > 0 ? '#f59e0b40' : '#22c55e40'}`,
+                background: paymentBreakdown.creditOutstanding > 0 ? '#fffbeb' : '#f0fdf4',
+              }}>
+                <p style={{ fontSize: '10px', color: colors.textLight, margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</p>
+                <p style={{
+                  fontSize: '14px',
+                  fontWeight: '800',
+                  color: paymentBreakdown.creditOutstanding > 0 ? '#d97706' : '#16a34a',
+                  margin: 0,
+                  letterSpacing: '1px',
+                }}>
+                  {paymentBreakdown.creditOutstanding > 0 ? '📋 CREDIT' : '✅ PAID'}
+                </p>
+              </div>
+            </div>
+
+            {/* Payment Line Items */}
+            <div style={{ marginTop: '15px', borderTop: `1px dashed ${colors.border}`, paddingTop: '12px' }}>
+              {paymentBreakdown.walletDeducted > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px' }}>
+                  <span style={{ color: colors.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ background: '#8b5cf6', color: 'white', borderRadius: '4px', padding: '1px 6px', fontSize: '10px', fontWeight: '600' }}>WALLET</span>
+                    Deducted from Wallet
+                  </span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#8b5cf6' }}>−{formatIndianCurrency(paymentBreakdown.walletDeducted)}</span>
+                </div>
+              )}
+
+              {paymentBreakdown.cashPaid > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px' }}>
+                  <span style={{ color: colors.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ background: '#16a34a', color: 'white', borderRadius: '4px', padding: '1px 6px', fontSize: '10px', fontWeight: '600' }}>{paymentBreakdown.paymentMethod || 'CASH'}</span>
+                    Paid
+                  </span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#16a34a' }}>−{formatIndianCurrency(paymentBreakdown.cashPaid)}</span>
+                </div>
+              )}
+
+              {paymentBreakdown.creditOutstanding > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px' }}>
+                  <span style={{ color: colors.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ background: '#d97706', color: 'white', borderRadius: '4px', padding: '1px 6px', fontSize: '10px', fontWeight: '600' }}>CREDIT</span>
+                    Added to Outstanding
+                  </span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#d97706' }}>{formatIndianCurrency(paymentBreakdown.creditOutstanding)}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Outstanding Balance */}
+            {paymentBreakdown.creditOutstanding > 0 && (
+              <div style={{
+                marginTop: '12px',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                background: '#fef3c7',
+                border: '1px solid #fcd34d',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}>
+                <div>
+                  <p style={{ fontSize: '10px', color: '#92400e', margin: '0 0 2px 0', fontWeight: '600' }}>CUSTOMER OUTSTANDING BALANCE</p>
+                  {paymentBreakdown.previousOutstanding > 0 && (
+                    <p style={{ fontSize: '10px', color: '#a16207', margin: 0 }}>
+                      Previous: {formatIndianCurrency(paymentBreakdown.previousOutstanding)}
+                    </p>
+                  )}
+                </div>
+                <span style={{
+                  fontSize: '18px',
+                  fontWeight: '800',
+                  color: '#92400e',
+                  fontFamily: 'monospace',
+                }}>
+                  {formatIndianCurrency(paymentBreakdown.newOutstanding)}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Footer Bar */}

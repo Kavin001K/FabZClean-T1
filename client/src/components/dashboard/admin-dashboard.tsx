@@ -28,6 +28,10 @@ export default function AdminDashboard() {
         const now = new Date();
         const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const startOfThisWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const startOfLastWeek = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
 
         const thisMonthOrders = orders.filter((o: any) => new Date(o.createdAt || now) >= startOfThisMonth);
         const lastMonthOrders = orders.filter((o: any) => {
@@ -35,27 +39,62 @@ export default function AdminDashboard() {
             return d >= startOfLastMonth && d < startOfThisMonth;
         });
 
-        const thisMonthRevenue = thisMonthOrders.reduce((sum: number, order: any) => sum + parseFloat(order.totalAmount || 0), 0);
-        const lastMonthRevenue = lastMonthOrders.reduce((sum: number, order: any) => sum + parseFloat(order.totalAmount || 0), 0);
+        const thisWeekOrders = orders.filter((o: any) => new Date(o.createdAt || now) >= startOfThisWeek);
+        const lastWeekOrders = orders.filter((o: any) => {
+            const d = new Date(o.createdAt || now);
+            return d >= startOfLastWeek && d < startOfThisWeek;
+        });
+
+        const todayOrders = orders.filter((o: any) => new Date(o.createdAt || now) >= startOfToday);
+        const yesterdayOrders = orders.filter((o: any) => {
+            const d = new Date(o.createdAt || now);
+            return d >= startOfYesterday && d < startOfToday;
+        });
 
         const totalRevenue = orders.reduce((sum: number, order: any) => sum + parseFloat(order.totalAmount || 0), 0);
         const totalOrders = orders.length;
         const activeCustomers = new Set(orders.map((o: any) => o.customerId)).size;
 
-        const activeCustomersThisMonth = new Set(thisMonthOrders.map((o: any) => o.customerId)).size;
-        const activeCustomersLastMonth = new Set(lastMonthOrders.map((o: any) => o.customerId)).size;
+        const getGrowth = (current: number, month: number, week: number, yesterday: number) => {
+            if (month > 0) return { val: ((current - month) / month) * 100, label: 'month' };
+            if (week > 0) return { val: ((current - week) / week) * 100, label: 'week' };
+            if (yesterday > 0) return { val: ((current - yesterday) / yesterday) * 100, label: 'yesterday' };
+            return { val: null, label: null };
+        };
 
-        const revenueGrowth = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
-        const ordersGrowth = lastMonthOrders.length > 0 ? ((thisMonthOrders.length - lastMonthOrders.length) / lastMonthOrders.length) * 100 : 0;
-        const customersGrowth = activeCustomersLastMonth > 0 ? ((activeCustomersThisMonth - activeCustomersLastMonth) / activeCustomersLastMonth) * 100 : 0;
+        // Revenue Growth
+        const thisMonthRevenue = thisMonthOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
+        const lastMonthRevenue = lastMonthOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
+        const thisWeekRevenue = thisWeekOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
+        const lastWeekRevenue = lastWeekOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
+        const todayRevenue = todayOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
+        const yesterdayRevenue = yesterdayOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
+
+        const revGrowth = getGrowth(thisMonthRevenue, lastMonthRevenue, lastWeekRevenue, yesterdayRevenue);
+
+        // Orders Growth
+        const ordGrowth = getGrowth(thisMonthOrders.length, lastMonthOrders.length, lastWeekOrders.length, yesterdayOrders.length);
+
+        // Customers Growth
+        const activeThisMonth = new Set(thisMonthOrders.map((o: any) => o.customerId)).size;
+        const activeLastMonth = new Set(lastMonthOrders.map((o: any) => o.customerId)).size;
+        const activeThisWeek = new Set(thisWeekOrders.map((o: any) => o.customerId)).size;
+        const activeLastWeek = new Set(lastWeekOrders.map((o: any) => o.customerId)).size;
+        const activeToday = new Set(todayOrders.map((o: any) => o.customerId)).size;
+        const activeYesterday = new Set(yesterdayOrders.map((o: any) => o.customerId)).size;
+
+        const custGrowth = getGrowth(activeThisMonth, activeLastMonth, activeLastWeek, activeYesterday);
 
         return {
             totalRevenue,
-            revenueGrowth: parseFloat(revenueGrowth.toFixed(1)),
+            revenueGrowth: revGrowth.val !== null ? parseFloat(revGrowth.val.toFixed(1)) : null,
+            revenueLabel: revGrowth.label,
             totalOrders,
-            ordersGrowth: parseFloat(ordersGrowth.toFixed(1)),
+            ordersGrowth: ordGrowth.val !== null ? parseFloat(ordGrowth.val.toFixed(1)) : null,
+            ordersLabel: ordGrowth.label,
             activeCustomers,
-            customersGrowth: parseFloat(customersGrowth.toFixed(1)),
+            customersGrowth: custGrowth.val !== null ? parseFloat(custGrowth.val.toFixed(1)) : null,
+            customersLabel: custGrowth.label,
         };
     }, [orders]);
 
@@ -112,16 +151,22 @@ export default function AdminDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-xl sm:text-2xl font-bold truncate">{formatCurrency(stats.totalRevenue)}</div>
-                        <p className="text-xs text-muted-foreground flex items-center mt-1">
-                            {stats.revenueGrowth > 0 ? (
-                                <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
+                        <p className="text-xs text-muted-foreground flex items-center mt-1 h-5">
+                            {stats.revenueGrowth !== null ? (
+                                <>
+                                    {stats.revenueGrowth > 0 ? (
+                                        <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
+                                    ) : (
+                                        <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
+                                    )}
+                                    <span className={stats.revenueGrowth > 0 ? "text-green-500" : "text-red-500"}>
+                                        {Math.abs(stats.revenueGrowth)}%
+                                    </span>
+                                    <span className="ml-1 hidden sm:inline">from last {stats.revenueLabel}</span>
+                                </>
                             ) : (
-                                <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
+                                <span className="text-muted-foreground italic">No comparison data</span>
                             )}
-                            <span className={stats.revenueGrowth > 0 ? "text-green-500" : "text-red-500"}>
-                                {Math.abs(stats.revenueGrowth)}%
-                            </span>
-                            <span className="ml-1 hidden sm:inline">from last month</span>
                         </p>
                     </CardContent>
                 </Card>
@@ -133,16 +178,22 @@ export default function AdminDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-xl sm:text-2xl font-bold">{stats.totalOrders}</div>
-                        <p className="text-xs text-muted-foreground flex items-center mt-1">
-                            {stats.ordersGrowth > 0 ? (
-                                <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
+                        <p className="text-xs text-muted-foreground flex items-center mt-1 h-5">
+                            {stats.ordersGrowth !== null ? (
+                                <>
+                                    {stats.ordersGrowth > 0 ? (
+                                        <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
+                                    ) : (
+                                        <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
+                                    )}
+                                    <span className={stats.ordersGrowth > 0 ? "text-green-500" : "text-red-500"}>
+                                        {Math.abs(stats.ordersGrowth)}%
+                                    </span>
+                                    <span className="ml-1 hidden sm:inline">from last {stats.ordersLabel}</span>
+                                </>
                             ) : (
-                                <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
+                                <span className="text-muted-foreground italic">No comparison data</span>
                             )}
-                            <span className={stats.ordersGrowth > 0 ? "text-green-500" : "text-red-500"}>
-                                {Math.abs(stats.ordersGrowth)}%
-                            </span>
-                            <span className="ml-1">from last month</span>
                         </p>
                     </CardContent>
                 </Card>
@@ -154,16 +205,22 @@ export default function AdminDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-xl sm:text-2xl font-bold">{stats.activeCustomers}</div>
-                        <p className="text-xs text-muted-foreground flex items-center mt-1">
-                            {stats.customersGrowth > 0 ? (
-                                <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
+                        <p className="text-xs text-muted-foreground flex items-center mt-1 h-5">
+                            {stats.customersGrowth !== null ? (
+                                <>
+                                    {stats.customersGrowth > 0 ? (
+                                        <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
+                                    ) : (
+                                        <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
+                                    )}
+                                    <span className={stats.customersGrowth > 0 ? "text-green-500" : "text-red-500"}>
+                                        {Math.abs(stats.customersGrowth)}%
+                                    </span>
+                                    <span className="ml-1 hidden sm:inline">from last {stats.customersLabel}</span>
+                                </>
                             ) : (
-                                <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
+                                <span className="text-muted-foreground italic">No comparison data</span>
                             )}
-                            <span className={stats.customersGrowth > 0 ? "text-green-500" : "text-red-500"}>
-                                {Math.abs(stats.customersGrowth)}%
-                            </span>
-                            <span className="ml-1">from last month</span>
                         </p>
                     </CardContent>
                 </Card>

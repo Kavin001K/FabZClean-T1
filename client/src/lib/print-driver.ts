@@ -142,6 +142,15 @@ export interface LabelPrintData {
   footer?: string;
 }
 
+export interface PaymentBreakdown {
+  walletDeducted: number;
+  cashPaid: number;
+  creditOutstanding: number;
+  previousOutstanding: number;
+  newOutstanding: number;
+  paymentMethod: string;
+}
+
 export interface InvoicePrintData {
   invoiceNumber: string;
   invoiceDate: string;
@@ -182,6 +191,7 @@ export interface InvoicePrintData {
   status?: string;
   qrCode?: string;
   isExpressOrder?: boolean;
+  paymentBreakdown?: PaymentBreakdown;
 }
 
 // Import franchise config for company details
@@ -377,6 +387,34 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
   const branchCode = franchise.branchCode;
   const invoiceNumber = `${branchCode}-${order.orderNumber || order.id}`;
 
+  // Extract payment breakdown from order data
+  const walletDeducted = parseFloat(String(order.walletUsed || order.wallet_used || 0));
+  const creditOutstanding = parseFloat(String(order.creditUsed || order.credit_used || 0));
+  const advancePaid = parseFloat(String(order.advancePaid || order.advance_paid || 0));
+  // Cash paid is advance minus wallet (since advance_paid = cash + wallet)
+  const cashPaid = Math.max(0, advancePaid - walletDeducted);
+  // Customer outstanding balances (from order's embedded customer data or split data)
+  const previousOutstanding = parseFloat(String(
+    order.customerOutstandingBefore ?? order.customer_outstanding_before ??
+    order.split?.previousOutstanding ?? 0
+  ));
+  const newOutstanding = parseFloat(String(
+    order.customerOutstandingAfter ?? order.customer_outstanding_after ??
+    (previousOutstanding + creditOutstanding)
+  ));
+
+  const paymentBreakdown: PaymentBreakdown | undefined =
+    (walletDeducted > 0 || creditOutstanding > 0 || cashPaid > 0)
+      ? {
+          walletDeducted,
+          cashPaid,
+          creditOutstanding,
+          previousOutstanding,
+          newOutstanding,
+          paymentMethod: (order.paymentMethod || order.payment_method || 'Cash').toUpperCase(),
+        }
+      : undefined;
+
   return {
     invoiceNumber,
     invoiceDate: order.createdAt ? new Date(order.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
@@ -402,7 +440,8 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
       ? 'GST Invoice. Tax is calculated at applicable rates. Payment due within 30 days.'
       : 'Payment due within 30 days of invoice date.',
     status: order.status,
-    isExpressOrder: order.isExpressOrder || order.is_express_order || false
+    isExpressOrder: order.isExpressOrder || order.is_express_order || false,
+    paymentBreakdown,
   };
 }
 
@@ -778,7 +817,8 @@ export class PrintDriver {
         notes: data.notes,
         status: data.status,
         qrCode: qrCodeDataUrl,
-        isExpressOrder: data.isExpressOrder || false
+        isExpressOrder: data.isExpressOrder || false,
+        paymentBreakdown: data.paymentBreakdown,
       };
 
       console.log('✅ Data prepared');

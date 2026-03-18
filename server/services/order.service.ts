@@ -220,36 +220,32 @@ export class OrderService {
       // Create the order
       const order = await storage.createOrder(orderData);
 
-      // Update customer stats if customerId is present
-      if (order.customerId) {
-        try {
-          const customer = await storage.getCustomer(order.customerId);
-          if (customer) {
-            const currentTotalSpent = parseFloat(customer.totalSpent || '0');
-            const orderTotal = parseFloat(order.totalAmount || '0');
-
-            await storage.updateCustomer(order.customerId, {
-              totalOrders: (customer.totalOrders || 0) + 1,
-              totalSpent: (currentTotalSpent + orderTotal).toString(),
-              lastOrder: new Date().toISOString()
-            });
-            console.log(`✅ [OrderService] Updated stats for customer: ${order.customerId}`);
-          }
-        } catch (error) {
-          console.error(`❌ [OrderService] Failed to update customer stats:`, error);
-          // Don't fail the order creation if stats update fails
-        }
-      }
-
-      // Enrich with algorithm processing
-      const enrichedOrder = enrichOrderWithAlgorithms(order);
-
       console.log(`✅ [OrderService] Order created: ${order.id}`);
 
-      // WhatsApp confirmation is now handled by the client after PDF generation
-      // to ensure the invoice is attached.
+      // PERF: Defer customer stats update — not critical for the response
+      if (order.customerId) {
+        const custId = order.customerId;
+        const orderTotal = parseFloat(order.totalAmount || '0');
+        setImmediate(async () => {
+          try {
+            const customer = await storage.getCustomer(custId);
+            if (customer) {
+              const currentTotalSpent = parseFloat(customer.totalSpent || '0');
+              await storage.updateCustomer(custId, {
+                totalOrders: (customer.totalOrders || 0) + 1,
+                totalSpent: (currentTotalSpent + orderTotal).toString(),
+                lastOrder: new Date().toISOString()
+              });
+              console.log(`✅ [OrderService] Deferred stats update for customer: ${custId}`);
+            }
+          } catch (error) {
+            console.error(`❌ [OrderService] Deferred stats update failed:`, error);
+          }
+        });
+      }
 
-      return enrichedOrder;
+      // PERF: Skip algorithm enrichment on create path — only needed for list/display
+      return order;
     } catch (error) {
       console.error('❌ [OrderService] Error creating order:', error);
       if (error instanceof Error) {

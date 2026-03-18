@@ -637,6 +637,21 @@ export default function CreateOrder() {
           });
         }
 
+        // 9. Enrich with customer outstanding balance & checkout split for invoice display
+        {
+          const walletUsed = safeParseFloat(newOrder.walletUsed ?? newOrder.wallet_used ?? newOrder.split?.walletDebited ?? 0);
+          const creditUsed = safeParseFloat(newOrder.creditUsed ?? newOrder.credit_used ?? newOrder.split?.creditAssigned ?? 0);
+          const previousOutstanding = safeParseFloat(foundCustomer?.creditBalance ?? 0);
+
+          // Ensure wallet/credit fields are on the order for invoice generation
+          if (!newOrder.walletUsed && walletUsed > 0) newOrder.walletUsed = String(walletUsed);
+          if (!newOrder.creditUsed && creditUsed > 0) newOrder.creditUsed = String(creditUsed);
+
+          // Attach customer outstanding balance info for the invoice payment breakdown
+          newOrder.customerOutstandingBefore = previousOutstanding;
+          newOrder.customerOutstandingAfter = previousOutstanding + creditUsed;
+        }
+
         console.log('✅ Normalized Order for Dialog:', newOrder);
 
         setCreatedOrder(newOrder);
@@ -887,6 +902,21 @@ export default function CreateOrder() {
           variant: "destructive",
         });
         return;
+      }
+    } else {
+      // PERF: Fire-and-forget address update — don't block order creation
+      const existingFormattedAddress = foundCustomer ? parseAndFormatAddress(foundCustomer.address) : '';
+      const orderLevelAddress = deliveryAddress || customerAddress;
+      
+      if (orderLevelAddress && orderLevelAddress !== existingFormattedAddress && orderLevelAddress !== 'Address not provided') {
+         customersApi.update(currentCustomerId, {
+           address: { line1: orderLevelAddress }
+         }).then(() => {
+           console.log("Customer address updated automatically for future use");
+           queryClient.invalidateQueries({ queryKey: ["customers"] });
+         }).catch((e) => {
+           console.warn("Soft fail: could not auto-update customer address", e);
+         });
       }
     }
 
@@ -1438,24 +1468,27 @@ export default function CreateOrder() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Delivery Address</Label>
-                        <div className="relative">
+                        <div className="relative group">
                           <Textarea 
                             placeholder="Enter detailed delivery address..." 
                             value={deliveryAddress}
                             onChange={(e) => setDeliveryAddress(e.target.value)}
-                            className="min-h-[100px] bg-slate-50 border-slate-200 focus:ring-primary/20 transition-all text-sm leading-relaxed"
+                            className="min-h-[100px] bg-slate-50 border-slate-200 focus:ring-primary/20 transition-all text-sm leading-relaxed pr-12"
                           />
-                          {foundCustomer?.address && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="absolute bottom-2 right-2 h-7 text-[10px] font-bold bg-white/80 hover:bg-primary hover:text-white border shadow-sm transition-all text-slate-600"
-                              onClick={() => setDeliveryAddress(parseAndFormatAddress(foundCustomer.address))}
-                            >
-                              Use Customer Address
-                            </Button>
-                          )}
+                          <div className="absolute right-2 top-2 flex flex-col gap-2">
+                            {foundCustomer?.address && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 rounded-full border-primary/20 bg-white hover:bg-primary hover:text-white transition-all shadow-sm"
+                                onClick={() => setDeliveryAddress(parseAndFormatAddress(foundCustomer.address))}
+                                title="Fetch from customer profile"
+                              >
+                                <User className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="space-y-2">

@@ -483,11 +483,12 @@ router.post(
       } | null = null;
 
       // Credit override guard:
-      // allow new customers / customers without past due,
-      // enforce only when an existing unpaid balance is already above the configured limit.
+      // PERF: Pre-fetch customer once and reuse for both credit check and checkout
+      let prefetchedCustomer: any = null;
       if (orderData.customerId) {
         const customer = await storage.getCustomer(orderData.customerId);
         if (customer) {
+          prefetchedCustomer = customer;
           const totalAmount = parseAmount(orderData.totalAmount);
           const walletBalance = parseAmount((customer as any).walletBalanceCache || '0');
           const projectedWalletCover = useWalletAtCreate
@@ -554,6 +555,8 @@ router.post(
             useWallet: useWalletAtCreate,
             walletDebitRequested: requestedWalletDebitAtCreate,
             paymentMethod: orderData.paymentMethod || 'CASH',
+            // PERF: Pass pre-fetched customer to avoid duplicate DB lookups
+            prefetchedCustomer: prefetchedCustomer ? (storage as any).toSnakeCase?.(prefetchedCustomer) || prefetchedCustomer : undefined,
           }
         );
 
@@ -567,44 +570,63 @@ router.post(
         }
 
         checkoutData = checkoutResult.data;
-        order = await storage.getOrder(order.id) || order;
+        // PERF: Skip re-fetching order — merge checkout payment fields onto existing order
+        if (checkoutData) {
+          (order as any).paymentStatus = checkoutData.payment_status || (order as any).paymentStatus;
+          (order as any).advancePaid = checkoutData.split?.cashApplied != null
+            ? String(parseAmount(order.totalAmount))
+            : (order as any).advancePaid;
+        }
       }
 
-      // Log order creation
+      // PERF: Defer audit logging — not critical for the response
       if (req.employee) {
-        await AuthService.logAction(
-          req.employee.employeeId,
-          req.employee.username,
-          'create_order',
-          'order',
-          order.id,
-          {
-            orderNumber: order.orderNumber,
-            totalAmount: order.totalAmount,
-            customerName: order.customerName
-          },
-          req.ip || req.connection.remoteAddress,
-          req.get('user-agent')
-        );
+        const employeeData = { ...req.employee };
+        const ip = req.ip || req.connection.remoteAddress;
+        const ua = req.get('user-agent');
+        const orderRef = { id: order.id, orderNumber: order.orderNumber, totalAmount: order.totalAmount, customerName: order.customerName };
+        const creditMeta = creditOverrideMetadata;
+        const creditApproved = creditOverrideApproved;
 
-        if (creditOverrideApproved && creditOverrideMetadata) {
-          await AuthService.logAction(
-            req.employee.employeeId,
-            req.employee.username,
-            'approve_credit_override',
-            'customer',
-            creditOverrideMetadata.customerId,
-            {
-              orderId: order.id,
-              orderNumber: order.orderNumber,
-              outstandingBefore: creditOverrideMetadata.outstandingBefore,
-              creditLimit: creditOverrideMetadata.creditLimit,
-              projectedCreditRequired: creditOverrideMetadata.projectedCreditRequired,
-            },
-            req.ip || req.connection.remoteAddress,
-            req.get('user-agent')
-          );
-        }
+        setImmediate(async () => {
+          try {
+            await AuthService.logAction(
+              employeeData.employeeId,
+              employeeData.username,
+              'create_order',
+              'order',
+              orderRef.id,
+              {
+                orderNumber: orderRef.orderNumber,
+                totalAmount: orderRef.totalAmount,
+                customerName: orderRef.customerName
+              },
+              ip,
+              ua
+            );
+
+            if (creditApproved && creditMeta) {
+              await AuthService.logAction(
+                employeeData.employeeId,
+                employeeData.username,
+                'approve_credit_override',
+                'customer',
+                creditMeta.customerId,
+                {
+                  orderId: orderRef.id,
+                  orderNumber: orderRef.orderNumber,
+                  outstandingBefore: creditMeta.outstandingBefore,
+                  creditLimit: creditMeta.creditLimit,
+                  projectedCreditRequired: creditMeta.projectedCreditRequired,
+                },
+                ip,
+                ua
+              );
+            }
+          } catch (logErr) {
+            console.warn('Deferred audit log failed:', logErr);
+          }
+        });
       }
 
       const serializedOrder = serializeOrder(order);

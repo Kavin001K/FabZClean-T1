@@ -1003,6 +1003,9 @@ export class SupabaseStorage {
             useWallet?: boolean;
             walletDebitRequested?: number;
             paymentMethod?: string;
+            // PERF: Accept pre-fetched data to avoid duplicate DB lookups
+            prefetchedOrder?: any;
+            prefetchedCustomer?: any;
         }
     ): Promise<{ success: boolean; data?: any; error?: string }> {
         const useWallet = options?.useWallet ?? walletAmount > 0;
@@ -1010,17 +1013,25 @@ export class SupabaseStorage {
         const normalizedPaymentMethod = options?.paymentMethod || 'CASH';
 
         try {
-            // Bypass broken RPC entirely and implement canonical checkout in JS
-            const [orderRes, customerRes] = await Promise.all([
-                this.supabase.from('orders').select('*').eq('id', orderId).single(),
-                this.supabase.from('customers').select('*').eq('id', customerId).single()
-            ]);
+            // PERF: Use pre-fetched data if available, otherwise fetch in parallel
+            let order: any;
+            let customer: any;
 
-            if (orderRes.error || !orderRes.data) throw new Error('Order not found');
-            if (customerRes.error || !customerRes.data) throw new Error('Customer not found');
+            if (options?.prefetchedOrder && options?.prefetchedCustomer) {
+                order = options.prefetchedOrder;
+                customer = options.prefetchedCustomer;
+            } else {
+                const [orderRes, customerRes] = await Promise.all([
+                    this.supabase.from('orders').select('*').eq('id', orderId).single(),
+                    this.supabase.from('customers').select('*').eq('id', customerId).single()
+                ]);
 
-            const order = orderRes.data;
-            const customer = customerRes.data;
+                if (orderRes.error || !orderRes.data) throw new Error('Order not found');
+                if (customerRes.error || !customerRes.data) throw new Error('Customer not found');
+
+                order = orderRes.data;
+                customer = customerRes.data;
+            }
 
             const orderTotal = parseFloat(order.total_amount || '0');
             const advancePaid = parseFloat(order.advance_paid || '0');
@@ -1044,46 +1055,48 @@ export class SupabaseStorage {
             let walletTxId = null;
             if (walletDebited > 0) {
                 walletBalance -= walletDebited;
-                const { data: wTx, error: wErr } = await this.supabase.from('wallet_transactions').insert({
-                    transaction_id: `WLT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-                    customer_id: customerId,
-                    type: 'debit',
-                    amount: walletDebited,
-                    balance_before: walletBalance + walletDebited,
-                    balance_after: walletBalance,
-                    reference_order_id: orderId,
-                    verified_by_staff: recordedBy
-                }).select('id').single();
-                if (wErr) throw wErr;
-                walletTxId = wTx.id;
-
-                // Update customer wallet balance cache
-                await this.supabase.from('customers').update({ wallet_balance_cache: walletBalance }).eq('id', customerId);
+                // PERF: Parallelize wallet transaction insert + customer balance update
+                const [wTxResult] = await Promise.all([
+                    this.supabase.from('wallet_transactions').insert({
+                        transaction_id: `WLT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                        customer_id: customerId,
+                        type: 'debit',
+                        amount: walletDebited,
+                        balance_before: walletBalance + walletDebited,
+                        balance_after: walletBalance,
+                        reference_order_id: orderId,
+                        verified_by_staff: recordedBy
+                    }).select('id').single(),
+                    this.supabase.from('customers').update({ wallet_balance_cache: walletBalance }).eq('id', customerId)
+                ]);
+                if (wTxResult.error) throw wTxResult.error;
+                walletTxId = wTxResult.data.id;
             }
 
-            // --- RECALCULATE CUSTOMER ORDER METRICS (NATIVELY) ---
-            // Because we bypassed the `process_payment_checkout_v2` RPC, we must 
-            // natively recalculate the customer's total orders and total spent.
-            try {
-                const { data: ordCounts } = await this.supabase
-                    .from('orders')
-                    .select('total_amount, status')
-                    .eq('customer_id', customerId)
-                    .neq('status', 'cancelled');
-                
-                if (ordCounts && Array.isArray(ordCounts)) {
-                    const totalOrders = ordCounts.length;
-                    const totalSpent = ordCounts.reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0);
+            // PERF: Defer customer order metrics recalculation — not needed for the response
+            const cId = customerId;
+            setImmediate(async () => {
+                try {
+                    const { data: ordCounts } = await this.supabase
+                        .from('orders')
+                        .select('total_amount, status')
+                        .eq('customer_id', cId)
+                        .neq('status', 'cancelled');
+                    
+                    if (ordCounts && Array.isArray(ordCounts)) {
+                        const totalOrders = ordCounts.length;
+                        const totalSpent = ordCounts.reduce((sum: number, o: any) => sum + parseFloat(o.total_amount || '0'), 0);
 
-                    await this.supabase.from('customers').update({
-                        total_orders: totalOrders,
-                        total_spent: totalSpent,
-                        last_order: new Date().toISOString()
-                    }).eq('id', customerId);
+                        await this.supabase.from('customers').update({
+                            total_orders: totalOrders,
+                            total_spent: totalSpent,
+                            last_order: new Date().toISOString()
+                        }).eq('id', cId);
+                    }
+                } catch (metricsErr) {
+                    console.warn('[SupabaseStorage] Deferred customer metrics update failed:', metricsErr);
                 }
-            } catch (metricsErr) {
-                console.warn('[SupabaseStorage] Non-fatal error updating customer metrics in checkout:', metricsErr);
-            }
+            });
 
 
             // Note: We don't track CASH payments in wallet_transactions anymore as per simplified schema, 

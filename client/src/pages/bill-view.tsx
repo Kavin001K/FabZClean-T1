@@ -237,7 +237,15 @@ export default function BillView() {
                 qrCode: qrCodeUrl || undefined,
                 isExpressOrder: (order as any).isExpressOrder || (order as any).is_express_order || false,
                 fulfillmentType: order.fulfillmentType || 'pickup',
-                deliveryAddress: order.deliveryAddress || formattedAddress
+                deliveryAddress: order.deliveryAddress || formattedAddress,
+                paymentBreakdown: {
+                    walletDeducted: Number(order.walletUsed || 0),
+                    cashPaid: Math.max(0, advancePaid - Number(order.walletUsed || 0)),
+                    creditOutstanding: Number(order.creditUsed || 0),
+                    previousOutstanding: 0, // Not stored on order, will be omitted or 0
+                    newOutstanding: Number(order.creditUsed || 0), // At least show this order's credit
+                    paymentMethod: (order.paymentMethod || 'CASH').toUpperCase()
+                }
             };
 
             return <InvoiceTemplateIN data={invoiceData} />;
@@ -277,7 +285,15 @@ export default function BillView() {
                 qrCode: qrCodeUrl || undefined,
                 isExpressOrder: (order as any).isExpressOrder || (order as any).is_express_order || false,
                 fulfillmentType: order.fulfillmentType || 'pickup',
-                deliveryAddress: order.deliveryAddress || formattedAddress
+                deliveryAddress: order.deliveryAddress || formattedAddress,
+                paymentBreakdown: {
+                    walletDeducted: Number(order.walletUsed || 0),
+                    cashPaid: Math.max(0, advancePaid - Number(order.walletUsed || 0)),
+                    creditOutstanding: Number(order.creditUsed || 0),
+                    previousOutstanding: 0, 
+                    newOutstanding: Number(order.creditUsed || 0),
+                    paymentMethod: (order.paymentMethod || 'CASH').toUpperCase()
+                }
             };
 
             return <SimpleInvoiceTemplate data={invoiceData} />;
