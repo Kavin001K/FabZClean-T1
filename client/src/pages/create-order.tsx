@@ -1850,27 +1850,10 @@ export default function CreateOrder() {
               </CardContent>
             </Card>
 
-            {/* Session Activity Tracker */}
-            <Card className="mt-6 border-slate-200 dark:border-slate-800 bg-transparent shadow-none border-dashed text-center">
-              <CardHeader className="py-4">
-                <CardTitle className="text-sm flex items-center justify-center gap-2">
-                  <Clock className="h-4 w-4 text-primary" />
-                  Session Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-4 pb-4">
-                <div className="space-y-3">
-                  <div className="text-xs text-muted-foreground flex flex-col items-center justify-center py-6 opacity-60">
-                     <List className="h-5 w-5 mb-2 opacity-30" />
-                     <p>Completed orders will appear here</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
 
-          {/* Customer History Section */}
-          <AnimatePresence>
+
+            {/* Customer History Section */}
+            <AnimatePresence>
             {foundCustomer && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -2033,8 +2016,33 @@ export default function CreateOrder() {
               </motion.div>
             )}
           </AnimatePresence>
+          </motion.div>
+
+
         </div>
       </div >
+
+
+      {/* Bottom Page Area */}
+      <div className="mt-8">
+                {/* Session Activity Tracker */}
+        <Card className="mt-6 border-slate-200 dark:border-slate-800 bg-transparent shadow-none border-dashed text-center">
+          <CardHeader className="py-4">
+            <CardTitle className="text-sm flex items-center justify-center gap-2">
+              <Clock className="h-4 w-4 text-primary" />
+              Session Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground flex flex-col items-center justify-center py-6 opacity-60">
+                 <List className="h-5 w-5 mb-2 opacity-30" />
+                 <p>Completed orders will appear here</p>
+              </div>
+            </div>
+          </CardContent>
+            </Card>
+      </div>
 
       {/* Customer Creation Dialog */}
       < Dialog open={showCustomerDialog} onOpenChange={setShowCustomerDialog} >
