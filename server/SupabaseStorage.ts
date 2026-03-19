@@ -188,9 +188,13 @@ export class SupabaseStorage {
             'percentage_change_mom': 'percentageChangeMoM',
             'last_computed_at': 'lastComputedAt',
             'invoice_url': 'invoiceUrl',
-            'last_whatsapp_status': 'lastWhatsappStatus',
             'last_whatsapp_sent_at': 'lastWhatsappSentAt',
-            'whatsapp_message_count': 'whatsappMessageCount'
+            'whatsapp_message_count': 'whatsappMessageCount',
+            'avatar_url': 'avatarUrl',
+            'user_id': 'userId',
+            'landing_page': 'landingPage',
+            'compact_mode': 'compactMode',
+            'quick_actions': 'quickActions'
         };
 
         Object.entries(mappings).forEach(([snake, camel]) => {
@@ -385,6 +389,11 @@ export class SupabaseStorage {
             'factoryId': 'factory_id',
             // Employee: baseSalary maps to DB column 'salary'
             'baseSalary': 'salary',
+            'avatarUrl': 'avatar_url',
+            'userId': 'user_id',
+            'landingPage': 'landing_page',
+            'compactMode': 'compact_mode',
+            'quickActions': 'quick_actions'
         };
 
         // If key exists in mappings, use snake_case. If not, preserve original (e.g. 'status', 'email', 'name')
@@ -1110,15 +1119,50 @@ export class SupabaseStorage {
         const offset = (page - 1) * limit;
         let query = this.supabase.from('audit_logs').select('*', { count: 'exact' });
 
-        if (employeeId) query = query.eq('employee_id', employeeId);
-        if (action) query = query.eq('action', action);
-        if (entityType) query = query.eq('entity_type', entityType);
-        if (startDate) query = query.gte('created_at', startDate);
-        if (endDate) query = query.lte('created_at', endDate);
+        if (params.from) query = query.gte('created_at', params.from);
+        if (params.to) query = query.lte('created_at', params.to);
+        if (params.action) query = query.eq('action', params.action);
+        if (params.employeeId) query = query.eq('employee_id', params.employeeId);
 
-        const { data, error, count } = await query.order(sortBy, { ascending: sortOrder === 'asc' }).range(offset, offset + limit - 1);
+        const { data, error, count } = await query
+            .order('created_at', { ascending: false })
+            .range(params.offset || 0, (params.offset || 0) + (params.limit || 50) - 1);
+
         if (error) throw error;
-        return { data: data.map(item => this.mapDates(item)), count: count || 0 };
+        return {
+            data: data.map(item => this.mapDates(item)),
+            count: count || 0
+        };
+    }
+
+    // ======= USER SETTINGS =======
+    async getUserSettings(userId: string): Promise<any | undefined> {
+        const { data, error } = await this.supabase
+            .from('user_settings')
+            .select('*')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (error) {
+            console.error('[SupabaseStorage] getUserSettings Error:', error);
+            return undefined;
+        }
+        return data ? this.mapDates(data) : undefined;
+    }
+
+    async updateUserSettings(userId: string, data: any): Promise<any> {
+        const snakeData = this.toSnakeCase(data);
+        const { data: settings, error } = await this.supabase
+            .from('user_settings')
+            .upsert({ user_id: userId, ...snakeData, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('[SupabaseStorage] updateUserSettings Error:', error);
+            throw new Error(`Failed to update user settings: ${error.message}`);
+        }
+        return this.mapDates(settings);
     }
 
     // ======= SEARCH =======

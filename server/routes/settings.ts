@@ -180,4 +180,38 @@ router.post('/import', requireRole(['admin']), async (req: Request, res: Respons
     }
 });
 
+// --- User-Specific Settings ---
+
+// Get current user's settings
+router.get('/me', async (req: Request, res: Response) => {
+    try {
+        const userId = (req as any).employee?.id;
+        if (!userId) {
+            return res.status(401).json({ message: 'User not authenticated' });
+        }
+
+        const settings = await settingsService.getUserSettings(userId);
+        res.json({ success: true, settings: settings || {} });
+    } catch (error) {
+        console.error('Error fetching user settings:', error);
+        res.status(500).json({ message: 'Failed to fetch user settings' });
+    }
+});
+
+// Update current user's settings
+router.put('/me', async (req: Request, res: Response) => {
+    try {
+        const userId = (req as any).employee?.id;
+        if (!userId) {
+            return res.status(401).json({ message: 'User not authenticated' });
+        }
+
+        const updatedSettings = await settingsService.updateUserSettings(userId, req.body);
+        res.json({ success: true, settings: updatedSettings });
+    } catch (error) {
+        console.error('Error updating user settings:', error);
+        res.status(500).json({ message: 'Failed to update user settings' });
+    }
+});
+
 export default router;

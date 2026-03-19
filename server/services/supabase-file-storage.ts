@@ -1,0 +1,96 @@
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import sharp from 'sharp';
+
+
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+    console.warn("⚠️ Supabase credentials not found. SupabaseFileStorage will fail if used.");
+}
+
+const supabase = createClient(supabaseUrl || '', supabaseKey || '');
+
+/**
+ * Supabase File Storage Service
+ * Handles cloud file storage using Supabase Storage buckets
+ */
+export const SupabaseFileStorage = {
+    /**
+     * Upload a profile image to 'avatars' bucket
+     */
+    async saveProfileImage(userId: string | number, buffer: Buffer, originalName: string, mimeType: string): Promise<string> {
+        const fileExt = 'webp';
+        const fileName = `profile-${userId}-${Date.now()}.${fileExt}`;
+        const filePath = `profiles/${fileName}`;
+
+        // Optimize image using sharp (resize to 400x400 and convert to WebP)
+        const optimizedBuffer = await sharp(buffer)
+            .resize(400, 400, { fit: 'cover' })
+            .webp({ quality: 85 })
+            .toBuffer();
+
+        // Upload to 'avatars' bucket
+        const { data, error } = await supabase.storage
+            .from('avatars')
+            .upload(filePath, optimizedBuffer, {
+                contentType: 'image/webp',
+                upsert: true
+            });
+
+
+        if (error) {
+            console.error('❌ Supabase upload failed:', error);
+            // Fallback: If bucket doesn't exist, try to create it (might fail depending on permissions)
+            if (error.message.includes('bucket not found')) {
+                console.log('📦 Attempting to create "avatars" bucket...');
+                await supabase.storage.createBucket('avatars', { public: true });
+                // Retry upload after creation
+                const { data: retryData, error: retryError } = await supabase.storage
+                    .from('avatars')
+                    .upload(filePath, optimizedBuffer, { contentType: 'image/webp', upsert: true });
+
+                if (retryError) throw retryError;
+                return this.getPublicUrl('avatars', filePath);
+            }
+            throw new Error(`Upload failed: ${error.message}`);
+        }
+
+        return this.getPublicUrl('avatars', filePath);
+    },
+
+    /**
+     * Get the public URL for a file in a bucket
+     */
+    getPublicUrl(bucket: string, path: string): string {
+        const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+        return data.publicUrl;
+    },
+
+    /**
+     * Delete a file from a bucket
+     */
+    async deleteFile(publicUrl: string): Promise<boolean> {
+        try {
+            // Extract bucket and path from URL
+            // Format is usually: https://.../storage/v1/object/public/BUCKET/PATH
+            const urlObj = new URL(publicUrl);
+            const pathParts = urlObj.pathname.split('/storage/v1/object/public/');
+            if (pathParts.length < 2) return false;
+
+            const fullPath = pathParts[1];
+            const bucket = fullPath.split('/')[0];
+            const filePath = fullPath.substring(bucket.length + 1);
+
+            const { error } = await supabase.storage.from(bucket).remove([filePath]);
+            if (error) {
+                console.error(`❌ Failed to delete from Supabase: ${error.message}`);
+                return false;
+            }
+            return true;
+        } catch (err) {
+            console.error('❌ Error parsing URL for deletion:', err);
+            return false;
+        }
+    }
+};

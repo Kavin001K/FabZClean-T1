@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { AuthService } from '../auth-service';
 import { authMiddleware, auditMiddleware } from '../middleware/employee-auth';
-import { LocalStorage } from '../services/local-storage';
+import { SupabaseFileStorage } from '../services/supabase-file-storage';
+
 import multer from 'multer';
 
 const router = Router();
@@ -129,7 +130,7 @@ router.put('/update-profile', authMiddleware, auditMiddleware('update_profile'),
     // Update the current user's own profile
     const updatedEmployee = await AuthService.updateEmployee(
       req.employee!.id!,
-      { fullName, email, phone, address, profileImage },
+      { fullName, email, phone, address, avatarUrl: profileImage, profileImage },
       req.employee!.employeeId
     );
 
@@ -159,23 +160,24 @@ router.post('/upload-profile-image', authMiddleware, upload.single('image'), asy
 
     console.log(`[Auth] Uploading profile image for ${req.employee?.employeeId}, size: ${Math.round(originalSize / 1024)}KB`);
 
-    // 1. Save to Local Storage with optimization
-    const imageUrl = await LocalStorage.saveProfileImage(
+    // 1. Save to Supabase Cloud Storage
+    const imageUrl = await SupabaseFileStorage.saveProfileImage(
       employeeId,
       req.file.buffer,
-      req.file.originalname
+      req.file.originalname,
+      req.file.mimetype
     );
 
     // 2. Update employee record with new URL
     const updatedEmployee = await AuthService.updateEmployee(
       employeeId,
-      { profileImage: imageUrl },
+      { avatarUrl: imageUrl, profileImage: imageUrl },
       req.employee!.employeeId
     );
 
     if (!updatedEmployee) {
       // Clean up the saved file if DB update fails
-      await LocalStorage.deleteFile(imageUrl);
+      await SupabaseFileStorage.deleteFile(imageUrl);
       return res.status(404).json({ error: 'Employee not found' });
     }
 

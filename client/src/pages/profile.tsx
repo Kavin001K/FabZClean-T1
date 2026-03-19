@@ -8,9 +8,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { User, Mail, Phone, Lock, Shield, LogOut, Camera, Loader2 } from 'lucide-react';
+import { 
+  User, Mail, Phone, Lock, LogOut, 
+  Camera, Loader2, MapPin, ShieldCheck,
+  Save, X
+} from 'lucide-react';
 import { useLocation } from 'wouter';
 import { ImageCropperDialog } from '@/components/image-cropper-dialog';
+import { cn } from '@/lib/utils';
 
 export default function ProfilePage() {
     const { employee, signOut, refreshEmployee } = useAuth();
@@ -27,6 +32,7 @@ export default function ProfilePage() {
         fullName: employee?.fullName || '',
         email: employee?.email || '',
         phone: employee?.phone || '',
+        address: employee?.address || '',
     });
 
     const handleLogout = async () => {
@@ -55,11 +61,7 @@ export default function ProfilePage() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
-                body: JSON.stringify({
-                    fullName: formData.fullName,
-                    email: formData.email,
-                    phone: formData.phone,
-                }),
+                body: JSON.stringify(formData),
             });
 
             if (!res.ok) {
@@ -73,59 +75,38 @@ export default function ProfilePage() {
             });
             setIsEditing(false);
 
-            // Refresh employee data
             if (refreshEmployee) {
                 await refreshEmployee();
             }
         } catch (error: any) {
             toast({
-                title: 'Error',
+                title: 'Update Failed',
                 description: error.message || 'Failed to update profile',
                 variant: 'destructive',
             });
         }
     };
 
-    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
-        // Validate file type
         if (!file.type.startsWith('image/')) {
             toast({
                 title: 'Invalid File',
-                description: 'Please select an image file (JPG, PNG, etc.)',
+                description: 'Please select an image file.',
                 variant: 'destructive',
             });
             return;
         }
 
-        // Validate file size (max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-            toast({
-                title: 'File Too Large',
-                description: 'Please select an image smaller than 5MB',
-                variant: 'destructive',
-            });
-            return;
-        }
-
-        // Read file and open cropper
         const reader = new FileReader();
         reader.onloadend = () => {
             setSelectedImage(reader.result as string);
             setIsCropperOpen(true);
         };
-        reader.onerror = () => {
-            toast({
-                title: 'Error',
-                description: 'Failed to read image file',
-                variant: 'destructive',
-            });
-        };
         reader.readAsDataURL(file);
 
-        // Reset file input so same file can be selected again
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -133,79 +114,57 @@ export default function ProfilePage() {
 
     const handleCroppedImageUpload = async (croppedImageBase64: string) => {
         setIsUploading(true);
-
         try {
             const token = localStorage.getItem('employee_token');
-            // Convert Base64 to Blob/File
             const response = await fetch(croppedImageBase64);
             const blob = await response.blob();
             const file = new File([blob], "profile.jpg", { type: "image/jpeg" });
 
-            const formData = new FormData();
-            formData.append('image', file);
+            const uploadFormData = new FormData();
+            uploadFormData.append('image', file);
 
             const res = await fetch('/api/auth/upload-profile-image', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
-                body: formData,
+                body: uploadFormData,
             });
 
-            if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.error || 'Failed to upload image');
-            }
+            if (!res.ok) throw new Error('Failed to upload image');
 
             toast({
                 title: 'Photo Updated',
-                description: 'Your profile photo has been updated successfully.',
+                description: 'Your profile photo has been updated.',
             });
 
-            // Refresh employee data to get the new image
-            if (refreshEmployee) {
-                await refreshEmployee();
-            }
-
-            setSelectedImage(null);
+            if (refreshEmployee) await refreshEmployee();
         } catch (error: any) {
             toast({
-                title: 'Upload Failed',
-                description: error.message || 'Failed to upload profile photo',
+                title: 'Upload Error',
+                description: error.message,
                 variant: 'destructive',
             });
         } finally {
             setIsUploading(false);
+            setIsCropperOpen(false);
+            setSelectedImage(null);
         }
     };
 
     const handlePasswordChange = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const formDataObj = new FormData(e.currentTarget);
-        const currentPassword = formDataObj.get('currentPassword') as string;
-        const newPassword = formDataObj.get('newPassword') as string;
-        const confirmPassword = formDataObj.get('confirmPassword') as string;
+        const fd = new FormData(e.currentTarget);
+        const currentPassword = fd.get('currentPassword') as string;
+        const newPassword = fd.get('newPassword') as string;
+        const confirmPassword = fd.get('confirmPassword') as string;
 
         if (newPassword !== confirmPassword) {
-            toast({
-                title: 'Error',
-                description: 'New passwords do not match.',
-                variant: 'destructive',
-            });
-            return;
-        }
-
-        if (newPassword.length < 8) {
-            toast({
-                title: 'Error',
-                description: 'Password must be at least 8 characters long.',
-                variant: 'destructive',
-            });
+            toast({ title: 'Error', description: 'Passwords do not match.', variant: 'destructive' });
             return;
         }
 
         setIsChangingPassword(true);
-
         try {
             const token = localStorage.getItem('employee_token');
             const res = await fetch('/api/auth/change-password', {
@@ -214,27 +173,20 @@ export default function ProfilePage() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
-                body: JSON.stringify({
-                    currentPassword,
-                    newPassword,
-                }),
+                body: JSON.stringify({ currentPassword, newPassword }),
             });
-
-            const data = await res.json();
 
             if (!res.ok) {
-                throw new Error(data.error || data.message || 'Failed to change password');
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to change password');
             }
 
-            toast({
-                title: 'Password Changed',
-                description: 'Your password has been changed successfully.',
-            });
-            e.currentTarget.reset();
+            toast({ title: 'Success', description: 'Password changed successfully.' });
+            (e.target as HTMLFormElement).reset();
         } catch (error: any) {
             toast({
                 title: 'Error',
-                description: error.message || 'Failed to change password. Please check your current password.',
+                description: error.message,
                 variant: 'destructive',
             });
         } finally {
@@ -243,237 +195,218 @@ export default function ProfilePage() {
     };
 
     const getInitials = (name: string) => {
-        return name
-            .split(' ')
-            .map((n) => n[0])
-            .join('')
-            .toUpperCase()
-            .slice(0, 2);
+        return name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??';
     };
 
-    const getRoleBadgeColor = (role: string) => {
-        const colors: Record<string, string> = {
-            admin: 'bg-destructive',
-            franchise_manager: 'bg-primary',
-            factory_manager: 'bg-secondary',
-            employee: 'bg-accent',
-            driver: 'bg-muted text-foreground',
-        };
-        return colors[role] || 'bg-muted text-foreground';
-    };
-
-    const getRoleDisplayName = (role: string) => {
-        const names: Record<string, string> = {
-            admin: 'Administrator',
-            franchise_manager: 'Franchise Manager',
-            factory_manager: 'Factory Manager',
-            employee: 'Staff',
-            driver: 'Driver',
-            staff: 'Staff',
-        };
-        return names[role] || role?.replace('_', ' ').toUpperCase();
-    };
-
-    // Get profile image from employee data
-    const profileImage = (employee as any)?.profileImage;
+    const avatarSource = employee?.avatarUrl || employee?.profileImage;
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
-                <Button variant="destructive" onClick={handleLogout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Logout
-                </Button>
-            </div>
+        <div className="container-desktop min-h-screen py-8 pb-20 sm:pb-8 gradient-mesh">
+            <div className="mx-auto max-w-5xl space-y-8">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div className="space-y-1">
+                        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                            Account Settings
+                        </h1>
+                        <p className="text-muted-foreground">
+                            Manage your personal information and security preferences.
+                        </p>
+                    </div>
+                    <Button variant="ghost" onClick={handleLogout} className="text-destructive hover:bg-destructive/10 rounded-xl">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                    </Button>
+                </div>
 
-            <div className="grid gap-6 md:grid-cols-3">
-                {/* Profile Card */}
-                <Card className="md:col-span-1">
-                    <CardHeader>
-                        <CardTitle>Profile</CardTitle>
-                        <CardDescription>Your account information</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="flex flex-col items-center space-y-4">
-                            {/* Profile Image with Upload */}
-                            <div className="relative group">
-                                <Avatar className="h-24 w-24 ring-4 ring-background shadow-lg">
-                                    <AvatarImage src={profileImage || ''} alt={employee?.fullName} />
-                                    <AvatarFallback className="text-2xl bg-primary/10 text-primary">
-                                        {getInitials(employee?.fullName || employee?.username || 'U')}
-                                    </AvatarFallback>
-                                </Avatar>
+                <div className="grid gap-8 lg:grid-cols-12">
+                    {/* Left Column: Profile Summary */}
+                    <div className="lg:col-span-4 space-y-6">
+                        <Card className="glass border-none shadow-2xl overflow-hidden ring-1 ring-white/10">
+                            <CardContent className="p-8 flex flex-col items-center text-center space-y-6">
+                                <div className="relative group">
+                                    <div className="absolute -inset-1 bg-gradient-to-r from-primary to-accent rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+                                    <Avatar className="h-32 w-32 ring-4 ring-background shadow-2xl relative">
+                                        <AvatarImage src={avatarSource} className="object-cover" />
+                                        <AvatarFallback className="text-4xl bg-primary/10 text-primary font-bold">
+                                            {getInitials(employee?.fullName || employee?.username || '')}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={isUploading}
+                                        className="absolute bottom-1 right-1 p-2.5 bg-primary text-primary-foreground rounded-full shadow-lg hover:scale-110 transition-transform active:scale-95 z-10"
+                                    >
+                                        {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                                    </button>
+                                </div>
+                                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
 
-                                {/* Upload overlay */}
-                                <button
-                                    onClick={() => fileInputRef.current?.click()}
-                                    disabled={isUploading}
-                                    className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                >
-                                    {isUploading ? (
-                                        <Loader2 className="h-6 w-6 text-white animate-spin" />
-                                    ) : (
-                                        <Camera className="h-6 w-6 text-white" />
-                                    )}
-                                </button>
+                                <div className="space-y-1">
+                                    <h2 className="text-2xl font-bold tracking-tight">{employee?.fullName || 'Anonymous'}</h2>
+                                    <p className="text-muted-foreground font-medium">@{employee?.username || 'user'}</p>
+                                </div>
 
-                                {/* Hidden file input */}
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageUpload}
-                                    className="hidden"
-                                />
-                            </div>
+                                <Badge variant="secondary" className="px-4 py-1.5 rounded-full bg-primary/10 text-primary border-primary/20 text-xs font-semibold uppercase tracking-wider">
+                                    {employee?.role?.replace('_', ' ')}
+                                </Badge>
 
-                            <p className="text-xs text-muted-foreground">
-                                Click to upload photo (max 5MB)
-                            </p>
-
-                            <div className="text-center">
-                                <h3 className="text-xl font-semibold">{employee?.fullName || employee?.username}</h3>
-                                <p className="text-sm text-muted-foreground">@{employee?.username || employee?.employeeId}</p>
-                            </div>
-                            <Badge className={`${getRoleBadgeColor(employee?.role || '')}`}>
-                                {getRoleDisplayName(employee?.role || '')}
-                            </Badge>
-                        </div>
-
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2 text-sm">
-                                <Mail className="h-4 w-4 text-muted-foreground" />
-                                <span className="truncate">{employee?.email || 'No email set'}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                                <Phone className="h-4 w-4 text-muted-foreground" />
-                                <span>{employee?.phone || 'No phone set'}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                                <Shield className="h-4 w-4 text-muted-foreground" />
-                                <span>Employee ID: {employee?.employeeId}</span>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Settings Tabs */}
-                <Card className="md:col-span-2">
-                    <Tabs defaultValue="general" className="w-full">
-                        <CardHeader>
-                            <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="general">General</TabsTrigger>
-                                <TabsTrigger value="security">Security</TabsTrigger>
-                            </TabsList>
-                        </CardHeader>
-
-                        <CardContent>
-                            <TabsContent value="general" className="space-y-4">
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="fullName">Full Name</Label>
-                                        <div className="flex gap-2">
-                                            <Input
-                                                id="fullName"
-                                                value={formData.fullName}
-                                                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                                                disabled={!isEditing}
-                                            />
+                                <div className="w-full space-y-4 pt-4 text-left border-t border-white/5">
+                                    <div className="flex items-center gap-3 text-sm">
+                                        <div className="p-2 rounded-lg bg-white/5 text-muted-foreground">
+                                            <Mail className="h-4 w-4" />
                                         </div>
+                                        <span className="font-medium truncate">{employee?.email || 'No email set'}</span>
                                     </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="email">Email</Label>
-                                        <Input
-                                            id="email"
-                                            type="email"
-                                            value={formData.email}
-                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                            disabled={!isEditing}
-                                        />
+                                    <div className="flex items-center gap-3 text-sm">
+                                        <div className="p-2 rounded-lg bg-white/5 text-muted-foreground">
+                                            <Phone className="h-4 w-4" />
+                                        </div>
+                                        <span className="font-medium">{employee?.phone || 'No phone set'}</span>
                                     </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="phone">Phone</Label>
-                                        <Input
-                                            id="phone"
-                                            type="tel"
-                                            value={formData.phone}
-                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                            disabled={!isEditing}
-                                        />
-                                    </div>
-
-                                    <div className="flex gap-2">
-                                        {!isEditing ? (
-                                            <Button onClick={() => setIsEditing(true)}>
-                                                <User className="mr-2 h-4 w-4" />
-                                                Edit Profile
-                                            </Button>
-                                        ) : (
-                                            <>
-                                                <Button onClick={handleSave}>Save Changes</Button>
-                                                <Button variant="outline" onClick={() => setIsEditing(false)}>
-                                                    Cancel
-                                                </Button>
-                                            </>
-                                        )}
+                                    <div className="flex items-center gap-3 text-sm">
+                                        <div className="p-2 rounded-lg bg-white/5 text-muted-foreground">
+                                            <ShieldCheck className="h-4 w-4" />
+                                        </div>
+                                        <span className="font-medium">ID: {employee?.employeeId}</span>
                                     </div>
                                 </div>
-                            </TabsContent>
+                            </CardContent>
+                        </Card>
+                    </div>
 
-                            <TabsContent value="security" className="space-y-4">
-                                <form onSubmit={handlePasswordChange} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="currentPassword">Current Password</Label>
-                                        <Input
-                                            id="currentPassword"
-                                            name="currentPassword"
-                                            type="password"
-                                            required
-                                            placeholder="Enter current password"
-                                        />
-                                    </div>
+                    {/* Right Column: Tabbed Interface */}
+                    <div className="lg:col-span-8">
+                        <Tabs defaultValue="general" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2 p-1 bg-muted/50 rounded-2xl glass mb-6">
+                                <TabsTrigger value="general" className="rounded-xl py-2.5 data-[state=active]:shadow-lg">Profile Details</TabsTrigger>
+                                <TabsTrigger value="security" className="rounded-xl py-2.5 data-[state=active]:shadow-lg">Security</TabsTrigger>
+                            </TabsList>
 
-                                    <div className="space-y-2">
-                                        <Label htmlFor="newPassword">New Password</Label>
-                                        <Input
-                                            id="newPassword"
-                                            name="newPassword"
-                                            type="password"
-                                            required
-                                            minLength={8}
-                                            placeholder="Enter new password (min 8 characters)"
-                                        />
-                                    </div>
+                            <TabsContent value="general" className="animate-in fade-in slide-in-from-right-4 duration-300">
+                                <Card className="glass border-none shadow-xl ring-1 ring-white/10 overflow-hidden">
+                                    <CardHeader className="p-6 border-b border-white/5">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <CardTitle className="text-xl">General Information</CardTitle>
+                                                <CardDescription>Update your personal and contact details.</CardDescription>
+                                            </div>
+                                            {!isEditing && (
+                                                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="rounded-xl">
+                                                    <User className="mr-2 h-4 w-4" /> Edit
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="p-6 space-y-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <Label className="text-muted-foreground">Full Name</Label>
+                                                <Input
+                                                    value={formData.fullName}
+                                                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                                                    disabled={!isEditing}
+                                                    className="rounded-xl glass border-white/10 focus:ring-primary/50"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-muted-foreground">Email Address</Label>
+                                                <Input
+                                                    type="email"
+                                                    value={formData.email}
+                                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                                    disabled={!isEditing}
+                                                    className="rounded-xl glass border-white/10 focus:ring-primary/50"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-muted-foreground">Phone Number</Label>
+                                                <Input
+                                                    type="tel"
+                                                    value={formData.phone}
+                                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                    disabled={!isEditing}
+                                                    className="rounded-xl glass border-white/10 focus:ring-primary/50"
+                                                />
+                                            </div>
+                                            <div className="space-y-2 md:col-span-2">
+                                                <Label className="text-muted-foreground flex items-center gap-2">
+                                                    <MapPin className="h-4 w-4" /> Residential Address
+                                                </Label>
+                                                <Input
+                                                    value={formData.address}
+                                                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                                    disabled={!isEditing}
+                                                    placeholder="Enter your full address"
+                                                    className="rounded-xl glass border-white/10 focus:ring-primary/50"
+                                                />
+                                            </div>
+                                        </div>
 
-                                    <div className="space-y-2">
-                                        <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                                        <Input
-                                            id="confirmPassword"
-                                            name="confirmPassword"
-                                            type="password"
-                                            required
-                                            minLength={8}
-                                            placeholder="Confirm new password"
-                                        />
-                                    </div>
-
-                                    <Button type="submit" disabled={isChangingPassword}>
-                                        {isChangingPassword ? (
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <Lock className="mr-2 h-4 w-4" />
+                                        {isEditing && (
+                                            <div className="flex gap-3 pt-4 justify-end">
+                                                <Button variant="ghost" onClick={() => setIsEditing(false)} className="rounded-xl">
+                                                    <X className="mr-2 h-4 w-4" /> Cancel
+                                                </Button>
+                                                <Button onClick={handleSave} className="rounded-xl shadow-lg shadow-primary/20 px-8">
+                                                    <Save className="mr-2 h-4 w-4" /> Save Changes
+                                                </Button>
+                                            </div>
                                         )}
-                                        Change Password
-                                    </Button>
-                                </form>
+                                    </CardContent>
+                                </Card>
                             </TabsContent>
-                        </CardContent>
-                    </Tabs>
-                </Card>
+
+                            <TabsContent value="security" className="animate-in fade-in slide-in-from-right-4 duration-300">
+                                <Card className="glass border-none shadow-xl ring-1 ring-white/10 overflow-hidden">
+                                    <CardHeader className="p-6 border-b border-white/5">
+                                        <CardTitle className="text-xl">Security & Password</CardTitle>
+                                        <CardDescription>Secure your account with a strong password.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="p-6">
+                                        <form onSubmit={handlePasswordChange} className="space-y-6 max-w-md mx-auto py-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-muted-foreground">Current Password</Label>
+                                                <Input
+                                                    name="currentPassword"
+                                                    type="password"
+                                                    required
+                                                    className="rounded-xl glass border-white/10 focus:ring-primary/50"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-muted-foreground">New Password</Label>
+                                                <Input
+                                                    name="newPassword"
+                                                    type="password"
+                                                    required
+                                                    minLength={8}
+                                                    className="rounded-xl glass border-white/10 focus:ring-primary/50"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-muted-foreground">Confirm New Password</Label>
+                                                <Input
+                                                    name="confirmPassword"
+                                                    type="password"
+                                                    required
+                                                    minLength={8}
+                                                    className="rounded-xl glass border-white/10 focus:ring-primary/50"
+                                                />
+                                            </div>
+                                            <Button type="submit" disabled={isChangingPassword} className="w-full rounded-xl py-6 text-lg font-semibold shadow-xl shadow-primary/10">
+                                                {isChangingPassword ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Lock className="mr-2 h-5 w-5" />}
+                                                Update Password
+                                            </Button>
+                                        </form>
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+                        </Tabs>
+                    </div>
+                </div>
             </div>
+
             {/* Image Cropper Dialog */}
             {selectedImage && (
                 <ImageCropperDialog

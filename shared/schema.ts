@@ -269,6 +269,18 @@ export const employees = pgTable("employees", {
   notes: text("notes"),
   // Delivery partner per-order salary
   perOrderSalary: integer("per_order_salary").default(0),
+  avatarUrl: text("avatar_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const userSettings = pgTable("user_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  theme: text("theme", { enum: ["light", "dark", "system"] }).notNull().default("system"),
+  landingPage: text("landing_page").notNull().default("/dashboard"),
+  compactMode: boolean("compact_mode").notNull().default(false),
+  quickActions: jsonb("quick_actions").$type<string[]>().notNull().default(sql`'["new-order", "active-orders", "customer-search", "print-queue"]'::jsonb`),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -371,6 +383,8 @@ export const insertBarcodeSchema = createInsertSchema(barcodes);
 
 export const insertEmployeeSchema = createInsertSchema(employees);
 
+export const insertUserSettingsSchema = createInsertSchema(userSettings);
+
 export const insertDocumentSchema = createInsertSchema(documents);
 
 // Types
@@ -403,6 +417,9 @@ export type Barcode = typeof barcodes.$inferSelect;
 
 export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type Employee = typeof employees.$inferSelect;
+
+export type InsertUserSettings = z.infer<typeof insertUserSettingsSchema>;
+export type UserSettings = typeof userSettings.$inferSelect;
 
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;

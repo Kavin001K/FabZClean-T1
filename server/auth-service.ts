@@ -48,6 +48,9 @@ export interface AuthEmployee {
     qualifications?: string;
     notes?: string;
     address?: string;
+    avatarUrl?: string;
+    profileImage?: string;
+
     [key: string]: any;
 }
 
@@ -146,6 +149,8 @@ export class AuthService {
                 department: localEmployee.department,
                 storeId: localEmployee.franchise_id || localEmployee.franchiseId,
                 factoryId: localEmployee.factory_id || localEmployee.factoryId,
+                avatarUrl: localEmployee.avatarUrl || localEmployee.avatar_url,
+                profileImage: localEmployee.profileImage || localEmployee.profile_image,
             };
 
             // Log successful login - catch error so it doesn't block the actual login
@@ -363,6 +368,7 @@ export class AuthService {
             qualifications: string;
             notes: string;
             address: string;
+            avatarUrl: string;
             profileImage: string;
             // RBAC fields
             role: string;
@@ -395,6 +401,7 @@ export class AuthService {
         }
         if (data.email !== undefined) updateData.email = data.email;
         if (data.phone !== undefined) updateData.phone = data.phone;
+        if (data.avatarUrl !== undefined) updateData.avatarUrl = data.avatarUrl;
         if (data.profileImage !== undefined) updateData.profileImage = data.profileImage;
         // Handle both isActive (boolean) and status (string)
         if (data.isActive !== undefined) updateData.status = data.isActive ? 'active' : 'inactive';
@@ -477,7 +484,10 @@ export class AuthService {
             department: updatedEmployee.department,
             storeId: (updatedEmployee as any).franchiseId,
             factoryId: (updatedEmployee as any).factoryId,
+            avatarUrl: updatedEmployee.avatarUrl || updatedEmployee.avatar_url,
+            profileImage: updatedEmployee.profileImage || updatedEmployee.profile_image,
         };
+
     }
 
     /**
@@ -669,8 +679,11 @@ export class AuthService {
             qualifications: localEmployee.qualifications,
             notes: localEmployee.notes,
             salaryType: localEmployee.salaryType,
-            workingHours: localEmployee.workingHours
+            workingHours: localEmployee.workingHours,
+            avatarUrl: localEmployee.avatarUrl || localEmployee.avatar_url,
+            profileImage: localEmployee.profileImage || localEmployee.profile_image,
         };
+
     }
 
     /**
@@ -713,6 +726,7 @@ export class AuthService {
                 gender: emp.gender,
                 bloodGroup: emp.bloodGroup || emp.blood_group,
                 profileImage: emp.profileImage || emp.profile_image,
+                avatarUrl: emp.avatarUrl || emp.avatar_url,
                 // Banking
                 bankName: emp.bankName || emp.bank_name,
                 accountNumber: emp.accountNumber || emp.account_number,

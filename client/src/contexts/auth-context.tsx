@@ -28,6 +28,7 @@ interface Employee {
   notes?: string;
   address?: string;
   settings?: any;
+  avatarUrl?: string;
   profileImage?: string;
 }
 

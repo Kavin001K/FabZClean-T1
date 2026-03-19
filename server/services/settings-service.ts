@@ -282,6 +282,30 @@ class SettingsService {
   }
 
   /**
+   * Get settings for a specific user
+   */
+  async getUserSettings(userId: string): Promise<any> {
+    try {
+      return await (db as any).getUserSettings(userId);
+    } catch (error) {
+      console.error(`Error fetching user settings for ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update settings for a specific user
+   */
+  async updateUserSettings(userId: string, data: any): Promise<any> {
+    try {
+      return await (db as any).updateUserSettings(userId, data);
+    } catch (error) {
+      console.error(`Error updating user settings for ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Validate a setting value
    */
   private validateSetting(key: string, value: any): void {

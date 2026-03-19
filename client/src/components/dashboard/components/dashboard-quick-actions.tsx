@@ -71,11 +71,11 @@ export function DashboardQuickActions(_props: DashboardQuickActionsProps = {}) {
   const { settings } = useSettings();
   const [, setLocation] = useLocation();
 
-  // Get the quick action slots from settings
-  const quickActionSlots = settings?.quickActionSlots || ['new-order', 'active-orders', 'customer-search', 'services', 'print-queue'];
+  // Get the quick actions from settings
+  const quickActions = settings?.quickActions || ['new-order', 'active-orders', 'customer-search', 'services', 'print-queue'];
 
   // Build the list of enabled actions from settings
-  const enabledActions = quickActionSlots
+  const enabledActions = quickActions
     .map(id => {
       const config = ACTIONS_CONFIG[id];
       if (!config) {
@@ -86,11 +86,7 @@ export function DashboardQuickActions(_props: DashboardQuickActionsProps = {}) {
     })
     .filter((action): action is NonNullable<typeof action> => action !== null);
 
-  // Debug logging
-  if (settings?.debugMode) {
-    console.log('[DashboardQuickActions] Settings quick action slots:', quickActionSlots);
-    console.log('[DashboardQuickActions] Enabled actions:', enabledActions.map(a => a.id));
-  }
+
 
   // Fallback if no actions configured
   if (enabledActions.length === 0) {

@@ -128,6 +128,10 @@ export interface IStorage {
   // Audit Log methods
   createAuditLog(data: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(params: any): Promise<{ data: AuditLog[]; count: number }>;
+
+  // User Settings methods
+  getUserSettings(userId: string): Promise<any | undefined>;
+  updateUserSettings(userId: string, data: any): Promise<any>;
 }
 
 // ======= Export Supabase as the ONLY storage =======
