@@ -213,6 +213,20 @@ export const ordersApi = {
     return this.getAll({ search: query });
   },
 
+  async getByCustomerId(customerId: string): Promise<Order[]> {
+    try {
+      const response = await fetchData<{ data: Order[] } | Order[]>(`/orders/customer/${customerId}`);
+      // Handle wrapped response
+      if (response && typeof response === 'object' && 'data' in response) {
+        return response.data || [];
+      }
+      return Array.isArray(response) ? response : [];
+    } catch (error) {
+      console.error(`Failed to fetch orders for customer ${customerId}:`, error);
+      return [];
+    }
+  },
+
   async getPrintQueue(): Promise<Order[]> {
     try {
       const response = await fetchData<{ data?: Order[]; success?: boolean } | Order[]>('/orders/print-queue');

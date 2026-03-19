@@ -461,6 +461,15 @@ router.post(
         orderData.employeeId = req.employee.employeeId;
       }
 
+      // UUID safety check for franchiseId
+      const empFranchise = req.employee?.storeId || req.employee?.franchiseId;
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (empFranchise && uuidRegex.test(empFranchise)) {
+        orderData.franchiseId = empFranchise;
+      } else {
+        orderData.franchiseId = null;
+      }
+
       const requestedCashAtCreate = parseAmount(orderData.advancePaid);
       const requestedWalletDebitAtCreate = parseAmount(
         orderData.walletDebitRequested ?? orderData.walletAmount ?? orderData.walletUsed

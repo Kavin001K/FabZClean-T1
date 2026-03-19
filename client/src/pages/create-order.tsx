@@ -225,6 +225,20 @@ export default function CreateOrder() {
     return roundInvoiceAmount(Math.max(0, calculatedTotal));
   }, [subtotal, discountAmount, extraCharges, deliveryCharges, enableGST, gstAmount]);
 
+  // Wallet and Payable logic
+  const walletLimit = useMemo(() => {
+    return parseFloat(foundCustomer?.walletBalanceCache || '0');
+  }, [foundCustomer?.walletBalanceCache]);
+
+  const walletApplied = useMemo(() => {
+    if (!useWallet) return 0;
+    return Math.min(totalAmount, walletLimit);
+  }, [useWallet, totalAmount, walletLimit]);
+
+  const finalPayable = useMemo(() => {
+    return Math.max(0, totalAmount - walletApplied);
+  }, [totalAmount, walletApplied]);
+
   // Fetch services - only active ones
   const { data: servicesData, isLoading: servicesLoading, isError: servicesError } = useQuery<Service[]>({
     queryKey: ["services"],
@@ -264,22 +278,27 @@ export default function CreateOrder() {
     queryKey: ["customer-orders", foundCustomer?.id],
     queryFn: async () => {
       if (!foundCustomer?.id) return [];
-      if (!foundCustomer?.id) return [];
 
-      let orders: Order[] = [];
-
-      // search by phone (priority)
-      if (foundCustomer.phone) {
-        orders = await ordersApi.search(foundCustomer.phone);
-      } else if (foundCustomer.email) {
-        orders = await ordersApi.search(foundCustomer.email);
+      try {
+        // PERF: Priority endpoint: Fetch specifically by customerId for accuracy
+        // Fallback to phone search if needed, but and prioritize the ID endpoint
+        const responseData = await ordersApi.getByCustomerId(foundCustomer.id);
+        const orders = Array.isArray(responseData) ? responseData : [];
+        
+        // Final sanity sort for display
+        return orders
+          .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+          .slice(0, 10);
+      } catch (error) {
+        console.warn('⚠️ Fetching by ID failed, falling back to search', error);
+        // Fallback search by phone
+        let orders: Order[] = [];
+        if (foundCustomer.phone) orders = await ordersApi.search(foundCustomer.phone);
+        return orders
+          .filter(order => order.customerId === foundCustomer.id)
+          .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+          .slice(0, 10);
       }
-
-      // Filter strictly for this customer and sort
-      return orders
-        .filter(order => order.customerId === foundCustomer.id)
-        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-        .slice(0, 10); // Last 10 orders
     },
     enabled: !!foundCustomer?.id,
   });
@@ -1901,12 +1920,27 @@ export default function CreateOrder() {
                   <div className="mt-4 p-5 rounded-2xl bg-primary text-white shadow-2xl transition-all duration-300 hover:scale-[1.03] ring-4 ring-primary/10">
                     <div className="flex justify-between items-center">
                       <div>
-                         <span className="text-[10px] uppercase tracking-[0.2em] font-black opacity-80">Payable Amount</span>
+                         <span className="text-[10px] uppercase tracking-[0.2em] font-black opacity-80">{useWallet && walletApplied > 0 ? 'Balance Due' : 'Payable Amount'}</span>
                          {isExpressOrder && <p className="text-[10px] text-amber-300 font-black uppercase mt-0.5 tracking-wider">Express Order</p>}
                       </div>
-                      <span className="text-3xl font-black tabular-nums">₹{totalAmount.toFixed(2)}</span>
+                      <span className="text-3xl font-black tabular-nums">₹{finalPayable.toFixed(2)}</span>
                     </div>
                   </div>
+
+                  <AnimatePresence>
+                    {useWallet && walletApplied > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="mt-2 flex justify-between text-sm text-emerald-600 dark:text-emerald-400 font-bold px-1"
+                      >
+                        <span className="flex items-center gap-1">
+                          <CreditCard className="h-3.5 w-3.5" /> Wallet Applied
+                        </span>
+                        <span>-₹{walletApplied.toFixed(2)}</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   <AnimatePresence>
                     {advancePayment && parseFloat(advancePayment) > 0 && (
@@ -1945,7 +1979,7 @@ export default function CreateOrder() {
                     ) : (
                       <>
                         <CheckCircle className="mr-2 h-5 w-5" />
-                        Place Order • ₹{totalAmount.toFixed(0)}
+                        Place Order • ₹{Math.max(0, finalPayable - (parseFloat(advancePayment) || 0)).toFixed(0)}
                       </>
                     )}
                   </Button>

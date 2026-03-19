@@ -118,7 +118,7 @@ BEGIN
         v_order_payment_status,
         v_order_customer_id
     FROM orders
-    WHERE id = p_order_id
+    WHERE id = p_order_id::UUID
     FOR UPDATE;
 
     IF v_existing_order_id IS NULL THEN
@@ -246,7 +246,7 @@ BEGIN
             -v_remaining_amount,
             p_recorded_by,
             'ORDER',
-            p_order_id,
+            p_order_id::UUID,
             '[' || v_credit_tx_code || '] Auto order debit | req=' || v_request_key || ' | by=' || COALESCE(p_recorded_by_name, 'system'),
             p_recorded_by
         );
@@ -278,7 +278,7 @@ BEGIN
             v_payment_method_normalized,
             p_recorded_by,
             'PAYMENT',
-            p_order_id,
+            p_order_id::UUID,
             '[' || v_wallet_tx_code || '] Order payment received | req=' || v_request_key || ' | by=' || COALESCE(p_recorded_by_name, 'system'),
             p_recorded_by
         );
@@ -312,7 +312,7 @@ BEGIN
             ELSE payment_method
         END,
         updated_at = NOW()
-    WHERE id = p_order_id;
+    WHERE id = p_order_id::UUID;
 
     RETURN json_build_object(
         'success', true,
@@ -460,7 +460,7 @@ BEGIN
         credit_used = COALESCE(credit_used, 0) + v_credit_used,
         payment_status = v_payment_status,
         updated_at = NOW()
-    WHERE id = p_order_id;
+    WHERE id = p_order_id::UUID;
     
     RETURN json_build_object(
         'success', true, 

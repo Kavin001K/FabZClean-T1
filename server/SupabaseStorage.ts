@@ -35,6 +35,14 @@ export class SupabaseStorage {
         this.supabase = createClient(supabaseUrl || '', supabaseKey || '');
     }
 
+    private toUuidOrNull(value: unknown): string | null {
+        if (typeof value !== 'string') return null;
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(trimmed) ? trimmed : null;
+    }
+
     // Map DB snake_case to App camelCase
     private mapDates(record: any): any {
         if (!record) return record;
@@ -476,11 +484,21 @@ export class SupabaseStorage {
 
     // ======= CUSTOMERS =======
     async createCustomer(data: InsertCustomer): Promise<Customer> {
-        // Generate FZCMY sequence logic
-        const customers = await this.listCustomers();
+        // Generate FZCMY sequence logic from ALL customers (active + deleted)
+        // to avoid PK collisions with soft-deleted records.
+        const { data: allCustomers, error: listError } = await this.supabase
+            .from('customers')
+            .select('id');
+        
+        if (listError) {
+            console.error('[SupabaseStorage] Failed to fetch customers for sequence generation:', listError);
+            throw new Error('Internal Error: Could not generate customer ID');
+        }
+
+        const customers = allCustomers || [];
         let maxSequence = 0;
         for (const c of customers) {
-            if (c.id.startsWith('FZCMY')) {
+            if (c.id && c.id.startsWith('FZCMY')) {
                 const numStr = c.id.substring(5);
                 const num = parseInt(numStr, 10);
                 if (!isNaN(num) && num > maxSequence) {
@@ -725,7 +743,14 @@ export class SupabaseStorage {
             const safeData: any = {};
             for (const key of Object.keys(snakeCaseData)) {
                 if (safeOrderFields.includes(key)) {
-                    safeData[key] = snakeCaseData[key];
+                    let value = snakeCaseData[key];
+                    
+                    // Apply UUID safety for known UUID columns in DB
+                    if (key === 'franchise_id' || (key === 'id' && value?.startsWith('FZCOR'))) {
+                        value = this.toUuidOrNull(value);
+                    }
+                    
+                    safeData[key] = value;
                 }
             }
 
@@ -976,11 +1001,12 @@ export class SupabaseStorage {
         recordedByName: string
     ): Promise<{ success: boolean; newBalance?: number; error?: string }> {
         try {
+            const safeRecordedBy = this.toUuidOrNull(recordedBy);
             const { data, error } = await this.supabase.rpc('process_wallet_recharge', {
                 p_customer_id: customerId,
                 p_amount: amount,
                 p_payment_method: paymentMethod,
-                p_recorded_by: recordedBy,
+                p_recorded_by: safeRecordedBy,
                 p_recorded_by_name: recordedByName
             });
 
@@ -1013,6 +1039,7 @@ export class SupabaseStorage {
         const paymentMethod = options?.paymentMethod || 'CASH';
 
         try {
+            const safeRecordedBy = this.toUuidOrNull(recordedBy);
             // Use the canonical Database RPC v2 for atomic, trigger-compliant checkout
             const { data, error } = await this.supabase.rpc('process_payment_checkout_v2', {
                 p_order_id: orderId,
@@ -1021,7 +1048,7 @@ export class SupabaseStorage {
                 p_use_wallet: useWallet,
                 p_wallet_debit_requested: walletDebitRequested,
                 p_payment_method: paymentMethod,
-                p_recorded_by: recordedBy,
+                p_recorded_by: safeRecordedBy,
                 p_recorded_by_name: recordedByName
             });
 
@@ -1050,11 +1077,12 @@ export class SupabaseStorage {
         recordedByName: string
     ): Promise<{ success: boolean; balanceAfter?: number; error?: string }> {
         try {
+            const safeRecordedBy = this.toUuidOrNull(recordedBy);
             const { data, error } = await this.supabase.rpc('process_credit_repayment', {
                 p_customer_id: customerId,
                 p_amount: amount,
                 p_payment_method: paymentMethod,
-                p_recorded_by: recordedBy,
+                p_recorded_by: safeRecordedBy,
                 p_recorded_by_name: recordedByName
             });
 
