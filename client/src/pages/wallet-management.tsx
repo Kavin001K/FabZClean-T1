@@ -322,15 +322,16 @@ export default function WalletManagementPage() {
   return (
     <PageTransition>
       <div className="container-desktop min-h-screen space-y-6 py-4 sm:space-y-8 sm:py-8 animate-in fade-in duration-500">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-1">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
-              Wallet & Ledger
-            </h1>
-            <p className="text-sm text-muted-foreground sm:text-base mt-1 font-medium">
-              Manage customer balances, monitor credit risks, and process transactions.
-            </p>
-          </div>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pb-6 border-b border-primary/10 px-1">
+            <div className="text-center sm:text-left">
+              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground flex items-center justify-center sm:justify-start gap-4">
+                <Wallet className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
+                Wallet & Ledger
+              </h1>
+              <p className="text-muted-foreground mt-2 text-sm sm:text-base max-w-xl font-medium">
+                Manage customer balances, monitor credit risks, and process transactions with real-time financial tracking.
+              </p>
+            </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={refreshData} className="flex-1 sm:w-auto shadow-sm hover:shadow-md transition-all">
               <RefreshCw className="mr-2 h-4 w-4" />
@@ -392,13 +393,13 @@ export default function WalletManagementPage() {
             <CardDescription>Live search and transaction management for all customer wallets.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <div className="flex flex-col gap-4 md:flex-row md:items-center">
+              <div className="relative flex-1 group">
+                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
+                  className="pl-10 h-11 text-sm border-primary/10 focus:border-primary/30 transition-all bg-muted/20"
                   placeholder="Search customer by name / phone / email"
                 />
               </div>

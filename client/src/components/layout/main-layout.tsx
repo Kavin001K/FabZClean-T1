@@ -82,7 +82,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             isMobile={isMobile}
           />
           <main className={cn(
-            "scrollbar-thin flex-1 min-h-0 overflow-x-hidden overflow-y-auto overscroll-y-contain scroll-smooth p-3 sm:p-4 md:p-6",
+            "scrollbar-thin flex-1 min-h-0 overflow-x-auto overflow-y-auto overscroll-y-contain scroll-smooth p-3 sm:p-4 md:p-6",
             isMobile ? "pb-[calc(5.75rem+env(safe-area-inset-bottom))]" : "pb-6"
           )}>
             <ErrorBoundary>

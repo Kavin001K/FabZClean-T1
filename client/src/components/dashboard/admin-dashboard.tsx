@@ -131,14 +131,15 @@ export default function AdminDashboard() {
     }, [orders]);
 
     return (
-        <div className="p-3 sm:p-4 md:p-8 space-y-4 sm:space-y-6 md:space-y-8 gradient-mesh min-h-screen">
+        <div className="container-desktop p-3 sm:p-4 md:p-8 space-y-4 sm:space-y-6 md:space-y-8 gradient-mesh min-h-screen">
             {/* Header */}
-            <div>
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-2">
-                    <span className="truncate">Dashboard</span>
+            <div className="pb-6 border-b border-primary/10">
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground flex items-center gap-4">
+                    <ShoppingBag className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
+                    Dashboard
                 </h1>
-                <p className="text-sm sm:text-base text-muted-foreground">
-                    Overview of FabZClean POS operations
+                <p className="text-muted-foreground mt-2 text-sm sm:text-base max-w-xl font-medium">
+                    Welcome back! Here's an overview of your FabZClean POS operations and real-time business performance.
                 </p>
             </div>
 

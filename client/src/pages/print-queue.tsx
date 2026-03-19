@@ -294,13 +294,14 @@ export default function PrintTags() {
     return (
         <div className="container-desktop min-h-screen py-8 space-y-8 gradient-mesh">
             {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pb-6 border-b border-primary/10">
+                <div className="text-center sm:text-left">
+                    <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground flex items-center justify-center sm:justify-start gap-4">
+                        <Printer className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
                         Print Queue
                     </h1>
-                    <p className="text-sm text-muted-foreground">
-                        Print garment tags & bills for your orders
+                    <p className="text-muted-foreground mt-2 text-sm sm:text-base font-medium">
+                        Efficiently manage and print garment tags, bills, and invoices for your active orders.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -318,7 +319,7 @@ export default function PrintTags() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
-                <Card className="glass border-none shadow-xl">
+                <Card className="glass border-primary/5 shadow-md hover:shadow-primary/10 transition-all">
                     <CardContent className="pt-6">
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
@@ -360,18 +361,18 @@ export default function PrintTags() {
             </div>
 
             {/* ── Search + Filter toggle ─────────────────────────────────── */}
-            <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-3">
+                <div className="relative flex-1 group">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
                         placeholder="Search order # or customer..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="pl-9"
+                        className="pl-10 h-11 text-sm border-primary/10 focus:border-primary/30 transition-all bg-muted/20"
                     />
                     {search && (
                         <button
-                            className="absolute right-3 top-1/2 -translate-y-1/2"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 opacity-60 hover:opacity-100"
                             onClick={() => setSearch("")}
                         >
                             <X className="h-4 w-4 text-muted-foreground" />

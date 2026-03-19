@@ -1125,94 +1125,98 @@ function OrdersComponent() {
       filters.amountMax;
   }, [filters]);
 
-  const ordersGridColumns = "grid-cols-[48px_170px_minmax(220px,1fr)_140px_150px_130px_130px_130px_130px_90px]";
-  const ordersTableMinWidth = "min-w-[1360px]";
-  const virtualTableBodyHeight = 548;
+  const ordersGridColumns = "grid-cols-[48px_140px_minmax(180px,1fr)_120px_140px_120px_110px_120px_120px_80px]";
+  const ordersTableMinWidth = "min-w-[1200px]";
+  const virtualTableBodyHeight = "calc(100vh - 420px)";
 
   const renderOrderRow = useCallback((order: Order, index: number) => {
     if (isMobile) {
       return (
         <motion.div
           key={order.id}
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.2, delay: index * 0.03 }}
+          initial={{ opacity: 0, scale: 0.98, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: index * 0.02 }}
           className={cn(
-            "p-4 mb-3 rounded-2xl border bg-card shadow-sm active:scale-[0.98] transition-all",
-            selectedOrders.includes(order.id) && "ring-2 ring-primary bg-primary/5"
+            "p-5 rounded-2xl border bg-card/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-all active:scale-[0.99]",
+            selectedOrders.includes(order.id) ? "ring-2 ring-primary bg-primary/5" : "hover:border-primary/20"
           )}
           onClick={() => handleViewOrder(order)}
         >
-          <div className="flex justify-between items-start mb-3">
+          <div className="flex justify-between items-start mb-4">
             <div className="flex items-center gap-3">
-              <div onClick={(e) => e.stopPropagation()}>
+              <div onClick={(e) => e.stopPropagation()} className="pt-0.5">
                 <Checkbox checked={selectedOrders.includes(order.id)} onCheckedChange={() => handleSelectOrder(order.id)} />
               </div>
-              <div>
-                <p className="font-mono font-bold text-primary text-sm">{order.orderNumber}</p>
-                <p className="text-[10px] text-muted-foreground">{formatDate((order.createdAt || new Date()).toString())}</p>
+              <div className="min-w-0">
+                <p className="font-mono font-black text-primary text-sm tracking-tighter uppercase">{order.orderNumber}</p>
+                <p className="text-[11px] text-muted-foreground font-medium">{formatDate((order.createdAt || new Date()).toString())}</p>
               </div>
             </div>
-            <Badge className={cn("text-[10px] h-5 px-2", getStatusColor(order.status))}>
+            <Badge className={cn("text-[10px] uppercase font-bold px-2 py-0 h-5 border-none", getStatusColor(order.status))}>
               {order.status}
             </Badge>
           </div>
 
-          <div className="space-y-2 mb-4">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-bold truncate pr-2">{order.customerName}</span>
-              <span className="text-base font-black text-slate-900 dark:text-slate-100">
+          <div className="space-y-3 mb-5">
+            <div className="flex justify-between items-baseline gap-2">
+              <h3 className="text-base font-bold text-foreground truncate">{order.customerName}</h3>
+              <span className="text-lg font-black text-foreground shrink-0 tabular-nums">
                 {formatCurrency(parseFloat(order.totalAmount || "0"))}
               </span>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-              <Package className="h-3 w-3" />
-              <span>{(order as any).service || 'Dry Cleaning'}</span>
-              <span className="mx-1">•</span>
-              <Badge variant="outline" className={cn("text-[9px] h-4 py-0", getPaymentStatusColor((order as any).paymentStatus || 'pending'))}>
-                {(order as any).paymentStatus || 'Pending'}
+            
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/30 text-[11px] text-muted-foreground">
+                <Package className="h-3 w-3" />
+                <span className="truncate max-w-[120px]">{(order as any).service || 'Dry Cleaning'}</span>
+              </div>
+              <Badge variant="outline" className={cn("text-[9px] font-bold h-5 px-1.5 py-0 border-primary/10", getPaymentStatusColor((order as any).paymentStatus || 'pending'))}>
+                {(order as any).paymentStatus?.toUpperCase() || 'PENDING'}
               </Badge>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 pt-3 border-t">
+          <div className="grid grid-cols-2 gap-2 pt-4 border-t border-dashed">
             <Button 
               variant="outline" 
               size="sm" 
-              className="flex-1 h-9 font-bold bg-slate-50 dark:bg-slate-900"
+              className="h-10 font-bold bg-background shadow-sm border-primary/10 hover:bg-primary/5 hover:text-primary transition-all"
               onClick={(e) => { e.stopPropagation(); handlePrintInvoice(order); }}
             >
-              <Printer className="h-3.5 w-3.5 mr-2" /> Print
+              <Printer className="h-4 w-4 mr-2" /> Print
             </Button>
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              className="px-3 h-9"
-              onClick={(e) => { e.stopPropagation(); handleEditOrder(order); }}
-            >
-              <Edit className="h-3.5 w-3.5" />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={(e) => e.stopPropagation()}>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleViewOrder(order)}>
-                  <Eye className="mr-2 h-4 w-4" /> View Details
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {order.paymentStatus !== 'paid' && (
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedPaymentOrder(order); setIsPaymentModalOpen(true); }}>
-                    <IndianRupee className="mr-2 h-4 w-4" /> Payment
+            <div className="flex gap-2">
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="flex-1 h-10 font-bold"
+                onClick={(e) => { e.stopPropagation(); handleEditOrder(order); }}
+              >
+                <Edit className="h-4 w-4 mr-2" /> Edit
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-full hover:bg-muted" onClick={(e) => e.stopPropagation()}>
+                    <MoreHorizontal className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => handleViewOrder(order)}>
+                    <Eye className="mr-2 h-4 w-4" /> View Details
                   </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={() => handleCancelOrder(order)} className="text-red-600">
-                  <XCircle className="mr-2 h-4 w-4" /> Cancel
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuSeparator />
+                  {order.paymentStatus !== 'paid' && (
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedPaymentOrder(order); setIsPaymentModalOpen(true); }}>
+                      <IndianRupee className="mr-2 h-4 w-4" /> Process Payment
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => handleCancelOrder(order)} className="text-destructive focus:text-destructive">
+                    <XCircle className="mr-2 h-4 w-4" /> Cancel Order
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </motion.div>
       );
@@ -1347,12 +1351,13 @@ function OrdersComponent() {
           transition={{ duration: 0.5 }}
           className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
         >
-          <div className="min-w-0">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
+              <Package className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
               Orders Management
             </h1>
-            <p className="text-muted-foreground mt-1 text-sm sm:text-base lg:text-lg">
-              Monitor, manage, and analyze your orders
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+              Monitor, manage, and analyze your orders in real-time
             </p>
           </div>
           <Button
@@ -1510,19 +1515,19 @@ function OrdersComponent() {
                 {/* Search and Primary Actions */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                   {/* Search Bar */}
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <div className="relative flex-1 group">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
                       placeholder="Search orders, customers, services..."
                       value={filters.search}
                       onChange={(e) => handleSearchChange(e.target.value)}
-                      className="pl-10 pr-10 h-11 text-base"
+                      className="pl-10 pr-10 h-10 text-sm border-primary/10 focus:border-primary/30 transition-all bg-muted/20"
                     />
                     {filters.search && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 opacity-60 hover:opacity-100"
                         onClick={() => handleSearchChange('')}
                       >
                         <X className="h-4 w-4" />
@@ -1952,19 +1957,19 @@ function OrdersComponent() {
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-lg border bg-background overflow-hidden h-[600px]">
+                    <div className="rounded-xl border bg-background shadow-sm overflow-hidden flex flex-col min-h-[500px] h-[calc(100vh-420px)]">
                       {!isMobile ? (
                         <VirtualScroll
                           items={filteredOrders}
                           itemHeight={64}
-                          containerHeight={600}
+                          containerHeight={window.innerHeight - 450}
                           header={OrderHeaders}
                           renderItem={renderOrderRow}
                           emptyMessage="No orders found matching your criteria"
-                          className={cn("scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent h-full", ordersTableMinWidth)}
+                          className={cn("scrollbar-thin h-full", ordersTableMinWidth)}
                         />
                       ) : (
-                        <div className="h-full overflow-y-auto p-2">
+                        <div className="flex-1 overflow-y-auto p-3 space-y-3">
                           {filteredOrders.map((order, idx) => renderOrderRow(order, idx))}
                         </div>
                       )}

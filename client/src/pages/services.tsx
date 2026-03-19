@@ -413,9 +413,12 @@ export default function Services() {
         className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
       >
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Service Catalog</h1>
-          <p className="text-muted-foreground">
-            Browse and manage your premium service offerings
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
+            <Sparkles className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
+            Service Catalog
+          </h1>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-base">
+            Browse, manage, and optimize your professional service offerings and price lists.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:justify-end">
@@ -537,13 +540,13 @@ export default function Services() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <div className="relative flex-1 group">
+                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input
                   placeholder="Search services by name, description, or category..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-11 text-sm border-primary/10 focus:border-primary/30 transition-all bg-muted/20"
                   aria-label="Search services by name, description, or category"
                 />
               </div>
@@ -683,19 +686,19 @@ export default function Services() {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: -20 }}
                   transition={{
-                    duration: 0.3,
+                    duration: 0.4,
                     delay: index * 0.05,
                     ease: [0.4, 0, 0.2, 1]
                   }}
                   whileHover={{
-                    scale: 1.03,
-                    y: -5,
+                    scale: 1.02,
+                    y: -4,
                     transition: { duration: 0.2 }
                   }}
                   whileTap={{ scale: 0.98 }}
                   layout
                 >
-                  <Card className="group hover:shadow-lg transition-all duration-300 relative overflow-hidden h-full"
+                  <Card className="group hover:shadow-xl transition-all duration-300 relative overflow-hidden h-full rounded-2xl border-primary/5 shadow-md"
                   >
                     {isPopular && (
                       <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-500 to-amber-400 text-white px-3 py-1 rounded-bl-lg text-xs font-semibold flex items-center gap-1">

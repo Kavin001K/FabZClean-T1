@@ -440,14 +440,14 @@ export default function Customers() {
       <div className="container-desktop min-h-screen py-8 gradient-mesh">
         {/* Header Section */}
         <FadeIn delay={0.1}>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
-            <div className="min-w-0">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-2 sm:gap-3">
-                <Users className="h-7 w-7 sm:h-10 sm:w-10 text-primary shrink-0" />
-                <span className="truncate">Customers</span>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pb-6 border-b border-primary/10">
+            <div className="text-center sm:text-left">
+              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground flex items-center justify-center sm:justify-start gap-4">
+                <Users className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
+                Customers & CRM
               </h1>
-              <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-                Manage customers and track lifetime value
+              <p className="text-muted-foreground mt-2 text-sm sm:text-base max-w-xl">
+                Manage your customer relationships, track lifetime value, and analyze spending patterns with real-time insights.
               </p>
             </div>
             <div className="flex gap-2 sm:gap-3 shrink-0">
@@ -577,13 +577,13 @@ export default function Customers() {
                 transition={{ duration: 0.3 }}
                 className="flex flex-col md:flex-row gap-4"
               >
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <div className="relative flex-1 group">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
                     placeholder="Search by name, email, or phone..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 h-11 text-sm border-primary/10 focus:border-primary/30 transition-all bg-muted/20"
                   />
                   <AnimatePresence>
                     {searchQuery && (
@@ -597,7 +597,7 @@ export default function Customers() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 w-7 p-0"
+                          className="h-8 w-8 p-0 opacity-60 hover:opacity-100"
                           onClick={() => setSearchQuery('')}
                         >
                           <X className="h-4 w-4" />
@@ -759,7 +759,7 @@ export default function Customers() {
                       layout
                     >
                       <Card
-                        className="glass border-none shadow-xl hover:shadow-primary/20 hover:-translate-y-1 transition-all duration-300 cursor-pointer group h-full overflow-hidden"
+                        className="glass border-primary/5 shadow-lg hover:shadow-primary/20 hover:-translate-y-1.5 transition-all duration-500 cursor-pointer group h-full overflow-hidden rounded-2xl"
                         onClick={() => handleViewCustomer(customer)}
                       >
                         <CardHeader className="pb-4">
