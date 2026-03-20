@@ -108,7 +108,7 @@ export default function PrintTags() {
     const markPrintedMutation = useMutation({
         mutationFn: async (orderId: string) => {
             const token = localStorage.getItem("employee_token");
-            const res = await fetch(`/api/orders/${orderId}/tags-printed`, {
+            const res = await fetch("/api/orders/${orderId}/tags-printed", {
                 method: "PATCH",
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -211,54 +211,71 @@ export default function PrintTags() {
             return;
         }
 
-        const allTags = targetOrders
-            .map((order) => {
-                const items = Array.isArray(order.items) ? order.items : [];
-                return items
-                    .map(
-                        (item: any, idx: number) => `
-        <div class="tag">
-          <div class="tag-header">Fab Clean</div>
-          <div class="tag-order">${order.orderNumber}</div>
-          <div class="tag-customer">${order.customerName}</div>
-          <div class="tag-row"><span class="lbl">Item:</span><span class="val">${item.garmentType || item.name || `Item ${idx + 1}`}</span></div>
-          <div class="tag-row"><span class="lbl">Qty:</span><span class="val">${item.quantity || 1}</span></div>
-          ${item.service ? `<div class="tag-row"><span class="lbl">Service:</span><span class="val">${item.service}</span></div>` : ""}
-          ${item.notes ? `<div class="tag-row"><span class="lbl">Note:</span><span class="val">${item.notes}</span></div>` : ""}
-          <div class="tag-row"><span class="lbl">Date:</span><span class="val">${new Date(order.createdAt || 0).toLocaleDateString("en-IN")}</span></div>
-        </div>`
-                    )
-                    .join("");
-            })
-            .join('<div class="page-break"></div>');
-
         tagWindow.document.write(`<!DOCTYPE html><html><head>
-      <title>Tags</title>
+      <title>Garment Tags - ${targetOrders.length} Orders</title>
       <style>
-        @media print { @page { size: 60mm auto; margin: 2mm; } .no-print { display:none !important; } }
-        * { box-sizing:border-box; }
-        body { font-family:'Courier New',monospace; margin:0; padding:4px; }
-        .tag { border:1px dashed #333; padding:8px; margin-bottom:8px; page-break-inside:avoid; }
-        .tag-header { font-size:14px; font-weight:bold; text-align:center; border-bottom:1px solid #666; padding-bottom:4px; margin-bottom:6px; }
-        .tag-order { font-size:16px; font-weight:bold; text-align:center; margin:4px 0; letter-spacing:1px; }
-        .tag-customer { text-align:center; font-size:12px; margin:2px 0; }
-        .tag-row { display:flex; justify-content:space-between; font-size:11px; margin:2px 0; }
-        .lbl { color:#666; } .val { font-weight:bold; }
-        .page-break { page-break-after:always; margin:12px 0; border-top:2px dashed #999; }
-        .print-bar { position:sticky; top:0; background:#fff; padding:8px; text-align:center; border-bottom:1px solid #ccc; }
-        .print-bar button { padding:8px 24px; background:#16a34a; color:#fff; border:none; border-radius:6px; font-size:14px; cursor:pointer; }
+        @media print { 
+          @page { size: 75mm auto; margin: 0; } 
+          .no-print { display:none !important; }
+          body { margin: 0; padding: 0; }
+        }
+        * { box-sizing:border-box; -webkit-print-color-adjust: exact; }
+        body { font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 10px; background: #f4f4f5; }
+        
+        .tag-container { background: white; width: 70mm; margin: 0 auto 15px auto; padding: 15px; border-radius: 8px; border: 1px solid #e4e4e7; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: relative; overflow: hidden; page-break-inside: avoid; }
+        .tag-container::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #2563eb; }
+        
+        .brand { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #2563eb; letter-spacing: 1px; margin-bottom: 8px; }
+        .order-num { font-size: 20px; font-weight: 900; color: #000; margin-bottom: 4px; line-height: 1; }
+        .customer { font-size: 14px; font-weight: 600; color: #3f3f46; margin-bottom: 12px; border-bottom: 1px dashed #e4e4e7; padding-bottom: 8px; }
+        
+        .item-main { font-size: 13px; font-weight: 700; color: #18181b; margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .service-type { font-size: 11px; font-weight: 600; color: #2563eb; background: #eff6ff; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
+        
+        .tag-grid { display: grid; grid-template-cols: 1fr 1fr; gap: 8px; margin-top: 10px; border-top: 1px solid #f4f4f5; padding-top: 8px; }
+        .grid-item { display: flex; flex-direction: column; }
+        .grid-label { font-size: 9px; font-weight: 700; color: #a1a1aa; text-transform: uppercase; }
+        .grid-value { font-size: 12px; font-weight: 700; color: #18181b; }
+        
+        .notes { font-size: 11px; color: #71717a; font-style: italic; margin-top: 8px; background: #fafafa; padding: 6px; border-radius: 4px; border-left: 2px solid #d4d4d8; }
+        
+        .page-break { page-break-after: always; }
+        .print-bar { position: sticky; top: 0; left: 0; right: 0; background: white; padding: 15px; text-align: center; border-bottom: 1px solid #e4e4e7; z-index: 100; margin-bottom: 20px; }
+        .print-button { padding: 10px 30px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); }
       </style>
     </head><body>
-      <div class="print-bar no-print"><button onclick="window.print()">🖨️ Print All Tags</button></div>
-      ${allTags}
-      <script>window.onload=function(){window.print();}<\/script>
+      <div class="print-bar no-print"><button class="print-button" onclick="window.print()">🖨️ Print Everything Now</button></div>
+      ${targetOrders.map(order => 
+        (Array.isArray(order.items) ? order.items : []).map((item, idx) => `
+          <div class="tag-container">
+            <div class="brand">FabZClean Premium</div>
+            <div class="order-num">${order.orderNumber}</div>
+            <div class="customer">${order.customerName}</div>
+            
+            <div class="item-main">
+              <span>${item.garmentType || item.name || `Item ${idx + 1}`}</span>
+              <span>Qty: ${item.quantity || 1}</span>
+            </div>
+            ${item.service ? `<div class=\"service-type\">${item.service}</div>` : ""}
+            
+            <div class="tag-grid">
+              <div class="grid-item">
+                <span class="grid-label">Booking Date</span>
+                <span class="grid-value">${new Date(order.createdAt || 0).toLocaleDateString("en-IN", { day: '2-digit', month: 'short' })}</span>
+              </div>
+              <div class="grid-item">
+                <span class="grid-label">Order SL</span>
+                <span class="grid-value">#${idx + 1} of ${(order.items).length}</span>
+              </div>
+            </div>
+            
+            ${item.notes ? `<div class=\"notes\">Note: ${item.notes}</div>` : ""}
+          </div>
+        `).join("")
+      ).join('<div class="page-break no-print"></div>')}
+      <script>window.onload=function(){ setTimeout(() => window.print(), 500); }<\/script>
     </body></html>`);
         tagWindow.document.close();
-
-        toast({
-            title: "Tags generated",
-            description: `${targetOrders.length} order(s) sent to print`,
-        });
     }, [toast]);
 
     /** Print bill/invoice for a single order */
@@ -294,66 +311,76 @@ export default function PrintTags() {
     return (
         <div className="container-desktop min-h-screen py-8 space-y-8 gradient-mesh">
             {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pb-6 border-b border-primary/10">
-                <div className="text-center sm:text-left">
-                    <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground flex items-center justify-center sm:justify-start gap-4">
-                        <Printer className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
-                        Print Queue
-                    </h1>
-                    <p className="text-muted-foreground mt-2 text-sm sm:text-base font-medium">
-                        Efficiently manage and print garment tags, bills, and invoices for your active orders.
-                    </p>
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-white/5">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20 shadow-inner">
+                        <Printer className="h-7 w-7 text-primary" />
+                    </div>
+                    <div>
+                        <h1 className="text-4xl font-black tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-br from-foreground to-foreground/60">
+                            Print Queue
+                        </h1>
+                        <p className="text-muted-foreground text-sm font-medium flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                            Garment tags and bills for active processing
+                        </p>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-3">
                     <Button
                         variant="outline"
                         size="sm"
+                        className="h-10 px-4 gap-2 border-white/10 hover:bg-white/5 text-sm font-semibold transition-all rounded-xl"
                         onClick={() => {
                             queryClient.invalidateQueries({ queryKey: ["print-queue"] });
                             queryClient.invalidateQueries({ queryKey: ["orders"] });
                         }}
                     >
-                        <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+                        <RefreshCw className="h-4 w-4" />
+                        <span className="hidden sm:inline">Refresh Sync</span>
                     </Button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
-                <Card className="glass border-primary/5 shadow-md hover:shadow-primary/10 transition-all">
-                    <CardContent className="pt-6">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-                                <Package className="h-6 w-6 text-primary" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8 px-1">
+                <Card className="glass border-muted border-l-4 border-l-primary shadow-sm hover:shadow-md transition-all">
+                    <CardContent className="p-6">
+                        <div className="flex items-center gap-5">
+                            <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+                                <Package className="h-7 w-7 text-primary" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">Total Displayed</p>
-                                <h3 className="text-2xl font-bold">{stats.total}</h3>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Total in Queue</p>
+                                <h3 className="text-3xl font-black tracking-tight text-foreground">{stats.total}</h3>
+                                <p className="text-[10px] text-slate-400 font-medium italic">Pending processing</p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
-                <Card className="glass border-none shadow-xl">
-                    <CardContent className="pt-6">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                                <Tag className="h-6 w-6 text-amber-500" />
+                <Card className="glass border-muted border-l-4 border-l-amber-500 shadow-sm hover:shadow-md transition-all">
+                    <CardContent className="p-6">
+                        <div className="flex items-center gap-5">
+                            <div className="h-14 w-14 rounded-2xl bg-amber-500/10 flex items-center justify-center shrink-0 border border-amber-500/20">
+                                <Tag className="h-7 w-7 text-amber-500" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">Tags Not Printed</p>
-                                <h3 className="text-2xl font-bold text-amber-500">{stats.tagsPending}</h3>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Tags Pending</p>
+                                <h3 className="text-3xl font-black tracking-tight text-amber-600">{stats.tagsPending}</h3>
+                                <p className="text-[10px] text-amber-500/60 font-medium italic">Require labeling</p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
-                <Card className="glass border-none shadow-xl">
-                    <CardContent className="pt-6">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                                <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                <Card className="glass border-muted border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-all">
+                    <CardContent className="p-6">
+                        <div className="flex items-center gap-5">
+                            <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                                <CheckCircle2 className="h-7 w-7 text-emerald-500" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">Tags Printed</p>
-                                <h3 className="text-2xl font-bold text-emerald-500">{stats.tagsDone}</h3>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Labelled</p>
+                                <h3 className="text-3xl font-black tracking-tight text-emerald-600">{stats.tagsDone}</h3>
+                                <p className="text-[10px] text-emerald-500/60 font-medium italic">Ready for factory</p>
                             </div>
                         </div>
                     </CardContent>
@@ -361,14 +388,14 @@ export default function PrintTags() {
             </div>
 
             {/* ── Search + Filter toggle ─────────────────────────────────── */}
-            <div className="flex items-center gap-3">
-                <div className="relative flex-1 group">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="relative flex-1 lg:max-w-xl group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
                         placeholder="Search order # or customer..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="pl-10 h-11 text-sm border-primary/10 focus:border-primary/30 transition-all bg-muted/20"
+                        className="pl-10 h-11 text-sm border-muted focus-visible:ring-primary/20 transition-all bg-muted/5 group-hover:bg-muted/10 font-medium"
                     />
                     {search && (
                         <button
@@ -381,14 +408,13 @@ export default function PrintTags() {
                 </div>
                 <Button
                     variant={showFilters ? "default" : "outline"}
-                    size="sm"
                     onClick={() => setShowFilters(!showFilters)}
-                    className="shrink-0"
+                    className="h-11 border-muted bg-transparent focus:ring-primary/20 px-6 shrink-0"
                 >
-                    <Filter className="h-4 w-4 mr-1" />
-                    <span className="hidden sm:inline">Filters</span>
+                    <Filter className="h-4 w-4 mr-2" />
+                    <span>Filters</span>
                     {hasActiveFilters && (
-                        <span className="ml-1 bg-primary-foreground text-primary rounded-full h-4 w-4 text-[10px] flex items-center justify-center">
+                        <span className="ml-2 bg-primary-foreground text-primary rounded-full h-5 w-5 text-[10px] flex items-center justify-center font-bold">
                             !
                         </span>
                     )}
@@ -460,21 +486,22 @@ export default function PrintTags() {
 
             {/* ── Batch actions bar ──────────────────────────────────────── */}
             {selectedIds.length > 0 && (
-                <Card className="border-primary/50 bg-primary/5">
+                <Card className="border-primary/50 bg-primary/5 animate-in slide-in-from-top-4">
                     <CardContent className="p-3 flex flex-wrap items-center gap-2 justify-between">
-                        <span className="text-sm font-medium">
+                        <span className="text-sm font-bold ml-2">
                             {selectedIds.length} order(s) selected
                         </span>
                         <div className="flex items-center gap-2 flex-wrap">
-                            <Button size="sm" onClick={handlePrintSelectedTags}>
-                                <Printer className="h-4 w-4 mr-1" /> Print All Tags
+                            <Button size="sm" onClick={handlePrintSelectedTags} className="font-bold">
+                                <Printer className="h-4 w-4 mr-2" /> Print All Tags
                             </Button>
                             <Button
                                 size="sm"
                                 variant="outline"
+                                className="font-bold gap-2 border-primary/20"
                                 onClick={handleMarkSelectedPrinted}
                             >
-                                <CheckCircle2 className="h-4 w-4 mr-1" /> Mark Printed
+                                <CheckCircle2 className="h-4 w-4" /> Mark Printed
                             </Button>
                             <Button
                                 size="sm"
@@ -490,32 +517,35 @@ export default function PrintTags() {
 
             {/* ── Select-all row ─────────────────────────────────────────── */}
             {filteredOrders.length > 0 && (
-                <div className="flex items-center gap-2 px-1">
+                <div className="flex items-center gap-3 px-2 py-1 bg-white/5 rounded-lg border border-white/5 w-fit">
                     <Checkbox
                         checked={selectedIds.length === filteredOrders.length && filteredOrders.length > 0}
                         onCheckedChange={selectAll}
+                        className="h-4 w-4"
                     />
-                    <span className="text-xs text-muted-foreground">
-                        Select all {filteredOrders.length} orders
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                        Check All ({filteredOrders.length})
                     </span>
                 </div>
             )}
 
             {/* ── Orders list ────────────────────────────────────────────── */}
             {filteredOrders.length === 0 ? (
-                <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                        <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
-                        <h3 className="text-lg font-semibold">No orders found</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
+                <Card className="glass border-muted border-dashed">
+                    <CardContent className="flex flex-col items-center justify-center py-20">
+                        <div className="h-20 w-20 rounded-full bg-emerald-500/10 flex items-center justify-center mb-6">
+                            <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+                        </div>
+                        <h3 className="text-xl font-black tracking-tight">Queue is Clear</h3>
+                        <p className="text-sm text-muted-foreground mt-2 font-medium">
                             {hasActiveFilters
-                                ? "Try adjusting your filters."
-                                : "Create a new order to get started."}
+                                ? "Adjust your search filters to see other orders."
+                                : "You're all caught up! No active orders in queue."}
                         </p>
                     </CardContent>
                 </Card>
             ) : (
-                <div className="space-y-2">
+                <div className="space-y-4 px-1">
                     {filteredOrders.map((order: any) => {
                         const items = Array.isArray(order.items) ? order.items : [];
                         const isSelected = selectedIds.includes(order.id);
@@ -526,139 +556,179 @@ export default function PrintTags() {
                             <Card
                                 key={order.id}
                                 className={cn(
-                                    "transition-all",
-                                    isSelected && "ring-2 ring-primary/50 bg-primary/5"
+                                    "transition-all duration-300 border-white/5 overflow-hidden group",
+                                    isSelected ? "ring-2 ring-primary bg-primary/5 border-primary/20" : "hover:bg-white/5"
                                 )}
                             >
-                                <CardContent className="p-3 sm:p-4">
+                                <CardContent className="p-4 sm:p-5">
                                     {/* Main row */}
-                                    <div className="flex items-start gap-3">
-                                        <Checkbox
-                                            checked={isSelected}
-                                            onCheckedChange={() => toggleSelect(order.id)}
-                                            className="mt-1 shrink-0"
-                                        />
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                                            <Checkbox
+                                                checked={isSelected}
+                                                onCheckedChange={() => toggleSelect(order.id)}
+                                                className="shrink-0 h-5 w-5 rounded-md border-muted data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                            />
 
-                                        {/* Info */}
-                                        <div
-                                            className="flex-1 min-w-0 cursor-pointer"
-                                            onClick={() =>
-                                                setExpandedOrder(isExpanded ? null : order.id)
-                                            }
-                                        >
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="font-bold text-base">
-                                                    {order.orderNumber}
-                                                </span>
-                                                <Badge
-                                                    variant="outline"
-                                                    className={cn("text-[10px] px-1.5 py-0", statusColor(order.status))}
-                                                >
-                                                    {order.status}
-                                                </Badge>
-                                                {tagsPrinted && (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="text-[10px] px-1.5 py-0 bg-green-500/15 text-green-700 border-green-300"
-                                                    >
-                                                        <CheckCircle2 className="h-3 w-3 mr-0.5" />
-                                                        Printed
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                            <p className="text-sm text-muted-foreground truncate">
-                                                {order.customerName} · {items.length} item{items.length !== 1 ? "s" : ""} ·{" "}
-                                                {formatCurrency(parseFloat(order.totalAmount || "0"))}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {new Date(order.createdAt).toLocaleDateString("en-IN", {
-                                                    day: "2-digit",
-                                                    month: "short",
-                                                    year: "numeric",
-                                                })}
-                                            </p>
-                                        </div>
-
-                                        {/* Actions — always visible */}
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-8 px-2 text-xs"
-                                                onClick={() => handlePrintTags([order])}
-                                                title="Print garment tags"
-                                            >
-                                                <Tag className="h-3.5 w-3.5 sm:mr-1" />
-                                                <span className="hidden sm:inline">Tags</span>
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-8 px-2 text-xs"
-                                                onClick={() => handlePrintBill(order)}
-                                                title="Print bill / invoice"
-                                            >
-                                                <Receipt className="h-3.5 w-3.5 sm:mr-1" />
-                                                <span className="hidden sm:inline">Bill</span>
-                                            </Button>
-                                            {!tagsPrinted && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    className="h-8 px-2 text-xs text-green-600"
-                                                    onClick={() => markPrintedMutation.mutate(order.id)}
-                                                    disabled={markPrintedMutation.isPending}
-                                                    title="Mark as printed"
-                                                >
-                                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                                </Button>
-                                            )}
-                                            <button
-                                                className="p-1 text-muted-foreground"
+                                            {/* Info */}
+                                            <div
+                                                className="flex-1 min-w-0 cursor-pointer group/info"
                                                 onClick={() =>
                                                     setExpandedOrder(isExpanded ? null : order.id)
                                                 }
                                             >
-                                                {isExpanded ? (
-                                                    <ChevronUp className="h-4 w-4" />
-                                                ) : (
-                                                    <ChevronDown className="h-4 w-4" />
+                                                <div className="flex items-center gap-3 flex-wrap mb-1">
+                                                    <span className="font-black text-lg tracking-tight group-hover:text-primary transition-colors">
+                                                        {order.orderNumber}
+                                                    </span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={cn("text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider", statusColor(order.status))}
+                                                        >
+                                                            {order.status}
+                                                        </Badge>
+                                                        {tagsPrinted ? (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                                            >
+                                                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                                                Labelled
+                                                            </Badge>
+                                                        ) : (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 border-amber-500/20 animate-pulse"
+                                                            >
+                                                                <Tag className="h-3 w-3 mr-1" />
+                                                                No Tag
+                                                            </Badge>
+                                                        )}
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={cn(
+                                                                "text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider",
+                                                                order.paymentStatus === 'paid' ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
+                                                                order.paymentStatus === 'credit' ? "bg-blue-500/10 text-blue-600 border-blue-500/20" :
+                                                                "bg-rose-500/10 text-rose-600 border-rose-500/20"
+                                                            )}
+                                                        >
+                                                            {order.paymentStatus || 'pending'}
+                                                        </Badge>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-medium text-muted-foreground">
+                                                    <span className="text-foreground font-bold">{order.customerName}</span>
+                                                    <span className="opacity-20">•</span>
+                                                    <span>{items.length} item{items.length !== 1 ? "s" : ""}</span>
+                                                    <span className="opacity-20">•</span>
+                                                    <span className="text-primary font-bold">{formatCurrency(parseFloat(order.totalAmount || "0"))}</span>
+                                                    <span className="opacity-20">•</span>
+                                                    <span className="text-xs opacity-70">
+                                                        {new Date(order.createdAt).toLocaleDateString("en-IN", {
+                                                            day: "2-digit",
+                                                            month: "short",
+                                                            year: "numeric",
+                                                        })}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Actions — always visible */}
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <div className="hidden sm:flex items-center gap-2 bg-muted/20 p-1 rounded-xl border border-white/5">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-9 px-3 gap-2 text-xs font-bold hover:bg-amber-500/10 hover:text-amber-500 transition-all"
+                                                    onClick={() => handlePrintTags([order])}
+                                                    title="Print garment tags"
+                                                >
+                                                    <Tag className="h-4 w-4" />
+                                                    <span>Tags</span>
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-9 px-3 gap-2 text-xs font-bold hover:bg-blue-500/10 hover:text-blue-500 transition-all"
+                                                    onClick={() => handlePrintBill(order)}
+                                                    title="Print bill / invoice"
+                                                >
+                                                    <Receipt className="h-4 w-4" />
+                                                    <span>Bill</span>
+                                                </Button>
+                                            </div>
+                                            
+                                            <div className="flex items-center gap-1">
+                                                {!tagsPrinted && (
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="h-10 w-10 text-emerald-500 hover:bg-emerald-500/10 rounded-xl"
+                                                        onClick={() => markPrintedMutation.mutate(order.id)}
+                                                        disabled={markPrintedMutation.isPending}
+                                                        title="Mark as printed"
+                                                    >
+                                                        <CheckCircle2 className="h-5 w-5" />
+                                                    </Button>
                                                 )}
-                                            </button>
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-10 w-10 text-muted-foreground hover:bg-white/5 rounded-xl"
+                                                    onClick={() =>
+                                                        setExpandedOrder(isExpanded ? null : order.id)
+                                                    }
+                                                >
+                                                    {isExpanded ? (
+                                                        <ChevronUp className="h-5 w-5" />
+                                                    ) : (
+                                                        <ChevronDown className="h-5 w-5" />
+                                                    )}
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
 
                                     {/* Expanded items */}
                                     {isExpanded && items.length > 0 && (
-                                        <div className="mt-3 ml-8 border-t pt-3 space-y-2">
-                                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                                Items
+                                        <div className="mt-4 ml-8 border-t border-white/5 pt-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                            <p className="text-[10px] font-bold text-primary uppercase tracking-widest pl-1">
+                                                Items in Order
                                             </p>
-                                            {items.map((item: any, idx: number) => (
-                                                <div
-                                                    key={idx}
-                                                    className="flex items-center justify-between text-sm py-1 border-b border-dashed last:border-0"
-                                                >
-                                                    <div>
-                                                        <span className="font-medium">
-                                                            {item.garmentType || item.name || `Item ${idx + 1}`}
-                                                        </span>
-                                                        {item.service && (
-                                                            <span className="text-muted-foreground ml-2 text-xs">
-                                                                ({item.service})
-                                                            </span>
-                                                        )}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                {items.map((item: any, idx: number) => (
+                                                    <div
+                                                        key={idx}
+                                                        className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors"
+                                                    >
+                                                        <div>
+                                                            <p className="font-bold text-sm leading-none">
+                                                                {item.garmentType || item.name || `Item ${idx + 1}`}
+                                                            </p>
+                                                            {item.service && (
+                                                                <p className="text-primary text-[10px] font-bold mt-1 uppercase tracking-wider">
+                                                                    {item.service}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-sm font-black">× {item.quantity || 1}</p>
+                                                            {item.price && <p className="text-[10px] text-muted-foreground font-medium">{formatCurrency(parseFloat(item.price))}</p>}
+                                                        </div>
                                                     </div>
-                                                    <div className="text-muted-foreground text-xs">
-                                                        × {item.quantity || 1}
-                                                        {item.price && ` · ${formatCurrency(parseFloat(item.price))}`}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                ))}
+                                            </div>
                                             {items.some((it: any) => it.notes) && (
-                                                <p className="text-xs text-muted-foreground italic mt-1">
-                                                    Notes: {items.filter((it: any) => it.notes).map((it: any) => it.notes).join(", ")}
-                                                </p>
+                                                <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 flex items-start gap-2">
+                                                    <FileText className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                                                    <p className="text-xs text-foreground/80 font-medium">
+                                                        <span className="font-bold text-primary mr-1">Notes:</span> 
+                                                        {items.filter((it: any) => it.notes).map((it: any) => it.notes).join(", ")}
+                                                    </p>
+                                                </div>
                                             )}
                                         </div>
                                     )}

@@ -308,25 +308,29 @@ router.get('/report/outstanding', requireRole(CREDIT_VIEW_ROLES), async (req, re
         }
 
 
+        // Support pagination
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 100;
+
         // Use optimized query to get only customers with credit
-        // This handles both credit > 0 check and franchise isolation at DB level
-        const customersWithCredit = await (storage as any).getCustomersWithOutstandingCredit(franchiseId);
-
-        // Sort by credit balance (highest first)
-        customersWithCredit.sort((a: any, b: any) =>
-            parseFloat(b.creditBalance || '0') - parseFloat(a.creditBalance || '0')
-        );
-
-        // Calculate totals
-        const totalOutstanding = customersWithCredit.reduce(
-            (sum: number, c: any) => sum + parseFloat(c.creditBalance || '0'),
-            0
-        );
+        const { 
+            customers: paginatedCustomers, 
+            totalCount, 
+            totalOutstanding,
+            prepaidCount,
+            totalPrepaid,
+            riskCount 
+        } = await (storage as any).getCustomersWithOutstandingCredit(franchiseId, page, limit);
 
         res.json(createSuccessResponse({
-            totalCustomers: customersWithCredit.length,
+            totalCustomers: totalCount,
             totalOutstanding,
-            customers: customersWithCredit.map((c: any) => ({
+            prepaidCount,
+            totalPrepaid,
+            riskCount,
+            page,
+            limit,
+            customers: paginatedCustomers.map((c: any) => ({
                 id: c.id,
                 name: c.name,
                 phone: c.phone,

@@ -12,7 +12,7 @@ interface CustomerWalletHistoryProps {
 
 export function CustomerWalletHistory({ customerId }: CustomerWalletHistoryProps) {
     const { data: historyResponse, isLoading, error } = useQuery({
-        queryKey: ['/api/customers', customerId, 'wallet-history'],
+        queryKey: ['customers', customerId, 'wallet-history'],
         enabled: !!customerId,
     });
 

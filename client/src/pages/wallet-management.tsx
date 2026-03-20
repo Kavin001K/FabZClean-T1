@@ -61,11 +61,28 @@ const toNumber = (value: unknown, fallback = 0) => {
 };
 
 const fetchCustomers = async (): Promise<WalletCustomer[]> => {
-  const res = await authorizedFetch("/customers?limit=500");
-  if (!res.ok) throw new Error("Failed to load customers");
-  const payload = await res.json();
-  const rows = Array.isArray(payload) ? payload : payload?.data;
-  return Array.isArray(rows) ? rows : [];
+  const allCustomers: WalletCustomer[] = [];
+  let page = 1;
+  const batchSize = 500;
+  let hasMore = true;
+
+  while (hasMore) {
+    const res = await authorizedFetch(`/customers?limit=${batchSize}&page=${page}`);
+    if (!res.ok) throw new Error("Failed to load customers");
+    const payload = await res.json();
+    const rows = Array.isArray(payload) ? payload : payload?.data;
+    const batch = Array.isArray(rows) ? rows : [];
+    allCustomers.push(...batch);
+
+    // If we got fewer than batchSize, we've reached the end
+    if (batch.length < batchSize) {
+      hasMore = false;
+    } else {
+      page++;
+    }
+  }
+
+  return allCustomers;
 };
 
 const walletApi = {
@@ -342,47 +359,63 @@ export default function WalletManagementPage() {
 
         {/* Dashboard Summary Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-1">
-          <Card className="overflow-hidden border-none shadow-sm bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
-            <CardContent className="relative p-6">
-              <div className="absolute top-4 right-4 h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <Users className="h-5 w-5 text-blue-500" />
+          <Card className="glass border-muted border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-all">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
+                  <Users className="h-6 w-6 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Customers</p>
+                  <h3 className="text-2xl font-black tracking-tight text-blue-600">{totals.customers}</h3>
+                  <div className="mt-1 text-[10px] text-slate-400 font-medium italic">Active managed wallets</div>
+                </div>
               </div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Customers</p>
-              <p className="mt-1 text-3xl font-black tracking-tight text-slate-900 dark:text-white">{totals.customers}</p>
-              <div className="mt-2 text-[10px] text-slate-400 font-medium italic">Active managed wallets</div>
             </CardContent>
           </Card>
 
-          <Card className="overflow-hidden border-none shadow-sm bg-gradient-to-br from-amber-50 to-white dark:from-amber-950/20 dark:to-slate-950">
-            <CardContent className="relative p-6">
-              <div className="absolute top-4 right-4 h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center">
-                <IndianRupee className="h-5 w-5 text-amber-500" />
+          <Card className="glass border-muted border-l-4 border-l-amber-500 shadow-sm hover:shadow-md transition-all">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                  <IndianRupee className="h-6 w-6 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Outstanding</p>
+                  <h3 className="text-2xl font-black tracking-tight text-amber-600">₹{totals.totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</h3>
+                  <div className="mt-1 text-[10px] text-amber-500/60 font-medium italic">Total receivables</div>
+                </div>
               </div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">Outstanding</p>
-              <p className="mt-1 text-3xl font-black tracking-tight text-amber-600">₹{totals.totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
-              <div className="mt-2 text-[10px] text-amber-500/60 font-medium italic">Total receivables</div>
             </CardContent>
           </Card>
 
-          <Card className="overflow-hidden border-none shadow-sm bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/20 dark:to-slate-950">
-            <CardContent className="relative p-6">
-              <div className="absolute top-4 right-4 h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <Wallet className="h-5 w-5 text-emerald-500" />
+          <Card className="glass border-muted border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-all">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+                  <Wallet className="h-6 w-6 text-emerald-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Prepaid</p>
+                  <h3 className="text-2xl font-black tracking-tight text-emerald-600">₹{totals.totalPrepaid.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</h3>
+                  <div className="mt-1 text-[10px] text-emerald-500/60 font-medium italic">Available balances</div>
+                </div>
               </div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Prepaid</p>
-              <p className="mt-1 text-3xl font-black tracking-tight text-emerald-600">₹{totals.totalPrepaid.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
-              <div className="mt-2 text-[10px] text-emerald-500/60 font-medium italic">Available balances</div>
             </CardContent>
           </Card>
 
-          <Card className="overflow-hidden border-none shadow-sm bg-gradient-to-br from-rose-50 to-white dark:from-rose-950/20 dark:to-slate-950">
-            <CardContent className="relative p-6">
-              <div className="absolute top-4 right-4 h-10 w-10 rounded-full bg-rose-500/10 flex items-center justify-center">
-                <AlertTriangle className="h-5 w-5 text-rose-500" />
+          <Card className="glass border-muted border-l-4 border-l-rose-500 shadow-sm hover:shadow-md transition-all">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-xl bg-rose-500/10 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="h-6 w-6 text-rose-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Risk</p>
+                  <h3 className="text-2xl font-black tracking-tight text-rose-600">{totals.exceededCount}</h3>
+                  <div className="mt-1 text-[10px] text-rose-500/60 font-medium italic">Over-limit accounts</div>
+                </div>
               </div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-rose-600">Risk</p>
-              <p className="mt-1 text-3xl font-black tracking-tight text-rose-600">{totals.exceededCount}</p>
-              <div className="mt-2 text-[10px] text-rose-500/60 font-medium italic">Over-limit accounts</div>
             </CardContent>
           </Card>
         </div>
@@ -393,18 +426,18 @@ export default function WalletManagementPage() {
             <CardDescription>Live search and transaction management for all customer wallets.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center">
-              <div className="relative flex-1 group">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="relative flex-1 lg:max-w-xl group">
                 <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10 h-11 text-sm border-primary/10 focus:border-primary/30 transition-all bg-muted/20"
+                  className="pl-10 h-11 text-sm border-muted focus-visible:ring-primary/20 transition-all bg-muted/5 group-hover:bg-muted/10 font-medium"
                   placeholder="Search customer by name / phone / email"
                 />
               </div>
               <Select value={filter} onValueChange={(value) => setFilter(value as FilterType)}>
-                <SelectTrigger className="w-full sm:w-44">
+                <SelectTrigger className="w-full sm:w-44 h-11 border-muted bg-transparent focus:ring-primary/20">
                   <SelectValue placeholder="Filter" />
                 </SelectTrigger>
                 <SelectContent>

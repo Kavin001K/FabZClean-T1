@@ -27,12 +27,12 @@ export default function DeliveriesManagement() {
 
     // Fetch Orders
     const { data: ordersData, isLoading: isLoadingOrders } = useQuery({
-        queryKey: ['/api/orders'],
+        queryKey: ['orders'],
     });
 
     // Fetch Delivery Employees
     const { data: employeesData } = useQuery({
-        queryKey: ['/api/employees'],
+        queryKey: ['employees'],
     });
 
     // Extract orders list (handling paginated response if applicable)
@@ -79,7 +79,7 @@ export default function DeliveriesManagement() {
                 title: "Success",
                 description: "Delivery partner assigned successfully.",
             });
-            queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
             setIsAssignModalOpen(false);
             setSelectedOrder(null);
             setSelectedPartnerId("");

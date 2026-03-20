@@ -42,7 +42,7 @@ router.get('/autocomplete', async (req, res) => {
     
     // If empty query, just return recent customers
     if (searchQuery.length === 0) {
-      results = await storage.listCustomers(undefined, {
+      const { data: results } = await storage.listCustomers(undefined, {
         limit: limitNum,
         sortBy: 'createdAt',
         sortOrder: 'desc'
@@ -56,10 +56,11 @@ router.get('/autocomplete', async (req, res) => {
       results = await (storage as any).searchCustomersAutocomplete(searchQuery, limitNum);
     } else {
       // Fallback to standard search
-      results = await storage.listCustomers(undefined, {
+      const { data: searchResults } = await storage.listCustomers(undefined, {
         search: searchQuery,
         limit: limitNum,
       });
+      results = searchResults;
     }
 
     const serializedCustomers = results.map((customer: Customer) => serializeCustomer(customer));
@@ -85,16 +86,23 @@ router.get('/', async (req, res) => {
 
     // Use database-level filtering for search-heavy paths to avoid loading the
     // entire customer base into the UI during order creation/autocomplete.
-    let customers = await storage.listCustomers(undefined, {
+    const pageNum = parseInt(req.query.page as string) || 1;
+    const limitNum = parseInt(limit as string) || 50;
+
+    // Use database-level filtering and pagination
+    const { data: customers, totalCount } = await storage.listCustomers(undefined, {
       search: typeof search === 'string' ? search : undefined,
       phone: typeof phone === 'string' ? phone : undefined,
       sortBy: typeof sortBy === 'string' ? sortBy : undefined,
       sortOrder: sortOrder === 'asc' ? 'asc' : 'desc',
+      page: pageNum,
+      limit: limitNum
     });
 
-    // Apply segment filter
+    // Apply segment filter (if still needed on results, though ideally handled in DB)
+    let filteredCustomers = customers;
     if (segment && segment !== 'all') {
-      customers = customers.filter((customer: Customer) => {
+      filteredCustomers = customers.filter((customer: Customer) => {
         const segmentsData = (customer as any).segments;
         if (!segmentsData) return false;
         try {
@@ -107,27 +115,25 @@ router.get('/', async (req, res) => {
         }
       });
     }
-    // Apply pagination
-    const limitNum = parseInt(limit as string) || 20;
-    const startIndex = cursor ? customers.findIndex((c: Customer) => c.id === cursor) + 1 : 0;
-    const endIndex = startIndex + limitNum;
 
-    const paginatedCustomers = customers.slice(startIndex, endIndex);
-    const hasMore = endIndex < customers.length;
-    const nextCursor = hasMore ? paginatedCustomers[paginatedCustomers.length - 1]?.id : undefined;
+    // Return paginated response
+    const hasMore = (pageNum * limitNum) < totalCount;
+    const nextCursor = hasMore ? filteredCustomers[filteredCustomers.length - 1]?.id : undefined;
 
     // Serialize customers
-    const serializedCustomers = paginatedCustomers.map((customer: Customer) => serializeCustomer(customer));
+    const serializedCustomers = filteredCustomers.map((customer: Customer) => serializeCustomer(customer));
 
     // Return paginated response
     const response = createPaginatedResponse(serializedCustomers, {
       cursor: nextCursor,
       hasMore,
-      total: customers.length,
-      limit: limitNum
+      page: pageNum,
+      limit: limitNum,
+      total: totalCount
     });
 
-    res.json(response);
+    // Add totalCount at top level for frontend compatibility
+    res.json({ ...response, totalCount });
   } catch (error: any) {
     console.error('Get customers error:', error.message, error.stack);
     res.status(500).json(createErrorResponse(`Failed to fetch customers: ${error.message}`, 500));
@@ -161,8 +167,8 @@ router.post(
       const customerData = req.body;
 
       // Check if customer already exists
-      const existingCustomer = await storage.listCustomers();
-      const emailExists = existingCustomer.some((c: Customer) => c.email === customerData.email);
+      const { data: existingCustomers } = await storage.listCustomers();
+      const emailExists = existingCustomers.some((c: Customer) => c.email === customerData.email);
 
       if (emailExists) {
         return res.status(400).json(createErrorResponse('Customer with this email already exists', 400));
@@ -170,7 +176,7 @@ router.post(
 
       // Check if phone already exists
       if (customerData.phone) {
-        const phoneExists = existingCustomer.some((c: Customer) => c.phone === customerData.phone);
+        const phoneExists = existingCustomers.some((c: Customer) => c.phone === customerData.phone);
         if (phoneExists) {
           return res.status(400).json(createErrorResponse('Customer with this phone number already exists', 400));
         }
@@ -339,7 +345,7 @@ router.get('/:id/orders', async (req, res) => {
 // Get customer analytics
 router.get('/analytics/overview', async (req, res) => {
   try {
-    const customers = await storage.listCustomers();
+    const { data: customers } = await storage.listCustomers();
     const orders = await storage.listOrders();
 
     // Calculate customer segments
@@ -442,7 +448,7 @@ router.patch(
 // Get customer segments list
 router.get('/segments/list', async (req, res) => {
   try {
-    const customers = await storage.listCustomers();
+    const { data: customers } = await storage.listCustomers();
     const allSegments = new Set<string>();
 
     customers.forEach((customer: Customer) => {
@@ -602,5 +608,33 @@ router.get('/:id/credit-history', async (req, res) => {
     res.status(500).json(createErrorResponse(error.message || 'Failed to fetch credit history', 500));
   }
 });
+
+// Bulk import customers
+router.post(
+  "/import",
+  requireRole(CUSTOMER_EDITOR_ROLES),
+  async (req, res) => {
+    try {
+      const customers = req.body;
+      if (!Array.isArray(customers)) {
+        return res.status(400).json(createErrorResponse('Body must be an array of customers', 400));
+      }
+
+      if (customers.length > 5000) {
+        return res.status(400).json(createErrorResponse('Maximum 5000 customers per import', 400));
+      }
+
+      const result = await (storage as any).importCustomersBulk(customers);
+
+      // Notify real-time clients that something changed
+      realtimeServer.triggerUpdate('customer', 'bulk_imported', { count: result.inserted_count });
+
+      res.json(createSuccessResponse(result, 'Bulk import completed'));
+    } catch (error: any) {
+      console.error('Bulk import error:', error);
+      res.status(500).json(createErrorResponse(`Bulk import failed: ${error.message}`, 500));
+    }
+  }
+);
 
 export default router;

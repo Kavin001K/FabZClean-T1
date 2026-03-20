@@ -266,7 +266,7 @@ const WorkerDeliveryList: React.FC<WorkerDeliveryListProps> = ({ deliveries, dri
         title: "Status Updated",
         description: `Delivery status strongly updated to ${variables.newStatus}`,
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
       setIsDeliveryDetailsOpen(false);
     },
     onError: (err) => {

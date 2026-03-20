@@ -127,7 +127,7 @@ export default function WorkerPortal() {
     isLoading: deliveriesLoading,
     error: deliveriesError,
   } = useQuery({
-    queryKey: ['/api/orders'],
+    queryKey: ['orders'],
   });
 
   const ordersList = (ordersData as any)?.data || ordersData || [];

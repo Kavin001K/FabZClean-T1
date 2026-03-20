@@ -49,10 +49,10 @@ router.post('/bulk', jwtRequired, requireRole(['admin', 'factory_manager', 'fran
                 const serviceData = {
                     name: s.name,
                     category: s.category || 'General',
-                    description: s.description || '',
                     price: String(parseFloat(s.price) || 0),
-                    status: s.status === 'inactive' ? 'inactive' : 'active',
-                    duration: s.duration || '24 hrs'
+                    status: s.status === 'inactive' ? 'Inactive' : 'Active',
+                    duration: s.duration || '24 hrs',
+                    description: s.description || '',
                 };
 
                 const created = await db.createService(serviceData);

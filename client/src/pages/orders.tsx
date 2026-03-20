@@ -158,7 +158,8 @@ function OrdersComponent() {
   } = useQuery({
     queryKey: ['orders'],
     queryFn: ordersApi.getAll,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5000,
+    refetchInterval: 5000, // Background auto-sync 5s
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });

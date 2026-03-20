@@ -20,7 +20,9 @@ export default function AdminDashboard() {
     // Fetch all orders (single-tenant, no franchise filtering)
     const { data: orders = [], isLoading: isLoadingOrders } = useQuery({
         queryKey: ['admin-orders'],
-        queryFn: () => ordersApi.getAll()
+        queryFn: () => ordersApi.getAll(),
+        staleTime: 5000,
+        refetchInterval: 5000, // Background auto-sync 5s
     });
 
     // Calculate stats

@@ -9,7 +9,7 @@ export default function DeliveryProfile() {
     const { employee, signOut } = useAuth();
 
     const { data: response, isLoading } = useQuery({
-        queryKey: ['/api/deliveries/me/history'],
+        queryKey: ['deliveries', 'me', 'history'],
     });
 
     const stats = (response as any)?.data?.earnings;

@@ -16,8 +16,12 @@ import {
   IndianRupee,
   Clock,
   FileText,
+  Edit,
+  Upload,
   UserPlus,
-  Edit
+  ChevronLeft,
+  ChevronRight,
+  FileSpreadsheet
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -58,6 +62,9 @@ import { exportCustomersEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportCustomersToExcel } from '@/lib/excel-exports';
 import { createAddressObject } from '@/lib/address-utils';
 import type { Customer, Order } from '@shared/schema';
+import * as XLSX from 'xlsx';
+
+// Import New Import Component (I'll define it below or just use a dialog here)
 
 // Helper functions
 const getInitials = (name: string) => {
@@ -75,8 +82,7 @@ const getCustomerSegment = (customer: Customer) => {
 
   if (totalSpent >= 50000) return { label: 'VIP', color: 'bg-primary', variant: 'default' as const };
   if (totalSpent >= 20000 || totalOrders >= 10) return { label: 'Premium', color: 'bg-accent', variant: 'secondary' as const };
-  if (totalOrders > 0) return { label: 'Regular', color: 'bg-secondary', variant: 'outline' as const };
-  return { label: 'Inactive', color: 'bg-muted', variant: 'outline' as const };
+  return { label: 'Regular', color: 'bg-secondary', variant: 'outline' as const };
 };
 
 const getSpendingTier = (totalSpent: number) => {
@@ -92,39 +98,59 @@ export default function Customers() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [segmentFilter, setSegmentFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('name');
+  
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Fetch customers data
   const {
-    data: customersData,
+    data: customersResponse,
     isLoading: customersLoading,
     isError: customersError,
     error: customersErrorDetails,
   } = useQuery({
-    queryKey: ['customers'],
-    queryFn: customersApi.getAll,
-    staleTime: 5 * 60 * 1000,
-    retry: 3,
+    queryKey: ['customers', page, pageSize, searchQuery, sortBy],
+    queryFn: () => customersApi.getAll({ 
+      page, 
+      limit: pageSize, 
+      search: searchQuery,
+      sortBy 
+    }),
+    staleTime: 5000, 
+    refetchInterval: 5000, // Background auto-sync 5s
+    retry: 2,
   });
 
-  // Ensure customers is always an array
-  const customers = useMemo(() => {
-    if (!customersData) return [];
-    if (Array.isArray(customersData)) return customersData;
-    // Handle case where API returns wrapped data
-    if (customersData && typeof customersData === 'object') {
-      const wrappedData = customersData as { data?: unknown };
-      if ('data' in wrappedData && Array.isArray(wrappedData.data)) {
-        return wrappedData.data as Customer[];
-      }
+  // Ensure customers is always an array and get total count
+  const { customers, totalCount } = useMemo(() => {
+    if (!customersResponse) return { customers: [], totalCount: 0 };
+    
+    // Handle the new response format { data, totalCount }
+    if (typeof customersResponse === 'object' && 'data' in customersResponse && Array.isArray(customersResponse.data)) {
+      return {
+        customers: customersResponse.data as Customer[],
+        totalCount: (customersResponse as any).totalCount || 0
+      };
     }
-    return [];
-  }, [customersData]);
+    
+    // Legacy support for plain arrays
+    if (Array.isArray(customersResponse)) {
+      return {
+        customers: customersResponse,
+        totalCount: customersResponse.length
+      };
+    }
+    
+    return { customers: [], totalCount: 0 };
+  }, [customersResponse]);
 
   // Fetch orders for customer analytics
   const {
@@ -132,19 +158,18 @@ export default function Customers() {
   } = useQuery({
     queryKey: ['orders'],
     queryFn: ordersApi.getAll,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 5000,
+    refetchInterval: 5000, // Background auto-sync 5s
   });
 
   // Computed metrics
   const metrics = useMemo(() => {
-    const totalCustomers = customers.length;
-    const totalRevenue = customers.length > 0
-      ? customers.reduce((sum, c) => sum + safeParseFloat(c.totalSpent), 0)
-      : 0;
-    const totalOrders = customers.length > 0
-      ? customers.reduce((sum, c) => sum + (c.totalOrders ?? 0), 0)
-      : 0;
-    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    const totalCustomers = totalCount;
+    // Metrics based on loaded page (approximate for UI) or ideally from another endpoint
+    const loadedRevenue = (customers || []).reduce((sum, c) => sum + safeParseFloat(c.totalSpent), 0);
+    const loadedOrders = (customers || []).reduce((sum, c) => sum + (c.totalOrders ?? 0), 0);
+    
+    const avgOrderValue = loadedOrders > 0 ? loadedRevenue / loadedOrders : 0;
 
     const vipCustomers = (customers || []).filter(c => {
       const spent = safeParseFloat(c.totalSpent);
@@ -162,15 +187,14 @@ export default function Customers() {
 
     return {
       totalCustomers,
-      totalRevenue,
-      totalOrders,
+      totalRevenue: loadedRevenue,
+      totalOrders: loadedOrders,
       avgOrderValue,
       vipCustomers,
       premiumCustomers,
       regularCustomers,
-      inactiveCustomers,
     };
-  }, [customers]);
+  }, [customers, totalCount]);
 
   // Filtered and sorted customers
   const filteredCustomers = useMemo(() => {
@@ -216,6 +240,9 @@ export default function Customers() {
 
     return filtered;
   }, [customers, searchQuery, segmentFilter, sortBy]);
+
+  const hasNextPage = (page * pageSize) < totalCount;
+  const hasPrevPage = page > 1;
 
   // Mutations
   const createCustomerMutation = useMutation({
@@ -377,6 +404,17 @@ export default function Customers() {
     });
   };
 
+  const downloadTemplate = () => {
+    const data = [
+      ['Name*', 'Phone*', 'Email', 'Address Street', 'Address City', 'Address Pincode', 'Notes', 'Company Name', 'Tax ID', 'Date of Birth (YYYY-MM-DD)'],
+      ['John Doe', '9876543210', 'john@example.com', '123 Main St', 'Coimbatore', '641001', 'Regular customer', 'Example Inc', 'GST12345', '1990-01-01']
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Customers");
+    XLSX.writeFile(wb, "Customer_Import_Template.xlsx");
+  };
+
   const handleExportPDF = () => {
     exportCustomersEnhanced(filteredCustomers);
     toast({
@@ -440,54 +478,65 @@ export default function Customers() {
       <div className="container-desktop min-h-screen py-8 gradient-mesh">
         {/* Header Section */}
         <FadeIn delay={0.1}>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pb-6 border-b border-primary/10">
-            <div className="text-center sm:text-left">
-              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground flex items-center justify-center sm:justify-start gap-4">
-                <Users className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
-                Customers & CRM
-              </h1>
-              <p className="text-muted-foreground mt-2 text-sm sm:text-base max-w-xl">
-                Manage your customer relationships, track lifetime value, and analyze spending patterns with real-time insights.
-              </p>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10 pb-6 border-b border-white/5">
+            <div className="space-y-2">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20 shadow-inner">
+                  <Users className="h-7 w-7 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-black tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-br from-foreground to-foreground/60">
+                    Customer Directory
+                  </h1>
+                  <div className="text-muted-foreground text-sm font-medium flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Managing {totalCount} active customer relationships
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex gap-2 sm:gap-3 shrink-0">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Download className="h-4 w-4" />
-                    <span className="hidden sm:inline">Export</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Export Options</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleExportPDF}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    All Customers (PDF)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExportExcel}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    All Customers (Excel)
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleExportSegmented('vip')}>
-                    <Award className="mr-2 h-4 w-4" />
-                    VIP Customers
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExportSegmented('premium')}>
-                    <TrendingUp className="mr-2 h-4 w-4" />
-                    Premium Customers
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExportSegmented('regular')}>
-                    <Users className="mr-2 h-4 w-4" />
-                    Regular Customers
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button onClick={() => setIsCreateDialogOpen(true)} size="sm" className="gap-2 gradient-primary">
+            
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              <div className="flex items-center gap-2 bg-muted/20 p-1.5 rounded-xl border border-white/5 shadow-inner">
+                <Button 
+                  onClick={handleExportExcel} 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-9 px-4 gap-2 text-xs font-bold hover:bg-emerald-500/10 hover:text-emerald-500 transition-all"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  <span className="hidden sm:inline">Excel</span>
+                </Button>
+                <Button 
+                  onClick={handleExportPDF} 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-9 px-4 gap-2 text-xs font-bold hover:bg-blue-500/10 hover:text-blue-500 transition-all"
+                >
+                  <FileText className="h-4 w-4" />
+                  <span className="hidden sm:inline">PDF Report</span>
+                </Button>
+              </div>
+
+              <div className="w-px h-8 bg-white/5 hidden md:block mx-1" />
+
+              <Button 
+                onClick={() => setIsImportDialogOpen(true)} 
+                variant="outline" 
+                size="sm" 
+                className="h-11 px-5 gap-2 border-white/10 hover:bg-white/5 text-sm font-semibold transition-all rounded-xl"
+              >
+                <Upload className="h-4 w-4 text-primary" />
+                <span>Import</span>
+              </Button>
+
+              <Button 
+                onClick={() => setIsCreateDialogOpen(true)} 
+                size="sm" 
+                className="h-11 px-6 gap-2 gradient-primary shadow-xl shadow-primary/20 text-sm font-bold transition-all hover:scale-[1.02] active:scale-[0.98] rounded-xl"
+              >
                 <UserPlus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add Customer</span>
-                <span className="sm:hidden">Add</span>
+                <span>Add Customer</span>
               </Button>
             </div>
           </div>
@@ -495,73 +544,66 @@ export default function Customers() {
 
         {/* KPI Cards */}
         <FadeIn delay={0.2}>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
-            <Card className="glass border-none shadow-xl hover:shadow-primary/10 transition-all duration-300">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Reached
-                </CardTitle>
-                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                  <Users className="h-5 w-5 text-primary" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-foreground">{metrics.totalCustomers}</div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
-                  <span className="text-destructive font-medium">{metrics.inactiveCustomers}</span> inactive accounts
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="glass border-none shadow-xl hover:shadow-primary/10 transition-all duration-300">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Revenue
-                </CardTitle>
-                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                  <IndianRupee className="h-5 w-5 text-primary" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-foreground">₹{metrics.totalRevenue.toFixed(0)}</div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2 text-primary font-medium">
-                  <TrendingUp className="h-3 w-3" />
-                  ₹{metrics.avgOrderValue.toFixed(0)} avg/order
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Card className="glass border-muted border-l-4 border-l-primary shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                    <Users className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Reached</p>
+                    <h3 className="text-2xl font-black tracking-tight text-foreground">
+                      {customersLoading ? '...' : metrics.totalCustomers}
+                    </h3>
+                    <div className="mt-1 text-[10px] text-slate-400 font-medium italic">Active customer base</div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="glass border-none shadow-xl hover:shadow-accent/10 transition-all duration-300">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  VIP Club
-                </CardTitle>
-                <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
-                  <Award className="h-5 w-5 text-accent" />
+            <Card className="glass border-muted border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+                    <IndianRupee className="h-6 w-6 text-emerald-500" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Revenue</p>
+                    <h3 className="text-2xl font-black tracking-tight text-emerald-600">₹{metrics.totalRevenue.toFixed(0)}</h3>
+                    <div className="mt-1 text-[10px] text-emerald-500/60 font-medium italic">₹{metrics.avgOrderValue.toFixed(0)} avg/order</div>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-foreground">{metrics.vipCustomers}</div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  <span className="text-accent font-medium">{metrics.premiumCustomers}</span> premium tier
-                </p>
               </CardContent>
             </Card>
 
-            <Card className="glass border-none shadow-xl hover:shadow-secondary/10 transition-all duration-300">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Orders
-                </CardTitle>
-                <div className="w-10 h-10 rounded-lg bg-secondary/20 flex items-center justify-center">
-                  <ShoppingBag className="h-5 w-5 text-secondary" />
+            <Card className="glass border-muted border-l-4 border-l-amber-500 shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                    <Award className="h-6 w-6 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">VIP Club</p>
+                    <h3 className="text-2xl font-black tracking-tight text-amber-600">{metrics.vipCustomers}</h3>
+                    <div className="mt-1 text-[10px] text-amber-500/60 font-medium italic">{metrics.premiumCustomers} premium tier</div>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-foreground">{metrics.totalOrders}</div>
-                <p className="text-xs text-muted-foreground mt-2 font-medium">
-                  Across entire base
-                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="glass border-muted border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
+                    <ShoppingBag className="h-6 w-6 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Orders</p>
+                    <h3 className="text-2xl font-black tracking-tight text-blue-600">{metrics.totalOrders}</h3>
+                    <div className="mt-1 text-[10px] text-blue-500/60 font-medium italic">Across entire base</div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -569,21 +611,16 @@ export default function Customers() {
 
         {/* Search and Filter Bar */}
         <FadeIn delay={0.3}>
-          <Card className="glass mb-6">
-            <CardContent className="pt-6">
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="flex flex-col md:flex-row gap-4"
-              >
-                <div className="relative flex-1 group">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+          <Card className="glass mb-8 overflow-hidden border-muted">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="relative flex-1 lg:max-w-xl group">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
                     placeholder="Search by name, email, or phone..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 h-11 text-sm border-primary/10 focus:border-primary/30 transition-all bg-muted/20"
+                    className="pl-9 h-11 border-muted bg-muted/5 focus-visible:ring-primary/20"
                   />
                   <AnimatePresence>
                     {searchQuery && (
@@ -591,82 +628,83 @@ export default function Customers() {
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.8 }}
-                        transition={{ duration: 0.2 }}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                        className="absolute right-2 top-1/2 -translate-y-1/2"
                       >
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0 opacity-60 hover:opacity-100"
+                          className="h-8 w-8 p-0 hover:bg-transparent"
                           onClick={() => setSearchQuery('')}
                         >
-                          <X className="h-4 w-4" />
+                          <X className="h-4 w-4 text-muted-foreground" />
                         </Button>
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
 
-                <Select value={segmentFilter} onValueChange={setSegmentFilter}>
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <Filter className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="Segment" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Segments</SelectItem>
-                    <SelectItem value="vip">VIP</SelectItem>
-                    <SelectItem value="premium">Premium</SelectItem>
-                    <SelectItem value="regular">Regular</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <Select value={segmentFilter} onValueChange={setSegmentFilter}>
+                    <SelectTrigger className="w-[140px] sm:w-[160px] h-11 border-muted bg-transparent focus:ring-primary/20">
+                      <Filter className="h-3.5 w-3.5 mr-2 opacity-60" />
+                      <SelectValue placeholder="Segment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Segments</SelectItem>
+                      <SelectItem value="vip">VIP</SelectItem>
+                      <SelectItem value="premium">Premium</SelectItem>
+                      <SelectItem value="regular">Regular</SelectItem>
+                    </SelectContent>
+                  </Select>
 
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="name">Name (A-Z)</SelectItem>
-                    <SelectItem value="spending">Highest Spending</SelectItem>
-                    <SelectItem value="orders">Most Orders</SelectItem>
-                    <SelectItem value="recent">Recent Activity</SelectItem>
-                  </SelectContent>
-                </Select>
-              </motion.div>
+                  <Select value={sortBy} onValueChange={setSortBy}>
+                    <SelectTrigger className="w-[140px] sm:w-[160px] h-11 border-muted bg-transparent focus:ring-primary/20">
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="name">Name (A-Z)</SelectItem>
+                      <SelectItem value="spending">Highest Spending</SelectItem>
+                      <SelectItem value="orders">Most Orders</SelectItem>
+                      <SelectItem value="recent">Recent Activity</SelectItem>
+                    </SelectContent>
+                  </Select>
 
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2, duration: 0.3 }}
-                className="mt-4 flex items-center gap-4 text-sm text-muted-foreground"
-              >
-                <span>
-                  Showing <strong className="text-foreground">{filteredCustomers.length}</strong> of{' '}
-                  <strong className="text-foreground">{customers.length}</strong> customers
-                </span>
-                <AnimatePresence>
+                  <div className="h-11 w-px bg-muted/50 mx-1 hidden sm:block" />
+
+                  <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(parseInt(v)); setPage(1); }}>
+                    <SelectTrigger className="w-[100px] sm:w-[120px] h-11 border-muted bg-transparent focus:ring-primary/20">
+                      <SelectValue placeholder="Page size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="50">50 / page</SelectItem>
+                      <SelectItem value="100">100 / page</SelectItem>
+                      <SelectItem value="500">500 / page</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between">
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <span>
+                    Showing <strong className="text-foreground">{customers.length}</strong> of{' '}
+                    <strong className="text-foreground">{totalCount}</strong> customers
+                  </span>
                   {(searchQuery || segmentFilter !== 'all') && (
-                    <motion.div
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -10 }}
-                      transition={{ duration: 0.2 }}
+                    <Button
+                      variant="link"
+                      size="sm"
+                      onClick={() => {
+                        setSearchQuery('');
+                        setSegmentFilter('all');
+                      }}
+                      className="h-auto p-0 text-primary hover:text-primary/80 decoration-primary/30"
                     >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSearchQuery('');
-                          setSegmentFilter('all');
-                        }}
-                        className="h-7"
-                      >
-                        Clear filters
-                      </Button>
-                    </motion.div>
+                      Clear all filters
+                    </Button>
                   )}
-                </AnimatePresence>
-              </motion.div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </FadeIn>
@@ -856,11 +894,11 @@ export default function Customers() {
                           </div>
 
                           {/* Quick Actions */}
-                          <div className="flex gap-2 pt-2">
+                          <div className="grid grid-cols-3 gap-2 pt-2">
                             <Button
                               variant="outline"
                               size="sm"
-                              className="flex-1 gap-2"
+                              className="w-full gap-2 text-[10px] h-9"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (customer.email) {
@@ -869,13 +907,13 @@ export default function Customers() {
                               }}
                               disabled={!customer.email}
                             >
-                              <Mail className="h-4 w-4" />
-                              Email
+                              <Mail className="h-3.5 w-3.5" />
+                              <span className="hidden sm:inline">Email</span>
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="flex-1 gap-2"
+                              className="w-full gap-2 text-[10px] h-9"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (customer.phone) {
@@ -884,20 +922,20 @@ export default function Customers() {
                               }}
                               disabled={!customer.phone}
                             >
-                              <Phone className="h-4 w-4" />
-                              Call
+                              <Phone className="h-3.5 w-3.5" />
+                              <span className="hidden sm:inline">Call</span>
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="flex-1 gap-2"
+                              className="w-full gap-2 text-[10px] h-9 group-hover:bg-primary group-hover:text-white transition-all"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleEditCustomer(customer);
                               }}
                             >
-                              <Edit className="h-4 w-4" />
-                              Edit
+                              <Edit className="h-3.5 w-3.5" />
+                              <span className="hidden sm:inline">Edit</span>
                             </Button>
                           </div>
                         </CardContent>
@@ -911,22 +949,245 @@ export default function Customers() {
         </FadeIn>
 
         {/* Customer Dialogs */}
-        <CustomerDialogs
-          selectedCustomer={selectedCustomer}
-          isViewDialogOpen={isViewDialogOpen}
-          isEditDialogOpen={isEditDialogOpen}
-          isCreateDialogOpen={isCreateDialogOpen}
-          isCreating={createCustomerMutation.isPending}
-          isUpdating={editCustomerMutation.isPending}
-          onCloseViewDialog={() => setIsViewDialogOpen(false)}
-          onCloseEditDialog={() => setIsEditDialogOpen(false)}
-          onCloseCreateDialog={() => setIsCreateDialogOpen(false)}
-          onEditCustomer={handleUpdateCustomer}
-          onCreateCustomer={handleCreateCustomer}
-          onDeleteCustomer={handleDeleteCustomer}
-          orders={orders}
+      <CustomerDialogs
+        isCreateDialogOpen={isCreateDialogOpen}
+        onCloseCreateDialog={() => setIsCreateDialogOpen(false)}
+        isEditDialogOpen={isEditDialogOpen}
+        onCloseEditDialog={() => setIsEditDialogOpen(false)}
+        isViewDialogOpen={isViewDialogOpen}
+        onCloseViewDialog={() => setIsViewDialogOpen(false)}
+        selectedCustomer={selectedCustomer}
+        onCreateCustomer={handleCreateCustomer}
+        onEditCustomer={handleUpdateCustomer}
+        onDeleteCustomer={handleDeleteCustomer}
+        isCreating={createCustomerMutation.isPending}
+        isUpdating={editCustomerMutation.isPending}
+        orders={[]} 
+      />
+
+      {/* Pagination Controls */}
+      {!customersLoading && filteredCustomers.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pb-12">
+          <p className="text-sm text-muted-foreground order-2 sm:order-1">
+            Showing <span className="font-medium text-foreground">{(page - 1) * pageSize + 1}</span> to{' '}
+            <span className="font-medium text-foreground">{Math.min(page * pageSize, metrics.totalCustomers)}</span> of{' '}
+            <span className="font-medium text-foreground">{metrics.totalCustomers}</span> customers
+          </p>
+          <div className="flex items-center gap-2 order-1 sm:order-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={!hasPrevPage}
+              className="gap-1 h-9"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            <div className="flex items-center justify-center min-w-[32px] font-medium text-sm">
+              {page}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => p + 1)}
+              disabled={!hasNextPage}
+              className="gap-1 h-9"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+      {/* Import Dialog */}
+      {isImportDialogOpen && (
+        <ImportCustomerModal
+          isOpen={isImportDialogOpen}
+          onClose={() => setIsImportDialogOpen(false)}
+          onDownloadTemplate={downloadTemplate}
+          onImport={(data: any) => {
+            customersApi.importMany(data).then((res) => {
+              toast({
+                title: "Import Successful",
+                description: `Imported ${res.inserted_count} customers. ${res.skipped_phones.length} duplicates skipped.`,
+              });
+              queryClient.invalidateQueries({ queryKey: ["customers"] });
+              setIsImportDialogOpen(false);
+            }).catch(err => {
+              toast({
+                title: "Import Failed",
+                description: err.message,
+                variant: "destructive"
+              });
+            });
+          }}
         />
+      )}
       </div>
     </PageTransition>
   );
-};
+}
+
+// Separate component for Import Modal for cleaner code
+function ImportCustomerModal({ isOpen, onClose, onDownloadTemplate, onImport }: any) {
+  const [file, setFile] = useState<File | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file) return;
+    setIsProcessing(true);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        // Map Excel columns to Customer fields with more flexibility
+        const mappedData = jsonData.map((row: any) => {
+          // Normalize column access
+          const getValue = (keys: string[]) => {
+            for (const key of keys) {
+              if (row[key] !== undefined && row[key] !== null) return row[key];
+            }
+            return undefined;
+          };
+
+          const name = getValue(['Name*', 'Name', 'Full Name', 'Customer Name', 'name']);
+          const phone = String(getValue(['Phone*', 'Phone', 'Mobile', 'Contact', 'phone', 'Mobile Number']) || '').trim();
+          
+          if (!name || !phone) return null;
+
+          return {
+            name: String(name).trim(),
+            phone: phone,
+            email: getValue(['Email', 'email', 'E-mail']),
+            address: createAddressObject({
+              street: String(getValue(['Address Street', 'Street', 'Address Line 1', 'address_street']) || '').trim(),
+              city: String(getValue(['Address City', 'City', 'address_city']) || 'Pollachi').trim(),
+              pincode: String(getValue(['Address Pincode', 'Pincode', 'Zip Code', 'address_pincode']) || '').trim(),
+            }),
+            notes: getValue(['Notes', 'Notes', 'Remarks', 'notes']),
+            companyName: getValue(['Company Name', 'Company', 'company_name']),
+            taxId: getValue(['Tax ID', 'TaxID', 'GST No', 'GST', 'tax_id']),
+            dateOfBirth: getValue(['Date of Birth (YYYY-MM-DD)', 'Birthday', 'DOB', 'date_of_birth']),
+            creditLimit: String(getValue(['Credit Limit', 'CreditLimit', 'Limit', 'credit_limit']) || '1000').trim(),
+            status: getValue(['Status', 'Account Status', 'status']) || 'active',
+            paymentTerms: getValue(['Payment Terms', 'Terms', 'payment_terms']),
+            franchiseId: getValue(['Franchise ID', 'Franchise', 'franchise_id']),
+            totalOrders: getValue(['Total Orders', 'Orders', 'total_orders']),
+            totalSpent: getValue(['Total Spent', 'Revenue', 'LTV', 'total_spent']),
+          };
+        }).filter(Boolean); // Filter out rows with missing required fields
+
+        if (mappedData.length === 0) {
+          throw new Error("No valid customer data found. Ensure Name and Phone columns exist.");
+        }
+
+        onImport(mappedData);
+      } catch (err: any) {
+        alert("Error parsing file: " + err.message);
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-md overflow-hidden"
+      >
+        <div className="p-6 border-b border-border flex items-center justify-between bg-muted/30">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Upload className="h-5 w-5 text-primary" />
+            Import Customers
+          </h2>
+          <Button variant="ghost" size="icon" onClick={onClose} disabled={isProcessing}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        <div className="p-8 space-y-6">
+          <div className="text-center space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Upload an Excel or CSV file to import customers in bulk.
+            </p>
+            <Button variant="link" size="sm" onClick={onDownloadTemplate} className="text-primary font-medium gap-2">
+              <Download className="h-4 w-4" />
+              Download Template
+            </Button>
+          </div>
+
+          <div 
+            className={`border-2 border-dashed rounded-lg p-10 text-center transition-all cursor-pointer hover:bg-muted/50 ${file ? 'border-primary/50 bg-primary/5' : 'border-muted-foreground/20'}`}
+            onClick={() => document.getElementById('file-upload')?.click()}
+          >
+            <input 
+              type="file" 
+              id="file-upload" 
+              className="hidden" 
+              accept=".xlsx, .xls, .csv" 
+              onChange={handleFileChange}
+            />
+            {file ? (
+              <div className="space-y-4">
+                <FileSpreadsheet className="h-12 w-12 text-primary mx-auto" />
+                <div>
+                  <p className="font-semibold text-foreground">{file.name}</p>
+                  <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setFile(null); }} className="h-8 text-destructive">
+                  Remove file
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                  <Upload className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">Click to upload or drag and drop</p>
+                  <p className="text-xs text-muted-foreground mt-1">Excel or CSV files only</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 pt-4">
+            <Button variant="outline" onClick={onClose} disabled={isProcessing}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpload} 
+              disabled={!file || isProcessing}
+              className="gradient-primary relative"
+            >
+              {isProcessing ? (
+                <>
+                  <span className="animate-spin mr-2">◌</span>
+                  Importing...
+                </>
+              ) : (
+                'Import Now'
+              )}
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}

@@ -538,21 +538,21 @@ export default function Services() {
         transition={{ duration: 0.4, delay: 0.3, ease: [0.4, 0, 0.2, 1] }}
       >
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center">
-              <div className="relative flex-1 group">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="relative flex-1 lg:max-w-xl group">
                 <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input
                   placeholder="Search services by name, description, or category..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 h-11 text-sm border-primary/10 focus:border-primary/30 transition-all bg-muted/20"
+                  className="pl-10 h-11 text-sm border-muted focus-visible:ring-primary/20 transition-all bg-muted/5 group-hover:bg-muted/10 font-medium"
                   aria-label="Search services by name, description, or category"
                 />
               </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="w-full sm:w-[180px]" aria-label="Filter by category">
+                  <SelectTrigger className="w-[140px] sm:w-[180px] h-11 border-muted bg-transparent focus:ring-primary/20" aria-label="Filter by category">
                     <SelectValue placeholder="All Categories" />
                   </SelectTrigger>
                   <SelectContent>
@@ -565,7 +565,7 @@ export default function Services() {
                 </Select>
 
                 <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger className="w-full sm:w-[140px]" aria-label="Filter by status">
+                  <SelectTrigger className="w-[110px] sm:w-[130px] h-11 border-muted bg-transparent focus:ring-primary/20" aria-label="Filter by status">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -576,7 +576,7 @@ export default function Services() {
                 </Select>
 
                 <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-                  <SelectTrigger className="w-full sm:w-[140px]" aria-label="Sort services">
+                  <SelectTrigger className="w-[110px] sm:w-[130px] h-11 border-muted bg-transparent focus:ring-primary/20" aria-label="Sort services">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent>
@@ -586,12 +586,12 @@ export default function Services() {
                   </SelectContent>
                 </Select>
 
-                <div className="flex w-full border rounded-md sm:w-auto">
+                <div className="flex items-center h-11 gap-1 border border-muted rounded-md p-1 bg-muted/5">
                   <Button
                     variant={viewMode === 'grid' ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => setViewMode('grid')}
-                    className="flex-1 rounded-r-none sm:flex-none"
+                    className={`h-full px-2.5 transition-all ${viewMode === 'grid' ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted text-muted-foreground'}`}
                   >
                     <Grid3x3 className="h-4 w-4" />
                   </Button>
@@ -599,7 +599,7 @@ export default function Services() {
                     variant={viewMode === 'list' ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => setViewMode('list')}
-                    className="flex-1 rounded-l-none sm:flex-none"
+                    className={`h-full px-2.5 transition-all ${viewMode === 'list' ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted text-muted-foreground'}`}
                   >
                     <List className="h-4 w-4" />
                   </Button>

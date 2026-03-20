@@ -14,7 +14,7 @@ export default function DeliveryHome() {
     const queryClient = useQueryClient();
 
     const { data: response, isLoading } = useQuery({
-        queryKey: ['/api/deliveries/me/active'],
+        queryKey: ['deliveries', 'me', 'active'],
         refetchInterval: 15000, // Auto-refresh every 15s
     });
 
@@ -27,8 +27,8 @@ export default function DeliveryHome() {
         },
         onSuccess: (_, orderId) => {
             toast({ title: '✅ Delivery Complete', description: 'Order marked as delivered successfully.' });
-            queryClient.invalidateQueries({ queryKey: ['/api/deliveries/me/active'] });
-            queryClient.invalidateQueries({ queryKey: ['/api/deliveries/me/history'] });
+            queryClient.invalidateQueries({ queryKey: ['deliveries', 'me', 'active'] });
+            queryClient.invalidateQueries({ queryKey: ['deliveries', 'me', 'history'] });
         },
         onError: (error: any) => {
             toast({ title: 'Delivery Failed', description: error.message || 'Something went wrong.', variant: 'destructive' });

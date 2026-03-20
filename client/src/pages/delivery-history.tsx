@@ -14,7 +14,7 @@ export default function DeliveryHistory() {
     const [filter, setFilter] = useState<FilterType>('today');
 
     const { data: response, isLoading } = useQuery({
-        queryKey: ['/api/deliveries/me/history'],
+        queryKey: ['deliveries', 'me', 'history'],
     });
 
     const orders = useMemo(() => {

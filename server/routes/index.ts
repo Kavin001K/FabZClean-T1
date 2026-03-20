@@ -4,6 +4,8 @@ import customersRouter from './customers';
 import employeesRouter from './employees';
 import productsRouter from './products';
 import servicesRouter from './services';
+import deliveriesRouter from './deliveries';
+import deliveriesApiRouter from './deliveries-api';
 import searchRouter from './api/search';
 import algorithmsRouter from './api/algorithms';
 import websocketMetricsRouter from './api/websocket-metrics';
@@ -25,6 +27,10 @@ import publicTrackingRouter from './public-tracking';
 import publicInvoiceRouter from './public-invoice';
 import businessSettingsRouter from './business-settings';
 import walletRouter from './wallet';
+import franchiseRouter from './franchise';
+import driversRouter from './drivers';
+import tasksRouter from './tasks';
+import transitRouter from './transit';
 import { jwtRequired } from '../middleware/auth';
 import { debugRouter } from './debug';
 import { db as storage } from '../db';
@@ -44,6 +50,9 @@ export function registerAllRoutes(app: Express): void {
       statusCode: 410,
     });
   });
+
+  // Partner Portal deliveries
+  app.use('/api/v1/deliveries/portal', deliveriesApiRouter);
 
   // Due Date Orders endpoint
   app.get("/api/due-date-orders", jwtRequired, async (req, res) => {
@@ -159,6 +168,10 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/employees', employeesRouter);
   app.use('/api/v1/orders', ordersRouter);
   app.use('/api/v1/customers', customersRouter);
+  app.use('/api/franchises', franchiseRouter);
+  app.use('/api/drivers', driversRouter);
+  app.use('/api/tasks', tasksRouter);
+  app.use('/api/transit', transitRouter);
 
   // API v1 routes
   app.use('/api/audit-logs', auditLogsRouter);
@@ -166,12 +179,12 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/credits', creditsRouter);
   app.use('/api/wallet', walletRouter);
   app.use('/api/reports', reportsRouter);
-  app.use('/api/deliveries', deliveryDisabledRouter);
+  app.use('/api/deliveries', deliveriesRouter);
 
   // Initialize the autonomous analytics cron job
   initAnalyticsCron();
 
-  app.use('/api/v1/deliveries', deliveryDisabledRouter);
+  app.use('/api/v1/deliveries', deliveriesRouter);
   app.use('/api/v1/products', productsRouter);
   app.use('/api/v1/services', servicesRouter);
 

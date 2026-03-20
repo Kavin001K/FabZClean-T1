@@ -382,24 +382,29 @@ export const ordersApi = {
 
 // Customers API
 export const customersApi = {
-  async getAll(params: Record<string, any> = {}): Promise<Customer[]> {
+  async getAll(params: Record<string, any> = {}): Promise<{ data: Customer[]; totalCount: number }> {
     try {
-      const hasExplicitPagination = params.page !== undefined || params.cursor !== undefined || params.limit !== undefined;
-      if (hasExplicitPagination) {
-        const queryParams = new URLSearchParams(
-          Object.fromEntries(Object.entries(params).map(([key, value]) => [key, String(value)]))
-        );
-        const response = await fetchData<{ data: Customer[] } | Customer[]>(`/customers?${queryParams.toString()}`);
-        if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
-          return response.data;
-        }
-        return Array.isArray(response) ? response : [];
+      const queryParams = new URLSearchParams(
+        Object.fromEntries(Object.entries(params).map(([key, value]) => [key, String(value)]))
+      );
+      
+      const response = await fetchData<{ data: Customer[]; totalCount?: number; meta?: { totalCount?: number } } | Customer[]>(`/customers?${queryParams.toString()}`);
+      
+      if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
+        return {
+          data: response.data,
+          totalCount: response.totalCount ?? response.meta?.totalCount ?? response.data.length
+        };
       }
-
-      return await fetchAllPaginated<Customer>('/customers', params);
+      
+      const data = Array.isArray(response) ? response : [];
+      return {
+        data,
+        totalCount: data.length
+      };
     } catch (error) {
       console.error('Failed to fetch customers:', error);
-      return [];
+      return { data: [], totalCount: 0 };
     }
   },
 
@@ -463,8 +468,8 @@ export const customersApi = {
 
   async searchByPhone(phone: string): Promise<Customer | null> {
     try {
-      const customers = await this.getAll({ phone, limit: 25 });
-      return customers.length > 0 ? customers[0] : null;
+      const result = await this.getAll({ phone, limit: 25 });
+      return result.data.length > 0 ? result.data[0] : null;
     } catch (error) {
       console.error(`Failed to search customer by phone ${phone}:`, error);
       return null;
@@ -498,7 +503,26 @@ export const customersApi = {
     } catch (error) {
       console.error('Customer autocomplete failed:', error);
       // Fallback to standard search
-      return this.getAll({ search: query, limit });
+      const result = await this.getAll({ search: query, limit });
+      return result.data;
+    }
+  },
+
+  async importMany(customers: Partial<Customer>[]): Promise<{ inserted_count: number; error_count: number; skipped_phones: string[] }> {
+    try {
+      const response = await authorizedFetch(`/customers/import`, {
+        method: "POST",
+        body: JSON.stringify(customers),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to import customers");
+      }
+      const payload = await response.json();
+      return payload?.data || payload;
+    } catch (error) {
+      console.error("Failed to import customers:", error);
+      throw error;
     }
   },
 

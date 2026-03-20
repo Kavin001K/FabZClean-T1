@@ -38,6 +38,8 @@ import {
     Wallet,
     BarChart3,
     PieChart,
+    ChevronLeft,
+    ChevronRight,
 } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,8 +116,8 @@ interface CreditSummary {
 
 // API functions
 const creditsApi = {
-    getOutstandingReport: async () => {
-        const res = await authorizedFetch('/credits/report/outstanding');
+    getOutstandingReport: async (page = 1, limit = 100) => {
+        const res = await authorizedFetch(`/credits/report/outstanding?page=${page}&limit=${limit}`);
         if (!res.ok) throw new Error('Failed to fetch outstanding report');
         const data = await res.json();
         return data.data;
@@ -172,6 +174,8 @@ export default function CreditsPage() {
     const [adjustAmount, setAdjustAmount] = useState("");
     const [adjustReason, setAdjustReason] = useState("");
     const [adjustNotes, setAdjustNotes] = useState("");
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(100);
 
     // Check role access
     const canManageCredits = currentUser?.role && ['admin'].includes(currentUser.role);
@@ -179,9 +183,10 @@ export default function CreditsPage() {
 
     // Fetch outstanding credits
     const { data: outstandingData, isLoading, refetch } = useQuery({
-        queryKey: ['credits', 'outstanding'],
-        queryFn: creditsApi.getOutstandingReport,
-        staleTime: 30000,
+        queryKey: ['credits', 'outstanding', page, pageSize],
+        queryFn: () => creditsApi.getOutstandingReport(page, pageSize),
+        staleTime: 5000,
+        refetchInterval: 5000, // Background auto-sync every 5 seconds
     });
 
     // Fetch customer credit history
@@ -434,85 +439,78 @@ export default function CreditsPage() {
                     transition={{ delay: 0.1 }}
                     className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
                 >
-                    <Card className="border-l-4 border-l-orange-500 hover:shadow-lg transition-all">
-                        <CardContent className="pt-6">
+                    <Card className="glass-card border-none hover:shadow-xl transition-all duration-300">
+                        <CardContent className="p-6">
                             <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Total Outstanding</p>
-                                    <p className="text-3xl font-bold mt-2 text-orange-600">
-                                        {formatCurrency(outstandingData?.totalOutstanding || 0)}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Pending credit dues
-                                    </p>
-                                </div>
-                                <div className="h-14 w-14 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                                    <Wallet className="h-7 w-7 text-orange-600" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border-l-4 border-l-blue-500 hover:shadow-lg transition-all">
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Customers with Credit</p>
-                                    <p className="text-3xl font-bold mt-2 text-blue-600">
+                                <div className="space-y-1">
+                                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Customers</p>
+                                    <p className="text-4xl font-extrabold tracking-tight">
                                         {outstandingData?.totalCustomers || 0}
                                     </p>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Active credit accounts
+                                    <p className="text-xs text-muted-foreground/80 font-medium italic">
+                                        Active managed wallets
                                     </p>
                                 </div>
-                                <div className="h-14 w-14 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                                    <Users className="h-7 w-7 text-blue-600" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border-l-4 border-l-green-500 hover:shadow-lg transition-all">
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Average Credit</p>
-                                    <p className="text-3xl font-bold mt-2 text-green-600">
-                                        {formatCurrency(
-                                            outstandingData?.totalCustomers
-                                                ? outstandingData.totalOutstanding / outstandingData.totalCustomers
-                                                : 0
-                                        )}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Per customer
-                                    </p>
-                                </div>
-                                <div className="h-14 w-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                                    <BarChart3 className="h-7 w-7 text-green-600" />
+                                <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center shadow-inner">
+                                    <Users className="h-6 w-6 text-primary" />
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className="border-l-4 border-l-purple-500 hover:shadow-lg transition-all">
-                        <CardContent className="pt-6">
+                    <Card className="glass-card border-none hover:shadow-xl transition-all duration-300">
+                        <CardContent className="p-6">
                             <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Highest Balance</p>
-                                    <p className="text-3xl font-bold mt-2 text-purple-600">
-                                        {formatCurrency(
-                                            filteredCustomers.length > 0
-                                                ? Math.max(...filteredCustomers.map((c: CreditCustomer) => c.creditBalance))
-                                                : 0
-                                        )}
+                                <div className="space-y-1">
+                                    <p className="text-xs font-bold uppercase tracking-wider text-orange-500/80">Outstanding</p>
+                                    <p className="text-4xl font-extrabold tracking-tight text-orange-500">
+                                        {formatCurrency(outstandingData?.totalOutstanding || 0)}
                                     </p>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Maximum credit due
+                                    <p className="text-xs text-muted-foreground/80 font-medium italic">
+                                        Total receivables
                                     </p>
                                 </div>
-                                <div className="h-14 w-14 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                                    <TrendingUp className="h-7 w-7 text-purple-600" />
+                                <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center shadow-inner">
+                                    <IndianRupee className="h-6 w-6 text-orange-500" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="glass-card border-none hover:shadow-xl transition-all duration-300">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <p className="text-xs font-bold uppercase tracking-wider text-emerald-500/80">Prepaid</p>
+                                    <p className="text-4xl font-extrabold tracking-tight text-emerald-500">
+                                        {formatCurrency(outstandingData?.totalPrepaid || 0)}
+                                    </p>
+                                    <p className="text-[11px] text-muted-foreground/70 font-medium italic">
+                                        Available balances
+                                    </p>
+                                </div>
+                                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.06)] group-hover:bg-emerald-500/20 transition-colors">
+                                    <Wallet className="h-6 w-6 text-emerald-500" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* RISK */}
+                    <Card className="glass-card border-none hover:shadow-xl transition-all duration-300 group">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <p className="text-[10px] uppercase font-black tracking-[0.2em] text-rose-500/60">Risk</p>
+                                    <p className="text-4xl font-black tracking-tight text-rose-500 group-hover:scale-105 transition-transform origin-left">
+                                        {outstandingData?.riskCount || 0}
+                                    </p>
+                                    <p className="text-[11px] text-muted-foreground/70 font-medium italic">
+                                        Over-limit accounts
+                                    </p>
+                                </div>
+                                <div className="h-12 w-12 rounded-2xl bg-rose-500/10 flex items-center justify-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.06)] group-hover:bg-rose-500/20 transition-colors">
+                                    <AlertCircle className="h-6 w-6 text-rose-500" />
                                 </div>
                             </div>
                         </CardContent>
@@ -689,6 +687,55 @@ export default function CreditsPage() {
                                                 ))}
                                             </TableBody>
                                         </Table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Pagination and Scaling Support */}
+                            {!isLoading && filteredCustomers.length > 0 && (
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mt-8 pt-6 border-t border-border/50">
+                                    <div className="flex flex-col sm:flex-row items-center gap-4 order-2 sm:order-1">
+                                        <p className="text-sm text-muted-foreground font-semibold flex items-center gap-2">
+                                            <span className="h-2 w-2 rounded-full animate-pulse bg-primary" />
+                                            Showing <span className="text-foreground">{(page - 1) * pageSize + 1}</span> to <span className="text-foreground">{Math.min(page * pageSize, outstandingData?.totalCustomers || 0)}</span> of <span className="text-foreground">{outstandingData?.totalCustomers || 0}</span>
+                                        </p>
+                                        <div className="flex items-center gap-2 px-3 py-1 bg-muted/30 rounded-full border border-border/50">
+                                            <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Per Page</span>
+                                            <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(parseInt(v)); setPage(1); }}>
+                                                <SelectTrigger className="h-7 w-16 text-xs bg-transparent border-none focus:ring-0">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="25">25</SelectItem>
+                                                    <SelectItem value="50">50</SelectItem>
+                                                    <SelectItem value="100">100</SelectItem>
+                                                    <SelectItem value="500">500</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 order-1 sm:order-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                                            disabled={page === 1}
+                                            className="h-10 px-4 gap-2 glass-card hover:bg-muted/50 transition-all font-bold"
+                                        >
+                                            <ChevronLeft className="h-4 w-4" /> Previous
+                                        </Button>
+                                        <div className="flex items-center justify-center h-10 w-10 glass-card bg-primary/5 rounded-xl font-black text-sm ring-2 ring-primary/20 shadow-lg">
+                                            {page}
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setPage(p => p + 1)}
+                                            disabled={page * pageSize >= (outstandingData?.totalCustomers || 0)}
+                                            className="h-10 px-4 gap-2 glass-card hover:bg-muted/50 transition-all font-bold text-primary"
+                                        >
+                                            Next <ChevronRight className="h-4 w-4" />
+                                        </Button>
                                     </div>
                                 </div>
                             )}
