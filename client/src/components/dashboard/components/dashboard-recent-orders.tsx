@@ -130,12 +130,26 @@ export const DashboardRecentOrders: React.FC<DashboardRecentOrdersProps> = React
                     Order #{order.id || 'N/A'} • {order.service || 'Service'}
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex flex-col items-end justify-between">
                   <div className="font-medium text-sm">
                     {formatCurrency(order.totalAmount || order.total || 0)}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
+                  <div className="flex items-center justify-end gap-2 mt-2">
+                    <span className="text-xs text-muted-foreground">
+                      {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
+                    </span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 text-[10px] px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank');
+                      }}
+                      title="Track Order"
+                    >
+                      Track
+                    </Button>
                   </div>
                 </div>
               </div>

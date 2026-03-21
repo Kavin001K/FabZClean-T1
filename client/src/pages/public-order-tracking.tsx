@@ -511,7 +511,11 @@ export default function PublicOrderTracking() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50 overflow-x-hidden">
+        <div className="min-h-screen overflow-x-hidden relative">
+            {/* Premium Background */}
+            <div className="fixed inset-0 -z-20" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1582735689146-2771d9d968dd?auto=format&fit=crop&q=80&w=2000')", backgroundSize: 'cover', backgroundPosition: 'center' }} />
+            <div className="fixed inset-0 bg-green-50/85 backdrop-blur-md -z-10" />
+
             {showConfetti && <Confetti />}
 
             {/* Mobile Bottom Sheet */}
@@ -524,14 +528,17 @@ export default function PublicOrderTracking() {
                 />
             )}
 
-            {/* Decorative Background - Simplified for mobile */}
+            {/* Decorative Background - Clean & Subtle */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-20 -right-20 w-48 md:w-96 h-48 md:h-96 bg-gradient-to-br from-emerald-200/30 to-teal-200/30 rounded-full blur-3xl" />
-                <div className="absolute -bottom-20 -left-20 w-48 md:w-96 h-48 md:h-96 bg-gradient-to-br from-blue-200/20 to-indigo-200/20 rounded-full blur-3xl" />
+                <div className="absolute -top-32 -right-32 w-64 md:w-[500px] h-64 md:h-[500px] bg-gradient-to-br from-emerald-100/40 to-teal-100/30 rounded-full blur-[80px] md:blur-[120px]" />
+                <div className="absolute top-1/2 -left-32 w-56 md:w-[400px] h-56 md:h-[400px] bg-gradient-to-br from-blue-100/25 to-indigo-100/20 rounded-full blur-[80px] md:blur-[120px]" />
+                <div className="absolute -bottom-32 right-1/4 w-48 md:w-[350px] h-48 md:h-[350px] bg-gradient-to-br from-teal-100/20 to-cyan-100/15 rounded-full blur-[80px] md:blur-[120px]" />
+                {/* Subtle grid pattern */}
+                <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: 'radial-gradient(circle, #10b981 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
             </div>
 
             {/* Header */}
-            <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/50 sticky top-0 z-40 safe-area-top">
+            <header className="bg-white/80 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-40 safe-area-top shadow-sm">
                 <div className="max-w-5xl mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-center">
                     <a href="/" className="flex items-center gap-2 active:opacity-70 transition-opacity">
                         <img src="/assets/logo.webp" alt="Fab Clean" className="h-9 md:h-12" />
@@ -540,21 +547,24 @@ export default function PublicOrderTracking() {
             </header>
 
             {/* Hero Section - Compact on mobile */}
-            <div className="relative bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 animate-gradient text-white py-8 md:py-16 overflow-hidden">
-                <div className="absolute inset-0 opacity-10">
+            <div className="relative bg-gradient-to-br from-emerald-600 via-teal-500 to-emerald-700 text-white py-8 md:py-16 overflow-hidden">
+                {/* Subtle pattern overlay */}
+                <div className="absolute inset-0 opacity-[0.08]">
                     <div className="absolute inset-0" style={{
                         backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
-                        backgroundSize: '20px 20px'
+                        backgroundSize: '24px 24px'
                     }} />
                 </div>
+                {/* Decorative glow */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] bg-white/10 rounded-full blur-[100px]" />
 
                 <div className="relative max-w-5xl mx-auto px-4 md:px-6 text-center">
-                    <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 mb-3">
+                    <div className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-full px-3.5 py-1.5 mb-3 border border-white/10">
                         <Sparkles className="w-3.5 h-3.5 animate-pulse-soft" />
-                        <span className="text-xs md:text-sm font-medium">Real-time Tracking</span>
+                        <span className="text-xs md:text-sm font-medium tracking-wide">Real-time Tracking</span>
                     </div>
-                    <h1 className="text-2xl md:text-5xl font-bold mb-2 md:mb-4">Track Your Order</h1>
-                    <p className="text-emerald-100 text-sm md:text-lg max-w-xl mx-auto">
+                    <h1 className="text-2xl md:text-5xl font-bold mb-2 md:mb-4 tracking-tight">Track Your Order</h1>
+                    <p className="text-emerald-100/90 text-sm md:text-lg max-w-xl mx-auto">
                         Enter your order number for live updates
                     </p>
                 </div>
@@ -562,7 +572,7 @@ export default function PublicOrderTracking() {
 
             {/* Search Section */}
             <div className="max-w-2xl mx-auto px-4 md:px-6 -mt-6 md:-mt-10 relative z-20">
-                <Card className="shadow-xl md:shadow-2xl border-0 bg-white/95 backdrop-blur-md overflow-hidden">
+                <Card className="shadow-xl md:shadow-2xl border border-slate-100 bg-white/98 backdrop-blur-xl overflow-hidden">
                     <CardContent className="p-4 md:p-6">
                         <div className="flex flex-col sm:flex-row gap-3">
                             <div className="relative flex-1">
@@ -625,7 +635,7 @@ export default function PublicOrderTracking() {
                 {order && (
                     <div className="space-y-4 md:space-y-6">
                         {/* Customer Greeting Card */}
-                        <Card className="border-0 shadow-lg md:shadow-xl bg-white overflow-hidden animate-slide-up">
+                        <Card className="border border-slate-100 shadow-md md:shadow-lg bg-white overflow-hidden animate-slide-up">
                             <CardContent className="p-4 md:p-8">
                                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                                     <div>
@@ -656,7 +666,7 @@ export default function PublicOrderTracking() {
                         </Card>
 
                         {/* Progress Tracker - Mobile Optimized */}
-                        <Card className="border-0 shadow-lg md:shadow-xl bg-white overflow-hidden animate-slide-up">
+                        <Card className="border border-slate-100 shadow-md md:shadow-lg bg-white overflow-hidden animate-slide-up">
                             <CardContent className="p-4 md:p-8">
                                 <div className="flex items-center justify-between mb-4 md:mb-6">
                                     <div className="flex items-center gap-2 md:gap-3">
@@ -843,7 +853,7 @@ export default function PublicOrderTracking() {
                         {/* Order Details - Stacked on Mobile */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                             {/* Order Info */}
-                            <Card className="border-0 shadow-lg bg-white overflow-hidden animate-slide-up">
+                            <Card className="border border-slate-100 shadow-md bg-white overflow-hidden animate-slide-up">
                                 <div className="h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
                                 <CardContent className="p-4 md:p-6">
                                     <h3 className="text-base md:text-lg font-bold text-slate-800 mb-3 md:mb-5 flex items-center gap-2">
@@ -917,7 +927,7 @@ export default function PublicOrderTracking() {
                             </Card>
 
                             {/* Items */}
-                            <Card className="border-0 shadow-lg bg-white overflow-hidden animate-slide-up">
+                            <Card className="border border-slate-100 shadow-md bg-white overflow-hidden animate-slide-up">
                                 <div className="h-1 bg-gradient-to-r from-blue-400 to-indigo-500" />
                                 <CardContent className="p-4 md:p-6">
                                     <h3 className="text-base md:text-lg font-bold text-slate-800 mb-3 md:mb-5 flex items-center gap-2">
@@ -966,7 +976,7 @@ export default function PublicOrderTracking() {
                                     { icon: Shield, label: 'Care Guarantee', color: 'from-purple-400 to-violet-500' },
                                     { icon: Truck, label: 'Free Delivery', color: 'from-amber-400 to-orange-500' },
                                 ].map((feature) => (
-                                    <Card key={feature.label} className="border-0 shadow bg-white/80 w-28 md:w-auto flex-shrink-0">
+                                    <Card key={feature.label} className="border border-slate-100 shadow-sm bg-white/90 w-28 md:w-auto flex-shrink-0">
                                         <CardContent className="p-3 md:p-4 text-center">
                                             <div className={cn(
                                                 "w-10 h-10 md:w-12 md:h-12 mx-auto rounded-lg md:rounded-xl flex items-center justify-center shadow mb-2",

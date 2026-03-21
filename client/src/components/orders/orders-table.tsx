@@ -37,6 +37,7 @@ import {
   Package,
   Store,
   MessageCircle,
+  Navigation,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/data-service";
 import type { Order } from "@shared/schema";
@@ -408,8 +409,18 @@ export default React.memo(function OrdersTable({
                     return 0;
                   })())}
                 </TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenu>
+                <TableCell onClick={(e) => e.stopPropagation()} className="text-right">
+                  <div className="flex justify-end gap-2 items-center">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                      onClick={() => window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank')}
+                      title="Track Order"
+                    >
+                      <Navigation className="h-4 w-4" />
+                    </Button>
+                    <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="h-8 w-8 p-0">
                         <span className="sr-only">Open menu</span>
@@ -430,6 +441,10 @@ export default React.memo(function OrdersTable({
                       <DropdownMenuItem onClick={() => onPrintInvoice(order)}>
                         <Printer className="mr-2 h-4 w-4" />
                         Print Invoice
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank')}>
+                        <Navigation className="mr-2 h-4 w-4" />
+                        Track Order
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       {order.status === 'pending' && (
@@ -455,6 +470,7 @@ export default React.memo(function OrdersTable({
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  </div>
                 </TableCell>
               </TableRow>
             ))

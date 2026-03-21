@@ -257,6 +257,22 @@ export const ordersApi = {
     }
   },
 
+  async getPrintHistory(): Promise<Order[]> {
+    try {
+      const allOrders = await ordersApi.getAll();
+      return allOrders
+        .filter((o: any) => o?.tagsPrinted && o?.status !== 'cancelled')
+        .sort((a: any, b: any) => {
+          const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
+        });
+    } catch (error) {
+      console.error('Failed to fetch print history:', error);
+      return [];
+    }
+  },
+
   async getById(id: string): Promise<Order | null> {
     try {
       const response = await fetchData<{ data: Order } | Order>(`/orders/${id}`);

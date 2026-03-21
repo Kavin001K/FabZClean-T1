@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useParams, Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Edit, Printer, X, CheckCircle, Clock, AlertCircle, XCircle, CreditCard, Truck, Package } from 'lucide-react';
+import { ArrowLeft, Edit, Printer, X, CheckCircle, Clock, AlertCircle, XCircle, CreditCard, Truck, Package, Navigation } from 'lucide-react';
 import { useInvoicePrint } from '@/hooks/use-invoice-print';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -228,6 +228,15 @@ export default function OrderDetailPage() {
           <Button variant="outline" size="sm" onClick={handlePrintInvoice} className="w-full sm:w-auto">
             <Printer className="h-4 w-4 mr-2" />
             Print Invoice
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 sm:w-auto"
+            onClick={() => window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank')}
+          >
+            <Navigation className="h-4 w-4 mr-2" />
+            Track Order
           </Button>
         </div>
       </div>

@@ -83,6 +83,7 @@ export default function PrintTags() {
     const [dateTo, setDateTo] = useState<Date | undefined>();
     const [showFilters, setShowFilters] = useState(false);
     const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<"pending" | "history">("pending");
 
     // Invoice print hook
     const { printInvoice } = useInvoicePrint({
@@ -104,11 +105,22 @@ export default function PrintTags() {
         refetchInterval: 15_000,
     });
 
+    const {
+        data: historyOrders = [],
+        isLoading: isLoadingHistory,
+    } = useQuery({
+        queryKey: ["print-history"],
+        queryFn: ordersApi.getPrintHistory,
+        staleTime: 10_000,
+        refetchOnWindowFocus: true,
+        refetchInterval: 60_000,
+    });
+
     // Mark tags as printed
     const markPrintedMutation = useMutation({
         mutationFn: async (orderId: string) => {
             const token = localStorage.getItem("employee_token");
-            const res = await fetch("/api/orders/${orderId}/tags-printed", {
+            const res = await fetch(`/api/orders/${orderId}/tags-printed`, {
                 method: "PATCH",
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -120,6 +132,7 @@ export default function PrintTags() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["print-queue"] });
+            queryClient.invalidateQueries({ queryKey: ["print-history"] });
             queryClient.invalidateQueries({ queryKey: ["orders"] });
             toast({ title: "Marked as printed" });
         },
@@ -135,7 +148,9 @@ export default function PrintTags() {
 
     const filteredOrders = useMemo(() => {
         const q = search.toLowerCase();
-        return orders.filter((o: Order) => {
+        const baseOrders = activeTab === "pending" ? orders : historyOrders;
+        
+        return baseOrders.filter((o: Order) => {
             if (q && !(
                 o.orderNumber.toLowerCase().includes(q) ||
                 o.customerName.toLowerCase().includes(q) ||
@@ -159,16 +174,16 @@ export default function PrintTags() {
         }).sort((a: Order, b: Order) =>
             new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
         );
-    }, [orders, search, statusFilter, paymentFilter, dateFrom, dateTo]);
+    }, [orders, historyOrders, activeTab, search, statusFilter, paymentFilter, dateFrom, dateTo]);
 
     // ── Stats ────────────────────────────────────────────────────────────────
 
     const stats = useMemo(() => {
-        const total = filteredOrders.length;
-        const tagsPending = filteredOrders.filter((o: any) => !o.tagsPrinted).length;
-        const tagsDone = total - tagsPending;
+        const tagsPending = orders.length;
+        const tagsDone = historyOrders.length;
+        const total = tagsPending + tagsDone;
         return { total, tagsPending, tagsDone };
-    }, [filteredOrders]);
+    }, [orders, historyOrders]);
 
     // ── Selection ────────────────────────────────────────────────────────────
 
@@ -253,10 +268,10 @@ export default function PrintTags() {
             <div class="customer">${order.customerName}</div>
             
             <div class="item-main">
-              <span>${item.garmentType || item.name || `Item ${idx + 1}`}</span>
+              <span>${item.serviceName || item.customName || `Item ${idx + 1}`}</span>
               <span>Qty: ${item.quantity || 1}</span>
             </div>
-            ${item.service ? `<div class=\"service-type\">${item.service}</div>` : ""}
+            ${item.tagNote ? `<div class=\"service-type\">${item.tagNote}</div>` : ""}
             
             <div class="tag-grid">
               <div class="grid-item">
@@ -269,7 +284,7 @@ export default function PrintTags() {
               </div>
             </div>
             
-            ${item.notes ? `<div class=\"notes\">Note: ${item.notes}</div>` : ""}
+            ${item.tagNote ? `<div class=\"notes\">Note: ${item.tagNote}</div>` : ""}
           </div>
         `).join("")
       ).join('<div class="page-break no-print"></div>')}
@@ -320,10 +335,10 @@ export default function PrintTags() {
                         <h1 className="text-4xl font-black tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-br from-foreground to-foreground/60">
                             Print Queue
                         </h1>
-                        <p className="text-muted-foreground text-sm font-medium flex items-center gap-2">
+                        <div className="text-muted-foreground text-sm font-medium flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                             Garment tags and bills for active processing
-                        </p>
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -333,6 +348,7 @@ export default function PrintTags() {
                         className="h-10 px-4 gap-2 border-white/10 hover:bg-white/5 text-sm font-semibold transition-all rounded-xl"
                         onClick={() => {
                             queryClient.invalidateQueries({ queryKey: ["print-queue"] });
+                            queryClient.invalidateQueries({ queryKey: ["print-history"] });
                             queryClient.invalidateQueries({ queryKey: ["orders"] });
                         }}
                     >
@@ -342,21 +358,23 @@ export default function PrintTags() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8 px-1">
-                <Card className="glass border-muted border-l-4 border-l-primary shadow-sm hover:shadow-md transition-all">
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-5">
-                            <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
-                                <Package className="h-7 w-7 text-primary" />
-                            </div>
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Total in Queue</p>
-                                <h3 className="text-3xl font-black tracking-tight text-foreground">{stats.total}</h3>
-                                <p className="text-[10px] text-slate-400 font-medium italic">Pending processing</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+            {/* ── Tabs ─────────────────────────────────────────────────────── */}
+            <div className="flex bg-muted/50 p-1 rounded-xl w-full max-w-[400px] mb-2 border border-white/5">
+                <button 
+                   onClick={() => { setActiveTab('pending'); setSelectedIds([]); }} 
+                   className={cn("flex-1 text-sm font-semibold py-2 rounded-lg transition-all", activeTab === 'pending' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}
+                >
+                  Pending Queue
+                </button>
+                <button 
+                   onClick={() => { setActiveTab('history'); setSelectedIds([]); }} 
+                   className={cn("flex-1 text-sm font-semibold py-2 rounded-lg transition-all", activeTab === 'history' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}
+                >
+                  Print History
+                </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8 px-1">
                 <Card className="glass border-muted border-l-4 border-l-amber-500 shadow-sm hover:shadow-md transition-all">
                     <CardContent className="p-6">
                         <div className="flex items-center gap-5">
@@ -493,16 +511,18 @@ export default function PrintTags() {
                         </span>
                         <div className="flex items-center gap-2 flex-wrap">
                             <Button size="sm" onClick={handlePrintSelectedTags} className="font-bold">
-                                <Printer className="h-4 w-4 mr-2" /> Print All Tags
+                                <Printer className="h-4 w-4 mr-2" /> {activeTab === 'pending' ? 'Print All Tags' : 'Reprint All Tags'}
                             </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="font-bold gap-2 border-primary/20"
-                                onClick={handleMarkSelectedPrinted}
-                            >
-                                <CheckCircle2 className="h-4 w-4" /> Mark Printed
-                            </Button>
+                            {activeTab === 'pending' && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="font-bold gap-2 border-primary/20"
+                                    onClick={handleMarkSelectedPrinted}
+                                >
+                                    <CheckCircle2 className="h-4 w-4" /> Mark Printed
+                                </Button>
+                            )}
                             <Button
                                 size="sm"
                                 variant="ghost"
@@ -644,10 +664,10 @@ export default function PrintTags() {
                                                     variant="ghost"
                                                     className="h-9 px-3 gap-2 text-xs font-bold hover:bg-amber-500/10 hover:text-amber-500 transition-all"
                                                     onClick={() => handlePrintTags([order])}
-                                                    title="Print garment tags"
+                                                    title={activeTab === 'pending' ? "Print garment tags" : "Reprint garment tags"}
                                                 >
                                                     <Tag className="h-4 w-4" />
-                                                    <span>Tags</span>
+                                                    <span>{activeTab === 'pending' ? 'Tags' : 'Reprint'}</span>
                                                 </Button>
                                                 <Button
                                                     size="sm"
@@ -698,35 +718,40 @@ export default function PrintTags() {
                                             <p className="text-[10px] font-bold text-primary uppercase tracking-widest pl-1">
                                                 Items in Order
                                             </p>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                            <div className="grid grid-cols-1 gap-2">
                                                 {items.map((item: any, idx: number) => (
                                                     <div
                                                         key={idx}
                                                         className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors"
                                                     >
-                                                        <div>
-                                                            <p className="font-bold text-sm leading-none">
-                                                                {item.garmentType || item.name || `Item ${idx + 1}`}
-                                                            </p>
-                                                            {item.service && (
-                                                                <p className="text-primary text-[10px] font-bold mt-1 uppercase tracking-wider">
-                                                                    {item.service}
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                                                                {idx + 1}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="font-bold text-sm leading-none truncate">
+                                                                    {item.serviceName || item.customName || `Item ${idx + 1}`}
                                                                 </p>
-                                                            )}
+                                                                {item.tagNote && (
+                                                                    <p className="text-primary text-[10px] font-bold mt-1 uppercase tracking-wider">
+                                                                        {item.tagNote}
+                                                                    </p>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                        <div className="text-right">
+                                                        <div className="text-right flex items-center gap-4 shrink-0">
                                                             <p className="text-sm font-black">× {item.quantity || 1}</p>
-                                                            {item.price && <p className="text-[10px] text-muted-foreground font-medium">{formatCurrency(parseFloat(item.price))}</p>}
+                                                            {item.price && <p className="text-sm font-semibold text-muted-foreground">{formatCurrency(parseFloat(item.price))}</p>}
                                                         </div>
                                                     </div>
                                                 ))}
                                             </div>
-                                            {items.some((it: any) => it.notes) && (
+                                            {items.some((it: any) => it.tagNote) && (
                                                 <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 flex items-start gap-2">
                                                     <FileText className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                                                     <p className="text-xs text-foreground/80 font-medium">
                                                         <span className="font-bold text-primary mr-1">Notes:</span> 
-                                                        {items.filter((it: any) => it.notes).map((it: any) => it.notes).join(", ")}
+                                                        {items.filter((it: any) => it.tagNote).map((it: any) => it.tagNote).join(", ")}
                                                     </p>
                                                 </div>
                                             )}

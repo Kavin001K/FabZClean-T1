@@ -386,6 +386,14 @@ export default React.memo(function OrderDetailsDialog({
               <Printer className="h-4 w-4 mr-2" /> Invoice
             </Button>
 
+            <Button
+              variant="outline"
+              onClick={() => window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank')}
+              className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
+            >
+              <Navigation className="h-4 w-4 mr-2" /> Track
+            </Button>
+
             {nextStatus && (
               <Button
                 onClick={() => onNextStep(order)}
