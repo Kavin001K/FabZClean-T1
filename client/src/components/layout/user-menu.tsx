@@ -61,8 +61,8 @@ export const UserMenu = () => {
     return labels[role] || role;
   };
 
-  // Get profile image from employee data
-  const profileImage = (employee as any)?.profileImage;
+  // Get profile image from employee data, prioritizing avatarUrl (Supabase)
+  const profileImage = employee?.avatarUrl || (employee as any)?.profileImage;
 
   return (
     <DropdownMenu>

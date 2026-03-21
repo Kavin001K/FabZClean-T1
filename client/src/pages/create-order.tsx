@@ -1056,14 +1056,14 @@ export default function CreateOrder() {
   }
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 animate-fade-in">
-      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Create New Order</h1>
+    <div className="p-3 sm:p-4 md:p-6 lg:p-8 animate-fade-in pb-24 lg:pb-8">
+      <header className="mb-4 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Create New Order</h1>
         <Button
           onClick={handleCreateOrder}
           disabled={createOrderMutation.isPending}
           size="lg"
-          className="w-full sm:w-auto"
+          className="hidden sm:inline-flex"
         >
           <PlusCircle className="h-4 w-4 mr-2" />
           {createOrderMutation.isPending ? "Creating..." : "Create Order"}
@@ -1091,23 +1091,23 @@ export default function CreateOrder() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {!foundCustomer ? (
-                  <CustomerAutocomplete
-                    searchCustomers={searchCustomers}
-                    onSelect={handleSelectCustomer}
-                    onCreateNew={(query) => {
-                      // Pre-fill based on query type (phone or name)
-                      const isPhone = /^\d+$/.test(query.replace(/[\s\-\(\)]/g, ''));
-                      if (isPhone) {
-                        setNewCustomerPhone(query);
-                        setNewCustomerName('');
-                      } else {
-                        setNewCustomerName(query);
-                        setNewCustomerPhone('');
-                      }
-                      setShowCustomerDialog(true);
-                    }}
-                    placeholder="Search by name, ID, phone, or email..."
-                  />
+                    <CustomerAutocomplete
+                      searchCustomers={searchCustomers}
+                      onSelect={handleSelectCustomer}
+                      onCreateNew={(query) => {
+                        // Pre-fill based on query type (phone or name)
+                        const isPhone = /^\d+$/.test(query.replace(/[\s\-\(\)]/g, ''));
+                        if (isPhone) {
+                          setNewCustomerPhone(query);
+                          setNewCustomerName('');
+                        } else {
+                          setNewCustomerName(query);
+                          setNewCustomerPhone('');
+                        }
+                        setShowCustomerDialog(true);
+                      }}
+                      placeholder={isMobile ? "Search customer..." : "Search by name, ID, phone, or email..."}
+                    />
                 ) : (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
@@ -1845,12 +1845,14 @@ export default function CreateOrder() {
                   ) : (
                     <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 scrollbar-thin">
                       {selectedServices.map(item => (
-                        <div key={item.service.id} className="flex justify-between items-start text-sm group">
-                          <div className="flex-1">
-                            <p className="font-medium group-hover:text-primary transition-colors">{item.service.name}</p>
-                            <p className="text-[11px] text-muted-foreground whitespace-nowrap">₹{safeParseFloat(item.priceOverride).toFixed(2)} × {item.quantity}</p>
+                        <div key={item.service.id} className="flex justify-between items-start text-sm group gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium group-hover:text-primary transition-colors truncate">{item.service.name}</p>
+                            <p className="text-[11px] text-muted-foreground truncate">
+                              ₹{safeParseFloat(item.priceOverride).toFixed(2)} × {item.quantity}
+                            </p>
                           </div>
-                          <span className="font-bold text-slate-700 dark:text-slate-300">₹{item.subtotal.toFixed(2)}</span>
+                          <span className="font-bold text-slate-700 dark:text-slate-300 flex-shrink-0">₹{item.subtotal.toFixed(2)}</span>
                         </div>
                       ))}
                     </div>
@@ -1858,9 +1860,9 @@ export default function CreateOrder() {
                 </div>
 
                 <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-                    <div className="flex justify-between text-sm text-slate-900 dark:text-slate-100 font-medium">
-                      <span className="opacity-70 dark:opacity-80">Services Subtotal</span>
-                      <span className="font-black">₹{baseSubtotal.toFixed(2)}</span>
+                    <div className="flex justify-between gap-4 text-sm text-slate-900 dark:text-slate-100 font-medium">
+                      <span className="opacity-70 dark:opacity-80 min-w-0 truncate">Services Subtotal</span>
+                      <span className="font-black flex-shrink-0">₹{baseSubtotal.toFixed(2)}</span>
                     </div>
   
                     <AnimatePresence>
@@ -1868,12 +1870,12 @@ export default function CreateOrder() {
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
-                          className="flex justify-between text-sm text-amber-600 dark:text-amber-400 font-bold"
+                          className="flex justify-between gap-4 text-sm text-amber-600 dark:text-amber-400 font-bold"
                         >
-                          <span className="flex items-center gap-1">
-                            <Zap className="h-3.5 w-3.5" /> Express Charge (50%)
+                          <span className="flex items-center gap-1 min-w-0">
+                            <Zap className="h-3.5 w-3.5 flex-shrink-0" /> <span className="truncate">Express Charge (50%)</span>
                           </span>
-                          <span>+₹{expressSurcharge.toFixed(2)}</span>
+                          <span className="flex-shrink-0">+₹{expressSurcharge.toFixed(2)}</span>
                         </motion.div>
                       )}
   
@@ -1881,13 +1883,13 @@ export default function CreateOrder() {
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
-                          className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400 font-bold"
+                          className="flex justify-between gap-4 text-sm text-emerald-600 dark:text-emerald-400 font-bold"
                         >
-                          <span className="flex items-center gap-1">
-                            <TrendingDown className="h-3.5 w-3.5" /> 
-                            Discount {discountType === 'percentage' ? `(${discountValue}%)` : '(Fixed)'}
+                          <span className="flex items-center gap-1 min-w-0">
+                            <TrendingDown className="h-3.5 w-3.5 flex-shrink-0" /> 
+                            <span className="truncate">Discount {discountType === 'percentage' ? `(${discountValue}%)` : '(Fixed)'}</span>
                           </span>
-                          <span>-₹{discountAmount.toFixed(2)}</span>
+                          <span className="flex-shrink-0">-₹{discountAmount.toFixed(2)}</span>
                         </motion.div>
                       )}
   
@@ -1895,13 +1897,13 @@ export default function CreateOrder() {
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
-                          className="flex justify-between text-sm text-foreground/80 dark:text-slate-300"
+                          className="flex justify-between gap-4 text-sm text-foreground/80 dark:text-slate-300"
                         >
-                          <span className="flex items-center gap-1 italic">
-                            <PlusCircle className="h-3.5 w-3.5 text-blue-500" />
-                            {extraChargesLabel || 'Extra Charges'}
+                          <span className="flex items-center gap-1 italic min-w-0">
+                            <PlusCircle className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                            <span className="truncate">{extraChargesLabel || 'Extra Charges'}</span>
                           </span>
-                          <span>+₹{extraCharges.toFixed(2)}</span>
+                          <span className="flex-shrink-0">+₹{extraCharges.toFixed(2)}</span>
                         </motion.div>
                       )}
   
@@ -1909,21 +1911,27 @@ export default function CreateOrder() {
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
-                          className="flex justify-between text-sm text-slate-900 dark:text-slate-100 font-medium"
+                          className="flex justify-between gap-4 text-sm text-slate-900 dark:text-slate-100 font-medium"
                         >
-                          <span className="opacity-70 dark:opacity-80">GST (18%)</span>
-                          <span className="font-black">+₹{gstAmount.toFixed(2)}</span>
+                          <span className="opacity-70 dark:opacity-80 min-w-0 truncate">GST (18%)</span>
+                          <span className="font-black flex-shrink-0">+₹{gstAmount.toFixed(2)}</span>
                         </motion.div>
                       )}
                   </AnimatePresence>
 
                   <div className="mt-4 p-5 rounded-2xl bg-primary text-white shadow-2xl transition-all duration-300 hover:scale-[1.03] ring-4 ring-primary/10">
-                    <div className="flex justify-between items-center">
-                      <div>
-                         <span className="text-[10px] uppercase tracking-[0.2em] font-black opacity-80">{useWallet && walletApplied > 0 ? 'Balance Due' : 'Payable Amount'}</span>
-                         {isExpressOrder && <p className="text-[10px] text-amber-300 font-black uppercase mt-0.5 tracking-wider">Express Order</p>}
+                    <div className="flex justify-between items-center gap-4">
+                      <div className="min-w-0">
+                         <span className="text-[10px] uppercase tracking-[0.2em] font-black opacity-80 block truncate">
+                           {useWallet && walletApplied > 0 ? 'Balance Due' : 'Payable Amount'}
+                         </span>
+                         {isExpressOrder && (
+                           <p className="text-[10px] text-amber-300 font-black uppercase mt-0.5 tracking-wider truncate">
+                             Express Order
+                           </p>
+                         )}
                       </div>
-                      <span className="text-3xl font-black tabular-nums">₹{finalPayable.toFixed(2)}</span>
+                      <span className="text-3xl font-black tabular-nums flex-shrink-0">₹{finalPayable.toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -1963,8 +1971,9 @@ export default function CreateOrder() {
                 </div>
 
                 <div className={cn(
-                  "mt-2",
-                  isMobile && "fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-lg border-t z-50 shadow-[0_-8px_30px_rgb(0,0,0,0.12)]"
+                  "mt-6 pb-6",
+                  // Removed fixed positioning on mobile to move it "below payable amount" as requested
+                  // and avoid overlapping with bottom navigation bar
                 )}>
                   <Button
                     onClick={handleCreateOrder}

@@ -450,7 +450,7 @@ export default function WalletManagementPage() {
               </Select>
             </div>
 
-            <div className="overflow-x-auto rounded-lg border">
+            <div className="hidden md:block overflow-x-auto rounded-lg border">
               <Table className="min-w-[920px]">
                 <TableHeader>
                   <TableRow>
@@ -572,6 +572,112 @@ export default function WalletManagementPage() {
                   )}
                 </TableBody>
               </Table>
+            </div>
+            
+            {/* Mobile Card List */}
+            <div className="md:hidden space-y-3">
+              {isLoading ? (
+                <div className="py-8 text-center text-muted-foreground">Loading customers...</div>
+              ) : filteredRows.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">No matching customers found.</div>
+              ) : (
+                filteredRows.map((row) => (
+                  <Card 
+                    key={row.id} 
+                    className="overflow-hidden border-muted shadow-sm active:scale-[0.98] transition-transform"
+                    onClick={() => {
+                      resetDialogState();
+                      setSelectedCustomer(row);
+                      setHistoryOpen(true);
+                    }}
+                  >
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-bold text-base">{row.name}</p>
+                          <p className="text-xs text-muted-foreground">{row.phone || row.email || "No contact info"}</p>
+                        </div>
+                        {row.isExceeded ? (
+                          <Badge className="bg-red-50 text-red-700 border-red-100 px-1">
+                            <AlertTriangle className="mr-1 h-3 w-3" /> Risk
+                          </Badge>
+                        ) : row.isClear ? (
+                          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 px-1">
+                            Clear
+                          </Badge>
+                        ) : null}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 py-2 border-y border-dashed">
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-muted-foreground">Outstanding</p>
+                          <p className={cn(
+                            "text-sm font-black",
+                            row.isExceeded ? "text-red-600" : row.isClear ? "text-emerald-600" : "text-amber-600",
+                          )}>₹{row.outstanding.toFixed(2)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] uppercase font-bold text-muted-foreground">Wallet</p>
+                          <p className={cn("text-sm font-black text-emerald-600")}>₹{row.walletBalance.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2 pt-1">
+                        <Button 
+                          variant="secondary" 
+                          size="sm" 
+                          className="flex-1 h-9 font-bold text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            resetDialogState();
+                            setSelectedCustomer(row);
+                            setRechargeOpen(true);
+                          }}
+                        >
+                          <Wallet className="mr-1.5 h-3.5 w-3.5" /> Recharge
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-9 px-3" onClick={(e) => e.stopPropagation()}>
+                              More
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              resetDialogState();
+                              setSelectedCustomer(row);
+                              setCreditPaymentOpen(true);
+                            }}>
+                              <IndianRupee className="mr-2 h-4 w-4" /> Receive Payment
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              resetDialogState();
+                              setSelectedCustomer(row);
+                              setHistoryOpen(true);
+                            }}>
+                              <RefreshCw className="mr-2 h-4 w-4" /> View History
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {canAdjust && (
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                resetDialogState();
+                                setSelectedCustomer(row);
+                                setRefundOpen(true);
+                                setReason("Wallet refund");
+                              }}>
+                                <HandCoins className="mr-2 h-4 w-4" /> Issue Refund
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>

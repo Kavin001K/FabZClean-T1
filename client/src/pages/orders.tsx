@@ -1344,30 +1344,27 @@ function OrdersComponent() {
 
   return (
     <PageTransition>
-      <div className="container-desktop min-h-screen py-8 space-y-8 gradient-mesh">
+      <div className="container-desktop min-h-screen p-3 sm:p-4 md:p-8 space-y-4 sm:space-y-8 gradient-mesh pb-24 lg:pb-8">
         {/* Header Section */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-primary/5 pb-4 lg:pb-0 lg:border-none"
         >
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
-              <Package className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
-              Orders Management
+            <h1 className="text-xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-foreground flex items-center gap-2 lg:gap-3">
+              <Package className="h-6 w-6 sm:h-10 sm:w-10 text-primary" />
+              Orders
             </h1>
-            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-              Monitor, manage, and analyze your orders in real-time
-            </p>
           </div>
           <Button
             size="lg"
-            className="gap-2 shadow-lg hover:shadow-xl transition-all w-full sm:w-auto shrink-0"
+            className="gap-2 shadow-lg hover:shadow-xl transition-all w-full sm:w-auto shrink-0 h-11 sm:h-12 hidden sm:flex"
             onClick={() => window.location.href = '/create-order'}
           >
             <PlusCircle className="h-5 w-5" />
-            Create New Order
+            Create Order
           </Button>
         </motion.div>
 
@@ -1376,10 +1373,10 @@ function OrdersComponent() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6"
         >
           <Card className="glass hover:shadow-lg transition-all duration-300 border-l-4 border-l-primary shadow-xl">
-            <CardContent className="pt-6">
+            <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Orders</p>

@@ -478,19 +478,19 @@ export default function Customers() {
       <div className="container-desktop min-h-screen py-8 gradient-mesh">
         {/* Header Section */}
         <FadeIn delay={0.1}>
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10 pb-6 border-b border-white/5">
-            <div className="space-y-2">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20 shadow-inner">
-                  <Users className="h-7 w-7 text-primary" />
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6 mb-6 lg:mb-10 pb-4 lg:pb-6 border-b border-white/5">
+            <div className="space-y-1 lg:space-y-2">
+              <div className="flex items-center gap-3 lg:gap-4">
+                <div className="p-2 lg:p-3 rounded-xl lg:rounded-2xl bg-primary/10 border border-primary/20 shadow-inner">
+                  <Users className="h-5 w-5 lg:h-7 lg:w-7 text-primary" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-black tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-br from-foreground to-foreground/60">
-                    Customer Directory
+                  <h1 className="text-2xl lg:text-4xl font-black tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-br from-foreground to-foreground/60">
+                    Customers
                   </h1>
-                  <div className="text-muted-foreground text-sm font-medium flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Managing {totalCount} active customer relationships
+                  <div className="text-muted-foreground text-[10px] lg:text-sm font-medium flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Managing {totalCount} active relationships
                   </div>
                 </div>
               </div>
@@ -544,64 +544,60 @@ export default function Customers() {
 
         {/* KPI Cards */}
         <FadeIn delay={0.2}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-6 lg:mb-8">
             <Card className="glass border-muted border-l-4 border-l-primary shadow-sm hover:shadow-md transition-all">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <Users className="h-6 w-6 text-primary" />
+              <CardContent className="p-3 sm:p-4 lg:p-6">
+                <div className="flex items-center gap-2 lg:gap-4">
+                  <div className="h-8 w-8 lg:h-12 lg:w-12 rounded-lg lg:rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                    <Users className="h-4 w-4 lg:h-6 lg:w-6 text-primary" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Reached</p>
-                    <h3 className="text-2xl font-black tracking-tight text-foreground">
+                    <p className="text-[8px] lg:text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Customers</p>
+                    <h3 className="text-lg lg:text-2xl font-black tracking-tight text-foreground">
                       {customersLoading ? '...' : metrics.totalCustomers}
                     </h3>
-                    <div className="mt-1 text-[10px] text-slate-400 font-medium italic">Active customer base</div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="glass border-muted border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-all">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-                    <IndianRupee className="h-6 w-6 text-emerald-500" />
+              <CardContent className="p-3 sm:p-4 lg:p-6">
+                <div className="flex items-center gap-2 lg:gap-4">
+                  <div className="h-8 w-8 lg:h-12 lg:w-12 rounded-lg lg:rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+                    <IndianRupee className="h-4 w-4 lg:h-6 lg:w-6 text-emerald-500" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Revenue</p>
-                    <h3 className="text-2xl font-black tracking-tight text-emerald-600">₹{metrics.totalRevenue.toFixed(0)}</h3>
-                    <div className="mt-1 text-[10px] text-emerald-500/60 font-medium italic">₹{metrics.avgOrderValue.toFixed(0)} avg/order</div>
+                    <p className="text-[8px] lg:text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Revenue</p>
+                    <h3 className="text-lg lg:text-2xl font-black tracking-tight text-emerald-600">₹{metrics.totalRevenue.toFixed(0)}</h3>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="glass border-muted border-l-4 border-l-amber-500 shadow-sm hover:shadow-md transition-all">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-                    <Award className="h-6 w-6 text-amber-500" />
+              <CardContent className="p-3 sm:p-4 lg:p-6">
+                <div className="flex items-center gap-2 lg:gap-4">
+                  <div className="h-8 w-8 lg:h-12 lg:w-12 rounded-lg lg:rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                    <Award className="h-4 w-4 lg:h-6 lg:w-6 text-amber-500" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">VIP Club</p>
-                    <h3 className="text-2xl font-black tracking-tight text-amber-600">{metrics.vipCustomers}</h3>
-                    <div className="mt-1 text-[10px] text-amber-500/60 font-medium italic">{metrics.premiumCustomers} premium tier</div>
+                    <p className="text-[8px] lg:text-[10px] font-bold uppercase tracking-wider text-muted-foreground">VIP</p>
+                    <h3 className="text-lg lg:text-2xl font-black tracking-tight text-amber-600">{metrics.vipCustomers}</h3>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="glass border-muted border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-all">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
-                    <ShoppingBag className="h-6 w-6 text-blue-500" />
+              <CardContent className="p-3 sm:p-4 lg:p-6">
+                <div className="flex items-center gap-2 lg:gap-4">
+                  <div className="h-8 w-8 lg:h-12 lg:w-12 rounded-lg lg:rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
+                    <ShoppingBag className="h-4 w-4 lg:h-6 lg:w-6 text-blue-500" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Orders</p>
-                    <h3 className="text-2xl font-black tracking-tight text-blue-600">{metrics.totalOrders}</h3>
-                    <div className="mt-1 text-[10px] text-blue-500/60 font-medium italic">Across entire base</div>
+                    <p className="text-[8px] lg:text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Orders</p>
+                    <h3 className="text-lg lg:text-2xl font-black tracking-tight text-blue-600">{metrics.totalOrders}</h3>
                   </div>
                 </div>
               </CardContent>

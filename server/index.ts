@@ -8,6 +8,7 @@ import { realtimeServer } from "./websocket-server";
 import { driverTrackingService } from "./driver-tracking";
 import { corsOptions, errorHandler } from "./middleware/auth";
 import { surveillanceMiddleware } from "./middleware/surveillance";
+import path from "path";
 
 const app = express();
 
@@ -111,6 +112,11 @@ app.use(surveillanceMiddleware);
     serveStatic(app);
     log("✅ Serving static files in production mode");
   }
+
+  // Serve uploaded files statically
+  const uploadsPath = process.env.UPLOADS_DIR || path.join(process.cwd(), 'server', 'uploads');
+  app.use('/uploads', express.static(uploadsPath));
+  log(`📁 Serving static uploads from: ${uploadsPath}`);
 
   // Initialize database connection
   try {

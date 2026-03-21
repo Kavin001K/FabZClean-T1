@@ -88,7 +88,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
       <div className="border-t p-4">
         <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-3">
           <Avatar className="h-10 w-10">
-            <AvatarImage src={(employee as any)?.profileImage || ''} alt={employee?.fullName} />
+            <AvatarImage src={employee?.avatarUrl || (employee as any)?.profileImage || ''} alt={employee?.fullName} />
             <AvatarFallback className="bg-primary/10 text-primary">
               {employee?.fullName?.[0]?.toUpperCase() ?? employee?.username?.[0]?.toUpperCase() ?? "E"}
             </AvatarFallback>
