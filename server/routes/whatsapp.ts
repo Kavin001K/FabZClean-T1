@@ -78,8 +78,8 @@ router.post("/send-invoice", async (req, res) => {
 
 /**
  * POST /api/whatsapp/send-bill
- * Send bill notification via WhatsApp
- * Supports template cycling based on sendCount
+ * Send order confirmation via WhatsApp
+ * Uses the new order template and resend count tracking
  */
 router.post("/send-bill", async (req, res) => {
     try {
@@ -111,52 +111,19 @@ router.post("/send-bill", async (req, res) => {
 
         // Smart Item Summary
         const itemSummary = mainItem || smartItemSummary(items) || "Laundry Items";
-        console.log(`[WhatsApp] Bill for order ${ orderId }, sendCount: ${ sendCount }, item: "${itemSummary}"`);
+        console.log(`[WhatsApp] Order confirmation for ${ orderId }, sendCount: ${ sendCount }, item: "${itemSummary}"`);
 
         // Get template based on send count
         const templateType = getTemplateForSendCount(sendCount);
         console.log(`[WhatsApp] Using template: ${ templateType } `);
 
-        // If no PDF URL, send text message instead
         if (!pdfUrl) {
-            const itemText = itemSummary !== "Laundry Items"
-                ? `This includes your ${ itemSummary }.`
-                : "";
-
-            const appBaseUrl = process.env.APP_BASE_URL || 'https://acedigital.myfabclean.com';
-            const message = `Hi ${ customerName } ! 👋 Your laundry order is Processing! 🧺\n\nWe have generated Invoice ${ orderId } for ₹${ amount || '0.00' }.${ itemText ? ` ${itemText}` : '' } \n\nPayment Options: Scan the QR in the invoice or use UPI / Google Pay / PhonePe.\n📄 Terms: ${ appBaseUrl }/terms\n\nThanks for choosing Fab Clean!`;
-
-const textResult = await sendTextWhatsApp({
-    phoneNumber: customerPhone,
-    message,
-});
-
-const newSendCount = sendCount + 1;
-
-// Update database with text message success
-try {
-    // Find order by orderNumber to get internal id
-    const allOrders = await storage.listOrders();
-    const matchedOrder = allOrders.find(o => o.orderNumber === orderId);
-
-    if (matchedOrder) {
-        await storage.updateOrder(matchedOrder.id, {
-            lastWhatsappStatus: textResult.success ? `Text Sent - Count: ${newSendCount}` : `Text Failed: ${textResult.error}`,
-            lastWhatsappSentAt: new Date(),
-            whatsappMessageCount: newSendCount,
-        });
-    }
-} catch (dbErr) {
-    console.warn("[WhatsApp] Failed to update DB status for text send:", dbErr);
-}
-
-return res.json({
-    success: textResult.success,
-    error: textResult.error,
-    message: "WhatsApp text message sent",
-    newSendCount,
-    canResendAgain: newSendCount < MAX_RESENDS,
-});
+            return res.status(400).json({
+                success: false,
+                error: "PDF URL is required to send the WhatsApp confirmation.",
+                canResendAgain: false,
+                newSendCount: sendCount,
+            });
         }
 
 // Send with PDF attachment using appropriate template
@@ -181,21 +148,21 @@ try {
         const matchedOrder = allOrders.find(o => o.orderNumber === orderId);
 
         if (matchedOrder) {
-            await storage.updateOrder(matchedOrder.id, {
-                invoiceUrl: pdfUrl,
-                lastWhatsappStatus: `Bill Sent - Count: ${newSendCount}`,
-                lastWhatsappSentAt: new Date(),
-                whatsappMessageCount: newSendCount,
-            });
+                await storage.updateOrder(matchedOrder.id, {
+                    invoiceUrl: pdfUrl,
+                    lastWhatsappStatus: `Order Confirmation Sent - Count: ${newSendCount}`,
+                    lastWhatsappSentAt: new Date(),
+                    whatsappMessageCount: newSendCount,
+                });
         }
     } else if (!result.success && pdfUrl) {
         const allOrders = await storage.listOrders();
         const matchedOrder = allOrders.find(o => o.orderNumber === orderId);
 
         if (matchedOrder) {
-            await storage.updateOrder(matchedOrder.id, {
-                lastWhatsappStatus: `Bill Failed: ${result.error}`,
-            });
+                await storage.updateOrder(matchedOrder.id, {
+                    lastWhatsappStatus: `Order Confirmation Failed: ${result.error}`,
+                });
         }
     }
 } catch (dbErr) {
@@ -205,7 +172,7 @@ try {
 res.json({
     success: result.success,
     error: result.error,
-    message: "WhatsApp bill sent successfully",
+    message: "WhatsApp order confirmation sent successfully",
     templateUsed: result.templateUsed,
     newSendCount,
     canResendAgain: newSendCount < MAX_RESENDS,

@@ -83,6 +83,13 @@ export class WhatsAppService {
         sendCount: number = 0
     ): Promise<SendResult> {
         try {
+            if (!pdfUrl) {
+                return {
+                    success: false,
+                    error: "Invoice PDF is required before sending WhatsApp confirmation.",
+                };
+            }
+
             console.log(`[WhatsApp] Sending bill to ${phone}, sendCount: ${sendCount}`);
 
             const response = await fetch("/api/whatsapp/send-bill", {

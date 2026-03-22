@@ -1,10 +1,8 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import { AuthService } from '../auth-service';
 import { jwtRequired } from '../middleware/auth';
-import { LocalStorage } from '../services/local-storage';
+import { R2Storage } from '../services/r2-storage';
 
 const router = express.Router();
 
@@ -36,8 +34,8 @@ router.post('/upload-pdf', jwtRequired, upload.single('pdf'), async (req: Reques
         // Extract order ID from filename or generate one
         const orderId = req.body.orderId || `temp-${Date.now()}`;
 
-        // Save using LocalStorage service
-        const publicUrl = await LocalStorage.saveInvoicePdf(orderId, req.file.buffer);
+        // Save using R2 storage
+        const { url: publicUrl } = await R2Storage.uploadInvoicePdf(orderId, req.file.buffer);
 
         console.log('✅ PDF saved:', publicUrl);
 
@@ -89,8 +87,8 @@ router.post('/generate-invoice/:orderId', jwtRequired, async (req: Request, res:
             ? pdfBuffer
             : Buffer.from(pdfBuffer, 'base64');
 
-        // Save using LocalStorage service
-        const publicUrl = await LocalStorage.saveInvoicePdf(orderId, buffer);
+        // Save using R2 storage
+        const { url: publicUrl } = await R2Storage.uploadInvoicePdf(orderId, buffer);
 
         console.log(`✅ Invoice PDF generated for order ${orderId}: ${publicUrl}`);
 

@@ -102,25 +102,27 @@ router.get('/test-whatsapp', async (req: Request, res: Response) => {
     }
 
     const authKey = process.env.MSG91_AUTH_KEY;
-    const integratedNumber = process.env.MSG91_INTEGRATED_NUMBER || '15558125705';
-    const namespace = process.env.MSG91_NAMESPACE_Bill || '1520cd50_8420_404b_b634_4808f5f33034';
-    const templateName = process.env.MSG91_TEMPLATE_NAME_Bill || 'bill';
+    const integratedNumber = process.env.MSG91_INTEGRATED_NUMBER || '15559458542';
+    const namespace = process.env.MSG91_TEMPLATE_NAMESPACE || '5b9c340a_3221_42e3_9b9f_98b402c0c8ac';
+    const templateName = process.env.MSG91_TEMPLATE_NAME_ORDER || 'invoice_for_customer';
 
     if (!authKey) {
         return res.status(503).json({ error: 'MSG91_AUTH_KEY not configured' });
     }
 
-    // Test data for "bill" template
+    // Test data for "invoice_for_customer" template
     const testData = {
         orderNumber: 'FZC-TEST-12345',
         customerName: 'Test Customer',
-        imageUrl: 'https://rxyatfvjjnvjxwyhhhqn.supabase.co/storage/v1/object/public/Templates/Screenshot%202025-12-27%20at%2010.32.31%20PM.png',
+        itemSummary: 'Dry Cleaning',
+        amount: '999',
+        pdfUrl: 'https://bill.myfabclean.com/sample.pdf',
     };
 
-    // "bill" template (ACTUAL MSG91 SPEC):
-    // - header_1: IMAGE
-    // - body_1, body_2: text (only 2 params)
-    // - button_1, button_2: url
+    // "invoice_for_customer" template spec:
+    // - header_1: DOCUMENT
+    // - body_1..4: text
+    // - button_2: url
     const payload = {
         integrated_number: integratedNumber,
         content_type: "template",
@@ -138,28 +140,33 @@ router.get('/test-whatsapp', async (req: Request, res: Response) => {
                     {
                         to: [String(phone)],
                         components: {
-                            // Header: IMAGE (not document!)
+                            // Header: DOCUMENT
                             header_1: {
-                                type: "image",
-                                value: testData.imageUrl,
+                                type: "document",
+                                filename: `Invoice-${testData.orderNumber}.pdf`,
+                                value: testData.pdfUrl,
                             },
-                            // Body: Only 2 params for "bill" template
                             body_1: {
                                 type: "text",
-                                value: testData.customerName, // {{1}} = Customer Name
+                                value: testData.customerName, // {{1}}
                             },
                             body_2: {
                                 type: "text",
-                                value: testData.orderNumber, // {{2}} = Order Number
+                                value: testData.itemSummary, // {{2}}
                             },
-                            // Button 1: Track Order - dynamic URL suffix
-                            // Template URL: https://myfabclean.com/trackorder/{{1}}
-                            button_1: {
+                            body_3: {
+                                type: "text",
+                                value: testData.orderNumber, // {{3}}
+                            },
+                            body_4: {
+                                type: "text",
+                                value: testData.amount, // {{4}}
+                            },
+                            button_2: {
                                 subtype: "url",
                                 type: "text",
-                                value: testData.orderNumber, // Order ID for tracking
+                                value: testData.orderNumber,
                             },
-                            // NOTE: button_2 (Terms) is STATIC URL, no dynamic variable needed
                         },
                     },
                 ],

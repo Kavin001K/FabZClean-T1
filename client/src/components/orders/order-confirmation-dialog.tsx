@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Printer, MessageCircle, FileText, Tag, Loader2, CheckCircle2, QrCode, Zap, Ban } from 'lucide-react';
+import { CheckCircle, Printer, FileText, Tag, Loader2, CheckCircle2, Zap, Ban } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 // @ts-ignore
 import QRCode from 'qrcode';
@@ -44,6 +44,8 @@ export function OrderConfirmationDialog({
     const [showTagPrint, setShowTagPrint] = useState(false);
     const [whatsappSendCount, setWhatsappSendCount] = useState(0);
     const [autoSendTriggered, setAutoSendTriggered] = useState(false);
+    const [whatsappStatus, setWhatsappStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+    const [whatsappError, setWhatsappError] = useState<string | null>(null);
     const { toast } = useToast();
 
     // Fetch customer details if phone is missing in order
@@ -164,6 +166,8 @@ export function OrderConfirmationDialog({
         if (!open) {
             setAutoSendTriggered(false);
             setWhatsappSendCount(0);
+            setWhatsappStatus('idle');
+            setWhatsappError(null);
         }
     }, [open]);
 
@@ -222,6 +226,8 @@ export function OrderConfirmationDialog({
                 description: "Missing order or customer phone number",
                 variant: "destructive",
             });
+            setWhatsappStatus('failed');
+            setWhatsappError("Missing order or customer phone number");
             return;
         }
 
@@ -232,10 +238,14 @@ export function OrderConfirmationDialog({
                 description: `Maximum ${MAX_WHATSAPP_SENDS} WhatsApp messages already sent for this order.`,
                 variant: "destructive",
             });
+            setWhatsappStatus('failed');
+            setWhatsappError(`Maximum ${MAX_WHATSAPP_SENDS} WhatsApp messages already sent.`);
             return;
         }
 
         setSendingWhatsApp(true);
+        setWhatsappStatus('sending');
+        setWhatsappError(null);
 
         const customerName = order.customerName || 'Valued Customer';
         const orderNum = order.orderNumber || order.id || 'N/A';
@@ -289,7 +299,19 @@ export function OrderConfirmationDialog({
                     console.log('[WhatsApp] PDF uploaded:', pdfUrl);
                 }
             } catch (pdfError) {
-                console.error('[WhatsApp] PDF generation failed (will send text only):', pdfError);
+                console.error('[WhatsApp] PDF generation failed:', pdfError);
+            }
+
+            if (!pdfUrl) {
+                const errorMessage = 'Invoice PDF generation/upload failed. WhatsApp cannot be sent without the PDF.';
+                setWhatsappStatus('failed');
+                setWhatsappError(errorMessage);
+                toast({
+                    title: "PDF Required",
+                    description: errorMessage,
+                    variant: "destructive",
+                });
+                return;
             }
 
             // Smart Item Summarization
@@ -323,12 +345,15 @@ export function OrderConfirmationDialog({
                         ? `WhatsApp ${templateName} sent. ${MAX_WHATSAPP_SENDS - newCount} resend(s) remaining.`
                         : `WhatsApp ${templateName} sent. No more resends available.`,
                 });
+                setWhatsappStatus('sent');
             } else {
                 toast({
                     title: "Failed",
                     description: result.error || "Could not send WhatsApp message. Please try again.",
                     variant: "destructive",
                 });
+                setWhatsappStatus('failed');
+                setWhatsappError(result.error || "Could not send WhatsApp message.");
             }
         } catch (error) {
             console.error("[WhatsApp] Error:", error);
@@ -337,6 +362,8 @@ export function OrderConfirmationDialog({
                 description: error instanceof Error ? error.message : "An error occurred while sending message.",
                 variant: "destructive",
             });
+            setWhatsappStatus('failed');
+            setWhatsappError(error instanceof Error ? error.message : "An error occurred while sending message.");
         } finally {
             setSendingWhatsApp(false);
         }
@@ -351,69 +378,93 @@ export function OrderConfirmationDialog({
         const React = await import('react');
         const { default: InvoiceTemplateIN } = await import('@/components/print/invoice-template-in');
 
-        // Create temporary container
-        const container = document.createElement('div');
-        container.style.position = 'absolute';
-        container.style.left = '-9999px';
-        container.style.width = '210mm';
-        container.style.background = 'white';
-        document.body.appendChild(container);
+        const renderToCanvas = async (scale: number) => {
+            const container = document.createElement('div');
+            container.style.position = 'absolute';
+            container.style.left = '-9999px';
+            container.style.width = '210mm';
+            container.style.background = 'white';
+            document.body.appendChild(container);
 
-        // Render React component
-        const root = createRoot(container);
-        await new Promise<void>((resolve) => {
-            root.render(React.createElement(InvoiceTemplateIN, { data: invoiceData }));
-            setTimeout(resolve, 1500);
-        });
+            const root = createRoot(container);
+            await new Promise<void>((resolve) => {
+                root.render(React.createElement(InvoiceTemplateIN, { data: invoiceData }));
+                setTimeout(resolve, 1500);
+            });
 
-        // Convert to canvas - OPTIMIZED settings
-        const canvas = await html2canvas(container, {
-            scale: 1.5, // Reduced from 2 for smaller file size
-            useCORS: true,
-            allowTaint: false,
-            backgroundColor: '#ffffff',
-            logging: false,
-            imageTimeout: 5000,
-        });
+            const canvas = await html2canvas(container, {
+                scale,
+                useCORS: true,
+                allowTaint: false,
+                backgroundColor: '#ffffff',
+                logging: false,
+                imageTimeout: 5000,
+            });
 
-        // Create PDF with compression
-        const pdf = new jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4',
-            compress: true // Enable compression
-        });
+            root.unmount();
+            document.body.removeChild(container);
 
-        // Always use JPEG with compression for smaller file size
-        const imgData = canvas.toDataURL('image/jpeg', 0.7); // 70% quality
-        const imgFormat: 'JPEG' = 'JPEG';
+            return canvas;
+        };
 
-        const imgWidth = 210;
-        const pageHeight = 297;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        let heightLeft = imgHeight;
-        let position = 0;
+        const buildPdfFromCanvas = (canvas: HTMLCanvasElement, quality: number): Blob => {
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4',
+                compress: true
+            });
 
-        // Add image with FAST compression
-        pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight, undefined, 'FAST');
-        heightLeft -= pageHeight;
+            const imgData = canvas.toDataURL('image/jpeg', quality);
+            const imgFormat: 'JPEG' = 'JPEG';
 
-        // Handle multi-page if content is longer
-        while (heightLeft > 5) {
-            position = heightLeft - imgHeight;
-            pdf.addPage();
+            const imgWidth = 210;
+            const pageHeight = 297;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let heightLeft = imgHeight;
+            let position = 0;
+
             pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight, undefined, 'FAST');
             heightLeft -= pageHeight;
+
+            while (heightLeft > 5) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight, undefined, 'FAST');
+                heightLeft -= pageHeight;
+            }
+
+            return pdf.output('blob');
+        };
+
+        const attempts = [
+            { scale: 1.5, quality: 0.7 },
+            { scale: 1.2, quality: 0.55 },
+            { scale: 1.0, quality: 0.45 },
+        ];
+
+        let lastBlob: Blob | null = null;
+
+        for (const attempt of attempts) {
+            const canvas = await renderToCanvas(attempt.scale);
+            const pdfBlob = buildPdfFromCanvas(canvas, attempt.quality);
+            lastBlob = pdfBlob;
+            const sizeMb = pdfBlob.size / (1024 * 1024);
+            console.log(`📊 PDF size: ${sizeMb.toFixed(2)} MB (scale ${attempt.scale}, quality ${attempt.quality})`);
+            if (sizeMb <= 5) {
+                return pdfBlob;
+            }
         }
 
-        // Cleanup
-        root.unmount();
-        document.body.removeChild(container);
+        if (lastBlob) {
+            const sizeMb = lastBlob.size / (1024 * 1024);
+            if (sizeMb > 5) {
+                throw new Error('Generated PDF exceeds 5 MB');
+            }
+            return lastBlob;
+        }
 
-        const pdfBlob = pdf.output('blob');
-        console.log(`📊 PDF size: ${(pdfBlob.size / (1024 * 1024)).toFixed(2)} MB`);
-
-        return pdfBlob;
+        throw new Error('Failed to generate PDF');
     };
 
     // Helper function to upload PDF to server
@@ -535,31 +586,65 @@ export function OrderConfirmationDialog({
                             Print Tags
                         </Button>
                     </div>
-                    <Button
-                        onClick={handleSendWhatsApp}
-                        disabled={sendingWhatsApp || !customerPhone || !canSendWhatsApp}
-                        className={`w-full font-bold shadow-sm hover:shadow-md transition-all ${canSendWhatsApp
-                            ? 'bg-[#25D366] hover:bg-[#128C7E] text-white'
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            }`}
-                    >
-                        {sendingWhatsApp ? (
-                            <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Sending...
-                            </>
-                        ) : !canSendWhatsApp ? (
-                            <>
-                                <Ban className="h-4 w-4 mr-2" />
-                                Limit Reached ({MAX_WHATSAPP_SENDS}/{MAX_WHATSAPP_SENDS})
-                            </>
-                        ) : (
-                            <>
-                                <MessageCircle className="h-4 w-4 mr-2" />
-                                {whatsappSendCount === 0 ? 'Send on WhatsApp' : `Resend Bill (${remainingSends} left)`}
-                            </>
+                    <div className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+                        {!customerPhone && (
+                            <div className="flex items-center gap-2 text-gray-500">
+                                <Ban className="h-4 w-4" />
+                                WhatsApp unavailable (missing customer phone).
+                            </div>
                         )}
-                    </Button>
+                        {customerPhone && whatsappStatus === 'sending' && (
+                            <div className="flex items-center gap-2 text-gray-700">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Sending WhatsApp message automatically...
+                            </div>
+                        )}
+                        {customerPhone && whatsappStatus === 'sent' && (
+                            <div className="flex items-center gap-2 text-emerald-700">
+                                <CheckCircle className="h-4 w-4" />
+                                WhatsApp message sent successfully.
+                            </div>
+                        )}
+                        {customerPhone && whatsappStatus === 'failed' && (
+                            <div className="flex flex-col gap-2 text-red-600">
+                                <div className="flex items-center gap-2">
+                                    <Ban className="h-4 w-4" />
+                                    Failed to send WhatsApp message.
+                                </div>
+                                {whatsappError && (
+                                    <div className="text-xs text-red-500">{whatsappError}</div>
+                                )}
+                                <Button
+                                    onClick={handleSendWhatsApp}
+                                    disabled={sendingWhatsApp || !customerPhone || !canSendWhatsApp}
+                                    className={`w-full font-bold shadow-sm hover:shadow-md transition-all ${canSendWhatsApp
+                                        ? 'bg-[#25D366] hover:bg-[#128C7E] text-white'
+                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        }`}
+                                >
+                                    {sendingWhatsApp ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            Sending...
+                                        </>
+                                    ) : !canSendWhatsApp ? (
+                                        <>
+                                            <Ban className="h-4 w-4 mr-2" />
+                                            Limit Reached ({MAX_WHATSAPP_SENDS}/{MAX_WHATSAPP_SENDS})
+                                        </>
+                                    ) : (
+                                        <>Retry WhatsApp ({remainingSends} left)</>
+                                    )}
+                                </Button>
+                            </div>
+                        )}
+                        {customerPhone && whatsappStatus === 'idle' && (
+                            <div className="flex items-center gap-2 text-gray-600">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Preparing WhatsApp message...
+                            </div>
+                        )}
+                    </div>
                     <Button
                         onClick={onClose}
                         variant="ghost"

@@ -1,39 +1,12 @@
 import { Router } from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import { db } from '../db';
-// @ts-ignore
-import { fileURLToPath } from 'url';
+import { R2Storage } from '../services/r2-storage';
 
 const router = Router();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Ensure documents directory exists
-const documentsDir = process.env.UPLOADS_DIR
-    ? path.join(process.env.UPLOADS_DIR, 'documents')
-    : path.join(__dirname, '../uploads/documents');
-if (!fs.existsSync(documentsDir)) {
-    fs.mkdirSync(documentsDir, { recursive: true });
-}
-
-// Configure multer for local disk storage
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, documentsDir);
-    },
-    filename: (req, file, cb) => {
-        // Sanitize filename and add timestamp
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const originalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-        cb(null, `${uniqueSuffix}-${originalName}`);
-    }
-});
-
 const upload = multer({
-    storage: storage,
+    storage: multer.memoryStorage(),
     limits: {
         fileSize: 50 * 1024 * 1024, // 50MB limit
     },
@@ -61,10 +34,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             console.warn('Failed to parse metadata JSON:', e);
         }
 
-        const filename = req.file.filename;
-        const filepath = `documents/${filename}`; // Relative path
-        const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
-        const fileUrl = `${baseUrl}/uploads/documents/${filename}`;
+        const originalName = req.file.originalname;
+        const { key: filepath, url: fileUrl } = await R2Storage.uploadDocumentPdf(originalName, req.file.buffer);
 
         // Save document record to database
         try {
@@ -72,8 +43,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 franchiseId: (req as any).user?.franchiseId, // Assuming user is attached to req
                 type: type || 'invoice',
                 title: (metadata as any).invoiceNumber ? `Invoice ${(metadata as any).invoiceNumber}` : req.file.originalname,
-                filename: req.file.originalname,
-                filepath, // Store relative path or absolute? Storing relative is better.
+                filename: originalName,
+                filepath, // R2 object key
                 fileUrl,
                 status: (metadata as any).status || 'sent',
                 amount: (metadata as any).amount ? String((metadata as any).amount) : null,
@@ -89,11 +60,6 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             });
         } catch (dbError) {
             console.error('Database insert error:', dbError);
-            // Try to clean up the uploaded file if DB insert fails
-            const fullPath = path.join(documentsDir, filename);
-            if (fs.existsSync(fullPath)) {
-                fs.unlinkSync(fullPath);
-            }
             return res.status(500).json({ error: 'Failed to save document record', details: dbError instanceof Error ? dbError.message : String(dbError) });
         }
     } catch (error) {
