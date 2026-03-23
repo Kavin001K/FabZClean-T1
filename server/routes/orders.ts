@@ -145,33 +145,12 @@ const schedulePostCreateTasks = (
       }
     }
 
-    // --- AUTOMATED WHATSAPP BILL SENDING ---
-    if (order.customerPhone) {
-      try {
-        console.log(`📱 [WhatsApp Background] Triggering auto-bill for ${order.orderNumber}`);
-        
-        // We use handleOrderStatusChange with 'pending' status which logic already handles billing in newer versions
-        // or we can call sendOrderCreatedNotification directly if we want explicit billing.
-        // Let's use handleOrderStatusChange as it's the standard entry point for status-based notifications.
-        await handleOrderStatusChange(
-          {
-            customerPhone: order.customerPhone,
-            customerName: order.customerName,
-            orderNumber: order.orderNumber,
-            totalAmount: order.totalAmount,
-            status: 'pending',
-            fulfillmentType: order.fulfillmentType || 'pickup',
-            items: order.items || [],
-            invoiceUrl: order.invoiceUrl || null,
-            invoiceNumber: order.orderNumber,
-          },
-          null // No previous status
-        );
-        console.log(`✅ [WhatsApp Background] Auto-bill task scheduled for ${order.orderNumber}`);
-      } catch (wsErr) {
-        console.error(`❌ [WhatsApp Background] Failed to trigger auto-bill for ${order.orderNumber}:`, wsErr);
-      }
-    }
+    // --- WHATSAPP BILL IS HANDLED BY THE CLIENT ---
+    // The client-side flow in order-confirmation-dialog.tsx handles:
+    // 1. Generating the invoice PDF in the browser
+    // 2. Uploading it to R2 via /api/documents/upload
+    // 3. Sending the WhatsApp message with the R2 PDF URL
+    // This ensures MSG91 can download the PDF from a public Cloudflare R2 URL.
   });
 };
 

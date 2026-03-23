@@ -46,14 +46,16 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
         // Try R2 upload first
         try {
+            console.log(`📡 [Documents] Attempting R2 upload for: ${originalName}`);
             const r2Result = await R2Storage.uploadDocumentPdf(originalName, req.file.buffer);
             filepath = r2Result.key;
             fileUrl = r2Result.url;
-            console.log(`✅ [Documents] Saved to R2: ${filepath}`);
+            console.log(`✅ [Documents] Saved to R2 successfully: ${filepath}`);
         } catch (r2Error) {
-            console.error('❌ [Documents] R2 Upload failed, falling back to LocalStorage:', r2Error instanceof Error ? r2Error.message : String(r2Error));
+            console.error('❌ [Documents] R2 Upload failed:', r2Error instanceof Error ? r2Error.message : String(r2Error));
             
             // Fallback to Local Storage
+            console.log(`⚠️ [Documents] Falling back to LocalStorage for: ${originalName}`);
             const localPath = await LocalStorage.saveFile('documents', req.file.buffer, originalName);
             filepath = localPath; // This is the /uploads/... path
             
@@ -64,14 +66,14 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             console.log(`✅ [Documents] Saved to LocalStorage (Fallback): ${filepath}`);
         }
 
-        // Save document record to database
+        // Save document record to database (non-fatal — R2 URL is the priority)
+        let document: any = null;
         try {
-            const document = await db.createDocument({
+            document = await db.createDocument({
                 franchiseId: (req as any).user?.franchiseId,
                 type: type || 'invoice',
                 title: (metadata as any).invoiceNumber ? `Invoice ${(metadata as any).invoiceNumber}` : req.file.originalname,
                 filename: originalName,
-                filepath, // R2 key or local path
                 fileUrl,
                 status: (metadata as any).status || 'sent',
                 amount: (metadata as any).amount ? String((metadata as any).amount) : null,
@@ -80,35 +82,39 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 metadata: {
                     ...(metadata as any).metadata || {},
                     storage: storageUsed,
+                    filepath, // Store R2 key in metadata instead
                     uploadedAt: new Date().toISOString()
                 },
             });
-
-            // Update order invoiceUrl if this was an invoice
-            if ((type === 'invoice' || !type) && (metadata as any).orderNumber) {
-                try {
-                    const orderNum = (metadata as any).orderNumber;
-                    const orders = await db.listOrders();
-                    const order = orders.find((o: any) => o.orderNumber === orderNum);
-                    if (order) {
-                        await db.updateOrder(order.id, { invoiceUrl: fileUrl } as any);
-                        console.log(`🔗 [Documents] Linked invoice URL to order: ${orderNum}`);
-                    }
-                } catch (linkErr) {
-                    console.warn('[Documents] Failed to link invoice URL to order:', linkErr);
-                }
-            }
-
-            res.json({
-                success: true,
-                document,
-                storageUsed,
-                message: 'Document uploaded successfully',
-            });
+            console.log(`✅ [Documents] DB record saved for: ${originalName}`);
         } catch (dbError) {
-            console.error('Database insert error:', dbError);
-            return res.status(500).json({ error: 'Failed to save document record', details: dbError instanceof Error ? dbError.message : String(dbError) });
+            // DB insert failed but R2 upload succeeded — NOT fatal
+            console.warn('⚠️ [Documents] DB record insert failed (non-fatal):', dbError instanceof Error ? dbError.message : String(dbError));
         }
+
+        // Update order invoiceUrl if this was an invoice (always try, even if DB record failed)
+        if ((type === 'invoice' || !type) && (metadata as any).orderNumber) {
+            try {
+                const orderNum = (metadata as any).orderNumber;
+                const orders = await db.listOrders();
+                const order = orders.find((o: any) => o.orderNumber === orderNum);
+                if (order) {
+                    await db.updateOrder(order.id, { invoiceUrl: fileUrl } as any);
+                    console.log(`🔗 [Documents] Linked invoice URL to order: ${orderNum}`);
+                }
+            } catch (linkErr) {
+                console.warn('[Documents] Failed to link invoice URL to order:', linkErr);
+            }
+        }
+
+        // Always return success if the file was uploaded (R2 or local)
+        res.json({
+            success: true,
+            document: document || { fileUrl, filename: originalName },
+            fileUrl,
+            storageUsed,
+            message: 'Document uploaded successfully',
+        });
     } catch (error) {
         console.error('Document upload error:', error);
         res.status(500).json({

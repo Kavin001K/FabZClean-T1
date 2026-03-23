@@ -43,7 +43,7 @@ export function OrderConfirmationDialog({
     const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
     const [showTagPrint, setShowTagPrint] = useState(false);
     const [whatsappSendCount, setWhatsappSendCount] = useState(0);
-    const [autoSendTriggered, setAutoSendTriggered] = useState(false);
+    const autoSendTriggeredRef = useRef(false);
     const [whatsappStatus, setWhatsappStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
     const [whatsappError, setWhatsappError] = useState<string | null>(null);
     const { toast } = useToast();
@@ -147,9 +147,9 @@ export function OrderConfirmationDialog({
 
     // Auto-send WhatsApp when dialog opens (on order creation)
     useEffect(() => {
-        if (open && order && customerPhone && !sendingWhatsApp && !autoSendTriggered && whatsappSendCount === 0) {
+        if (open && order && customerPhone && !sendingWhatsApp && !autoSendTriggeredRef.current && whatsappSendCount === 0) {
             // Auto-send bill on order creation
-            setAutoSendTriggered(true);
+            autoSendTriggeredRef.current = true;
             console.log('[WhatsApp] Auto-sending bill on order creation...');
 
             // Delay slightly to allow dialog to render
@@ -159,12 +159,12 @@ export function OrderConfirmationDialog({
 
             return () => clearTimeout(timer);
         }
-    }, [open, order, customerPhone, autoSendTriggered, whatsappSendCount]);
+    }, [open, order, customerPhone, whatsappSendCount]);
 
     // Reset state when dialog closes
     useEffect(() => {
         if (!open) {
-            setAutoSendTriggered(false);
+            autoSendTriggeredRef.current = false;
             setWhatsappSendCount(0);
             setWhatsappStatus('idle');
             setWhatsappError(null);
@@ -475,13 +475,16 @@ export function OrderConfirmationDialog({
         formData.append('metadata', JSON.stringify({
             invoiceNumber: invoiceData.invoiceNumber,
             orderNumber: order?.orderNumber,
-            customerName: invoiceData.customer.name,
+            customerName: invoiceData.customerInfo.name,
             amount: invoiceData.total,
             status: 'sent',
         }));
 
         const response = await fetch('/api/documents/upload', {
             method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('employee_token')}`,
+            },
             body: formData,
         });
 
