@@ -335,9 +335,9 @@ export default function OrderDetailPage() {
                   <p className="text-sm font-medium text-muted-foreground">Balance Due</p>
                   <p className="text-lg font-semibold text-red-600">
                     {formatCurrency(
-                      (toNumber(order.totalAmount, 0)) - 
-                      (toNumber((order as any).advancePaid, 0)) - 
-                      (toNumber((order as any).walletUsed, 0))
+                      (Number(order.totalAmount || 0)) - 
+                      (Number((order as any).advancePaid || 0)) - 
+                      (Number((order as any).walletUsed || 0))
                     )}
                   </p>
                 </div>
