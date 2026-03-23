@@ -305,19 +305,15 @@ router.post('/:id/mark-paid', async (req, res) => {
         String(paymentMethod).toUpperCase(),
         recordedBy,
         recordedByName
-      ).catch((err: any) => {
-        // Fallback: If RPC fails with account-not-found, we still want to allow completion
-        // if the client intent is to mark as paid. We'll manually inject the ledger entry.
-        console.warn('[OrdersRoute] processCreditRepayment failed, attempting manual settlement fallback:', err.message);
-        return { success: false, error: err.message };
-      });
+      );
 
       if (!repayment.success && !repayment.error?.includes('Credit account not found')) {
         return res.status(400).json(createErrorResponse(repayment.error || 'Failed to settle outstanding balance', 400));
       }
       
-      // If we got past the check, even with a 'handled' failure, we continue to update the order.
-      // The customer's credit_balance being 0 already is fine for a completion flow.
+      if (!repayment.success) {
+        console.warn('[OrdersRoute] processCreditRepayment skipped/failed with handled error:', repayment.error);
+      }
     }
 
     const nextAdvancePaid = Math.min(totalAmount, advancePaid + settlementAmount);

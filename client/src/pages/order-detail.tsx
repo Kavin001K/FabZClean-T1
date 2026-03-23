@@ -196,7 +196,7 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center">
-          {order.paymentStatus !== 'paid' && (
+          {order.paymentStatus !== 'paid' && (Number(order.totalAmount) - Number((order as any).advancePaid || 0) > 0) && (
             <Button
               variant="outline"
               size="sm"
@@ -325,9 +325,9 @@ export default function OrderDetailPage() {
                 <p className="text-sm font-medium text-muted-foreground">Payment Status</p>
                 <Badge className={cn(
                   "mt-1",
-                  order.paymentStatus === 'paid' ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                  order.paymentStatus === 'paid' ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
                 )}>
-                  {order.paymentStatus === 'paid' ? 'Paid' : 'Pending'}
+                  {order.paymentStatus === 'paid' ? 'Paid' : 'Pending Payment / Credit'}
                 </Badge>
               </div>
               {order.paymentStatus !== 'paid' && (

@@ -678,6 +678,12 @@ export default function PublicOrderTracking() {
                                         <Badge className={cn('text-sm md:text-base px-3 md:px-5 py-1.5 md:py-2 font-semibold shadow border-0', getStatusBadgeStyle(order.status))}>
                                             {currentSteps[currentStepIndex]?.fullLabel || 'Processing'}
                                         </Badge>
+                                        <Badge className={cn(
+                                            "text-sm md:text-base px-3 md:px-5 py-1.5 md:py-2 font-bold shadow border-0 ml-1 md:ml-3",
+                                            order.paymentStatus === 'paid' ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200"
+                                        )}>
+                                            {order.paymentStatus === 'paid' ? '💰 PAID' : '💳 PENDING PAYMENT'}
+                                        </Badge>
                                         <Button
                                             variant="ghost"
                                             size="sm"

@@ -516,12 +516,28 @@ export async function handleOrderStatusChange(
         return null;
     }
 
-    const currentStatus = order.status;
+    const currentStatusLine = order.status as string;
+    const prevStatusStr = (previousStatus as string) || '';
 
-    console.log(`🔄 [WhatsApp] Order ${order.orderNumber} status changed: ${previousStatus} -> ${currentStatus}`);
+    console.log(`🔄 [WhatsApp] Order ${order.orderNumber} status changed: ${prevStatusStr || 'NONE'} -> ${currentStatusLine}`);
+
+    // STATUS: pending or received - Send Order Created (Bill) notification
+    if ((currentStatusLine === 'pending' || currentStatusLine === 'received') && !prevStatusStr) {
+        console.log(`📤 [WhatsApp] Triggering Order Created (Bill) notification for order ${order.orderNumber}`);
+        return await sendInvoiceWhatsApp({
+            phoneNumber: order.customerPhone,
+            pdfUrl: order.invoiceUrl || `https://erp.myfabclean.com/api/orders/${order.orderNumber}/invoice`, // Fallback URL
+            filename: `Invoice_${order.orderNumber}.pdf`,
+            customerName: order.customerName,
+            invoiceNumber: order.invoiceNumber || order.orderNumber,
+            amount: order.totalAmount,
+            itemName: order.items?.[0]?.serviceName || order.items?.[0]?.name || 'Laundry Services',
+            templateType: 'order'
+        });
+    }
 
     // STATUS: ready_for_pickup - Send status update
-    if (currentStatus === 'ready_for_pickup' && previousStatus !== 'ready_for_pickup') {
+    if (currentStatusLine === 'ready_for_pickup' && prevStatusStr !== 'ready_for_pickup') {
         console.log(`📤 [WhatsApp] Triggering Ready for Pickup notification for order ${order.orderNumber}`);
         return await sendOrderStatusUpdateNotification({
             phoneNumber: order.customerPhone,
@@ -532,7 +548,7 @@ export async function handleOrderStatusChange(
     }
 
     // STATUS: out_for_delivery - Send status update
-    if (currentStatus === 'out_for_delivery' && previousStatus !== 'out_for_delivery') {
+    if (currentStatusLine === 'out_for_delivery' && prevStatusStr !== 'out_for_delivery') {
         console.log(`📤 [WhatsApp] Triggering Out for Delivery notification for order ${order.orderNumber}`);
         return await sendOrderStatusUpdateNotification({
             phoneNumber: order.customerPhone,
@@ -543,7 +559,7 @@ export async function handleOrderStatusChange(
     }
 
     // STATUS: completed - Send feedback request
-    if (currentStatus === 'completed' && previousStatus !== 'completed') {
+    if (currentStatusLine === 'completed' && prevStatusStr !== 'completed') {
         console.log(`📤 [WhatsApp] Triggering Feedback notification for order ${order.orderNumber}`);
         return await sendCustomerFeedbackNotification({
             phoneNumber: order.customerPhone,
@@ -553,7 +569,7 @@ export async function handleOrderStatusChange(
     }
 
     // No notification needed for other status changes
-    console.log(`ℹ️ [WhatsApp] No notification configured for status: ${currentStatus}`);
+    console.log(`ℹ️ [WhatsApp] No notification configured for status: ${currentStatusLine}`);
     return null;
 }
 
