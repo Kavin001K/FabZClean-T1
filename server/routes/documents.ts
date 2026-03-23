@@ -2,6 +2,11 @@ import { Router } from 'express';
 import multer from 'multer';
 import { db } from '../db';
 import { R2Storage } from '../services/r2-storage';
+import { LocalStorage } from '../services/local-storage';
+import path from 'path';
+import fs from 'fs';
+
+const documentsDir = path.join(process.cwd(), 'server', 'uploads', 'documents');
 
 const router = Router();
 
@@ -35,27 +40,69 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         }
 
         const originalName = req.file.originalname;
-        const { key: filepath, url: fileUrl } = await R2Storage.uploadDocumentPdf(originalName, req.file.buffer);
+        let filepath = "";
+        let fileUrl = "";
+        let storageUsed = "r2";
+
+        // Try R2 upload first
+        try {
+            const r2Result = await R2Storage.uploadDocumentPdf(originalName, req.file.buffer);
+            filepath = r2Result.key;
+            fileUrl = r2Result.url;
+            console.log(`✅ [Documents] Saved to R2: ${filepath}`);
+        } catch (r2Error) {
+            console.error('❌ [Documents] R2 Upload failed, falling back to LocalStorage:', r2Error instanceof Error ? r2Error.message : String(r2Error));
+            
+            // Fallback to Local Storage
+            const localPath = await LocalStorage.saveFile('documents', req.file.buffer, originalName);
+            filepath = localPath; // This is the /uploads/... path
+            
+            const baseUrl = process.env.APP_BASE_URL || `http://${req.get('host')}`;
+            fileUrl = `${baseUrl.replace(/\/$/, '')}${localPath}`;
+            storageUsed = "local";
+            
+            console.log(`✅ [Documents] Saved to LocalStorage (Fallback): ${filepath}`);
+        }
 
         // Save document record to database
         try {
             const document = await db.createDocument({
-                franchiseId: (req as any).user?.franchiseId, // Assuming user is attached to req
+                franchiseId: (req as any).user?.franchiseId,
                 type: type || 'invoice',
                 title: (metadata as any).invoiceNumber ? `Invoice ${(metadata as any).invoiceNumber}` : req.file.originalname,
                 filename: originalName,
-                filepath, // R2 object key
+                filepath, // R2 key or local path
                 fileUrl,
                 status: (metadata as any).status || 'sent',
                 amount: (metadata as any).amount ? String((metadata as any).amount) : null,
                 customerName: (metadata as any).customerName || null,
                 orderNumber: (metadata as any).orderNumber || null,
-                metadata: (metadata as any).metadata || {},
+                metadata: {
+                    ...(metadata as any).metadata || {},
+                    storage: storageUsed,
+                    uploadedAt: new Date().toISOString()
+                },
             });
+
+            // Update order invoiceUrl if this was an invoice
+            if ((type === 'invoice' || !type) && (metadata as any).orderNumber) {
+                try {
+                    const orderNum = (metadata as any).orderNumber;
+                    const orders = await db.listOrders();
+                    const order = orders.find((o: any) => o.orderNumber === orderNum);
+                    if (order) {
+                        await db.updateOrder(order.id, { invoiceUrl: fileUrl } as any);
+                        console.log(`🔗 [Documents] Linked invoice URL to order: ${orderNum}`);
+                    }
+                } catch (linkErr) {
+                    console.warn('[Documents] Failed to link invoice URL to order:', linkErr);
+                }
+            }
 
             res.json({
                 success: true,
                 document,
+                storageUsed,
                 message: 'Document uploaded successfully',
             });
         } catch (dbError) {

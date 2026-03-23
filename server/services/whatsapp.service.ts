@@ -526,8 +526,9 @@ export async function handleOrderStatusChange(
         console.log(`📤 [WhatsApp] Triggering Order Created (Bill) notification for order ${order.orderNumber}`);
         return await sendInvoiceWhatsApp({
             phoneNumber: order.customerPhone,
-            pdfUrl: order.invoiceUrl || `https://erp.myfabclean.com/api/orders/${order.orderNumber}/invoice`, // Fallback URL
-            filename: `Invoice_${order.orderNumber}.pdf`,
+            // Use public PDF endpoint as fallback if direct URL is missing
+            pdfUrl: order.invoiceUrl || `${APP_BASE_URL}/api/public/invoice/${order.orderNumber}/pdf`,
+            filename: `Invoice-${order.orderNumber}.pdf`,
             customerName: order.customerName,
             invoiceNumber: order.invoiceNumber || order.orderNumber,
             amount: order.totalAmount,

@@ -398,4 +398,37 @@ router.get('/invoice/:orderNumber', async (req: Request, res: Response) => {
     }
 });
 
+// Get PDF version of the invoice (for WhatsApp etc)
+router.get('/invoice/:orderNumber/pdf', async (req: Request, res: Response) => {
+    try {
+        const { orderNumber } = req.params;
+        if (!orderNumber) return res.status(400).json({ error: 'Order number is required' });
+
+        // Find the document record for this order
+        const documents = await storage.listDocuments({ type: 'invoice' });
+        const doc = documents.find((d: any) => 
+            d.orderNumber === orderNumber || 
+            (d.metadata && d.metadata.orderNumber === orderNumber)
+        );
+
+        if (!doc || !doc.fileUrl) {
+            // Fallback: check order table itself
+            const orders = await storage.listOrders();
+            const order = orders.find((o: any) => o.orderNumber === orderNumber);
+            
+            if (order && order.invoiceUrl) {
+                return res.redirect(order.invoiceUrl);
+            }
+            
+            return res.status(404).json({ error: 'Invoice PDF not found' });
+        }
+
+        // Redirect to the actual file (R2 or Local)
+        res.redirect(doc.fileUrl);
+    } catch (error) {
+        console.error('[Invoice] Error retrieving invoice PDF:', error);
+        res.status(500).json({ error: 'Failed to retrieve invoice PDF' });
+    }
+});
+
 export default router;
