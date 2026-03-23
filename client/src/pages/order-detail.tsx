@@ -86,11 +86,36 @@ export default function OrderDetailPage() {
     },
   });
 
+  const markPaidMutation = useMutation({
+    mutationFn: () => ordersApi.markAsPaid(id!, String((order as any)?.paymentMethod || 'cash')),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order', id] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['wallet-management', 'customers'] });
+      queryClient.invalidateQueries({ queryKey: ['credits'] });
+      toast({
+        title: "Order Marked Paid",
+        description: "Outstanding ledger amount has been settled.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Update Failed",
+        description: "Failed to mark the order as paid.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleStatusChange = (newStatus: Order['status']) => {
     updateOrderMutation.mutate({ status: newStatus });
   };
 
   const handlePaymentStatusChange = (newStatus: 'paid' | 'pending' | 'failed') => {
+    if (newStatus === 'paid') {
+      markPaidMutation.mutate();
+      return;
+    }
     updateOrderMutation.mutate({ paymentStatus: newStatus });
   };
 
@@ -177,7 +202,7 @@ export default function OrderDetailPage() {
               size="sm"
               className="w-full bg-green-50 text-green-700 hover:bg-green-100 border-green-200 sm:w-auto"
               onClick={() => handlePaymentStatusChange('paid')}
-              disabled={updateOrderMutation.isPending}
+              disabled={updateOrderMutation.isPending || markPaidMutation.isPending}
             >
               <CreditCard className="h-4 w-4 mr-2" />
               Mark as Paid
@@ -201,14 +226,14 @@ export default function OrderDetailPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleStatusChange('out_for_delivery')}
+              onClick={() => handleStatusChange(order.fulfillmentType === 'delivery' ? 'out_for_delivery' : 'ready_for_pickup')}
             >
               <Package className="h-4 w-4 mr-2" />
-              Ready for Delivery
+              {order.fulfillmentType === 'delivery' ? 'Out for Delivery' : 'Ready for Pickup'}
             </Button>
           )}
 
-          {order.status === 'out_for_delivery' && (
+          {(order.status === 'out_for_delivery' || order.status === 'ready_for_pickup') && (
             <Button
               variant="outline"
               size="sm"
@@ -305,6 +330,18 @@ export default function OrderDetailPage() {
                   {order.paymentStatus === 'paid' ? 'Paid' : 'Pending'}
                 </Badge>
               </div>
+              {order.paymentStatus !== 'paid' && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Balance Due</p>
+                  <p className="text-lg font-semibold text-red-600">
+                    {formatCurrency(
+                      (toNumber(order.totalAmount, 0)) - 
+                      (toNumber((order as any).advancePaid, 0)) - 
+                      (toNumber((order as any).walletUsed, 0))
+                    )}
+                  </p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

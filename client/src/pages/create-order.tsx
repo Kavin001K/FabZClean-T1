@@ -2416,9 +2416,14 @@ export default function CreateOrder() {
           }
         }}
         onNextStep={(order) => {
-          const statusFlow = ['pending', 'processing', 'ready_for_pickup', 'completed'];
-          const currentIndex = statusFlow.indexOf(order.status);
-          const nextStatus = statusFlow[currentIndex + 1];
+          let nextStatus: string | null = null;
+          if (order.status === 'pending') {
+            nextStatus = 'processing';
+          } else if (order.status === 'processing') {
+            nextStatus = (order as any).fulfillmentType === 'delivery' ? 'out_for_delivery' : 'ready_for_pickup';
+          } else if (order.status === 'out_for_delivery' || order.status === 'ready_for_pickup') {
+            nextStatus = 'completed';
+          }
           if (nextStatus) {
             updateOrderStatusMutation.mutate({
               orderId: order.id,
@@ -2429,9 +2434,9 @@ export default function CreateOrder() {
         onPrintInvoice={(order) => {
           // Printing is handled inside the dialog, but we could add extra logic here
         }}
-        onUpdatePaymentStatus={(orderId, status) => {
+        onUpdatePaymentStatus={(order, status) => {
           updateOrderMutation.mutate({
-            id: orderId,
+            id: order.id,
             paymentStatus: status
           } as any);
         }}

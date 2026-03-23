@@ -113,7 +113,8 @@ export default React.memo(function OrderDetailsDialog({
   onEdit,
   onCancel,
   onNextStep,
-  onPrintInvoice
+  onPrintInvoice,
+  onUpdatePaymentStatus,
 }: OrderDetailsDialogProps) {
   const { printInvoice } = useInvoicePrint({
     onSuccess: (invoiceData) => {
@@ -143,6 +144,17 @@ export default React.memo(function OrderDetailsDialog({
 
   const anyOrder = order as any; // Helper casting for dynamic fields
   const nextStatus = getNextStatus(order.status, anyOrder.fulfillmentType);
+  const parseMoney = (value: unknown): number => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const totalAmount = parseMoney(order.totalAmount);
+  const advancePaid = parseMoney(anyOrder.advancePaid);
+  const walletUsed = parseMoney(anyOrder.walletUsed);
+  const creditUsed = parseMoney(anyOrder.creditUsed);
+  const calculatedDue = Math.max(0, totalAmount - advancePaid - walletUsed);
+  const outstandingAmount = Math.max(creditUsed, calculatedDue);
+  const canMarkPaid = anyOrder.paymentStatus !== 'paid' && outstandingAmount > 0;
 
   // Parse Address Helper
   const formatAddress = (addr: any) => {
@@ -375,6 +387,17 @@ export default React.memo(function OrderDetailsDialog({
             {order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'delivered' && (
               <Button variant="ghost" onClick={() => onCancel(order)} className="text-red-600 hover:text-red-700 hover:bg-red-50">
                 <XCircle className="h-4 w-4 mr-2" /> Cancel
+              </Button>
+            )}
+
+            {canMarkPaid && onUpdatePaymentStatus && (
+              <Button
+                variant="outline"
+                onClick={() => onUpdatePaymentStatus(order, 'paid')}
+                className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                Mark Paid (₹{outstandingAmount.toFixed(2)})
               </Button>
             )}
 

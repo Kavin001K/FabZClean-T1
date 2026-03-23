@@ -396,6 +396,44 @@ function OrdersComponent() {
     },
   });
 
+  const markOrderPaidMutation = useMutation({
+    mutationFn: ({ orderId, paymentMethod }: { orderId: string; paymentMethod?: string }) =>
+      ordersApi.markAsPaid(orderId, paymentMethod || 'cash'),
+    onSuccess: (updatedOrder, { orderId }) => {
+      if (!updatedOrder) {
+        toast({
+          title: "Payment Update Failed",
+          description: "Could not mark this order as paid. Please retry.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      queryClient.setQueryData<Order[]>(['orders'], (old) =>
+        Array.isArray(old) ? old.map((order) => (order.id === orderId ? { ...order, ...updatedOrder } : order)) : old
+      );
+      setSelectedOrder((prev) => (prev && prev.id === orderId ? { ...prev, ...updatedOrder } : prev));
+
+      toast({
+        title: "Order Marked Paid",
+        description: `Order ${updatedOrder.orderNumber || orderId} is now fully paid.`,
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to mark order as paid:', error);
+      toast({
+        title: "Payment Update Failed",
+        description: "Could not mark this order as paid.",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['wallet-management', 'customers'] });
+      queryClient.invalidateQueries({ queryKey: ['credits'] });
+    },
+  });
+
   const deleteOrderMutation = useMutation({
     mutationFn: (orderId: string) => ordersApi.delete(orderId),
     onSuccess: (_, orderId) => {
@@ -483,9 +521,14 @@ function OrdersComponent() {
   }, [printInvoice]);
 
   const handleNextStep = useCallback((order: Order) => {
-    const statusFlow = ['pending', 'processing', 'completed'];
-    const currentIndex = statusFlow.indexOf(order.status);
-    const nextStatus = statusFlow[currentIndex + 1];
+    let nextStatus: string | null = null;
+    if (order.status === 'pending') {
+      nextStatus = 'processing';
+    } else if (order.status === 'processing') {
+      nextStatus = (order as any).fulfillmentType === 'delivery' ? 'out_for_delivery' : 'ready_for_pickup';
+    } else if (order.status === 'out_for_delivery' || order.status === 'ready_for_pickup') {
+      nextStatus = 'completed';
+    }
 
     if (nextStatus) {
       updateOrderStatusMutation.mutate({
@@ -566,6 +609,21 @@ function OrdersComponent() {
       });
     }
   }, [queryClient, toast]);
+
+  const handleMarkOrderPaid = useCallback((order: Order, status: 'paid' | 'credit') => {
+    if (status !== 'paid') {
+      updateOrderMutation.mutate({
+        orderId: order.id,
+        updates: { paymentStatus: status as any },
+      });
+      return;
+    }
+
+    markOrderPaidMutation.mutate({
+      orderId: order.id,
+      paymentMethod: (order as any).paymentMethod || 'cash',
+    });
+  }, [markOrderPaidMutation, updateOrderMutation]);
 
   const handleBulkStatusUpdate = useCallback(async (newStatus: string) => {
     if (selectedOrders.length === 0) {
@@ -2251,7 +2309,7 @@ function OrdersComponent() {
         onCancel={handleCancelOrder}
         onNextStep={handleNextStep}
         onPrintInvoice={handlePrintInvoice}
-        onUpdatePaymentStatus={() => {}}
+        onUpdatePaymentStatus={handleMarkOrderPaid}
       />
 
       <EditOrderDialog

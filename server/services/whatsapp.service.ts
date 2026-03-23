@@ -98,10 +98,7 @@ function cleanPhoneNumber(phone: string): string {
 }
 
 /**
- * Get template based on send count
- * 1st send (on order creation): 'order' template
- * 2nd send (1st resend): 'bill' template
- * 3rd send (2nd resend): 'invoice' template
+ * Keep a single template flow while still enforcing resend limits.
  */
 export function getTemplateForSendCount(sendCount: number): MessageTemplateType {
     return 'order';
@@ -116,12 +113,15 @@ export function getStatusMessageForFulfillment(
     status: OrderStatus,
     fulfillmentType: FulfillmentType
 ): string | null {
-    // For ready_for_pickup or out_for_delivery statuses
-    if (status === 'ready_for_pickup' || (fulfillmentType === 'pickup' && status === 'completed')) {
+    if (status === 'ready_for_pickup') {
         return 'Ready to Pickup';
     }
-    if (status === 'out_for_delivery' || (fulfillmentType === 'delivery' && status === 'completed')) {
+    if (status === 'out_for_delivery') {
         return 'Out For Delivery';
+    }
+    // Backward compatibility for automated completed -> stage mapping if needed
+    if (status === 'completed') {
+        return fulfillmentType === 'pickup' ? 'Ready to Pickup' : 'Out For Delivery';
     }
     return null;
 }
@@ -773,8 +773,7 @@ export async function sendOrderConfirmation(params: {
 }
 
 /**
- * Resend invoice (manual resend by user)
- * Uses the same order confirmation template with updated send count
+ * Resend invoice (manual resend by user) with MAX_RESENDS guard.
  */
 export async function resendBill(
     params: Omit<InvoiceMessageParams, 'templateType'>,

@@ -11,11 +11,34 @@ import { smartItemSummary } from "../utils/item-summarizer";
 import { storage } from "../storage";
 
 const router = Router();
+const INVOICE_PUBLIC_BASE_URL = (process.env.R2_INVOICE_PUBLIC_BASE_URL || 'https://bill.myfabclean.com').replace(/\/$/, '');
+
+const resolveInvoicePublicUrl = (doc: any): string | null => {
+    const rawUrl = doc?.fileUrl || doc?.file_url;
+    const filepath = doc?.filepath || doc?.file_path;
+
+    if (rawUrl && typeof rawUrl === 'string') {
+        if (INVOICE_PUBLIC_BASE_URL && rawUrl.includes('.r2.cloudflarestorage.com/')) {
+            const split = rawUrl.split('.r2.cloudflarestorage.com/');
+            const objectPath = split[1] || '';
+            const normalizedPath = objectPath.replace(/^invoice-pdf\//, '');
+            return `${INVOICE_PUBLIC_BASE_URL}/${normalizedPath}`;
+        }
+        return rawUrl;
+    }
+
+    if (filepath && typeof filepath === 'string') {
+        const normalizedPath = filepath.replace(/^invoice-pdf\//, '');
+        return `${INVOICE_PUBLIC_BASE_URL}/${normalizedPath}`;
+    }
+
+    return null;
+};
 
 /**
  * POST /api/whatsapp/send-invoice
  * Send invoice via WhatsApp with PDF attachment
- * Supports template cycling based on sendCount
+ * Uses the configured MSG91 invoice template and resend count guard.
  */
 router.post("/send-invoice", async (req, res) => {
     try {
@@ -91,6 +114,7 @@ router.post("/send-bill", async (req, res) => {
             mainItem,
             items,
             pdfUrl,
+            filename,
             sendCount = 0,
         } = req.body;
 
@@ -117,7 +141,31 @@ router.post("/send-bill", async (req, res) => {
         const templateType = getTemplateForSendCount(sendCount);
         console.log(`[WhatsApp] Using template: ${ templateType } `);
 
-        if (!pdfUrl) {
+        let resolvedPdfUrl = pdfUrl;
+
+        if (!resolvedPdfUrl) {
+            try {
+                const documents = await (storage as any).listDocuments({
+                    type: 'invoice',
+                    limit: 200
+                });
+
+                const matchedDoc = documents.find((doc: any) =>
+                    (doc.orderNumber === orderId || doc.order_number === orderId) ||
+                    (doc.metadata && (doc.metadata.orderNumber === orderId || doc.metadata.orderId === orderId)) ||
+                    (filename && doc.filename === filename)
+                );
+
+                if (matchedDoc) {
+                    resolvedPdfUrl = resolveInvoicePublicUrl(matchedDoc) || undefined;
+                    console.log(`[WhatsApp] Found invoice URL from DB: ${resolvedPdfUrl}`);
+                }
+            } catch (docError) {
+                console.warn('[WhatsApp] Could not lookup invoice document:', docError);
+            }
+        }
+
+        if (!resolvedPdfUrl) {
             return res.status(400).json({
                 success: false,
                 error: "PDF URL is required to send the WhatsApp confirmation.",
@@ -126,62 +174,54 @@ router.post("/send-bill", async (req, res) => {
             });
         }
 
-// Send with PDF attachment using appropriate template
-const result = await sendInvoiceWhatsApp({
-    phoneNumber: customerPhone,
-    pdfUrl,
-    filename: `Invoice-${orderId}.pdf`,
-    customerName,
-    invoiceNumber: orderId,
-    amount: String(amount || "0.00"),
-    itemName: itemSummary,
-    templateType,
-});
+        // Send with PDF attachment using appropriate template
+        const result = await sendInvoiceWhatsApp({
+            phoneNumber: customerPhone,
+            pdfUrl: resolvedPdfUrl,
+            filename: filename || `Invoice-${orderId}.pdf`,
+            customerName,
+            invoiceNumber: orderId,
+            amount: String(amount || "0.00"),
+            itemName: itemSummary,
+            templateType,
+        });
 
-const newSendCount = sendCount + 1;
+        const newSendCount = sendCount + 1;
 
-// Sync real pdfUrl and WhatsApp status back to the order table
-try {
-    if (result.success && pdfUrl) {
-        // Find order internal ID via the orderNumber
-        const allOrders = await storage.listOrders();
-        const matchedOrder = allOrders.find(o => o.orderNumber === orderId);
+        // Sync PDF URL and WhatsApp status back to the order table
+        try {
+            const allOrders = await storage.listOrders();
+            const matchedOrder = allOrders.find(o => o.orderNumber === orderId);
 
-        if (matchedOrder) {
+            if (matchedOrder && result.success) {
                 await storage.updateOrder(matchedOrder.id, {
-                    invoiceUrl: pdfUrl,
+                    invoiceUrl: resolvedPdfUrl,
                     lastWhatsappStatus: `Order Confirmation Sent - Count: ${newSendCount}`,
                     lastWhatsappSentAt: new Date(),
                     whatsappMessageCount: newSendCount,
                 });
-        }
-    } else if (!result.success && pdfUrl) {
-        const allOrders = await storage.listOrders();
-        const matchedOrder = allOrders.find(o => o.orderNumber === orderId);
-
-        if (matchedOrder) {
+            } else if (matchedOrder && !result.success) {
                 await storage.updateOrder(matchedOrder.id, {
                     lastWhatsappStatus: `Order Confirmation Failed: ${result.error}`,
                 });
+            }
+        } catch (dbErr) {
+            console.warn("[WhatsApp] Failed to update DB tracking post bill send:", dbErr);
         }
-    }
-} catch (dbErr) {
-    console.warn("[WhatsApp] Failed to update DB tracking post bill send:", dbErr);
-}
 
-res.json({
-    success: result.success,
-    error: result.error,
-    message: "WhatsApp order confirmation sent successfully",
-    templateUsed: result.templateUsed,
-    newSendCount,
-    canResendAgain: newSendCount < MAX_RESENDS,
-    remainingSends: MAX_RESENDS - newSendCount,
-});
+        res.json({
+            success: result.success,
+            error: result.error,
+            message: "WhatsApp order confirmation sent successfully",
+            templateUsed: result.templateUsed,
+            newSendCount,
+            canResendAgain: newSendCount < MAX_RESENDS,
+            remainingSends: MAX_RESENDS - newSendCount,
+        });
     } catch (error) {
-    console.error("[WhatsApp] Bill Error:", error);
-    res.status(500).json({ success: false, error: "Failed to send WhatsApp message" });
-}
+        console.error("[WhatsApp] Bill Error:", error);
+        res.status(500).json({ success: false, error: "Failed to send WhatsApp message" });
+    }
 });
 
 /**

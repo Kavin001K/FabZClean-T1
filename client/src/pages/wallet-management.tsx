@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type WheelEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, Wallet, RefreshCw, IndianRupee, AlertTriangle, CheckCircle2, HandCoins, Users, Banknote, Smartphone, CreditCard, Building, FileText } from "lucide-react";
+import { Search, Wallet, RefreshCw, IndianRupee, AlertTriangle, CheckCircle2, HandCoins, Users, Banknote, Smartphone, CreditCard, Building, FileText, Printer } from "lucide-react";
 import { PageTransition } from "@/components/ui/page-transition";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -185,6 +185,163 @@ export default function WalletManagementPage() {
   });
 
   const selectedOrder = customerOrders.find((o: any) => o.id === selectedOrderId);
+
+  const getLedgerDirection = useCallback((tx: any) => {
+    const rawAmount = toNumber(tx?.amount, 0);
+    const normalizedType = String(tx?.type || '').toLowerCase();
+    const isCredit = rawAmount < 0 || normalizedType === 'payment' || normalizedType === 'deposit';
+    return {
+      isCredit,
+      absoluteAmount: Math.abs(rawAmount),
+      signedAmount: rawAmount,
+    };
+  }, []);
+
+  const ledgerSummary = useMemo(() => {
+    return customerHistory.reduce((summary: { creditIn: number; debitOut: number; count: number }, tx: any) => {
+      const direction = getLedgerDirection(tx);
+      if (direction.isCredit) {
+        summary.creditIn += direction.absoluteAmount;
+      } else {
+        summary.debitOut += direction.absoluteAmount;
+      }
+      summary.count += 1;
+      return summary;
+    }, { creditIn: 0, debitOut: 0, count: 0 });
+  }, [customerHistory, getLedgerDirection]);
+
+
+  const printLedgerEntry = useCallback((tx: any) => {
+    const escapeHtml = (value: unknown) => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    const direction = getLedgerDirection(tx);
+    const createdAt = tx?.createdAt || tx?.transactionDate;
+    const transactionTime = createdAt ? new Date(createdAt).toLocaleString() : '-';
+    const customerName = selectedCustomer?.name || 'Customer';
+    const orderRef = tx?.orderId || tx?.referenceNumber || '-';
+    const balanceAfter = toNumber(tx?.balanceAfter, 0);
+    const notesText = tx?.description || tx?.notes || tx?.reason || '-';
+
+    const receiptWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!receiptWindow) {
+      toast({
+        title: "Popup blocked",
+        description: "Please allow popups to print the ledger receipt.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const title = `Ledger-${customerName}-${tx?.transactionId || tx?.id || Date.now()}`;
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    @page { size: auto; margin: 5mm; }
+    body { 
+      font-family: 'Inter', -apple-system, sans-serif; 
+      padding: 0; 
+      margin: 0;
+      color: #1a1a1a;
+      background: #fff;
+    }
+    .receipt {
+      max-width: 80mm;
+      margin: 0 auto;
+      padding: 15px;
+      border: 1px dashed #ccc;
+    }
+    .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+    .logo { font-size: 24px; font-weight: 800; letter-spacing: -1px; margin: 0; }
+    .title { font-size: 14px; text-transform: uppercase; font-weight: 600; margin-top: 5px; color: #666; }
+    
+    .customer-box { background: #f9fafb; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; }
+    .customer-name { font-weight: 700; font-size: 15px; margin-bottom: 2px; }
+    
+    .details { margin-bottom: 15px; }
+    .row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 13px; line-height: 1.4; }
+    .label { color: #555; }
+    .value { font-weight: 600; text-align: right; }
+    
+    .amount-box { 
+      border-top: 1px solid #000; 
+      border-bottom: 1px solid #000; 
+      padding: 10px 0; 
+      margin: 15px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .amount-label { font-weight: 700; font-size: 16px; }
+    .amount-value { font-size: 20px; font-weight: 800; }
+    .credit { color: #059669; }
+    .debit { color: #dc2626; }
+    
+    .footer { text-align: center; font-size: 11px; color: #666; margin-top: 20px; }
+    .footer-msg { font-weight: 600; margin-bottom: 4px; color: #333; }
+    
+    @media print {
+      body { padding: 0; }
+      .receipt { border: none; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="receipt">
+    <div class="header">
+      <h1 class="logo">FAB CLEAN</h1>
+      <div class="title">Transaction Receipt</div>
+    </div>
+
+    <div class="customer-box">
+      <div class="customer-name">${escapeHtml(customerName)}</div>
+      <div style="color: #666;">Date: ${escapeHtml(transactionTime)}</div>
+    </div>
+
+    <div class="details">
+      <div class="row"><span class="label">Type</span><span class="value">${escapeHtml(String(tx?.type || 'Adjustment'))}</span></div>
+      <div class="row"><span class="label">Reference</span><span class="value">${escapeHtml(String(orderRef))}</span></div>
+      <div class="row"><span class="label">Payment Mode</span><span class="value">${escapeHtml(String(tx?.paymentMethod || 'SYSTEM'))}</span></div>
+      <div class="row" style="margin-top: 10px; font-style: italic; color: #666;">
+        <span class="label">Notes</span>
+        <span class="value" style="font-weight: 400;">${escapeHtml(String(notesText))}</span>
+      </div>
+    </div>
+
+    <div class="amount-box">
+      <span class="amount-label">TOTAL AMOUNT</span>
+      <span class="amount-value ${direction.isCredit ? 'credit' : 'debit'}">
+        ${direction.isCredit ? '₹' : '-₹'}${direction.absoluteAmount.toFixed(2)}
+      </span>
+    </div>
+
+    <div class="row" style="background: #f3f4f6; padding: 6px; border-radius: 4px;">
+      <span class="label">Balance After</span>
+      <span class="value">₹${balanceAfter.toFixed(2)}</span>
+    </div>
+
+    <div class="footer">
+      <div class="footer-msg">Thank you for choosing Fab Clean!</div>
+      <div>This is a computer generated receipt.</div>
+      <div style="margin-top: 8px; font-size: 10px;">ID: ${escapeHtml(String(tx?.transactionId || tx?.id || '-'))}</div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    receiptWindow.document.open();
+    receiptWindow.document.write(html);
+    receiptWindow.document.close();
+    receiptWindow.focus();
+    receiptWindow.print();
+  }, [getLedgerDirection, selectedCustomer?.name, toast]);
 
   const refreshData = () => {
     refetch();
@@ -976,7 +1133,24 @@ export default function WalletManagementPage() {
             </DialogHeader>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-0">
+          <div className="grid grid-cols-3 gap-2 px-6 py-3 bg-slate-50 dark:bg-slate-900/30 border-y border-slate-100 dark:border-slate-800">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Entries</p>
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{ledgerSummary.count}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Credit In</p>
+              <p className="text-sm font-bold text-emerald-600">₹{ledgerSummary.creditIn.toFixed(2)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Debit Out</p>
+              <p className="text-sm font-bold text-amber-600">₹{ledgerSummary.debitOut.toFixed(2)}</p>
+            </div>
+          </div>
+
+          <div
+            className="flex-1 max-h-[calc(85vh-220px)] overflow-y-auto overscroll-contain p-0 [scrollbar-gutter:stable]"
+          >
             {historyLoading ? (
               <div className="flex flex-col items-center justify-center py-20 animate-pulse">
                 <RefreshCw className="h-8 w-8 text-slate-300 animate-spin mb-3" />
@@ -995,7 +1169,8 @@ export default function WalletManagementPage() {
             ) : (
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {customerHistory.map((tx: any) => {
-                  const isCredit = tx.type === 'payment' || tx.type === 'deposit' || toNumber(tx.amount) < 0;
+                  const direction = getLedgerDirection(tx);
+                  const isCredit = direction.isCredit;
                   return (
                     <div key={tx.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors group">
                       <div className="flex justify-between items-start mb-1">
@@ -1034,9 +1209,18 @@ export default function WalletManagementPage() {
                         </div>
                         <div className="text-right shrink-0">
                           <p className={cn("font-bold text-base", isCredit ? "text-emerald-600" : "text-amber-600")}>
-                            {isCredit ? "+" : "-"}₹{Math.abs(toNumber(tx.amount)).toFixed(2)}
+                            {isCredit ? "+" : "-"}₹{direction.absoluteAmount.toFixed(2)}
                           </p>
                           <p className="text-[10px] font-medium text-slate-500 mt-0.5">Bal: ₹{toNumber(tx.balanceAfter).toFixed(2)}</p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-1 h-7 px-2 text-[10px] text-slate-600 hover:text-slate-900"
+                            onClick={() => printLedgerEntry(tx)}
+                          >
+                            <Printer className="h-3 w-3 mr-1" />
+                            Print
+                          </Button>
                         </div>
                       </div>
                       {(tx.description || tx.notes || tx.referenceNumber || tx.reason) && (

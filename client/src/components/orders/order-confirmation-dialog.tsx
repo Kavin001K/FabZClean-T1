@@ -336,8 +336,7 @@ export function OrderConfirmationDialog({
                 const newCount = result.newSendCount ?? (whatsappSendCount + 1);
                 setWhatsappSendCount(newCount);
 
-                const templateName = result.templateUsed ||
-                    (whatsappSendCount === 0 ? 'Order' : whatsappSendCount === 1 ? 'Bill' : 'Invoice');
+                const templateName = result.templateUsed || 'Confirmation';
 
                 toast({
                     title: "Sent!",

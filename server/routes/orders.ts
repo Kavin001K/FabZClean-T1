@@ -22,11 +22,14 @@ import {
   type OrderStatus,
   type FulfillmentType,
 } from "../services/whatsapp.service";
+import { sendOrderConfirmationEmail } from "../services/order-confirmation-email.service";
 
 const router = Router();
 const orderService = new OrderService();
 const DELIVERY_DISABLED_MESSAGE = 'Delivery operations are disabled in this build.';
-const DELIVERY_DISABLED_STATUSES = new Set(['assigned', 'ready_for_delivery', 'out_for_delivery', 'delivered']);
+// Keep only backend-internal delivery statuses blocked from manual updates.
+// Customer-facing statuses like out_for_delivery remain enabled.
+const DELIVERY_DISABLED_STATUSES = new Set(['assigned', 'ready_for_delivery', 'delivered']);
 const FINANCIAL_MUTATION_FIELDS = new Set(['paymentStatus', 'advancePaid', 'walletUsed', 'creditUsed', 'paymentMethod']);
 
 // Apply rate limiting to all order routes
@@ -70,7 +73,15 @@ const normalizeCreditLimit = (value: unknown, fallback = 1000): number => {
   return Math.max(0, parsed);
 };
 
-const schedulePostCreateTasks = (order: any) => {
+const schedulePostCreateTasks = (
+  order: any,
+  context?: {
+    employeeId?: string;
+    username?: string;
+    ip?: string | undefined;
+    userAgent?: string | undefined;
+  }
+) => {
   setImmediate(async () => {
     if (order.customerId) {
       try {
@@ -93,6 +104,45 @@ const schedulePostCreateTasks = (order: any) => {
       realtimeServer.triggerUpdate('order', 'created', order);
     } catch (realtimeError) {
       console.warn('Failed to broadcast order creation:', realtimeError);
+    }
+
+    const emailResult = await sendOrderConfirmationEmail({
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      totalAmount: order.totalAmount,
+    });
+
+    if (emailResult.success) {
+      console.log(`📧 [Order Email] Confirmation email sent for ${order.orderNumber}`);
+    } else if (!emailResult.skipped) {
+      console.warn(`⚠️ [Order Email] Failed for ${order.orderNumber}: ${emailResult.error}`);
+    } else {
+      console.log(`ℹ️ [Order Email] Skipped for ${order.orderNumber}: ${emailResult.error}`);
+    }
+
+    if (context?.employeeId && context?.username) {
+      try {
+        await AuthService.logAction(
+          context.employeeId,
+          context.username,
+          'send_order_confirmation_email',
+          'order',
+          order.id,
+          {
+            orderNumber: order.orderNumber,
+            customerEmail: order.customerEmail || null,
+            sent: emailResult.success,
+            skipped: Boolean(emailResult.skipped),
+            error: emailResult.error || null,
+          },
+          context.ip,
+          context.userAgent
+        );
+      } catch (logError) {
+        console.warn('Failed to log order confirmation email action:', logError);
+      }
     }
   });
 };
@@ -183,6 +233,104 @@ router.post('/:id/checkout', async (req, res) => {
   } catch (error: any) {
     console.error('Checkout error:', error);
     res.status(500).json(createErrorResponse(`Failed to process checkout: ${error.message}`, 500));
+  }
+});
+
+/**
+ * POST /api/orders/:id/mark-paid
+ * Marks the order as fully paid and settles any order-linked credit amount.
+ */
+router.post('/:id/mark-paid', async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const requestedPaymentMethod = String(req.body?.paymentMethod || '').trim();
+    const paymentMethod = requestedPaymentMethod || String(req.body?.payment_method || 'CASH');
+
+    const order = await storage.getOrder(orderId);
+    if (!order) {
+      return res.status(404).json(createErrorResponse('Order not found', 404));
+    }
+
+    const existingPaymentStatus = String((order as any).paymentStatus || 'pending').toLowerCase();
+    if (existingPaymentStatus === 'paid') {
+      return res.json(createSuccessResponse({
+        order: serializeOrder(order),
+        settledAmount: 0,
+        message: 'Order is already marked as paid',
+      }));
+    }
+
+    const totalAmount = parseAmount(order.totalAmount);
+    const advancePaid = parseAmount((order as any).advancePaid);
+    const walletUsed = parseAmount((order as any).walletUsed);
+    const explicitCreditUsed = parseAmount((order as any).creditUsed);
+    const computedDue = Math.max(0, totalAmount - advancePaid - walletUsed);
+    const settlementAmount = explicitCreditUsed > 0 ? explicitCreditUsed : computedDue;
+
+    if (settlementAmount > 0 && order.customerId) {
+      const recordedBy = req.employee?.id || null;
+      const recordedByName = req.employee?.username || 'system';
+
+      const repayment = await (storage as any).processCreditRepayment(
+        order.customerId,
+        settlementAmount,
+        String(paymentMethod).toUpperCase(),
+        recordedBy,
+        recordedByName
+      );
+
+      if (!repayment.success) {
+        return res.status(400).json(createErrorResponse(repayment.error || 'Failed to settle outstanding balance', 400));
+      }
+    }
+
+    const nextAdvancePaid = Math.min(totalAmount, advancePaid + settlementAmount);
+    const updatedOrder = await storage.updateOrder(orderId, {
+      paymentStatus: 'paid',
+      paymentMethod: String(paymentMethod).toLowerCase(),
+      creditUsed: '0',
+      advancePaid: nextAdvancePaid.toFixed(2),
+      isCreditOrder: false,
+    } as any);
+
+    if (!updatedOrder) {
+      return res.status(500).json(createErrorResponse('Failed to mark order as paid', 500));
+    }
+
+    if (req.employee) {
+      await AuthService.logAction(
+        req.employee.employeeId,
+        req.employee.username,
+        'mark_order_paid',
+        'order',
+        orderId,
+        {
+          orderNumber: order.orderNumber,
+          settlementAmount,
+          paymentMethod: String(paymentMethod).toUpperCase(),
+          previousPaymentStatus: order.paymentStatus,
+        },
+        req.ip || req.connection.remoteAddress,
+        req.get('user-agent')
+      );
+    }
+
+    realtimeServer.triggerUpdate('order', 'payment_updated' as any, {
+      orderId,
+      paymentStatus: 'paid',
+      settledAmount: settlementAmount,
+    });
+
+    res.json(createSuccessResponse({
+      order: serializeOrder(updatedOrder),
+      settledAmount: settlementAmount,
+      message: settlementAmount > 0
+        ? `Outstanding amount of ₹${settlementAmount.toFixed(2)} has been settled and marked as paid`
+        : 'Order marked as paid',
+    }, 'Order payment updated successfully'));
+  } catch (error: any) {
+    console.error('Mark order paid error:', error);
+    res.status(500).json(createErrorResponse(`Failed to mark order as paid: ${error.message}`, 500));
   }
 });
 
@@ -444,11 +592,6 @@ router.post(
     try {
       const orderData: any = { ...(req.body || {}) };
 
-      // Delivery is disabled for new orders in this build.
-      orderData.fulfillmentType = 'pickup';
-      orderData.deliveryCharges = '0';
-      orderData.deliveryAddress = null;
-      orderData.deliveryPartnerId = null;
       if (DELIVERY_DISABLED_STATUSES.has(orderData.status)) {
         orderData.status = 'pending';
       }
@@ -583,8 +726,14 @@ router.post(
         if (checkoutData) {
           (order as any).paymentStatus = checkoutData.payment_status || (order as any).paymentStatus;
           (order as any).advancePaid = checkoutData.split?.cashApplied != null
-            ? String(parseAmount(order.totalAmount))
+            ? String(parseAmount(checkoutData.split.cashApplied))
             : (order as any).advancePaid;
+          (order as any).walletUsed = checkoutData.split?.walletDebited != null
+            ? String(parseAmount(checkoutData.split.walletDebited))
+            : (order as any).walletUsed;
+          (order as any).creditUsed = checkoutData.split?.creditAssigned != null
+            ? String(parseAmount(checkoutData.split.creditAssigned))
+            : (order as any).creditUsed;
         }
       }
 
@@ -650,7 +799,12 @@ router.post(
       };
 
       res.status(201).json(createSuccessResponse(responsePayload, 'Order created successfully'));
-      schedulePostCreateTasks(order);
+      schedulePostCreateTasks(order, {
+        employeeId: req.employee?.employeeId,
+        username: req.employee?.username,
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('user-agent'),
+      });
     } catch (error) {
       console.error('Create order error:', error);
 
@@ -686,15 +840,6 @@ router.put('/:id', async (req, res) => {
     }
 
     if (updateData.status && DELIVERY_DISABLED_STATUSES.has(String(updateData.status))) {
-      return res.status(410).json(createErrorResponse(DELIVERY_DISABLED_MESSAGE, 410));
-    }
-
-    if (
-      updateData.fulfillmentType === 'delivery' ||
-      updateData.deliveryAddress !== undefined ||
-      updateData.deliveryCharges !== undefined ||
-      updateData.deliveryPartnerId !== undefined
-    ) {
       return res.status(410).json(createErrorResponse(DELIVERY_DISABLED_MESSAGE, 410));
     }
 

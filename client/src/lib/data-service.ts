@@ -393,6 +393,25 @@ export const ordersApi = {
     } catch (error) {
       console.error(`Failed to log print action for order ${id}:`, error);
     }
+  },
+
+  async markAsPaid(id: string, paymentMethod: string = 'cash'): Promise<Order | null> {
+    try {
+      const response = await authorizedFetch(`/orders/${id}/mark-paid`, {
+        method: "POST",
+        body: JSON.stringify({ paymentMethod }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result?.message || result?.error || 'Failed to mark order as paid');
+      }
+
+      return result?.data?.order || result?.order || result?.data || null;
+    } catch (error) {
+      console.error(`Failed to mark order ${id} as paid:`, error);
+      return null;
+    }
   }
 };
 
@@ -920,10 +939,9 @@ export const getNextStatus = (currentStatus: Order['status'], fulfillmentType?: 
     const statusMap: Record<string, Order['status'] | null> = {
       'pending': 'processing',
       'in_transit': 'processing',
-      'processing': 'ready_for_delivery',
+      'processing': 'out_for_delivery',
       'ready_for_delivery': 'out_for_delivery',
-      // out_for_delivery normally transitioned via captain, not admin button
-      'out_for_delivery': null,
+      'out_for_delivery': 'completed',
       'delivered': null,
       'completed': null,
       'cancelled': null
@@ -948,7 +966,8 @@ export const getPreviousStatus = (currentStatus: Order['status'], fulfillmentTyp
     const reverseMap: Record<string, Order['status'] | null> = {
       'processing': 'pending',
       'ready_for_delivery': 'processing',
-      'out_for_delivery': 'ready_for_delivery',
+      'out_for_delivery': 'processing',
+      'completed': 'out_for_delivery',
       'delivered': 'out_for_delivery'
     };
     return reverseMap[currentStatus] || null;

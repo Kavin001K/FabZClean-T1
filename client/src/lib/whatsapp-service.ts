@@ -1,5 +1,5 @@
 // client/src/lib/whatsapp-service.ts
-// WhatsApp Service - Calls backend API to send messages with template cycling
+// WhatsApp Service - Calls backend API to send template messages
 
 export const MAX_WHATSAPP_SENDS = 3;
 
@@ -10,7 +10,7 @@ export interface SendInvoiceParams {
     invoiceNumber: string;
     amount: string;
     itemName: string;
-    sendCount?: number; // Current send count for this order
+    sendCount?: number; // Current send count for resend limit tracking
 }
 
 export interface SendResult {
@@ -24,10 +24,7 @@ export interface SendResult {
 export class WhatsAppService {
     /**
      * Send Invoice via WhatsApp with PDF attachment
-     * Template is automatically selected based on sendCount:
-     * - sendCount 0: 'order' template (first send on order creation)
-     * - sendCount 1: 'bill' template (first resend)
-     * - sendCount 2: 'invoice' template (second resend)
+     * Uses the configured MSG91 invoice/order template.
      */
     static async sendInvoice(data: SendInvoiceParams): Promise<SendResult> {
         try {
