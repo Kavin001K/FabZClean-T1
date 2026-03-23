@@ -29,7 +29,7 @@ const orderService = new OrderService();
 const DELIVERY_DISABLED_MESSAGE = 'Delivery operations are disabled in this build.';
 // Keep only backend-internal delivery statuses blocked from manual updates.
 // Customer-facing statuses like out_for_delivery remain enabled.
-const DELIVERY_DISABLED_STATUSES = new Set(['assigned', 'ready_for_delivery', 'delivered']);
+const DELIVERY_DISABLED_STATUSES = new Set(['assigned']);
 const FINANCIAL_MUTATION_FIELDS = new Set(['paymentStatus', 'advancePaid', 'walletUsed', 'creditUsed', 'paymentMethod']);
 
 // Apply rate limiting to all order routes
@@ -989,14 +989,14 @@ router.patch(
         'in_store': 2,
         'ready_for_transit': 3,
         'ready': 3,
-        'ready_for_pickup': 3,
-        'ready_for_delivery': 3,
-        'assigned': 4,
-        'in_transit': 4,
-        'shipped': 4,
-        'out_for_delivery': 4,
-        'delivered': 5,
-        'completed': 5,
+        'ready_for_pickup': 4,
+        'ready_for_delivery': 4,
+        'assigned': 5,
+        'in_transit': 5,
+        'shipped': 5,
+        'out_for_delivery': 5,
+        'delivered': 6,
+        'completed': 6,
         'cancelled': 99,
         'refunded': 100,
       };

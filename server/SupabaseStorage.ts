@@ -148,6 +148,9 @@ export class SupabaseStorage {
             'created_at': 'createdAt',
             'updated_at': 'updatedAt',
             'profile_image': 'profileImage',
+            'credit_used': 'creditUsed',
+            'wallet_used': 'walletUsed',
+            'cash_applied': 'cashApplied',
             // Transit mappings
             'transit_id': 'transitId',
             'transit_order_id': 'transitOrderId',
@@ -324,6 +327,9 @@ export class SupabaseStorage {
             'createdAt': 'created_at',
             'updatedAt': 'updated_at',
             'profileImage': 'profile_image',
+            'creditUsed': 'credit_used',
+            'walletUsed': 'wallet_used',
+            'cashApplied': 'cash_applied',
             // Transit-related mappings
             'transitId': 'transit_id',
             'transitOrderId': 'transit_order_id',
