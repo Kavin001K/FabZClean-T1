@@ -33,7 +33,81 @@ CREATE INDEX IF NOT EXISTS idx_wallet_tx_customer_created_at_desc ON public.wall
 CREATE INDEX IF NOT EXISTS idx_wallet_tx_reference_id ON public.wallet_transactions (reference_id);
 
 -- ---------------------------------------------------------------------------
--- 3. CACHE SYNCHRONIZATION (High Reliability)
+-- 3. FIX: Relax process_credit_repayment (Allow mark-paid for active orders)
+-- ---------------------------------------------------------------------------
+-- Previously failed if global credit_balance was 0. Now allows settlement anytime.
+CREATE OR REPLACE FUNCTION public.process_credit_repayment(
+  p_customer_id text,
+  p_amount numeric(10, 2),
+  p_payment_method text,
+  p_recorded_by text,
+  p_recorded_by_name text
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_balance_after numeric(10, 2);
+  v_tx_code text;
+  v_payment_method text;
+BEGIN
+  IF p_amount IS NULL OR p_amount <= 0 THEN
+    RAISE EXCEPTION 'Repayment amount must be strictly positive';
+  END IF;
+
+  -- Verify customer exists without enforcing a positive credit balance check
+  PERFORM 1
+  FROM public.customers
+  WHERE id = p_customer_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Customer not found';
+  END IF;
+
+  v_payment_method := upper(replace(coalesce(p_payment_method, 'CASH'), ' ', '_'));
+  IF v_payment_method NOT IN ('CASH', 'UPI', 'BANK_TRANSFER', 'CARD', 'CHEQUE', 'NET_BANKING', 'OTHER') THEN
+    v_payment_method := 'CASH';
+  END IF;
+
+  v_tx_code := 'PAY-' || to_char(clock_timestamp(), 'YYYYMMDDHH24MISSMS') || '-' || substring(md5(random()::text), 1, 6);
+
+  INSERT INTO public.wallet_transactions (
+    customer_id,
+    transaction_type,
+    amount,
+    payment_method,
+    verified_by_staff,
+    reference_type,
+    reference_id,
+    note,
+    created_by
+  )
+  VALUES (
+    p_customer_id,
+    'CREDIT',
+    p_amount,
+    v_payment_method,
+    p_recorded_by,
+    'PAYMENT',
+    NULL,
+    '[' || v_tx_code || '] Credit repayment | by=' || coalesce(p_recorded_by_name, 'system'),
+    p_recorded_by
+  )
+  RETURNING balance_after INTO v_balance_after;
+
+  RETURN json_build_object(
+    'success', true,
+    'balance_after', CASE WHEN coalesce(v_balance_after, 0) < 0 THEN abs(v_balance_after) ELSE 0 END
+  );
+END;
+$$;
+
+
+-- ---------------------------------------------------------------------------
+-- 4. CACHE SYNCHRONIZATION (High Reliability)
 -- ---------------------------------------------------------------------------
 -- Recompute customer wallet_balance_cache and credit_balance from ledger history
 -- Use this after manual adjustments or to fix drift.
