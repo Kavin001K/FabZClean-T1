@@ -1,47 +1,68 @@
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
-const r2Endpoint = process.env.R2_ENDPOINT || (process.env.R2_ACCOUNT_ID
-    ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
-    : undefined);
+// Helper to get configuration dynamically to avoid ESM initialization order issues
+function getR2Config() {
+    const r2Endpoint = process.env.R2_ENDPOINT || (process.env.R2_ACCOUNT_ID
+        ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
+        : undefined);
 
-const r2AccessKeyId = process.env.R2_ACCESS_KEY_ID;
-const r2SecretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+    const r2AccessKeyId = process.env.R2_ACCESS_KEY_ID;
+    const r2SecretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
 
-const invoiceBucket = process.env.R2_INVOICE_BUCKET || 'invoice-pdf';
-const assetsBucket = process.env.R2_ASSETS_BUCKET || 'assets';
+    const invoiceBucket = process.env.R2_INVOICE_BUCKET || 'invoice-pdf';
+    const assetsBucket = process.env.R2_ASSETS_BUCKET || 'assets';
 
-const invoicePublicBaseUrl = process.env.R2_INVOICE_PUBLIC_BASE_URL || '';
-const assetsPublicBaseUrl = process.env.R2_ASSETS_PUBLIC_BASE_URL || '';
+    const invoicePublicBaseUrl = process.env.R2_INVOICE_PUBLIC_BASE_URL || '';
+    const assetsPublicBaseUrl = process.env.R2_ASSETS_PUBLIC_BASE_URL || '';
 
-const r2Client = new S3Client({
-    region: 'auto',
-    endpoint: r2Endpoint,
-    credentials: r2AccessKeyId && r2SecretAccessKey ? {
-        accessKeyId: r2AccessKeyId,
-        secretAccessKey: r2SecretAccessKey,
-    } : undefined,
-    forcePathStyle: true,
-});
+    return {
+        r2Endpoint,
+        r2AccessKeyId,
+        r2SecretAccessKey,
+        invoiceBucket,
+        assetsBucket,
+        invoicePublicBaseUrl,
+        assetsPublicBaseUrl
+    };
+}
 
-function requireR2Config(): void {
-    if (!r2Endpoint || !r2AccessKeyId || !r2SecretAccessKey) {
-        throw new Error('R2 configuration missing. Set R2_ENDPOINT, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY.');
+let client: S3Client | null = null;
+
+function getR2Client() {
+    if (client) return client;
+
+    const config = getR2Config();
+    if (!config.r2Endpoint || !config.r2AccessKeyId || !config.r2SecretAccessKey) {
+        throw new Error('R2 configuration missing. Set R2_ENDPOINT, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY in .env');
     }
+
+    client = new S3Client({
+        region: 'auto',
+        endpoint: config.r2Endpoint,
+        credentials: {
+            accessKeyId: config.r2AccessKeyId,
+            secretAccessKey: config.r2SecretAccessKey,
+        },
+        // Cloudflare R2 prefers virtual-hosted-style but path-style works with account-id endpoints
+        forcePathStyle: true,
+    });
+
+    return client;
 }
 
 function sanitizeFilename(name: string): string {
     return name.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
-function buildPublicUrl(baseUrl: string, bucket: string, key: string): string {
+function buildPublicUrl(baseUrl: string, bucket: string, key: string, endpoint?: string): string {
     if (baseUrl) {
         return `${baseUrl.replace(/\/$/, '')}/${key}`;
     }
-    if (!r2Endpoint) {
+    if (!endpoint) {
         return key;
     }
-    const endpoint = r2Endpoint.replace(/\/$/, '');
-    return `${endpoint}/${bucket}/${key}`;
+    const cleanEndpoint = endpoint.replace(/\/$/, '');
+    return `${cleanEndpoint}/${bucket}/${key}`;
 }
 
 async function uploadBuffer(params: {
@@ -50,7 +71,8 @@ async function uploadBuffer(params: {
     buffer: Buffer;
     contentType: string;
 }): Promise<string> {
-    requireR2Config();
+    const r2Client = getR2Client();
+    const config = getR2Config();
 
     const command = new PutObjectCommand({
         Bucket: params.bucket,
@@ -61,23 +83,23 @@ async function uploadBuffer(params: {
 
     await r2Client.send(command);
 
-    const baseUrl = params.bucket === assetsBucket
-        ? assetsPublicBaseUrl
-        : invoicePublicBaseUrl;
+    const baseUrl = params.bucket === config.assetsBucket
+        ? config.assetsPublicBaseUrl
+        : config.invoicePublicBaseUrl;
 
-    return buildPublicUrl(baseUrl, params.bucket, params.key);
+    return buildPublicUrl(baseUrl, params.bucket, params.key, config.r2Endpoint);
 }
 
 export const R2Storage = {
     async uploadInvoicePdf(orderId: string, buffer: Buffer): Promise<{ key: string; url: string }> {
-        const now = new Date();
-        const year = now.getFullYear().toString();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const config = getR2Config();
         const safeOrderId = sanitizeFilename(orderId || 'invoice');
-        const key = `invoices/${year}/${month}/invoice-${safeOrderId}-${Date.now()}.pdf`;
+        
+        // Simplified key for direct bucket access
+        const key = `invoice-${safeOrderId}.pdf`;
 
         const url = await uploadBuffer({
-            bucket: invoiceBucket,
+            bucket: config.invoiceBucket,
             key,
             buffer,
             contentType: 'application/pdf',
@@ -87,15 +109,12 @@ export const R2Storage = {
     },
 
     async uploadDocumentPdf(originalName: string, buffer: Buffer): Promise<{ key: string; url: string }> {
-        const now = new Date();
-        const year = now.getFullYear().toString();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const config = getR2Config();
         const sanitizedOriginal = sanitizeFilename(originalName || 'document.pdf');
-        const uniquePrefix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        const key = `documents/${year}/${month}/${uniquePrefix}-${sanitizedOriginal}`;
+        const key = `documents/${Date.now()}-${sanitizedOriginal}`;
 
         const url = await uploadBuffer({
-            bucket: invoiceBucket,
+            bucket: config.invoiceBucket,
             key,
             buffer,
             contentType: 'application/pdf',
@@ -104,4 +123,3 @@ export const R2Storage = {
         return { key, url };
     },
 };
-
