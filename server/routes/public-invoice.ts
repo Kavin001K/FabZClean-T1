@@ -404,27 +404,32 @@ router.get('/invoice/:orderNumber/pdf', async (req: Request, res: Response) => {
         const { orderNumber } = req.params;
         if (!orderNumber) return res.status(400).json({ error: 'Order number is required' });
 
+        console.log(`🔍 [PDF Redirect] Looking for invoice for order: ${orderNumber}`);
+
         // Find the document record for this order
         const documents = await storage.listDocuments({ type: 'invoice' });
         const doc = documents.find((d: any) => 
-            d.orderNumber === orderNumber || 
-            (d.metadata && d.metadata.orderNumber === orderNumber)
+            String(d.orderNumber) === String(orderNumber) || 
+            (d.metadata && String(d.metadata.orderNumber) === String(orderNumber))
         );
 
-        if (!doc || !doc.fileUrl) {
-            // Fallback: check order table itself
-            const orders = await storage.listOrders();
-            const order = orders.find((o: any) => o.orderNumber === orderNumber);
-            
-            if (order && order.invoiceUrl) {
-                return res.redirect(order.invoiceUrl);
-            }
-            
-            return res.status(404).json({ error: 'Invoice PDF not found' });
+        if (doc && doc.fileUrl) {
+            console.log(`✅ [PDF Redirect] Found document: ${doc.id}, redirecting to: ${doc.fileUrl}`);
+            return res.redirect(doc.fileUrl);
         }
 
-        // Redirect to the actual file (R2 or Local)
-        res.redirect(doc.fileUrl);
+        // Fallback: check order table itself
+        console.log(`⚠️ [PDF Redirect] No document record found for ${orderNumber}, checking order table...`);
+        const orders = await storage.listOrders();
+        const order = orders.find((o: any) => String(o.orderNumber) === String(orderNumber));
+        
+        if (order && order.invoiceUrl) {
+            console.log(`✅ [PDF Redirect] Found invoiceUrl in order table, redirecting to: ${order.invoiceUrl}`);
+            return res.redirect(order.invoiceUrl);
+        }
+        
+        console.error(`❌ [PDF Redirect] No PDF found for order: ${orderNumber}`);
+        return res.status(404).json({ error: 'Invoice PDF not found for this order' });
     } catch (error) {
         console.error('[Invoice] Error retrieving invoice PDF:', error);
         res.status(500).json({ error: 'Failed to retrieve invoice PDF' });

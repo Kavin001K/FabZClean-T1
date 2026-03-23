@@ -634,7 +634,7 @@ export async function sendInvoiceWhatsApp({
             type: "text",
             value: amount,
         },
-        button_2: {
+        button_1: {
             subtype: "url",
             type: "text",
             value: cleanOrderNumber,
