@@ -216,8 +216,9 @@ interface Order {
 }
 
 // Status step configuration
-const statusSteps = [
-    {
+// Status step configuration template - base for mapping
+const STATUS_META = {
+    pending: {
         id: 'pending',
         label: 'Placed',
         fullLabel: 'Order Placed',
@@ -231,7 +232,7 @@ const statusSteps = [
         detailedInfo: 'We have received your order and are preparing to process it.',
         estimatedTime: '~30 mins'
     },
-    {
+    processing: {
         id: 'processing',
         label: 'Process',
         fullLabel: 'In Process',
@@ -245,10 +246,10 @@ const statusSteps = [
         detailedInfo: 'Our experts are carefully handling your garments with premium care.',
         estimatedTime: '24-48 hrs'
     },
-    {
+    ready_for_pickup: {
         id: 'ready_for_pickup',
         label: 'Ready',
-        fullLabel: 'Ready',
+        fullLabel: 'Ready for Pickup',
         icon: CheckCircle2,
         emoji: '✨',
         color: 'from-emerald-400 to-green-500',
@@ -259,10 +260,10 @@ const statusSteps = [
         detailedInfo: 'Your freshly cleaned items are ready and waiting for you!',
         estimatedTime: 'Ready now!'
     },
-    {
+    out_for_delivery: {
         id: 'out_for_delivery',
         label: 'On Way',
-        fullLabel: 'On The Way',
+        fullLabel: 'Out for Delivery',
         icon: Truck,
         emoji: '🚚',
         color: 'from-purple-400 to-violet-500',
@@ -273,32 +274,54 @@ const statusSteps = [
         detailedInfo: 'Your order is on its way! Our delivery partner will reach you shortly.',
         estimatedTime: '30-60 mins'
     },
-    {
+    completed: {
         id: 'completed',
         label: 'Done',
-        fullLabel: 'Delivered',
+        fullLabel: 'Completed',
         icon: PartyPopper,
         emoji: '🎉',
         color: 'from-green-400 to-emerald-500',
         bgColor: 'bg-green-50',
         textColor: 'text-green-700',
         borderColor: 'border-green-200',
-        description: 'Delivered!',
-        detailedInfo: 'Your order has been delivered successfully. Thank you for choosing Fab Clean!',
-        estimatedTime: 'Completed'
+        description: 'Order completed!',
+        detailedInfo: 'Your order has been finished successfully. Thank you for choosing Fab Clean!',
+        estimatedTime: 'Done'
     },
-];
+};
 
-const getStatusIndex = (status: string): number => {
+const getStatusStepsForFulfillment = (fulfillmentType?: string) => {
+    const isPickup = fulfillmentType === 'pickup' || fulfillmentType === 'store_pickup';
+    
+    // For pickup: Placed -> Process -> Ready -> Completed
+    if (isPickup) {
+        return [STATUS_META.pending, STATUS_META.processing, STATUS_META.ready_for_pickup, STATUS_META.completed];
+    }
+    
+    // For delivery: Placed -> Process -> Out for Delivery -> Completed
+    return [STATUS_META.pending, STATUS_META.processing, STATUS_META.out_for_delivery, STATUS_META.completed];
+};
+
+const getStatusIndexForSteps = (status: string, steps: any[]): number => {
     const normalizedStatus = status?.toLowerCase().replace(/[\s-_]/g, '');
-    const statusMap: Record<string, number> = {
-        'pending': 0, 'received': 0, 'orderplaced': 0, 'new': 0,
-        'processing': 1, 'inprocess': 1, 'cleaning': 1, 'inprogress': 1,
-        'readyforpickup': 2, 'ready': 2, 'readyforcollection': 2,
-        'outfordelivery': 3, 'intransit': 3, 'shipping': 3, 'dispatched': 3,
-        'completed': 4, 'delivered': 4, 'done': 4, 'finished': 4,
+    const statusMap: Record<string, string> = {
+        'pending': 'pending', 'received': 'pending', 'orderplaced': 'pending', 'new': 'pending',
+        'processing': 'processing', 'inprocess': 'processing', 'cleaning': 'processing', 'inprogress': 'processing',
+        'readyforpickup': 'ready_for_pickup', 'ready': 'ready_for_pickup', 'readyforcollection': 'ready_for_pickup',
+        'outfordelivery': 'out_for_delivery', 'intransit': 'out_for_delivery', 'shipping': 'out_for_delivery', 'dispatched': 'out_for_delivery',
+        'completed': 'completed', 'delivered': 'completed', 'done': 'completed', 'finished': 'completed',
     };
-    return statusMap[normalizedStatus] ?? 0;
+    
+    const baseId = statusMap[normalizedStatus] || 'pending';
+    const index = steps.findIndex(s => s.id === baseId);
+    
+    // If exact status not in steps (e.g., ready_for_pickup in a delivery flow), find nearest or return based on map
+    if (index === -1) {
+        if (baseId === 'ready_for_pickup' && steps.some(s => s.id === 'out_for_delivery')) return 1; // Show still in process or transition
+        if (baseId === 'out_for_delivery' && steps.some(s => s.id === 'ready_for_pickup')) return 2; // Show ready if somehow tracked here
+        return 0;
+    }
+    return index;
 };
 
 // Confetti component
@@ -329,7 +352,7 @@ const BottomSheet = ({
 }: {
     isOpen: boolean;
     onClose: () => void;
-    step: typeof statusSteps[0] | null;
+    step: any;
     isCurrent: boolean;
 }) => {
     if (!step) return null;
@@ -421,12 +444,15 @@ export default function PublicOrderTracking() {
         }
     }, [params.orderNumber]);
 
+    const currentSteps = getStatusStepsForFulfillment(order?.fulfillmentType);
+    const currentStepIndex = order ? getStatusIndexForSteps(order.status, currentSteps) : -1;
+
     useEffect(() => {
-        if (order && getStatusIndex(order.status) === 4) {
+        if (order && currentStepIndex === currentSteps.length - 1) {
             setShowConfetti(true);
             setTimeout(() => setShowConfetti(false), 3000);
         }
-    }, [order]);
+    }, [order, currentStepIndex, currentSteps.length]);
 
     const [honeypot, setHoneypot] = useState('');
 
@@ -496,7 +522,7 @@ export default function PublicOrderTracking() {
         return `₹${num?.toLocaleString('en-IN') || '0'}`;
     };
 
-    const getCurrentStepIndex = () => order ? getStatusIndex(order.status) : -1;
+    // Replaced static helpers with local calculation
 
     const getStatusBadgeStyle = (status: string) => {
         const styles: Record<string, string> = {
@@ -523,8 +549,8 @@ export default function PublicOrderTracking() {
                 <BottomSheet
                     isOpen={bottomSheetOpen}
                     onClose={() => setBottomSheetOpen(false)}
-                    step={selectedStep !== null ? statusSteps[selectedStep] : null}
-                    isCurrent={selectedStep === getCurrentStepIndex()}
+                    step={selectedStep !== null ? currentSteps[selectedStep] : null}
+                    isCurrent={selectedStep === currentStepIndex}
                 />
             )}
 
@@ -644,13 +670,13 @@ export default function PublicOrderTracking() {
                                         </Badge>
                                         <h2 className="text-xl md:text-3xl font-bold text-slate-800">
                                             Hello, {order.customerName?.split(' ')[0] || 'there'}!
-                                            <span className="inline-block ml-2 animate-float text-lg md:text-2xl">{statusSteps[getCurrentStepIndex()]?.emoji || '👋'}</span>
+                                            <span className="inline-block ml-2 animate-float text-lg md:text-2xl">{currentSteps[currentStepIndex]?.emoji || '👋'}</span>
                                         </h2>
                                         <p className="text-slate-500 text-sm md:text-lg mt-1">Track your order in real-time</p>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Badge className={cn('text-sm md:text-base px-3 md:px-5 py-1.5 md:py-2 font-semibold shadow border-0', getStatusBadgeStyle(order.status))}>
-                                            {statusSteps[getCurrentStepIndex()]?.fullLabel || 'Processing'}
+                                            {currentSteps[currentStepIndex]?.fullLabel || 'Processing'}
                                         </Badge>
                                         <Button
                                             variant="ghost"
@@ -692,7 +718,7 @@ export default function PublicOrderTracking() {
                                     {/* Progress Fill */}
                                     <div
                                         className="absolute top-6 md:top-10 left-4 md:left-0 h-2 md:h-3 rounded-full transition-all duration-700 ease-out overflow-hidden"
-                                        style={{ width: `calc(${(getCurrentStepIndex() / (statusSteps.length - 1)) * 100}% - 32px)`, marginLeft: '0' }}
+                                        style={{ width: `calc(${(currentStepIndex / (currentSteps.length - 1)) * 100}% - 32px)`, marginLeft: '0' }}
                                     >
                                         <div className="h-full w-full bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 relative">
                                             <div className="absolute inset-0 animate-shimmer" />
@@ -701,17 +727,17 @@ export default function PublicOrderTracking() {
 
                                     {/* Steps */}
                                     <div className="relative flex justify-between items-start px-0">
-                                        {statusSteps.map((step, index) => {
-                                            const isCompleted = index <= getCurrentStepIndex();
-                                            const isCurrent = index === getCurrentStepIndex();
-                                            const isPast = index < getCurrentStepIndex();
+                                        {currentSteps.map((step, index) => {
+                                            const isCompleted = index <= currentStepIndex;
+                                            const isCurrent = index === currentStepIndex;
+                                            const isPast = index < currentStepIndex;
                                             const StepIcon = step.icon;
 
                                             return (
                                                 <button
                                                     key={step.id}
                                                     className="flex flex-col items-center text-center focus:outline-none touch-target group"
-                                                    style={{ width: `${100 / statusSteps.length}%` }}
+                                                    style={{ width: `${100 / currentSteps.length}%` }}
                                                     onClick={() => handleStepClick(index)}
                                                 >
                                                     {/* Step Circle */}
@@ -764,32 +790,32 @@ export default function PublicOrderTracking() {
                                 {!isMobile && selectedStep !== null && (
                                     <div className={cn(
                                         "mt-4 p-4 md:p-5 rounded-xl border-2 transition-all duration-300 animate-slide-up",
-                                        statusSteps[selectedStep].bgColor,
-                                        statusSteps[selectedStep].borderColor
+                                        currentSteps[selectedStep].bgColor,
+                                        currentSteps[selectedStep].borderColor
                                     )}>
                                         <div className="flex items-start gap-4">
                                             <div className={cn(
                                                 "w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0",
-                                                `bg-gradient-to-br ${statusSteps[selectedStep].color}`
+                                                `bg-gradient-to-br ${currentSteps[selectedStep].color}`
                                             )}>
                                                 {(() => {
-                                                    const StepIcon = statusSteps[selectedStep].icon;
+                                                    const StepIcon = currentSteps[selectedStep].icon;
                                                     return <StepIcon className="w-6 h-6 md:w-7 md:h-7 text-white" />;
                                                 })()}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <h4 className={cn("text-lg font-bold", statusSteps[selectedStep].textColor)}>
-                                                        {statusSteps[selectedStep].emoji} {statusSteps[selectedStep].fullLabel}
+                                                    <h4 className={cn("text-lg font-bold", currentSteps[selectedStep].textColor)}>
+                                                        {currentSteps[selectedStep].emoji} {currentSteps[selectedStep].fullLabel}
                                                     </h4>
-                                                    {selectedStep === getCurrentStepIndex() && (
+                                                    {selectedStep === currentStepIndex && (
                                                         <Badge className="bg-emerald-500 text-white text-xs">Current</Badge>
                                                     )}
                                                 </div>
-                                                <p className="text-slate-600 mt-1 text-sm">{statusSteps[selectedStep].detailedInfo}</p>
-                                                <p className={cn("text-xs mt-2 flex items-center gap-1", statusSteps[selectedStep].textColor)}>
+                                                <p className="text-slate-600 mt-1 text-sm">{currentSteps[selectedStep].detailedInfo}</p>
+                                                <p className={cn("text-xs mt-2 flex items-center gap-1", currentSteps[selectedStep].textColor)}>
                                                     <Timer className="w-3 h-3" />
-                                                    Est: {statusSteps[selectedStep].estimatedTime}
+                                                    Est: {currentSteps[selectedStep].estimatedTime}
                                                 </p>
                                             </div>
                                         </div>
@@ -798,50 +824,62 @@ export default function PublicOrderTracking() {
 
                                 {/* Progress Summary */}
                                 <div className="mt-4 md:mt-6 flex items-center justify-between p-3 md:p-4 bg-slate-50 rounded-xl">
-                                    <div className="flex items-center gap-2 md:gap-3">
-                                        <div className="w-10 h-10 md:w-14 md:h-14 rounded-full bg-white shadow border-2 md:border-4 border-emerald-100 flex items-center justify-center">
-                                            <span className="text-base md:text-xl font-bold text-emerald-600">
-                                                {Math.round((getCurrentStepIndex() / (statusSteps.length - 1)) * 100)}%
-                                            </span>
+                                    <div className="flex items-center gap-3">
+                                        <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", currentSteps[currentStepIndex]?.bgColor)}>
+                                            {(() => {
+                                                const StepIcon = currentSteps[currentStepIndex]?.icon || Package;
+                                                return <StepIcon className={cn("w-5 h-5", currentSteps[currentStepIndex]?.textColor)} />;
+                                            })()}
                                         </div>
                                         <div>
-                                            <p className="font-semibold text-slate-800 text-sm md:text-base">Progress</p>
-                                            <p className="text-xs md:text-sm text-slate-500">Step {getCurrentStepIndex() + 1}/{statusSteps.length}</p>
+                                            <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Status</p>
+                                            <p className={cn("font-bold", currentSteps[currentStepIndex]?.textColor)}>
+                                                {currentSteps[currentStepIndex]?.fullLabel}
+                                            </p>
                                         </div>
                                     </div>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
+                                    <button
                                         onClick={() => setShowTimeline(!showTimeline)}
-                                        className="text-slate-600 text-xs md:text-sm h-9 touch-target"
+                                        className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-emerald-600 transition-colors uppercase tracking-widest bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm"
                                     >
                                         {showTimeline ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                        <span className="ml-1 hidden sm:inline">{showTimeline ? 'Hide' : 'Timeline'}</span>
-                                    </Button>
+                                        Timeline
+                                    </button>
                                 </div>
 
                                 {/* Timeline */}
                                 {showTimeline && (
-                                    <div className="mt-3 md:mt-4 space-y-2 animate-slide-up">
-                                        {statusSteps.slice(0, getCurrentStepIndex() + 1).map((step, index) => {
+                                    <div className="mt-3 md:mt-4 space-y-4 animate-slide-up bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                                        {currentSteps.map((step, index) => {
+                                            const isCompleted = index <= currentStepIndex;
+                                            const isCurrent = index === currentStepIndex;
                                             const StepIcon = step.icon;
+
                                             return (
-                                                <div key={step.id} className="flex items-center gap-3 p-2.5 md:p-3 bg-white rounded-lg border border-slate-100">
-                                                    <div className={cn(
-                                                        "w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center flex-shrink-0",
-                                                        `bg-gradient-to-br ${step.color}`
-                                                    )}>
-                                                        <StepIcon className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="font-medium text-slate-800 text-sm truncate">{step.fullLabel}</p>
-                                                        <p className="text-xs text-slate-500 truncate">{step.description}</p>
-                                                    </div>
-                                                    {index === getCurrentStepIndex() ? (
-                                                        <span className="text-emerald-600 font-medium text-xs flex-shrink-0">Now</span>
-                                                    ) : (
-                                                        <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                                                <div key={step.id} className="relative pl-10">
+                                                    {index !== currentSteps.length - 1 && (
+                                                        <div className={cn(
+                                                            "absolute left-[19px] top-10 bottom-0 w-0.5",
+                                                            index < currentStepIndex ? "bg-emerald-500" : "bg-slate-200"
+                                                        )} />
                                                     )}
+                                                    <div className={cn(
+                                                        "absolute left-0 top-0 w-10 h-10 rounded-full flex items-center justify-center z-10 transition-all duration-300",
+                                                        isCompleted ? `bg-gradient-to-br ${step.color} text-white shadow-lg` : "bg-white border-2 border-slate-200 text-slate-300"
+                                                    )}>
+                                                        <StepIcon className={cn("w-5 h-5", isCurrent && "animate-pulse-soft")} />
+                                                    </div>
+                                                    <div className="py-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <h5 className={cn("font-bold text-sm md:text-base", isCompleted ? "text-slate-800" : "text-slate-400")}>
+                                                                {step.fullLabel}
+                                                            </h5>
+                                                            {isCurrent && (
+                                                                <Badge className="bg-emerald-500 text-[10px] h-4 animate-pulse-soft text-white">LIVE</Badge>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-slate-500 mt-0.5">{step.description}</p>
+                                                    </div>
                                                 </div>
                                             );
                                         })}
