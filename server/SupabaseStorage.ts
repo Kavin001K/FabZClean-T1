@@ -322,8 +322,6 @@ export class SupabaseStorage {
             'reviewPeriod': 'review_period',
             'reviewedBy': 'reviewed_by',
             'reviewDate': 'review_date',
-            'fileUrl': 'file_url',
-            'filepath': 'file_path',
             'ipAddress': 'ip_address',
             'userAgent': 'user_agent',
             'createdAt': 'created_at',
@@ -1818,11 +1816,34 @@ export class SupabaseStorage {
         return !error;
     }
 
-    // ======= DOCUMENTS =======
     async createDocument(data: any): Promise<any> {
-        const { data: document, error } = await this.supabase.from('documents').insert(this.toSnakeCase(data)).select().single();
+        // Document specific mapping to avoid global toSnakeCase side effects
+        const docData = { ...data };
+        if (docData.filepath) {
+            (docData as any).file_path = docData.filepath;
+            delete docData.filepath;
+        }
+        if (docData.fileUrl) {
+            (docData as any).file_url = docData.fileUrl;
+            delete docData.fileUrl;
+        }
+
+        const { data: document, error } = await this.supabase
+            .from('documents')
+            .insert(this.toSnakeCase(docData))
+            .select()
+            .single();
+        
         if (error) throw error;
-        return this.mapDates(document);
+        return this.mapDocument(document);
+    }
+
+    private mapDocument(doc: any): any {
+        if (!doc) return doc;
+        const mapped = this.mapDates(doc);
+        if (doc.file_path) mapped.filepath = doc.file_path;
+        if (doc.file_url) mapped.fileUrl = doc.file_url;
+        return mapped;
     }
 
     async listDocuments(filters: any = {}): Promise<any[]> {
@@ -1830,15 +1851,16 @@ export class SupabaseStorage {
         if (filters.type) query = query.eq('type', filters.type);
         if (filters.status) query = query.eq('status', filters.status);
         if (filters.limit) query = query.limit(filters.limit);
+        
         const { data, error } = await query.order('created_at', { ascending: false });
-        if (error) throw error;
-        return data.map(item => this.mapDates(item));
+        if (error) return [];
+        return data.map(doc => this.mapDocument(doc));
     }
 
     async getDocument(id: string): Promise<any | undefined> {
         const { data: document, error } = await this.supabase.from('documents').select('*').eq('id', id).single();
         if (error) return undefined;
-        return this.mapDates(document);
+        return this.mapDocument(document);
     }
 
     async deleteDocument(id: string): Promise<boolean> {

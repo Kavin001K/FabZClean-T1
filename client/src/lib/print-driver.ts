@@ -182,6 +182,8 @@ export interface InvoicePrintData {
   }>;
   subtotal: number;
   tax: number;
+  deliveryCharges?: number;
+  extraCharges?: number;
   discount?: number;
   total: number;
   paymentMethod?: string;
@@ -330,27 +332,27 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
   }
 
   // Add Extra Charges
-  if (order.extraCharges && parseFloat(String(order.extraCharges)) > 0) {
-    const charge = parseFloat(String(order.extraCharges));
+  const extraCharges = parseFloat(String(order.extraCharges || order.extra_charges || 0)) || 0;
+  if (extraCharges > 0) {
     items.push({
       name: 'Extra Charges',
       description: 'Additional fees',
       quantity: 1,
-      unitPrice: charge,
-      total: charge,
+      unitPrice: extraCharges,
+      total: extraCharges,
       taxRate: enableGST ? 18 : 0
     });
   }
 
   // Add Delivery Charges
-  if (order.deliveryCharges && parseFloat(String(order.deliveryCharges)) > 0) {
-    const charge = parseFloat(String(order.deliveryCharges));
+  const deliveryCharges = parseFloat(String(order.deliveryCharges || order.delivery_charges || 0)) || 0;
+  if (deliveryCharges > 0) {
     items.push({
       name: 'Delivery Charges',
       description: 'Fee for home delivery',
       quantity: 1,
-      unitPrice: charge,
-      total: charge,
+      unitPrice: deliveryCharges,
+      total: deliveryCharges,
       taxRate: enableGST ? 18 : 0
     });
   }
@@ -432,6 +434,8 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
     items,
     subtotal,
     tax,
+    deliveryCharges,
+    extraCharges,
     total,
     paymentMethod: order.paymentMethod || 'Cash',
     paymentStatus: order.paymentStatus || order.status || 'Pending',

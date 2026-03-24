@@ -66,27 +66,35 @@ export function OrderConfirmationDialog({
     const getTotalAmount = (): number => {
         if (!order) return 0;
 
-        let amount = 0;
-
-        // Try totalAmount field first
+        // 1. Try totalAmount field first as it's the source of truth from backend
         if (order.totalAmount) {
-            if (typeof order.totalAmount === 'string') {
-                amount = parseFloat(order.totalAmount.replace(/[^0-9.]/g, '')) || 0;
-            } else {
-                amount = Number(order.totalAmount) || 0;
-            }
+            const amount = typeof order.totalAmount === 'string' 
+                ? parseFloat(order.totalAmount.replace(/[^0-9.]/g, '')) 
+                : Number(order.totalAmount);
+            if (amount > 0) return amount;
         }
 
-        // Fallback: calculate from items
-        if (amount === 0 && Array.isArray(order.items) && order.items.length > 0) {
-            amount = order.items.reduce((sum: number, item: any) => {
-                const price = parseFloat(String(item.price || 0));
-                const qty = parseInt(String(item.quantity || 1));
-                return sum + (price * qty);
-            }, 0);
+        // 2. Fallback: calculate from components
+        const itemsSubtotal = Array.isArray(order.items) 
+            ? order.items.reduce((sum: number, item: any) => sum + (parseFloat(String(item.price || item.total || 0)) * parseInt(String(item.quantity || 1))), 0)
+            : 0;
+        
+        const deliveryCharges = parseFloat(String((order as any).delivery_charges || order.deliveryCharges || 0)) || 0;
+        const extraCharges = parseFloat(String((order as any).extra_charges || order.extraCharges || 0)) || 0;
+        const discountValue = parseFloat(String((order as any).discount_value || order.discountValue || 0)) || 0;
+        
+        // Handle Express Surcharge (typically 50% of items subtotal)
+        const isExpress = (order as any).isExpressOrder || (order as any).is_express_order;
+        const expressSurcharge = parseFloat(String((order as any).express_surcharge || (order as any).expressSurcharge || 0)) || (isExpress ? itemsSubtotal * 0.5 : 0);
+
+        let total = itemsSubtotal + expressSurcharge + deliveryCharges + extraCharges - discountValue;
+        
+        // Add GST if enabled (18%)
+        if (enableGST) {
+            total = total * 1.18;
         }
 
-        return amount;
+        return total;
     };
 
     const totalAmount = getTotalAmount();

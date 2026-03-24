@@ -84,7 +84,8 @@ export default function BillView() {
             }
 
             if (balanceDue > 0) {
-                const qrData = `upi://pay?pa=8825702072@okbizaxis&pn=FabZClean&am=${balanceDue.toFixed(2)}&tr=${order.orderNumber}&tn=Order-${order.orderNumber}`;
+                // Use centralized UPI configuration
+                const qrData = generateUPIUrl(balanceDue, order.orderNumber, `Order-${order.orderNumber}`);
 
                 // Generate Data URL for Invoice Template
                 QRCode.toDataURL(qrData, {
@@ -231,6 +232,7 @@ export default function BillView() {
                 subtotal: subtotal,
                 taxAmount: calculatedTax,
                 deliveryCharges: deliveryCharges,
+                extraCharges: extraCharges,
                 expressSurcharge: (order as any).expressSurcharge ? Number((order as any).expressSurcharge) : 0,
                 total: calculatedTotal,
                 paymentTerms: "Due on receipt",
@@ -280,6 +282,7 @@ export default function BillView() {
                 subtotal: subtotal,
                 total: totalAmount, // Use stored total for simple bill
                 deliveryCharges: deliveryCharges,
+                extraCharges: extraCharges,
                 expressSurcharge: (order as any).expressSurcharge ? Number((order as any).expressSurcharge) : 0,
                 paymentTerms: "Due on receipt",
                 qrCode: qrCodeUrl || undefined,

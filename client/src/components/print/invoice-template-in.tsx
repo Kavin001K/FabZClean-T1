@@ -40,6 +40,7 @@ interface InvoiceData {
   taxAmount: number;
   deliveryCharges?: number;
   expressSurcharge?: number;
+  extraCharges?: number;
   total: number;
   paymentTerms: string;
   notes?: string;
@@ -135,6 +136,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
     fulfillmentType = 'pickup',
     deliveryAddress: explicitDeliveryAddress,
     paymentBreakdown,
+    extraCharges = 0,
   } = data;
 
   // Parse customer address
@@ -167,9 +169,15 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
 
   // Calculate totals
   const itemsSubtotal = safeItems.reduce((sum, item) => sum + (item?.total || 0), 0);
-  const baseAmount = itemsSubtotal + (deliveryCharges || 0);
-
-  // GST Calculation
+  
+  // Use expressSurcharge from data or calculate it if missing but isExpressOrder is true
+  // Note: Usually expressSurcharge is 50% of itemsSubtotal
+  const effectiveExpressSurcharge = expressSurcharge || (isExpressOrder ? itemsSubtotal * 0.5 : 0);
+  
+  // Base amount for tax calculation includes items, express surcharge, and extra charges
+  const baseAmount = itemsSubtotal + effectiveExpressSurcharge + (extraCharges || 0) + (deliveryCharges || 0);
+  
+  // GST Calculation (18% split as 9% CGST + 9% SGST for intra-state)
   const cgstAmount = enableGST ? (baseAmount * 9) / 100 : 0;
   const sgstAmount = enableGST ? (baseAmount * 9) / 100 : 0;
   const totalGST = cgstAmount + sgstAmount;
