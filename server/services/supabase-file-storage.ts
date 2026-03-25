@@ -49,18 +49,30 @@ export const SupabaseFileStorage = {
 
         if (error) {
             console.error('❌ Supabase upload failed:', error);
-            // Fallback: If bucket doesn't exist, try to create it (might fail depending on permissions)
-            if (error.message.includes('bucket not found')) {
+            // Bucket doesn't exist - try to create it
+            if (error.statusCode === '404' || error.message?.includes('not found')) {
                 console.log('📦 Attempting to create "avatars" bucket...');
-                await supabase.storage.createBucket('avatars', { public: true });
-                // Retry upload after creation
-                const { data: retryData, error: retryError } = await supabase.storage
-                    .from('avatars')
-                    .upload(filePath, optimizedBuffer, { contentType: 'image/webp', upsert: true });
-
-                if (retryError) throw retryError;
-                return this.getPublicUrl('avatars', filePath);
+                try {
+                    const { data: bucketData, error: bucketError } = await supabase.storage.createBucket('avatars', { public: true });
+                    if (!bucketError) {
+                        console.log('✅ Avatars bucket created successfully');
+                        // Retry upload after creation
+                        const { data: retryData, error: retryError } = await supabase.storage
+                            .from('avatars')
+                            .upload(filePath, uploadBuffer, { contentType: contentType, upsert: true });
+                        if (!retryError) {
+                            console.log('✅ Upload successful after bucket creation');
+                            return this.getPublicUrl('avatars', filePath);
+                        }
+                        console.error('❌ Retry upload failed:', retryError?.message);
+                    } else {
+                        console.warn('⚠️ Could not auto-create avatars bucket:', bucketError?.message);
+                    }
+                } catch (e) {
+                    console.error('❌ Error creating bucket:', e);
+                }
             }
+            console.error('⚠️ Profile image upload failed. Please create the "avatars" bucket in Supabase Storage manually.');
             throw new Error(`Upload failed: ${error.message}`);
         }
 
