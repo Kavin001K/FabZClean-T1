@@ -95,20 +95,15 @@ export function GarmentTagPrint({
   const getAllTags = () => {
     const tags: {
       item: TagItem;
-      globalIndex: number;
       serviceIndex: number;
       serviceTotalQty: number;
       serviceName: string;
     }[] = [];
 
-    let globalCounter = 0;
-
     items.forEach((item) => {
       for (let i = 0; i < item.quantity; i++) {
-        globalCounter++;
         tags.push({
           item,
-          globalIndex: globalCounter,
           serviceIndex: i + 1,
           serviceTotalQty: item.quantity,
           serviceName: item.serviceName
@@ -120,21 +115,25 @@ export function GarmentTagPrint({
 
   const handlePrint = () => {
     const allTags = getAllTags();
-    const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '';
+    const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
     const displayCustomer = (customerName || 'Customer').toUpperCase();
+    const shortOrderId = orderNumber.slice(-5).toUpperCase();
 
-    // Generate individual service tags - COMPACT 4cm x 3cm (40mm x 30mm) layout with EXPRESS watermark
-    const tagsHtml = allTags.map(({ item, globalIndex }) => {
+    // Generate individual service tags - COMPACT layout ~40mm x 25mm, 3 per row on A4
+    const tagsHtml = allTags.map(({ item, serviceIndex, serviceTotalQty }) => {
       return `
         <div class="tag ${isExpressOrder ? 'express' : ''}">
           ${isExpressOrder ? '<div class="express-watermark">EXPRESS</div>' : ''}
-          <div class="tag-header">
-            <span class="order-id">${orderNumber}</span>
-            <span class="count-main">${globalIndex}/${totalItems}</span>
+          <div class="tag-top">
+            <span class="order-id">${shortOrderId}</span>
+            <span class="customer">${displayCustomer}</span>
           </div>
-          <div class="customer">${displayCustomer}</div>
           <div class="service">${item.serviceName.toUpperCase()}</div>
-          ${item.tagNote ? `<div class="note">Note: ${item.tagNote}</div>` : ''}
+          ${item.tagNote ? `<div class="note">${item.tagNote}</div>` : ''}
+          <div class="tag-footer">
+            <span class="due-date">DUE: ${formattedDueDate}</span>
+            <span class="count-main">${serviceIndex} of ${serviceTotalQty}</span>
+          </div>
         </div>
       `;
     }).join('');
@@ -186,14 +185,13 @@ export function GarmentTagPrint({
           /*=============================================
             GARMENT TAG PRINT STYLES
             - Header Tag: 40mm width x AUTO height
-            - Service Tags: 40mm x 30mm (4cm x 3cm) STRICT
+            - Service Tags: ~40mm x 25mm, 3 per row on A4
             High DPI + Electron Compatible
           =============================================*/
           
           @page {
-            size: 40mm auto;
-            margin: 0 !important;
-            padding: 0 !important;
+            size: A4;
+            margin: 5mm !important;
           }
           
           *, *::before, *::after {
@@ -210,8 +208,7 @@ export function GarmentTagPrint({
           
           body {
             margin: 0 !important;
-            padding: 0 !important;
-            width: 40mm;
+            padding: 2mm !important;
             background: #fff;
             font-family: 'Consolas', 'Courier New', monospace;
             font-size: 8pt;
@@ -220,14 +217,14 @@ export function GarmentTagPrint({
             color: #333;
           }
           
-          .tags-wrapper {
-            width: 40mm;
-            display: flex;
-            flex-direction: column;
-            gap: 0;
+          /*========== HEADER TAG (Order Summary) ==========*/
+          .header-wrapper {
+            width: 100%;
+            margin-bottom: 4mm;
+            page-break-after: always;
+            page-break-inside: avoid;
           }
-          
-          /*========== HEADER TAG (Order Summary) - AUTO HEIGHT ==========*/
+
           .header-tag {
             width: 40mm;
             padding: 1.5mm;
@@ -235,7 +232,6 @@ export function GarmentTagPrint({
             border: 0.4mm dashed #333;
             display: flex;
             flex-direction: column;
-            page-break-after: always;
             page-break-inside: avoid;
           }
           
@@ -333,25 +329,31 @@ export function GarmentTagPrint({
             margin-top: 0.5mm;
           }
           
-          /*========== SERVICE TAG (STRICT 4cm x 3cm) ==========*/
+          /*========== SERVICE TAGS GRID (3 per row, 40mm each) ==========*/
+          .tags-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 40mm);
+            gap: 2mm;
+          }
+
+          /*========== SERVICE TAG (40mm x 25mm compact) ==========*/
           .tag {
             width: 40mm;
-            height: 30mm;
-            max-height: 30mm;
-            padding: 1.5mm;
+            height: 25mm;
+            max-height: 25mm;
+            padding: 1.2mm 1.5mm;
             background: #fff;
             border: 0.4mm dashed #333;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            page-break-after: always;
             page-break-inside: avoid;
+            position: relative;
           }
           
           .tag.express {
             border-color: #c2410c;
             border-style: solid;
-            position: relative;
           }
           
           .express-watermark {
@@ -359,55 +361,49 @@ export function GarmentTagPrint({
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%) rotate(-25deg);
-            font-size: 14pt;
+            font-size: 12pt;
             font-weight: 900;
             color: #ea580c;
-            opacity: 0.12;
+            opacity: 0.10;
             letter-spacing: 2pt;
             white-space: nowrap;
             pointer-events: none;
             z-index: 0;
           }
           
-          .tag-header {
+          .tag-top {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            align-items: baseline;
+            gap: 1mm;
             padding-bottom: 0.5mm;
             border-bottom: 0.2mm dashed #999;
             flex-shrink: 0;
+            overflow: hidden;
           }
-          
+
           .order-id {
             font-size: 6pt;
-            font-weight: 700;
-            color: #333;
-          }
-          
-          .count-main {
-            font-size: 9pt;
-            font-weight: 900;
-            color: #111;
-          }
-          
-          .customer {
-            text-align: center;
-            font-size: 8pt;
-            font-weight: 700;
-            padding: 1mm 0 0.5mm 0;
-            color: #222;
+            font-weight: 800;
+            color: #555;
+            white-space: nowrap;
             flex-shrink: 0;
+          }
+
+          .customer {
+            font-size: 7pt;
+            font-weight: 700;
+            color: #111;
+            white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            white-space: nowrap;
           }
           
           .service {
             text-align: center;
-            font-size: 9pt;
+            font-size: 8pt;
             font-weight: 800;
             color: #111;
-            padding: 0.5mm 0;
+            padding: 0.8mm 0 0.3mm 0;
             flex: 1;
             display: flex;
             align-items: center;
@@ -419,72 +415,81 @@ export function GarmentTagPrint({
           
           .note {
             text-align: center;
-            font-size: 6pt;
+            font-size: 5.5pt;
             font-weight: 600;
-            color: #333;
-            padding: 0.5mm;
-            border-top: 0.2mm dashed #999;
+            color: #555;
+            padding: 0.3mm 0;
             flex-shrink: 0;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+          }
+
+          .tag-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 0.5mm;
+            border-top: 0.2mm dashed #999;
+            flex-shrink: 0;
+          }
+
+          .due-date {
+            font-size: 6pt;
+            font-weight: 700;
+            color: ${isExpressOrder ? '#c2410c' : '#059669'};
+          }
+
+          .count-main {
+            font-size: 7.5pt;
+            font-weight: 900;
+            color: #111;
           }
           
           /*========== PRINT MEDIA QUERY ==========*/
           @media print {
             html, body {
               margin: 0 !important;
-              padding: 0 !important;
-              width: 40mm !important;
+              padding: 2mm !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
               color-adjust: exact !important;
             }
             
             @page {
-              size: 40mm auto !important;
-              margin: 0 !important;
+              size: A4 !important;
+              margin: 5mm !important;
             }
-            
-            .tags-wrapper {
-              gap: 0 !important;
+
+            .tags-grid {
+              display: grid !important;
+              grid-template-columns: repeat(3, 40mm) !important;
+              gap: 2mm !important;
             }
             
             .header-tag {
-              page-break-after: always !important;
               page-break-inside: avoid !important;
               margin: 0 !important;
               box-shadow: none !important;
             }
             
             .tag {
-              page-break-after: always !important;
+              width: 40mm !important;
               page-break-inside: avoid !important;
               margin: 0 !important;
               box-shadow: none !important;
-              height: 30mm !important;
-              max-height: 30mm !important;
+              height: 25mm !important;
+              max-height: 25mm !important;
               overflow: hidden !important;
-            }
-            
-            .header-tag:last-child,
-            .tag:last-child {
-              page-break-after: auto;
-            }
-          }
-          
-          /*========== ELECTRON SPECIFIC ==========*/
-          @media screen {
-            body {
-              /* Preview mode - show borders clearly */
-              padding: 2mm;
             }
           }
         </style>
       </head>
       <body>
-        <div class="tags-wrapper">
+        <div class="header-wrapper">
           ${headerTagHtml}
+        </div>
+        <div class="tags-grid">
           ${tagsHtml}
         </div>
         <script>
@@ -588,7 +593,7 @@ export function GarmentTagPrint({
   };
 
   const allTags = getAllTags();
-  const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '';
+  const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -605,16 +610,15 @@ export function GarmentTagPrint({
             )}
           </DialogTitle>
           <DialogDescription>
-            {allTags.length} tags • Optimized for 40mm × 30mm (4×3 cm) thermal labels
+            {allTags.length} tags • Compact ~40mm × 25mm, 3 per row on A4
           </DialogDescription>
         </DialogHeader>
 
-        {/* Preview - Vertical Layout */}
-        <div ref={printRef} className="flex flex-col items-center gap-2 p-4 bg-gray-800 rounded-lg max-h-[50vh] overflow-auto">
+        {/* Preview */}
+        <div ref={printRef} className="flex flex-col gap-2 p-4 bg-gray-800 rounded-lg max-h-[55vh] overflow-auto">
 
           {/* Order Summary Header Preview */}
-          <div className={`w-[40mm] bg-white border-2 border-dashed rounded p-2 text-[8px] shadow-lg flex flex-col gap-0.5 ${isExpressOrder ? 'border-orange-500' : 'border-gray-600'
-            }`}>
+          <div className={`w-[40mm] bg-white border-2 border-dashed rounded p-2 text-[8px] shadow-lg flex flex-col gap-0.5 ${isExpressOrder ? 'border-orange-500' : 'border-gray-600'}`}>
             {isExpressOrder && (
               <div className="text-center bg-gray-800 text-white text-[8px] font-bold py-0.5 rounded -mt-0.5 -mx-0.5 mb-1">
                 ⚡ EXPRESS ORDER
@@ -623,12 +627,9 @@ export function GarmentTagPrint({
             <div className="text-center font-bold text-[10px] border-b border-dashed border-gray-600 pb-0.5">
               ORDER SUMMARY
             </div>
-
-            {/* Barcode Container */}
             <div className="flex justify-center items-center bg-white border border-gray-200 rounded py-1 my-0.5 min-h-[35px]">
               <svg ref={previewBarcodeRef} className="max-w-full h-8"></svg>
             </div>
-
             <div className="text-center font-mono text-[9px] font-semibold text-gray-700 py-0.5">
               {orderNumber}
             </div>
@@ -641,14 +642,12 @@ export function GarmentTagPrint({
                 <span className="text-gray-500">Total Items:</span>
                 <span className="font-semibold text-gray-800">{totalItems} pcs</span>
               </div>
-              {formattedDueDate && (
-                <div className={`flex justify-between ${isExpressOrder ? 'bg-gray-100 px-0.5 rounded' : ''}`}>
-                  <span className="text-gray-500">{isExpressOrder ? '⚡ Due:' : 'Due Date:'}</span>
-                  <span className={`font-semibold ${isExpressOrder ? 'text-orange-600' : 'text-emerald-600'}`}>
-                    {formattedDueDate}
-                  </span>
-                </div>
-              )}
+              <div className={`flex justify-between ${isExpressOrder ? 'bg-gray-100 px-0.5 rounded' : ''}`}>
+                <span className="text-gray-500">Due Date:</span>
+                <span className={`font-semibold ${isExpressOrder ? 'text-orange-600' : 'text-emerald-600'}`}>
+                  {formattedDueDate}
+                </span>
+              </div>
             </div>
             <div className="flex justify-between text-[6px] text-gray-400 pt-0.5 border-t border-dashed border-gray-400 mt-0.5">
               <span>{storeCode}</span>
@@ -657,52 +656,50 @@ export function GarmentTagPrint({
           </div>
 
           {/* Divider */}
-          <div className="w-full flex items-center gap-2 px-2">
+          <div className="w-full flex items-center gap-2">
             <div className="flex-1 border-t border-dashed border-gray-500"></div>
-            <span className="text-[8px] text-gray-400 font-medium">Service Tags (4×3 cm)</span>
+            <span className="text-[8px] text-gray-400 font-medium">Service Tags (compact, 3/row)</span>
             <div className="flex-1 border-t border-dashed border-gray-500"></div>
           </div>
 
-          {/* Service Tags - Compact 4x3cm preview with overflow hidden */}
-          {allTags.map(({ item, globalIndex }) => (
-            <div
-              key={`preview-${globalIndex}`}
-              className={`w-[40mm] h-[30mm] bg-white border-2 border-dashed rounded p-1.5 font-mono text-[8px] shadow-sm flex flex-col overflow-hidden relative ${isExpressOrder ? 'border-orange-500' : 'border-gray-600'
-                }`}
-            >
-              {/* EXPRESS Watermark for express orders */}
-              {isExpressOrder && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                  <span className="text-orange-500 text-[14px] font-black opacity-10 rotate-[-25deg] tracking-widest">
-                    EXPRESS
+          {/* Service Tags Grid - 3 per row preview at fixed 40mm width */}
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(3, 40mm)' }}>
+            {allTags.map(({ item, serviceIndex, serviceTotalQty }) => (
+              <div
+                key={`preview-${serviceIndex}-${item.serviceName}`}
+                className={`bg-white border border-dashed rounded font-mono text-[7px] shadow-sm flex flex-col overflow-hidden relative ${isExpressOrder ? 'border-orange-400' : 'border-gray-500'}`}
+                style={{ width: '40mm', height: '25mm' }}
+              >
+                {isExpressOrder && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                    <span className="text-orange-500 text-[10px] font-black opacity-10 rotate-[-25deg] tracking-widest">EXPRESS</span>
+                  </div>
+                )}
+                {/* Top row: short order ID + customer name */}
+                <div className="flex items-baseline gap-0.5 px-1 pt-0.5 pb-0.5 border-b border-dashed border-gray-300 flex-shrink-0 overflow-hidden relative z-10">
+                  <span className="text-[5.5px] font-bold text-gray-500 whitespace-nowrap">{orderNumber.slice(-5).toUpperCase()}</span>
+                  <span className="text-[6px] font-bold text-gray-900 uppercase truncate">{customerName || 'Customer'}</span>
+                </div>
+                {/* Service name */}
+                <div className="text-center text-[7px] font-bold text-gray-900 uppercase flex-1 flex items-center justify-center px-0.5 overflow-hidden relative z-10">
+                  <span className="break-words line-clamp-2">{item.serviceName}</span>
+                </div>
+                {/* Note */}
+                {item.tagNote && (
+                  <div className="text-[5px] text-gray-500 text-center px-0.5 truncate flex-shrink-0 relative z-10">
+                    {item.tagNote}
+                  </div>
+                )}
+                {/* Footer: due date + count */}
+                <div className="flex justify-between items-center px-1 pt-0.5 pb-0.5 border-t border-dashed border-gray-300 flex-shrink-0 relative z-10">
+                  <span className={`text-[5.5px] font-bold ${isExpressOrder ? 'text-orange-600' : 'text-emerald-600'}`}>
+                    DUE: {formattedDueDate}
                   </span>
+                  <span className="text-[6.5px] font-black text-gray-900">{serviceIndex} of {serviceTotalQty}</span>
                 </div>
-              )}
-
-              {/* Header Row - Order ID and Count */}
-              <div className="flex justify-between items-center pb-0.5 border-b border-dashed border-gray-400 flex-shrink-0 relative z-10">
-                <span className="text-[6px] text-gray-600 font-semibold truncate max-w-[60%]">{orderNumber}</span>
-                <span className="text-[9px] font-black text-gray-900">{globalIndex}/{totalItems}</span>
               </div>
-
-              {/* Customer Name */}
-              <div className="text-center text-[8px] font-bold text-gray-800 uppercase tracking-wide py-1 flex-shrink-0 truncate relative z-10">
-                {customerName || 'Customer'}
-              </div>
-
-              {/* Service Name */}
-              <div className="text-center text-[9px] font-bold text-gray-900 uppercase flex-1 flex items-center justify-center overflow-hidden relative z-10">
-                <span className="break-words line-clamp-2">{item.serviceName}</span>
-              </div>
-
-              {/* Note (if any) */}
-              {item.tagNote && (
-                <div className="text-[6px] text-gray-600 text-center pt-0.5 border-t border-dashed border-gray-400 flex-shrink-0 truncate relative z-10">
-                  Note: {item.tagNote}
-                </div>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         <DialogFooter className="gap-2">

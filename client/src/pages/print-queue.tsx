@@ -38,7 +38,7 @@ import { useInvoicePrint } from "@/hooks/use-invoice-print";
 import { ordersApi, formatCurrency } from "@/lib/data-service";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import type { Order } from "@shared/schema";
+import type { Order, OrderItem } from "@shared/schema";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -220,74 +220,142 @@ export default function PrintTags() {
             return;
         }
 
-        const tagWindow = window.open("", "_blank", "width=420,height=700");
+        const tagWindow = window.open("", "_blank", "width=600,height=800");
         if (!tagWindow) {
             toast({ title: "Popup blocked", description: "Please allow popups", variant: "destructive" });
             return;
         }
 
+        // Expand each order's items by quantity, producing one tag per unit
+        type OrderWithDueDate = Order & { dueDate?: string | null };
+        const allTagsHtml = (targetOrders as OrderWithDueDate[]).map(order => {
+            const items = Array.isArray(order.items) ? order.items : [];
+            const shortId = (order.orderNumber || "").slice(-5).toUpperCase();
+            const customer = (order.customerName || "Customer").toUpperCase();
+            const dueDate = order.dueDate
+                ? new Date(order.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                : "—";
+
+            return items.map((item: OrderItem) => {
+                const qty = item.quantity || 1;
+                const serviceName = (item.serviceName || item.customName || "Item").toUpperCase();
+                const note = item.tagNote || "";
+                const tags = [];
+                for (let i = 1; i <= qty; i++) {
+                    tags.push(`
+                        <div class="tag">
+                            <div class="tag-top">
+                                <span class="order-id">${shortId}</span>
+                                <span class="customer">${customer}</span>
+                            </div>
+                            <div class="service">${serviceName}</div>
+                            ${note ? `<div class="note">${note}</div>` : ""}
+                            <div class="tag-footer">
+                                <span class="due-date">DUE: ${dueDate}</span>
+                                <span class="count">${i} of ${qty}</span>
+                            </div>
+                        </div>
+                    `);
+                }
+                return tags.join("");
+            }).join("");
+        }).join("");
+
         tagWindow.document.write(`<!DOCTYPE html><html><head>
+      <meta charset="UTF-8">
       <title>Garment Tags - ${targetOrders.length} Orders</title>
       <style>
-        @media print { 
-          @page { size: 75mm auto; margin: 0; } 
-          .no-print { display:none !important; }
-          body { margin: 0; padding: 0; }
+        @page { size: A4; margin: 5mm; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body { font-family: 'Consolas', 'Courier New', monospace; font-size: 8pt; font-weight: 600; background: #fff; padding: 2mm; color: #333; }
+
+        .no-print { display: block; }
+        @media print { .no-print { display: none !important; } }
+
+        .print-bar { position: sticky; top: 0; background: white; padding: 10px; text-align: center; border-bottom: 1px solid #e4e4e7; z-index: 100; margin-bottom: 10px; }
+        .print-button { padding: 8px 24px; background: #2563eb; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 700; cursor: pointer; }
+
+        .tags-grid { display: grid; grid-template-columns: repeat(3, 40mm); gap: 2mm; }
+
+        .tag {
+          width: 40mm;
+          height: 25mm;
+          max-height: 25mm;
+          padding: 1.2mm 1.5mm;
+          background: #fff;
+          border: 0.4mm dashed #333;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          page-break-inside: avoid;
+          position: relative;
         }
-        * { box-sizing:border-box; -webkit-print-color-adjust: exact; }
-        body { font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 10px; background: #f4f4f5; }
-        
-        .tag-container { background: white; width: 70mm; margin: 0 auto 15px auto; padding: 15px; border-radius: 8px; border: 1px solid #e4e4e7; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: relative; overflow: hidden; page-break-inside: avoid; }
-        .tag-container::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #2563eb; }
-        
-        .brand { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #2563eb; letter-spacing: 1px; margin-bottom: 8px; }
-        .order-num { font-size: 20px; font-weight: 900; color: #000; margin-bottom: 4px; line-height: 1; }
-        .customer { font-size: 14px; font-weight: 600; color: #3f3f46; margin-bottom: 12px; border-bottom: 1px dashed #e4e4e7; padding-bottom: 8px; }
-        
-        .item-main { font-size: 13px; font-weight: 700; color: #18181b; margin-bottom: 4px; display: flex; justify-content: space-between; }
-        .service-type { font-size: 11px; font-weight: 600; color: #2563eb; background: #eff6ff; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
-        
-        .tag-grid { display: grid; grid-template-cols: 1fr 1fr; gap: 8px; margin-top: 10px; border-top: 1px solid #f4f4f5; padding-top: 8px; }
-        .grid-item { display: flex; flex-direction: column; }
-        .grid-label { font-size: 9px; font-weight: 700; color: #a1a1aa; text-transform: uppercase; }
-        .grid-value { font-size: 12px; font-weight: 700; color: #18181b; }
-        
-        .notes { font-size: 11px; color: #71717a; font-style: italic; margin-top: 8px; background: #fafafa; padding: 6px; border-radius: 4px; border-left: 2px solid #d4d4d8; }
-        
-        .page-break { page-break-after: always; }
-        .print-bar { position: sticky; top: 0; left: 0; right: 0; background: white; padding: 15px; text-align: center; border-bottom: 1px solid #e4e4e7; z-index: 100; margin-bottom: 20px; }
-        .print-button { padding: 10px 30px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); }
+
+        .tag-top {
+          display: flex;
+          align-items: baseline;
+          gap: 1mm;
+          padding-bottom: 0.5mm;
+          border-bottom: 0.2mm dashed #999;
+          flex-shrink: 0;
+          overflow: hidden;
+        }
+
+        .order-id { font-size: 6pt; font-weight: 800; color: #555; white-space: nowrap; flex-shrink: 0; }
+        .customer { font-size: 7pt; font-weight: 700; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .service {
+          text-align: center;
+          font-size: 8pt;
+          font-weight: 800;
+          color: #111;
+          padding: 0.8mm 0 0.3mm 0;
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          word-break: break-word;
+          line-height: 1.1;
+        }
+
+        .note {
+          text-align: center;
+          font-size: 5.5pt;
+          font-weight: 600;
+          color: #555;
+          padding: 0.3mm 0;
+          flex-shrink: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .tag-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-top: 0.5mm;
+          border-top: 0.2mm dashed #999;
+          flex-shrink: 0;
+        }
+
+        .due-date { font-size: 6pt; font-weight: 700; color: #059669; }
+        .count { font-size: 7.5pt; font-weight: 900; color: #111; }
+
+        @media print {
+          .tags-grid { display: grid !important; grid-template-columns: repeat(3, 40mm) !important; gap: 2mm !important; }
+          .tag { width: 40mm !important; page-break-inside: avoid !important; height: 25mm !important; max-height: 25mm !important; overflow: hidden !important; }
+        }
       </style>
     </head><body>
-      <div class="print-bar no-print"><button class="print-button" onclick="window.print()">🖨️ Print Everything Now</button></div>
-      ${targetOrders.map(order => 
-        (Array.isArray(order.items) ? order.items : []).map((item, idx) => `
-          <div class="tag-container">
-            <div class="brand">FabZClean Premium</div>
-            <div class="order-num">${order.orderNumber}</div>
-            <div class="customer">${order.customerName}</div>
-            
-            <div class="item-main">
-              <span>${item.serviceName || item.customName || `Item ${idx + 1}`}</span>
-              <span>Qty: ${item.quantity || 1}</span>
-            </div>
-            ${item.tagNote ? `<div class=\"service-type\">${item.tagNote}</div>` : ""}
-            
-            <div class="tag-grid">
-              <div class="grid-item">
-                <span class="grid-label">Booking Date</span>
-                <span class="grid-value">${new Date(order.createdAt || 0).toLocaleDateString("en-IN", { day: '2-digit', month: 'short' })}</span>
-              </div>
-              <div class="grid-item">
-                <span class="grid-label">Order SL</span>
-                <span class="grid-value">#${idx + 1} of ${(order.items).length}</span>
-              </div>
-            </div>
-            
-            ${item.tagNote ? `<div class=\"notes\">Note: ${item.tagNote}</div>` : ""}
-          </div>
-        `).join("")
-      ).join('<div class="page-break no-print"></div>')}
+      <div class="print-bar no-print">
+        <button class="print-button" onclick="window.print()">Print Tags</button>
+      </div>
+      <div class="tags-grid">
+        ${allTagsHtml}
+      </div>
       <script>window.onload=function(){ setTimeout(() => window.print(), 500); }<\/script>
     </body></html>`);
         tagWindow.document.close();
