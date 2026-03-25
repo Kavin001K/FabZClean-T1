@@ -4,7 +4,7 @@ import {
     ShoppingCart,
     PlusCircle,
     Users2,
-    Printer,
+    Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -15,7 +15,7 @@ const BOTTOM_NAV_ITEMS = [
     { to: "/orders", label: "Orders", icon: ShoppingCart },
     { to: "/create-order", label: "New", icon: PlusCircle, allowedRoles: ["admin", "store_manager", "store_staff"] },
     { to: "/customers", label: "Customers", icon: Users2, allowedRoles: ["admin", "store_manager", "store_staff"] },
-    { to: "/print-queue", label: "Tags", icon: Printer },
+    { to: "/wallet-management", label: "Wallet", icon: Wallet, allowedRoles: ["admin", "store_manager", "store_staff"] },
 ];
 
 export function BottomNav() {

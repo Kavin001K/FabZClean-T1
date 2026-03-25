@@ -231,13 +231,13 @@ export default function PrintTags() {
         }
 
         // Expand each order's items by quantity, producing one tag per unit
-        type OrderWithDueDate = Order & { dueDate?: string | null };
-        const allTagsHtml = (targetOrders as OrderWithDueDate[]).map(order => {
+        const allTagsHtml = (targetOrders as Order[]).map(order => {
             const items = Array.isArray(order.items) ? order.items : [];
             const shortId = (order.orderNumber || "").slice(-5).toUpperCase();
             const customer = (order.customerName || "Customer").toUpperCase();
-            const dueDate = order.dueDate
-                ? new Date(order.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+            const rawDue = (order as any).pickupDate;
+            const dueDate = rawDue
+                ? new Date(rawDue).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
                 : "—";
 
             return items.map((item: OrderItem) => {
@@ -269,9 +269,9 @@ export default function PrintTags() {
       <meta charset="UTF-8">
       <title>Garment Tags - ${targetOrders.length} Orders</title>
       <style>
-        @page { size: A4; margin: 5mm; }
+        @page { size: A4 landscape; margin: 5mm; }
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        html { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
         body { font-family: 'Consolas', 'Courier New', monospace; font-size: 8pt; font-weight: 600; background: #fff; padding: 2mm; color: #333; }
 
         .no-print { display: block; }
@@ -280,7 +280,8 @@ export default function PrintTags() {
         .print-bar { position: sticky; top: 0; background: white; padding: 10px; text-align: center; border-bottom: 1px solid #e4e4e7; z-index: 100; margin-bottom: 10px; }
         .print-button { padding: 8px 24px; background: #2563eb; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 700; cursor: pointer; }
 
-        .tags-grid { display: grid; grid-template-columns: repeat(3, 40mm); gap: 2mm; }
+        /* A4 landscape: 287mm usable width — 5 tags x 40mm + 4 gaps x 2mm = 208mm */
+        .tags-grid { display: grid; grid-template-columns: repeat(5, 40mm); gap: 2mm; }
 
         .tag {
           width: 40mm;
@@ -293,6 +294,7 @@ export default function PrintTags() {
           flex-direction: column;
           overflow: hidden;
           page-break-inside: avoid;
+          break-inside: avoid;
           position: relative;
         }
 
@@ -349,8 +351,9 @@ export default function PrintTags() {
         .count { font-size: 7.5pt; font-weight: 900; color: #111; }
 
         @media print {
-          .tags-grid { display: grid !important; grid-template-columns: repeat(3, 40mm) !important; gap: 2mm !important; }
-          .tag { width: 40mm !important; page-break-inside: avoid !important; height: 25mm !important; max-height: 25mm !important; overflow: hidden !important; }
+          @page { size: A4 landscape !important; margin: 5mm !important; }
+          .tags-grid { display: grid !important; grid-template-columns: repeat(5, 40mm) !important; gap: 2mm !important; }
+          .tag { width: 40mm !important; page-break-inside: avoid !important; break-inside: avoid !important; height: 25mm !important; max-height: 25mm !important; overflow: hidden !important; }
         }
       </style>
     </head><body>

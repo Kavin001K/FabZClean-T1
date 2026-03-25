@@ -113,18 +113,14 @@ export const queryClient = new QueryClient({
   },
 });
 
-// Prefetch common data on app load for Electron
+// Prefetch common data on app load to warm the cache
 export async function prefetchCommonData() {
-  if (isElectron()) {
-    try {
-      // Prefetch commonly used data to warm up the cache
-      await Promise.all([
-        queryClient.prefetchQuery({ queryKey: ['services'] }),
-        queryClient.prefetchQuery({ queryKey: ['customers'] }),
-      ]);
-    } catch (e) {
-      // Silent fail - this is just optimization
-      console.debug('Prefetch failed:', e);
-    }
+  try {
+    await Promise.all([
+      queryClient.prefetchQuery({ queryKey: ['services'] }),
+      queryClient.prefetchQuery({ queryKey: ['customers'] }),
+    ]);
+  } catch (e) {
+    // Silent fail - this is just a cache warmup optimization
   }
 }

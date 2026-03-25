@@ -172,7 +172,7 @@ export function GarmentTagPrint({
       </div>
     `;
 
-    // OPTIMIZED PRINT HTML - Matches Preview EXACTLY
+    // OPTIMIZED PRINT HTML - Landscape for barcode printers, no breaks
     const printHTML = `
       <!DOCTYPE html>
       <html>
@@ -183,14 +183,16 @@ export function GarmentTagPrint({
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
         <style>
           /*=============================================
-            GARMENT TAG PRINT STYLES
+            GARMENT TAG PRINT STYLES - LANDSCAPE
             - Header Tag: 40mm width x AUTO height
-            - Service Tags: ~40mm x 25mm, 3 per row on A4
-            High DPI + Electron Compatible
+            - Service Tags: ~40mm x 25mm, 5 per row on A4 landscape
+            - A4 landscape: 297mm x 210mm (5mm margins = 287mm usable)
+            - 5 tags x 40mm + 4 gaps x 2mm = 208mm — fits perfectly
+            High DPI + Barcode Printer Compatible
           =============================================*/
           
           @page {
-            size: A4;
+            size: A4 landscape;
             margin: 5mm !important;
           }
           
@@ -221,7 +223,6 @@ export function GarmentTagPrint({
           .header-wrapper {
             width: 100%;
             margin-bottom: 4mm;
-            page-break-after: always;
             page-break-inside: avoid;
           }
 
@@ -329,10 +330,10 @@ export function GarmentTagPrint({
             margin-top: 0.5mm;
           }
           
-          /*========== SERVICE TAGS GRID (3 per row, 40mm each) ==========*/
+          /*========== SERVICE TAGS GRID (5 per row on A4 landscape) ==========*/
           .tags-grid {
             display: grid;
-            grid-template-columns: repeat(3, 40mm);
+            grid-template-columns: repeat(5, 40mm);
             gap: 2mm;
           }
 
@@ -457,14 +458,18 @@ export function GarmentTagPrint({
             }
             
             @page {
-              size: A4 !important;
+              size: A4 landscape !important;
               margin: 5mm !important;
             }
 
             .tags-grid {
               display: grid !important;
-              grid-template-columns: repeat(3, 40mm) !important;
+              grid-template-columns: repeat(5, 40mm) !important;
               gap: 2mm !important;
+            }
+            
+            .header-wrapper {
+              page-break-inside: avoid !important;
             }
             
             .header-tag {
@@ -610,7 +615,7 @@ export function GarmentTagPrint({
             )}
           </DialogTitle>
           <DialogDescription>
-            {allTags.length} tags • Compact ~40mm × 25mm, 3 per row on A4
+            {allTags.length} tags • Landscape A4 • 5 per row • No breaks
           </DialogDescription>
         </DialogHeader>
 
@@ -658,11 +663,11 @@ export function GarmentTagPrint({
           {/* Divider */}
           <div className="w-full flex items-center gap-2">
             <div className="flex-1 border-t border-dashed border-gray-500"></div>
-            <span className="text-[8px] text-gray-400 font-medium">Service Tags (compact, 3/row)</span>
+            <span className="text-[8px] text-gray-400 font-medium">Service Tags (5/row · landscape)</span>
             <div className="flex-1 border-t border-dashed border-gray-500"></div>
           </div>
 
-          {/* Service Tags Grid - 3 per row preview at fixed 40mm width */}
+          {/* Service Tags Grid - Preview */}
           <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(3, 40mm)' }}>
             {allTags.map(({ item, serviceIndex, serviceTotalQty }) => (
               <div
