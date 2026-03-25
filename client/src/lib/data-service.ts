@@ -344,13 +344,17 @@ export const ordersApi = {
         method: "PUT",
         body: JSON.stringify(order),
       });
-      if (!response.ok) throw new Error("Failed to update order");
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to update order: ${response.statusText}`);
+      }
+      
       const result = await response.json();
-      // Handle wrapped response
       return result.data || result;
     } catch (error) {
-      console.error(`Failed to update order ${id}:`, error);
-      return null;
+      console.error(`❌ [OrdersApi] Failed to update order ${id}:`, error);
+      throw error; // Rethrow to let useMutation handle it
     }
   },
 

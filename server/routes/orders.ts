@@ -219,10 +219,27 @@ router.post('/:id/checkout', async (req, res) => {
     const paymentStatus = result.data?.payment_status || (updatedOrder as any).paymentStatus || 'pending';
     const creditId = result.data?.credit_id || resolvedCustomerId;
 
-    // Maintain backward behavior: auto-complete early-stage orders when fully paid.
-    const earlyStatuses = ['pending', 'processing', 'confirmed'];
-    if (paymentStatus === 'paid' && earlyStatuses.includes(updatedOrder.status)) {
+    // Maintain backward behavior: only auto-complete if it's already in a final fulfillment stage (ready)
+    const completionEligibleStatuses = ['ready_for_pickup', 'ready_for_delivery', 'delivered'];
+    const previousStatus = updatedOrder.status;
+    if (paymentStatus === 'paid' && completionEligibleStatuses.includes(updatedOrder.status)) {
       updatedOrder = await storage.updateOrder(orderId, { status: 'completed' }) || updatedOrder;
+      
+      // Send WhatsApp notification for auto-completion (feedback request)
+      if (updatedOrder.status === 'completed' && previousStatus !== 'completed') {
+        handleOrderStatusChange(
+          {
+            customerPhone: updatedOrder.customerPhone || order.customerPhone,
+            customerName: updatedOrder.customerName || order.customerName,
+            orderNumber: updatedOrder.orderNumber || order.orderNumber,
+            totalAmount: updatedOrder.totalAmount || order.totalAmount,
+            status: 'completed' as any,
+            fulfillmentType: (updatedOrder.fulfillmentType || order.fulfillmentType || 'pickup') as any,
+            items: updatedOrder.items || order.items || [],
+          },
+          previousStatus as any
+        ).catch(err => console.error('❌ [WhatsApp] Checkout auto-complete notification failed:', err));
+      }
     }
     const serializedOrder = serializeOrder(updatedOrder);
 
@@ -894,7 +911,7 @@ router.put('/:id', async (req, res) => {
     if (updateData.status && updateData.status !== order.status) {
       handleOrderStatusChange(
         {
-          customerPhone: updatedOrder?.customerPhone,
+          customerPhone: updatedOrder?.customerPhone || order.customerPhone,
           customerName: updatedOrder?.customerName || order.customerName,
           orderNumber: updatedOrder?.orderNumber || order.orderNumber,
           totalAmount: updatedOrder?.totalAmount || order.totalAmount,
@@ -935,9 +952,12 @@ router.put('/:id', async (req, res) => {
 
     const serializedOrder = serializeOrder(updatedOrder);
     res.json(createSuccessResponse(serializedOrder, 'Order updated successfully'));
-  } catch (error) {
-    console.error('Update order error:', error);
-    res.status(500).json(createErrorResponse('Failed to update order', 500));
+  } catch (error: any) {
+    console.error('❌ [OrdersRoute] Update order exception:', error);
+    res.status(500).json(createErrorResponse(
+      `Failed to update order: ${error.message || String(error)}`,
+      500
+    ));
   }
 });
 
@@ -1042,7 +1062,7 @@ router.patch(
       // Send WhatsApp notification for status change
       handleOrderStatusChange(
         {
-          customerPhone: updatedOrder?.customerPhone,
+          customerPhone: updatedOrder?.customerPhone || order.customerPhone,
           customerName: updatedOrder?.customerName || order.customerName,
           orderNumber: updatedOrder?.orderNumber || order.orderNumber,
           totalAmount: updatedOrder?.totalAmount || order.totalAmount,
@@ -1082,9 +1102,12 @@ router.patch(
 
       const serializedOrder = serializeOrder(updatedOrder);
       res.json(createSuccessResponse(serializedOrder, 'Order status updated successfully'));
-    } catch (error) {
-      console.error('Update order status error:', error);
-      res.status(500).json(createErrorResponse('Failed to update order status', 500));
+    } catch (error: any) {
+      console.error('❌ [OrdersRoute] Update status exception:', error);
+      res.status(500).json(createErrorResponse(
+        `Failed to update status: ${error.message || String(error)}`,
+        500
+      ));
     }
   },
 );

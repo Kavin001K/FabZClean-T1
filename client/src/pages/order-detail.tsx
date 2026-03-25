@@ -72,15 +72,16 @@ export default function OrderDetailPage() {
     mutationFn: (data: Partial<Order>) => ordersApi.update(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order', id] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
       toast({
         title: "Order Updated",
         description: "The order has been successfully updated.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "Update Failed",
-        description: "Failed to update the order. Please try again.",
+        description: error.message || "Failed to update the order. Please try again.",
         variant: "destructive",
       });
     },
