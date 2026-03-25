@@ -326,7 +326,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
             </span>
           </div>
           <p style={{ fontSize: '18px', fontWeight: '700', margin: '0', fontFamily: 'monospace' }}>
-            #{invoiceNumber}
+            #{invoiceNumber ? invoiceNumber.slice(-10) : ''}
           </p>
         </div>
       </div>

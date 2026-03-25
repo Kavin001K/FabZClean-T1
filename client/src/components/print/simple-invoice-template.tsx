@@ -150,7 +150,7 @@ const SimpleInvoiceTemplate: React.FC<{ data: InvoiceData }> = ({ data }) => {
                         </div>
                     )}
                     <h2 style={{ fontSize: '32px', fontWeight: 'bold', color: isExpressOrder ? colors.express : colors.primary }}>INVOICE</h2>
-                    <p style={{ fontWeight: 'bold' }}>#{invoiceNumber}</p>
+                    <p style={{ fontWeight: 'bold' }}>#{invoiceNumber ? invoiceNumber.slice(-10) : ''}</p>
                     <p style={{ fontSize: '12px' }}>Date: {new Date(invoiceDate).toLocaleDateString('en-IN')}</p>
                 </div>
             </div>

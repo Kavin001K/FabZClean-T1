@@ -342,6 +342,54 @@ router.get('/:id/orders', async (req, res) => {
   }
 });
 
+// Get customer wallet transaction history
+router.get('/:id/wallet-history', async (req, res) => {
+  try {
+    const customerId = req.params.id;
+    const { limit = 50 } = req.query;
+    const limitNum = parseInt(limit as string) || 50;
+
+    const db = (storage as any);
+    if (typeof db.getWalletHistory === 'function') {
+      const transactions = await db.getWalletHistory(customerId, limitNum);
+      return res.json(createSuccessResponse(transactions));
+    }
+
+    if (db.supabase) {
+      const { data, error } = await db.supabase
+        .from('wallet_transactions')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false })
+        .limit(limitNum);
+
+      if (error) {
+        console.error('Get wallet history supabase error:', error);
+        return res.json(createSuccessResponse([]));
+      }
+
+      const transactions = (data || []).map((row: any) => ({
+        id: row.id,
+        type: row.transaction_type || 'UNKNOWN',
+        amount: row.amount,
+        balanceAfter: row.balance_after,
+        paymentMethod: row.payment_method,
+        orderId: row.order_id,
+        note: row.note || row.notes || '',
+        createdAt: row.created_at,
+        transactionDate: row.created_at,
+      }));
+
+      return res.json(createSuccessResponse(transactions));
+    }
+
+    return res.json(createSuccessResponse([]));
+  } catch (error) {
+    console.error('Get customer wallet history error:', error);
+    res.json(createSuccessResponse([]));
+  }
+});
+
 // Get customer analytics
 router.get('/analytics/overview', async (req, res) => {
   try {

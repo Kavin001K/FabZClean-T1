@@ -307,12 +307,22 @@ router.post('/:id/mark-paid', async (req, res) => {
         recordedByName
       );
 
-      if (!repayment.success && !repayment.error?.includes('Credit account not found')) {
-        return res.status(400).json(createErrorResponse(repayment.error || 'Failed to settle outstanding balance', 400));
-      }
-      
       if (!repayment.success) {
-        console.warn('[OrdersRoute] processCreditRepayment skipped/failed with handled error:', repayment.error);
+        const noCreditAccountPhrases = [
+          'credit account not found',
+          'no outstanding balance',
+          'balance is 0',
+          'nothing to repay',
+          'no credit',
+          'not found',
+        ];
+        const errorLower = (repayment.error || '').toLowerCase();
+        const isNoAccount = noCreditAccountPhrases.some(phrase => errorLower.includes(phrase));
+        if (isNoAccount) {
+          console.warn('[OrdersRoute] processCreditRepayment skipped (no credit account/balance):', repayment.error);
+        } else {
+          return res.status(400).json(createErrorResponse(repayment.error || 'Failed to settle outstanding balance', 400));
+        }
       }
     }
 
@@ -1004,8 +1014,16 @@ router.patch(
       const currentStatusLevel = STATUS_ORDER[order.status] || 0;
       const newStatusLevel = STATUS_ORDER[status] || 0;
 
+      // Explicitly allow common forward transitions that may span multiple levels
+      const EXPLICIT_FORWARD_TRANSITIONS: Record<string, string[]> = {
+        'processing': ['ready_for_pickup', 'out_for_delivery', 'completed'],
+        'pending': ['processing', 'ready_for_pickup', 'out_for_delivery', 'completed'],
+        'in_store': ['processing', 'ready_for_pickup', 'out_for_delivery', 'completed'],
+      };
+      const explicitlyAllowed = EXPLICIT_FORWARD_TRANSITIONS[order.status]?.includes(status) ?? false;
+
       if (status !== 'cancelled' && status !== 'refunded') {
-        if (newStatusLevel < currentStatusLevel) {
+        if (!explicitlyAllowed && newStatusLevel < currentStatusLevel) {
           return res.status(400).json(createErrorResponse(
             `Cannot change status from '${order.status}' to '${status}'. Order status changes are irreversible.`,
             400

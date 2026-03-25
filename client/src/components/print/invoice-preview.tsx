@@ -53,10 +53,10 @@ export default function InvoicePreview({
 
           <div className="text-right">
             <h2 className="text-2xl font-bold">INVOICE</h2>
-            <p className="text-sm text-muted-foreground">Invoice #: {invoiceData.invoiceNumber}</p>
+            <p className="text-sm text-muted-foreground">Invoice #: {invoiceData.invoiceNumber ? invoiceData.invoiceNumber.slice(-10) : ''}</p>
             <p className="text-sm text-muted-foreground">Date: {invoiceData.invoiceDate}</p>
             {invoiceData.orderNumber && (
-              <p className="text-sm text-muted-foreground">Order #: {invoiceData.orderNumber}</p>
+              <p className="text-sm text-muted-foreground">Order #: {invoiceData.orderNumber.slice(-10)}</p>
             )}
             {invoiceData.dueDate && (
               <p className="text-sm text-muted-foreground">Due Date: {invoiceData.dueDate}</p>
