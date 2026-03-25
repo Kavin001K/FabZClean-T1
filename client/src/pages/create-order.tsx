@@ -989,14 +989,14 @@ export default function CreateOrder() {
   }
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 lg:p-8 animate-fade-in pb-24 lg:pb-8">
+    <div className="p-3 sm:p-4 md:p-6 lg:p-8 animate-fade-in pb-24 lg:pb-8 dark:bg-slate-950 min-h-screen">
       <header className="mb-4 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Create New Order</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Create New Order</h1>
         <Button
           onClick={handleCreateOrder}
           disabled={createOrderMutation.isPending}
           size="lg"
-          className="hidden sm:inline-flex"
+          className="hidden sm:inline-flex bg-primary hover:bg-primary/90 text-white shadow-lg"
         >
           <PlusCircle className="h-4 w-4 mr-2" />
           {createOrderMutation.isPending ? "Creating..." : "Create Order"}
@@ -1012,13 +1012,13 @@ export default function CreateOrder() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Search className="h-5 w-5 mr-2" />
+            <Card className="border dark:border-slate-700/50 dark:bg-slate-900/40 shadow-sm">
+              <CardHeader className="dark:border-slate-800">
+                <CardTitle className="flex items-center text-slate-900 dark:text-white">
+                  <Search className="h-5 w-5 mr-2 text-primary" />
                   Customer Search
                 </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-sm text-muted-foreground dark:text-slate-400 mt-1">
                   Type to search by name, phone, or email - results appear as you type
                 </p>
               </CardHeader>
@@ -1045,17 +1045,17 @@ export default function CreateOrder() {
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="flex items-center justify-between p-4 rounded-xl border-2 border-primary/20 bg-primary/5 shadow-sm"
+                    className="flex items-center justify-between p-4 rounded-xl border-2 border-primary/20 bg-primary/5 dark:bg-primary/10 dark:border-primary/30 shadow-sm"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                      <div className="h-12 w-12 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center text-primary dark:text-primary">
                         <User className="h-6 w-6" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-lg leading-none">{foundCustomer.name}</h3>
+                          <h3 className="font-bold text-lg leading-none text-slate-900 dark:text-white">{foundCustomer.name}</h3>
                           {foundCustomer.id && (
-                            <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0 h-4 bg-slate-100 text-slate-600 border-slate-200">
+                            <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0 h-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700">
                               {foundCustomer.id}
                             </Badge>
                           )}
@@ -1101,28 +1101,28 @@ export default function CreateOrder() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
           >
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <User className="h-5 w-5 mr-2" />
+            <Card className="border dark:border-slate-700/50 dark:bg-slate-900/40 shadow-sm">
+              <CardHeader className="dark:border-slate-800">
+                <CardTitle className="flex items-center text-slate-900 dark:text-white">
+                  <User className="h-5 w-5 mr-2 text-primary" />
                   Customer Information
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="customerName">Name *</Label>
+                    <Label htmlFor="customerName" className="text-slate-700 dark:text-slate-300">Name *</Label>
                     <Input
                       id="customerName"
                       placeholder="Customer's full name"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       required
-                      className="bg-background"
+                      className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="customerPhone">Phone Number *</Label>
+                    <Label htmlFor="customerPhone" className="text-slate-700 dark:text-slate-300">Phone Number *</Label>
                     <Input
                       id="customerPhone"
                       placeholder="Phone number"
@@ -1130,28 +1130,30 @@ export default function CreateOrder() {
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
                       required
-                      className="bg-background"
+                      className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="customerEmail">Email Address</Label>
+                  <Label htmlFor="customerEmail" className="text-slate-700 dark:text-slate-300">Email Address</Label>
                   <Input
                     id="customerEmail"
                     placeholder="Email (optional)"
                     type="email"
                     value={customerEmail}
                     onChange={(e) => setCustomerEmail(e.target.value)}
+                    className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="customerAddress">Address</Label>
+                  <Label htmlFor="customerAddress" className="text-slate-700 dark:text-slate-300">Address</Label>
                   <Textarea
                     id="customerAddress"
                     placeholder="Customer's address (optional)"
                     value={customerAddress}
                     onChange={(e) => setCustomerAddress(e.target.value)}
                     rows={3}
+                    className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
               </CardContent>
@@ -1164,23 +1166,23 @@ export default function CreateOrder() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
           >
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Truck className="h-5 w-5 mr-2" />
+            <Card className="border dark:border-slate-700/50 dark:bg-slate-900/40 shadow-sm">
+              <CardHeader className="dark:border-slate-800">
+                <CardTitle className="flex items-center text-slate-900 dark:text-white">
+                  <Truck className="h-5 w-5 mr-2 text-primary" />
                   Services Selection
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Add Service *</Label>
+                  <Label className="text-slate-700 dark:text-slate-300">Add Service *</Label>
                   {servicesLoading ? (
-                    <div className="flex items-center justify-center p-3 border rounded-md bg-muted/50">
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      <span className="text-sm text-muted-foreground">Loading services...</span>
+                    <div className="flex items-center justify-center p-3 border rounded-md bg-slate-100 dark:bg-slate-800/50 dark:border-slate-700">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin text-primary" />
+                      <span className="text-sm text-muted-foreground dark:text-slate-400">Loading services...</span>
                     </div>
                   ) : servicesError ? (
-                    <div className="flex items-center justify-center p-3 border rounded-md bg-destructive/10 text-destructive">
+                    <div className="flex items-center justify-center p-3 border rounded-md bg-destructive/10 dark:bg-red-950/20 dark:border-red-900/30 text-destructive dark:text-red-400">
                       <AlertCircle className="h-4 w-4 mr-2" />
                       <span className="text-sm">Failed to load services. Please refresh the page.</span>
                     </div>
@@ -1195,20 +1197,20 @@ export default function CreateOrder() {
                 </div>
 
                 {selectedServices.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <div className="text-center py-8 text-muted-foreground dark:text-slate-400">
+                    <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50 dark:opacity-40" />
                     <p>No services added yet. Select a service from the dropdown above.</p>
                   </div>
                 ) : (
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className="border dark:border-slate-700 rounded-lg overflow-hidden dark:bg-slate-900/30">
                     <div className="overflow-x-auto">
                       <Table>
-                        <TableHeader>
+                        <TableHeader className="bg-slate-50 dark:bg-slate-900/50 border-b dark:border-slate-700">
                           <TableRow>
-                            <TableHead className="min-w-[180px]">Service</TableHead>
-                            <TableHead className="w-24">Quantity</TableHead>
-                            <TableHead className="w-28">Price</TableHead>
-                            <TableHead className="w-28">Subtotal</TableHead>
+                            <TableHead className="min-w-[180px] text-slate-700 dark:text-slate-300 font-bold">Service</TableHead>
+                            <TableHead className="w-24 text-slate-700 dark:text-slate-300 font-bold">Quantity</TableHead>
+                            <TableHead className="w-28 text-slate-700 dark:text-slate-300 font-bold">Price</TableHead>
+                            <TableHead className="w-28 text-slate-700 dark:text-slate-300 font-bold">Subtotal</TableHead>
                             <TableHead className="w-16"></TableHead>
                           </TableRow>
                         </TableHeader>
@@ -1223,7 +1225,7 @@ export default function CreateOrder() {
                                   transition={{ duration: 0.2 }}
                                   className="border-b-0"
                                 >
-                                  <TableCell className="font-medium">
+                                  <TableCell className="font-medium py-2">
                                     <Input
                                       value={item.customName}
                                       onChange={(e) => {
@@ -1232,20 +1234,20 @@ export default function CreateOrder() {
                                         );
                                         setSelectedServices(updated);
                                       }}
-                                      className="w-full font-medium"
+                                      className="w-full font-medium text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                                       placeholder="Service name"
                                     />
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell className="py-2">
                                     <Input
                                       type="number"
                                       min="1"
                                       value={item.quantity}
                                       onChange={(e) => handleUpdateQuantity(item.service.id, parseInt(e.target.value) || 0)}
-                                      className="w-20"
+                                      className="w-20 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                                     />
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell className="py-2">
                                     <Input
                                       type="number"
                                       min="0"
@@ -1258,10 +1260,10 @@ export default function CreateOrder() {
                                         );
                                         setSelectedServices(updated);
                                       }}
-                                      className="w-24"
+                                      className="w-24 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                                     />
                                   </TableCell>
-                                  <TableCell className="font-semibold">₹{item.subtotal.toFixed(2)}</TableCell>
+                                  <TableCell className="font-semibold text-slate-900 dark:text-white py-2">₹{item.subtotal.toFixed(2)}</TableCell>
                                   <TableCell>
                                     <Button
                                       variant="ghost"
@@ -1383,13 +1385,14 @@ export default function CreateOrder() {
                   </Popover>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="specialInstructions">Special Instructions</Label>
+                  <Label htmlFor="specialInstructions" className="text-slate-700 dark:text-slate-300">Special Instructions</Label>
                   <Textarea
                     id="specialInstructions"
                     placeholder="e.g., gate code, specific drop-off location"
                     value={specialInstructions}
                     onChange={(e) => setSpecialInstructions(e.target.value)}
                     rows={3}
+                    className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
               </CardContent>
@@ -1402,9 +1405,9 @@ export default function CreateOrder() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.35 }}
           >
-            <Card className="overflow-hidden border-2 transition-all duration-300">
-              <CardHeader className="bg-slate-50/50 dark:bg-slate-900/50 border-b pb-4">
-                <CardTitle className="flex items-center text-lg font-bold">
+            <Card className="overflow-hidden border transition-all duration-300 dark:border-slate-700/50 dark:bg-slate-900/40 shadow-sm">
+              <CardHeader className="bg-slate-50/50 dark:bg-primary/10 border-b dark:border-primary/20 pb-4">
+                <CardTitle className="flex items-center text-lg font-bold text-slate-900 dark:text-white">
                   <Truck className="h-5 w-5 mr-2 text-primary" />
                   Fulfillment Type
                 </CardTitle>
@@ -1424,11 +1427,11 @@ export default function CreateOrder() {
                   }}
                   className="w-full"
                 >
-                  <TabsList className="grid grid-cols-2 w-full h-12 p-1 bg-slate-100 dark:bg-slate-800">
-                    <TabsTrigger value="pickup" className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm font-bold gap-2">
+                  <TabsList className="grid grid-cols-2 w-full h-14 p-1.5 bg-slate-100 dark:bg-slate-900 rounded-lg shadow-sm">
+                    <TabsTrigger value="pickup" className="data-[state=active]:bg-white dark:data-[state=active]:bg-primary data-[state=active]:text-primary dark:data-[state=active]:text-white data-[state=active]:shadow-md font-bold gap-2 rounded-md transition-all text-sm">
                       <Store className="h-4 w-4" /> Store Pickup
                     </TabsTrigger>
-                    <TabsTrigger value="delivery" className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm font-bold gap-2">
+                    <TabsTrigger value="delivery" className="data-[state=active]:bg-white dark:data-[state=active]:bg-primary data-[state=active]:text-primary dark:data-[state=active]:text-white data-[state=active]:shadow-md font-bold gap-2 rounded-md transition-all text-sm">
                       <MapPin className="h-4 w-4" /> Home Delivery
                     </TabsTrigger>
                   </TabsList>
@@ -1449,16 +1452,16 @@ export default function CreateOrder() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <Label className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">Delivery Address</Label>
+                          <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Delivery Address</Label>
                           {foundCustomer && (
                             <Button
                               type="button"
-                              variant="ghost"
+                              variant="secondary"
                               size="sm"
-                              className="h-6 text-[10px] gap-1 text-primary hover:text-primary hover:bg-primary/5 px-2"
+                              className="h-7 text-[10px] font-semibold gap-1.5 px-3 shadow-sm hover:shadow-md transition-all bg-primary/10 hover:bg-primary/20 text-primary dark:bg-primary/20 dark:hover:bg-primary/30"
                               onClick={() => setDeliveryAddress(parseAndFormatAddress(foundCustomer.address))}
                             >
-                              <User className="h-3 w-3" /> Use Profile Address
+                              <User className="h-3.5 w-3.5" /> Auto-fill from Profile
                             </Button>
                           )}
                         </div>
@@ -1467,21 +1470,21 @@ export default function CreateOrder() {
                             placeholder="Enter detailed delivery address..." 
                             value={deliveryAddress}
                             onChange={(e) => setDeliveryAddress(e.target.value)}
-                            className="min-h-[100px] bg-white border-slate-200 focus:ring-primary/20 transition-all text-sm leading-relaxed shadow-sm lg:pr-1"
+                            className="min-h-[100px] sm:min-h-[120px] bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-primary/20 focus:border-primary dark:focus:border-primary transition-all text-sm leading-relaxed shadow-sm"
                           />
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Delivery Charges (₹)</Label>
+                        <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Delivery Charges (₹)</Label>
                         <div className="relative group">
-                          <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                          <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 group-focus-within:text-primary transition-colors" />
                           <Input 
                             type="number" 
                             min="0"
                             placeholder="0.00"
                             value={deliveryCharges || ''}
                             onChange={(e) => setDeliveryCharges(safeParseFloat(e.target.value))}
-                            className="pl-9 h-12 bg-slate-50 border-slate-200 focus:ring-primary/20 transition-all font-bold text-lg"
+                            className="pl-9 h-12 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-primary/20 focus:border-primary dark:focus:border-primary transition-all font-bold text-lg"
                           />
                         </div>
                         <div className="flex flex-wrap gap-2 mt-2">
@@ -1492,7 +1495,7 @@ export default function CreateOrder() {
                               variant="outline" 
                               size="sm" 
                               className={cn(
-                                "h-7 px-3 text-[10px] font-bold transition-all",
+                                "h-8 px-4 text-xs font-bold transition-all rounded-lg dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white",
                                 deliveryCharges === amt ? "bg-primary text-white border-primary" : "hover:border-primary hover:text-primary"
                               )}
                               onClick={() => setDeliveryCharges(amt)}
@@ -1755,8 +1758,8 @@ export default function CreateOrder() {
           >
             <Card className="border-none shadow-xl bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 overflow-hidden ring-1 ring-slate-200 dark:ring-slate-800 rounded-2xl md:rounded-xl">
               <div className="h-1.5 w-full bg-primary" />
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center justify-between">
+              <CardHeader className="pb-4 border-b dark:border-slate-700/50">
+                <CardTitle className="flex items-center justify-between text-slate-900 dark:text-white">
                   <span className="flex items-center gap-2">
                     <ShoppingBag className="h-5 w-5 text-primary" />
                     Bill Summary
