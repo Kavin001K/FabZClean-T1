@@ -121,7 +121,7 @@ app.get('/api/performance', (req, res) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   // Bind to 0.0.0.0 to accept connections from any IP address (including static IP)
-  const port = parseInt(process.env.PORT || (process.env.NODE_ENV === "production" ? "5000" : "5001"), 10);
+  const port = parseInt(process.env.PORT || "5000", 10);
   const host = process.env.HOST || "0.0.0.0";
   server.listen(port, host, () => {
     log(`🚀 FabZClean Server running on ${host}:${port}`);

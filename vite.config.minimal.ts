@@ -99,17 +99,19 @@ export default defineConfig({
     ],
   },
   server: {
+    host: '0.0.0.0',
+    allowedHosts: true,
     fs: {
       strict: false,
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:5001',
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
       },
       '/uploads': {
-        target: 'http://localhost:5001',
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
       }
