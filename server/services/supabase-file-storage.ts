@@ -20,21 +20,29 @@ export const SupabaseFileStorage = {
      * Upload a profile image to 'avatars' bucket
      */
     async saveProfileImage(userId: string | number, buffer: Buffer, originalName: string, mimeType: string): Promise<string> {
-        const fileExt = 'webp';
+        const fileExt = originalName.split('.').pop() || 'jpg';
         const fileName = `profile-${userId}-${Date.now()}.${fileExt}`;
         const filePath = `profiles/${fileName}`;
 
-        // Optimize image using sharp (resize to 400x400 and convert to WebP)
-        const optimizedBuffer = await sharp(buffer)
-            .resize(400, 400, { fit: 'cover' })
-            .webp({ quality: 85 })
-            .toBuffer();
+        // Try to optimize image using sharp, fallback to raw buffer if sharp unavailable
+        let uploadBuffer = buffer;
+        let contentType = mimeType;
+        
+        try {
+            uploadBuffer = await sharp(buffer)
+                .resize(400, 400, { fit: 'cover' })
+                .webp({ quality: 85 })
+                .toBuffer();
+            contentType = 'image/webp';
+        } catch (e) {
+            console.log('⚠️ Sharp optimization unavailable, uploading original image');
+        }
 
         // Upload to 'avatars' bucket
         const { data, error } = await supabase.storage
             .from('avatars')
-            .upload(filePath, optimizedBuffer, {
-                contentType: 'image/webp',
+            .upload(filePath, uploadBuffer, {
+                contentType: contentType,
                 upsert: true
             });
 
