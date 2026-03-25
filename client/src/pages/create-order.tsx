@@ -52,6 +52,10 @@ const safeParseFloat = (val: any) => {
 };
 
 export default function CreateOrder() {
+  useEffect(() => {
+    document.title = "New Order | FabzClean";
+  }, []);
+
   const { toast } = useToast();
   const { addNotification } = useNotifications();
   const queryClient = useQueryClient();

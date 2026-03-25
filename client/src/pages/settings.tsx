@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useSettings, Theme, LandingPage, AVAILABLE_QUICK_ACTIONS } from '@/contexts/settings-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -24,6 +25,10 @@ const ICON_MAP: Record<string, React.ElementType> = {
 };
 
 export default function SettingsPage() {
+  useEffect(() => {
+    document.title = "Settings | FabzClean";
+  }, []);
+
   const { settings, updateSetting, isLoading } = useSettings();
 
   if (isLoading) {

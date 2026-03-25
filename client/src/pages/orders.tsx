@@ -119,6 +119,10 @@ function OrdersComponent() {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
 
+  useEffect(() => {
+    document.title = "Active Orders | FabzClean";
+  }, []);
+
   // State Management
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);

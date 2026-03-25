@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './auth-context';
+import { useTheme } from '@/components/ui/theme-provider';
 
 // --- Types: User Preferences ---
 export type Theme = 'light' | 'dark' | 'system';
@@ -50,6 +51,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { employee } = useAuth();
+  const { setTheme: setProviderTheme } = useTheme();
 
   // Load from localStorage initially for immediate UI
   const [localSettings, setLocalSettings] = useState<UserSettings>(() => {
@@ -94,28 +96,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   }, [settings]);
 
-  // Apply Theme
+  // Delegate theme application to ThemeProvider so it persists via fabzclean-theme key
   useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
-
-    if (settings.theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      root.classList.add(systemTheme);
-    } else {
-      root.classList.add(settings.theme);
-    }
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e: MediaQueryListEvent) => {
-      if (settings.theme === 'system') {
-        root.classList.remove('light', 'dark');
-        root.classList.add(e.matches ? 'dark' : 'light');
-      }
-    };
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [settings.theme]);
+    setProviderTheme(settings.theme as 'light' | 'dark' | 'system');
+  }, [settings.theme, setProviderTheme]);
 
   // Apply Compact Mode
   useEffect(() => {

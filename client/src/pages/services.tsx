@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
@@ -94,6 +94,10 @@ const formatCurrency = (amount: string | number) => {
 };
 
 export default function Services() {
+  useEffect(() => {
+    document.title = "Services | FabzClean";
+  }, []);
+
   // State for dialog management
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);

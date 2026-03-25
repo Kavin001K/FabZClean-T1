@@ -205,7 +205,19 @@ router.post('/upload-profile-image', authMiddleware, upload.single('image'), asy
     });
   } catch (error: any) {
     console.error('[Auth] Upload profile image error:', error);
-    res.status(500).json({ error: error.message || 'Failed to upload profile image' });
+    const isStorageError =
+      error.message?.includes('storage') ||
+      error.message?.includes('bucket') ||
+      error.message?.includes('upload') ||
+      error.message?.includes('Supabase') ||
+      error.message?.includes('network') ||
+      error.message?.includes('ECONNREFUSED') ||
+      error.statusCode >= 400;
+    res.status(503).json({
+      error: isStorageError
+        ? 'Image upload is temporarily unavailable. Please try again later or contact support.'
+        : 'Failed to upload profile image. Please try again.'
+    });
   }
 });
 

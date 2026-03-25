@@ -104,7 +104,7 @@ export default function DashboardQuickActions({ employeeId, employeeName }: Empl
         type: 'success',
         title: 'Checked In Successfully!',
         message: `Welcome ${employeeName}! You're now clocked in.`,
-        actionUrl: '/employee-dashboard',
+        actionUrl: '/',
         actionText: 'View Dashboard'
       });
       toast({
@@ -175,7 +175,7 @@ export default function DashboardQuickActions({ employeeId, employeeName }: Empl
         type: 'success',
         title: 'Time Off Request Submitted!',
         message: `Your ${timeOffForm.type} leave request has been submitted for approval.`,
-        actionUrl: '/employee-dashboard',
+        actionUrl: '/',
         actionText: 'View Status'
       });
       toast({
@@ -202,7 +202,7 @@ export default function DashboardQuickActions({ employeeId, employeeName }: Empl
       type: 'success',
       title: 'Report Submitted!',
       message: `Your ${reportForm.priority} priority report has been submitted.`,
-      actionUrl: '/employee-dashboard',
+      actionUrl: '/',
       actionText: 'View Reports'
     });
 

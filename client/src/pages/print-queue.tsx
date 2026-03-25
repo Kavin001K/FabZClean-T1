@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,10 @@ const statusColor = (s: string) => {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function PrintTags() {
+    useEffect(() => {
+        document.title = "Print Tags | FabzClean";
+    }, []);
+
     const { toast } = useToast();
     const queryClient = useQueryClient();
 

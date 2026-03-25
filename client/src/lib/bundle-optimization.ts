@@ -2,34 +2,13 @@
 
 // Dynamic imports for code splitting
 export const dynamicImports = {
-  // Dashboard components
-  dashboard: () => import('../components/dashboard/enhanced-employee-dashboard'),
-
-  // Order management
-  orderManagement: () => import('../components/orders/employee-order-management'),
-  orderTracking: () => import('../components/customer-portal/customer-order-tracking'),
-
-  // Transit management
-  transitManagement: () => import('../components/transit/employee-transit-management'),
-
-  // Customer portal
-  customerPortal: () => import('../pages/customer-portal'),
-  serviceBooking: () => import('../components/customer-portal/customer-service-booking'),
-  accountManagement: () => import('../components/customer-portal/customer-account-management'),
-
-  // Worker portal
-  workerPortal: () => import('../pages/worker-portal'),
-  // deliveryManagement: () => import('../components/worker-portal/worker-delivery-management'), // TODO: Create this component
-
   // Charts and analytics
   charts: () => import('recharts'),
 
   // Heavy libraries
   dateFns: () => import('date-fns'),
-  // lodash: () => import('lodash-es'), // Use specific lodash imports instead
 
   // UI components (lazy loaded)
-  // dataTable: () => import('../components/ui/data-table'), // TODO: Create this component
   virtualScroll: () => import('../components/ui/virtual-scroll'),
   lazyLoad: () => import('../components/ui/lazy-load')
 };
@@ -38,41 +17,14 @@ export const dynamicImports = {
 export const preloadComponents = {
   // Preload critical components
   preloadCritical: async () => {
-    const criticalComponents = [
-      dynamicImports.dashboard,
-      dynamicImports.orderManagement,
-      dynamicImports.customerPortal
-    ];
-
-    await Promise.all(criticalComponents.map(importFn => importFn()));
+    await Promise.all([
+      dynamicImports.charts(),
+    ]);
   },
 
   // Preload based on user role
-  preloadByRole: async (role: 'admin' | 'employee' | 'customer' | 'worker') => {
-    const roleComponents = {
-      admin: [
-        dynamicImports.dashboard,
-        dynamicImports.orderManagement,
-        dynamicImports.transitManagement
-      ],
-      employee: [
-        dynamicImports.dashboard,
-        dynamicImports.orderManagement,
-        dynamicImports.transitManagement
-      ],
-      customer: [
-        dynamicImports.customerPortal,
-        dynamicImports.serviceBooking,
-        dynamicImports.accountManagement
-      ],
-      worker: [
-        dynamicImports.workerPortal,
-        // dynamicImports.deliveryManagement // TODO: Enable when component is created
-      ]
-    };
-
-    const components = roleComponents[role] || [];
-    await Promise.all(components.map(importFn => importFn()));
+  preloadByRole: async (_role: 'admin' | 'employee' | 'customer' | 'worker') => {
+    // Role-based preloading is handled by lazy imports in App.tsx
   },
 
   // Preload on hover

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type WheelEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Wallet, RefreshCw, IndianRupee, AlertTriangle, CheckCircle2, HandCoins, Users, Banknote, Smartphone, CreditCard, Building, FileText, Printer } from "lucide-react";
 import { PageTransition } from "@/components/ui/page-transition";
@@ -131,6 +131,10 @@ const walletApi = {
 };
 
 export default function WalletManagementPage() {
+  useEffect(() => {
+    document.title = "Wallet | FabzClean";
+  }, []);
+
   const { employee } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { safeParseFloat } from '@/lib/safe-utils';
@@ -93,6 +93,10 @@ const getSpendingTier = (totalSpent: number) => {
 };
 
 export default function Customers() {
+  useEffect(() => {
+    document.title = "Customers | FabzClean";
+  }, []);
+
   // State management
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);

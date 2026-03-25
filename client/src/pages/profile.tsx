@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,10 @@ import { ImageCropperDialog } from '@/components/image-cropper-dialog';
 import { cn } from '@/lib/utils';
 
 export default function ProfilePage() {
+    useEffect(() => {
+        document.title = "Profile | FabzClean";
+    }, []);
+
     const { employee, signOut, refreshEmployee } = useAuth();
     const { toast } = useToast();
     const [, setLocation] = useLocation();
@@ -131,7 +135,11 @@ export default function ProfilePage() {
                 body: uploadFormData,
             });
 
-            if (!res.ok) throw new Error('Failed to upload image');
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                const msg = data?.error || data?.message || 'Image upload not available';
+                throw new Error(msg);
+            }
 
             toast({
                 title: 'Photo Updated',
@@ -141,8 +149,8 @@ export default function ProfilePage() {
             if (refreshEmployee) await refreshEmployee();
         } catch (error: any) {
             toast({
-                title: 'Upload Error',
-                description: error.message,
+                title: 'Image upload unavailable',
+                description: 'Image upload is not available right now — please contact support.',
                 variant: 'destructive',
             });
         } finally {

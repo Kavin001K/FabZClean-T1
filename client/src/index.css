@@ -599,3 +599,49 @@ html.density-compact h2 {
 html.density-compact h3 {
   font-size: 1rem;
 }
+
+/* ========================
+   MOBILE UX IMPROVEMENTS
+   ======================== */
+
+/* Ensure 44px minimum touch targets on mobile */
+@media (max-width: 640px) {
+  button,
+  [role="button"],
+  a,
+  input[type="checkbox"],
+  input[type="radio"],
+  select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Exception: icon-only buttons and checkboxes can be smaller if explicitly sized */
+  button.h-6,
+  button.h-7,
+  button.h-8,
+  button.icon-only {
+    min-height: unset;
+    min-width: unset;
+  }
+
+  /* Dialogs should be full-width on mobile */
+  [role="dialog"] {
+    max-width: 100vw !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    border-radius: 1rem 1rem 0 0 !important;
+  }
+
+  /* Tables should not overflow on mobile — hide non-essential columns */
+  .mobile-hidden {
+    display: none !important;
+  }
+}
+
+/* Tablet improvements */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .container-desktop {
+    @apply px-4;
+  }
+}

@@ -203,7 +203,7 @@ function App() {
           <AuthProvider>
             <SettingsProvider>
               <RealtimeProvider>
-                <ThemeProvider defaultTheme="light" storageKey="fab-z-ui-theme">
+                <ThemeProvider defaultTheme="light" storageKey="fabzclean-theme">
                   <TooltipProvider>
                     <NotificationProvider>
                       <ShortcutsProvider>

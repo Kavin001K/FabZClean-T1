@@ -150,13 +150,9 @@ export function GlobalSearch({ compact = false }: GlobalSearchProps) {
                         <Users className="mr-2 h-4 w-4" />
                         <span>Customers</span>
                       </CommandItem>
-                      <CommandItem onSelect={() => { setLocation('/inventory'); setIsOpen(false); }}>
-                        <Package className="mr-2 h-4 w-4" />
-                        <span>Inventory</span>
-                      </CommandItem>
                       <CommandItem onSelect={() => { setLocation('/services'); setIsOpen(false); }}>
                         <FileText className="mr-2 h-4 w-4" />
-                        <span>Services Catalog</span>
+                        <span>Services</span>
                       </CommandItem>
                     </CommandGroup>
                   )}
