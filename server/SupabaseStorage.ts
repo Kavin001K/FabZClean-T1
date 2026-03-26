@@ -178,6 +178,8 @@ export class SupabaseStorage {
             // Delivery earnings & analytics mappings
             'delivery_earnings_calculated': 'deliveryEarningsCalculated',
             'is_credit_order': 'isCreditOrder',
+            'wallet_used': 'walletUsed',
+            'credit_used': 'creditUsed',
             'delivered_at': 'deliveredAt',
             'delivery_partner_id': 'deliveryPartnerId',
             'per_order_salary': 'perOrderSalary',
@@ -373,6 +375,8 @@ export class SupabaseStorage {
             // Delivery earnings & analytics mappings
             'deliveryEarningsCalculated': 'delivery_earnings_calculated',
             'isCreditOrder': 'is_credit_order',
+            'walletUsed': 'wallet_used',
+            'creditUsed': 'credit_used',
             'deliveredAt': 'delivered_at',
             'deliveryPartnerId': 'delivery_partner_id',
             'perOrderSalary': 'per_order_salary',

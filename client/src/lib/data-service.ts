@@ -350,7 +350,7 @@ export const ordersApi = {
       return result.data || result;
     } catch (error) {
       console.error(`Failed to update order ${id}:`, error);
-      return null;
+      throw error;
     }
   },
 
@@ -410,7 +410,7 @@ export const ordersApi = {
       return result?.data?.order || result?.order || result?.data || null;
     } catch (error) {
       console.error(`Failed to mark order ${id} as paid:`, error);
-      return null;
+      throw error;
     }
   }
 };
