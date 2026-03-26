@@ -269,27 +269,38 @@ export default function PrintTags() {
       <meta charset="UTF-8">
       <title>Garment Tags - ${targetOrders.length} Orders</title>
       <style>
-        @page { size: A4 landscape; margin: 5mm; }
+        /* Allow printer to determine page size. Some barcode printers need 'portrait' or 'landscape' depending on feed direction. We'll use auto to respect printer settings. */
+        @page { margin: 0; }
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
-        body { font-family: 'Consolas', 'Courier New', monospace; font-size: 8pt; font-weight: 600; background: #fff; padding: 2mm; color: #333; }
+        body { font-family: 'Inter', 'Consolas', 'Courier New', monospace; background: #fff; padding: 0; margin: 0; color: #000; }
 
         .no-print { display: block; }
-        @media print { .no-print { display: none !important; } }
+        @media print { 
+            .no-print { display: none !important; } 
+            body { padding: 0; margin: 0; }
+            .tag { border: none !important; border-bottom: 1px dashed #ccc !important; }
+        }
 
-        .print-bar { position: sticky; top: 0; background: white; padding: 10px; text-align: center; border-bottom: 1px solid #e4e4e7; z-index: 100; margin-bottom: 10px; }
+        .print-bar { position: sticky; top: 0; background: white; padding: 10px; text-align: center; border-bottom: 1px solid #e4e4e7; z-index: 100; margin-bottom: 5px; }
         .print-button { padding: 8px 24px; background: #2563eb; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 700; cursor: pointer; }
 
-        /* A4 landscape: 287mm usable width — 5 tags x 40mm + 4 gaps x 2mm = 208mm */
-        .tags-grid { display: grid; grid-template-columns: repeat(5, 40mm); gap: 2mm; }
+        /* Continuous single-column flex layout for barcode continuous rolls */
+        .tags-grid { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: flex-start;
+            padding: 0; 
+            margin: 0;
+            gap: 2mm; /* Space between tags */
+        }
 
         .tag {
-          width: 40mm;
-          height: 25mm;
-          max-height: 25mm;
-          padding: 1.2mm 1.5mm;
+          width: 50mm; /* Standard barcode label width */
+          height: 30mm; /* Standard barcode label height */
+          padding: 1.5mm 2mm;
           background: #fff;
-          border: 0.4mm dashed #333;
+          border: 1px dashed #000;
           display: flex;
           flex-direction: column;
           overflow: hidden;
@@ -301,60 +312,52 @@ export default function PrintTags() {
         .tag-top {
           display: flex;
           align-items: baseline;
-          gap: 1mm;
+          justify-content: space-between;
           padding-bottom: 0.5mm;
-          border-bottom: 0.2mm dashed #999;
+          border-bottom: 1px solid #aaa;
           flex-shrink: 0;
-          overflow: hidden;
         }
 
-        .order-id { font-size: 6pt; font-weight: 800; color: #555; white-space: nowrap; flex-shrink: 0; }
-        .customer { font-size: 7pt; font-weight: 700; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .order-id { font-size: 7.5pt; font-weight: 900; color: #000; text-transform: uppercase; }
+        .customer { font-size: 7.5pt; font-weight: 800; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65%; text-align: right; }
 
         .service {
           text-align: center;
-          font-size: 8pt;
-          font-weight: 800;
-          color: #111;
-          padding: 0.8mm 0 0.3mm 0;
+          font-size: 9.5pt;
+          font-weight: 900;
+          color: #000;
           flex: 1;
           display: flex;
           align-items: center;
           justify-content: center;
-          overflow: hidden;
+          text-transform: uppercase;
           word-break: break-word;
           line-height: 1.1;
+          padding: 1mm 0;
         }
 
         .note {
           text-align: center;
-          font-size: 5.5pt;
-          font-weight: 600;
-          color: #555;
-          padding: 0.3mm 0;
-          flex-shrink: 0;
+          font-size: 6.5pt;
+          font-weight: 700;
+          color: #000;
+          padding-bottom: 0.5mm;
+          white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          white-space: nowrap;
         }
 
         .tag-footer {
           display: flex;
           justify-content: space-between;
-          align-items: center;
+          align-items: flex-end;
           padding-top: 0.5mm;
-          border-top: 0.2mm dashed #999;
+          border-top: 1px solid #aaa;
           flex-shrink: 0;
         }
 
-        .due-date { font-size: 6pt; font-weight: 700; color: #059669; }
-        .count { font-size: 7.5pt; font-weight: 900; color: #111; }
-
-        @media print {
-          @page { size: A4 landscape !important; margin: 5mm !important; }
-          .tags-grid { display: grid !important; grid-template-columns: repeat(5, 40mm) !important; gap: 2mm !important; }
-          .tag { width: 40mm !important; page-break-inside: avoid !important; break-inside: avoid !important; height: 25mm !important; max-height: 25mm !important; overflow: hidden !important; }
-        }
+        .due-date { font-size: 6.5pt; font-weight: 800; color: #000; }
+        .count { font-size: 7.5pt; font-weight: 900; color: #000; }
       </style>
     </head><body>
       <div class="print-bar no-print">

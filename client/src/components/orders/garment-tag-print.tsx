@@ -183,17 +183,15 @@ export function GarmentTagPrint({
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
         <style>
           /*=============================================
-            GARMENT TAG PRINT STYLES - LANDSCAPE
-            - Header Tag: 40mm width x AUTO height
-            - Service Tags: ~40mm x 25mm, 5 per row on A4 landscape
-            - A4 landscape: 297mm x 210mm (5mm margins = 287mm usable)
-            - 5 tags x 40mm + 4 gaps x 2mm = 208mm — fits perfectly
-            High DPI + Barcode Printer Compatible
+            GARMENT TAG PRINT STYLES - CONTINUOUS BARCODE ROLL
+            - Header Tag: width 50mm, auto height
+            - Service Tags: 50mm x 30mm
+            - High DPI + Barcode Printer Compatible
+            - Prints 1 per row (continuous column)
           =============================================*/
           
           @page {
-            size: A4 landscape;
-            margin: 5mm !important;
+            margin: 0 !important;
           }
           
           *, *::before, *::after {
@@ -206,6 +204,8 @@ export function GarmentTagPrint({
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             color-adjust: exact !important;
+            margin: 0;
+            padding: 0;
           }
           
           body {
@@ -227,8 +227,8 @@ export function GarmentTagPrint({
           }
 
           .header-tag {
-            width: 40mm;
-            padding: 1.5mm;
+            width: 50mm;
+            padding: 1.5mm 2mm;
             background: #fff;
             border: 0.4mm dashed #333;
             display: flex;
@@ -330,19 +330,21 @@ export function GarmentTagPrint({
             margin-top: 0.5mm;
           }
           
-          /*========== SERVICE TAGS GRID (5 per row on A4 landscape) ==========*/
+          /*========== SERVICE TAGS GRID (Continuous Column) ==========*/
           .tags-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 40mm);
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
             gap: 2mm;
+            margin: 0;
+            padding: 0;
           }
 
-          /*========== SERVICE TAG (40mm x 25mm compact) ==========*/
+          /*========== SERVICE TAG (50mm x 30mm) ==========*/
           .tag {
-            width: 40mm;
-            height: 25mm;
-            max-height: 25mm;
-            padding: 1.2mm 1.5mm;
+            width: 50mm;
+            height: 30mm;
+            padding: 1.5mm 2mm;
             background: #fff;
             border: 0.4mm dashed #333;
             display: flex;
@@ -451,21 +453,22 @@ export function GarmentTagPrint({
           @media print {
             html, body {
               margin: 0 !important;
-              padding: 2mm !important;
+              padding: 0 !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
               color-adjust: exact !important;
             }
             
             @page {
-              size: A4 landscape !important;
-              margin: 5mm !important;
+              margin: 0 !important;
             }
 
             .tags-grid {
-              display: grid !important;
-              grid-template-columns: repeat(5, 40mm) !important;
+              display: flex !important;
+              flex-direction: column !important;
               gap: 2mm !important;
+              padding: 0 !important;
+              margin: 0 !important;
             }
             
             .header-wrapper {
@@ -474,18 +477,22 @@ export function GarmentTagPrint({
             
             .header-tag {
               page-break-inside: avoid !important;
-              margin: 0 !important;
+              margin: 0 0 2mm 0 !important;
               box-shadow: none !important;
+              border: none !important;
+              border-bottom: 0.4mm dashed #ccc !important;
             }
             
             .tag {
-              width: 40mm !important;
+              width: 50mm !important;
               page-break-inside: avoid !important;
-              margin: 0 !important;
+              margin: 0 0 2mm 0 !important;
               box-shadow: none !important;
-              height: 25mm !important;
-              max-height: 25mm !important;
+              height: 30mm !important;
+              max-height: 30mm !important;
               overflow: hidden !important;
+              border: none !important;
+              border-bottom: 0.4mm dashed #ccc !important;
             }
           }
         </style>
@@ -615,7 +622,7 @@ export function GarmentTagPrint({
             )}
           </DialogTitle>
           <DialogDescription>
-            {allTags.length} tags • Landscape A4 • 5 per row • No breaks
+            {allTags.length} tags • Optimized for barcode printer (continuous row)
           </DialogDescription>
         </DialogHeader>
 
@@ -663,12 +670,12 @@ export function GarmentTagPrint({
           {/* Divider */}
           <div className="w-full flex items-center gap-2">
             <div className="flex-1 border-t border-dashed border-gray-500"></div>
-            <span className="text-[8px] text-gray-400 font-medium">Service Tags (5/row · landscape)</span>
+            <span className="text-[8px] text-gray-400 font-medium">Service Tags (Continuous Row)</span>
             <div className="flex-1 border-t border-dashed border-gray-500"></div>
           </div>
 
           {/* Service Tags Grid - Preview */}
-          <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(3, 40mm)' }}>
+          <div className="flex flex-col gap-1.5 items-center">
             {allTags.map(({ item, serviceIndex, serviceTotalQty }) => (
               <div
                 key={`preview-${serviceIndex}-${item.serviceName}`}
