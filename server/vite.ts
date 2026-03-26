@@ -70,10 +70,10 @@ export async function setupVite(app: Express, server: Server) {
 
       // Always reload the index.html file from disk in case it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      const { nanoid } = await import("nanoid");
+      // Use Date.now() for simple cache busting instead of nanoid dependency
       template = template.replace(
         `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
+        `src="/src/main.tsx?v=${Date.now()}"`,
       );
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
