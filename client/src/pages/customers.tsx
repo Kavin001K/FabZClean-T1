@@ -109,7 +109,7 @@ export default function Customers() {
   
   // Pagination state
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(20);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -128,8 +128,8 @@ export default function Customers() {
       search: searchQuery,
       sortBy 
     }),
-    staleTime: 5000, 
-    refetchInterval: 5000, // Background auto-sync 5s
+    staleTime: 30000, 
+    refetchOnWindowFocus: true,
     retry: 2,
   });
 
@@ -162,8 +162,8 @@ export default function Customers() {
   } = useQuery({
     queryKey: ['orders'],
     queryFn: ordersApi.getAll,
-    staleTime: 5000,
-    refetchInterval: 5000, // Background auto-sync 5s
+    staleTime: 60000,
+    refetchOnWindowFocus: true,
   });
 
   // Computed metrics

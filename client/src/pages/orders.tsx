@@ -163,7 +163,7 @@ function OrdersComponent() {
     queryKey: ['orders'],
     queryFn: ordersApi.getAll,
     staleTime: 5000,
-    refetchInterval: 5000, // Background auto-sync 5s
+    refetchOnWindowFocus: true,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });

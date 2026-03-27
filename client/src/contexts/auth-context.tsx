@@ -193,9 +193,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, SESSION_DURATION - WARNING_BEFORE_LOGOUT);
 
     // Set logout timer
-    logoutTimerRef.current = setTimeout(() => {
+    logoutTimerRef.current = setTimeout(async () => {
       console.log('Session expired due to inactivity');
-      signOut();
+      await signOut();
+      window.location.href = '/login';
     }, SESSION_DURATION);
   }, [employee, signOut]);
 

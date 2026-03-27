@@ -287,19 +287,24 @@ class SettingsService {
   async getUserSettings(userId: string): Promise<any> {
     try {
       return await (db as any).getUserSettings(userId);
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message?.includes('user_settings') || error?.message?.includes('relation')) {
+        console.warn('[Settings] user_settings table may not exist yet. Returning defaults.');
+        return undefined;
+      }
       console.error(`Error fetching user settings for ${userId}:`, error);
-      throw error;
+      return undefined;
     }
   }
 
-  /**
-   * Update settings for a specific user
-   */
   async updateUserSettings(userId: string, data: any): Promise<any> {
     try {
       return await (db as any).updateUserSettings(userId, data);
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message?.includes('user_settings') || error?.message?.includes('relation')) {
+        console.warn('[Settings] user_settings table may not exist yet. Saving to localStorage only.');
+        return data;
+      }
       console.error(`Error updating user settings for ${userId}:`, error);
       throw error;
     }

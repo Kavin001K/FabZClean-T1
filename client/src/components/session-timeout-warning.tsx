@@ -1,20 +1,34 @@
+import React from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Clock, LogOut } from 'lucide-react';
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Clock, LogOut, RefreshCw } from 'lucide-react';
 
 export function SessionTimeoutWarning() {
     const { showSessionWarning, sessionTimeRemaining, extendSession, signOut } = useAuth();
 
-    // Format time remaining as MM:SS
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
+    const handleLogout = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await signOut();
+        window.location.href = '/login';
+    };
+
+    const handleExtend = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        extendSession();
+    };
+
     return (
         <AlertDialog open={showSessionWarning}>
-            <AlertDialogContent className="max-w-md">
+            <AlertDialogContent className="max-w-md" onEscapeKeyDown={(e) => e.preventDefault()}>
                 <AlertDialogHeader>
                     <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
                         <Clock className="w-5 h-5 animate-pulse" />
@@ -36,25 +50,27 @@ export function SessionTimeoutWarning() {
                             </div>
 
                             <p className="text-sm text-muted-foreground">
-                                Click "Stay Logged In" to continue your session, or "Logout Now" to end your session immediately.
+                                Click "Stay Logged In" to continue your session, or "Logout Now" to end it immediately.
                             </p>
                         </div>
                     </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter className="gap-2">
-                    <AlertDialogCancel
-                        onClick={() => signOut()}
+                <AlertDialogFooter className="gap-2 sm:gap-2">
+                    <Button
+                        variant="destructive"
+                        onClick={handleLogout}
                         className="flex items-center gap-2"
                     >
                         <LogOut className="w-4 h-4" />
                         Logout Now
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                        onClick={extendSession}
-                        className="bg-primary hover:bg-primary/90"
+                    </Button>
+                    <Button
+                        onClick={handleExtend}
+                        className="bg-primary hover:bg-primary/90 flex items-center gap-2"
                     >
+                        <RefreshCw className="w-4 h-4" />
                         Stay Logged In
-                    </AlertDialogAction>
+                    </Button>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

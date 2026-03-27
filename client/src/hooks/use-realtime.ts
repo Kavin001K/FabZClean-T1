@@ -152,7 +152,7 @@ export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeRe
           table: tableName,
         },
         (payload) => {
-          console.log('Realtime event received:', payload.eventType, payload);
+          console.debug('Realtime event:', payload.eventType, tableName);
 
           // ✅ Merge Algorithm: Update local state optimistically
           setData((currentData) => {
@@ -205,9 +205,7 @@ export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeRe
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          console.log(`✅ Subscribed to ${tableName} realtime changes`);
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error(`❌ Error subscribing to ${tableName} realtime changes`);
+          console.debug(`Subscribed to ${tableName} realtime`);
         }
       });
 
@@ -218,7 +216,7 @@ export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeRe
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
-        console.log(`🔌 Unsubscribed from ${tableName} realtime changes`);
+        console.debug(`Unsubscribed from ${tableName} realtime`);
       }
     };
   }, [tableName, enabled]);

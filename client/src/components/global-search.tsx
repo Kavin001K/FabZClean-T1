@@ -26,6 +26,10 @@ export function GlobalSearch({ compact = false }: GlobalSearchProps) {
   const { searchQuery, setSearchQuery, searchResults, isSearching, clearSearch } = useGlobalSearch();
   const [, setLocation] = useLocation();
 
+  const isMac = typeof navigator !== 'undefined' && (navigator.platform?.toUpperCase().includes('MAC') || navigator.userAgent?.includes('Mac'));
+  const modSymbol = isMac ? '\u2318' : 'Ctrl+';
+  const modSymbolShort = isMac ? '\u2318' : 'Ctrl+';
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -86,7 +90,7 @@ export function GlobalSearch({ compact = false }: GlobalSearchProps) {
           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
           <span className="truncate text-xs sm:text-sm">Search...</span>
           <kbd className="pointer-events-none absolute right-[0.3rem] top-[0.3rem] hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
-            <span className="text-xs">⌘</span>K
+            <span className="text-xs">{modSymbol}</span>K
           </kbd>
         </Button>
       )}
@@ -144,7 +148,7 @@ export function GlobalSearch({ compact = false }: GlobalSearchProps) {
                       <CommandItem onSelect={() => { setLocation('/orders/new'); setIsOpen(false); }}>
                         <ShoppingCart className="mr-2 h-4 w-4" />
                         <span>New Order</span>
-                        <CommandShortcut>⌘N</CommandShortcut>
+                        <CommandShortcut>{modSymbolShort}N</CommandShortcut>
                       </CommandItem>
                       <CommandItem onSelect={() => { setLocation('/customers'); setIsOpen(false); }}>
                         <Users className="mr-2 h-4 w-4" />

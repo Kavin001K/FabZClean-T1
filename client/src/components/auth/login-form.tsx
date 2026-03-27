@@ -5,10 +5,8 @@ import { useSettings } from '../../contexts/settings-context';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Alert, AlertDescription } from '../ui/alert';
-import { Loader2, User, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
-import { BiometricAuthButton } from '../biometric-auth-button';
+import { Loader2, User, Lock, AlertCircle, Eye, EyeOff, Sparkles } from 'lucide-react';
 
 export const LoginForm: React.FC = () => {
   const [, setLocation] = useLocation();
@@ -21,7 +19,6 @@ export const LoginForm: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Get redirect URL from query params to respect deep links if needed, though settings takes priority for default flows
   const searchParams = new URLSearchParams(window.location.search);
   const redirectTo = searchParams.get('redirect');
 
@@ -36,15 +33,11 @@ export const LoginForm: React.FC = () => {
       if (error) {
         setError(error);
       } else {
-        // 1. If there's an explicit redirect param, use it (highest priority)
         if (redirectTo) {
           setLocation(redirectTo);
           return;
         }
-
-        // 2. Otherwise use the settings-defined landing page
         const targetPage = settings.landingPage || '/dashboard';
-        console.log("Redirecting to preference:", targetPage, "User role:", employee?.role);
         setLocation(targetPage);
       }
     } catch (err) {
@@ -56,55 +49,66 @@ export const LoginForm: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-2xl font-bold text-white">F</span>
-            </div>
+    <div className="flex items-center justify-center min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyem0wLTRWMjhIMjR2Mmgxem0tMjIgNmgyVjIyaC0ydjE0em00LTI4aDJ2LTJoLTJ2MnptMCAyOGgydi0yaC0ydjJ6bTQ0LTMyaDJ2LTJoLTJ2MnptMCAzMmgydi0yaC0ydjJ6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-50" />
+      </div>
+
+      <div className="relative z-10 w-full max-w-md px-4">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-2xl shadow-lg shadow-primary/30 mb-4">
+            <Sparkles className="w-8 h-8 text-white" />
           </div>
-          <CardTitle className="text-2xl text-center">Employee Login</CardTitle>
-          <CardDescription className="text-center">
-            Sign in to your FabZClean employee account
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+          <h1 className="text-3xl font-bold text-white tracking-tight">FabZClean</h1>
+          <p className="text-slate-400 mt-1 text-sm">Laundry Management System</p>
+        </div>
+
+        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl p-8">
+          <div className="text-center mb-6">
+            <h2 className="text-xl font-semibold text-white">Welcome Back</h2>
+            <p className="text-slate-400 text-sm mt-1">Sign in to your employee account</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <Alert variant="destructive">
+              <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-300">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
+
             <div className="space-y-2">
-              <Label htmlFor="username">User ID or Email</Label>
+              <Label htmlFor="username" className="text-slate-300 text-sm font-medium">User ID or Email</Label>
               <div className="relative">
-                <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   id="username"
                   type="text"
                   placeholder="Enter User ID or Email"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-11 bg-white/10 border-white/20 text-white placeholder:text-slate-500 focus:bg-white/15 focus:border-primary/50 focus:ring-primary/20 transition-all rounded-xl"
                   required
                   disabled={loading}
                   autoComplete="username"
                 />
               </div>
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-slate-300 text-sm font-medium">Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10"
+                  className="pl-10 pr-10 h-11 bg-white/10 border-white/20 text-white placeholder:text-slate-500 focus:bg-white/15 focus:border-primary/50 focus:ring-primary/20 transition-all rounded-xl"
                   required
                   disabled={loading}
                   autoComplete="current-password"
@@ -112,47 +116,38 @@ export const LoginForm: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 focus:outline-none"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white focus:outline-none transition-colors"
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
-          </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={loading}>
+
+            <Button
+              type="submit"
+              className="w-full h-11 bg-primary hover:bg-primary/90 text-white font-semibold shadow-lg shadow-primary/30 hover:shadow-primary/40 transition-all rounded-xl"
+              disabled={loading}
+            >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Signing in...
                 </>
               ) : (
-                'Sign in'
+                'Sign In'
               )}
             </Button>
+          </form>
 
-            <div className="relative w-full">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or continue with
-                </span>
-              </div>
-            </div>
+          <p className="text-xs text-center text-slate-500 mt-6">
+            Contact your administrator to create an employee account
+          </p>
+        </div>
 
-            <BiometricAuthButton onSuccess={() => setLocation('/')} />
-            <p className="text-sm text-center text-gray-500 dark:text-gray-400">
-              Contact your administrator to create an employee account
-            </p>
-          </CardFooter>
-        </form>
-      </Card>
+        <p className="text-center text-slate-600 text-xs mt-6">
+          Powered by FabZClean
+        </p>
+      </div>
     </div>
   );
 };

@@ -122,7 +122,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => signOut()}
+          onClick={async () => { await signOut(); window.location.href = '/login'; }}
           className="mt-1 w-full justify-start gap-3 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
         >
           <LogOut className="h-4 w-4" />

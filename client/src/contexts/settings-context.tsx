@@ -78,9 +78,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      if (!res.ok) throw new Error('Failed to fetch settings');
+      if (!res.ok) {
+        console.warn('[Settings] Failed to fetch from server, using defaults');
+        return DEFAULT_SETTINGS;
+      }
       const data = await res.json();
-      return data.success ? (data.settings as UserSettings) : DEFAULT_SETTINGS;
+      return data.success ? { ...DEFAULT_SETTINGS, ...(data.settings || {}) } : DEFAULT_SETTINGS;
     },
     enabled: !!employee,
   });
@@ -151,11 +154,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     },
     onError: (err, newSettings, context) => {
       queryClient.setQueryData(['user-settings', employee?.id], context?.previousSettings);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to save settings. Please try again.",
-      });
+      console.warn('[Settings] Save to server failed, keeping local:', err);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['user-settings', employee?.id] });

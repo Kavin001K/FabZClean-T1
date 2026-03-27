@@ -1236,32 +1236,53 @@ export class SupabaseStorage {
 
     // ======= USER SETTINGS =======
     async getUserSettings(userId: string): Promise<any | undefined> {
-        const { data, error } = await this.supabase
-            .from('user_settings')
-            .select('*')
-            .eq('user_id', userId)
-            .maybeSingle();
+        try {
+            const { data, error } = await this.supabase
+                .from('user_settings')
+                .select('*')
+                .eq('user_id', userId)
+                .maybeSingle();
 
-        if (error) {
-            console.error('[SupabaseStorage] getUserSettings Error:', error);
+            if (error) {
+                if (error.code === '42P01' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
+                    console.warn('[SupabaseStorage] user_settings table does not exist. Run create_user_settings_table.sql');
+                    return undefined;
+                }
+                console.error('[SupabaseStorage] getUserSettings Error:', error);
+                return undefined;
+            }
+            return data ? this.mapDates(data) : undefined;
+        } catch (err) {
+            console.error('[SupabaseStorage] getUserSettings unexpected error:', err);
             return undefined;
         }
-        return data ? this.mapDates(data) : undefined;
     }
 
     async updateUserSettings(userId: string, data: any): Promise<any> {
-        const snakeData = this.toSnakeCase(data);
-        const { data: settings, error } = await this.supabase
-            .from('user_settings')
-            .upsert({ user_id: userId, ...snakeData, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
-            .select()
-            .single();
+        try {
+            const snakeData = this.toSnakeCase(data);
+            const { data: settings, error } = await this.supabase
+                .from('user_settings')
+                .upsert({ user_id: userId, ...snakeData, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+                .select()
+                .single();
 
-        if (error) {
-            console.error('[SupabaseStorage] updateUserSettings Error:', error);
-            throw new Error(`Failed to update user settings: ${error.message}`);
+            if (error) {
+                if (error.code === '42P01' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
+                    console.warn('[SupabaseStorage] user_settings table does not exist. Settings saved locally only.');
+                    return data;
+                }
+                console.error('[SupabaseStorage] updateUserSettings Error:', error);
+                throw new Error(`Failed to update user settings: ${error.message}`);
+            }
+            return this.mapDates(settings);
+        } catch (err: any) {
+            if (err?.message?.includes('user_settings') || err?.message?.includes('relation')) {
+                console.warn('[SupabaseStorage] user_settings table not available.');
+                return data;
+            }
+            throw err;
         }
-        return this.mapDates(settings);
     }
 
     // ======= SEARCH =======

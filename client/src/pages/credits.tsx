@@ -186,7 +186,7 @@ export default function CreditsPage() {
         queryKey: ['credits', 'outstanding', page, pageSize],
         queryFn: () => creditsApi.getOutstandingReport(page, pageSize),
         staleTime: 5000,
-        refetchInterval: 5000, // Background auto-sync every 5 seconds
+        refetchOnWindowFocus: true,
     });
 
     // Fetch customer credit history

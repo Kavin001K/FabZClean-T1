@@ -165,12 +165,12 @@ export const DEFAULT_SHORTCUTS = [
     { key: '4', alt: true, description: 'Reports Page' },
 ];
 
-// Format shortcut for display
 export function formatShortcut(shortcut: { key: string; ctrl?: boolean; alt?: boolean; shift?: boolean }): string {
+    const isMac = typeof navigator !== 'undefined' && (navigator.platform?.toUpperCase().includes('MAC') || navigator.userAgent?.includes('Mac'));
     const parts: string[] = [];
-    if (shortcut.ctrl) parts.push('Ctrl');
-    if (shortcut.alt) parts.push('Alt');
-    if (shortcut.shift) parts.push('Shift');
+    if (shortcut.ctrl) parts.push(isMac ? '\u2318' : 'Ctrl');
+    if (shortcut.alt) parts.push(isMac ? '\u2325' : 'Alt');
+    if (shortcut.shift) parts.push(isMac ? '\u21E7' : 'Shift');
     parts.push(shortcut.key.toUpperCase());
-    return parts.join(' + ');
+    return parts.join(isMac ? '' : ' + ');
 }

@@ -29,11 +29,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   // This serves as a fallback if Supabase Realtime is not configured or failing
   const skipBackendWS = false;
 
-  // ✅ Use Supabase Realtime for driver locations (works on Vercel Serverless)
   const { data: supabaseDrivers } = useSupabaseRealtime({
     tableName: 'drivers',
-    // Fix: Use correct snake_case column names. vehicle_type and vehicle_number DO exist.
     selectQuery: 'id, name, status, current_latitude, current_longitude, updated_at, vehicle_type, vehicle_number',
+    enabled: !!employee,
   });
 
   // Map Supabase drivers to DriverLocation format
@@ -66,7 +65,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       // Skip processing if in development mode
       if (skipBackendWS) return;
 
-      console.log('Realtime update:', message);
+      console.debug('WS update:', message?.type);
       const { type, data } = message || {};
 
       // Guard against undefined or null type
