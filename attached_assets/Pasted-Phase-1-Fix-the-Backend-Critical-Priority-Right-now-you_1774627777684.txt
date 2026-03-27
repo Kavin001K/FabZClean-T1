@@ -1,0 +1,27 @@
+Phase 1: Fix the Backend (Critical Priority)
+
+Right now, your server is pulling the entire database into memory to do basic math. You must change this to make the database do the work.
+
+Rewrite /:id/orders: Change it to query only the specific customer's orders directly from the database using a WHERE customerId = ? clause, instead of fetching every order in the system and filtering in JavaScript.
+
+Rewrite /analytics/overview: Create an SQL query or database function that returns the exact sum of revenue and count of VIPs. Remove the .reduce() and .map() loops that are currently processing the whole customer list.
+
+Create a Metrics Endpoint: Build a specific, lightweight route (e.g., /api/customers/metrics) that only returns the numbers for your 4 KPI cards (Total Customers, Revenue, VIP, Orders).
+
+Phase 2: Fix the Frontend (Stop the Spam)
+
+Your React app is currently launching a DDoS attack on your own server by asking for the full customer list every 5 seconds.
+
+Kill the Polling: Open client/src/pages/customers.tsx and delete refetchInterval: 5000 from every useQuery hook.
+
+Implement Priority Load: Change the default pageSize in your customer query from 50 to 20, and ensure it sorts by lastOrder descending. This guarantees the UI loads instantly with the most relevant data.
+
+Fetch KPIs Separately: Point your KPI cards to the new /api/customers/metrics endpoint you built in Phase 1, rather than trying to calculate revenue from the limited 20-person list.
+
+Phase 3: Background & Real-Time Sync
+
+To keep the search fast and the data fresh without HTTP polling:
+
+Background Search Index: Create a function that runs after the page loads (using requestIdleCallback) to fetch a lightweight list of just id, name, and phone. Store this in IndexedDB or local storage so the search bar works instantly without hitting the server.
+
+Wire Up WebSockets: Use your existing SocketContext. Write a useEffect hook in the customers page that listens for the customer_updated WebSocket event. When it fires, use React Query's queryClient.setQueryData to silently update the specific customer row in the UI without refreshing the page.
