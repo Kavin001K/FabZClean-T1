@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db as storage } from "../db";
-import { insertOrderSchema, type Order, type Product } from "../../shared/schema";
+import { insertOrderSchema, type Order, type Product, type OrderItem } from "../../shared/schema";
 import {
   jwtRequired,
   validateInput,
@@ -19,10 +19,12 @@ import { OrderService } from "../services/order.service";
 import { AuthService } from "../auth-service";
 import {
   handleOrderStatusChange,
+  sendInvoiceWhatsApp,
   type OrderStatus,
   type FulfillmentType,
 } from "../services/whatsapp.service";
 import { sendOrderConfirmationEmail } from "../services/order-confirmation-email.service";
+import { smartItemSummary } from "../utils/item-summarizer";
 
 const router = Router();
 const orderService = new OrderService();
@@ -31,6 +33,30 @@ const DELIVERY_DISABLED_MESSAGE = 'Delivery operations are disabled in this buil
 // Customer-facing statuses like out_for_delivery remain enabled.
 const DELIVERY_DISABLED_STATUSES = new Set(['assigned', 'ready_for_delivery', 'delivered']);
 const FINANCIAL_MUTATION_FIELDS = new Set(['paymentStatus', 'advancePaid', 'walletUsed', 'creditUsed', 'paymentMethod']);
+const ORDER_UPDATE_FIELDS = new Set([
+  'status',
+  'priority',
+  'pickupDate',
+  'deliveryAddress',
+  'shippingAddress',
+  'fulfillmentType',
+  'deliveryCharges',
+  'specialInstructions',
+  'notes',
+  'isExpressOrder',
+  'discountType',
+  'discountValue',
+  'couponCode',
+  'extraCharges',
+  'gstEnabled',
+  'gstRate',
+  'gstAmount',
+  'panNumber',
+  'gstNumber',
+  'items',
+  'totalAmount',
+]);
+const APP_BASE_URL = (process.env.APP_BASE_URL || 'https://erp.myfabclean.com').replace(/\/$/, '');
 
 // Apply rate limiting to all order routes
 router.use(jwtRequired);
@@ -72,6 +98,41 @@ const normalizeCreditLimit = (value: unknown, fallback = 1000): number => {
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(0, parsed);
 };
+
+const coerceNonNegativeNumber = (value: unknown, fallback = 0): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, parsed);
+};
+
+const parseOrderItems = (items: unknown): OrderItem[] => {
+  if (!Array.isArray(items)) return [];
+  const normalized = items
+    .map((item: any) => {
+      const quantity = Math.max(1, Math.round(coerceNonNegativeNumber(item?.quantity, 1)));
+      const basePrice = coerceNonNegativeNumber(item?.price, 0);
+      const subtotal = coerceNonNegativeNumber(item?.subtotal, basePrice * quantity);
+      const serviceName = String(
+        item?.serviceName || item?.name || item?.customName || 'Service'
+      ).trim();
+
+      return {
+        serviceId: String(item?.serviceId || item?.id || `custom-${Date.now()}`),
+        serviceName: serviceName || 'Service',
+        quantity,
+        price: basePrice.toFixed(2),
+        subtotal: subtotal.toFixed(2),
+        customName: item?.customName ? String(item.customName) : undefined,
+        tagNote: item?.tagNote ? String(item.tagNote) : undefined,
+      } as OrderItem;
+    })
+    .filter((item) => item.serviceName);
+
+  return normalized;
+};
+
+const sumItemsTotal = (items: OrderItem[]): number =>
+  items.reduce((sum, item) => sum + coerceNonNegativeNumber(item.subtotal, 0), 0);
 
 const schedulePostCreateTasks = (
   order: any,
@@ -868,20 +929,10 @@ router.post(
 router.put('/:id', async (req, res) => {
   try {
     const orderId = req.params.id;
-    const updateData = req.body || {};
-    console.log(`[UPDATE ORDER] ID: ${orderId}`, JSON.stringify(updateData, null, 2));
+    const rawUpdateData = req.body || {};
+    console.log(`[UPDATE ORDER] ID: ${orderId}`, JSON.stringify(rawUpdateData, null, 2));
 
-    const attemptedFinancialMutations = Object.keys(updateData).filter((field) =>
-      FINANCIAL_MUTATION_FIELDS.has(field)
-    );
-    if (attemptedFinancialMutations.length > 0) {
-      return res.status(400).json(createErrorResponse(
-        `Direct mutation blocked for financial fields: ${attemptedFinancialMutations.join(', ')}. Use checkout/credit APIs.`,
-        400
-      ));
-    }
-
-    if (updateData.status && DELIVERY_DISABLED_STATUSES.has(String(updateData.status))) {
+    if (rawUpdateData.status && DELIVERY_DISABLED_STATUSES.has(String(rawUpdateData.status))) {
       return res.status(410).json(createErrorResponse(DELIVERY_DISABLED_MESSAGE, 410));
     }
 
@@ -890,7 +941,75 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json(createErrorResponse('Order not found', 404));
     }
 
+    const attemptedFinancialMutations = Object.keys(rawUpdateData).filter((field) =>
+      FINANCIAL_MUTATION_FIELDS.has(field)
+    );
+
+    // Accept broad payloads from legacy clients, but persist only known editable fields.
+    const updateData: Record<string, any> = {};
+    Object.entries(rawUpdateData).forEach(([key, value]) => {
+      if (ORDER_UPDATE_FIELDS.has(key)) {
+        updateData[key] = value;
+      }
+    });
+
+    const hasItemPayload = Object.prototype.hasOwnProperty.call(updateData, 'items');
+    const oldItems = parseOrderItems((order as any).items);
+    const oldTotal = coerceNonNegativeNumber((order as any).totalAmount);
+    const advancePaid = coerceNonNegativeNumber((order as any).advancePaid);
+    const walletUsed = coerceNonNegativeNumber((order as any).walletUsed);
+    const oldOutstanding = Math.max(0, oldTotal - advancePaid - walletUsed);
+
+    let normalizedItems: OrderItem[] | null = null;
+    if (hasItemPayload) {
+      normalizedItems = parseOrderItems(updateData.items);
+      if (normalizedItems.length === 0) {
+        return res.status(400).json(createErrorResponse('Order must have at least one service item', 400));
+      }
+      updateData.items = normalizedItems;
+      updateData.totalAmount = sumItemsTotal(normalizedItems).toFixed(2);
+      updateData.tagsPrinted = false;
+      updateData.invoiceUrl = null;
+    }
+
+    const nextTotal = coerceNonNegativeNumber(
+      updateData.totalAmount !== undefined ? updateData.totalAmount : oldTotal
+    );
+    const totalChanged = Math.abs(nextTotal - oldTotal) >= 0.01;
+    const revisedOrderFinancials = hasItemPayload || totalChanged;
+
+    let newOutstanding = oldOutstanding;
+    let outstandingDelta = 0;
+    if (revisedOrderFinancials) {
+      newOutstanding = Math.max(0, nextTotal - advancePaid - walletUsed);
+      outstandingDelta = newOutstanding - oldOutstanding;
+
+      updateData.totalAmount = nextTotal.toFixed(2);
+      updateData.creditUsed = newOutstanding.toFixed(2);
+      updateData.isCreditOrder = newOutstanding > 0;
+      updateData.paymentStatus = newOutstanding > 0 ? 'credit' : 'paid';
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json(createErrorResponse('No editable order fields provided', 400));
+    }
+
+    if (order.customerId && revisedOrderFinancials && Math.abs(outstandingDelta) >= 0.01) {
+      await (storage as any).addCustomerCredit(
+        order.customerId,
+        outstandingDelta,
+        'adjustment',
+        `Order ${order.orderNumber} revised (outstanding delta ₹${outstandingDelta.toFixed(2)})`,
+        orderId,
+        req.employee?.id || undefined,
+        (order as any).paymentMethod || undefined
+      );
+    }
+
     const updatedOrder = await storage.updateOrder(orderId, updateData);
+    if (!updatedOrder) {
+      return res.status(500).json(createErrorResponse('Failed to update order', 500));
+    }
 
     // Log updates
     if (req.employee) {
@@ -900,6 +1019,19 @@ router.put('/:id', async (req, res) => {
         changes.price_changed = {
           from: order.totalAmount,
           to: updateData.totalAmount
+        };
+      }
+
+      if (attemptedFinancialMutations.length > 0) {
+        changes.ignored_financial_fields = attemptedFinancialMutations;
+      }
+
+      if (revisedOrderFinancials) {
+        changes.financial_reconciliation = {
+          previousOutstanding: oldOutstanding.toFixed(2),
+          newOutstanding: newOutstanding.toFixed(2),
+          delta: outstandingDelta.toFixed(2),
+          itemsEdited: hasItemPayload,
         };
       }
 
@@ -920,6 +1052,13 @@ router.put('/:id', async (req, res) => {
 
     // Notify real-time clients
     realtimeServer.triggerUpdate('order', 'updated', updatedOrder);
+
+    if (hasItemPayload) {
+      realtimeServer.triggerUpdate('order', 'tags_reset' as any, {
+        orderId,
+        tagsPrinted: false,
+      });
+    }
 
     // If status was changed, send WhatsApp notification
     if (updateData.status && updateData.status !== order.status) {
@@ -961,6 +1100,41 @@ router.put('/:id', async (req, res) => {
         }
       }).catch(err => {
         console.error(`❌ [WhatsApp] Error sending status notification:`, err);
+      });
+    }
+
+    // If order bill was revised (items/total), send updated WhatsApp bill automatically.
+    if (revisedOrderFinancials && (updatedOrder as any)?.customerPhone) {
+      setImmediate(async () => {
+        try {
+          const itemSummary = smartItemSummary((updatedOrder as any)?.items || normalizedItems || oldItems);
+          const orderNumber = (updatedOrder as any)?.orderNumber || order.orderNumber;
+          const fallbackPdfUrl = `${APP_BASE_URL}/api/public/invoice/${encodeURIComponent(orderNumber)}/pdf`;
+          const invoiceResult = await sendInvoiceWhatsApp({
+            phoneNumber: (updatedOrder as any).customerPhone,
+            pdfUrl: (updatedOrder as any)?.invoiceUrl || (order as any)?.invoiceUrl || fallbackPdfUrl,
+            filename: `Invoice-${orderNumber}.pdf`,
+            customerName: (updatedOrder as any)?.customerName || order.customerName || 'Customer',
+            invoiceNumber: orderNumber,
+            amount: nextTotal.toFixed(2),
+            itemName: itemSummary || 'Laundry Services',
+          });
+
+          const currentCount = Number((updatedOrder as any)?.whatsappMessageCount || 0);
+          if (invoiceResult.success) {
+            await storage.updateOrder(orderId, {
+              lastWhatsappStatus: `Bill Updated - Sent`,
+              lastWhatsappSentAt: new Date(),
+              whatsappMessageCount: currentCount + 1,
+            } as any);
+          } else {
+            await storage.updateOrder(orderId, {
+              lastWhatsappStatus: `Bill Updated - Failed: ${invoiceResult.error || 'Unknown error'}`,
+            } as any);
+          }
+        } catch (billSendError) {
+          console.error('Failed to send revised WhatsApp bill:', billSendError);
+        }
       });
     }
 

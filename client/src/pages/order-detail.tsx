@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Edit, Printer, X, CheckCircle, Clock, AlertCircle, XCircle, CreditCard, Truck, Package, Navigation } from 'lucide-react';
@@ -14,6 +14,7 @@ import { formatCurrency, formatDate, getNextStatus } from '@/lib/data-service';
 import type { Order } from "@shared/schema";
 import { cn } from '@/lib/utils';
 import LoadingSkeleton from '@/components/ui/loading-skeleton';
+import EditOrderDialog from '@/components/orders/edit-order-dialog';
 
 const getStatusIcon = (status: Order['status']) => {
   switch (status) {
@@ -38,6 +39,7 @@ const getStatusColor = (status: Order['status']) => {
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const {
     data: order,
@@ -72,10 +74,14 @@ export default function OrderDetailPage() {
     mutationFn: (data: Partial<Order>) => ordersApi.update(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order', id] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['credits'] });
+      queryClient.invalidateQueries({ queryKey: ['wallet-management', 'customers'] });
       toast({
         title: "Order Updated",
-        description: "The order has been successfully updated.",
+        description: "Order details, bill, tags, and outstanding ledger were updated.",
       });
+      setIsEditDialogOpen(false);
     },
     onError: (error) => {
       toast({
@@ -246,7 +252,12 @@ export default function OrderDetailPage() {
             </Button>
           )}
 
-          <Button variant="outline" size="sm" className="w-full sm:w-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => setIsEditDialogOpen(true)}
+          >
             <Edit className="h-4 w-4 mr-2" />
             Edit Order
           </Button>
@@ -459,6 +470,16 @@ export default function OrderDetailPage() {
           </Card>
         )}
       </div>
+
+      <EditOrderDialog
+        order={order}
+        isOpen={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        onSave={(_orderId, updates) => {
+          updateOrderMutation.mutate(updates);
+        }}
+        isLoading={updateOrderMutation.isPending}
+      />
     </div>
   );
 }

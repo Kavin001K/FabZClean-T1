@@ -344,7 +344,10 @@ export const ordersApi = {
         method: "PUT",
         body: JSON.stringify(order),
       });
-      if (!response.ok) throw new Error("Failed to update order");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData?.message || errorData?.error?.message || "Failed to update order");
+      }
       const result = await response.json();
       // Handle wrapped response
       return result.data || result;

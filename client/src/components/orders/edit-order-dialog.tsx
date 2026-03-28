@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, Minus, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -23,7 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Order } from "@shared/schema";
+import type { Order, Service } from "@shared/schema";
+import { servicesApi } from "@/lib/data-service";
 
 export interface EditOrderDialogProps {
   order: Order | null;
@@ -33,6 +34,16 @@ export interface EditOrderDialogProps {
   isLoading?: boolean;
 }
 
+type EditableOrderItem = {
+  serviceId: string;
+  serviceName: string;
+  quantity: number;
+  price: string;
+  subtotal: string;
+  customName?: string;
+  tagNote?: string;
+};
+
 export default React.memo(function EditOrderDialog({
   order,
   isOpen,
@@ -41,29 +52,85 @@ export default React.memo(function EditOrderDialog({
   isLoading = false,
 }: EditOrderDialogProps) {
   const [formData, setFormData] = useState<Partial<Order>>({});
+  const [editableItems, setEditableItems] = useState<EditableOrderItem[]>([]);
+  const [availableServices, setAvailableServices] = useState<Service[]>([]);
+
+  const toMoney = (value: unknown, fallback = 0): number => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
+  };
+
+  const normalizeItem = (item: any, index: number): EditableOrderItem => {
+    const quantity = Math.max(1, Math.round(toMoney(item?.quantity, 1)));
+    const unitPrice = toMoney(item?.price, toMoney(item?.unitPrice, 0));
+    const subtotal = toMoney(item?.subtotal, unitPrice * quantity);
+    return {
+      serviceId: String(item?.serviceId || item?.id || `custom-${index + 1}`),
+      serviceName: String(item?.serviceName || item?.name || item?.customName || 'Service').trim() || 'Service',
+      quantity,
+      price: unitPrice.toFixed(2),
+      subtotal: subtotal.toFixed(2),
+      customName: item?.customName ? String(item.customName) : undefined,
+      tagNote: item?.tagNote ? String(item.tagNote) : undefined,
+    };
+  };
 
   useEffect(() => {
     if (order) {
       setFormData({
         ...order,
       });
+
+      const incomingItems = Array.isArray((order as any).items)
+        ? (order as any).items
+        : [];
+
+      if (incomingItems.length > 0) {
+        setEditableItems(incomingItems.map((item: any, index: number) => normalizeItem(item, index)));
+      } else {
+        const fallbackItem: EditableOrderItem = {
+          serviceId: 'manual',
+          serviceName: String((order as any).service || 'Service'),
+          quantity: Math.max(1, Math.round(toMoney((order as any).quantity, 1))),
+          price: toMoney(order.totalAmount, 0).toFixed(2),
+          subtotal: toMoney(order.totalAmount, 0).toFixed(2),
+        };
+        setEditableItems([fallbackItem]);
+      }
     }
   }, [order]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    servicesApi.getAll()
+      .then((services) => {
+        setAvailableServices(Array.isArray(services) ? services : []);
+      })
+      .catch(() => {
+        setAvailableServices([]);
+      });
+  }, [isOpen]);
+
   const handleSave = () => {
     if (order && formData) {
-      const updates: any = { ...formData };
+      const cleanedItems = editableItems
+        .map((item, index) => normalizeItem(item, index))
+        .filter((item) => item.serviceName && item.quantity > 0);
 
-      // Make sure we pass priority and paymentMethod even if they were manipulated
-      // We removed the code that deletes `priority`, so it will now be saved.
+      if (cleanedItems.length === 0) {
+        return;
+      }
 
-      // Ensure numeric fields are strings/numbers as expected by DB
-      if (updates.totalAmount !== undefined && updates.totalAmount !== null) {
-        updates.totalAmount = updates.totalAmount.toString();
-      }
-      if (updates.advancePaid !== undefined && updates.advancePaid !== null) {
-        updates.advancePaid = updates.advancePaid.toString();
-      }
+      const recalculatedTotal = cleanedItems.reduce((sum, item) => sum + toMoney(item.subtotal, 0), 0);
+
+      const updates: any = {
+        status: formData.status,
+        priority: (formData as any).priority || 'normal',
+        pickupDate: (formData as any).pickupDate || null,
+        fulfillmentType: (formData as any).fulfillmentType || (order as any).fulfillmentType || 'pickup',
+        items: cleanedItems,
+        totalAmount: recalculatedTotal.toFixed(2),
+      };
 
       console.log('Saving order updates:', updates);
       onSave(order.id, updates);
@@ -77,9 +144,75 @@ export default React.memo(function EditOrderDialog({
     }));
   };
 
+  const updateItem = (index: number, updater: (item: EditableOrderItem) => EditableOrderItem) => {
+    setEditableItems((prev) => prev.map((item, i) => {
+      if (i !== index) return item;
+      const next = normalizeItem(updater(item), i);
+      const qty = Math.max(1, next.quantity);
+      const price = toMoney(next.price, 0);
+      return {
+        ...next,
+        quantity: qty,
+        price: price.toFixed(2),
+        subtotal: (price * qty).toFixed(2),
+      };
+    }));
+  };
+
+  const handleServiceChange = (index: number, serviceId: string) => {
+    const selected = availableServices.find((service) => service.id === serviceId);
+    if (!selected) return;
+
+    updateItem(index, (item) => ({
+      ...item,
+      serviceId: selected.id,
+      serviceName: selected.name,
+      price: toMoney(selected.price, 0).toFixed(2),
+      subtotal: (toMoney(selected.price, 0) * Math.max(1, item.quantity)).toFixed(2),
+    }));
+  };
+
+  const handleQuantityChange = (index: number, nextQuantity: number) => {
+    updateItem(index, (item) => ({
+      ...item,
+      quantity: Math.max(1, Math.round(nextQuantity)),
+    }));
+  };
+
+  const handlePriceChange = (index: number, nextPrice: string) => {
+    const parsed = toMoney(nextPrice, 0);
+    updateItem(index, (item) => ({
+      ...item,
+      price: parsed.toFixed(2),
+    }));
+  };
+
+  const handleAddItem = () => {
+    const defaultService = availableServices[0];
+    const defaultPrice = toMoney(defaultService?.price, 0).toFixed(2);
+    setEditableItems((prev) => [
+      ...prev,
+      {
+        serviceId: defaultService?.id || `custom-${Date.now()}`,
+        serviceName: defaultService?.name || 'New Service',
+        quantity: 1,
+        price: defaultPrice,
+        subtotal: defaultPrice,
+      },
+    ]);
+  };
+
+  const handleRemoveItem = (index: number) => {
+    setEditableItems((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
   if (!order) return null;
 
-  const isDelivery = (order as any).fulfillmentType === 'delivery';
+  const isDelivery = ((formData as any).fulfillmentType || (order as any).fulfillmentType) === 'delivery';
+  const recalculatedTotal = editableItems.reduce((sum, item) => sum + toMoney(item.subtotal, 0), 0);
   const getValidStatuses = (currentStatus: string) => {
     const list = isDelivery
       ? ['pending', 'processing', 'ready_for_delivery', 'out_for_delivery', 'delivered', 'cancelled']
@@ -136,7 +269,7 @@ export default React.memo(function EditOrderDialog({
               Update Details
               <span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Editable</span>
             </h4>
-            <div className="grid grid-cols-2 gap-6 p-5 rounded-xl bg-card border shadow-sm relative overflow-hidden">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-xl bg-card border shadow-sm relative overflow-hidden">
               <div className="absolute left-0 top-0 w-1 h-full bg-primary/80"></div>
 
               <div className="space-y-2">
@@ -177,19 +310,17 @@ export default React.memo(function EditOrderDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="paymentMethod" className="font-medium">Payment Method</Label>
+                <Label htmlFor="fulfillmentType" className="font-medium">Fulfillment Type</Label>
                 <Select
-                  value={(formData as any).paymentMethod || 'Cash'}
-                  onValueChange={(value) => handleInputChange('paymentMethod', value)}
+                  value={(formData as any).fulfillmentType || 'pickup'}
+                  onValueChange={(value) => handleInputChange('fulfillmentType', value)}
                 >
                   <SelectTrigger className="border-primary/20 hover:border-primary/50 focus:ring-primary/20 transition-all font-medium">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Cash">Cash</SelectItem>
-                    <SelectItem value="Card">Card</SelectItem>
-                    <SelectItem value="UPI">UPI</SelectItem>
-                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="pickup">Pickup</SelectItem>
+                    <SelectItem value="delivery">Delivery</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -226,6 +357,107 @@ export default React.memo(function EditOrderDialog({
             </div>
           </div>
 
+          {/* Editable Services Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-foreground">Order Services</h4>
+              <Button type="button" variant="outline" size="sm" onClick={handleAddItem} className="gap-1.5">
+                <Plus className="h-4 w-4" />
+                Add Service
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {editableItems.map((item, index) => (
+                <div key={`${item.serviceId}-${index}`} className="rounded-lg border bg-card p-3 md:p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-[1.4fr_140px_140px_120px_auto] gap-3 items-end">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Service</Label>
+                      <Select
+                        value={item.serviceId}
+                        onValueChange={(value) => handleServiceChange(index, value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select service" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {!availableServices.some((service) => service.id === item.serviceId) && (
+                            <SelectItem value={item.serviceId}>
+                              {item.serviceName}
+                            </SelectItem>
+                          )}
+                          {availableServices.map((service) => (
+                            <SelectItem key={service.id} value={service.id}>
+                              {service.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Qty</Label>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => handleQuantityChange(index, item.quantity - 1)}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={item.quantity}
+                          onChange={(e) => handleQuantityChange(index, Number(e.target.value || 1))}
+                          className="text-center"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => handleQuantityChange(index, item.quantity + 1)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Unit Price</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={item.price}
+                        onChange={(e) => handlePriceChange(index, e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Subtotal</Label>
+                      <Input value={item.subtotal} readOnly disabled className="font-semibold" />
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive"
+                      disabled={editableItems.length <= 1}
+                      onClick={() => handleRemoveItem(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Read-only Financials & Notes Section */}
           <div className="space-y-4">
             <h4 className="text-sm font-semibold text-muted-foreground flex items-center">
@@ -251,7 +483,7 @@ export default React.memo(function EditOrderDialog({
                 <Label htmlFor="totalAmount" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Amount (₹)</Label>
                 <Input
                   id="totalAmount"
-                  value={parseFloat(formData.totalAmount || '0')}
+                  value={recalculatedTotal.toFixed(2)}
                   readOnly
                   disabled
                   className="cursor-not-allowed font-bold text-foreground text-lg shadow-none border-transparent bg-background"
