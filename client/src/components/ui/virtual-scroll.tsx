@@ -103,8 +103,7 @@ export function VirtualScroll<T>({
             visibleItems.map((item, index) => (
               <div
                 key={visibleRange.start + index}
-                style={{ height: itemHeight }}
-                className="flex items-center"
+                style={{ height: itemHeight, width: '100%' }}
               >
                 {renderItem(item, visibleRange.start + index)}
               </div>

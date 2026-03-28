@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isMac } from "@/lib/utils";
 
 export interface OrdersToolbarProps {
   searchQuery: string;
@@ -70,6 +71,7 @@ export default React.memo(function OrdersToolbar({
   className,
 }: OrdersToolbarProps) {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const searchShortcutLabel = isMac() ? "⌘F" : "Ctrl+F";
 
   const hasActiveFilters = searchQuery || statusFilter.length > 0;
   const selectedCount = selectedOrders.length;
@@ -82,7 +84,7 @@ export default React.memo(function OrdersToolbar({
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search orders... (⌘F)"
+            placeholder={`Search orders... (${searchShortcutLabel})`}
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="pl-10 pr-10"

@@ -91,7 +91,7 @@ import { exportOrdersEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportOrdersToExcel } from '@/lib/excel-exports';
 import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
-import { isElectron } from "@/lib/utils";
+import { isElectron, isMac } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 // Types
@@ -118,9 +118,23 @@ function OrdersComponent() {
   const { addNotification } = useNotifications();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  const [viewportHeight, setViewportHeight] = useState(() =>
+    typeof window !== 'undefined' ? window.innerHeight : 900
+  );
 
   useEffect(() => {
     document.title = "Active Orders | FabzClean";
+  }, []);
+
+  useEffect(() => {
+    const handleViewportResize = () => setViewportHeight(window.innerHeight);
+    window.addEventListener('resize', handleViewportResize);
+    window.addEventListener('orientationchange', handleViewportResize);
+
+    return () => {
+      window.removeEventListener('resize', handleViewportResize);
+      window.removeEventListener('orientationchange', handleViewportResize);
+    };
   }, []);
 
   // State Management
@@ -162,8 +176,8 @@ function OrdersComponent() {
   } = useQuery({
     queryKey: ['orders'],
     queryFn: ordersApi.getAll,
-    staleTime: 5000,
-    refetchOnWindowFocus: true,
+    staleTime: 15000,
+    refetchOnWindowFocus: false,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
@@ -1188,9 +1202,18 @@ function OrdersComponent() {
       filters.amountMax;
   }, [filters]);
 
-  const ordersGridColumns = "grid-cols-[48px_140px_minmax(180px,1fr)_120px_140px_120px_110px_120px_120px_80px]";
-  const ordersTableMinWidth = "min-w-[1200px]";
-  const virtualTableBodyHeight = "calc(100vh - 420px)";
+  const ordersGridColumns = "grid-cols-[48px_168px_minmax(220px,1.6fr)_minmax(140px,1.1fr)_minmax(140px,1fr)_minmax(130px,1fr)_110px_130px_130px_84px]";
+  const ordersTableMinWidth = "min-w-[1320px]";
+  const primaryShortcutPrefix = isMac() ? "⌘" : "Ctrl+";
+  const searchShortcutLabel = `${primaryShortcutPrefix}F`;
+  const refreshShortcutLabel = `${primaryShortcutPrefix}R`;
+  const searchPlaceholder = isMobile
+    ? "Search orders, customers, services..."
+    : `Search orders, customers, services... (${searchShortcutLabel})`;
+  const tableViewportHeight = Math.max(
+    isMobile ? 340 : 420,
+    viewportHeight - (isMobile ? 420 : 360)
+  );
 
   const renderOrderRow = useCallback((order: Order, index: number) => {
     if (isMobile) {
@@ -1289,7 +1312,7 @@ function OrdersComponent() {
       <div
         key={order.id}
         className={cn(
-          `grid ${ordersGridColumns} gap-4 items-center px-4 h-full border-b hover:bg-muted/50 transition-colors text-sm`,
+          `grid ${ordersGridColumns} gap-4 items-center px-4 h-full border-b hover:bg-muted/50 transition-colors text-sm w-full`,
           selectedOrders.includes(order.id) && "bg-muted"
         )}
         onClick={() => handleViewOrder(order)}
@@ -1578,7 +1601,7 @@ function OrdersComponent() {
                   <div className="relative flex-1 group">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
-                      placeholder="Search orders, customers, services..."
+                      placeholder={searchPlaceholder}
                       value={filters.search}
                       onChange={(e) => handleSearchChange(e.target.value)}
                       className="pl-10 pr-10 h-10 text-sm border-primary/10 focus:border-primary/30 transition-all bg-muted/20"
@@ -2017,12 +2040,15 @@ function OrdersComponent() {
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-xl border bg-background shadow-sm overflow-hidden flex flex-col min-h-[500px] h-[calc(100vh-420px)]">
+                    <div
+                      className="rounded-xl border bg-background shadow-sm overflow-hidden flex flex-col"
+                      style={{ height: tableViewportHeight }}
+                    >
                       {!isMobile ? (
                         <VirtualScroll
                           items={filteredOrders}
-                          itemHeight={64}
-                          containerHeight={window.innerHeight - 450}
+                          itemHeight={76}
+                          containerHeight={tableViewportHeight}
                           header={OrderHeaders}
                           renderItem={renderOrderRow}
                           emptyMessage="No orders found matching your criteria"
@@ -2287,15 +2313,15 @@ function OrdersComponent() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="flex items-center justify-center gap-6 text-sm text-muted-foreground"
+          className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 px-3 text-center text-xs sm:text-sm text-muted-foreground"
         >
           <span className="flex items-center gap-2">
-            <kbd className="px-2 py-1 rounded bg-muted text-xs">⌘F</kbd> Search
+            <kbd className="px-2 py-1 rounded bg-muted text-xs">{searchShortcutLabel}</kbd> Search
           </span>
           <span className="flex items-center gap-2">
-            <kbd className="px-2 py-1 rounded bg-muted text-xs">⌘R</kbd> Refresh
+            <kbd className="px-2 py-1 rounded bg-muted text-xs">{refreshShortcutLabel}</kbd> Refresh
           </span>
-          <span className="flex items-center gap-2">
+          <span className="hidden sm:flex items-center gap-2">
             Click column headers to sort
           </span>
         </motion.div>

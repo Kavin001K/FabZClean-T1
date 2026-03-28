@@ -16,6 +16,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { isMac } from '@/lib/utils';
 
 interface GlobalSearchProps {
   compact?: boolean;
@@ -26,9 +27,9 @@ export function GlobalSearch({ compact = false }: GlobalSearchProps) {
   const { searchQuery, setSearchQuery, searchResults, isSearching, clearSearch } = useGlobalSearch();
   const [, setLocation] = useLocation();
 
-  const isMac = typeof navigator !== 'undefined' && (navigator.platform?.toUpperCase().includes('MAC') || navigator.userAgent?.includes('Mac'));
-  const modSymbol = isMac ? '\u2318' : 'Ctrl+';
-  const modSymbolShort = isMac ? '\u2318' : 'Ctrl+';
+  const onMac = isMac();
+  const modSymbol = onMac ? '\u2318' : 'Ctrl+';
+  const modSymbolShort = onMac ? '\u2318' : 'Ctrl+';
 
   // Handle keyboard shortcuts
   useEffect(() => {
