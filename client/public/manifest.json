@@ -9,15 +9,21 @@
     "theme_color": "#16a34a",
     "icons": [
         {
-            "src": "/assets/logo.svg",
-            "sizes": "any",
-            "type": "image/svg+xml",
+            "src": "/assets/icon-webapp.png",
+            "sizes": "192x192",
+            "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "/assets/logo.svg",
-            "sizes": "any",
-            "type": "image/svg+xml",
+            "src": "/assets/icon-launcher.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/assets/icon-launcher.png",
+            "sizes": "512x512",
+            "type": "image/png",
             "purpose": "maskable"
         }
     ],

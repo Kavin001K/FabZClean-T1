@@ -1211,8 +1211,8 @@ function OrdersComponent() {
     ? "Search orders, customers, services..."
     : `Search orders, customers, services... (${searchShortcutLabel})`;
   const tableViewportHeight = Math.max(
-    isMobile ? 340 : 420,
-    viewportHeight - (isMobile ? 420 : 360)
+    isMobile ? 360 : 520,
+    viewportHeight - (isMobile ? 320 : 280)
   );
 
   const renderOrderRow = useCallback((order: Order, index: number) => {

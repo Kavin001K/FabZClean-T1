@@ -4,6 +4,20 @@ import App from "./App";
 import "./index.css";
 
 
+const syncViewportVariables = () => {
+  const visualHeight = window.visualViewport?.height || window.innerHeight;
+  const visualWidth = window.visualViewport?.width || window.innerWidth;
+
+  document.documentElement.style.setProperty('--app-vh', `${window.innerHeight * 0.01}px`);
+  document.documentElement.style.setProperty('--app-dvh', `${visualHeight * 0.01}px`);
+  document.documentElement.style.setProperty('--app-vw', `${visualWidth * 0.01}px`);
+};
+
+syncViewportVariables();
+window.addEventListener('resize', syncViewportVariables, { passive: true });
+window.addEventListener('orientationchange', syncViewportVariables, { passive: true });
+window.visualViewport?.addEventListener('resize', syncViewportVariables, { passive: true });
+
 // Global error handler for unhandled errors
 window.addEventListener('error', (event) => {
   console.error('Global error:', event.error);

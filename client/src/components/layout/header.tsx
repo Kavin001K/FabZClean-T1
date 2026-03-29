@@ -82,7 +82,7 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/95 px-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:h-16 sm:gap-3 sm:px-4 md:gap-4 md:px-6">
+    <header className="sticky top-0 z-30 flex min-h-14 items-center gap-2 border-b bg-background/95 px-2.5 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:min-h-16 sm:gap-3 sm:px-4 sm:pt-0 md:gap-4 md:px-6">
       {/* Sidebar toggle */}
       <Button
         variant="ghost"
@@ -129,7 +129,7 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
 
       {/* Mobile: show current page title instead of breadcrumbs */}
       {isMobile && (
-        <h1 className="min-w-0 max-w-[40vw] truncate text-sm font-semibold">
+        <h1 className="min-w-0 max-w-[42vw] truncate text-sm font-semibold">
           {breadcrumbs[breadcrumbs.length - 1]?.label || 'Dashboard'}
         </h1>
       )}

@@ -60,7 +60,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     <>
       <SessionTimeoutWarning />
 
-      <div className="flex h-[100dvh] w-full overflow-hidden bg-background">
+      <div className="flex h-[calc(var(--app-dvh,1dvh)*100)] min-h-[100svh] w-full overflow-hidden bg-background">
         {/* Desktop Sidebar */}
         {!isMobile && isSidebarOpen && <Sidebar className="w-64 shrink-0" />}
 
@@ -82,11 +82,11 @@ export function MainLayout({ children }: MainLayoutProps) {
             isMobile={isMobile}
           />
           <main className={cn(
-            "scrollbar-thin flex-1 min-h-0 overflow-x-auto overflow-y-auto overscroll-y-contain scroll-smooth p-3 sm:p-4 md:p-6",
-            isMobile ? "pb-[calc(5.75rem+env(safe-area-inset-bottom))]" : "pb-6"
+            "scrollbar-thin flex-1 min-h-0 overflow-x-hidden overflow-y-auto overscroll-y-contain scroll-smooth px-2.5 py-2.5 sm:px-4 sm:py-4 md:px-5 md:py-5",
+            isMobile ? "pb-[calc(5.75rem+env(safe-area-inset-bottom)+0.5rem)]" : "pb-[max(1.5rem,env(safe-area-inset-bottom))]"
           )}>
             <ErrorBoundary>
-              <div className="mx-auto w-full max-w-[1400px]">
+              <div className="mx-auto w-full max-w-[1400px] min-w-0">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={location}

@@ -7,6 +7,9 @@
 :root {
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  --app-vh: 1vh;
+  --app-dvh: 1dvh;
+  --app-vw: 1vw;
 
   /* New FabClean Theme */
   --color-primary: 132 204 22;
@@ -105,8 +108,19 @@
     min-height: 100%;
   }
 
+  html {
+    height: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body,
   #root {
-    min-height: 100dvh;
+    min-height: calc(var(--app-dvh, 1dvh) * 100);
+  }
+
+  #root {
+    display: flex;
+    flex-direction: column;
   }
 
   body {
@@ -608,10 +622,10 @@ html.density-compact h3 {
 @media (max-width: 640px) {
   button,
   [role="button"],
-  a,
   input[type="checkbox"],
   input[type="radio"],
-  select {
+  select,
+  .touch-target {
     min-height: 44px;
     min-width: 44px;
   }
@@ -643,5 +657,19 @@ html.density-compact h3 {
 @media (min-width: 641px) and (max-width: 1024px) {
   .container-desktop {
     @apply px-4;
+  }
+}
+
+/* Mobile + tablet hardening for embedded/PWA windows */
+@media (max-width: 1024px) {
+  [data-radix-popper-content-wrapper],
+  [role="menu"],
+  [role="listbox"],
+  [role="dialog"] {
+    max-width: min(100vw, 100%);
+  }
+
+  table {
+    min-width: max-content;
   }
 }
