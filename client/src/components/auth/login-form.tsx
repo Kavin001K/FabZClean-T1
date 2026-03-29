@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'wouter';
+import { useLocation } from 'wouter';
 import { useAuth } from '../../contexts/auth-context';
 import { useSettings } from '../../contexts/settings-context';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription } from '../ui/alert';
-import { Loader2, User, Lock, AlertCircle, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Loader2, User, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 export const LoginForm: React.FC = () => {
   const [, setLocation] = useLocation();
@@ -66,8 +66,8 @@ export const LoginForm: React.FC = () => {
 
       <div className={`relative z-10 w-full max-w-md px-4 transition-all duration-700 ease-out motion-reduce:transition-none ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`}>
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-2xl shadow-lg shadow-primary/30 mb-4 transition-transform duration-500 hover:scale-105">
-            <Sparkles className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center px-4 py-3 bg-white/95 rounded-2xl shadow-xl shadow-primary/25 mb-4 transition-transform duration-500 hover:scale-105">
+            <img src="/assets/logo.webp" alt="Fab Clean Logo" className="h-10 w-auto object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">FabZClean</h1>
           <p className="text-slate-300 mt-1 text-sm">Laundry Management System</p>
@@ -152,15 +152,30 @@ export const LoginForm: React.FC = () => {
           </p>
         </div>
 
-        <div className="mt-6 space-y-1.5 text-center text-xs text-slate-400">
-          <p className="tracking-wide">Powered by Ace-Digital</p>
-          <p>
-            © 2026 Ace-Digital. All rights reserved.{" "}
-            <Link href="/terms" className="text-slate-300 hover:text-white transition-colors underline underline-offset-2">
-              Terms
-            </Link>
-          </p>
-        </div>
+      </div>
+
+      <div className="absolute bottom-1.5 left-0 right-0 px-3 text-center text-[9px] leading-tight text-slate-400/40">
+        <p className="truncate sm:whitespace-normal">
+          Copyright © 2026 Ace-Digital. All rights reserved.{" "}
+          <span className="opacity-60">|</span>{" "}
+          <a
+            href="https://acedigital.space/Terms%20of%20Service"
+            target="_blank"
+            rel="noreferrer"
+            className="text-slate-300/45 underline decoration-slate-400/30 underline-offset-2 transition-all hover:text-slate-200/80 focus-visible:text-slate-100"
+          >
+            Terms of Use
+          </a>{" "}
+          <span className="opacity-60">|</span>{" "}
+          <a
+            href="https://acedigital.space/Privacy%20Policy"
+            target="_blank"
+            rel="noreferrer"
+            className="text-slate-300/45 underline decoration-slate-400/30 underline-offset-2 transition-all hover:text-slate-200/80 focus-visible:text-slate-100"
+          >
+            Privacy Policy
+          </a>
+        </p>
       </div>
     </div>
   );
