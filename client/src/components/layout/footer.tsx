@@ -6,8 +6,6 @@ interface FooterProps {
 }
 
 export function Footer({ isMobile = false }: FooterProps) {
-  const year = new Date().getFullYear();
-
   return (
     <footer
       className={cn(
@@ -21,7 +19,7 @@ export function Footer({ isMobile = false }: FooterProps) {
           isMobile ? "flex-col items-start" : "flex-col items-start justify-between gap-3 sm:flex-row sm:items-center"
         )}
       >
-        <p className="text-safe-wrap">© {year} FabZClean. All rights reserved.</p>
+        <p className="text-safe-wrap">© 2026 Ace-Digital. All rights reserved.</p>
         <div className="flex flex-wrap items-center gap-3">
           <Link href="/terms" className="transition-colors hover:text-primary">Terms</Link>
           <Link href="/privacy" className="transition-colors hover:text-primary">Privacy</Link>
