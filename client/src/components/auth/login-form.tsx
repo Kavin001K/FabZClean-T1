@@ -66,8 +66,8 @@ export const LoginForm: React.FC = () => {
 
       <div className={`relative z-10 w-full max-w-md px-4 transition-all duration-700 ease-out motion-reduce:transition-none ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`}>
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center px-4 py-3 bg-white/95 rounded-2xl shadow-xl shadow-primary/25 mb-4 transition-transform duration-500 hover:scale-105">
-            <img src="/assets/logo.webp" alt="Fab Clean Logo" className="h-10 w-auto object-contain" />
+          <div className="inline-flex items-center justify-center px-2 py-2 mb-4 transition-transform duration-500 hover:scale-105">
+            <img src="/assets/fabclean-logo.png" alt="Fab Clean Logo" className="h-11 w-auto object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.45)]" />
           </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">FabZClean</h1>
           <p className="text-slate-300 mt-1 text-sm">Laundry Management System</p>
