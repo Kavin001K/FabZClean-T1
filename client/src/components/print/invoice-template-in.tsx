@@ -227,6 +227,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
       ? 'Credit Pending'
       : 'Paid'
     : 'Pending';
+  const FulfillmentIcon = fulfillmentType === 'delivery' ? Truck : Store;
 
   const invoiceMetaRows: Array<{ label: string; value: string; Icon: LucideIcon }> = [
     { label: 'Issued On', value: formatDisplayDate(invoiceDate), Icon: CalendarDays },
@@ -240,7 +241,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
       style={{
         width: '210mm',
         margin: '0 auto',
-        background: '#f4f8fb',
+        background: '#f6f8fb',
         color: bodyInk,
         fontFamily: '"Aptos", "Segoe UI Variable", "Segoe UI", sans-serif',
       }}
@@ -248,41 +249,39 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
       <style>{`
         @page {
           size: A4;
-          margin: 9mm 8mm 12mm;
+          margin: 8mm;
         }
 
         .invoice-shell {
           background: #ffffff;
           box-shadow: ${shadow};
           min-height: 297mm;
-          position: relative;
           overflow: hidden;
         }
 
-        .invoice-shell::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background:
-            radial-gradient(circle at top right, ${isExpressOrder ? 'rgba(251,146,60,0.14)' : 'rgba(20,184,166,0.12)'} 0%, transparent 26%),
-            radial-gradient(circle at bottom left, rgba(148, 163, 184, 0.08) 0%, transparent 20%);
-          pointer-events: none;
-        }
-
         .invoice-body {
-          position: relative;
-          z-index: 1;
-          padding: 18mm 16mm 14mm;
+          padding: 0;
         }
 
         .invoice-section,
         .invoice-card,
-        .invoice-summary-card,
-        .invoice-notes-card,
         .invoice-totals-card,
-        .invoice-payment-card {
+        .invoice-payment-card,
+        .invoice-summary-card {
           break-inside: avoid;
           page-break-inside: avoid;
+        }
+
+        .invoice-grid-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+
+        .invoice-meta-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
         }
 
         .invoice-items-table {
@@ -290,7 +289,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
           border-collapse: collapse;
           table-layout: fixed;
           border: 1px solid ${line};
-          border-radius: 16px;
+          border-radius: 14px;
           overflow: hidden;
         }
 
@@ -314,12 +313,6 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
           background: ${panelSoft};
         }
 
-        .invoice-footer {
-          border-top: 1px solid ${line};
-          margin-top: 14mm;
-          padding-top: 6mm;
-        }
-
         @media print {
           html, body {
             margin: 0 !important;
@@ -338,651 +331,514 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
           <header
             className="invoice-section"
             style={{
-              display: 'grid',
-              gridTemplateColumns: '1.15fr 0.85fr',
-              gap: '18px',
-              marginBottom: '18px',
-              alignItems: 'stretch',
+              background: `linear-gradient(135deg, ${isExpressOrder ? '#ea580c' : '#059669'} 0%, ${isExpressOrder ? '#f97316' : '#10b981'} 100%)`,
+              color: '#ffffff',
+              padding: '18px 22px',
             }}
           >
-            <div
-              style={{
-                background: `linear-gradient(135deg, ${headingInk} 0%, ${accent} 100%)`,
-                color: '#ffffff',
-                borderRadius: '22px',
-                padding: '20px 22px',
-                position: 'relative',
-                overflow: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: 'linear-gradient(130deg, rgba(255,255,255,0.12), transparent 55%)',
-                  pointerEvents: 'none',
-                }}
-              />
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
                 <div
                   style={{
-                    width: '72px',
-                    height: '72px',
-                    borderRadius: '20px',
-                    background: 'rgba(255,255,255,0.96)',
-                    display: 'grid',
-                    placeItems: 'center',
-                    boxShadow: '0 14px 26px rgba(15, 23, 42, 0.18)',
+                    background: '#ffffff',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    minWidth: '112px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 8px 18px rgba(15, 23, 42, 0.14)',
                   }}
                 >
-                  <img src={companyDetails.logo} alt="Fab Clean" style={{ width: '54px', height: 'auto', objectFit: 'contain' }} />
+                  <img src={companyDetails.logo} alt="Fab Clean" style={{ width: '92px', height: 'auto', objectFit: 'contain' }} />
                 </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: '12px', letterSpacing: '0.22em', textTransform: 'uppercase', opacity: 0.78 }}>
-                    Premium Garment Care
-                  </p>
-                  <h1 style={{ margin: '4px 0 0', fontSize: '34px', lineHeight: 1.05, fontWeight: 900 }}>
-                    {companyDetails.name}
-                  </h1>
-                  <p style={{ margin: '8px 0 0', fontSize: '13px', opacity: 0.86 }}>
-                    Crisp invoices for pickup, delivery, and express orders.
+                <div style={{ minWidth: 0 }}>
+                  <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 900, lineHeight: 1.05 }}>Fab Clean</h1>
+                  <p style={{ margin: '4px 0 0', fontSize: '12px', opacity: 0.94 }}>
+                    Premium Laundry & Dry Cleaning Services
                   </p>
                 </div>
               </div>
 
-              <div
-                style={{
-                  marginTop: '18px',
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '14px',
-                  position: 'relative',
-                  zIndex: 1,
-                }}
-              >
-                <div>
-                  <p style={{ margin: 0, fontSize: '11px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.15em' }}>Branch</p>
-                  <p style={{ margin: '5px 0 0', fontSize: '16px', fontWeight: 800 }}>{companyDetails.branchName}</p>
-                  <p style={{ margin: '8px 0 0', fontSize: '12px', lineHeight: 1.55, opacity: 0.9 }}>{companyDetails.address}</p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ margin: 0, fontSize: '11px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.15em' }}>Contact</p>
-                  <p style={{ margin: '5px 0 0', fontSize: '14px', fontWeight: 700 }}>{companyDetails.phone}</p>
-                  <p style={{ margin: '4px 0 0', fontSize: '12px', opacity: 0.9 }}>{companyDetails.email}</p>
-                  {enableGST && (
-                    <p style={{ margin: '8px 0 0', fontSize: '12px', opacity: 0.88 }}>
-                      GSTIN {companyDetails.gstin}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div
-              className="invoice-card"
-              style={{
-                background: panel,
-                border: `1px solid ${line}`,
-                borderRadius: '22px',
-                padding: '20px 22px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-end', marginBottom: '12px' }}>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '7px 11px',
-                      borderRadius: '999px',
-                      fontSize: '10px',
-                      fontWeight: 800,
-                      letterSpacing: '0.14em',
-                      textTransform: 'uppercase',
-                      background: accentSoft,
-                      border: `1px solid ${accentBorder}`,
-                      color: accent,
-                    }}
-                  >
-                    {enableGST ? 'Tax Invoice' : 'Invoice'}
-                  </span>
+              <div style={{ textAlign: 'right', minWidth: '220px' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
                   {isExpressOrder && (
                     <span
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px',
-                        padding: '7px 11px',
+                        padding: '5px 10px',
                         borderRadius: '999px',
+                        background: 'rgba(255,255,255,0.92)',
+                        color: '#c2410c',
                         fontSize: '10px',
                         fontWeight: 900,
-                        letterSpacing: '0.14em',
                         textTransform: 'uppercase',
-                        background: '#fff1f2',
-                        border: '1px solid #fdba74',
-                        color: '#c2410c',
+                        letterSpacing: '0.12em',
                       }}
                     >
-                      Express Priority
+                      <Clock3 size={12} strokeWidth={2.3} />
+                      Express Order
                     </span>
                   )}
-                </div>
-
-                <p style={{ margin: 0, fontSize: '11px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.16em' }}>
-                  Invoice Number
-                </p>
-                <h2 style={{ margin: '6px 0 0', fontSize: '28px', lineHeight: 1.05, fontWeight: 900, color: headingInk }}>
-                  #{orderCode}
-                </h2>
-              </div>
-
-              <div style={{ display: 'grid', gap: '12px', marginTop: '18px' }}>
-                {invoiceMetaRows.map(({ label, value, Icon }) => (
-                  <div
-                    key={label}
+                  <span
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: '12px',
-                      paddingBottom: '10px',
-                      borderBottom: `1px dashed ${line}`,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '5px 10px',
+                      borderRadius: '999px',
+                      background: 'rgba(255,255,255,0.16)',
+                      border: '1px solid rgba(255,255,255,0.28)',
+                      color: '#ffffff',
+                      fontSize: '10px',
+                      fontWeight: 900,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.12em',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                      <span style={iconBoxStyle(accentSoft, accentBorder)}>
-                        <Icon size={14} color={accent} strokeWidth={2.2} />
-                      </span>
-                      <span style={{ fontSize: '12px', color: mutedInk }}>{label}</span>
-                    </div>
-                    <span style={{ fontSize: '13px', fontWeight: 800, color: headingInk, textAlign: 'right' }}>{value}</span>
-                  </div>
-                ))}
+                    Invoice
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: '11px', opacity: 0.78, textTransform: 'uppercase', letterSpacing: '0.14em' }}>
+                  Order Ref
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 900, letterSpacing: '0.03em' }}>
+                  #{orderCode}
+                </p>
               </div>
             </div>
           </header>
 
-          <section
-            className="invoice-section"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '14px',
-              marginBottom: '14px',
-            }}
-          >
-            <div
-              className="invoice-card"
-              style={{
-                background: panel,
-                border: `1px solid ${line}`,
-                borderRadius: '18px',
-                padding: '18px 18px 16px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={iconBoxStyle(accentSoft, accentBorder)}>
-                  <UserRound size={14} color={accent} strokeWidth={2.2} />
-                </span>
-                <p style={sectionTitleStyle(accent)}>Billed To</p>
-              </div>
-              <div style={{ marginTop: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                  <h3 style={{ margin: 0, fontSize: '20px', color: headingInk, fontWeight: 900 }}>{customer?.name || 'Customer'}</h3>
-                  {customer?.id && (
-                    <span
-                      style={{
-                        padding: '4px 8px',
-                        borderRadius: '999px',
-                        background: panelSoft,
-                        border: `1px solid ${line}`,
-                        color: mutedInk,
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        fontFamily: '"IBM Plex Mono", monospace',
-                      }}
-                    >
-                      {customer.id}
-                    </span>
-                  )}
-                </div>
-                <div style={{ marginTop: '14px', display: 'grid', gap: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <span style={iconBoxStyle(panelSoft, line)}>
-                      <MapPin size={14} color={accent} strokeWidth={2.2} />
-                    </span>
-                    <div>
-                      <p style={{ margin: 0, fontSize: '11px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Address</p>
-                      <p style={{ margin: '4px 0 0', fontSize: '13px', lineHeight: 1.65, color: headingInk, fontWeight: 600 }}>{customerAddress}</p>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '14px' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={iconBoxStyle(panelSoft, line)}>
-                        <Phone size={14} color={accent} strokeWidth={2.2} />
-                      </span>
-                      <div>
-                        <p style={{ margin: 0, fontSize: '11px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Phone</p>
-                        <p style={{ margin: '4px 0 0', fontSize: '13px', fontWeight: 700, color: headingInk }}>{customer?.phone || 'N/A'}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={iconBoxStyle(panelSoft, line)}>
-                        <Mail size={14} color={accent} strokeWidth={2.2} />
-                      </span>
-                      <div>
-                        <p style={{ margin: 0, fontSize: '11px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Email</p>
-                        <p style={{ margin: '4px 0 0', fontSize: '13px', fontWeight: 700, color: headingInk, wordBreak: 'break-word' }}>{customer?.email || 'N/A'}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div
-              className="invoice-card"
-              style={{
-                background: accentSoft,
-                border: `1px solid ${accentBorder}`,
-                borderRadius: '18px',
-                padding: '18px 18px 16px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={iconBoxStyle('#ffffffcc', accentBorder)}>
-                  <ReceiptText size={14} color={accent} strokeWidth={2.2} />
-                </span>
-                <p style={sectionTitleStyle(accent)}>Order Snapshot</p>
-              </div>
-              <div style={{ marginTop: '12px', display: 'grid', gap: '12px' }}>
-                <div
-                  className="invoice-summary-card"
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-                    gap: '10px',
-                  }}
-                >
-                  {[
-                    ['Items', `${safeItems.length}`],
-                    ['Pieces', `${safeItems.reduce((sum, item) => sum + safeNumber(item.quantity), 0)}`],
-                    ['Grand Total', formatCompactCurrency(grandTotal)],
-                  ].map(([label, value]) => (
-                    <div
-                      key={label}
-                      style={{
-                        background: '#ffffffcc',
-                        borderRadius: '14px',
-                        padding: '12px 10px',
-                        border: `1px solid ${accentBorder}`,
-                      }}
-                    >
-                      <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>{label}</p>
-                      <p style={{ margin: '6px 0 0', fontSize: '18px', fontWeight: 900, color: headingInk }}>{value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ display: 'grid', gap: '10px' }}>
-                  <div
-                    style={{
-                      background: '#ffffffcc',
-                      borderRadius: '14px',
-                      padding: '12px 14px',
-                      border: `1px solid ${accentBorder}`,
-                    }}
-                  >
-                    <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Fulfillment Details</p>
-                    <p style={{ margin: '6px 0 0', fontSize: '13px', lineHeight: 1.55, color: headingInk, fontWeight: 700 }}>
-                      {fulfillmentType === 'delivery'
-                        ? (resolvedDeliveryAddress || customerAddress || 'Delivery address will be confirmed')
-                        : 'Collect your order from the store on or before the due date.'}
-                    </p>
-                  </div>
-                  {(notes || paymentTerms) && (
-                    <div
-                      className="invoice-notes-card"
-                      style={{
-                        background: '#ffffffcc',
-                        borderRadius: '14px',
-                        padding: '12px 14px',
-                        border: `1px solid ${accentBorder}`,
-                      }}
-                    >
-                      <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Notes</p>
-                      <p style={{ margin: '6px 0 0', fontSize: '12px', lineHeight: 1.6, color: bodyInk }}>
-                        {notes || paymentTerms}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="invoice-section" style={{ marginBottom: '14px' }}>
-            <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={iconBoxStyle(accentSoft, accentBorder)}>
-                  <Shirt size={14} color={accent} strokeWidth={2.2} />
-                </span>
-                <p style={sectionTitleStyle(accent)}>Service Summary</p>
-              </div>
-              {enableGST && (
-                <span
-                  style={{
-                    fontSize: '11px',
-                    color: mutedInk,
-                    background: panelSoft,
-                    border: `1px solid ${line}`,
-                    padding: '6px 10px',
-                    borderRadius: '999px',
-                  }}
-                >
-                  HSN / SAC 998314
-                </span>
-              )}
-            </div>
-
-            <table className="invoice-items-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '8%', textAlign: 'left', padding: '13px 14px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>No.</th>
-                  <th style={{ width: enableGST ? '44%' : '48%', textAlign: 'left', padding: '13px 14px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Description</th>
-                  {enableGST && (
-                    <th style={{ width: '12%', textAlign: 'center', padding: '13px 10px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>HSN</th>
-                  )}
-                  <th style={{ width: '10%', textAlign: 'center', padding: '13px 10px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Qty</th>
-                  <th style={{ width: '13%', textAlign: 'right', padding: '13px 14px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Rate</th>
-                  <th style={{ width: '13%', textAlign: 'right', padding: '13px 14px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {safeItems.map((item, index) => (
-                  <tr key={`${item.description}-${index}`}>
-                    <td style={{ padding: '14px', fontSize: '13px', color: mutedInk, verticalAlign: 'top' }}>{index + 1}</td>
-                    <td style={{ padding: '14px', verticalAlign: 'top' }}>
-                      <div style={{ fontSize: '14px', fontWeight: 800, color: headingInk, lineHeight: 1.45, wordBreak: 'break-word' }}>{item.description}</div>
-                      {enableGST && (
-                        <div style={{ marginTop: '4px', fontSize: '11px', color: mutedInk }}>
-                          Laundry care service
-                        </div>
-                      )}
-                    </td>
-                    {enableGST && (
-                      <td style={{ padding: '14px 10px', textAlign: 'center', fontSize: '12px', color: mutedInk, fontFamily: '"IBM Plex Mono", monospace', verticalAlign: 'top' }}>
-                        {item.hsn || '998314'}
-                      </td>
-                    )}
-                    <td style={{ padding: '14px 10px', textAlign: 'center', fontSize: '14px', fontWeight: 800, color: accent, verticalAlign: 'top' }}>
-                      {safeNumber(item.quantity)}
-                    </td>
-                    <td style={{ padding: '14px', textAlign: 'right', fontSize: '13px', color: mutedInk, fontFamily: '"IBM Plex Mono", monospace', verticalAlign: 'top' }}>
-                      {formatIndianCurrency(safeNumber(item.unitPrice))}
-                    </td>
-                    <td style={{ padding: '14px', textAlign: 'right', fontSize: '13px', fontWeight: 800, color: headingInk, fontFamily: '"IBM Plex Mono", monospace', verticalAlign: 'top' }}>
-                      {formatIndianCurrency(safeNumber(item.total))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-
-          <section
-            className="invoice-section"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '0.9fr 1.1fr',
-              gap: '14px',
-              alignItems: 'start',
-            }}
-          >
-            <div style={{ display: 'grid', gap: '14px' }}>
+          <div style={{ padding: '16px 18px 0' }}>
+            <section className="invoice-section invoice-grid-2" style={{ marginBottom: '12px' }}>
               <div
-                className="invoice-payment-card"
+                className="invoice-card"
                 style={{
                   background: panel,
                   border: `1px solid ${line}`,
-                  borderRadius: '18px',
-                  padding: '18px',
+                  borderRadius: '12px',
+                  padding: '16px',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={iconBoxStyle(accentSoft, accentBorder)}>
-                    <FileText size={14} color={accent} strokeWidth={2.2} />
-                  </span>
-                  <p style={sectionTitleStyle(accent)}>Payment & Terms</p>
-                </div>
-                <div style={{ marginTop: '14px', display: 'flex', gap: '14px', alignItems: 'center' }}>
-                  {qrCode && (
-                    <div
-                      style={{
-                        width: '104px',
-                        minWidth: '104px',
-                        height: '104px',
-                        borderRadius: '18px',
-                        background: '#ffffff',
-                        border: `1px solid ${line}`,
-                        display: 'grid',
-                        placeItems: 'center',
-                        padding: '8px',
-                      }}
-                    >
-                      <img src={qrCode} alt="Payment QR" style={{ width: '88px', height: '88px', display: 'block' }} />
+                <p style={sectionTitleStyle(mutedInk)}>From</p>
+                <div style={{ marginTop: '12px', display: 'grid', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <span style={iconBoxStyle(panelSoft, line)}>
+                      <Store size={14} color={accent} strokeWidth={2.2} />
+                    </span>
+                    <div>
+                      <p style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: headingInk }}>{companyDetails.branchName}</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '12px', lineHeight: 1.65, color: bodyInk }}>{companyDetails.address}</p>
                     </div>
-                  )}
-                  <div style={{ flex: 1 }}>
-                    <p style={{ margin: 0, fontSize: '15px', color: headingInk, fontWeight: 900 }}>Scan to pay or settle at counter</p>
-                    <p style={{ margin: '6px 0 0', fontSize: '12px', color: bodyInk, lineHeight: 1.65 }}>
-                      {paymentTerms || 'Payment due on or before delivery / pickup.'}
-                    </p>
-                    <p style={{ margin: '10px 0 0', fontSize: '11px', color: mutedInk }}>
-                      For support, contact {companyDetails.phone} or {companyDetails.email}.
-                    </p>
+                  </div>
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={iconBoxStyle(panelSoft, line)}>
+                        <Phone size={14} color={accent} strokeWidth={2.2} />
+                      </span>
+                      <span style={{ fontSize: '12px', color: bodyInk, fontWeight: 600 }}>{companyDetails.phone}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={iconBoxStyle(panelSoft, line)}>
+                        <Mail size={14} color={accent} strokeWidth={2.2} />
+                      </span>
+                      <span style={{ fontSize: '12px', color: bodyInk, fontWeight: 600 }}>{companyDetails.email}</span>
+                    </div>
+                    {enableGST && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={iconBoxStyle(panelSoft, line)}>
+                          <FileText size={14} color={accent} strokeWidth={2.2} />
+                        </span>
+                        <span style={{ fontSize: '12px', color: bodyInk, fontWeight: 600 }}>
+                          GSTIN {companyDetails.gstin}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {paymentBreakdown && (
+              <div
+                className="invoice-card"
+                style={{
+                  background: panel,
+                  border: `1px solid ${line}`,
+                  borderRadius: '12px',
+                  padding: '16px',
+                }}
+              >
+                <p style={sectionTitleStyle(accent)}>Bill To</p>
+                <div style={{ marginTop: '12px', display: 'grid', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <span style={iconBoxStyle(panelSoft, line)}>
+                      <UserRound size={14} color={accent} strokeWidth={2.2} />
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: headingInk, lineHeight: 1.25 }}>{customer?.name || 'Customer'}</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '12px', color: bodyInk, lineHeight: 1.65 }}>{customerAddress}</p>
+                    </div>
+                  </div>
+                  <div className="invoice-grid-2" style={{ gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                      <span style={iconBoxStyle(panelSoft, line)}>
+                        <Phone size={14} color={accent} strokeWidth={2.2} />
+                      </span>
+                      <span style={{ fontSize: '12px', color: bodyInk, fontWeight: 600 }}>{customer?.phone || 'N/A'}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                      <span style={iconBoxStyle(panelSoft, line)}>
+                        <Mail size={14} color={accent} strokeWidth={2.2} />
+                      </span>
+                      <span style={{ fontSize: '12px', color: bodyInk, fontWeight: 600, wordBreak: 'break-word' }}>{customer?.email || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="invoice-section invoice-meta-grid" style={{ marginBottom: '12px' }}>
+              {invoiceMetaRows.slice(0, 2).map(({ label, value, Icon }) => (
+                <div
+                  key={label}
+                  className="invoice-card"
+                  style={{
+                    background: panel,
+                    border: `1px solid ${line}`,
+                    borderRadius: '10px',
+                    padding: '14px 16px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={iconBoxStyle(accentSoft, accentBorder)}>
+                      <Icon size={14} color={accent} strokeWidth={2.2} />
+                    </span>
+                    <div>
+                      <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>{label}</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '18px', color: headingInk, fontWeight: 800 }}>{value}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </section>
+
+            <section
+              className="invoice-section invoice-card"
+              style={{
+                marginBottom: '12px',
+                background: panel,
+                border: `1px solid ${line}`,
+                borderRadius: '10px',
+                padding: '14px 16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={iconBoxStyle(accentSoft, accentBorder)}>
+                    <FulfillmentIcon size={14} color={accent} strokeWidth={2.2} />
+                  </span>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Fulfillment Method</p>
+                    <p style={{ margin: '4px 0 0', fontSize: '16px', color: headingInk, fontWeight: 800 }}>
+                      {fulfillmentType === 'delivery' ? 'Home Delivery' : 'Store Pickup'}
+                    </p>
+                  </div>
+                </div>
+                {fulfillmentType === 'delivery' && (
+                  <div style={{ textAlign: 'right', maxWidth: '58%' }}>
+                    <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Destination</p>
+                    <p style={{ margin: '4px 0 0', fontSize: '12px', color: bodyInk, lineHeight: 1.55 }}>
+                      {resolvedDeliveryAddress || customerAddress}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="invoice-section" style={{ marginBottom: '12px' }}>
+              <table className="invoice-items-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '8%', textAlign: 'left', padding: '12px 14px', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>#</th>
+                    <th style={{ width: enableGST ? '46%' : '50%', textAlign: 'left', padding: '12px 14px', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>Description</th>
+                    {enableGST && (
+                      <th style={{ width: '10%', textAlign: 'center', padding: '12px 10px', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>HSN</th>
+                    )}
+                    <th style={{ width: '10%', textAlign: 'center', padding: '12px 10px', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>Qty</th>
+                    <th style={{ width: '13%', textAlign: 'right', padding: '12px 14px', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>Rate</th>
+                    <th style={{ width: '13%', textAlign: 'right', padding: '12px 14px', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {safeItems.map((item, index) => (
+                    <tr key={`${item.description}-${index}`}>
+                      <td style={{ padding: '12px 14px', fontSize: '13px', color: mutedInk, verticalAlign: 'top' }}>{index + 1}</td>
+                      <td style={{ padding: '12px 14px', verticalAlign: 'top' }}>
+                        <div style={{ fontSize: '14px', fontWeight: 800, color: headingInk, lineHeight: 1.45 }}>{item.description}</div>
+                      </td>
+                      {enableGST && (
+                        <td style={{ padding: '12px 10px', textAlign: 'center', fontSize: '12px', color: mutedInk, fontFamily: '"IBM Plex Mono", monospace', verticalAlign: 'top' }}>
+                          {item.hsn || '998314'}
+                        </td>
+                      )}
+                      <td style={{ padding: '12px 10px', textAlign: 'center', fontSize: '14px', fontWeight: 800, color: accent, verticalAlign: 'top' }}>
+                        {safeNumber(item.quantity)}
+                      </td>
+                      <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: '13px', color: mutedInk, fontFamily: '"IBM Plex Mono", monospace', verticalAlign: 'top' }}>
+                        {formatIndianCurrency(safeNumber(item.unitPrice))}
+                      </td>
+                      <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: '13px', fontWeight: 800, color: headingInk, fontFamily: '"IBM Plex Mono", monospace', verticalAlign: 'top' }}>
+                        {formatIndianCurrency(safeNumber(item.total))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+
+            <section className="invoice-section invoice-grid-2" style={{ alignItems: 'start', marginBottom: '12px' }}>
+              <div style={{ display: 'grid', gap: '12px' }}>
                 <div
                   className="invoice-payment-card"
                   style={{
-                    background: panelSoft,
+                    background: panel,
                     border: `1px solid ${line}`,
-                    borderRadius: '18px',
-                    padding: '18px',
+                    borderRadius: '10px',
+                    padding: '14px 16px',
                   }}
                 >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={iconBoxStyle(panel, line)}>
-                    <CircleDollarSign size={14} color={accent} strokeWidth={2.2} />
-                  </span>
-                  <p style={sectionTitleStyle(accent)}>Payment Breakdown</p>
-                </div>
-                  <div style={{ marginTop: '14px', display: 'grid', gap: '10px' }}>
-                    {paymentBreakdown.walletDeducted > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '13px' }}>
-                        <span style={{ color: bodyInk }}>Wallet used</span>
-                        <strong style={{ color: '#7c3aed', fontFamily: '"IBM Plex Mono", monospace' }}>- {formatIndianCurrency(paymentBreakdown.walletDeducted)}</strong>
+                  <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                    {qrCode && (
+                      <div
+                        style={{
+                          width: '92px',
+                          height: '92px',
+                          borderRadius: '10px',
+                          background: '#ffffff',
+                          border: `1px solid ${line}`,
+                          display: 'grid',
+                          placeItems: 'center',
+                          padding: '6px',
+                        }}
+                      >
+                        <img src={qrCode} alt="Payment QR" style={{ width: '78px', height: '78px', display: 'block' }} />
                       </div>
                     )}
-                    {paymentBreakdown.cashPaid > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '13px' }}>
-                        <span style={{ color: bodyInk }}>{paymentBreakdown.paymentMethod || 'Cash'} paid</span>
-                        <strong style={{ color: '#15803d', fontFamily: '"IBM Plex Mono", monospace' }}>- {formatIndianCurrency(paymentBreakdown.cashPaid)}</strong>
-                      </div>
-                    )}
-                    {paymentBreakdown.creditOutstanding > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '13px' }}>
-                        <span style={{ color: bodyInk }}>Added to outstanding</span>
-                        <strong style={{ color: '#b45309', fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(paymentBreakdown.creditOutstanding)}</strong>
-                      </div>
-                    )}
-                    <div style={{ borderTop: `1px dashed ${line}`, paddingTop: '10px', display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '13px' }}>
-                      <span style={{ color: mutedInk }}>Customer outstanding balance</span>
-                      <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>
-                        {formatIndianCurrency(paymentBreakdown.newOutstanding || 0)}
-                      </strong>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontSize: '14px', color: accent, fontWeight: 900 }}>Scan to Pay</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '12px', color: mutedInk }}>UPI / GPay / PhonePe</p>
+                      <p style={{ margin: '6px 0 0', fontSize: '12px', color: headingInk, fontWeight: 700 }}>Fab Clean</p>
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
 
-            <div
-              className="invoice-totals-card"
-              style={{
-                background: panel,
-                border: `1px solid ${line}`,
-                borderRadius: '22px',
-                padding: '20px',
-                position: 'relative',
-                overflow: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: `linear-gradient(180deg, ${isExpressOrder ? 'rgba(251,146,60,0.10)' : 'rgba(20,184,166,0.08)'} 0%, transparent 50%)`,
-                  pointerEvents: 'none',
-                }}
-              />
-              <div style={{ position: 'relative', zIndex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={iconBoxStyle(accentSoft, accentBorder)}>
-                      <ReceiptText size={14} color={accent} strokeWidth={2.2} />
-                    </span>
-                    <p style={sectionTitleStyle(accent)}>Billing Summary</p>
+                <div
+                  className="invoice-payment-card"
+                  style={{
+                    background: panel,
+                    border: `1px dashed ${line}`,
+                    borderRadius: '10px',
+                    padding: '14px 16px',
+                  }}
+                >
+                  <p style={sectionTitleStyle(accent)}>Terms & Conditions</p>
+                  <div style={{ marginTop: '10px', fontSize: '11px', color: bodyInk, lineHeight: 1.7 }}>
+                    <div>1. Payment due on delivery or pickup.</div>
+                    <div>2. We are not responsible for natural wear and tear.</div>
+                    <div>3. Review garments at the time of handover.</div>
+                    {(notes || paymentTerms) && <div>4. {notes || paymentTerms}</div>}
                   </div>
-                  {isExpressOrder && (
-                    <span
-                      style={{
-                        padding: '6px 10px',
-                        borderRadius: '999px',
-                        background: '#fff7ed',
-                        border: '1px solid #fdba74',
-                        color: '#c2410c',
-                        fontSize: '10px',
-                        fontWeight: 900,
-                        letterSpacing: '0.12em',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      Express
-                    </span>
-                  )}
                 </div>
+              </div>
 
-                <div style={{ display: 'grid', gap: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '14px', fontSize: '14px' }}>
-                    <span style={{ color: mutedInk }}>Service subtotal</span>
+              <div
+                className="invoice-totals-card"
+                style={{
+                  background: panel,
+                  border: `1px solid ${line}`,
+                  borderRadius: '10px',
+                  padding: '14px 16px',
+                  position: 'relative',
+                }}
+              >
+                {isExpressOrder && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '12px',
+                      width: '92px',
+                      height: '92px',
+                      borderRadius: '50%',
+                      border: '2px solid rgba(234,88,12,0.45)',
+                      boxShadow: 'inset 0 0 0 3px rgba(234,88,12,0.16)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transform: 'rotate(12deg)',
+                      opacity: 0.78,
+                    }}
+                  >
+                    <div style={{ textAlign: 'center', color: '#c2410c', lineHeight: 1.1 }}>
+                      <div style={{ fontSize: '8px', fontWeight: 800, letterSpacing: '0.18em' }}>EXPRESS</div>
+                      <div style={{ fontSize: '16px', fontWeight: 900 }}>PRIORITY</div>
+                      <div style={{ fontSize: '8px', fontWeight: 800 }}>FAB CLEAN</div>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gap: '10px', position: 'relative', zIndex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                    <span style={{ color: mutedInk }}>Subtotal</span>
                     <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(serviceSubtotal)}</strong>
                   </div>
-
                   {deliveryTotal > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '14px', fontSize: '14px' }}>
-                      <span style={{ color: mutedInk }}>Delivery charges</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                      <span style={{ color: mutedInk }}>Delivery Charges</span>
                       <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(deliveryTotal)}</strong>
                     </div>
                   )}
-
                   {expressTotal > 0 && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        gap: '14px',
-                        fontSize: '14px',
-                        background: '#fff7ed',
-                        border: '1px solid #fed7aa',
-                        borderRadius: '14px',
-                        padding: '10px 12px',
-                      }}
-                    >
-                      <span style={{ color: '#c2410c', fontWeight: 700 }}>Express surcharge</span>
-                      <strong style={{ color: '#c2410c', fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(expressTotal)}</strong>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#c2410c' }}>
+                      <span style={{ fontWeight: 700 }}>Express Surcharge</span>
+                      <strong style={{ fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(expressTotal)}</strong>
                     </div>
                   )}
-
                   {enableGST && (
                     <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '14px', fontSize: '14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                         <span style={{ color: mutedInk }}>CGST @ 9%</span>
                         <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(cgstAmount)}</strong>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '14px', fontSize: '14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                         <span style={{ color: mutedInk }}>SGST @ 9%</span>
                         <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(sgstAmount)}</strong>
                       </div>
                     </>
                   )}
+                  <div style={{ height: '3px', background: accent, borderRadius: '999px', marginTop: '4px' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+                    <span style={{ fontSize: '15px', fontWeight: 900, color: headingInk, textTransform: 'uppercase' }}>Grand Total</span>
+                    <span style={{ fontSize: '34px', fontWeight: 900, color: accent, fontFamily: '"IBM Plex Mono", monospace' }}>
+                      {formatIndianCurrency(grandTotal)}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      background: panelSoft,
+                      borderRadius: '8px',
+                      padding: '8px 10px',
+                      fontSize: '10px',
+                      color: mutedInk,
+                      textAlign: 'center',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    {convertToWords(grandTotal)}
+                  </div>
                 </div>
+              </div>
+            </section>
 
-                <div style={{ margin: '18px 0 14px', height: '4px', borderRadius: '999px', background: `linear-gradient(90deg, ${headingInk} 0%, ${accent} 100%)` }} />
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-end' }}>
-                  <div>
-                    <p style={{ margin: 0, fontSize: '11px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.14em' }}>Grand Total</p>
-                    <p style={{ margin: '6px 0 0', fontSize: '31px', lineHeight: 1, fontWeight: 900, color: accent, fontFamily: '"IBM Plex Mono", monospace' }}>
+            {paymentBreakdown && (
+              <section
+                className="invoice-section invoice-payment-card"
+                style={{
+                  background: panelSoft,
+                  border: `1px solid ${line}`,
+                  borderRadius: '10px',
+                  padding: '14px 16px',
+                  marginBottom: '14px',
+                }}
+              >
+                <p style={sectionTitleStyle(accent)}>Payment Summary</p>
+                <div className="invoice-grid-2" style={{ marginTop: '12px', alignItems: 'start' }}>
+                  <div
+                    className="invoice-summary-card"
+                    style={{
+                      background: '#ffffff',
+                      border: `1px solid ${line}`,
+                      borderRadius: '8px',
+                      padding: '12px',
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Invoice Total</p>
+                    <p style={{ margin: '6px 0 0', fontSize: '18px', fontWeight: 900, color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>
                       {formatIndianCurrency(grandTotal)}
                     </p>
                   </div>
                   <div
+                    className="invoice-summary-card"
                     style={{
-                      padding: '8px 12px',
-                      background: accentSoft,
-                      border: `1px solid ${accentBorder}`,
-                      borderRadius: '14px',
+                      background: paymentBreakdown.creditOutstanding > 0 ? '#fffbeb' : '#f0fdf4',
+                      border: `1px solid ${paymentBreakdown.creditOutstanding > 0 ? '#fde68a' : '#bbf7d0'}`,
+                      borderRadius: '8px',
+                      padding: '12px',
                     }}
                   >
-                    <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Amount in Words</p>
-                    <p style={{ margin: '6px 0 0', fontSize: '11px', color: headingInk, fontWeight: 700, maxWidth: '190px', lineHeight: 1.55 }}>
-                      {convertToWords(grandTotal)}
+                    <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Status</p>
+                    <p style={{ margin: '6px 0 0', fontSize: '18px', fontWeight: 900, color: paymentBreakdown.creditOutstanding > 0 ? '#b45309' : '#15803d' }}>
+                      {paymentBreakdown.creditOutstanding > 0 ? 'Credit' : 'Paid'}
                     </p>
                   </div>
                 </div>
-              </div>
-            </div>
-          </section>
 
-          <footer className="invoice-footer">
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1.1fr 0.9fr',
-                gap: '14px',
-                alignItems: 'end',
-              }}
-            >
-              <div>
-                <p style={{ margin: 0, fontSize: '12px', color: bodyInk, fontWeight: 700 }}>
-                  Thank you for choosing Fab Clean.
-                </p>
-                <p style={{ margin: '6px 0 0', fontSize: '11px', color: mutedInk, lineHeight: 1.7 }}>
-                  Garments should be checked at the time of delivery or pickup. Natural wear, hidden defects, and pre-existing damage may become visible during processing. For detailed terms, visit myfabclean.com/terms.
-                </p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <p style={{ margin: 0, fontSize: '11px', color: mutedInk }}>Computer-generated invoice</p>
-                <p style={{ margin: '4px 0 0', fontSize: '11px', color: mutedInk }}>No physical signature required</p>
-                {enableGST && (
-                  <p style={{ margin: '8px 0 0', fontSize: '11px', color: mutedInk }}>
-                    PAN {companyDetails.pan} {companyDetails.gstin ? `• GSTIN ${companyDetails.gstin}` : ''}
-                  </p>
-                )}
-              </div>
-            </div>
+                <div style={{ marginTop: '12px', display: 'grid', gap: '8px' }}>
+                  {paymentBreakdown.walletDeducted > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                      <span style={{ color: bodyInk }}>Wallet Deducted</span>
+                      <strong style={{ color: '#7c3aed', fontFamily: '"IBM Plex Mono", monospace' }}>- {formatIndianCurrency(paymentBreakdown.walletDeducted)}</strong>
+                    </div>
+                  )}
+                  {paymentBreakdown.cashPaid > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                      <span style={{ color: bodyInk }}>{paymentBreakdown.paymentMethod || 'Cash'} Paid</span>
+                      <strong style={{ color: '#15803d', fontFamily: '"IBM Plex Mono", monospace' }}>- {formatIndianCurrency(paymentBreakdown.cashPaid)}</strong>
+                    </div>
+                  )}
+                  {paymentBreakdown.creditOutstanding > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                      <span style={{ color: bodyInk }}>Added to Outstanding</span>
+                      <strong style={{ color: '#b45309', fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(paymentBreakdown.creditOutstanding)}</strong>
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      marginTop: '4px',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      background: '#fffbeb',
+                      border: '1px solid #fde68a',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span style={{ fontSize: '11px', color: '#92400e', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Customer Outstanding Balance
+                    </span>
+                    <strong style={{ fontSize: '18px', color: '#92400e', fontFamily: '"IBM Plex Mono", monospace' }}>
+                      {formatIndianCurrency(paymentBreakdown.newOutstanding || 0)}
+                    </strong>
+                  </div>
+                </div>
+              </section>
+            )}
+          </div>
+
+          <footer
+            style={{
+              background: '#1e293b',
+              color: '#ffffff',
+              padding: '12px 18px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              gap: '14px',
+              alignItems: 'center',
+            }}
+          >
+            <p style={{ margin: 0, fontSize: '13px', fontWeight: 700 }}>Thank you for choosing Fab Clean.</p>
+            <p style={{ margin: 0, fontSize: '10px', opacity: 0.72 }}>This is a computer-generated invoice. No signature required.</p>
           </footer>
         </div>
       </div>

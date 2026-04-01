@@ -24,7 +24,6 @@ import {
   type FulfillmentType,
 } from "../services/whatsapp.service";
 import { sendOrderConfirmationEmail } from "../services/order-confirmation-email.service";
-import { ensureOrderInvoiceDocument } from "../services/order-invoice.service";
 import { smartItemSummary } from "../utils/item-summarizer";
 
 const router = Router();
@@ -207,53 +206,10 @@ const schedulePostCreateTasks = (
       }
     }
 
-    // --- AUTOMATED WHATSAPP BILL SENDING ---
     if (order.customerPhone) {
-      try {
-        const invoiceResult = await ensureOrderInvoiceDocument(order);
-        console.log(
-          `📄 [WhatsApp Background] Invoice ready for ${order.orderNumber} via ${invoiceResult.storageUsed}: ${invoiceResult.fileUrl}`
-        );
-
-        console.log(`📱 [WhatsApp Background] Triggering auto-bill for ${order.orderNumber}`);
-        const whatsappResult = await handleOrderStatusChange(
-          {
-            customerPhone: order.customerPhone,
-            customerName: order.customerName,
-            orderNumber: order.orderNumber,
-            totalAmount: order.totalAmount,
-            status: 'pending',
-            fulfillmentType: order.fulfillmentType || 'pickup',
-            items: order.items || [],
-            invoiceUrl: invoiceResult.fileUrl,
-            invoiceNumber: order.orderNumber,
-          },
-          null
-        );
-
-        if (whatsappResult?.success) {
-          await storage.updateOrder(order.id, {
-            invoiceUrl: invoiceResult.fileUrl,
-            lastWhatsappStatus: 'Order Confirmation Sent - Count: 1',
-            lastWhatsappSentAt: new Date(),
-            whatsappMessageCount: 1,
-          } as any);
-          console.log(`✅ [WhatsApp Background] Auto-bill sent for ${order.orderNumber}`);
-        } else {
-          const errorMessage = whatsappResult?.error || 'Unknown error';
-          await storage.updateOrder(order.id, {
-            invoiceUrl: invoiceResult.fileUrl,
-            lastWhatsappStatus: `Order Confirmation Failed: ${errorMessage}`,
-          } as any);
-          console.error(`❌ [WhatsApp Background] Failed to send auto-bill for ${order.orderNumber}: ${errorMessage}`);
-        }
-      } catch (wsErr) {
-        const errorMessage = wsErr instanceof Error ? wsErr.message : String(wsErr);
-        await storage.updateOrder(order.id, {
-          lastWhatsappStatus: `Order Confirmation Failed: ${errorMessage}`,
-        } as any).catch(() => undefined);
-        console.error(`❌ [WhatsApp Background] Failed to trigger auto-bill for ${order.orderNumber}:`, wsErr);
-      }
+      console.log(
+        `📱 [WhatsApp Background] Waiting for template invoice generation in the order confirmation dialog for ${order.orderNumber}`
+      );
     }
   });
 };

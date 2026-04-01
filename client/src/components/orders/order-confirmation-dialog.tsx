@@ -45,6 +45,7 @@ export function OrderConfirmationDialog({
     const [whatsappSendCount, setWhatsappSendCount] = useState(0);
     const [whatsappStatus, setWhatsappStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
     const [whatsappError, setWhatsappError] = useState<string | null>(null);
+    const [autoSendTriggered, setAutoSendTriggered] = useState(false);
     const { toast } = useToast();
 
     // Fetch customer details if phone is missing in order
@@ -144,14 +145,36 @@ export function OrderConfirmationDialog({
         return () => clearTimeout(timer);
     }, [open, order, totalAmount]);
 
-    // Reset state when dialog closes
+    // Sync WhatsApp state from the newly created order and reset cleanly on close.
     useEffect(() => {
         if (!open) {
             setWhatsappSendCount(0);
             setWhatsappStatus('idle');
             setWhatsappError(null);
+            setAutoSendTriggered(false);
+            return;
         }
-    }, [open]);
+
+        const persistedSendCount = Number((order as any)?.whatsappMessageCount || 0);
+        const normalizedSendCount = Number.isFinite(persistedSendCount) ? Math.max(0, persistedSendCount) : 0;
+        const lastStatus = String((order as any)?.lastWhatsappStatus || '').trim();
+
+        setWhatsappSendCount(normalizedSendCount);
+        setWhatsappError(lastStatus.includes('Failed') ? lastStatus : null);
+        setAutoSendTriggered(false);
+
+        if (lastStatus.includes('Sent')) {
+            setWhatsappStatus('sent');
+            return;
+        }
+
+        if (lastStatus.includes('Failed')) {
+            setWhatsappStatus('failed');
+            return;
+        }
+
+        setWhatsappStatus('idle');
+    }, [open, order]);
 
     const handlePrintBill = async () => {
         if (!order) return;
@@ -349,6 +372,30 @@ export function OrderConfirmationDialog({
             setSendingWhatsApp(false);
         }
     };
+
+    useEffect(() => {
+        if (!open || !order || !customerPhone || autoSendTriggered) {
+            return;
+        }
+
+        const persistedStatus = String((order as any)?.lastWhatsappStatus || '').trim();
+        const hasExistingAttempt = whatsappSendCount > 0 || persistedStatus.length > 0;
+
+        if (hasExistingAttempt || whatsappStatus === 'sending' || whatsappStatus === 'sent' || !canSendWhatsApp) {
+            return;
+        }
+
+        setAutoSendTriggered(true);
+        void handleSendWhatsApp();
+    }, [
+        open,
+        order,
+        customerPhone,
+        autoSendTriggered,
+        whatsappSendCount,
+        whatsappStatus,
+        canSendWhatsApp,
+    ]);
 
     // Helper function to generate PDF blob
     // Helper function to generate PDF blob - OPTIMIZED for lightweight files

@@ -7,7 +7,6 @@ import {
     getTemplateForSendCount,
     MAX_RESENDS,
 } from "../services/whatsapp.service";
-import { ensureOrderInvoiceDocument } from "../services/order-invoice.service";
 import { smartItemSummary } from "../utils/item-summarizer";
 import { storage } from "../storage";
 
@@ -172,20 +171,10 @@ router.post("/send-bill", async (req, res) => {
             }
         }
 
-        if (!resolvedPdfUrl && matchedOrder) {
-            try {
-                const invoiceResult = await ensureOrderInvoiceDocument(matchedOrder);
-                resolvedPdfUrl = invoiceResult.fileUrl;
-                console.log(`[WhatsApp] Generated invoice on demand for ${orderId}: ${resolvedPdfUrl}`);
-            } catch (invoiceError) {
-                console.error(`[WhatsApp] Failed to generate invoice for ${orderId}:`, invoiceError);
-            }
-        }
-
         if (!resolvedPdfUrl) {
             return res.status(400).json({
                 success: false,
-                error: "PDF URL is required to send the WhatsApp confirmation.",
+                error: "Template invoice PDF is required before sending the WhatsApp confirmation.",
                 canResendAgain: false,
                 newSendCount: sendCount,
             });
@@ -216,6 +205,7 @@ router.post("/send-bill", async (req, res) => {
                 });
             } else if (matchedOrder && !result.success) {
                 await storage.updateOrder(matchedOrder.id, {
+                    invoiceUrl: resolvedPdfUrl,
                     lastWhatsappStatus: `Order Confirmation Failed: ${result.error}`,
                 });
             }
