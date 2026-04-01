@@ -37,7 +37,6 @@ const WalletManagement = lazy(() => retryDynamicImport(() => import("@/pages/wal
 const Settings = lazy(() => retryDynamicImport(() => import("@/pages/settings")));
 const PerformanceAnalytics = lazy(() => retryDynamicImport(() => import("@/components/analytics")));
 const BillView = lazy(() => retryDynamicImport(() => import("@/pages/bill-view")));
-const InvoiceTemplateDemo = lazy(() => retryDynamicImport(() => import("@/pages/invoice-template-demo")));
 
 const OrderTracking = lazy(() => retryDynamicImport(() => import("@/pages/order-tracking")));
 const TermsPage = lazy(() => retryDynamicImport(() => import("@/pages/terms")));
@@ -62,7 +61,6 @@ function Router() {
       <Route path="/unauthorized" component={UnauthorizedPage} />
       <Route path="/account-inactive" component={AccountInactivePage} />
       <Route path="/bill/:orderNumber" component={BillView} />
-      <Route path="/invoice-template-demo/:mode" component={InvoiceTemplateDemo} />
       <Route path="/tracking/:id" component={OrderTracking} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/privacy" component={PrivacyPage} />
