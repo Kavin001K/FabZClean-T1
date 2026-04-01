@@ -15,7 +15,7 @@ interface EmailSendResult {
 const EMAIL_WEBHOOK_URL = process.env.ORDER_CONFIRMATION_EMAIL_WEBHOOK_URL;
 const EMAIL_WEBHOOK_AUTH_HEADER = process.env.ORDER_CONFIRMATION_EMAIL_WEBHOOK_AUTH_HEADER || 'Authorization';
 const EMAIL_WEBHOOK_AUTH_TOKEN = process.env.ORDER_CONFIRMATION_EMAIL_WEBHOOK_AUTH_TOKEN;
-const APP_BASE_URL = (process.env.APP_BASE_URL || 'https://erp.myfabclean.com').replace(/\/$/, '');
+const PUBLIC_WEBSITE_URL = (process.env.PUBLIC_WEBSITE_URL || 'https://www.myfabclean.com').replace(/\/$/, '');
 
 /**
  * Sends order confirmation email through a configurable webhook.
@@ -43,7 +43,7 @@ export async function sendOrderConfirmationEmail(input: OrderConfirmationEmailIn
         orderId: input.orderId,
         orderNumber: input.orderNumber,
         totalAmount: input.totalAmount,
-        trackUrl: `${APP_BASE_URL}/trackorder/${encodeURIComponent(input.orderNumber)}`,
+        trackUrl: `${PUBLIC_WEBSITE_URL}/trackorder/${encodeURIComponent(input.orderNumber)}`,
         generatedAt: new Date().toISOString(),
     };
 

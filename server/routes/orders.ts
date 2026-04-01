@@ -31,6 +31,37 @@ const DELIVERY_DISABLED_MESSAGE = 'Delivery operations are disabled in this buil
 // Customer-facing statuses like out_for_delivery remain enabled.
 const DELIVERY_DISABLED_STATUSES = new Set(['assigned']);
 const FINANCIAL_MUTATION_FIELDS = new Set(['paymentStatus', 'advancePaid', 'walletUsed', 'creditUsed', 'paymentMethod']);
+<<<<<<< Updated upstream
+=======
+const ORDER_UPDATE_FIELDS = new Set([
+  'status',
+  'priority',
+  'pickupDate',
+  'deliveryAddress',
+  'shippingAddress',
+  'fulfillmentType',
+  'deliveryCharges',
+  'specialInstructions',
+  'notes',
+  'isExpressOrder',
+  'discountType',
+  'discountValue',
+  'couponCode',
+  'extraCharges',
+  'gstEnabled',
+  'gstRate',
+  'gstAmount',
+  'panNumber',
+  'gstNumber',
+  'items',
+  'totalAmount',
+  'customerRating',
+  'feedbackComment',
+  'feedbackMetadata',
+  'feedbackSubmittedAt',
+]);
+const APP_BASE_URL = (process.env.APP_BASE_URL || 'https://erp.myfabclean.com').replace(/\/$/, '');
+>>>>>>> Stashed changes
 
 // Apply rate limiting to all order routes
 router.use(jwtRequired);

@@ -230,15 +230,36 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   const selectedWalletBalance = selectedCustomer ? parseFloat((selectedCustomer as any).walletBalanceCache || '0') : 0;
 
   // Filter orders for the selected customer
-  const customerOrders = React.useMemo(() => {
+  const matchedCustomerOrders = React.useMemo(() => {
     if (!selectedCustomer || !orders) return [];
+<<<<<<< Updated upstream
     // Match by customer name or phone since ID linking might be loose
     return orders.filter(order =>
       (order.customerName === selectedCustomer.name) ||
       (order.customerPhone === selectedCustomer.phone)
     ).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
       .slice(0, 5); // Show last 5 orders
+=======
+    return orders.filter(order => {
+      if (selectedCustomer.id && order.customerId === selectedCustomer.id) return true;
+      if (selectedCustomer.phone && order.customerPhone === selectedCustomer.phone) return true;
+      return false;
+    }).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+>>>>>>> Stashed changes
   }, [selectedCustomer, orders]);
+
+  const customerOrders = React.useMemo(() => matchedCustomerOrders.slice(0, 5), [matchedCustomerOrders]);
+  const feedbackOrders = React.useMemo(
+    () => matchedCustomerOrders.filter((order) => Number((order as any).customerRating) > 0),
+    [matchedCustomerOrders]
+  );
+  const fallbackAverageRating = feedbackOrders.length
+    ? feedbackOrders.reduce((sum, order) => sum + Number((order as any).customerRating || 0), 0) / feedbackOrders.length
+    : 0;
+  const feedbackCount = Number((selectedCustomer as any)?.feedbackCount || feedbackOrders.length || 0);
+  const averageRating = (selectedCustomer as any)?.averageRating !== undefined && (selectedCustomer as any)?.averageRating !== null
+    ? Number((selectedCustomer as any).averageRating)
+    : fallbackAverageRating;
 
   return (
     <>
@@ -400,9 +421,11 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-purple-600">
-                        N/A
+                        {feedbackCount ? averageRating.toFixed(1) : 'N/A'}
                       </div>
-                      <p className="text-xs text-muted-foreground">Not evaluated</p>
+                      <p className="text-xs text-muted-foreground">
+                        {feedbackCount ? `${feedbackCount} review${feedbackCount === 1 ? '' : 's'}` : 'No reviews yet'}
+                      </p>
                     </CardContent>
                   </Card>
                 </div>

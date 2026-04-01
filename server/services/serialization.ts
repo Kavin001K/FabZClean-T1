@@ -260,6 +260,24 @@ export class SerializationService {
         : serialized.walletBalanceCache;
     }
 
+    if (serialized.feedbackCount !== undefined) {
+      serialized.feedbackCount = typeof serialized.feedbackCount === 'string'
+        ? parseInt(serialized.feedbackCount)
+        : serialized.feedbackCount;
+    }
+
+    if (serialized.averageRating !== undefined && serialized.averageRating !== null) {
+      serialized.averageRating = typeof serialized.averageRating === 'string'
+        ? parseFloat(serialized.averageRating)
+        : serialized.averageRating;
+    }
+
+    if (serialized.positiveFeedbackCount !== undefined) {
+      serialized.positiveFeedbackCount = typeof serialized.positiveFeedbackCount === 'string'
+        ? parseInt(serialized.positiveFeedbackCount)
+        : serialized.positiveFeedbackCount;
+    }
+
     // Handle loyalty points
     if (includeLoyalty && customer.loyaltyPoints !== undefined) {
       serialized.loyaltyPoints = parseInt(customer.loyaltyPoints) || 0;

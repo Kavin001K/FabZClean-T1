@@ -140,8 +140,28 @@ export const orders = pgTable("orders", {
   isCreditOrder: boolean("is_credit_order").default(false),
   walletUsed: decimal("wallet_used", { precision: 10, scale: 2 }).default("0"),
   creditUsed: decimal("credit_used", { precision: 10, scale: 2 }).default("0"),
+  customerRating: integer("customer_rating"),
+  feedbackComment: text("feedback_comment"),
+  feedbackMetadata: jsonb("feedback_metadata"),
+  feedbackSubmittedAt: timestamp("feedback_submitted_at"),
   deliveredAt: timestamp("delivered_at"),
   dispatchedAt: timestamp("dispatched_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const publicWebsiteReviews = pgTable("public_website_reviews", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orderId: varchar("order_id").references(() => orders.id),
+  customerId: varchar("customer_id").references(() => customers.id),
+  rating: integer("rating").notNull(),
+  comment: text("comment"),
+  isTopRating: boolean("is_top_rating").default(false),
+  isBestRating: boolean("is_best_rating").default(true),
+  curationScore: decimal("curation_score", { precision: 5, scale: 2 }),
+  curationReason: text("curation_reason"),
+  aiProvider: text("ai_provider"),
+  aiModel: text("ai_model"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -363,6 +383,10 @@ export const insertOrderSchema = z.object({
   isCreditOrder: z.coerce.boolean().optional().default(false),
   walletUsed: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
   creditUsed: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+  customerRating: z.coerce.number().int().min(1).max(5).optional().nullable(),
+  feedbackComment: z.string().optional().nullable(),
+  feedbackMetadata: z.any().optional().nullable(),
+  feedbackSubmittedAt: z.coerce.date().optional().nullable(),
   deliveredAt: z.coerce.date().optional().nullable(),
   dispatchedAt: z.coerce.date().optional().nullable(),
   createdAt: z.coerce.date().optional(),
@@ -396,6 +420,7 @@ export type Product = typeof products.$inferSelect;
 
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect & { service?: string };
+export type PublicWebsiteReview = typeof publicWebsiteReviews.$inferSelect;
 
 export type InsertDelivery = z.infer<typeof insertDeliverySchema>;
 export type Delivery = typeof deliveries.$inferSelect;
@@ -404,7 +429,12 @@ export type InsertOrderTransaction = z.infer<typeof insertOrderTransactionSchema
 export type OrderTransaction = typeof orderTransactions.$inferSelect;
 
 export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
-export type Customer = typeof customers.$inferSelect;
+export type Customer = typeof customers.$inferSelect & {
+  feedbackCount?: number | null;
+  averageRating?: number | null;
+  lastFeedbackSubmittedAt?: Date | null;
+  positiveFeedbackCount?: number | null;
+};
 
 export type InsertService = z.infer<typeof insertServiceSchema>;
 export type Service = typeof services.$inferSelect;

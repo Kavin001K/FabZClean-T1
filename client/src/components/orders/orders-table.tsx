@@ -40,6 +40,7 @@ import {
   Navigation,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/data-service";
+import { getPublicTrackOrderUrl } from "@/lib/public-website";
 import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -415,7 +416,7 @@ export default React.memo(function OrdersTable({
                       variant="ghost" 
                       size="icon" 
                       className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                      onClick={() => window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank')}
+                      onClick={() => window.open(getPublicTrackOrderUrl(order.orderNumber || order.id), '_blank')}
                       title="Track Order"
                     >
                       <Navigation className="h-4 w-4" />
@@ -442,7 +443,7 @@ export default React.memo(function OrdersTable({
                         <Printer className="mr-2 h-4 w-4" />
                         Print Invoice
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank')}>
+                      <DropdownMenuItem onClick={() => window.open(getPublicTrackOrderUrl(order.orderNumber || order.id), '_blank')}>
                         <Navigation className="mr-2 h-4 w-4" />
                         Track Order
                       </DropdownMenuItem>

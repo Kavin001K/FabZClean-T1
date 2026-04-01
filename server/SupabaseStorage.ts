@@ -182,6 +182,19 @@ export class SupabaseStorage {
             // Delivery earnings & analytics mappings
             'delivery_earnings_calculated': 'deliveryEarningsCalculated',
             'is_credit_order': 'isCreditOrder',
+<<<<<<< Updated upstream
+=======
+            'wallet_used': 'walletUsed',
+            'credit_used': 'creditUsed',
+            'customer_rating': 'customerRating',
+            'feedback_comment': 'feedbackComment',
+            'feedback_metadata': 'feedbackMetadata',
+            'feedback_submitted_at': 'feedbackSubmittedAt',
+            'feedback_count': 'feedbackCount',
+            'average_rating': 'averageRating',
+            'last_feedback_submitted_at': 'lastFeedbackSubmittedAt',
+            'positive_feedback_count': 'positiveFeedbackCount',
+>>>>>>> Stashed changes
             'delivered_at': 'deliveredAt',
             'delivery_partner_id': 'deliveryPartnerId',
             'per_order_salary': 'perOrderSalary',
@@ -220,6 +233,61 @@ export class SupabaseStorage {
             }
         }
         return newRecord;
+    }
+
+    private async attachCustomerFeedbackStats<T extends Customer | Customer[] | undefined>(input: T): Promise<T> {
+        if (!input) {
+            return input;
+        }
+
+        const customers = Array.isArray(input) ? input : [input];
+        const customerIds = customers
+            .map((customer: any) => String(customer?.id || '').trim())
+            .filter(Boolean);
+
+        if (!customerIds.length) {
+            return input;
+        }
+
+        const { data, error } = await this.supabase
+            .from('customer_feedback_stats')
+            .select('customer_id, feedback_count, average_rating, last_feedback_submitted_at, positive_feedback_count')
+            .in('customer_id', customerIds);
+
+        if (error) {
+            console.warn('[SupabaseStorage] attachCustomerFeedbackStats skipped:', error.message);
+            return input;
+        }
+
+        const statsByCustomerId = new Map(
+            (data || []).map((row: any) => [
+                row.customer_id,
+                this.mapDates(row),
+            ])
+        );
+
+        const mergeStats = (customer: any) => {
+            const stats = statsByCustomerId.get(customer.id);
+            if (!stats) return customer;
+
+            return {
+                ...customer,
+                feedbackCount: typeof stats.feedbackCount === 'number' ? stats.feedbackCount : Number(stats.feedbackCount || 0),
+                averageRating: stats.averageRating === null || stats.averageRating === undefined
+                    ? null
+                    : Number(stats.averageRating),
+                lastFeedbackSubmittedAt: stats.lastFeedbackSubmittedAt || null,
+                positiveFeedbackCount: typeof stats.positiveFeedbackCount === 'number'
+                    ? stats.positiveFeedbackCount
+                    : Number(stats.positiveFeedbackCount || 0),
+            };
+        };
+
+        if (Array.isArray(input)) {
+            return input.map(mergeStats) as T;
+        }
+
+        return mergeStats(input) as T;
     }
 
 
@@ -379,6 +447,15 @@ export class SupabaseStorage {
             // Delivery earnings & analytics mappings
             'deliveryEarningsCalculated': 'delivery_earnings_calculated',
             'isCreditOrder': 'is_credit_order',
+<<<<<<< Updated upstream
+=======
+            'walletUsed': 'wallet_used',
+            'creditUsed': 'credit_used',
+            'customerRating': 'customer_rating',
+            'feedbackComment': 'feedback_comment',
+            'feedbackMetadata': 'feedback_metadata',
+            'feedbackSubmittedAt': 'feedback_submitted_at',
+>>>>>>> Stashed changes
             'deliveredAt': 'delivered_at',
             'deliveryPartnerId': 'delivery_partner_id',
             'perOrderSalary': 'per_order_salary',
@@ -625,7 +702,7 @@ export class SupabaseStorage {
     async getCustomer(id: string): Promise<Customer | undefined> {
         const { data: customer, error } = await this.supabase.from('customers').select('*').eq('id', id).single();
         if (error) return undefined;
-        return this.mapDates(customer);
+        return this.attachCustomerFeedbackStats(this.mapDates(customer));
     }
 
     async updateCustomer(id: string, data: Partial<InsertCustomer>): Promise<Customer | undefined> {
@@ -723,7 +800,7 @@ export class SupabaseStorage {
         }
         
         return {
-            data: (data || []).map(item => this.mapDates(item)),
+            data: await this.attachCustomerFeedbackStats((data || []).map(item => this.mapDates(item))),
             totalCount: count || 0
         };
     }

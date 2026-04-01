@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TEST_IDS, getTestId } from '@/lib/test-ids';
 import { formatCurrency } from '@/lib/data-service';
+import { getPublicTrackOrderUrl } from '@/lib/public-website';
 import { Package, ChevronRight } from 'lucide-react';
 import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
 import { useLocation } from 'wouter';
@@ -144,7 +145,7 @@ export const DashboardRecentOrders: React.FC<DashboardRecentOrdersProps> = React
                       className="h-6 text-[10px] px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
                       onClick={(e) => {
                         e.stopPropagation();
-                        window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank');
+                        window.open(getPublicTrackOrderUrl(order.orderNumber || order.id), '_blank');
                       }}
                       title="Track Order"
                     >

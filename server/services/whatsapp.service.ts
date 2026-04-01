@@ -22,6 +22,7 @@ const TEMPLATES = {
 // App base URL for tracking links and terms pages
 // Configure via environment variable: APP_BASE_URL=https://erp.myfabclean.com
 const APP_BASE_URL = process.env.APP_BASE_URL || 'https://erp.myfabclean.com';
+const PUBLIC_WEBSITE_URL = (process.env.PUBLIC_WEBSITE_URL || 'https://www.myfabclean.com').replace(/\/$/, '');
 
 // Max number of resends allowed per order
 export const MAX_RESENDS = 3;
@@ -57,6 +58,7 @@ interface OrderStatusUpdateMessageParams {
 interface FeedbackMessageParams {
     phoneNumber: string;
     customerName: string;
+    orderId?: string;
     orderNumber: string;
 }
 
@@ -330,7 +332,7 @@ export async function sendOrderStatusUpdateNotification({
         console.log(`📱 [WhatsApp] Sending Status Update to ${cleanPhone}`);
         console.log(`📄 [WhatsApp] Template: ${template.name} (status)`);
         console.log(`📋 [WhatsApp] Customer: ${customerName}, Order: ${orderNumber}, Status: ${status}`);
-        console.log(`🔗 [WhatsApp] Track URL: ${APP_BASE_URL}/trackorder/${cleanOrderNumber}`);
+        console.log(`🔗 [WhatsApp] Track URL: ${PUBLIC_WEBSITE_URL}/trackorder/${cleanOrderNumber}`);
 
         const response = await fetch(
             "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
@@ -386,6 +388,7 @@ export async function sendOrderStatusUpdateNotification({
 export async function sendCustomerFeedbackNotification({
     phoneNumber,
     customerName,
+    orderId,
     orderNumber,
 }: FeedbackMessageParams): Promise<SendResult> {
     const authKey = process.env.MSG91_AUTH_KEY;
@@ -398,7 +401,9 @@ export async function sendCustomerFeedbackNotification({
 
     const template = TEMPLATES.feedback;
     const cleanPhone = cleanPhoneNumber(phoneNumber);
+    const cleanOrderId = String(orderId || '').trim();
     const cleanOrderNumber = orderNumber.replace(/[#]/g, '').trim();
+    const feedbackLinkValue = cleanOrderId || cleanOrderNumber;
     const feedbackVideoUrl = process.env.WHATSAPP_FEEDBACK_VIDEO_URL || 'https://assets.myfabclean.com/Feedback%20mesage.mp4';
 
     const payload = {
@@ -429,7 +434,7 @@ export async function sendCustomerFeedbackNotification({
                             button_1: {
                                 subtype: "url",
                                 type: "text",
-                                value: cleanOrderNumber,
+                                value: feedbackLinkValue,
                             }
                         },
                     },
@@ -441,7 +446,7 @@ export async function sendCustomerFeedbackNotification({
     try {
         console.log(`📱 [WhatsApp] Sending Feedback to ${cleanPhone}`);
         console.log(`📄 [WhatsApp] Template: ${template.name} (feedback)`);
-        console.log(`🔗 [WhatsApp] Feedback URL suffix: ${cleanOrderNumber}`);
+        console.log(`🔗 [WhatsApp] Feedback URL: ${PUBLIC_WEBSITE_URL}/feedback?orderId=${feedbackLinkValue}`);
 
         const response = await fetch(
             "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
@@ -498,6 +503,7 @@ export async function sendCustomerFeedbackNotification({
  */
 export async function handleOrderStatusChange(
     order: {
+        id?: string | null;
         customerPhone?: string | null;
         customerName: string;
         orderNumber: string;
@@ -565,6 +571,7 @@ export async function handleOrderStatusChange(
         return await sendCustomerFeedbackNotification({
             phoneNumber: order.customerPhone,
             customerName: order.customerName,
+            orderId: order.id,
             orderNumber: order.orderNumber,
         });
     }

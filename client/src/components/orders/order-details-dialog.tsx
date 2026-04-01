@@ -32,6 +32,11 @@ import { formatCurrency, formatDate, getNextStatus } from "@/lib/data-service";
 import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { useInvoicePrint } from "@/hooks/use-invoice-print";
+<<<<<<< Updated upstream
+=======
+import { getOrderStoreLabel, resolveOrderStoreCodeFromOrder } from "@/lib/order-store";
+import { getPublicTrackOrderUrl } from "@/lib/public-website";
+>>>>>>> Stashed changes
 
 export interface OrderDetailsDialogProps {
   order: Order | null;
@@ -411,7 +416,7 @@ export default React.memo(function OrderDetailsDialog({
 
             <Button
               variant="outline"
-              onClick={() => window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank')}
+              onClick={() => window.open(getPublicTrackOrderUrl(order.orderNumber || order.id), '_blank')}
               className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
             >
               <Navigation className="h-4 w-4 mr-2" /> Track

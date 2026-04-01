@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useParams, Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Edit, Printer, X, CheckCircle, Clock, AlertCircle, XCircle, CreditCard, Truck, Package, Navigation } from 'lucide-react';
+import { ArrowLeft, Edit, Printer, X, CheckCircle, Clock, AlertCircle, XCircle, CreditCard, Truck, Package, Navigation, Star } from 'lucide-react';
 import { useInvoicePrint } from '@/hooks/use-invoice-print';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,11 @@ import { formatCurrency, formatDate, getNextStatus } from '@/lib/data-service';
 import type { Order } from "@shared/schema";
 import { cn } from '@/lib/utils';
 import LoadingSkeleton from '@/components/ui/loading-skeleton';
+<<<<<<< Updated upstream
+=======
+import EditOrderDialog from '@/components/orders/edit-order-dialog';
+import { getPublicTrackOrderUrl } from '@/lib/public-website';
+>>>>>>> Stashed changes
 
 const getStatusIcon = (status: Order['status']) => {
   switch (status) {
@@ -259,7 +264,7 @@ export default function OrderDetailPage() {
             variant="outline"
             size="sm"
             className="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 sm:w-auto"
-            onClick={() => window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank')}
+            onClick={() => window.open(getPublicTrackOrderUrl(order.orderNumber || order.id), '_blank')}
           >
             <Navigation className="h-4 w-4 mr-2" />
             Track Order
@@ -344,6 +349,51 @@ export default function OrderDetailPage() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Customer Feedback</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(order as any).customerRating ? (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: 5 }, (_, index) => (
+                      <Star
+                        key={index}
+                        className={cn(
+                          "h-5 w-5",
+                          index < Number((order as any).customerRating)
+                            ? "fill-amber-400 text-amber-400"
+                            : "text-slate-300"
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+                    {(order as any).customerRating}/5 Rating
+                  </Badge>
+                  {(order as any).feedbackSubmittedAt && (
+                    <span className="text-sm text-muted-foreground">
+                      Submitted {formatDate((order as any).feedbackSubmittedAt)}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Comment</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
+                    {(order as any).feedbackComment || 'No written comment provided.'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-muted-foreground">
+                No customer feedback has been submitted for this order yet.
+              </div>
+            )}
           </CardContent>
         </Card>
 
