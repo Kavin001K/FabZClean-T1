@@ -39,6 +39,7 @@ import { ordersApi, formatCurrency } from "@/lib/data-service";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { Order, OrderItem } from "@shared/schema";
+import { buildThermalTagPrintHtml, prepareThermalTags } from "@/lib/garment-tag-layout";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -224,150 +225,38 @@ export default function PrintTags() {
             return;
         }
 
+        const preparedTags = targetOrders.flatMap((order) => prepareThermalTags({
+            orderNumber: order.orderNumber,
+            customerName: order.customerName,
+            franchiseId: (order as any).franchiseId || (order as any).franchise_id || null,
+            storeCode: (order as any).storeCode || undefined,
+            commonNote: (order as any).specialInstructions || (order as any).special_instructions || undefined,
+            dueDate: (order as any).pickupDate
+                ? String((order as any).pickupDate)
+                : (order as any).dueDate
+                    ? String((order as any).dueDate)
+                    : undefined,
+            items: (Array.isArray(order.items) ? order.items : []).map((item: OrderItem) => ({
+                orderNumber: order.orderNumber,
+                serviceName: item.serviceName || item.customName || "Item",
+                tagNote: item.tagNote || "",
+                quantity: item.quantity || 1,
+                customerName: order.customerName,
+            })),
+        }));
+
+        if (preparedTags.length === 0) {
+            toast({ title: "No printable tags", description: "The selected orders do not contain any tag items.", variant: "destructive" });
+            return;
+        }
+
         const tagWindow = window.open("", "_blank", "width=600,height=800");
         if (!tagWindow) {
             toast({ title: "Popup blocked", description: "Please allow popups", variant: "destructive" });
             return;
         }
 
-        // Expand each order's items by quantity, producing one tag per unit
-        const allTagsHtml = (targetOrders as Order[]).map(order => {
-            const items = Array.isArray(order.items) ? order.items : [];
-            const shortId = (order.orderNumber || "").slice(-5).toUpperCase();
-            const customer = (order.customerName || "Customer").toUpperCase();
-            const rawDue = (order as any).pickupDate;
-            const dueDate = rawDue
-                ? new Date(rawDue).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
-                : "—";
-
-            return items.map((item: OrderItem) => {
-                const qty = item.quantity || 1;
-                const serviceName = (item.serviceName || item.customName || "Item").toUpperCase();
-                const note = item.tagNote || "";
-                const tags = [];
-                for (let i = 1; i <= qty; i++) {
-                    tags.push(`
-                        <div class="tag">
-                            <div class="tag-top">
-                                <span class="order-id">${shortId}</span>
-                                <span class="customer">${customer}</span>
-                            </div>
-                            <div class="service">${serviceName}</div>
-                            ${note ? `<div class="note">${note}</div>` : ""}
-                            <div class="tag-footer">
-                                <span class="due-date">DUE: ${dueDate}</span>
-                                <span class="count">${i} of ${qty}</span>
-                            </div>
-                        </div>
-                    `);
-                }
-                return tags.join("");
-            }).join("");
-        }).join("");
-
-        tagWindow.document.write(`<!DOCTYPE html><html><head>
-      <meta charset="UTF-8">
-      <title>Garment Tags - ${targetOrders.length} Orders</title>
-      <style>
-        /* Allow printer to determine page size. Some barcode printers need 'portrait' or 'landscape' depending on feed direction. We'll use auto to respect printer settings. */
-        @page { margin: 0; }
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
-        body { font-family: 'Inter', 'Consolas', 'Courier New', monospace; background: #fff; padding: 0; margin: 0; color: #000; }
-
-        .no-print { display: block; }
-        @media print { 
-            .no-print { display: none !important; } 
-            body { padding: 0; margin: 0; }
-            .tag { border: none !important; border-bottom: 1px dashed #ccc !important; }
-        }
-
-        .print-bar { position: sticky; top: 0; background: white; padding: 10px; text-align: center; border-bottom: 1px solid #e4e4e7; z-index: 100; margin-bottom: 5px; }
-        .print-button { padding: 8px 24px; background: #2563eb; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 700; cursor: pointer; }
-
-        /* Continuous single-column flex layout for barcode continuous rolls */
-        .tags-grid { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: flex-start;
-            padding: 0; 
-            margin: 0;
-            gap: 2mm; /* Space between tags */
-        }
-
-        .tag {
-          width: 50mm; /* Standard barcode label width */
-          height: 30mm; /* Standard barcode label height */
-          padding: 1.5mm 2mm;
-          background: #fff;
-          border: 1px dashed #000;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-          page-break-inside: avoid;
-          break-inside: avoid;
-          position: relative;
-        }
-
-        .tag-top {
-          display: flex;
-          align-items: baseline;
-          justify-content: space-between;
-          padding-bottom: 0.5mm;
-          border-bottom: 1px solid #aaa;
-          flex-shrink: 0;
-        }
-
-        .order-id { font-size: 7.5pt; font-weight: 900; color: #000; text-transform: uppercase; }
-        .customer { font-size: 7.5pt; font-weight: 800; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65%; text-align: right; }
-
-        .service {
-          text-align: center;
-          font-size: 9.5pt;
-          font-weight: 900;
-          color: #000;
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          text-transform: uppercase;
-          word-break: break-word;
-          line-height: 1.1;
-          padding: 1mm 0;
-        }
-
-        .note {
-          text-align: center;
-          font-size: 6.5pt;
-          font-weight: 700;
-          color: #000;
-          padding-bottom: 0.5mm;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .tag-footer {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-end;
-          padding-top: 0.5mm;
-          border-top: 1px solid #aaa;
-          flex-shrink: 0;
-        }
-
-        .due-date { font-size: 6.5pt; font-weight: 800; color: #000; }
-        .count { font-size: 7.5pt; font-weight: 900; color: #000; }
-      </style>
-    </head><body>
-      <div class="print-bar no-print">
-        <button class="print-button" onclick="window.print()">Print Tags</button>
-      </div>
-      <div class="tags-grid">
-        ${allTagsHtml}
-      </div>
-      <script>window.onload=function(){ setTimeout(() => window.print(), 500); }<\/script>
-    </body></html>`);
+        tagWindow.document.write(buildThermalTagPrintHtml(preparedTags, `Garment Tags - ${targetOrders.length} Orders`));
         tagWindow.document.close();
     }, [toast]);
 

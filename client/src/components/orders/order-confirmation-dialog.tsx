@@ -468,14 +468,24 @@ export function OrderConfirmationDialog({
 
     // Helper function to upload PDF to server
     const uploadPDFToServer = async (pdfBlob: Blob, invoiceData: any): Promise<any> => {
+        const metadataCustomerName =
+            invoiceData?.customerInfo?.name ||
+            invoiceData?.customer?.name ||
+            order?.customerName ||
+            'Customer';
+        const metadataOrderNumber =
+            order?.orderNumber ||
+            invoiceData?.orderNumber ||
+            invoiceData?.invoiceNumber;
+
         const formData = new FormData();
         const filename = `invoice-${invoiceData.invoiceNumber}-${Date.now()}.pdf`;
         formData.append('file', pdfBlob, filename);
         formData.append('type', 'invoice');
         formData.append('metadata', JSON.stringify({
             invoiceNumber: invoiceData.invoiceNumber,
-            orderNumber: order?.orderNumber,
-            customerName: invoiceData.customer.name,
+            orderNumber: metadataOrderNumber,
+            customerName: metadataCustomerName,
             amount: invoiceData.total,
             status: 'sent',
         }));
@@ -660,6 +670,7 @@ export function OrderConfirmationDialog({
                 onOpenChange={setShowTagPrint}
                 orderNumber={order?.orderNumber || ''}
                 customerName={order?.customerName}
+                franchiseId={(order as any)?.franchiseId || (order as any)?.franchise_id || null}
                 storeCode={'FAB'}
                 commonNote={(order as any)?.specialInstructions || (order as any)?.special_instructions || undefined}
                 isExpressOrder={(order as any)?.isExpressOrder || (order as any)?.is_express_order || false}

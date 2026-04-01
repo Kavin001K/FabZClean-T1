@@ -82,6 +82,8 @@ import {
   PlusCircle,
   Settings,
   Zap,
+  Loader2,
+  MessageCircle,
 } from "lucide-react";
 
 // Data Service
@@ -89,6 +91,8 @@ import { ordersApi, formatCurrency, formatDate, authorizedFetch } from '@/lib/da
 import { exportOrdersToCSV } from '@/lib/export-utils';
 import { exportOrdersEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportOrdersToExcel } from '@/lib/excel-exports';
+import { smartItemSummary } from '@/lib/item-summarizer';
+import { MAX_WHATSAPP_SENDS, WhatsAppService } from '@/lib/whatsapp-service';
 import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { isElectron, isMac } from "@/lib/utils";
@@ -112,6 +116,21 @@ interface PaginationState {
 }
 
 type ViewMode = 'table' | 'timeline';
+
+const getBillWhatsappStatus = (order: Order): string => {
+  return String((order as any).lastWhatsappStatus || '').trim();
+};
+
+const hasBillSendFailed = (order: Order): boolean => {
+  const status = getBillWhatsappStatus(order);
+  return status.startsWith('Order Confirmation Failed') || status.startsWith('Bill Updated - Failed');
+};
+
+const canShowSendBillAction = (order: Order): boolean => {
+  const phone = order.customerPhone || (order as any).customerPhone;
+  const sendCount = Number((order as any).whatsappMessageCount || 0);
+  return Boolean(phone) && hasBillSendFailed(order) && sendCount < MAX_WHATSAPP_SENDS;
+};
 
 function OrdersComponent() {
   const { toast } = useToast();
@@ -166,6 +185,7 @@ function OrdersComponent() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedPaymentOrder, setSelectedPaymentOrder] = useState<Order | null>(null);
+  const [sendingBillOrderId, setSendingBillOrderId] = useState<string | null>(null);
 
   // Data Fetching with React Query
   const {
@@ -472,6 +492,66 @@ function OrdersComponent() {
     },
   });
 
+  const resendBillMutation = useMutation({
+    mutationFn: async (order: Order) => {
+      const customerPhone = order.customerPhone || (order as any).customerPhone;
+      if (!customerPhone) {
+        throw new Error('Customer phone number is missing for this order.');
+      }
+
+      const sendCount = Number((order as any).whatsappMessageCount || 0);
+      if (sendCount >= MAX_WHATSAPP_SENDS) {
+        throw new Error(`Maximum ${MAX_WHATSAPP_SENDS} WhatsApp bill attempts reached for this order.`);
+      }
+
+      const orderNumber = order.orderNumber || order.id;
+      const amount = parseFloat(String(order.totalAmount || '0')) || 0;
+      const items = Array.isArray((order as any).items) ? (order as any).items : [];
+      const itemSummary = smartItemSummary(items) || (order as any).service || 'Laundry Items';
+
+      const result = await WhatsAppService.sendOrderBill(
+        customerPhone,
+        orderNumber,
+        order.customerName || 'Customer',
+        amount,
+        `${window.location.origin}/bill/${encodeURIComponent(orderNumber)}`,
+        (order as any).invoiceUrl || undefined,
+        itemSummary,
+        sendCount
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send WhatsApp bill.');
+      }
+
+      return { order, result };
+    },
+    onMutate: async (order) => {
+      setSendingBillOrderId(order.id);
+      toast({
+        title: 'Sending Bill',
+        description: `Retrying WhatsApp bill for ${order.orderNumber || order.id}...`,
+      });
+    },
+    onSuccess: ({ order }) => {
+      toast({
+        title: 'Bill Sent',
+        description: `WhatsApp bill sent for ${order.orderNumber || order.id}.`,
+      });
+    },
+    onError: (error: any, order) => {
+      toast({
+        title: 'Bill Send Failed',
+        description: error?.message || `Could not send WhatsApp bill for ${order.orderNumber || order.id}.`,
+        variant: 'destructive',
+      });
+    },
+    onSettled: async () => {
+      setSendingBillOrderId(null);
+      await queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+  });
+
   // Event Handlers
   const handleSort = useCallback((field: keyof Order) => {
     if (sortField === field) {
@@ -537,6 +617,10 @@ function OrdersComponent() {
   const handlePrintInvoice = useCallback((order: Order) => {
     printInvoice(order);
   }, [printInvoice]);
+
+  const handleSendBill = useCallback((order: Order) => {
+    resendBillMutation.mutate(order);
+  }, [resendBillMutation]);
 
   const handleNextStep = useCallback((order: Order) => {
     let nextStatus: string | null = null;
@@ -1292,6 +1376,20 @@ function OrdersComponent() {
                     <Eye className="mr-2 h-4 w-4" /> View Details
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  {canShowSendBillAction(order) && (
+                    <DropdownMenuItem
+                      onClick={() => handleSendBill(order)}
+                      disabled={sendingBillOrderId === order.id}
+                    >
+                      {sendingBillOrderId === order.id ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <MessageCircle className="mr-2 h-4 w-4" />
+                      )}
+                      Send Bill
+                    </DropdownMenuItem>
+                  )}
+                  {canShowSendBillAction(order) && <DropdownMenuSeparator />}
                   {order.paymentStatus !== 'paid' && (
                     <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedPaymentOrder(order); setIsPaymentModalOpen(true); }}>
                       <IndianRupee className="mr-2 h-4 w-4" /> Process Payment
@@ -1365,6 +1463,19 @@ function OrdersComponent() {
               <DropdownMenuItem onClick={() => handlePrintInvoice(order)}>
                 <Printer className="mr-2 h-4 w-4" /> Print Invoice
               </DropdownMenuItem>
+              {canShowSendBillAction(order) && (
+                <DropdownMenuItem
+                  onClick={() => handleSendBill(order)}
+                  disabled={sendingBillOrderId === order.id}
+                >
+                  {sendingBillOrderId === order.id ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                  )}
+                  Send Bill
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               {order.status === 'processing' && <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>Mark as Completed</DropdownMenuItem>}
               {order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit' && (
@@ -1388,7 +1499,7 @@ function OrdersComponent() {
         </div>
       </div>
     );
-  }, [isMobile, selectedOrders, ordersGridColumns, getStatusColor, getStatusIcon, getPaymentStatusColor, handleSelectOrder, handleViewOrder, handleEditOrder, handlePrintInvoice, handleUpdateStatus, handleDebitFromWallet, handleCancelOrder, setIsPaymentModalOpen, setSelectedPaymentOrder]);
+  }, [isMobile, selectedOrders, ordersGridColumns, getStatusColor, getStatusIcon, getPaymentStatusColor, handleSelectOrder, handleViewOrder, handleEditOrder, handlePrintInvoice, handleSendBill, handleUpdateStatus, handleDebitFromWallet, handleCancelOrder, sendingBillOrderId, setIsPaymentModalOpen, setSelectedPaymentOrder]);
 
   const OrderHeaders = (
     <div className={`grid ${ordersGridColumns} gap-4 items-center px-4 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase select-none`}>
@@ -2234,6 +2345,22 @@ function OrdersComponent() {
                                           <Printer className="h-4 w-4" />
                                           Print
                                         </Button>
+                                        {canShowSendBillAction(order) && (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleSendBill(order)}
+                                            className="gap-2"
+                                            disabled={sendingBillOrderId === order.id}
+                                          >
+                                            {sendingBillOrderId === order.id ? (
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <MessageCircle className="h-4 w-4" />
+                                            )}
+                                            Send Bill
+                                          </Button>
+                                        )}
 
                                         {/* More Actions Dropdown */}
                                         <DropdownMenu>

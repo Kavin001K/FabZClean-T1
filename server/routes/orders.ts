@@ -209,6 +209,11 @@ const schedulePostCreateTasks = (
     // --- AUTOMATED WHATSAPP BILL SENDING ---
     if (order.customerPhone) {
       try {
+        if (!order.invoiceUrl) {
+          console.log(`ℹ️ [WhatsApp Background] Skipping auto-bill for ${order.orderNumber}: invoice PDF URL is not ready yet`);
+          return;
+        }
+
         console.log(`📱 [WhatsApp Background] Triggering auto-bill for ${order.orderNumber}`);
         
         // We use handleOrderStatusChange with 'pending' status which logic already handles billing in newer versions
@@ -223,7 +228,7 @@ const schedulePostCreateTasks = (
             status: 'pending',
             fulfillmentType: order.fulfillmentType || 'pickup',
             items: order.items || [],
-            invoiceUrl: order.invoiceUrl || null,
+            invoiceUrl: order.invoiceUrl,
             invoiceNumber: order.orderNumber,
           },
           null // No previous status
