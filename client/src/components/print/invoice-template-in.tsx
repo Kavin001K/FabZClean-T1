@@ -1,12 +1,26 @@
 import React from 'react';
 import { getFranchiseById, getFormattedAddress } from '@/lib/franchise-config';
 import { parseAndFormatAddress } from '@/lib/address-utils';
+import {
+  CalendarDays,
+  CircleDollarSign,
+  Clock3,
+  FileText,
+  type LucideIcon,
+  Mail,
+  MapPin,
+  Phone,
+  ReceiptText,
+  Shirt,
+  Store,
+  Truck,
+  UserRound,
+} from 'lucide-react';
 
-// Fixed Company GST Number
 const COMPANY_GSTIN = '33AITPD3522F1ZK';
 const COMPANY_PAN = 'AITPD3522F';
 
-interface InvoiceData {
+export interface InvoiceData {
   invoiceNumber: string;
   invoiceDate: string;
   dueDate: string;
@@ -17,37 +31,37 @@ interface InvoiceData {
     address: string;
     phone: string;
     email: string;
-    taxId: string;
+    taxId?: string | null;
     logo?: string;
   };
   customer: {
-    id?: string;
+    id?: string | null;
     name: string;
-    address: string;
-    phone: string;
-    email: string;
-    taxId?: string;
+    address: string | Record<string, unknown>;
+    phone: string | null;
+    email: string | null;
+    taxId?: string | null;
   };
   items: Array<{
     description: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
+    quantity: number | string;
+    unitPrice: number | string;
+    total: number | string;
     taxRate?: number;
     hsn?: string;
   }>;
-  subtotal: number;
-  taxAmount: number;
-  deliveryCharges?: number;
-  expressSurcharge?: number;
-  total: number;
-  paymentTerms: string;
+  subtotal: number | string;
+  taxAmount?: number | string;
+  deliveryCharges?: number | string;
+  expressSurcharge?: number | string;
+  total: number | string;
+  paymentTerms?: string;
   notes?: string;
   qrCode?: string;
   signature?: string;
   isExpressOrder?: boolean;
-  fulfillmentType?: 'pickup' | 'delivery';
-  deliveryAddress?: string | any;
+  fulfillmentType?: string;
+  deliveryAddress?: unknown;
   paymentBreakdown?: {
     walletDeducted: number;
     cashPaid: number;
@@ -58,28 +72,25 @@ interface InvoiceData {
   };
 }
 
-// Utility functions
-const formatIndianCurrency = (amount: number): string => {
-  return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+const formatIndianCurrency = (amount: number): string =>
+  `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const formatCompactCurrency = (amount: number): string => {
-  return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-};
+const formatCompactCurrency = (amount: number): string =>
+  `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
-// Number to words converter (Indian format)
 const convertToWords = (num: number): string => {
-  if (num === 0) return 'Zero Rupees';
+  if (num === 0) return 'Zero Rupees Only';
+
   const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
   const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
   const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
 
-  const convertLessThanThousand = (n: number): string => {
-    if (n === 0) return '';
-    if (n < 10) return ones[n];
-    if (n < 20) return teens[n - 10];
-    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
-    return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' and ' + convertLessThanThousand(n % 100) : '');
+  const convertLessThanThousand = (value: number): string => {
+    if (value === 0) return '';
+    if (value < 10) return ones[value];
+    if (value < 20) return teens[value - 10];
+    if (value < 100) return `${tens[Math.floor(value / 10)]}${value % 10 ? ` ${ones[value % 10]}` : ''}`;
+    return `${ones[Math.floor(value / 100)]} Hundred${value % 100 ? ` and ${convertLessThanThousand(value % 100)}` : ''}`;
   };
 
   let rupees = Math.floor(num);
@@ -87,818 +98,892 @@ const convertToWords = (num: number): string => {
   let result = '';
 
   if (rupees >= 10000000) {
-    result += convertLessThanThousand(Math.floor(rupees / 10000000)) + ' Crore ';
+    result += `${convertLessThanThousand(Math.floor(rupees / 10000000))} Crore `;
     rupees %= 10000000;
   }
   if (rupees >= 100000) {
-    result += convertLessThanThousand(Math.floor(rupees / 100000)) + ' Lakh ';
+    result += `${convertLessThanThousand(Math.floor(rupees / 100000))} Lakh `;
     rupees %= 100000;
   }
   if (rupees >= 1000) {
-    result += convertLessThanThousand(Math.floor(rupees / 1000)) + ' Thousand ';
+    result += `${convertLessThanThousand(Math.floor(rupees / 1000))} Thousand `;
     rupees %= 1000;
   }
   if (rupees > 0) {
     result += convertLessThanThousand(rupees);
   }
 
-  result = result.trim() + ' Rupees';
+  result = `${result.trim()} Rupees`;
   if (paise > 0) {
-    result += ' and ' + convertLessThanThousand(paise) + ' Paise';
+    result += ` and ${convertLessThanThousand(paise)} Paise`;
   }
-  return result + ' Only';
+
+  return `${result} Only`;
 };
+
+const safeNumber = (value: unknown): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const formatDisplayDate = (value: string) =>
+  new Date(value).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+
+const iconBoxStyle = (accentSoft: string, borderColor: string): React.CSSProperties => ({
+  width: '28px',
+  height: '28px',
+  borderRadius: '9px',
+  background: accentSoft,
+  border: `1px solid ${borderColor}`,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+});
+
+const sectionTitleStyle = (accent: string): React.CSSProperties => ({
+  fontSize: '11px',
+  fontWeight: 800,
+  letterSpacing: '0.16em',
+  textTransform: 'uppercase',
+  color: accent,
+  margin: 0,
+});
 
 const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
   if (!data) {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center', color: 'red' }}>
-        Error: Invoice data is missing
-      </div>
-    );
+    return <div style={{ padding: 24, color: '#b91c1c', textAlign: 'center' }}>Invoice data is missing.</div>;
   }
 
   const {
     invoiceNumber = 'INV-000',
     invoiceDate = new Date().toISOString(),
     dueDate = new Date().toISOString(),
+    company,
     customer,
     items = [],
     subtotal = 0,
+    taxAmount = 0,
     deliveryCharges = 0,
     expressSurcharge = 0,
     total = 0,
+    paymentTerms,
+    notes,
     qrCode,
     enableGST = false,
     franchiseId,
     isExpressOrder = false,
     fulfillmentType = 'pickup',
-    deliveryAddress: explicitDeliveryAddress,
+    deliveryAddress,
     paymentBreakdown,
   } = data;
 
-  // Parse customer address
-  const formattedAddress = parseAndFormatAddress(customer?.address);
-
-  const safeCustomer = {
-    id: customer?.id || '',
-    name: customer?.name || 'Customer',
-    address: formattedAddress,
-    phone: customer?.phone || 'N/A',
-    email: customer?.email || '',
-  };
-
-  // Get franchise details
   const franchise = getFranchiseById(franchiseId);
+  const accent = isExpressOrder ? '#c2410c' : '#0f766e';
+  const accentSoft = isExpressOrder ? '#fff7ed' : '#ecfdf5';
+  const accentBorder = isExpressOrder ? '#fdba74' : '#99f6e4';
+  const headingInk = '#0f172a';
+  const bodyInk = '#334155';
+  const mutedInk = '#64748b';
+  const panel = '#ffffff';
+  const panelSoft = '#f8fafc';
+  const line = '#e2e8f0';
+  const shadow = '0 22px 60px rgba(15, 23, 42, 0.08)';
+
+  const safeItems = Array.isArray(items) ? items : [];
+  const customerAddress = parseAndFormatAddress(customer?.address);
+  const resolvedDeliveryAddress = typeof deliveryAddress === 'string'
+    ? deliveryAddress
+    : parseAndFormatAddress(deliveryAddress);
 
   const companyDetails = {
-    name: "Fab Clean",
-    branchName: franchise?.name || 'Fab Clean',
-    address: franchise ? getFormattedAddress(franchise) : 'Pollachi, Tamil Nadu',
-    phone: franchise?.phone || '+91 93630 59595',
-    email: franchise?.email || "support@myfabclean.com",
-    gstin: COMPANY_GSTIN,
+    name: company?.name || 'Fab Clean',
+    branchName: franchise?.name || company?.name || 'Fab Clean',
+    address: franchise ? getFormattedAddress(franchise) : company?.address || 'Pollachi, Tamil Nadu',
+    phone: franchise?.phone || company?.phone || '+91 93630 59595',
+    email: franchise?.email || company?.email || 'support@myfabclean.com',
+    gstin: company?.taxId || COMPANY_GSTIN,
     pan: COMPANY_PAN,
+    logo: company?.logo || '/assets/logo.webp',
   };
 
-  // Calculate GST (18% split as 9% CGST + 9% SGST for intra-state)
-  const GST_RATE = 18;
-  const safeItems = Array.isArray(items) ? items : [];
+  const itemSubtotal = safeItems.reduce((sum, item) => sum + safeNumber(item?.total), 0);
+  const serviceSubtotal = safeNumber(subtotal) > 0 ? safeNumber(subtotal) : itemSubtotal;
+  const deliveryTotal = Math.max(0, safeNumber(deliveryCharges));
+  const expressTotal = Math.max(0, safeNumber(expressSurcharge));
+  const chargeSubtotal = deliveryTotal + expressTotal;
+  const derivedTax = Math.max(0, safeNumber(taxAmount) || (enableGST ? Math.max(0, safeNumber(total) - serviceSubtotal - chargeSubtotal) : 0));
+  const grandTotal = Math.max(0, safeNumber(total) || (serviceSubtotal + chargeSubtotal + derivedTax));
+  const cgstAmount = enableGST ? derivedTax / 2 : 0;
+  const sgstAmount = enableGST ? derivedTax / 2 : 0;
+  const orderCode = invoiceNumber ? invoiceNumber.slice(-5) : 'INVC';
 
-  // Calculate totals
-  const itemsSubtotal = safeItems.reduce((sum, item) => sum + (item?.total || 0), 0);
-  const baseAmount = itemsSubtotal + (deliveryCharges || 0);
+  const paymentStatus = paymentBreakdown
+    ? paymentBreakdown.creditOutstanding > 0
+      ? 'Credit Pending'
+      : 'Paid'
+    : 'Pending';
 
-  // GST Calculation
-  const cgstAmount = enableGST ? (baseAmount * 9) / 100 : 0;
-  const sgstAmount = enableGST ? (baseAmount * 9) / 100 : 0;
-  const totalGST = cgstAmount + sgstAmount;
-  const grandTotal = enableGST ? (baseAmount + totalGST) : baseAmount;
-
-  // Premium color palette
-  const colors = {
-    primary: isExpressOrder ? '#ea580c' : '#059669',      // Express Orange or Emerald-600
-    primaryDark: isExpressOrder ? '#c2410c' : '#047857',  // Dark Orange or Emerald-700
-    primaryLight: isExpressOrder ? '#fb923c' : '#10b981', // Light Orange or Emerald-500
-    accent: '#f59e0b',       // Amber-500
-    dark: '#1f2937',         // Gray-800
-    text: '#374151',         // Gray-700
-    textLight: '#6b7280',    // Gray-500
-    border: '#e5e7eb',       // Gray-200
-    background: '#f9fafb',   // Gray-50
-    white: '#ffffff',
-    success: '#22c55e',      // Green-500
-    express: '#ea580c',      // Orange for EXPRESS
-    expressLight: '#fff7ed', // Light Orange bg
-  };
-
-  // Determine invoice type
-  const invoiceType = enableGST ? 'TAX INVOICE' : 'INVOICE';
+  const invoiceMetaRows: Array<{ label: string; value: string; Icon: LucideIcon }> = [
+    { label: 'Issued On', value: formatDisplayDate(invoiceDate), Icon: CalendarDays },
+    { label: 'Due / Pickup', value: formatDisplayDate(dueDate), Icon: Clock3 },
+    { label: 'Fulfillment', value: fulfillmentType === 'delivery' ? 'Home Delivery' : 'Store Pickup', Icon: fulfillmentType === 'delivery' ? Truck : Store },
+    { label: 'Payment Status', value: paymentStatus, Icon: CircleDollarSign },
+  ];
 
   return (
-    <div style={{
-      backgroundColor: colors.white,
-      width: '210mm',
-      minHeight: '297mm',
-      fontFamily: "'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif",
-      fontSize: '12px',
-      lineHeight: '1.5',
-      color: colors.text,
-      margin: '0 auto',
-      position: 'relative',
-      boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
-      overflow: 'hidden',
-    }}>
+    <div
+      style={{
+        width: '210mm',
+        margin: '0 auto',
+        background: '#f4f8fb',
+        color: bodyInk,
+        fontFamily: '"Aptos", "Segoe UI Variable", "Segoe UI", sans-serif',
+      }}
+    >
+      <style>{`
+        @page {
+          size: A4;
+          margin: 9mm 8mm 12mm;
+        }
 
-      {/* Fab Clean Logo Watermark - Appears on ALL invoices */}
-      <div style={{
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        opacity: 0.04,
-        pointerEvents: 'none',
-        zIndex: 0,
-        userSelect: 'none',
-      }}>
-        <img
-          src="/assets/logo.webp"
-          alt=""
-          style={{
-            width: '400px',
-            height: 'auto',
-            filter: 'grayscale(100%)',
-          }}
-        />
-      </div>
+        .invoice-shell {
+          background: #ffffff;
+          box-shadow: ${shadow};
+          min-height: 297mm;
+          position: relative;
+          overflow: hidden;
+        }
 
-      {/* Header Section */}
-      <div style={{
-        background: `linear-gradient(135deg, ${colors.primaryDark} 0%, ${colors.primary} 50%, ${colors.primaryLight} 100%)`,
-        color: colors.white,
-        padding: '30px 40px',
-        position: 'relative',
-        overflow: 'hidden',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        {/* Decorative circles */}
-        <div style={{
-          position: 'absolute',
-          right: '-50px',
-          top: '-50px',
-          width: '200px',
-          height: '200px',
-          borderRadius: '50%',
-          background: 'rgba(255,255,255,0.1)',
-        }}></div>
+        .invoice-shell::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(circle at top right, ${isExpressOrder ? 'rgba(251,146,60,0.14)' : 'rgba(20,184,166,0.12)'} 0%, transparent 26%),
+            radial-gradient(circle at bottom left, rgba(148, 163, 184, 0.08) 0%, transparent 20%);
+          pointer-events: none;
+        }
 
-        <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: '20px' }}>
-          {/* Logo Container */}
-          <div style={{
-            background: colors.white,
-            padding: '8px',
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-          }}>
-            <img
-              src="/assets/logo.webp"
-              alt="Fab Clean"
+        .invoice-body {
+          position: relative;
+          z-index: 1;
+          padding: 18mm 16mm 14mm;
+        }
+
+        .invoice-section,
+        .invoice-card,
+        .invoice-summary-card,
+        .invoice-notes-card,
+        .invoice-totals-card,
+        .invoice-payment-card {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        .invoice-items-table {
+          width: 100%;
+          border-collapse: collapse;
+          table-layout: fixed;
+          border: 1px solid ${line};
+          border-radius: 16px;
+          overflow: hidden;
+        }
+
+        .invoice-items-table thead {
+          display: table-header-group;
+        }
+
+        .invoice-items-table tr,
+        .invoice-items-table td,
+        .invoice-items-table th {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        .invoice-items-table th {
+          background: ${headingInk};
+          color: #ffffff;
+        }
+
+        .invoice-items-table tbody tr:nth-child(even) {
+          background: ${panelSoft};
+        }
+
+        .invoice-footer {
+          border-top: 1px solid ${line};
+          margin-top: 14mm;
+          padding-top: 6mm;
+        }
+
+        @media print {
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+          }
+
+          .invoice-shell {
+            box-shadow: none !important;
+          }
+        }
+      `}</style>
+
+      <div className="invoice-shell">
+        <div className="invoice-body">
+          <header
+            className="invoice-section"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1.15fr 0.85fr',
+              gap: '18px',
+              marginBottom: '18px',
+              alignItems: 'stretch',
+            }}
+          >
+            <div
               style={{
-                height: '50px',
-                width: 'auto',
-                objectFit: 'contain'
+                background: `linear-gradient(135deg, ${headingInk} 0%, ${accent} 100%)`,
+                color: '#ffffff',
+                borderRadius: '22px',
+                padding: '20px 22px',
+                position: 'relative',
+                overflow: 'hidden',
               }}
-            />
-          </div>
-
-          <div>
-            <h1 style={{
-              fontSize: '28px',
-              fontWeight: '800',
-              margin: '0',
-              letterSpacing: '-0.5px',
-              lineHeight: '1.2'
-            }}>
-              {companyDetails.name}
-            </h1>
-            <p style={{ fontSize: '12px', opacity: 0.9, margin: '2px 0 0 0' }}>
-              Premium Laundry & Dry Cleaning Services
-            </p>
-          </div>
-        </div>
-
-        {/* Invoice Meta */}
-        <div style={{ textAlign: 'right', position: 'relative', zIndex: 1 }}>
-          {/* EXPRESS Badge */}
-          {isExpressOrder && (
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'rgba(255,255,255,0.95)',
-              color: colors.express,
-              padding: '6px 14px',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: '800',
-              marginBottom: '8px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              letterSpacing: '1.5px',
-            }}>
-              ⚡ EXPRESS ORDER
-            </div>
-          )}
-          <div style={{
-            display: 'inline-block',
-            background: 'rgba(255,255,255,0.2)',
-            padding: '6px 16px',
-            borderRadius: '4px',
-            marginBottom: '6px',
-            backdropFilter: 'blur(4px)'
-          }}>
-            <span style={{ fontSize: '14px', fontWeight: '700', letterSpacing: '2px' }}>
-              {invoiceType}
-            </span>
-          </div>
-          <p style={{ fontSize: '18px', fontWeight: '700', margin: '0', fontFamily: 'monospace' }}>
-            #{invoiceNumber ? invoiceNumber.slice(-10) : ''}
-          </p>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div style={{ padding: '30px 40px' }}>
-
-        {/* Company & Customer Info Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginBottom: '30px' }}>
-
-          {/* From Section */}
-          <div style={{
-            background: colors.white, // Changed to white for subtlety
-            padding: '20px',
-            borderRadius: '10px',
-            border: `1px solid ${colors.border}`, // Simple border
-          }}>
-            <h3 style={{
-              fontSize: '10px',
-              fontWeight: '700',
-              color: colors.textLight, // Muted color
-              textTransform: 'uppercase',
-              letterSpacing: '1.5px',
-              margin: '0 0 12px 0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}>
-              From
-            </h3>
-            {/* Removed large Name since it is in Header */}
-            <p style={{ margin: '0 0 4px 0', color: colors.text, fontSize: '13px', lineHeight: '1.5' }}>
-              <strong>{companyDetails.address.split(',')[0]}</strong><br />
-              {companyDetails.address.split(',').slice(1).join(', ')}
-            </p>
-            <p style={{ margin: '8px 0 2px 0', color: colors.textLight, fontSize: '12px' }}>
-              📞 {companyDetails.phone}
-            </p>
-            <p style={{ margin: '0 0 8px 0', color: colors.textLight, fontSize: '12px' }}>
-              ✉️ {companyDetails.email}
-            </p>
-            {enableGST && (
-              <div style={{
-                marginTop: '10px',
-                paddingTop: '8px',
-                borderTop: `1px dashed ${colors.border}`,
-                fontSize: '11px',
-                color: colors.textLight
-              }}>
-                <p style={{ margin: '0 0 2px 0' }}>
-                  GSTIN: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: colors.dark }}>{companyDetails.gstin}</span>
-                </p>
-                <p style={{ margin: '0' }}>
-                  PAN: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: colors.dark }}>{companyDetails.pan}</span>
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Bill To Section */}
-          <div style={{
-            background: colors.background,
-            padding: '20px',
-            borderRadius: '10px',
-            border: `1px solid ${colors.border}`,
-          }}>
-            <h3 style={{
-              fontSize: '10px',
-              fontWeight: '700',
-              color: colors.primary,
-              textTransform: 'uppercase',
-              letterSpacing: '1.5px',
-              margin: '0 0 12px 0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}>
-              <span style={{ width: '4px', height: '12px', background: colors.accent, borderRadius: '2px' }}></span>
-              Bill To
-            </h3>
-            <p style={{ fontWeight: '700', fontSize: '16px', margin: '0 0 8px 0', color: colors.dark }}>
-              {safeCustomer.name}
-              {safeCustomer.id && (
-                <span style={{ 
-                  fontSize: '10px', 
-                  fontWeight: '500', 
-                  color: colors.primary, 
-                  background: `${colors.primary}10`,
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  marginLeft: '8px',
-                  verticalAlign: 'middle',
-                  fontFamily: 'monospace'
-                }}>
-                  ID: {safeCustomer.id}
-                </span>
-              )}
-            </p>
-            <p style={{ margin: '0 0 4px 0', color: colors.textLight, fontSize: '12px', maxWidth: '250px' }}>
-              {safeCustomer.address}
-            </p>
-            <p style={{ margin: '0', color: colors.textLight, fontSize: '12px' }}>
-              📞 {safeCustomer.phone}
-            </p>
-          </div>
-        </div>
-
-        {/* Invoice Details */}
-        <div style={{
-          display: 'flex',
-          gap: '20px',
-          marginBottom: '25px',
-        }}>
-          <div style={{
-            flex: 1,
-            background: `linear-gradient(135deg, ${colors.primary}15 0%, ${colors.primary}08 100%)`,
-            padding: '15px 20px',
-            borderRadius: '8px',
-            border: `1px solid ${colors.primary}30`,
-          }}>
-            <span style={{ fontSize: '10px', color: colors.textLight, textTransform: 'uppercase', letterSpacing: '1px' }}>Invoice Date</span>
-            <p style={{ margin: '4px 0 0 0', fontWeight: '700', fontSize: '14px', color: colors.dark }}>
-              {new Date(invoiceDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-            </p>
-          </div>
-          <div style={{
-            flex: 1,
-            background: `linear-gradient(135deg, ${colors.accent}15 0%, ${colors.accent}08 100%)`,
-            padding: '15px 20px',
-            borderRadius: '8px',
-            border: `1px solid ${colors.accent}30`,
-          }}>
-            <span style={{ fontSize: '10px', color: colors.textLight, textTransform: 'uppercase', letterSpacing: '1px' }}>Due Date</span>
-            <p style={{ margin: '4px 0 0 0', fontWeight: '700', fontSize: '14px', color: colors.dark }}>
-              {new Date(dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-            </p>
-          </div>
-          {enableGST && (
-            <div style={{
-              flex: 1,
-              background: `linear-gradient(135deg, ${colors.success}15 0%, ${colors.success}08 100%)`,
-              padding: '15px 20px',
-              borderRadius: '8px',
-              border: `1px solid ${colors.success}30`,
-            }}>
-              <span style={{ fontSize: '10px', color: colors.textLight, textTransform: 'uppercase', letterSpacing: '1px' }}>Supply Type</span>
-              <p style={{ margin: '4px 0 0 0', fontWeight: '700', fontSize: '14px', color: colors.dark }}>
-                Intra-State (TN)
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Fulfillment Details Section */}
-        <div style={{
-          marginBottom: '25px',
-          padding: '15px 20px',
-          borderRadius: '10px',
-          border: `1px solid ${colors.border}`,
-          background: fulfillmentType === 'delivery' ? `${colors.accent}05` : `${colors.success}05`,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              background: fulfillmentType === 'delivery' ? colors.accent : colors.success,
-              color: colors.white,
-              padding: '8px',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '16px'
-            }}>
-              {fulfillmentType === 'delivery' ? '🚚' : '🏪'}
-            </div>
-            <div>
-              <p style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: colors.textLight, margin: '0' }}>Fulfillment Method</p>
-              <p style={{ fontSize: '15px', fontWeight: '800', color: colors.dark, margin: '0' }}>
-                {fulfillmentType === 'delivery' ? 'Home Delivery' : 'Store Pickup'}
-              </p>
-            </div>
-          </div>
-          
-          {fulfillmentType === 'delivery' && (
-            <div style={{ textAlign: 'right', maxWidth: '60%' }}>
-              <p style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: colors.textLight, margin: '0 0 4px 0' }}>Delivery Destination</p>
-              <p style={{ fontSize: '12px', fontWeight: '600', color: colors.text, margin: '0', lineHeight: '1.4' }}>
-                {explicitDeliveryAddress || safeCustomer.address}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Items Table */}
-        <div style={{ marginBottom: '25px', borderRadius: '10px', overflow: 'hidden', border: `1px solid ${colors.border}` }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: colors.dark, color: colors.white }}>
-                <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: '600', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>#</th>
-                <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: '600', fontSize: '11px', textTransform: 'uppercase' }}>Description</th>
-                <th style={{ padding: '14px', textAlign: 'center', fontWeight: '600', fontSize: '11px', textTransform: 'uppercase' }}>Qty</th>
-                <th style={{ padding: '14px', textAlign: 'right', fontWeight: '600', fontSize: '11px', textTransform: 'uppercase' }}>Rate</th>
-                <th style={{ padding: '14px 16px', textAlign: 'right', fontWeight: '600', fontSize: '11px', textTransform: 'uppercase' }}>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {safeItems.map((item, index) => (
-                <tr key={index} style={{
-                  borderBottom: `1px solid ${colors.border}`,
-                  backgroundColor: index % 2 === 0 ? colors.white : colors.background,
-                }}>
-                  <td style={{ padding: '14px 16px', color: colors.textLight, fontSize: '13px' }}>{index + 1}</td>
-                  <td style={{ padding: '14px 16px' }}>
-                    <span style={{ fontWeight: '600', color: colors.dark, fontSize: '13px' }}>{item.description}</span>
-                  </td>
-                  <td style={{ padding: '14px', textAlign: 'center', color: colors.primary, fontWeight: '700', fontSize: '14px' }}>{item.quantity}</td>
-                  <td style={{ padding: '14px', textAlign: 'right', fontFamily: 'monospace', color: colors.textLight, fontSize: '13px' }}>{formatCompactCurrency(item.unitPrice)}</td>
-                  <td style={{ padding: '14px 16px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '600', color: colors.dark, fontSize: '13px' }}>{formatIndianCurrency(item.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Footer Section: QR + Totals */}
-        <div style={{ display: 'flex', gap: '30px' }}>
-
-          {/* Left: QR & Bank Details */}
-          <div style={{ flex: 1 }}>
-            {qrCode && (
-              <div style={{
-                display: 'flex',
-                gap: '16px',
-                alignItems: 'center',
-                marginBottom: '15px',
-                padding: '12px',
-                background: colors.white,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '8px',
-                width: 'fit-content' // Keep it compact
-              }}>
-                <div style={{
-                  padding: '4px',
-                  background: colors.white,
-                  borderRadius: '4px',
-                }}>
-                  <img src={qrCode} alt="QR Code" style={{ width: '70px', height: '70px', display: 'block' }} />
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(130deg, rgba(255,255,255,0.12), transparent 55%)',
+                  pointerEvents: 'none',
+                }}
+              />
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+                <div
+                  style={{
+                    width: '72px',
+                    height: '72px',
+                    borderRadius: '20px',
+                    background: 'rgba(255,255,255,0.96)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    boxShadow: '0 14px 26px rgba(15, 23, 42, 0.18)',
+                  }}
+                >
+                  <img src={companyDetails.logo} alt="Fab Clean" style={{ width: '54px', height: 'auto', objectFit: 'contain' }} />
                 </div>
                 <div>
-                  <p style={{ fontWeight: '700', color: colors.primary, margin: '0 0 2px 0', fontSize: '13px' }}>Scan to Pay</p>
-                  <p style={{ color: colors.textLight, margin: '0', fontSize: '10px' }}>UPI / GPay / PhonePe</p>
-                  <p style={{ color: colors.primary, margin: '2px 0 0 0', fontSize: '10px', fontWeight: '600' }}>Fab Clean</p>
+                  <p style={{ margin: 0, fontSize: '12px', letterSpacing: '0.22em', textTransform: 'uppercase', opacity: 0.78 }}>
+                    Premium Garment Care
+                  </p>
+                  <h1 style={{ margin: '4px 0 0', fontSize: '34px', lineHeight: 1.05, fontWeight: 900 }}>
+                    {companyDetails.name}
+                  </h1>
+                  <p style={{ margin: '8px 0 0', fontSize: '13px', opacity: 0.86 }}>
+                    Crisp invoices for pickup, delivery, and express orders.
+                  </p>
                 </div>
               </div>
-            )}
 
-            <div style={{
-              background: colors.background,
-              padding: '12px',
-              borderRadius: '8px',
-              border: `1px dashed ${colors.border}`,
-            }}>
-              <p style={{ fontWeight: '600', color: colors.primary, margin: '0 0 4px 0', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>Terms & Conditions</p>
-              <p style={{ color: colors.textLight, margin: '0', fontSize: '10px', lineHeight: '1.4' }}>
-                1. Payment due on delivery.<br />
-                2. We are not responsible for natural wear & tear.<br />
-                3. For full terms visit: <a href="https://myfabclean.com/terms" style={{ color: colors.primary, textDecoration: 'none' }}>myfabclean.com/terms</a>
-              </p>
-            </div>
-          </div>
-
-          {/* Right: Totals */}
-          <div style={{ width: '300px', position: 'relative' }}>
-            {/* EXPRESS Stamp - Semi-transparent like real rubber stamp */}
-            {isExpressOrder && (
-              <div style={{
-                position: 'absolute',
-                top: '5px',
-                right: '-20px',
-                transform: 'rotate(12deg)',
-                zIndex: 15,
-                pointerEvents: 'none',
-                opacity: 0.85,
-              }}>
-                <div style={{
-                  width: '100px',
-                  height: '100px',
-                  borderRadius: '50%',
-                  border: '3px solid rgba(234,88,12,0.7)',
-                  background: 'transparent',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: 'inset 0 0 0 4px rgba(234,88,12,0.6)',
-                }}>
-                  <span style={{ fontSize: '8px', fontWeight: '800', color: 'rgba(234,88,12,0.8)', letterSpacing: '2px' }}>★ EXPRESS ★</span>
-                  <span style={{ fontSize: '18px', fontWeight: '900', color: 'rgba(234,88,12,0.85)', letterSpacing: '1px', lineHeight: '1.1' }}>EXPRESS</span>
-                  <span style={{ fontSize: '7px', fontWeight: '700', color: 'rgba(234,88,12,0.8)', letterSpacing: '2px' }}>PRIORITY</span>
-                  <span style={{ fontSize: '8px', fontWeight: '800', color: 'rgba(234,88,12,0.8)', letterSpacing: '1px', marginTop: '2px' }}>FAB CLEAN</span>
-                </div>
-              </div>
-            )}
-
-            <div style={{
-              background: colors.white,
-              padding: '20px',
-              borderRadius: '10px',
-              border: `1px solid ${colors.border}`,
-              position: 'relative',
-              overflow: 'hidden',
-            }}>
-              {/* Fab Clean Watermark Logo */}
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                opacity: 0.06,
-                fontSize: '28px',
-                fontWeight: '900',
-                color: colors.primary,
-                letterSpacing: '2px',
-                whiteSpace: 'nowrap',
-                pointerEvents: 'none',
-                userSelect: 'none',
-                textAlign: 'center',
-                lineHeight: '1.2',
-              }}>
-                <div style={{ fontSize: '24px' }}>fab clean</div>
-                <div style={{ fontSize: '10px', letterSpacing: '4px' }}>PREMIUM LAUNDRY</div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px', position: 'relative', zIndex: 1 }}>
-                <span style={{ color: colors.textLight }}>Subtotal</span>
-                <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{formatIndianCurrency(itemsSubtotal)}</span>
-              </div>
-
-              {deliveryCharges > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px', position: 'relative', zIndex: 1 }}>
-                  <span style={{ color: colors.textLight }}>Delivery</span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{formatIndianCurrency(deliveryCharges)}</span>
-                </div>
-              )}
-
-              {/* EXPRESS Surcharge */}
-              {isExpressOrder && expressSurcharge > 0 && (
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  marginBottom: '10px',
-                  fontSize: '12px',
-                  padding: '8px 10px',
-                  background: colors.expressLight,
-                  borderRadius: '6px',
-                  border: `1px solid ${colors.express}30`,
+              <div
+                style={{
+                  marginTop: '18px',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '14px',
                   position: 'relative',
                   zIndex: 1,
-                }}>
-                  <span style={{
-                    color: colors.express,
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}>⚡ Express Surcharge (50%)</span>
-                  <span style={{
-                    fontFamily: 'monospace',
-                    fontWeight: '700',
-                    color: colors.express
-                  }}>{formatIndianCurrency(expressSurcharge)}</span>
-                </div>
-              )}
-
-              {enableGST && (
-                <>
-                  <div style={{ height: '1px', background: colors.border, margin: '12px 0', position: 'relative', zIndex: 1 }}></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px', position: 'relative', zIndex: 1 }}>
-                    <span style={{ color: colors.textLight }}>CGST @ 9%</span>
-                    <span style={{ fontFamily: 'monospace' }}>{formatIndianCurrency(cgstAmount)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '12px', position: 'relative', zIndex: 1 }}>
-                    <span style={{ color: colors.textLight }}>SGST @ 9%</span>
-                    <span style={{ fontFamily: 'monospace' }}>{formatIndianCurrency(sgstAmount)}</span>
-                  </div>
-                </>
-              )}
-
-              <div style={{
-                height: '3px',
-                background: `linear-gradient(90deg, ${colors.primary}, ${colors.accent})`,
-                margin: '15px 0',
-                borderRadius: '2px',
-                position: 'relative',
-                zIndex: 1,
-              }}></div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
-                <span style={{ fontWeight: '700', fontSize: '14px', color: colors.dark, textTransform: 'uppercase' }}>Grand Total</span>
-                <span style={{
-                  fontSize: '24px',
-                  fontWeight: '800',
-                  fontFamily: 'monospace',
-                  color: colors.primary,
-                }}>
-                  {formatIndianCurrency(grandTotal)}
-                </span>
-              </div>
-
-              <div style={{
-                marginTop: '12px',
-                padding: '10px',
-                background: colors.background,
-                borderRadius: '6px',
-                fontSize: '10px',
-                color: colors.textLight,
-                fontStyle: 'italic',
-                textAlign: 'center',
-                position: 'relative',
-                zIndex: 1,
-              }}>
-                {convertToWords(grandTotal)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Payment Summary Section — shows wallet/cash/credit split */}
-        {paymentBreakdown && (paymentBreakdown.walletDeducted > 0 || paymentBreakdown.creditOutstanding > 0) && (
-          <div style={{
-            marginTop: '25px',
-            padding: '20px',
-            borderRadius: '10px',
-            border: `1px solid ${colors.border}`,
-            background: colors.background,
-          }}>
-            <h3 style={{
-              fontSize: '11px',
-              fontWeight: '700',
-              color: colors.primary,
-              textTransform: 'uppercase',
-              letterSpacing: '1.5px',
-              margin: '0 0 15px 0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}>
-              <span style={{ width: '4px', height: '12px', background: colors.accent, borderRadius: '2px' }}></span>
-              Payment Summary
-            </h3>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              {/* Invoice Total */}
-              <div style={{
-                padding: '12px',
-                borderRadius: '8px',
-                border: `1px solid ${colors.border}`,
-                background: colors.white,
-              }}>
-                <p style={{ fontSize: '10px', color: colors.textLight, margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Invoice Total</p>
-                <p style={{ fontSize: '16px', fontWeight: '700', color: colors.dark, margin: 0, fontFamily: 'monospace' }}>
-                  {formatIndianCurrency(grandTotal)}
-                </p>
-              </div>
-
-              {/* Payment Status */}
-              <div style={{
-                padding: '12px',
-                borderRadius: '8px',
-                border: `1px solid ${paymentBreakdown.creditOutstanding > 0 ? '#f59e0b40' : '#22c55e40'}`,
-                background: paymentBreakdown.creditOutstanding > 0 ? '#fffbeb' : '#f0fdf4',
-              }}>
-                <p style={{ fontSize: '10px', color: colors.textLight, margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</p>
-                <p style={{
-                  fontSize: '14px',
-                  fontWeight: '800',
-                  color: paymentBreakdown.creditOutstanding > 0 ? '#d97706' : '#16a34a',
-                  margin: 0,
-                  letterSpacing: '1px',
-                }}>
-                  {paymentBreakdown.creditOutstanding > 0 ? '📋 CREDIT' : '✅ PAID'}
-                </p>
-              </div>
-            </div>
-
-            {/* Payment Line Items */}
-            <div style={{ marginTop: '15px', borderTop: `1px dashed ${colors.border}`, paddingTop: '12px' }}>
-              {paymentBreakdown.walletDeducted > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px' }}>
-                  <span style={{ color: colors.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ background: '#8b5cf6', color: 'white', borderRadius: '4px', padding: '1px 6px', fontSize: '10px', fontWeight: '600' }}>WALLET</span>
-                    Deducted from Wallet
-                  </span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#8b5cf6' }}>−{formatIndianCurrency(paymentBreakdown.walletDeducted)}</span>
-                </div>
-              )}
-
-              {paymentBreakdown.cashPaid > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px' }}>
-                  <span style={{ color: colors.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ background: '#16a34a', color: 'white', borderRadius: '4px', padding: '1px 6px', fontSize: '10px', fontWeight: '600' }}>{paymentBreakdown.paymentMethod || 'CASH'}</span>
-                    Paid
-                  </span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#16a34a' }}>−{formatIndianCurrency(paymentBreakdown.cashPaid)}</span>
-                </div>
-              )}
-
-              {paymentBreakdown.creditOutstanding > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px' }}>
-                  <span style={{ color: colors.text, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ background: '#d97706', color: 'white', borderRadius: '4px', padding: '1px 6px', fontSize: '10px', fontWeight: '600' }}>CREDIT</span>
-                    Added to Outstanding
-                  </span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#d97706' }}>{formatIndianCurrency(paymentBreakdown.creditOutstanding)}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Outstanding Balance */}
-            {paymentBreakdown.creditOutstanding > 0 && (
-              <div style={{
-                marginTop: '12px',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                background: '#fef3c7',
-                border: '1px solid #fcd34d',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}>
+                }}
+              >
                 <div>
-                  <p style={{ fontSize: '10px', color: '#92400e', margin: '0 0 2px 0', fontWeight: '600' }}>CUSTOMER OUTSTANDING BALANCE</p>
-                  {paymentBreakdown.previousOutstanding > 0 && (
-                    <p style={{ fontSize: '10px', color: '#a16207', margin: 0 }}>
-                      Previous: {formatIndianCurrency(paymentBreakdown.previousOutstanding)}
+                  <p style={{ margin: 0, fontSize: '11px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.15em' }}>Branch</p>
+                  <p style={{ margin: '5px 0 0', fontSize: '16px', fontWeight: 800 }}>{companyDetails.branchName}</p>
+                  <p style={{ margin: '8px 0 0', fontSize: '12px', lineHeight: 1.55, opacity: 0.9 }}>{companyDetails.address}</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ margin: 0, fontSize: '11px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.15em' }}>Contact</p>
+                  <p style={{ margin: '5px 0 0', fontSize: '14px', fontWeight: 700 }}>{companyDetails.phone}</p>
+                  <p style={{ margin: '4px 0 0', fontSize: '12px', opacity: 0.9 }}>{companyDetails.email}</p>
+                  {enableGST && (
+                    <p style={{ margin: '8px 0 0', fontSize: '12px', opacity: 0.88 }}>
+                      GSTIN {companyDetails.gstin}
                     </p>
                   )}
                 </div>
-                <span style={{
-                  fontSize: '18px',
-                  fontWeight: '800',
-                  color: '#92400e',
-                  fontFamily: 'monospace',
-                }}>
-                  {formatIndianCurrency(paymentBreakdown.newOutstanding)}
-                </span>
               </div>
-            )}
-          </div>
-        )}
-      </div>
+            </div>
 
-      {/* Footer Bar */}
-      <div style={{
-        position: 'absolute',
-        bottom: '0',
-        left: '0',
-        width: '100%',
-        background: colors.dark,
-        color: colors.white,
-        padding: '16px 40px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <div style={{ fontSize: '13px', fontWeight: '600' }}>
-          ✨ Thank you for choosing Fab Clean!
-        </div>
-        <div style={{ fontSize: '10px', opacity: 0.7 }}>
-          This is a computer-generated invoice • No signature required
+            <div
+              className="invoice-card"
+              style={{
+                background: panel,
+                border: `1px solid ${line}`,
+                borderRadius: '22px',
+                padding: '20px 22px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '7px 11px',
+                      borderRadius: '999px',
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                      background: accentSoft,
+                      border: `1px solid ${accentBorder}`,
+                      color: accent,
+                    }}
+                  >
+                    {enableGST ? 'Tax Invoice' : 'Invoice'}
+                  </span>
+                  {isExpressOrder && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '7px 11px',
+                        borderRadius: '999px',
+                        fontSize: '10px',
+                        fontWeight: 900,
+                        letterSpacing: '0.14em',
+                        textTransform: 'uppercase',
+                        background: '#fff1f2',
+                        border: '1px solid #fdba74',
+                        color: '#c2410c',
+                      }}
+                    >
+                      Express Priority
+                    </span>
+                  )}
+                </div>
+
+                <p style={{ margin: 0, fontSize: '11px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.16em' }}>
+                  Invoice Number
+                </p>
+                <h2 style={{ margin: '6px 0 0', fontSize: '28px', lineHeight: 1.05, fontWeight: 900, color: headingInk }}>
+                  #{orderCode}
+                </h2>
+              </div>
+
+              <div style={{ display: 'grid', gap: '12px', marginTop: '18px' }}>
+                {invoiceMetaRows.map(({ label, value, Icon }) => (
+                  <div
+                    key={label}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      paddingBottom: '10px',
+                      borderBottom: `1px dashed ${line}`,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <span style={iconBoxStyle(accentSoft, accentBorder)}>
+                        <Icon size={14} color={accent} strokeWidth={2.2} />
+                      </span>
+                      <span style={{ fontSize: '12px', color: mutedInk }}>{label}</span>
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: headingInk, textAlign: 'right' }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </header>
+
+          <section
+            className="invoice-section"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '14px',
+              marginBottom: '14px',
+            }}
+          >
+            <div
+              className="invoice-card"
+              style={{
+                background: panel,
+                border: `1px solid ${line}`,
+                borderRadius: '18px',
+                padding: '18px 18px 16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={iconBoxStyle(accentSoft, accentBorder)}>
+                  <UserRound size={14} color={accent} strokeWidth={2.2} />
+                </span>
+                <p style={sectionTitleStyle(accent)}>Billed To</p>
+              </div>
+              <div style={{ marginTop: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, fontSize: '20px', color: headingInk, fontWeight: 900 }}>{customer?.name || 'Customer'}</h3>
+                  {customer?.id && (
+                    <span
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '999px',
+                        background: panelSoft,
+                        border: `1px solid ${line}`,
+                        color: mutedInk,
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        fontFamily: '"IBM Plex Mono", monospace',
+                      }}
+                    >
+                      {customer.id}
+                    </span>
+                  )}
+                </div>
+                <div style={{ marginTop: '14px', display: 'grid', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <span style={iconBoxStyle(panelSoft, line)}>
+                      <MapPin size={14} color={accent} strokeWidth={2.2} />
+                    </span>
+                    <div>
+                      <p style={{ margin: 0, fontSize: '11px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Address</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '13px', lineHeight: 1.65, color: headingInk, fontWeight: 600 }}>{customerAddress}</p>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '14px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={iconBoxStyle(panelSoft, line)}>
+                        <Phone size={14} color={accent} strokeWidth={2.2} />
+                      </span>
+                      <div>
+                        <p style={{ margin: 0, fontSize: '11px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Phone</p>
+                        <p style={{ margin: '4px 0 0', fontSize: '13px', fontWeight: 700, color: headingInk }}>{customer?.phone || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={iconBoxStyle(panelSoft, line)}>
+                        <Mail size={14} color={accent} strokeWidth={2.2} />
+                      </span>
+                      <div>
+                        <p style={{ margin: 0, fontSize: '11px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Email</p>
+                        <p style={{ margin: '4px 0 0', fontSize: '13px', fontWeight: 700, color: headingInk, wordBreak: 'break-word' }}>{customer?.email || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="invoice-card"
+              style={{
+                background: accentSoft,
+                border: `1px solid ${accentBorder}`,
+                borderRadius: '18px',
+                padding: '18px 18px 16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={iconBoxStyle('#ffffffcc', accentBorder)}>
+                  <ReceiptText size={14} color={accent} strokeWidth={2.2} />
+                </span>
+                <p style={sectionTitleStyle(accent)}>Order Snapshot</p>
+              </div>
+              <div style={{ marginTop: '12px', display: 'grid', gap: '12px' }}>
+                <div
+                  className="invoice-summary-card"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                    gap: '10px',
+                  }}
+                >
+                  {[
+                    ['Items', `${safeItems.length}`],
+                    ['Pieces', `${safeItems.reduce((sum, item) => sum + safeNumber(item.quantity), 0)}`],
+                    ['Grand Total', formatCompactCurrency(grandTotal)],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      style={{
+                        background: '#ffffffcc',
+                        borderRadius: '14px',
+                        padding: '12px 10px',
+                        border: `1px solid ${accentBorder}`,
+                      }}
+                    >
+                      <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>{label}</p>
+                      <p style={{ margin: '6px 0 0', fontSize: '18px', fontWeight: 900, color: headingInk }}>{value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'grid', gap: '10px' }}>
+                  <div
+                    style={{
+                      background: '#ffffffcc',
+                      borderRadius: '14px',
+                      padding: '12px 14px',
+                      border: `1px solid ${accentBorder}`,
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Fulfillment Details</p>
+                    <p style={{ margin: '6px 0 0', fontSize: '13px', lineHeight: 1.55, color: headingInk, fontWeight: 700 }}>
+                      {fulfillmentType === 'delivery'
+                        ? (resolvedDeliveryAddress || customerAddress || 'Delivery address will be confirmed')
+                        : 'Collect your order from the store on or before the due date.'}
+                    </p>
+                  </div>
+                  {(notes || paymentTerms) && (
+                    <div
+                      className="invoice-notes-card"
+                      style={{
+                        background: '#ffffffcc',
+                        borderRadius: '14px',
+                        padding: '12px 14px',
+                        border: `1px solid ${accentBorder}`,
+                      }}
+                    >
+                      <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Notes</p>
+                      <p style={{ margin: '6px 0 0', fontSize: '12px', lineHeight: 1.6, color: bodyInk }}>
+                        {notes || paymentTerms}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="invoice-section" style={{ marginBottom: '14px' }}>
+            <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={iconBoxStyle(accentSoft, accentBorder)}>
+                  <Shirt size={14} color={accent} strokeWidth={2.2} />
+                </span>
+                <p style={sectionTitleStyle(accent)}>Service Summary</p>
+              </div>
+              {enableGST && (
+                <span
+                  style={{
+                    fontSize: '11px',
+                    color: mutedInk,
+                    background: panelSoft,
+                    border: `1px solid ${line}`,
+                    padding: '6px 10px',
+                    borderRadius: '999px',
+                  }}
+                >
+                  HSN / SAC 998314
+                </span>
+              )}
+            </div>
+
+            <table className="invoice-items-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '8%', textAlign: 'left', padding: '13px 14px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>No.</th>
+                  <th style={{ width: enableGST ? '44%' : '48%', textAlign: 'left', padding: '13px 14px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Description</th>
+                  {enableGST && (
+                    <th style={{ width: '12%', textAlign: 'center', padding: '13px 10px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>HSN</th>
+                  )}
+                  <th style={{ width: '10%', textAlign: 'center', padding: '13px 10px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Qty</th>
+                  <th style={{ width: '13%', textAlign: 'right', padding: '13px 14px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Rate</th>
+                  <th style={{ width: '13%', textAlign: 'right', padding: '13px 14px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {safeItems.map((item, index) => (
+                  <tr key={`${item.description}-${index}`}>
+                    <td style={{ padding: '14px', fontSize: '13px', color: mutedInk, verticalAlign: 'top' }}>{index + 1}</td>
+                    <td style={{ padding: '14px', verticalAlign: 'top' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 800, color: headingInk, lineHeight: 1.45, wordBreak: 'break-word' }}>{item.description}</div>
+                      {enableGST && (
+                        <div style={{ marginTop: '4px', fontSize: '11px', color: mutedInk }}>
+                          Laundry care service
+                        </div>
+                      )}
+                    </td>
+                    {enableGST && (
+                      <td style={{ padding: '14px 10px', textAlign: 'center', fontSize: '12px', color: mutedInk, fontFamily: '"IBM Plex Mono", monospace', verticalAlign: 'top' }}>
+                        {item.hsn || '998314'}
+                      </td>
+                    )}
+                    <td style={{ padding: '14px 10px', textAlign: 'center', fontSize: '14px', fontWeight: 800, color: accent, verticalAlign: 'top' }}>
+                      {safeNumber(item.quantity)}
+                    </td>
+                    <td style={{ padding: '14px', textAlign: 'right', fontSize: '13px', color: mutedInk, fontFamily: '"IBM Plex Mono", monospace', verticalAlign: 'top' }}>
+                      {formatIndianCurrency(safeNumber(item.unitPrice))}
+                    </td>
+                    <td style={{ padding: '14px', textAlign: 'right', fontSize: '13px', fontWeight: 800, color: headingInk, fontFamily: '"IBM Plex Mono", monospace', verticalAlign: 'top' }}>
+                      {formatIndianCurrency(safeNumber(item.total))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          <section
+            className="invoice-section"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '0.9fr 1.1fr',
+              gap: '14px',
+              alignItems: 'start',
+            }}
+          >
+            <div style={{ display: 'grid', gap: '14px' }}>
+              <div
+                className="invoice-payment-card"
+                style={{
+                  background: panel,
+                  border: `1px solid ${line}`,
+                  borderRadius: '18px',
+                  padding: '18px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={iconBoxStyle(accentSoft, accentBorder)}>
+                    <FileText size={14} color={accent} strokeWidth={2.2} />
+                  </span>
+                  <p style={sectionTitleStyle(accent)}>Payment & Terms</p>
+                </div>
+                <div style={{ marginTop: '14px', display: 'flex', gap: '14px', alignItems: 'center' }}>
+                  {qrCode && (
+                    <div
+                      style={{
+                        width: '104px',
+                        minWidth: '104px',
+                        height: '104px',
+                        borderRadius: '18px',
+                        background: '#ffffff',
+                        border: `1px solid ${line}`,
+                        display: 'grid',
+                        placeItems: 'center',
+                        padding: '8px',
+                      }}
+                    >
+                      <img src={qrCode} alt="Payment QR" style={{ width: '88px', height: '88px', display: 'block' }} />
+                    </div>
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: '15px', color: headingInk, fontWeight: 900 }}>Scan to pay or settle at counter</p>
+                    <p style={{ margin: '6px 0 0', fontSize: '12px', color: bodyInk, lineHeight: 1.65 }}>
+                      {paymentTerms || 'Payment due on or before delivery / pickup.'}
+                    </p>
+                    <p style={{ margin: '10px 0 0', fontSize: '11px', color: mutedInk }}>
+                      For support, contact {companyDetails.phone} or {companyDetails.email}.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {paymentBreakdown && (
+                <div
+                  className="invoice-payment-card"
+                  style={{
+                    background: panelSoft,
+                    border: `1px solid ${line}`,
+                    borderRadius: '18px',
+                    padding: '18px',
+                  }}
+                >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={iconBoxStyle(panel, line)}>
+                    <CircleDollarSign size={14} color={accent} strokeWidth={2.2} />
+                  </span>
+                  <p style={sectionTitleStyle(accent)}>Payment Breakdown</p>
+                </div>
+                  <div style={{ marginTop: '14px', display: 'grid', gap: '10px' }}>
+                    {paymentBreakdown.walletDeducted > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '13px' }}>
+                        <span style={{ color: bodyInk }}>Wallet used</span>
+                        <strong style={{ color: '#7c3aed', fontFamily: '"IBM Plex Mono", monospace' }}>- {formatIndianCurrency(paymentBreakdown.walletDeducted)}</strong>
+                      </div>
+                    )}
+                    {paymentBreakdown.cashPaid > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '13px' }}>
+                        <span style={{ color: bodyInk }}>{paymentBreakdown.paymentMethod || 'Cash'} paid</span>
+                        <strong style={{ color: '#15803d', fontFamily: '"IBM Plex Mono", monospace' }}>- {formatIndianCurrency(paymentBreakdown.cashPaid)}</strong>
+                      </div>
+                    )}
+                    {paymentBreakdown.creditOutstanding > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '13px' }}>
+                        <span style={{ color: bodyInk }}>Added to outstanding</span>
+                        <strong style={{ color: '#b45309', fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(paymentBreakdown.creditOutstanding)}</strong>
+                      </div>
+                    )}
+                    <div style={{ borderTop: `1px dashed ${line}`, paddingTop: '10px', display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '13px' }}>
+                      <span style={{ color: mutedInk }}>Customer outstanding balance</span>
+                      <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>
+                        {formatIndianCurrency(paymentBreakdown.newOutstanding || 0)}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div
+              className="invoice-totals-card"
+              style={{
+                background: panel,
+                border: `1px solid ${line}`,
+                borderRadius: '22px',
+                padding: '20px',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: `linear-gradient(180deg, ${isExpressOrder ? 'rgba(251,146,60,0.10)' : 'rgba(20,184,166,0.08)'} 0%, transparent 50%)`,
+                  pointerEvents: 'none',
+                }}
+              />
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={iconBoxStyle(accentSoft, accentBorder)}>
+                      <ReceiptText size={14} color={accent} strokeWidth={2.2} />
+                    </span>
+                    <p style={sectionTitleStyle(accent)}>Billing Summary</p>
+                  </div>
+                  {isExpressOrder && (
+                    <span
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '999px',
+                        background: '#fff7ed',
+                        border: '1px solid #fdba74',
+                        color: '#c2410c',
+                        fontSize: '10px',
+                        fontWeight: 900,
+                        letterSpacing: '0.12em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Express
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '14px', fontSize: '14px' }}>
+                    <span style={{ color: mutedInk }}>Service subtotal</span>
+                    <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(serviceSubtotal)}</strong>
+                  </div>
+
+                  {deliveryTotal > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '14px', fontSize: '14px' }}>
+                      <span style={{ color: mutedInk }}>Delivery charges</span>
+                      <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(deliveryTotal)}</strong>
+                    </div>
+                  )}
+
+                  {expressTotal > 0 && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: '14px',
+                        fontSize: '14px',
+                        background: '#fff7ed',
+                        border: '1px solid #fed7aa',
+                        borderRadius: '14px',
+                        padding: '10px 12px',
+                      }}
+                    >
+                      <span style={{ color: '#c2410c', fontWeight: 700 }}>Express surcharge</span>
+                      <strong style={{ color: '#c2410c', fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(expressTotal)}</strong>
+                    </div>
+                  )}
+
+                  {enableGST && (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '14px', fontSize: '14px' }}>
+                        <span style={{ color: mutedInk }}>CGST @ 9%</span>
+                        <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(cgstAmount)}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '14px', fontSize: '14px' }}>
+                        <span style={{ color: mutedInk }}>SGST @ 9%</span>
+                        <strong style={{ color: headingInk, fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(sgstAmount)}</strong>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div style={{ margin: '18px 0 14px', height: '4px', borderRadius: '999px', background: `linear-gradient(90deg, ${headingInk} 0%, ${accent} 100%)` }} />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-end' }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '11px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.14em' }}>Grand Total</p>
+                    <p style={{ margin: '6px 0 0', fontSize: '31px', lineHeight: 1, fontWeight: 900, color: accent, fontFamily: '"IBM Plex Mono", monospace' }}>
+                      {formatIndianCurrency(grandTotal)}
+                    </p>
+                  </div>
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      background: accentSoft,
+                      border: `1px solid ${accentBorder}`,
+                      borderRadius: '14px',
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Amount in Words</p>
+                    <p style={{ margin: '6px 0 0', fontSize: '11px', color: headingInk, fontWeight: 700, maxWidth: '190px', lineHeight: 1.55 }}>
+                      {convertToWords(grandTotal)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <footer className="invoice-footer">
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1.1fr 0.9fr',
+                gap: '14px',
+                alignItems: 'end',
+              }}
+            >
+              <div>
+                <p style={{ margin: 0, fontSize: '12px', color: bodyInk, fontWeight: 700 }}>
+                  Thank you for choosing Fab Clean.
+                </p>
+                <p style={{ margin: '6px 0 0', fontSize: '11px', color: mutedInk, lineHeight: 1.7 }}>
+                  Garments should be checked at the time of delivery or pickup. Natural wear, hidden defects, and pre-existing damage may become visible during processing. For detailed terms, visit myfabclean.com/terms.
+                </p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ margin: 0, fontSize: '11px', color: mutedInk }}>Computer-generated invoice</p>
+                <p style={{ margin: '4px 0 0', fontSize: '11px', color: mutedInk }}>No physical signature required</p>
+                {enableGST && (
+                  <p style={{ margin: '8px 0 0', fontSize: '11px', color: mutedInk }}>
+                    PAN {companyDetails.pan} {companyDetails.gstin ? `• GSTIN ${companyDetails.gstin}` : ''}
+                  </p>
+                )}
+              </div>
+            </div>
+          </footer>
         </div>
       </div>
     </div>
