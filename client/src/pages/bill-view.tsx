@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ordersApi } from "@/lib/data-service";
+import { customersApi, ordersApi } from "@/lib/data-service";
 import { Loader2, Printer, Share2, Download, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import InvoiceTemplateIN from '@/components/print/invoice-template-in';
@@ -30,6 +30,113 @@ export default function BillView() {
         },
         enabled: !!orderNumber
     });
+
+    const { data: customer } = useQuery({
+        queryKey: ["bill-customer", order?.customerId],
+        queryFn: async () => {
+            if (!order?.customerId) return null;
+            return customersApi.getById(order.customerId);
+        },
+        enabled: !!order?.customerId,
+        staleTime: 30_000,
+    });
+
+    const firstNonEmpty = (...values: unknown[]) => {
+        for (const value of values) {
+            if (typeof value === "string" && value.trim()) {
+                return value.trim();
+            }
+        }
+        return "";
+    };
+
+    const parseAddress = (value: any): string => {
+        if (!value) return "";
+
+        if (typeof value === "string") {
+            const trimmed = value.trim();
+            if (!trimmed || trimmed === "[object Object]") return "";
+            if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+                try {
+                    return parseAddress(JSON.parse(trimmed));
+                } catch {
+                    return trimmed;
+                }
+            }
+            return trimmed;
+        }
+
+        if (typeof value === "object") {
+            const parts = [
+                value.street,
+                value.line1,
+                value.line2,
+                value.address,
+                value.instructions,
+                value.landmark,
+                value.city,
+                value.state,
+                value.zip,
+                value.pincode,
+                value.country,
+            ].filter((part) => typeof part === "string" && part.trim());
+
+            if (parts.length > 0) {
+                return parts.join(", ");
+            }
+
+            const stringValues = Object.values(value).filter(
+                (part) => typeof part === "string" && part.trim()
+            ) as string[];
+
+            return stringValues.join(", ");
+        }
+
+        return "";
+    };
+
+    const buildInvoiceItems = (rawOrder: any) => {
+        const rawItems = Array.isArray(rawOrder?.items) ? rawOrder.items : [];
+
+        return rawItems.map((item: any) => {
+            const description = firstNonEmpty(
+                item?.serviceName,
+                item?.service_name,
+                item?.customName,
+                item?.custom_name,
+                item?.productName,
+                item?.product_name,
+                item?.description,
+                item?.name,
+                item?.service,
+                rawOrder?.serviceName,
+                rawOrder?.service,
+                "Laundry Service"
+            );
+
+            const note = firstNonEmpty(
+                item?.tagNote,
+                item?.tag_note,
+                item?.notes,
+                item?.details,
+                item?.description && item.description !== description ? item.description : ""
+            );
+
+            const quantity = Number(item?.quantity || 1);
+            const unitPrice = Number(item?.unitPrice ?? item?.price ?? 0);
+            const total = Number(item?.total ?? quantity * unitPrice);
+
+            return {
+                description,
+                note: note || undefined,
+                quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+                unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
+                total: Number.isFinite(total) ? total : 0,
+                taxRate: 18,
+                hsn: item?.hsn || "9601",
+            };
+        });
+    };
 
     // Parse query params for GST toggle
     const searchParams = new URLSearchParams(window.location.search);
@@ -166,33 +273,20 @@ export default function BillView() {
 
     // At this point, order is guaranteed to exist
     if (order) {
-        const shippingAddress = order.shippingAddress as any;
-
-        // Robust address parsing
-        let formattedAddress = "";
-        try {
-            if (typeof shippingAddress === 'object' && shippingAddress !== null) {
-                if (Object.keys(shippingAddress).length > 0) {
-                    formattedAddress = [
-                        shippingAddress.street || shippingAddress.line1 || shippingAddress.address || shippingAddress.instructions,
-                        shippingAddress.city,
-                        shippingAddress.state,
-                        shippingAddress.zip || shippingAddress.pincode,
-                        shippingAddress.country
-                    ].filter(Boolean).join(", ");
-                }
-            } else if (typeof shippingAddress === 'string') {
-                if (shippingAddress !== "[object Object]") {
-                    formattedAddress = shippingAddress;
-                }
-            }
-        } catch (e) {
-            console.error("Error parsing address:", e);
-        }
-
-        if (!formattedAddress || formattedAddress === "[object Object]") {
-            formattedAddress = "";
-        }
+        const linkedCustomer = (order as any).customer || (order as any).customers || customer || null;
+        const invoiceItems = buildInvoiceItems(order);
+        const subtotal = invoiceItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
+        const formattedAddress = firstNonEmpty(
+            parseAddress(order.fulfillmentType === 'delivery' ? order.deliveryAddress : ""),
+            parseAddress(order.shippingAddress),
+            parseAddress((order as any).address),
+            parseAddress((order as any).customerAddress),
+            parseAddress(linkedCustomer?.address),
+            "N/A"
+        );
+        const customerName = firstNonEmpty(order.customerName, linkedCustomer?.name, "Customer");
+        const customerPhone = firstNonEmpty(order.customerPhone, linkedCustomer?.phone, (order as any).phone, "N/A");
+        const customerEmail = firstNonEmpty(order.customerEmail, linkedCustomer?.email, (order as any).email, "N/A");
 
         // GST Invoice
         if (enableGST) {
@@ -214,20 +308,13 @@ export default function BillView() {
                 },
                 customer: {
                     id: order.customerId,
-                    name: order.customerName,
+                    name: customerName,
                     address: formattedAddress,
-                    phone: order.customerPhone || "",
-                    email: order.customerEmail || "",
+                    phone: customerPhone,
+                    email: customerEmail,
                     taxId: order.gstNumber || undefined
                 },
-                items: Array.isArray(order.items) ? order.items.map((item: any) => ({
-                    description: item.serviceName || item.service_name || item.customName || item.productName || item.name || item.description || 'Laundry Service',
-                    quantity: item.quantity,
-                    unitPrice: item.price,
-                    total: item.price * item.quantity,
-                    taxRate: 18,
-                    hsn: "9601"
-                })) : [],
+                items: invoiceItems,
                 subtotal: subtotal,
                 taxAmount: calculatedTax,
                 deliveryCharges: deliveryCharges,
@@ -266,17 +353,16 @@ export default function BillView() {
                 },
                 customer: {
                     id: order.customerId,
-                    name: order.customerName,
+                    name: customerName,
                     address: formattedAddress,
-                    phone: order.customerPhone || "",
-                    email: order.customerEmail || ""
+                    phone: customerPhone,
+                    email: customerEmail
                 },
-                items: Array.isArray(order.items) ? order.items.map((item: any) => ({
-                    description: item.productName || item.name,
-                    quantity: item.quantity,
-                    unitPrice: item.price,
-                    total: item.price * item.quantity
-                })) : [],
+                items: invoiceItems.map((item) => ({
+                    ...item,
+                    taxRate: 0,
+                    hsn: undefined,
+                })),
                 subtotal: subtotal,
                 total: totalAmount, // Use stored total for simple bill
                 deliveryCharges: deliveryCharges,

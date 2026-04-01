@@ -273,10 +273,11 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
 
   // Parse customer address - always return human-readable text, never JSON
   let customerAddress = 'Address not provided';
+  const linkedCustomer = order.customer || order.customers || null;
   // Use delivery address if fulfillment type is delivery, otherwise fallback to standard address fields
   const rawAddress = (order.fulfillmentType === 'delivery' && order.deliveryAddress)
     ? order.deliveryAddress
-    : (order.shippingAddress || order.address || order.customerAddress);
+    : (order.shippingAddress || order.address || order.customerAddress || linkedCustomer?.address);
 
   if (rawAddress) {
     if (typeof rawAddress === 'string') {
@@ -307,7 +308,8 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
 
       return {
         name: item.serviceName || item.service_name || item.customName || item.name || item.productName || item.description || 'Laundry Service',
-        description: item.description || item.details,
+        description: item.serviceName || item.service_name || item.customName || item.name || item.productName || item.description || 'Laundry Service',
+        note: item.tagNote || item.tag_note || item.notes || item.details || undefined,
         quantity,
         unitPrice,
         total,
@@ -423,10 +425,10 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
     franchiseId: franchiseId,
     enableGST,
     customerInfo: {
-      name: order.customerName || order.customer?.name || 'Customer',
+      name: order.customerName || linkedCustomer?.name || 'Customer',
       address: customerAddress,
-      phone: order.customerPhone || order.customer?.phone || order.phone || 'N/A',
-      email: order.customerEmail || order.customer?.email || order.email || 'N/A'
+      phone: order.customerPhone || linkedCustomer?.phone || order.phone || 'N/A',
+      email: order.customerEmail || linkedCustomer?.email || order.email || 'N/A'
     },
     companyInfo,
     items,

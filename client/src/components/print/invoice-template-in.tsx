@@ -44,6 +44,7 @@ export interface InvoiceData {
   };
   items: Array<{
     description: string;
+    note?: string;
     quantity: number | string;
     unitPrice: number | string;
     total: number | string;
@@ -574,7 +575,14 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                     <tr key={`${item.description}-${index}`}>
                       <td style={{ padding: '12px 14px', fontSize: '13px', color: mutedInk, verticalAlign: 'top' }}>{index + 1}</td>
                       <td style={{ padding: '12px 14px', verticalAlign: 'top' }}>
-                        <div style={{ fontSize: '14px', fontWeight: 800, color: headingInk, lineHeight: 1.45 }}>{item.description}</div>
+                        <div style={{ fontSize: '14px', fontWeight: 800, color: headingInk, lineHeight: 1.45 }}>
+                          {item.description || 'Laundry Service'}
+                        </div>
+                        {item.note && (
+                          <div style={{ marginTop: '4px', fontSize: '11px', color: mutedInk, lineHeight: 1.5 }}>
+                            {item.note}
+                          </div>
+                        )}
                       </td>
                       {enableGST && (
                         <td style={{ padding: '12px 10px', textAlign: 'center', fontSize: '12px', color: mutedInk, fontFamily: '"IBM Plex Mono", monospace', verticalAlign: 'top' }}>
