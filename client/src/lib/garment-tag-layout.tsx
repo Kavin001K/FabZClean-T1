@@ -3,6 +3,7 @@ import { DEFAULT_COMPANY_INFO, getFranchiseById } from './franchise-config';
 
 export const THERMAL_TAG_WIDTH_MM = 36;
 export const THERMAL_TAG_HEIGHT_MM = 23;
+const THERMAL_TAG_STACK_PADDING_MM = 0.2;
 
 export interface ThermalTagItem {
   orderNumber: string;
@@ -157,11 +158,7 @@ const escapeHtml = (value: string) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-export const getThermalTagPrintStyles = () => `
-  @page {
-    margin: 0;
-  }
-
+export const getThermalTagPrintStyles = (pageHeightMm: number) => `
   *, *::before, *::after {
     box-sizing: border-box;
   }
@@ -171,7 +168,8 @@ export const getThermalTagPrintStyles = () => `
     padding: 0;
     background: #ffffff;
     color: #000000;
-    width: ${THERMAL_TAG_WIDTH_MM}mm;
+    width: var(--thermal-page-width-mm);
+    min-width: var(--thermal-page-width-mm);
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -185,7 +183,8 @@ export const getThermalTagPrintStyles = () => `
   }
 
   .thermal-page {
-    width: ${THERMAL_TAG_WIDTH_MM}mm;
+    width: var(--thermal-page-width-mm);
+    min-height: var(--thermal-page-height-mm);
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -306,6 +305,11 @@ export const getThermalTagPrintStyles = () => `
   }
 
   @media print {
+    @page {
+      size: ${THERMAL_TAG_WIDTH_MM}mm ${pageHeightMm}mm;
+      margin: 0;
+    }
+
     .no-print {
       display: none !important;
     }
@@ -313,11 +317,24 @@ export const getThermalTagPrintStyles = () => `
     html, body {
       margin: 0 !important;
       padding: 0 !important;
+      width: var(--thermal-page-width-mm) !important;
+      min-width: var(--thermal-page-width-mm) !important;
+      height: var(--thermal-page-height-mm) !important;
+      min-height: var(--thermal-page-height-mm) !important;
+      overflow: hidden !important;
+    }
+
+    .thermal-page {
+      min-height: var(--thermal-page-height-mm) !important;
     }
   }
 `;
 
+export const getThermalTagStripHeightMm = (tagCount: number) =>
+  Math.max(THERMAL_TAG_HEIGHT_MM, (Math.max(1, tagCount) * THERMAL_TAG_HEIGHT_MM) + THERMAL_TAG_STACK_PADDING_MM);
+
 export const buildThermalTagPrintHtml = (tags: PreparedThermalTag[], title: string) => {
+  const pageHeightMm = getThermalTagStripHeightMm(tags.length);
   const tagsHtml = tags.map((tag) => `
     <div class="thermal-tag">
       <div class="tag-top">
@@ -342,9 +359,9 @@ export const buildThermalTagPrintHtml = (tags: PreparedThermalTag[], title: stri
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>${escapeHtml(title)}</title>
-      <style>${getThermalTagPrintStyles()}</style>
+      <style>${getThermalTagPrintStyles(pageHeightMm)}</style>
     </head>
-    <body>
+    <body style="--thermal-page-width-mm:${THERMAL_TAG_WIDTH_MM}mm;--thermal-page-height-mm:${pageHeightMm}mm;">
       <div class="no-print" style="padding:4mm 0;text-align:center;width:${THERMAL_TAG_WIDTH_MM}mm;">
         <button onclick="window.print()" style="font:900 12px Arial,sans-serif;padding:8px 12px;border:1px solid #000;background:#fff;color:#000;cursor:pointer;">
           PRINT TAGS

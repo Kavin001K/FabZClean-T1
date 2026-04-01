@@ -71,13 +71,13 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 type: type || 'invoice',
                 title: (metadata as any).invoiceNumber ? `Invoice ${(metadata as any).invoiceNumber}` : req.file.originalname,
                 filename: originalName,
-                filepath, // R2 key or local path
                 fileUrl,
                 status: (metadata as any).status || 'sent',
                 amount: (metadata as any).amount ? String((metadata as any).amount) : null,
                 customerName: (metadata as any).customerName || null,
                 orderNumber: (metadata as any).orderNumber || null,
                 metadata: {
+                    filepath,
                     ...(metadata as any).metadata || {},
                     storage: storageUsed,
                     uploadedAt: new Date().toISOString()
@@ -175,8 +175,10 @@ router.get('/:id/download', async (req, res) => {
 
         let fullPath = "";
 
-        if (document.filepath.startsWith('documents/')) {
-            const fname = document.filepath.split('documents/')[1];
+        const resolvedFilepath = document.filepath || document.metadata?.filepath;
+
+        if (resolvedFilepath?.startsWith('documents/')) {
+            const fname = resolvedFilepath.split('documents/')[1];
             fullPath = path.join(documentsDir, fname);
         } else {
             // Fallback for legacy or other paths - might fail if not in local storage
@@ -214,10 +216,12 @@ router.delete('/:id', async (req, res) => {
         }
 
         // Delete from local filesystem
-        if (document.filepath) {
+        const resolvedFilepath = document.filepath || document.metadata?.filepath;
+
+        if (resolvedFilepath) {
             let fullPath = "";
-            if (document.filepath.startsWith('documents/')) {
-                const fname = document.filepath.split('documents/')[1];
+            if (resolvedFilepath.startsWith('documents/')) {
+                const fname = resolvedFilepath.split('documents/')[1];
                 fullPath = path.join(documentsDir, fname);
             } else {
                 fullPath = path.join(documentsDir, document.filename);

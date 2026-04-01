@@ -43,7 +43,6 @@ export function OrderConfirmationDialog({
     const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
     const [showTagPrint, setShowTagPrint] = useState(false);
     const [whatsappSendCount, setWhatsappSendCount] = useState(0);
-    const [autoSendTriggered, setAutoSendTriggered] = useState(false);
     const [whatsappStatus, setWhatsappStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
     const [whatsappError, setWhatsappError] = useState<string | null>(null);
     const { toast } = useToast();
@@ -145,26 +144,9 @@ export function OrderConfirmationDialog({
         return () => clearTimeout(timer);
     }, [open, order, totalAmount]);
 
-    // Auto-send WhatsApp when dialog opens (on order creation)
-    useEffect(() => {
-        if (open && order && customerPhone && !sendingWhatsApp && !autoSendTriggered && whatsappSendCount === 0) {
-            // Auto-send bill on order creation
-            setAutoSendTriggered(true);
-            console.log('[WhatsApp] Auto-sending bill on order creation...');
-
-            // Delay slightly to allow dialog to render
-            const timer = setTimeout(() => {
-                handleSendWhatsApp();
-            }, 1000);
-
-            return () => clearTimeout(timer);
-        }
-    }, [open, order, customerPhone, autoSendTriggered, whatsappSendCount]);
-
     // Reset state when dialog closes
     useEffect(() => {
         if (!open) {
-            setAutoSendTriggered(false);
             setWhatsappSendCount(0);
             setWhatsappStatus('idle');
             setWhatsappError(null);

@@ -7,6 +7,7 @@ import {
     getTemplateForSendCount,
     MAX_RESENDS,
 } from "../services/whatsapp.service";
+import { ensureOrderInvoiceDocument } from "../services/order-invoice.service";
 import { smartItemSummary } from "../utils/item-summarizer";
 import { storage } from "../storage";
 
@@ -15,7 +16,7 @@ const INVOICE_PUBLIC_BASE_URL = (process.env.R2_INVOICE_PUBLIC_BASE_URL || 'http
 
 const resolveInvoicePublicUrl = (doc: any): string | null => {
     const rawUrl = doc?.fileUrl || doc?.file_url;
-    const filepath = doc?.filepath || doc?.file_path;
+    const filepath = doc?.filepath || doc?.file_path || doc?.metadata?.filepath;
 
     if (rawUrl && typeof rawUrl === 'string') {
         if (INVOICE_PUBLIC_BASE_URL && rawUrl.includes('.r2.cloudflarestorage.com/')) {
@@ -142,6 +143,12 @@ router.post("/send-bill", async (req, res) => {
         console.log(`[WhatsApp] Using template: ${ templateType } `);
 
         let resolvedPdfUrl = pdfUrl;
+        let matchedOrder: any | undefined;
+
+        const allOrders = await storage.listOrders();
+        matchedOrder = allOrders.find((order: any) =>
+            String(order.orderNumber || '') === String(orderId || '')
+        );
 
         if (!resolvedPdfUrl) {
             try {
@@ -162,6 +169,16 @@ router.post("/send-bill", async (req, res) => {
                 }
             } catch (docError) {
                 console.warn('[WhatsApp] Could not lookup invoice document:', docError);
+            }
+        }
+
+        if (!resolvedPdfUrl && matchedOrder) {
+            try {
+                const invoiceResult = await ensureOrderInvoiceDocument(matchedOrder);
+                resolvedPdfUrl = invoiceResult.fileUrl;
+                console.log(`[WhatsApp] Generated invoice on demand for ${orderId}: ${resolvedPdfUrl}`);
+            } catch (invoiceError) {
+                console.error(`[WhatsApp] Failed to generate invoice for ${orderId}:`, invoiceError);
             }
         }
 
@@ -190,9 +207,6 @@ router.post("/send-bill", async (req, res) => {
 
         // Sync PDF URL and WhatsApp status back to the order table
         try {
-            const allOrders = await storage.listOrders();
-            const matchedOrder = allOrders.find(o => o.orderNumber === orderId);
-
             if (matchedOrder && result.success) {
                 await storage.updateOrder(matchedOrder.id, {
                     invoiceUrl: resolvedPdfUrl,

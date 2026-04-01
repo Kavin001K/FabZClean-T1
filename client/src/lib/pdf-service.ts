@@ -3,10 +3,101 @@ import html2canvas from 'html2canvas';
 
 export interface PDFGenerationOptions {
     filename?: string;
-    format?: 'a4' | 'letter';
+    format?: 'a4' | 'letter' | [number, number];
     orientation?: 'portrait' | 'landscape';
     quality?: number;
 }
+
+const PX_TO_MM = 25.4 / 96;
+
+const clampMm = (value: number, fallback: number) => {
+    if (!Number.isFinite(value) || value <= 0) {
+        return fallback;
+    }
+
+    return Math.max(10, value);
+};
+
+const getDocumentDimensionsPx = (doc: Document) => {
+    const body = doc.body;
+    const root = doc.documentElement;
+
+    return {
+        width: Math.max(
+            body?.scrollWidth || 0,
+            body?.offsetWidth || 0,
+            body?.clientWidth || 0,
+            root?.scrollWidth || 0,
+            root?.offsetWidth || 0,
+            root?.clientWidth || 0
+        ),
+        height: Math.max(
+            body?.scrollHeight || 0,
+            body?.offsetHeight || 0,
+            body?.clientHeight || 0,
+            root?.scrollHeight || 0,
+            root?.offsetHeight || 0,
+            root?.clientHeight || 0
+        ),
+    };
+};
+
+const getElementDimensionsPx = (element: HTMLElement) => ({
+    width: Math.max(
+        element.scrollWidth,
+        element.offsetWidth,
+        element.clientWidth,
+        element.getBoundingClientRect().width
+    ),
+    height: Math.max(
+        element.scrollHeight,
+        element.offsetHeight,
+        element.clientHeight,
+        element.getBoundingClientRect().height
+    ),
+});
+
+const getPdfFormat = (
+    options: PDFGenerationOptions,
+    widthPx: number,
+    heightPx: number,
+): 'a4' | 'letter' | [number, number] => {
+    if (options.format) {
+        return options.format;
+    }
+
+    return [
+        clampMm(widthPx * PX_TO_MM, 210),
+        clampMm(heightPx * PX_TO_MM, 297),
+    ];
+};
+
+const addCanvasToPdf = (
+    pdf: jsPDF,
+    canvas: HTMLCanvasElement,
+    format: 'a4' | 'letter' | [number, number],
+    quality: number,
+) => {
+    const imgData = canvas.toDataURL('image/jpeg', quality);
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
+
+    if (!Array.isArray(format)) {
+        let heightLeft = imgHeight - pageHeight;
+        let position = pageHeight - imgHeight;
+
+        while (heightLeft > 5) {
+            pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+            heightLeft -= pageHeight;
+            position -= pageHeight;
+        }
+    }
+};
 
 /**
  * PDF Generation Service
@@ -43,6 +134,11 @@ export class PDFService {
 
                         // Get the content to capture
                         const content = iframeDocument.body;
+                        const contentDimensions = getDocumentDimensionsPx(iframeDocument);
+                        iframe.style.width = `${Math.ceil(contentDimensions.width)}px`;
+                        iframe.style.height = `${Math.ceil(contentDimensions.height)}px`;
+
+                        await new Promise(resolve => setTimeout(resolve, 150));
 
                         // Capture the content as canvas - OPTIMIZED
                         const canvas = await html2canvas(content, {
@@ -51,35 +147,22 @@ export class PDFService {
                             logging: false,
                             backgroundColor: '#ffffff',
                             imageTimeout: 5000,
+                            width: Math.ceil(contentDimensions.width),
+                            height: Math.ceil(contentDimensions.height),
+                            windowWidth: Math.ceil(contentDimensions.width),
+                            windowHeight: Math.ceil(contentDimensions.height),
                         });
 
-                        // Create PDF with compression
-                        const imgWidth = 210;
-                        const pageHeight = 297;
-                        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                        let heightLeft = imgHeight;
+                        const format = getPdfFormat(options, contentDimensions.width, contentDimensions.height);
 
                         const pdf = new jsPDF({
                             orientation: options.orientation || 'portrait',
                             unit: 'mm',
-                            format: options.format || 'a4',
+                            format,
                             compress: true,
                         });
 
-                        let position = 0;
-
-                        // Use JPEG with 70% quality for smaller file size
-                        const imgData = canvas.toDataURL('image/jpeg', 0.7);
-                        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-                        heightLeft -= pageHeight;
-
-                        // Add more pages if content is longer
-                        while (heightLeft > 5) {
-                            position = heightLeft - imgHeight;
-                            pdf.addPage();
-                            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-                            heightLeft -= pageHeight;
-                        }
+                        addCanvasToPdf(pdf, canvas, format, options.quality || 0.7);
 
                         // Convert to blob
                         const pdfBlob = pdf.output('blob');
@@ -115,6 +198,8 @@ export class PDFService {
         options: PDFGenerationOptions = {}
     ): Promise<Blob> {
         try {
+            const elementDimensions = getElementDimensionsPx(element);
+
             // Capture element as canvas - OPTIMIZED
             const canvas = await html2canvas(element, {
                 scale: 1.5, // Reduced for smaller file
@@ -122,23 +207,22 @@ export class PDFService {
                 logging: false,
                 backgroundColor: '#ffffff',
                 imageTimeout: 5000,
+                width: Math.ceil(elementDimensions.width),
+                height: Math.ceil(elementDimensions.height),
+                windowWidth: Math.ceil(elementDimensions.width),
+                windowHeight: Math.ceil(elementDimensions.height),
             });
 
-            // Create PDF with compression
-            const imgWidth = 210;
-            const pageHeight = 297;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            const format = getPdfFormat(options, elementDimensions.width, elementDimensions.height);
 
             const pdf = new jsPDF({
                 orientation: options.orientation || 'portrait',
                 unit: 'mm',
-                format: options.format || 'a4',
+                format,
                 compress: true,
             });
 
-            // Use JPEG with 70% quality
-            const imgData = canvas.toDataURL('image/jpeg', 0.7);
-            pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
+            addCanvasToPdf(pdf, canvas, format, options.quality || 0.7);
 
             // Convert to blob
             return pdf.output('blob');
