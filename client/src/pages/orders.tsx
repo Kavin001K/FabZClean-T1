@@ -92,6 +92,7 @@ import { exportOrdersToCSV } from '@/lib/export-utils';
 import { exportOrdersEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportOrdersToExcel } from '@/lib/excel-exports';
 import { smartItemSummary } from '@/lib/item-summarizer';
+import { getOrderStoreLabel, resolveOrderStoreCodeFromOrder } from '@/lib/order-store';
 import { MAX_WHATSAPP_SENDS, WhatsAppService } from '@/lib/whatsapp-service';
 import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
@@ -245,7 +246,8 @@ function OrdersComponent() {
           order.customerName.toLowerCase().includes(searchLower) ||
           order.orderNumber.toLowerCase().includes(searchLower) ||
           (order as any).customerPhone?.toLowerCase().includes(searchLower) ||
-          (order as any).service?.toLowerCase().includes(searchLower);
+          (order as any).service?.toLowerCase().includes(searchLower) ||
+          getOrderStoreLabel(resolveOrderStoreCodeFromOrder(order)).toLowerCase().includes(searchLower);
         if (!matchesSearch) return false;
       }
 
@@ -1175,6 +1177,7 @@ function OrdersComponent() {
             <tr>
               <th>Order #</th>
               <th>Customer</th>
+              <th>Store</th>
               <th>Service</th>
               <th>Status</th>
               <th>Payment</th>
@@ -1187,6 +1190,7 @@ function OrdersComponent() {
               <tr>
                 <td><strong>${order.orderNumber}</strong></td>
                 <td>${order.customerName}</td>
+                <td>${resolveOrderStoreCodeFromOrder(order) || 'NA'}</td>
                 <td>${order.service || 'N/A'}</td>
                 <td><span class="status-badge status-${order.status}">${order.status}</span></td>
                 <td>${order.paymentStatus || 'N/A'}</td>
@@ -1286,8 +1290,8 @@ function OrdersComponent() {
       filters.amountMax;
   }, [filters]);
 
-  const ordersGridColumns = "grid-cols-[48px_168px_minmax(220px,1.6fr)_minmax(140px,1.1fr)_minmax(140px,1fr)_minmax(130px,1fr)_110px_130px_130px_84px]";
-  const ordersTableMinWidth = "min-w-[1320px]";
+  const ordersGridColumns = "grid-cols-[48px_168px_minmax(220px,1.6fr)_110px_minmax(140px,1.1fr)_minmax(140px,1fr)_minmax(130px,1fr)_110px_130px_130px_84px]";
+  const ordersTableMinWidth = "min-w-[1430px]";
   const primaryShortcutPrefix = isMac() ? "⌘" : "Ctrl+";
   const searchShortcutLabel = `${primaryShortcutPrefix}F`;
   const refreshShortcutLabel = `${primaryShortcutPrefix}R`;
@@ -1300,6 +1304,8 @@ function OrdersComponent() {
   );
 
   const renderOrderRow = useCallback((order: Order, index: number) => {
+    const orderStoreCode = resolveOrderStoreCodeFromOrder(order);
+
     if (isMobile) {
       return (
         <motion.div
@@ -1341,6 +1347,11 @@ function OrdersComponent() {
                 <Package className="h-3 w-3" />
                 <span className="truncate max-w-[120px]">{(order as any).service || 'Dry Cleaning'}</span>
               </div>
+              {orderStoreCode && (
+                <Badge variant="outline" className="text-[9px] font-bold h-5 px-1.5 py-0 border-slate-300 bg-slate-900 text-white">
+                  {orderStoreCode}
+                </Badge>
+              )}
               <Badge variant="outline" className={cn("text-[9px] font-bold h-5 px-1.5 py-0 border-primary/10", getPaymentStatusColor((order as any).paymentStatus || 'pending'))}>
                 {(order as any).paymentStatus?.toUpperCase() || 'PENDING'}
               </Badge>
@@ -1428,6 +1439,11 @@ function OrdersComponent() {
           <span className="font-medium">{order.customerName}</span>
           <span className="text-[10px] text-muted-foreground font-mono leading-tight">{order.customerId || (order as any).customers?.id}</span>
         </div>
+        <div className="truncate">
+          <Badge variant="outline" className="font-bold border-slate-300 bg-slate-900 text-white">
+            {orderStoreCode || 'NA'}
+          </Badge>
+        </div>
         <div className="truncate text-muted-foreground">{(order as any).service || 'Dry Cleaning'}</div>
         <div onClick={(e) => e.stopPropagation()}>
           <Badge className={cn("border gap-1.5 w-fit", getStatusColor(order.status))}>
@@ -1506,6 +1522,7 @@ function OrdersComponent() {
       <div><Checkbox checked={filteredOrders.length > 0 && selectedOrders.length === filteredOrders.length} onCheckedChange={handleSelectAll} /></div>
       <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('orderNumber')}>Order # <ArrowUpDown className="h-3 w-3" /></div>
       <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('customerName')}>Customer <ArrowUpDown className="h-3 w-3" /></div>
+      <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('storeCode')}>Store <ArrowUpDown className="h-3 w-3" /></div>
       <div>Service</div>
       <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('status')}>Status <ArrowUpDown className="h-3 w-3" /></div>
       <div>Payment</div>

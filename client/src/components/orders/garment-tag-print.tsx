@@ -36,7 +36,7 @@ export function GarmentTagPrint({
   orderNumber,
   customerName,
   franchiseId,
-  storeCode = 'FAB',
+  storeCode,
   commonNote,
   dueDate,
 }: GarmentTagPrintProps) {

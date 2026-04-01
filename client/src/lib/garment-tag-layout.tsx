@@ -1,5 +1,6 @@
 import React from 'react';
 import { DEFAULT_COMPANY_INFO, getFranchiseById } from './franchise-config';
+import { normalizeOrderStoreCode } from './order-store';
 
 export const THERMAL_TAG_WIDTH_MM = 36;
 export const THERMAL_TAG_HEIGHT_MM = 23;
@@ -90,7 +91,8 @@ const formatDueDate = (dueDate?: string) => {
 
 const resolveBranchText = (franchiseId?: string | null, storeCode?: string) => {
   const franchise = franchiseId ? getFranchiseById(franchiseId) : DEFAULT_COMPANY_INFO;
-  const branchCode = normalizeText(storeCode || franchise.branchCode, franchise.branchCode);
+  const normalizedStoreCode = normalizeOrderStoreCode(storeCode);
+  const branchCode = normalizedStoreCode || normalizeText(franchise.branchCode, franchise.branchCode);
   return `FAB CLEAN (${branchCode})`;
 };
 

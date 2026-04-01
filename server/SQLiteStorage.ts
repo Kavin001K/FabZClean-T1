@@ -248,6 +248,7 @@ export class SQLiteStorage implements IStorage {
       CREATE TABLE IF NOT EXISTS orders (
         id TEXT PRIMARY KEY,
         franchiseId TEXT,
+        storeCode TEXT DEFAULT 'POL',
         customerId TEXT,
         status TEXT DEFAULT 'pending',
         totalAmount TEXT,
@@ -683,6 +684,7 @@ export class SQLiteStorage implements IStorage {
         const newColumns = [
           { name: 'advancePaid', type: 'TEXT' },
           { name: 'paymentMethod', type: 'TEXT' },
+          { name: 'storeCode', type: 'TEXT DEFAULT \"POL\"' },
           { name: 'discountType', type: 'TEXT' },
           { name: 'discountValue', type: 'TEXT' },
           { name: 'couponCode', type: 'TEXT' },

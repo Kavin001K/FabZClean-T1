@@ -21,6 +21,7 @@ import { useQuery } from '@tanstack/react-query';
 import { printDriver } from '@/lib/print-driver';
 import { GarmentTagPrint } from './garment-tag-print';
 import { generateUPIUrl, PAYMENT_CONFIG } from '@/lib/franchise-config';
+import { resolveOrderStoreCodeFromOrder } from '@/lib/order-store';
 import { smartItemSummary } from '@/lib/item-summarizer';
 
 interface OrderConfirmationDialogProps {
@@ -700,7 +701,7 @@ export function OrderConfirmationDialog({
                 orderNumber={order?.orderNumber || ''}
                 customerName={order?.customerName}
                 franchiseId={(order as any)?.franchiseId || (order as any)?.franchise_id || null}
-                storeCode={'FAB'}
+                storeCode={resolveOrderStoreCodeFromOrder(order)}
                 commonNote={(order as any)?.specialInstructions || (order as any)?.special_instructions || undefined}
                 isExpressOrder={(order as any)?.isExpressOrder || (order as any)?.is_express_order || false}
                 dueDate={order?.pickupDate ? String(order.pickupDate) : (order as any)?.dueDate ? String((order as any).dueDate) : undefined}

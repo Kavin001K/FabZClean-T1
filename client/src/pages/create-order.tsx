@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Switch } from "@/components/ui/switch";
-import { PlusCircle, User, Calendar as CalendarIcon, Truck, IndianRupee, Search, CheckCircle, X, Loader2, AlertCircle, History, Package, TrendingUp, Clock, ShoppingBag, Zap, CreditCard, Phone, Mail, TrendingDown, ShoppingCart, List, Store, MapPin } from "lucide-react";
+import { PlusCircle, User, Calendar as CalendarIcon, Truck, IndianRupee, Search, CheckCircle, X, Loader2, AlertCircle, History, Package, TrendingUp, Clock, ShoppingBag, Zap, CreditCard, Phone, Mail, TrendingDown, ShoppingCart, List, Store, MapPin, ChevronUp, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Service, Order, Customer } from "@shared/schema";
+import type { Service, Order, Customer, OrderStoreCode } from "@shared/schema";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -27,8 +27,12 @@ import { ServiceCombobox } from "@/components/orders/service-combobox";
 import { OrderConfirmationDialog } from "@/components/orders/order-confirmation-dialog";
 import OrderDetailsDialog from "@/components/orders/order-details-dialog";
 import { useAuth } from "@/contexts/auth-context";
-import { generateOrderNumberSync } from "@/lib/franchise-config";
 import { createAddressObject, parseAndFormatAddress } from "@/lib/address-utils";
+import {
+  ORDER_STORE_OPTIONS,
+  getOrderStoreLabel,
+  resolveOrderStoreCodeFromEmployee,
+} from "@/lib/order-store";
 import { formatCurrencyWithSettings, roundInvoiceAmount } from "@/lib/settings-utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -73,6 +77,7 @@ export default function CreateOrder() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
+  const [storeCode, setStoreCode] = useState<OrderStoreCode>('POL');
 
   // Services state (must be before useEffect that references it)
   const [selectedServices, setSelectedServices] = useState<ServiceItem[]>([]);
@@ -82,6 +87,13 @@ export default function CreateOrder() {
 
   // Abandoned Cart Recovery
   const ABANDONED_CART_KEY = "fabzclean_cart_draft_v1";
+
+  useEffect(() => {
+    const hasDraft = Boolean(localStorage.getItem(ABANDONED_CART_KEY));
+    if (!hasDraft) {
+      setStoreCode(resolveOrderStoreCodeFromEmployee(currentUser as any));
+    }
+  }, [currentUser]);
 
   // Load draft on mount
   useEffect(() => {
@@ -95,6 +107,7 @@ export default function CreateOrder() {
         if (draft.foundCustomer) setFoundCustomer(draft.foundCustomer);
         if (draft.selectedServices) setSelectedServices(draft.selectedServices);
         if (draft.specialInstructions) setSpecialInstructions(draft.specialInstructions);
+        if (draft.storeCode) setStoreCode(draft.storeCode);
 
         toast({ title: "Draft Restored", description: "Taking you back to where you left off." });
       } catch (e) {
@@ -106,10 +119,10 @@ export default function CreateOrder() {
   // Save draft on change
   useEffect(() => {
     const draft = {
-      phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer
+      phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeCode
     };
     localStorage.setItem(ABANDONED_CART_KEY, JSON.stringify(draft));
-  }, [phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer]);
+  }, [phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeCode]);
 
   // Customer creation popup
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
@@ -552,6 +565,28 @@ export default function CreateOrder() {
     setSelectedServices(updated);
   };
 
+  const handleAdjustQuantity = (serviceId: string, delta: number) => {
+    const currentItem = selectedServices.find((item) => item.service.id === serviceId);
+    if (!currentItem) return;
+    handleUpdateQuantity(serviceId, currentItem.quantity + delta);
+  };
+
+  const handleUpdatePrice = (serviceId: string, price: number) => {
+    const safePrice = Math.max(0, Number.isFinite(price) ? price : 0);
+    const updated = selectedServices.map((item) =>
+      item.service.id === serviceId
+        ? { ...item, priceOverride: safePrice, subtotal: item.quantity * safePrice }
+        : item
+    );
+    setSelectedServices(updated);
+  };
+
+  const handleAdjustPrice = (serviceId: string, delta: number) => {
+    const currentItem = selectedServices.find((item) => item.service.id === serviceId);
+    if (!currentItem) return;
+    handleUpdatePrice(serviceId, Number((currentItem.priceOverride + delta).toFixed(2)));
+  };
+
   // Remove service
   const handleRemoveService = (serviceId: string) => {
     setSelectedServices(selectedServices.filter(s => s.service.id !== serviceId));
@@ -636,6 +671,11 @@ export default function CreateOrder() {
         // 4. Ensure Order Number
         if (!newOrder.orderNumber) {
           newOrder.orderNumber = newOrder.order_number;
+        }
+
+        // 4b. Ensure Store Code for tags and filtering
+        if (!newOrder.storeCode) {
+          newOrder.storeCode = newOrder.store_code || storeCode;
         }
 
         // 5. Ensure Customer Name
@@ -903,6 +943,7 @@ export default function CreateOrder() {
     // Don't set orderNumber here - let server generate it with proper sequential format
     const orderData: any = {
       customerId: currentCustomerId,
+      storeCode,
       customerName,
       customerEmail: customerEmail || undefined,
       customerPhone,
@@ -1203,136 +1244,277 @@ export default function CreateOrder() {
                   </div>
                 ) : (
                   <div className="border dark:border-slate-700 rounded-lg overflow-hidden dark:bg-slate-900/30">
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader className="bg-slate-50 dark:bg-slate-900/50 border-b dark:border-slate-700">
-                          <TableRow>
-                            <TableHead className="min-w-[180px] text-slate-700 dark:text-slate-300 font-bold">Service</TableHead>
-                            <TableHead className="w-24 text-slate-700 dark:text-slate-300 font-bold">Quantity</TableHead>
-                            <TableHead className="w-28 text-slate-700 dark:text-slate-300 font-bold">Price</TableHead>
-                            <TableHead className="w-28 text-slate-700 dark:text-slate-300 font-bold">Subtotal</TableHead>
-                            <TableHead className="w-16"></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          <AnimatePresence>
-                            {selectedServices.map((item) => (
-                              <React.Fragment key={item.service.id}>
-                                <motion.tr
-                                  initial={{ opacity: 0, x: -20 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  exit={{ opacity: 0, x: 20 }}
-                                  transition={{ duration: 0.2 }}
-                                  className="border-b-0"
+                    {isMobile ? (
+                      <div className="space-y-3 p-3">
+                        <AnimatePresence>
+                          {selectedServices.map((item) => (
+                            <motion.div
+                              key={item.service.id}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Service</p>
+                                  <Input
+                                    value={item.customName}
+                                    onChange={(e) => {
+                                      const updated = selectedServices.map((s) =>
+                                        s.service.id === item.service.id ? { ...s, customName: e.target.value } : s
+                                      );
+                                      setSelectedServices(updated);
+                                    }}
+                                    className="mt-2 h-11 rounded-xl border-slate-200 bg-white text-base font-semibold dark:border-slate-700 dark:bg-slate-800"
+                                    placeholder="Service name"
+                                  />
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveService(item.service.id)}
+                                  className="h-10 w-10 rounded-full text-slate-500 hover:bg-rose-50 hover:text-rose-600"
                                 >
-                                  <TableCell className="font-medium py-2">
-                                    <Input
-                                      value={item.customName}
-                                      onChange={(e) => {
-                                        const updated = selectedServices.map(s =>
-                                          s.service.id === item.service.id ? { ...s, customName: e.target.value } : s
-                                        );
-                                        setSelectedServices(updated);
-                                      }}
-                                      className="w-full font-medium text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                                      placeholder="Service name"
-                                    />
-                                  </TableCell>
-                                  <TableCell className="py-2">
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+
+                              <div className="mt-4 grid grid-cols-2 gap-3">
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/80">
+                                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Quantity</p>
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => handleAdjustQuantity(item.service.id, -1)}
+                                      className="h-10 w-10 rounded-xl border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900"
+                                    >
+                                      <ChevronDown className="h-4 w-4" />
+                                    </Button>
                                     <Input
                                       type="number"
                                       min="1"
                                       value={item.quantity}
-                                      onChange={(e) => handleUpdateQuantity(item.service.id, parseInt(e.target.value) || 0)}
-                                      className="w-20 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                                      onChange={(e) => handleUpdateQuantity(item.service.id, parseInt(e.target.value, 10) || 0)}
+                                      className="h-10 rounded-xl border-slate-300 bg-white text-center text-lg font-black dark:border-slate-600 dark:bg-slate-900"
                                     />
-                                  </TableCell>
-                                  <TableCell className="py-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => handleAdjustQuantity(item.service.id, 1)}
+                                      className="h-10 w-10 rounded-xl border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900"
+                                    >
+                                      <ChevronUp className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/80">
+                                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Price</p>
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => handleAdjustPrice(item.service.id, -5)}
+                                      className="h-10 w-10 rounded-xl border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900"
+                                    >
+                                      <ChevronDown className="h-4 w-4" />
+                                    </Button>
                                     <Input
                                       type="number"
                                       min="0"
                                       step="0.01"
                                       value={item.priceOverride}
-                                      onChange={(e) => {
-                                        const newPrice = parseFloat(e.target.value) || 0;
-                                        const updated = selectedServices.map(s =>
-                                          s.service.id === item.service.id ? { ...s, priceOverride: newPrice, subtotal: s.quantity * newPrice } : s
-                                        );
-                                        setSelectedServices(updated);
-                                      }}
-                                      className="w-24 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                                      onChange={(e) => handleUpdatePrice(item.service.id, parseFloat(e.target.value) || 0)}
+                                      className="h-10 rounded-xl border-slate-300 bg-white text-center text-lg font-black dark:border-slate-600 dark:bg-slate-900"
                                     />
-                                  </TableCell>
-                                  <TableCell className="font-semibold text-slate-900 dark:text-white py-2">₹{item.subtotal.toFixed(2)}</TableCell>
-                                  <TableCell>
                                     <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleRemoveService(item.service.id)}
-                                      className="h-8 w-8 p-0"
+                                      type="button"
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => handleAdjustPrice(item.service.id, 5)}
+                                      className="h-10 w-10 rounded-xl border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900"
                                     >
-                                      <X className="h-4 w-4" />
+                                      <ChevronUp className="h-4 w-4" />
                                     </Button>
-                                  </TableCell>
-                                </motion.tr>
-                                {/* Tag Note & Barcode Row */}
-                                <motion.tr
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  exit={{ opacity: 0 }}
-                                  className="border-b bg-muted/30"
-                                >
-                                  <TableCell colSpan={5} className="py-2 px-4">
-                                    <div className="flex flex-col md:flex-row gap-4">
-                                      <div className="flex items-center gap-2 flex-1">
-                                        <span className="text-xs text-muted-foreground whitespace-nowrap">Tag Note:</span>
-                                        <Input
-                                          value={item.tagNote}
-                                          onChange={(e) => {
-                                            const updated = selectedServices.map(s =>
-                                              s.service.id === item.service.id ? { ...s, tagNote: e.target.value } : s
-                                            );
-                                            setSelectedServices(updated);
-                                          }}
-                                          className="h-8 text-sm flex-1"
-                                          placeholder="e.g., Delicate fabric, No bleach"
-                                        />
-                                      </div>
-                                      <div className="flex items-center gap-2 flex-1">
-                                        <span className="text-xs text-muted-foreground whitespace-nowrap">Barcode:</span>
-                                        <Input
-                                          value={item.garmentBarcode || ''}
-                                          onChange={(e) => {
-                                            const updated = selectedServices.map(s =>
-                                              s.service.id === item.service.id ? { ...s, garmentBarcode: e.target.value } : s
-                                            );
-                                            setSelectedServices(updated);
+                                  </div>
+                                </div>
+                              </div>
 
-                                            // Mock Check for History (Garment Lifecycle)
-                                            if (e.target.value.length > 5) {
-                                              // In real app, query API. Here we mock warning.
-                                              if (e.target.value.endsWith('50')) { // Test condition
+                              <div className="mt-4 rounded-2xl bg-primary px-4 py-3 text-white shadow-lg shadow-primary/10">
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="text-xs font-black uppercase tracking-[0.18em] text-white/80">Subtotal</span>
+                                  <span className="text-2xl font-black tabular-nums">₹{item.subtotal.toFixed(2)}</span>
+                                </div>
+                              </div>
+
+                              <div className="mt-4 space-y-3">
+                                <div className="space-y-1.5">
+                                  <Label className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Tag note</Label>
+                                  <Input
+                                    value={item.tagNote}
+                                    onChange={(e) => {
+                                      const updated = selectedServices.map((s) =>
+                                        s.service.id === item.service.id ? { ...s, tagNote: e.target.value } : s
+                                      );
+                                      setSelectedServices(updated);
+                                    }}
+                                    className="h-10 rounded-xl"
+                                    placeholder="Delicate fabric, no bleach"
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Garment barcode</Label>
+                                  <Input
+                                    value={item.garmentBarcode || ''}
+                                    onChange={(e) => {
+                                      const updated = selectedServices.map((s) =>
+                                        s.service.id === item.service.id ? { ...s, garmentBarcode: e.target.value } : s
+                                      );
+                                      setSelectedServices(updated);
+
+                                      if (e.target.value.length > 5 && e.target.value.endsWith('50')) {
+                                        toast({
+                                          title: "Garment Lifecycle Warning",
+                                          description: "This garment has been washed 50 times. Inspect it for wear before processing.",
+                                          variant: "destructive"
+                                        });
+                                      }
+                                    }}
+                                    className="h-10 rounded-xl"
+                                    placeholder="Scan permanent tag"
+                                  />
+                                </div>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader className="bg-slate-50 dark:bg-slate-900/50 border-b dark:border-slate-700">
+                            <TableRow>
+                              <TableHead className="min-w-[180px] text-slate-700 dark:text-slate-300 font-bold">Service</TableHead>
+                              <TableHead className="w-24 text-slate-700 dark:text-slate-300 font-bold">Quantity</TableHead>
+                              <TableHead className="w-28 text-slate-700 dark:text-slate-300 font-bold">Price</TableHead>
+                              <TableHead className="w-28 text-slate-700 dark:text-slate-300 font-bold">Subtotal</TableHead>
+                              <TableHead className="w-16"></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            <AnimatePresence>
+                              {selectedServices.map((item) => (
+                                <React.Fragment key={item.service.id}>
+                                  <motion.tr
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: 20 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="border-b-0"
+                                  >
+                                    <TableCell className="font-medium py-2">
+                                      <Input
+                                        value={item.customName}
+                                        onChange={(e) => {
+                                          const updated = selectedServices.map(s =>
+                                            s.service.id === item.service.id ? { ...s, customName: e.target.value } : s
+                                          );
+                                          setSelectedServices(updated);
+                                        }}
+                                        className="w-full font-medium text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                                        placeholder="Service name"
+                                      />
+                                    </TableCell>
+                                    <TableCell className="py-2">
+                                      <Input
+                                        type="number"
+                                        min="1"
+                                        value={item.quantity}
+                                        onChange={(e) => handleUpdateQuantity(item.service.id, parseInt(e.target.value, 10) || 0)}
+                                        className="w-20 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                                      />
+                                    </TableCell>
+                                    <TableCell className="py-2">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={item.priceOverride}
+                                        onChange={(e) => handleUpdatePrice(item.service.id, parseFloat(e.target.value) || 0)}
+                                        className="w-24 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                                      />
+                                    </TableCell>
+                                    <TableCell className="font-semibold text-slate-900 dark:text-white py-2">₹{item.subtotal.toFixed(2)}</TableCell>
+                                    <TableCell>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRemoveService(item.service.id)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </TableCell>
+                                  </motion.tr>
+                                  <motion.tr
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="border-b bg-muted/30"
+                                  >
+                                    <TableCell colSpan={5} className="py-2 px-4">
+                                      <div className="flex flex-col md:flex-row gap-4">
+                                        <div className="flex items-center gap-2 flex-1">
+                                          <span className="text-xs text-muted-foreground whitespace-nowrap">Tag Note:</span>
+                                          <Input
+                                            value={item.tagNote}
+                                            onChange={(e) => {
+                                              const updated = selectedServices.map(s =>
+                                                s.service.id === item.service.id ? { ...s, tagNote: e.target.value } : s
+                                              );
+                                              setSelectedServices(updated);
+                                            }}
+                                            className="h-8 text-sm flex-1"
+                                            placeholder="e.g., Delicate fabric, No bleach"
+                                          />
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-1">
+                                          <span className="text-xs text-muted-foreground whitespace-nowrap">Barcode:</span>
+                                          <Input
+                                            value={item.garmentBarcode || ''}
+                                            onChange={(e) => {
+                                              const updated = selectedServices.map(s =>
+                                                s.service.id === item.service.id ? { ...s, garmentBarcode: e.target.value } : s
+                                              );
+                                              setSelectedServices(updated);
+
+                                              if (e.target.value.length > 5 && e.target.value.endsWith('50')) {
                                                 toast({
                                                   title: "Garment Lifecycle Warning",
                                                   description: "This garment has been washed 50 times! Inspect for wear and tear.",
                                                   variant: "destructive"
                                                 });
                                               }
-                                            }
-                                          }}
-                                          className="h-8 text-sm flex-1"
-                                          placeholder="Scan permanent tag..."
-                                        />
+                                            }}
+                                            className="h-8 text-sm flex-1"
+                                            placeholder="Scan permanent tag..."
+                                          />
+                                        </div>
                                       </div>
-                                    </div>
-                                  </TableCell>
-                                </motion.tr>
-                              </React.Fragment>
-                            ))}
-                          </AnimatePresence>
-                        </TableBody>
-                      </Table>
-                    </div>
+                                    </TableCell>
+                                  </motion.tr>
+                                </React.Fragment>
+                              ))}
+                            </AnimatePresence>
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -1394,6 +1576,26 @@ export default function CreateOrder() {
                     rows={3}
                     className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="storeCode" className="text-slate-700 dark:text-slate-300">Store Code</Label>
+                  <Select value={storeCode} onValueChange={(value: OrderStoreCode) => setStoreCode(value)}>
+                    <SelectTrigger id="storeCode" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                      <SelectValue placeholder="Select store">
+                        {getOrderStoreLabel(storeCode)}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ORDER_STORE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Printed tags will show this branch code as `FAB CLEAN ({storeCode})`.
+                  </p>
                 </div>
               </CardContent>
             </Card>

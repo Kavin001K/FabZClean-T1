@@ -32,6 +32,7 @@ import { formatCurrency, formatDate, getNextStatus } from "@/lib/data-service";
 import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { useInvoicePrint } from "@/hooks/use-invoice-print";
+import { getOrderStoreLabel, resolveOrderStoreCodeFromOrder } from "@/lib/order-store";
 
 export interface OrderDetailsDialogProps {
   order: Order | null;
@@ -155,6 +156,7 @@ export default React.memo(function OrderDetailsDialog({
   const calculatedDue = Math.max(0, totalAmount - advancePaid - walletUsed);
   const outstandingAmount = Math.max(creditUsed, calculatedDue);
   const canMarkPaid = anyOrder.paymentStatus !== 'paid' && outstandingAmount > 0;
+  const storeLabel = getOrderStoreLabel(resolveOrderStoreCodeFromOrder(anyOrder));
 
   // Parse Address Helper
   const formatAddress = (addr: any) => {
@@ -228,6 +230,13 @@ export default React.memo(function OrderDetailsDialog({
                 <p className="text-sm font-medium text-muted-foreground mb-1">Priority</p>
                 <Badge className={getPriorityColor(anyOrder.priority || 'Normal')}>
                   {anyOrder.priority || 'Normal'}
+                </Badge>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">Store</p>
+                <Badge variant="outline" className="font-bold border-slate-300 bg-slate-900 text-white">
+                  {storeLabel}
                 </Badge>
               </div>
             </div>

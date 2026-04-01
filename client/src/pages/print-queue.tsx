@@ -40,6 +40,11 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { Order, OrderItem } from "@shared/schema";
 import { buildThermalTagPrintHtml, prepareThermalTags } from "@/lib/garment-tag-layout";
+import {
+    ORDER_STORE_OPTIONS,
+    getOrderStoreLabel,
+    resolveOrderStoreCodeFromOrder,
+} from "@/lib/order-store";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -84,6 +89,7 @@ export default function PrintTags() {
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [paymentFilter, setPaymentFilter] = useState("all");
+    const [storeFilter, setStoreFilter] = useState("all");
     const [dateFrom, setDateFrom] = useState<Date | undefined>();
     const [dateTo, setDateTo] = useState<Date | undefined>();
     const [showFilters, setShowFilters] = useState(false);
@@ -159,11 +165,13 @@ export default function PrintTags() {
             if (q && !(
                 o.orderNumber.toLowerCase().includes(q) ||
                 o.customerName.toLowerCase().includes(q) ||
-                ((o as any).customerPhone || "").toLowerCase().includes(q)
+                ((o as any).customerPhone || "").toLowerCase().includes(q) ||
+                getOrderStoreLabel(resolveOrderStoreCodeFromOrder(o)).toLowerCase().includes(q)
             )) return false;
 
             if (statusFilter !== "all" && o.status !== statusFilter) return false;
             if (paymentFilter !== "all" && ((o as any).paymentStatus || "pending") !== paymentFilter) return false;
+            if (storeFilter !== "all" && resolveOrderStoreCodeFromOrder(o) !== storeFilter) return false;
 
             if (dateFrom) {
                 const d = new Date(o.createdAt || 0);
@@ -179,7 +187,7 @@ export default function PrintTags() {
         }).sort((a: Order, b: Order) =>
             new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
         );
-    }, [orders, historyOrders, activeTab, search, statusFilter, paymentFilter, dateFrom, dateTo]);
+    }, [orders, historyOrders, activeTab, search, statusFilter, paymentFilter, storeFilter, dateFrom, dateTo]);
 
     // ── Stats ────────────────────────────────────────────────────────────────
 
@@ -210,11 +218,12 @@ export default function PrintTags() {
         setSearch("");
         setStatusFilter("all");
         setPaymentFilter("all");
+        setStoreFilter("all");
         setDateFrom(undefined);
         setDateTo(undefined);
     }, []);
 
-    const hasActiveFilters = search || statusFilter !== "all" || paymentFilter !== "all" || dateFrom || dateTo;
+    const hasActiveFilters = search || statusFilter !== "all" || paymentFilter !== "all" || storeFilter !== "all" || dateFrom || dateTo;
 
     // ── Print handlers ───────────────────────────────────────────────────────
 
@@ -229,7 +238,7 @@ export default function PrintTags() {
             orderNumber: order.orderNumber,
             customerName: order.customerName,
             franchiseId: (order as any).franchiseId || (order as any).franchise_id || null,
-            storeCode: (order as any).storeCode || undefined,
+            storeCode: resolveOrderStoreCodeFromOrder(order),
             commonNote: (order as any).specialInstructions || (order as any).special_instructions || undefined,
             dueDate: (order as any).pickupDate
                 ? String((order as any).pickupDate)
@@ -410,7 +419,7 @@ export default function PrintTags() {
             {showFilters && (
                 <Card>
                     <CardContent className="p-3 sm:p-4">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                             <Select value={statusFilter} onValueChange={setStatusFilter}>
                                 <SelectTrigger className="h-9 text-sm">
                                     <SelectValue placeholder="Status" />
@@ -429,6 +438,20 @@ export default function PrintTags() {
                                 <SelectContent>
                                     {PAYMENT_OPTIONS.map((o) => (
                                         <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            <Select value={storeFilter} onValueChange={setStoreFilter}>
+                                <SelectTrigger className="h-9 text-sm">
+                                    <SelectValue placeholder="Store" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Stores</SelectItem>
+                                    {ORDER_STORE_OPTIONS.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -538,6 +561,7 @@ export default function PrintTags() {
                         const isSelected = selectedIds.includes(order.id);
                         const isExpanded = expandedOrder === order.id;
                         const tagsPrinted = !!order.tagsPrinted;
+                        const orderStoreCode = resolveOrderStoreCodeFromOrder(order);
 
                         return (
                             <Card
@@ -603,10 +627,20 @@ export default function PrintTags() {
                                                         >
                                                             {order.paymentStatus || 'pending'}
                                                         </Badge>
+                                                        {orderStoreCode && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider bg-slate-900 text-white border-slate-800"
+                                                            >
+                                                                {orderStoreCode}
+                                                            </Badge>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-medium text-muted-foreground">
                                                     <span className="text-foreground font-bold">{order.customerName}</span>
+                                                    <span className="opacity-20">•</span>
+                                                    <span>{getOrderStoreLabel(orderStoreCode)}</span>
                                                     <span className="opacity-20">•</span>
                                                     <span>{items.length} item{items.length !== 1 ? "s" : ""}</span>
                                                     <span className="opacity-20">•</span>

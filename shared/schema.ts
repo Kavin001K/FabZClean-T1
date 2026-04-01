@@ -92,10 +92,15 @@ export interface OrderItem {
   tagNote?: string;
 }
 
+export const ORDER_STORE_CODES = ["POL", "KIN", "MCET", "UDM"] as const;
+export type OrderStoreCode = (typeof ORDER_STORE_CODES)[number];
+export const DEFAULT_ORDER_STORE_CODE: OrderStoreCode = "POL";
+
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderNumber: text("order_number").notNull(),
   franchiseId: text("franchise_id"),
+  storeCode: text("store_code", { enum: ORDER_STORE_CODES }).default(DEFAULT_ORDER_STORE_CODE),
   customerId: text("customer_id").references(() => customers.id),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
@@ -327,6 +332,7 @@ export const insertOrderSchema = z.object({
   id: z.string().optional(),
   orderNumber: z.string().optional(),
   customerId: z.string().optional().nullable(),
+  storeCode: z.enum(ORDER_STORE_CODES).optional().default(DEFAULT_ORDER_STORE_CODE),
   customerName: z.string(),
   customerEmail: z.string().optional().nullable(),
   customerPhone: z.string().optional().nullable(),

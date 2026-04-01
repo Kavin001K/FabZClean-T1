@@ -280,19 +280,6 @@ export async function generateOrderNumber(franchiseId?: string | null, storage?:
 }
 
 /**
- * Synchronous version for cases where async is not possible
- * Format: FZC26POL0001 (Prefix + 2-digit Year + Franchise Code + 4-digit Sequence)
- * 
- * NOTE: The server generates the actual order number - this is just a placeholder.
- * Pass empty orderNumber to let the server generate the correct sequential number.
- */
-export function generateOrderNumberSync(franchiseId?: string | null): string {
-    // Return empty string to let server generate the proper sequential order number
-    // The server's getNextOrderNumber() function handles proper sequencing
-    return '';
-}
-
-/**
  * Generate a unique transit ID with new format
  * Format: TRN-YYYY+BRANCHCODE+NNN+LETTER-DIRECTION
  * Example: TRN-2025POL001A-F (To Factory) or TRN-2025POL001A-S (To Store)

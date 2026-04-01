@@ -50,6 +50,7 @@ export class SupabaseStorage {
         const newRecord = { ...record };
         const mappings: Record<string, string> = {
             'franchise_id': 'franchiseId',
+            'store_code': 'storeCode',
             'owner_name': 'ownerName',
             'legal_entity_name': 'legalEntityName',
             'tax_id': 'taxId',
@@ -228,6 +229,7 @@ export class SupabaseStorage {
         const newData: any = {};
         const mappings: Record<string, string> = {
             'franchiseId': 'franchise_id',
+            'storeCode': 'store_code',
             'ownerName': 'owner_name',
             'legalEntityName': 'legal_entity_name',
             'taxId': 'tax_id',
@@ -843,7 +845,7 @@ export class SupabaseStorage {
                 'items', 'notes', 'special_instructions', 'shipping_address', 'pickup_date',
                 'advance_paid', 'discount_type', 'discount_value', 'coupon_code',
                 'extra_charges', 'gst_enabled', 'gst_rate', 'gst_amount', 'pan_number',
-                'gst_number', 'franchise_id', 'created_at', 'priority',
+                'gst_number', 'franchise_id', 'store_code', 'created_at', 'priority',
                 'is_express_order', 'fulfillment_type', 'delivery_charges', 'delivery_address',
                 'tag_note', 'barcode_id', 'assigned_to', 'wallet_used', 'credit_used',
                 'is_credit_order', 'delivery_earnings_calculated', 'delivery_cash_collected'
