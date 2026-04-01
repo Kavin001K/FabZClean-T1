@@ -32,11 +32,7 @@ import { formatCurrency, formatDate, getNextStatus } from "@/lib/data-service";
 import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { useInvoicePrint } from "@/hooks/use-invoice-print";
-<<<<<<< Updated upstream
-=======
-import { getOrderStoreLabel, resolveOrderStoreCodeFromOrder } from "@/lib/order-store";
 import { getPublicTrackOrderUrl } from "@/lib/public-website";
->>>>>>> Stashed changes
 
 export interface OrderDetailsDialogProps {
   order: Order | null;

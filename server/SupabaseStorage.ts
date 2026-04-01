@@ -182,10 +182,6 @@ export class SupabaseStorage {
             // Delivery earnings & analytics mappings
             'delivery_earnings_calculated': 'deliveryEarningsCalculated',
             'is_credit_order': 'isCreditOrder',
-<<<<<<< Updated upstream
-=======
-            'wallet_used': 'walletUsed',
-            'credit_used': 'creditUsed',
             'customer_rating': 'customerRating',
             'feedback_comment': 'feedbackComment',
             'feedback_metadata': 'feedbackMetadata',
@@ -194,7 +190,6 @@ export class SupabaseStorage {
             'average_rating': 'averageRating',
             'last_feedback_submitted_at': 'lastFeedbackSubmittedAt',
             'positive_feedback_count': 'positiveFeedbackCount',
->>>>>>> Stashed changes
             'delivered_at': 'deliveredAt',
             'delivery_partner_id': 'deliveryPartnerId',
             'per_order_salary': 'perOrderSalary',
@@ -447,15 +442,10 @@ export class SupabaseStorage {
             // Delivery earnings & analytics mappings
             'deliveryEarningsCalculated': 'delivery_earnings_calculated',
             'isCreditOrder': 'is_credit_order',
-<<<<<<< Updated upstream
-=======
-            'walletUsed': 'wallet_used',
-            'creditUsed': 'credit_used',
             'customerRating': 'customer_rating',
             'feedbackComment': 'feedback_comment',
             'feedbackMetadata': 'feedback_metadata',
             'feedbackSubmittedAt': 'feedback_submitted_at',
->>>>>>> Stashed changes
             'deliveredAt': 'delivered_at',
             'deliveryPartnerId': 'delivery_partner_id',
             'perOrderSalary': 'per_order_salary',

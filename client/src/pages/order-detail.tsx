@@ -14,11 +14,7 @@ import { formatCurrency, formatDate, getNextStatus } from '@/lib/data-service';
 import type { Order } from "@shared/schema";
 import { cn } from '@/lib/utils';
 import LoadingSkeleton from '@/components/ui/loading-skeleton';
-<<<<<<< Updated upstream
-=======
-import EditOrderDialog from '@/components/orders/edit-order-dialog';
 import { getPublicTrackOrderUrl } from '@/lib/public-website';
->>>>>>> Stashed changes
 
 const getStatusIcon = (status: Order['status']) => {
   switch (status) {

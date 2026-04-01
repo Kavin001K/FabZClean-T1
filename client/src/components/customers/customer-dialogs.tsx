@@ -232,20 +232,11 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   // Filter orders for the selected customer
   const matchedCustomerOrders = React.useMemo(() => {
     if (!selectedCustomer || !orders) return [];
-<<<<<<< Updated upstream
-    // Match by customer name or phone since ID linking might be loose
-    return orders.filter(order =>
-      (order.customerName === selectedCustomer.name) ||
-      (order.customerPhone === selectedCustomer.phone)
-    ).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-      .slice(0, 5); // Show last 5 orders
-=======
     return orders.filter(order => {
       if (selectedCustomer.id && order.customerId === selectedCustomer.id) return true;
       if (selectedCustomer.phone && order.customerPhone === selectedCustomer.phone) return true;
       return false;
     }).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
->>>>>>> Stashed changes
   }, [selectedCustomer, orders]);
 
   const customerOrders = React.useMemo(() => matchedCustomerOrders.slice(0, 5), [matchedCustomerOrders]);
