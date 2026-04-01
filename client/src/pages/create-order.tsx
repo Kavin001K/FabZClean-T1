@@ -1280,16 +1280,16 @@ export default function CreateOrder() {
                                 </Button>
                               </div>
 
-                              <div className="mt-4 grid grid-cols-2 gap-3">
+                              <div className="mt-4 grid grid-cols-2 gap-4">
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/80">
-                                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Quantity</p>
-                                  <div className="mt-2 flex items-center gap-2">
+                                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 mb-2">Quantity</p>
+                                  <div className="flex items-center justify-between bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 h-11 overflow-hidden">
                                     <Button
                                       type="button"
-                                      variant="outline"
+                                      variant="ghost"
                                       size="icon"
                                       onClick={() => handleAdjustQuantity(item.service.id, -1)}
-                                      className="h-10 w-10 rounded-xl border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900"
+                                      className="h-full w-10 flex-shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800"
                                     >
                                       <ChevronDown className="h-4 w-4" />
                                     </Button>
@@ -1298,14 +1298,14 @@ export default function CreateOrder() {
                                       min="1"
                                       value={item.quantity}
                                       onChange={(e) => handleUpdateQuantity(item.service.id, parseInt(e.target.value, 10) || 0)}
-                                      className="h-10 rounded-xl border-slate-300 bg-white text-center text-lg font-black dark:border-slate-600 dark:bg-slate-900"
+                                      className="h-full border-0 bg-transparent text-center text-lg font-black dark:text-white focus-visible:ring-0 px-0"
                                     />
                                     <Button
                                       type="button"
-                                      variant="outline"
+                                      variant="ghost"
                                       size="icon"
                                       onClick={() => handleAdjustQuantity(item.service.id, 1)}
-                                      className="h-10 w-10 rounded-xl border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900"
+                                      className="h-full w-10 flex-shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800"
                                     >
                                       <ChevronUp className="h-4 w-4" />
                                     </Button>
@@ -1313,34 +1313,17 @@ export default function CreateOrder() {
                                 </div>
 
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/80">
-                                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Price</p>
-                                  <div className="mt-2 flex items-center gap-2">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="icon"
-                                      onClick={() => handleAdjustPrice(item.service.id, -5)}
-                                      className="h-10 w-10 rounded-xl border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900"
-                                    >
-                                      <ChevronDown className="h-4 w-4" />
-                                    </Button>
+                                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 mb-2">Price</p>
+                                  <div className="flex items-center bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 h-11 pr-3">
+                                    <span className="pl-3 text-slate-400 font-bold text-sm">₹</span>
                                     <Input
                                       type="number"
                                       min="0"
-                                      step="0.01"
+                                      step="1"
                                       value={item.priceOverride}
                                       onChange={(e) => handleUpdatePrice(item.service.id, parseFloat(e.target.value) || 0)}
-                                      className="h-10 rounded-xl border-slate-300 bg-white text-center text-lg font-black dark:border-slate-600 dark:bg-slate-900"
+                                      className="h-full border-0 bg-transparent text-right text-lg font-black dark:text-white focus-visible:ring-0 pr-0"
                                     />
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="icon"
-                                      onClick={() => handleAdjustPrice(item.service.id, 5)}
-                                      className="h-10 w-10 rounded-xl border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900"
-                                    >
-                                      <ChevronUp className="h-4 w-4" />
-                                    </Button>
                                   </div>
                                 </div>
                               </div>
@@ -2467,10 +2450,10 @@ export default function CreateOrder() {
 
       {/* Credit Override Dialog */}
       <Dialog open={!!creditOverridePrompt} onOpenChange={(open) => !open && setCreditOverridePrompt(null)}>
-        <DialogContent className="max-w-2xl border-none shadow-2xl p-0 overflow-hidden bg-slate-50 dark:bg-slate-950">
+        <DialogContent className="max-w-2xl border-none shadow-2xl p-0 overflow-hidden bg-slate-50 dark:bg-slate-950 max-h-[90vh] flex flex-col">
           <div className="h-1.5 w-full bg-amber-500" />
           
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-6 overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-xl font-black text-amber-600 dark:text-amber-500 flex items-center gap-2">
                 <AlertCircle className="h-6 w-6" />
@@ -2518,7 +2501,7 @@ export default function CreateOrder() {
                 <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm">
                   <h4 className="text-[10px] uppercase tracking-wider font-black text-slate-400 mb-3">Recent Activity</h4>
                   <div className="space-y-2.5">
-                    {customerOrders?.slice(0, 3).map((order: any) => (
+                    {customerOrders?.slice(0, 10).map((order: any) => (
                       <div key={order.id} className="flex justify-between items-center text-[11px] border-b border-slate-50 dark:border-slate-800 pb-2 last:border-0 last:pb-0">
                         <div className="min-w-0 flex-1">
                           <p className="font-bold text-slate-700 dark:text-slate-300 truncate">{order.orderNumber || 'Legacy Order'}</p>
