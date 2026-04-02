@@ -234,6 +234,12 @@ export class SerializationService {
         : serialized.totalSpent;
     }
 
+    if (serialized.customerRating !== undefined && serialized.customerRating !== null) {
+      serialized.customerRating = typeof serialized.customerRating === 'string'
+        ? parseFloat(serialized.customerRating)
+        : serialized.customerRating;
+    }
+
     // Convert totalOrders to number if it's a string
     if (serialized.totalOrders !== undefined) {
       serialized.totalOrders = typeof serialized.totalOrders === 'string'

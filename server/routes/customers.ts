@@ -27,6 +27,48 @@ const CUSTOMER_EDITOR_ROLES: string[] = [
 ];
 const CUSTOMER_ADMIN_ROLES: string[] = ["admin", "franchise_manager"];
 
+const normalizePhone = (value?: string | null) => (value || "").replace(/\D/g, "").slice(-10);
+const toNumeric = (value: unknown) => {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+type CustomerFeedbackSummary = {
+  id: string;
+  orderId: string | null;
+  orderNumber: string | null;
+  rating: number;
+  feedback: string | null;
+  feedbackDate: string | null;
+  feedbackTime: string | null;
+  createdAt: string | null;
+  aiSentiment: string | null;
+  feedbackStatus: string | null;
+};
+
+type CustomerOrderSummary = {
+  id: string;
+  orderNumber: string;
+  status: string;
+  totalAmount: string | number | null;
+  createdAt: string | null;
+  items: unknown[] | null;
+  rating: number | null;
+  feedback: string | null;
+  feedbackDate: string | null;
+  feedbackTime: string | null;
+};
+
+function calculateWeightedCustomerRating(customerRatings: number[], globalAverage: number, priorWeight = 5): number | null {
+  if (!customerRatings.length) return null;
+
+  const reviewCount = customerRatings.length;
+  const customerAverage = customerRatings.reduce((sum, rating) => sum + rating, 0) / reviewCount;
+  const smoothed = ((customerAverage * reviewCount) + (globalAverage * priorWeight)) / (reviewCount + priorWeight);
+
+  return Number(smoothed.toFixed(2));
+}
+
 // Apply rate limiting
 router.use(rateLimit(60000, 100));
 router.use(jwtRequired);
@@ -141,6 +183,175 @@ router.get('/', async (req, res) => {
 });
 
 // Get single customer
+router.get('/:id/profile', async (req, res) => {
+  try {
+    const customer = await storage.getCustomer(req.params.id);
+
+    if (!customer) {
+      return res.status(404).json(createErrorResponse('Customer not found', 404));
+    }
+
+    const customerPhone = normalizePhone(customer.phone);
+    const allOrders = await storage.listOrders();
+    const matchedOrders = allOrders
+      .filter((order: Order) => {
+        if (order.customerId && order.customerId === customer.id) return true;
+        return customerPhone && normalizePhone(order.customerPhone) === customerPhone;
+      })
+      .sort((a: Order, b: Order) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+
+    const orderLookup = new Map(
+      matchedOrders.map((order: Order) => [order.id, order] as const)
+    );
+
+    const supabase = (storage as any).supabase;
+    let feedbackHistory: CustomerFeedbackSummary[] = [];
+    let globalRatings: number[] = [];
+
+    if (supabase) {
+      try {
+        const orderIds = matchedOrders.map((order: Order) => order.id).filter(Boolean);
+
+        const [reviewsByCustomer, reviewsByOrders, globalReviewRatings] = await Promise.all([
+          supabase
+            .from('reviews_table')
+            .select('id,order_id,rating,feedback,created_at,ai_sentiment,feedback_status')
+            .eq('customer_id', customer.id)
+            .order('created_at', { ascending: false }),
+          orderIds.length > 0
+            ? supabase
+                .from('reviews_table')
+                .select('id,order_id,rating,feedback,created_at,ai_sentiment,feedback_status')
+                .in('order_id', orderIds)
+                .order('created_at', { ascending: false })
+            : Promise.resolve({ data: [], error: null }),
+          supabase
+            .from('reviews_table')
+            .select('rating')
+            .not('rating', 'is', null),
+        ]);
+
+        const mergedReviews = new Map<string, any>();
+        [...(reviewsByCustomer.data || []), ...(reviewsByOrders.data || [])].forEach((review: any) => {
+          const key = review.id || review.order_id;
+          if (!key) return;
+          if (!mergedReviews.has(key)) {
+            mergedReviews.set(key, review);
+          }
+        });
+
+        feedbackHistory = Array.from(mergedReviews.values()).map((review: any) => {
+          const order = review.order_id ? orderLookup.get(review.order_id) : undefined;
+          return {
+            id: review.id,
+            orderId: review.order_id || null,
+            orderNumber: order?.orderNumber || null,
+            rating: toNumeric(review.rating),
+            feedback: review.feedback || null,
+            feedbackDate: null,
+            feedbackTime: null,
+            createdAt: review.created_at || null,
+            aiSentiment: review.ai_sentiment || null,
+            feedbackStatus: review.feedback_status || null,
+          };
+        });
+
+        globalRatings = (globalReviewRatings.data || [])
+          .map((row: any) => toNumeric(row.rating))
+          .filter((rating: number) => rating > 0);
+      } catch (error) {
+        console.error('Customer profile review aggregation failed:', error);
+      }
+    }
+
+    const reviewOrderIds = new Set(feedbackHistory.map((entry) => entry.orderId).filter(Boolean));
+
+    const fallbackFeedback = matchedOrders
+      .filter((order: any) => toNumeric(order.rating) > 0 && !reviewOrderIds.has(order.id))
+      .map((order: any) => ({
+        id: `order-${order.id}`,
+        orderId: order.id,
+        orderNumber: order.orderNumber || null,
+        rating: toNumeric(order.rating),
+        feedback: order.feedback || null,
+        feedbackDate: order.feedbackDate || null,
+        feedbackTime: order.feedbackTime || null,
+        createdAt: order.updatedAt || order.createdAt || null,
+        aiSentiment: order.aiSentiment || null,
+        feedbackStatus: order.feedbackStatus || null,
+      }));
+
+    const combinedFeedbackHistory = [...feedbackHistory, ...fallbackFeedback].sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    const feedbackByOrderId = new Map(
+      combinedFeedbackHistory
+        .filter((entry) => entry.orderId)
+        .map((entry) => [entry.orderId as string, entry] as const)
+    );
+
+    const recentOrders: CustomerOrderSummary[] = matchedOrders.slice(0, 10).map((order: any) => {
+      const linkedFeedback = feedbackByOrderId.get(order.id);
+      return {
+        id: order.id,
+        orderNumber: order.orderNumber || order.id,
+        status: order.status || 'unknown',
+        totalAmount: order.totalAmount ?? null,
+        createdAt: order.createdAt || null,
+        items: Array.isArray(order.items) ? order.items : null,
+        rating: linkedFeedback?.rating ?? (toNumeric(order.rating) > 0 ? toNumeric(order.rating) : null),
+        feedback: linkedFeedback?.feedback ?? order.feedback ?? null,
+        feedbackDate: linkedFeedback?.feedbackDate ?? order.feedbackDate ?? null,
+        feedbackTime: linkedFeedback?.feedbackTime ?? order.feedbackTime ?? null,
+      };
+    });
+
+    const customerRatings = combinedFeedbackHistory
+      .map((entry) => entry.rating)
+      .filter((rating) => rating > 0);
+
+    const fallbackGlobalAverage = customerRatings.length
+      ? customerRatings.reduce((sum, rating) => sum + rating, 0) / customerRatings.length
+      : 0;
+
+    const globalAverage = globalRatings.length
+      ? globalRatings.reduce((sum, rating) => sum + rating, 0) / globalRatings.length
+      : fallbackGlobalAverage;
+
+    const rawAverageRating = customerRatings.length
+      ? Number((customerRatings.reduce((sum, rating) => sum + rating, 0) / customerRatings.length).toFixed(2))
+      : null;
+
+    const customerRating = calculateWeightedCustomerRating(customerRatings, globalAverage || rawAverageRating || 0);
+
+    const positiveReviews = combinedFeedbackHistory.filter((entry) => entry.aiSentiment === 'positive').length;
+    const neutralReviews = combinedFeedbackHistory.filter((entry) => entry.aiSentiment === 'neutral').length;
+    const negativeReviews = combinedFeedbackHistory.filter((entry) => entry.aiSentiment === 'negative').length;
+
+    res.json(createSuccessResponse({
+      customer: serializeCustomer(customer),
+      customerRating: customerRating ?? (customer as any).customerRating ?? null,
+      rawAverageRating,
+      reviewCount: customerRatings.length,
+      positiveReviews,
+      neutralReviews,
+      negativeReviews,
+      recentOrders,
+      feedbackHistory: combinedFeedbackHistory,
+    }));
+  } catch (error) {
+    console.error('Get customer profile error:', error);
+    res.status(500).json(createErrorResponse('Failed to fetch customer profile details', 500));
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const customer = await storage.getCustomer(req.params.id);

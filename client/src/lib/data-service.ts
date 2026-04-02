@@ -39,6 +39,44 @@ export type ServicePopularityData = {
   fill: string;
 };
 
+export type CustomerOrderHistoryRecord = {
+  id: string;
+  orderNumber: string;
+  status: string;
+  totalAmount: string | number | null;
+  createdAt: string | null;
+  items: unknown[] | null;
+  rating: number | null;
+  feedback: string | null;
+  feedbackDate: string | null;
+  feedbackTime: string | null;
+};
+
+export type CustomerFeedbackRecord = {
+  id: string;
+  orderId: string | null;
+  orderNumber: string | null;
+  rating: number;
+  feedback: string | null;
+  feedbackDate: string | null;
+  feedbackTime: string | null;
+  createdAt: string | null;
+  aiSentiment: string | null;
+  feedbackStatus: string | null;
+};
+
+export type CustomerProfileDetails = {
+  customer: Customer;
+  customerRating: number | null;
+  rawAverageRating: number | null;
+  reviewCount: number;
+  positiveReviews: number;
+  neutralReviews: number;
+  negativeReviews: number;
+  recentOrders: CustomerOrderHistoryRecord[];
+  feedbackHistory: CustomerFeedbackRecord[];
+};
+
 // API base URL - use environment variable or fallback to relative path
 // In production (Vercel), this will use /api which is handled by rewrites
 // In development, this uses Vite proxy
@@ -455,6 +493,19 @@ export const customersApi = {
       return response as Customer;
     } catch (error) {
       console.error(`Failed to fetch customer ${id}:`, error);
+      return null;
+    }
+  },
+
+  async getProfileDetails(id: string): Promise<CustomerProfileDetails | null> {
+    try {
+      const response = await fetchData<{ data?: CustomerProfileDetails } | CustomerProfileDetails>(`/customers/${id}/profile`);
+      if (response && typeof response === 'object' && 'data' in response) {
+        return response.data || null;
+      }
+      return response as CustomerProfileDetails;
+    } catch (error) {
+      console.error(`Failed to fetch customer profile ${id}:`, error);
       return null;
     }
   },

@@ -2,6 +2,7 @@ import React from 'react';
 // Customer Dialogs Component
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
+import { useQuery } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -39,8 +40,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatDate, formatCurrency } from '@/lib/data-service';
+import { customersApi } from '@/lib/data-service';
 import { cn } from '@/lib/utils';
 import type { Customer, Order } from '@shared/schema';
+import type { CustomerFeedbackRecord, CustomerOrderHistoryRecord, CustomerProfileDetails } from '@/lib/data-service';
 
 // Import New Wallet Components
 import { WalletRechargeModal } from '../wallet-recharge-modal';
@@ -88,34 +91,6 @@ interface CustomerDialogsProps {
   orders?: Order[];
 }
 
-// Mock recent orders data - in real app this would come from API
-const mockRecentOrders = [
-  {
-    id: '1',
-    orderNumber: 'FC-2024-001',
-    status: 'completed',
-    total: '₹2,450',
-    createdAt: '2025-09-15T10:30:00Z',
-    services: ['Dry Cleaning', 'Ironing']
-  },
-  {
-    id: '2',
-    orderNumber: 'FC-2024-002',
-    status: 'in_progress',
-    total: '₹1,850',
-    createdAt: '2025-09-18T14:20:00Z',
-    services: ['Wash & Fold']
-  },
-  {
-    id: '3',
-    orderNumber: 'FC-2024-003',
-    status: 'completed',
-    total: '₹3,200',
-    createdAt: '2025-09-20T09:15:00Z',
-    services: ['Dry Cleaning', 'Stain Removal', 'Ironing']
-  }
-];
-
 const getStatusColor = (status: string) => {
   switch (status) {
     case 'completed':
@@ -127,6 +102,26 @@ const getStatusColor = (status: string) => {
     default:
       return 'bg-gray-100 text-gray-800';
   }
+};
+
+const formatRating = (rating?: number | null) => {
+  if (rating === null || rating === undefined || Number.isNaN(Number(rating))) return 'N/A';
+  return Number(rating).toFixed(2);
+};
+
+const formatFeedbackTimestamp = (dateValue?: string | null, timeValue?: string | null, createdAt?: string | null) => {
+  const direct = [dateValue, timeValue].filter(Boolean).join(' ');
+  if (direct) return direct;
+  if (!createdAt) return 'Not timestamped';
+  const parsed = new Date(createdAt);
+  if (Number.isNaN(parsed.getTime())) return 'Not timestamped';
+  return parsed.toLocaleString('en-IN', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 };
 
 const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
@@ -229,16 +224,47 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   const selectedOutstandingClass = selectedLimitExceeded ? 'text-red-500' : selectedOutstanding === 0 ? 'text-emerald-500' : 'text-amber-500';
   const selectedWalletBalance = selectedCustomer ? parseFloat((selectedCustomer as any).walletBalanceCache || '0') : 0;
 
-  // Filter orders for the selected customer
-  const customerOrders = React.useMemo(() => {
+  const customerProfileQuery = useQuery({
+    queryKey: ['customers', selectedCustomer?.id, 'profile'],
+    queryFn: () => selectedCustomer ? customersApi.getProfileDetails(selectedCustomer.id) : Promise.resolve(null),
+    enabled: isViewDialogOpen && !!selectedCustomer?.id,
+    staleTime: 15000,
+  });
+
+  const profileData = customerProfileQuery.data as CustomerProfileDetails | null;
+
+  const fallbackOrders = React.useMemo(() => {
     if (!selectedCustomer || !orders) return [];
     return orders.filter(order => {
       if (selectedCustomer.id && order.customerId === selectedCustomer.id) return true;
       if (selectedCustomer.phone && order.customerPhone === selectedCustomer.phone) return true;
       return false;
     }).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-      .slice(0, 5); // Show last 5 orders
+      .slice(0, 10);
   }, [selectedCustomer, orders]);
+
+  const customerOrders = (profileData?.recentOrders as CustomerOrderHistoryRecord[] | undefined)?.length
+    ? profileData.recentOrders
+    : fallbackOrders.map((order: any) => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        totalAmount: order.totalAmount,
+        createdAt: order.createdAt || null,
+        items: Array.isArray(order.items) ? order.items : null,
+        rating: order.rating ?? null,
+        feedback: order.feedback ?? null,
+        feedbackDate: order.feedbackDate ?? null,
+        feedbackTime: order.feedbackTime ?? null,
+      }));
+
+  const feedbackHistory = (profileData?.feedbackHistory || []) as CustomerFeedbackRecord[];
+  const computedCustomerRating = profileData?.customerRating ?? ((selectedCustomer as any)?.customerRating ?? null);
+  const rawAverageRating = profileData?.rawAverageRating ?? null;
+  const reviewCount = profileData?.reviewCount ?? feedbackHistory.length;
+  const positiveReviews = profileData?.positiveReviews ?? feedbackHistory.filter((entry) => entry.aiSentiment === 'positive').length;
+  const neutralReviews = profileData?.neutralReviews ?? feedbackHistory.filter((entry) => entry.aiSentiment === 'neutral').length;
+  const negativeReviews = profileData?.negativeReviews ?? feedbackHistory.filter((entry) => entry.aiSentiment === 'negative').length;
 
   return (
     <>
@@ -400,12 +426,63 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-purple-600">
-                        N/A
+                        {formatRating(computedCustomerRating)}
                       </div>
-                      <p className="text-xs text-muted-foreground">Not evaluated</p>
+                      <p className="text-xs text-muted-foreground">
+                        {reviewCount > 0
+                          ? `${reviewCount} feedback entr${reviewCount === 1 ? 'y' : 'ies'} | raw avg ${formatRating(rawAverageRating)}`
+                          : 'No customer feedback yet'}
+                      </p>
                     </CardContent>
                   </Card>
                 </div>
+
+                {(reviewCount > 0 || customerProfileQuery.isLoading) && (
+                  <>
+                    <Separator />
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                      <Card className="border-l-4 border-l-emerald-500">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">Positive</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-emerald-600">{positiveReviews}</div>
+                          <p className="text-xs text-muted-foreground">AI-positive reviews</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-l-4 border-l-slate-500">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">Neutral</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-slate-600">{neutralReviews}</div>
+                          <p className="text-xs text-muted-foreground">Needs no escalation</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-l-4 border-l-rose-500">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">Negative</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-rose-600">{negativeReviews}</div>
+                          <p className="text-xs text-muted-foreground">Needs attention</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-l-4 border-l-amber-500">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">Review Coverage</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-amber-600">
+                            {customerOrders.length > 0 ? `${Math.round((reviewCount / customerOrders.length) * 100)}%` : '0%'}
+                          </div>
+                          <p className="text-xs text-muted-foreground">orders with rating</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </>
+                )}
 
                 <Separator />
 
@@ -413,13 +490,15 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
                   <div className="overflow-x-auto">
-                    <Table className="min-w-[680px]">
+                    <Table className="min-w-[980px]">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Order #</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Services</TableHead>
                           <TableHead>Total</TableHead>
+                          <TableHead>Rating</TableHead>
+                          <TableHead>Feedback</TableHead>
                           <TableHead>Date</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -450,7 +529,22 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                                     )}
                                   </div>
                                 </TableCell>
-                                <TableCell className="font-medium">{formatCurrency(parseFloat(order.totalAmount))}</TableCell>
+                                <TableCell className="font-medium">{formatCurrency(Number(order.totalAmount || 0))}</TableCell>
+                                <TableCell>
+                                  {order.rating ? (
+                                    <div className="flex items-center gap-1 font-medium text-amber-600">
+                                      <Star className="h-3.5 w-3.5 fill-current" />
+                                      {Number(order.rating).toFixed(1)}
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">No rating</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="max-w-[260px]">
+                                  <div className="text-sm text-muted-foreground line-clamp-2">
+                                    {order.feedback || 'No written feedback'}
+                                  </div>
+                                </TableCell>
                                 <TableCell className="text-sm text-muted-foreground">
                                   {formatDate(order.createdAt ? new Date(order.createdAt).toISOString() : '')}
                                 </TableCell>
@@ -459,7 +553,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                           })
                         ) : (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
+                            <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
                               No orders found for this customer.
                             </TableCell>
                           </TableRow>
@@ -467,6 +561,51 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                       </TableBody>
                     </Table>
                   </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Customer Feedback</h3>
+                  {customerProfileQuery.isLoading ? (
+                    <div className="text-sm text-muted-foreground">Loading feedback history...</div>
+                  ) : feedbackHistory.length > 0 ? (
+                    <div className="space-y-3">
+                      {feedbackHistory.map((entry) => (
+                        <Card key={entry.id} className="border border-border/60">
+                          <CardContent className="p-4 space-y-3">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-semibold">{entry.orderNumber || 'Order feedback'}</span>
+                                  <Badge variant="outline">{entry.feedbackStatus || 'recorded'}</Badge>
+                                  {entry.aiSentiment && (
+                                    <Badge variant={entry.aiSentiment === 'positive' ? 'default' : entry.aiSentiment === 'negative' ? 'destructive' : 'secondary'}>
+                                      {entry.aiSentiment}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  {formatFeedbackTimestamp(entry.feedbackDate, entry.feedbackTime, entry.createdAt)}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1 text-amber-600 font-semibold">
+                                <Star className="h-4 w-4 fill-current" />
+                                {entry.rating.toFixed(1)}
+                              </div>
+                            </div>
+
+                            <p className="text-sm leading-6 text-foreground/90">
+                              {entry.feedback || 'Customer submitted a rating without written feedback.'}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">No customer feedback found yet.</div>
+                  )}
                 </div>
 
                 <Separator />

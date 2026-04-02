@@ -185,6 +185,7 @@ export const customers = pgTable("customers", {
   address: jsonb("address"),
   totalOrders: integer("total_orders").default(0),
   totalSpent: decimal("total_spent", { precision: 10, scale: 2 }).default("0"),
+  customerRating: decimal("customer_rating", { precision: 4, scale: 2 }),
   creditLimit: decimal("credit_limit", { precision: 10, scale: 2 }).default("-500"),
   walletBalanceCache: decimal("wallet_balance_cache", { precision: 10, scale: 2 }).default("0"),
   creditBalance: decimal("credit_balance", { precision: 10, scale: 2 }).default("0"),
