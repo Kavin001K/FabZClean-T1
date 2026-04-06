@@ -55,6 +55,11 @@ const safeParseFloat = (val: any) => {
   return isNaN(parsed) ? 0 : parsed;
 };
 
+const toDateOnly = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate());
+
+const toOrderCreatedAt = (value: Date) =>
+  new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate(), 12, 0, 0)).toISOString();
+
 export default function CreateOrder() {
   useEffect(() => {
     document.title = "New Order | FabzClean";
@@ -78,6 +83,7 @@ export default function CreateOrder() {
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
   const [storeCode, setStoreCode] = useState<OrderStoreCode>('POL');
+  const [billDate, setBillDate] = useState<Date>(() => toDateOnly(new Date()));
 
   // Services state (must be before useEffect that references it)
   const [selectedServices, setSelectedServices] = useState<ServiceItem[]>([]);
@@ -108,6 +114,7 @@ export default function CreateOrder() {
         if (draft.selectedServices) setSelectedServices(draft.selectedServices);
         if (draft.specialInstructions) setSpecialInstructions(draft.specialInstructions);
         if (draft.storeCode) setStoreCode(draft.storeCode);
+        if (draft.billDate) setBillDate(toDateOnly(new Date(draft.billDate)));
 
         toast({ title: "Draft Restored", description: "Taking you back to where you left off." });
       } catch (e) {
@@ -119,10 +126,10 @@ export default function CreateOrder() {
   // Save draft on change
   useEffect(() => {
     const draft = {
-      phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeCode
+      phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate
     };
     localStorage.setItem(ABANDONED_CART_KEY, JSON.stringify(draft));
-  }, [phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeCode]);
+  }, [phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate]);
 
   // Customer creation popup
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
@@ -594,11 +601,10 @@ export default function CreateOrder() {
 
   // Auto-set due date: 2 days for express, 7 days for regular
   useEffect(() => {
-    const today = new Date();
     const daysToAdd = isExpressOrder ? 2 : 7;
-    const dueDate = new Date(today.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+    const dueDate = new Date(toDateOnly(billDate).getTime() + daysToAdd * 24 * 60 * 60 * 1000);
     setPickupDate(dueDate);
-  }, [isExpressOrder]);
+  }, [billDate, isExpressOrder]);
 
   // Mutation for updating order status from history
   const updateOrderStatusMutation = useMutation({
@@ -671,6 +677,11 @@ export default function CreateOrder() {
         // 4. Ensure Order Number
         if (!newOrder.orderNumber) {
           newOrder.orderNumber = newOrder.order_number;
+        }
+
+        // 4a. Ensure Bill Date for invoice/confirmation displays
+        if (!newOrder.createdAt) {
+          newOrder.createdAt = newOrder.created_at || toOrderCreatedAt(billDate);
         }
 
         // 4b. Ensure Store Code for tags and filtering
@@ -807,6 +818,7 @@ export default function CreateOrder() {
     setCouponCode('');
     setExtraCharges(0);
     setExtraChargesLabel('');
+    setBillDate(toDateOnly(new Date()));
     setPickupDate(undefined);
     setSpecialInstructions('');
     setAdvancePayment('');
@@ -961,6 +973,7 @@ export default function CreateOrder() {
         tagNote: item.tagNote,
         garmentBarcode: item.garmentBarcode
       })),
+      createdAt: toOrderCreatedAt(billDate),
       pickupDate: pickupDate ? new Date(pickupDate).toISOString() : undefined,
       specialInstructions: specialInstructions,
       shippingAddress: customerAddress ? {
@@ -1519,6 +1532,34 @@ export default function CreateOrder() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
+                  <Label>Bill Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className="w-full justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {format(billDate, "PPP")}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={billDate}
+                        onSelect={(date) => {
+                          if (date) setBillDate(toDateOnly(date));
+                        }}
+                        disabled={(date) => date > toDateOnly(new Date())}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-xs text-muted-foreground">
+                    Default is today. Choose an older date when you need to bill a missed order.
+                  </p>
+                </div>
+                <div className="space-y-2">
                   <Label>Due Date</Label>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -1539,10 +1580,7 @@ export default function CreateOrder() {
                         selected={pickupDate}
                         onSelect={setPickupDate}
                         disabled={(date) => {
-                          // Disable past dates and today - only allow future dates
-                          const today = new Date();
-                          today.setHours(0, 0, 0, 0);
-                          return date <= today;
+                          return date < toDateOnly(billDate);
                         }}
                         initialFocus
                       />
