@@ -12,6 +12,7 @@
  */
 
 import { db as storage } from './db';
+import { extractListData } from './utils/list-result';
 
 // ============================================================================
 // STATISTICAL FUNCTIONS
@@ -216,7 +217,7 @@ export interface RFMScore {
  * Perform RFM analysis on customers
  */
 export async function performRFMAnalysis(): Promise<RFMScore[]> {
-  const customers = await storage.listCustomers();
+  const customers = extractListData(await storage.listCustomers());
   const orders = await storage.listOrders();
 
   const now = new Date();
@@ -321,7 +322,7 @@ export interface CohortData {
  */
 export async function performCohortAnalysis(): Promise<CohortData[]> {
   const orders = await storage.listOrders();
-  const customers = await storage.listCustomers();
+  const customers = extractListData(await storage.listCustomers());
 
   // Group customers by first order month
   const cohorts: { [cohort: string]: { customerIds: Set<string>; ordersByPeriod: { [period: string]: Set<string> } } } = {};
@@ -534,7 +535,7 @@ export interface BusinessAnalytics {
  */
 export async function generateBusinessAnalytics(): Promise<BusinessAnalytics> {
   const orders = await storage.listOrders();
-  const customers = await storage.listCustomers();
+  const customers = extractListData(await storage.listCustomers());
   const allServices = await storage.getServices();
 
   // Overview metrics

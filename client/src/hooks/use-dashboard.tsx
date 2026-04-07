@@ -95,7 +95,10 @@ export function useDashboard() {
   });
 
   const safeOrders = useMemo(() => Array.isArray(allOrders) ? [...allOrders] : [], [allOrders]);
-  const safeCustomers = useMemo(() => Array.isArray(customers) ? [...customers] : [], [customers]);
+  const safeCustomers = useMemo(
+    () => Array.isArray(customers?.data) ? [...customers.data] : [],
+    [customers]
+  );
 
   const filteredOrders = useMemo(() => {
     return safeOrders.filter((order) => {

@@ -41,6 +41,11 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
   const { employee, isAdmin, signOut } = useAuth();
   const [location] = useLocation();
   const role = (employee?.role || 'store_staff') as SystemRole;
+  const todayLabel = new Intl.DateTimeFormat('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date());
 
   // Filter nav items by role
   const filteredNav = NAV_ITEMS.filter((item) => {
@@ -57,13 +62,21 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
   const roleLabel = roleInfo?.position || (isAdmin ? 'Administrator' : 'Staff');
 
   return (
-    <aside className={cn("sticky top-0 flex h-[100dvh] min-h-0 w-60 min-w-0 flex-col border-r bg-background", className)}>
-      <div className="flex h-16 items-center justify-between border-b px-6">
-        <Link href="/" onClick={handleLinkClick} className="flex min-w-0 items-center gap-2 font-semibold">
-          <img src="/assets/logo.webp" alt="FabzClean Logo" className="h-9 w-auto" />
+    <aside className={cn("flex h-full min-h-0 min-w-0 flex-col rounded-[1.75rem] border border-border/70 bg-card/85 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.45)] backdrop-blur-xl", className)}>
+      <div className="p-4">
+        <Link href="/" onClick={handleLinkClick} className="flex min-w-0 items-start gap-3 rounded-[1.4rem] border border-primary/15 bg-[radial-gradient(circle_at_top_left,rgba(132,204,22,0.22),transparent_48%),linear-gradient(135deg,rgba(255,255,255,0.94),rgba(249,250,251,0.92))] px-4 py-4 shadow-sm dark:bg-[radial-gradient(circle_at_top_left,rgba(132,204,22,0.16),transparent_48%),linear-gradient(135deg,rgba(31,41,55,0.96),rgba(17,24,39,0.95))]">
+          <img src="/assets/logo.webp" alt="FabzClean Logo" className="h-11 w-auto shrink-0 rounded-2xl bg-white/80 p-1.5 shadow-sm" />
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-primary/80">FabzClean</p>
+            <h2 className="mt-1 truncate text-base font-semibold text-foreground">Operations Console</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Orders, customers, printing and store flow in one place.</p>
+            <div className="mt-3 inline-flex items-center rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+              {todayLabel}
+            </div>
+          </div>
         </Link>
       </div>
-      <nav className="scrollbar-thin flex flex-1 min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain scroll-smooth p-4 font-medium">
+      <nav className="scrollbar-thin flex flex-1 min-h-0 flex-col gap-1.5 overflow-y-auto overscroll-contain scroll-smooth px-4 pb-2 font-medium">
         {filteredNav.map((item) => {
           const isActive = item.to === "/"
             ? location === "/" || location === "/dashboard"
@@ -75,18 +88,26 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
               href={item.to}
               onClick={handleLinkClick}
               className={cn(
-                "flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all hover:bg-primary/5 hover:text-primary",
-                isActive ? "bg-primary/10 font-semibold text-primary" : "text-muted-foreground"
+                "group flex min-w-0 items-center gap-3 rounded-2xl border px-3.5 py-3 text-sm transition-all duration-200",
+                isActive
+                  ? "border-primary/25 bg-primary/10 font-semibold text-primary shadow-sm"
+                  : "border-transparent text-muted-foreground hover:border-border/80 hover:bg-muted/70 hover:text-foreground"
               )}
             >
-              <item.icon className="h-4 w-4" />
+              <span className={cn(
+                "flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
+                isActive ? "bg-primary/15 text-primary" : "bg-muted/70 text-muted-foreground group-hover:bg-background group-hover:text-foreground"
+              )}>
+                <item.icon className="h-4 w-4" />
+              </span>
               <span className="truncate">{item.label}</span>
             </Link>
           );
         })}
       </nav>
-      <div className="border-t p-4">
-        <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-3">
+      <div className="border-t border-border/70 p-4">
+        <div className="rounded-[1.4rem] border border-border/70 bg-muted/35 p-3.5">
+          <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
             <AvatarImage src={employee?.avatarUrl || (employee as any)?.profileImage || ''} alt={employee?.fullName} />
             <AvatarFallback className="bg-primary/10 text-primary">
@@ -104,15 +125,16 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         </div>
         <div className="mt-3 flex items-center justify-between text-xs">
           <span className="text-muted-foreground">Role</span>
-          <span className="font-medium text-primary">
+          <span className="rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">
             {roleLabel}
           </span>
+        </div>
         </div>
         <Link
           href="/settings"
           onClick={handleLinkClick}
           className={cn(
-            "mt-2 flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary",
+            "mt-3 flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary",
             !["admin", "store_manager", "factory_manager"].includes(role) && "hidden"
           )}
         >
@@ -123,7 +145,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
           variant="ghost"
           size="sm"
           onClick={async () => { await signOut(); window.location.href = '/login'; }}
-          className="mt-1 w-full justify-start gap-3 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
+          className="mt-1 w-full justify-start gap-3 rounded-2xl px-3 py-2.5 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
         >
           <LogOut className="h-4 w-4" />
           <span>Logout</span>

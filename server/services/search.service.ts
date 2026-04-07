@@ -4,6 +4,7 @@ import {
   LevenshteinDistance,
   AdvancedSearchEngine
 } from '../algorithms/search-algorithms';
+import { extractListData } from '../utils/list-result';
 
 export interface SearchOptions {
   fuzzy?: boolean;
@@ -165,7 +166,7 @@ class SearchService {
       return createSearchResponse([], query, 0, Date.now() - startTime);
     }
 
-    const customers = await storage.listCustomers();
+    const customers = extractListData(await storage.listCustomers());
     const searchTerm = options.caseSensitive ? query : query.toLowerCase();
     const limit = options.limit || 50;
 
@@ -280,7 +281,7 @@ class SearchService {
       return [];
     }
 
-    const customers = await storage.listCustomers();
+    const customers = extractListData(await storage.listCustomers());
     const searchTerm = query.toLowerCase();
 
     const suggestions = customers
@@ -359,11 +360,12 @@ class SearchService {
    */
   async buildSearchIndex(): Promise<void> {
     try {
-      const [orders, customers, products] = await Promise.all([
+      const [orders, customersResult, products] = await Promise.all([
         storage.listOrders(),
         storage.listCustomers(),
         storage.listProducts()
       ]);
+      const customers = extractListData(customersResult);
 
       this.searchIndex.set('orders', orders);
       this.searchIndex.set('customers', customers);

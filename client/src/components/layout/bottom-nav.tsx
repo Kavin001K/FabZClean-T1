@@ -29,8 +29,8 @@ export function BottomNav() {
     });
 
     return (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden">
-            <div className="mx-auto flex h-16 w-full max-w-3xl items-center justify-around px-1.5 sm:px-2">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] lg:hidden">
+            <div className="mx-auto flex h-[4.4rem] w-full max-w-3xl items-center justify-around rounded-[1.8rem] border border-border/70 bg-background/92 px-2 shadow-[0_20px_60px_-28px_rgba(15,23,42,0.48)] backdrop-blur-xl">
                 {filteredItems.map((item) => {
                     const isActive = location === item.to;
                     const Icon = item.icon;
@@ -41,7 +41,7 @@ export function BottomNav() {
                             key={item.to}
                             href={item.to}
                             className={cn(
-                                "flex flex-1 flex-col items-center justify-center gap-1 rounded-lg py-1 transition-colors",
+                                "flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl py-1 transition-all",
                                 isActive
                                     ? "text-primary"
                                     : "text-muted-foreground hover:text-foreground",
@@ -52,22 +52,20 @@ export function BottomNav() {
                                 className={cn(
                                     "flex items-center justify-center rounded-full transition-all",
                                     isNewOrder
-                                        ? "h-10 w-10 -mt-4 bg-primary text-white shadow-lg"
-                                        : "h-6 w-6",
-                                    isActive && !isNewOrder && "scale-110"
+                                        ? "h-11 w-11 -mt-5 bg-primary text-white shadow-lg"
+                                        : "h-9 w-9 bg-transparent",
+                                    isActive && !isNewOrder && "scale-105 bg-primary/10 text-primary"
                                 )}
                             >
                                 <Icon className={cn(isNewOrder ? "h-5 w-5" : "h-5 w-5")} />
                             </div>
-                            <span className={cn("max-w-full truncate px-0.5 text-[10px] font-medium", isNewOrder && "-mt-0.5")}>
+                            <span className={cn("max-w-full truncate px-0.5 text-[10px] font-semibold", isNewOrder && "-mt-0.5")}>
                                 {item.label}
                             </span>
                         </Link>
                     );
                 })}
             </div>
-            {/* Safe area for notched devices */}
-            <div className="h-[env(safe-area-inset-bottom)]" />
         </nav>
     );
 }

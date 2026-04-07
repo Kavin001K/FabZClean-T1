@@ -2,7 +2,7 @@ import { Link, useLocation } from 'wouter';
 import { useEffect, useState } from 'react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import { PanelLeftClose, PanelLeftOpen, RefreshCw, Keyboard, Menu } from 'lucide-react';
+import { CalendarDays, PanelLeftClose, PanelLeftOpen, RefreshCw, Keyboard, Menu } from 'lucide-react';
 import { useShortcuts } from '@/components/shortcuts-provider';
 import { NotificationCenter } from '@/components/notification-center';
 import { GlobalSearch } from '@/components/global-search';
@@ -33,6 +33,12 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
   const [breadcrumbs, setBreadcrumbs] = useState([{ label: 'Dashboard', href: '/dashboard' }]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { showShortcuts } = useShortcuts();
+  const currentPage = breadcrumbs[breadcrumbs.length - 1]?.label || 'Dashboard';
+  const todayLabel = new Intl.DateTimeFormat('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date());
 
   useEffect(() => {
     const pathSegments = location.split('/').filter(p => p);
@@ -82,13 +88,14 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
   };
 
   return (
-    <header className="sticky top-0 z-30 flex min-h-14 items-center gap-2 border-b bg-background/95 px-2.5 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:min-h-16 sm:gap-3 sm:px-4 sm:pt-0 md:gap-4 md:px-6">
+    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 px-2.5 pt-[env(safe-area-inset-top)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 sm:px-4 sm:pt-0 md:px-6">
+      <div className="flex min-h-14 items-center gap-2 sm:min-h-16 sm:gap-3 md:gap-4">
       {/* Sidebar toggle */}
       <Button
         variant="ghost"
         size="icon"
         onClick={onToggleSidebar}
-        className="h-9 w-9 shrink-0"
+        className="h-9 w-9 shrink-0 rounded-2xl border border-border/70 bg-card/70 shadow-sm hover:bg-card"
         title={isSidebarVisible ? "Hide menu" : "Show menu"}
       >
         {isMobile ? (
@@ -102,7 +109,9 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
 
       {/* Breadcrumbs — hide on mobile to save space */}
       {!isMobile && (
-        <Breadcrumb className="hidden sm:block">
+        <div className="hidden min-w-0 flex-1 items-center gap-3 sm:flex">
+          <div className="min-w-0 flex-1 rounded-2xl border border-border/70 bg-card/70 px-3 py-2 shadow-sm">
+        <Breadcrumb className="min-w-0">
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
@@ -125,29 +134,36 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
             ))}
           </BreadcrumbList>
         </Breadcrumb>
+          </div>
+          <div className="hidden items-center gap-2 rounded-2xl border border-border/70 bg-card/70 px-3 py-2 text-xs font-semibold text-muted-foreground shadow-sm xl:flex">
+            <CalendarDays className="h-3.5 w-3.5 text-primary" />
+            <span>{todayLabel}</span>
+          </div>
+        </div>
       )}
 
       {/* Mobile: show current page title instead of breadcrumbs */}
       {isMobile && (
-        <h1 className="min-w-0 max-w-[42vw] truncate text-sm font-semibold">
-          {breadcrumbs[breadcrumbs.length - 1]?.label || 'Dashboard'}
-        </h1>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Workspace</p>
+          <h1 className="max-w-[42vw] truncate text-sm font-semibold">{currentPage}</h1>
+        </div>
       )}
 
       {/* Search */}
-      <div className={isMobile ? "ml-auto" : "ml-auto min-w-0 w-[180px] sm:w-[220px] md:w-[280px] lg:w-[360px]"}>
+      <div className={isMobile ? "ml-auto" : "ml-auto min-w-0 w-[200px] sm:w-[240px] md:w-[300px] lg:w-[380px]"}>
         <GlobalSearch compact={isMobile} />
       </div>
 
       {/* Action buttons */}
-      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1 md:gap-2">
+      <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-border/70 bg-card/70 px-1.5 py-1 shadow-sm sm:px-2">
         {/* Keyboard shortcuts — hide on mobile */}
         {!isMobile && (
           <Button
             variant="ghost"
             size="icon"
             onClick={showShortcuts}
-            className="h-8 w-8"
+            className="h-8 w-8 rounded-xl"
             title="Keyboard Shortcuts (F1)"
           >
             <Keyboard className="h-4 w-4" />
@@ -159,7 +175,7 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
             size="icon"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="h-8 w-8"
+            className="h-8 w-8 rounded-xl"
             title="Refresh app (F5)"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -168,6 +184,7 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
         <ThemeToggle />
         <NotificationCenter />
         <UserMenu />
+      </div>
       </div>
     </header>
   );

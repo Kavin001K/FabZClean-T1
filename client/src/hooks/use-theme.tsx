@@ -12,13 +12,13 @@ export function useTheme() {
         theme: settings.theme,
         setTheme: (theme: 'light' | 'dark' | 'system') => updateSetting('theme', theme),
 
-        // Performance flags for conditional rendering
-        isLowDataMode: settings.lowDataMode,
-        isReduceMotion: settings.reduceMotion,
+        // Compatibility flags for legacy consumers
+        isLowDataMode: false,
+        isReduceMotion: false,
 
         // Density
-        density: settings.density,
-        isCompact: settings.density === 'compact',
+        density: settings.compactMode ? 'compact' : 'comfortable',
+        isCompact: settings.compactMode,
     };
 }
 
@@ -29,9 +29,10 @@ export function usePerformanceSettings() {
     const { settings } = useSettings();
 
     return {
-        lowDataMode: settings.lowDataMode,
-        reduceMotion: settings.reduceMotion,
-        offlineMode: settings.offlineMode,
+        lowDataMode: false,
+        reduceMotion: false,
+        offlineMode: false,
+        compactMode: settings.compactMode,
     };
 }
 
@@ -39,8 +40,8 @@ export function useWorkflowSettings() {
     const { settings } = useSettings();
 
     return {
-        autoSubmitOnScan: settings.autoSubmitOnScan,
-        defaultLandingPage: settings.defaultLandingPage,
-        quickActionSlots: settings.quickActionSlots,
+        autoSubmitOnScan: false,
+        defaultLandingPage: settings.landingPage,
+        quickActionSlots: settings.quickActions,
     };
 }

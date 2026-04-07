@@ -25,7 +25,7 @@ const fetchCustomerKPIs = async (): Promise<CustomerKpiData> => {
   await new Promise(resolve => setTimeout(resolve, 500));
   
   // Get current customers data
-  const customers = await customersApi.getAll();
+  const { data: customers } = await customersApi.getAll();
   
   // Calculate KPIs (in real app, these would come from the backend)
   const totalCustomers = customers.length;

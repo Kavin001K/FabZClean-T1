@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db as storage } from "../db";
 import { jwtRequired } from "../middleware/auth";
 import { Order } from "../../shared/schema";
+import { extractListData } from "../utils/list-result";
 
 const router = Router();
 
@@ -25,7 +26,7 @@ router.get("/dashboard", async (req, res) => {
         }
 
         const orders = await storage.listOrders(franchiseId);
-        const customers = await storage.listCustomers();
+        const customers = extractListData(await storage.listCustomers());
 
         const totalRevenue = orders.reduce((sum: number, order: Order) => {
             const amount = parseFloat(order.totalAmount || "0");

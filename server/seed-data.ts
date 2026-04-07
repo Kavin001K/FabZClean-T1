@@ -1,12 +1,13 @@
 import { db } from "./db";
 import type { InsertCustomer, InsertProduct, InsertService, InsertOrder, InsertEmployee } from "../shared/schema";
+import { extractListData } from "./utils/list-result";
 
 export async function seedDatabase() {
   try {
     console.log("🌱 Seeding database with sample data...");
 
     // Check if data already exists
-    const existingCustomers = await db.listCustomers();
+    const existingCustomers = extractListData(await db.listCustomers());
     if (existingCustomers.length > 0) {
       console.log("✅ Database already has data, skipping seed");
       return;

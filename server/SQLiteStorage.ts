@@ -1524,6 +1524,14 @@ export class SQLiteStorage implements IStorage {
     return this.db.prepare(query).all() as any[];
   }
 
+  async getUserSettings(userId: string): Promise<any | undefined> {
+    return undefined;
+  }
+
+  async updateUserSettings(userId: string, data: any): Promise<any> {
+    return data;
+  }
+
   // ======= ORDER NUMBER GENERATION =======
   /**
    * Generate next sequential order number

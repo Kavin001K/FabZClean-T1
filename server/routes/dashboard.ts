@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { db as storage } from "../db";
+import { extractListData } from "../utils/list-result";
 
 const router = Router();
 
@@ -20,7 +21,7 @@ router.get("/metrics", authMiddleware, async (req, res) => {
 
         // Note: listCustomers and listProducts might also need update in future if they need isolation
         // For now, assuming customers and products are shared or handled elsewhere
-        const customers = await storage.listCustomers();
+        const customers = extractListData(await storage.listCustomers());
         const products = await storage.listProducts();
 
         const activeOrders = allOrders.filter((order: any) => order.status !== 'cancelled');

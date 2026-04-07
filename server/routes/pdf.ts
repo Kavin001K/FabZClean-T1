@@ -3,8 +3,37 @@ import multer from 'multer';
 import { AuthService } from '../auth-service';
 import { jwtRequired } from '../middleware/auth';
 import { R2Storage } from '../services/r2-storage';
+import { LocalStorage } from '../services/local-storage';
 
 const router = express.Router();
+const MAX_BASE64_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+
+function decodeDocumentBuffer(input: unknown): Buffer {
+    if (Buffer.isBuffer(input)) {
+        return input;
+    }
+
+    if (typeof input !== 'string' || input.trim().length === 0) {
+        throw new Error('Document payload is required');
+    }
+
+    const buffer = Buffer.from(input, 'base64');
+    if (buffer.length === 0) {
+        throw new Error('Document payload is empty');
+    }
+
+    if (buffer.length > MAX_BASE64_FILE_SIZE_BYTES) {
+        throw new Error('Document exceeds size limit');
+    }
+
+    return buffer;
+}
+
+function normalizeReportExtension(extension?: string): string {
+    const normalized = (extension || '.pdf').toLowerCase();
+    const allowedExtensions = new Set(['.pdf', '.csv', '.xlsx']);
+    return allowedExtensions.has(normalized) ? normalized : '.pdf';
+}
 
 // Configure multer with memory storage for processing
 const upload = multer({
@@ -83,9 +112,7 @@ router.post('/generate-invoice/:orderId', jwtRequired, async (req: Request, res:
         }
 
         // Convert base64 to buffer if needed
-        const buffer = Buffer.isBuffer(pdfBuffer)
-            ? pdfBuffer
-            : Buffer.from(pdfBuffer, 'base64');
+        const buffer = decodeDocumentBuffer(pdfBuffer);
 
         // Save using R2 storage
         const { url: publicUrl } = await R2Storage.uploadInvoicePdf(orderId, buffer);
@@ -129,11 +156,9 @@ router.post('/save-report', jwtRequired, async (req: Request, res: Response) => 
             return res.status(400).json({ error: 'Report name and PDF buffer are required' });
         }
 
-        const buffer = Buffer.isBuffer(pdfBuffer)
-            ? pdfBuffer
-            : Buffer.from(pdfBuffer, 'base64');
+        const buffer = decodeDocumentBuffer(pdfBuffer);
 
-        const publicUrl = await LocalStorage.saveReport(reportName, buffer, extension || '.pdf');
+        const publicUrl = await LocalStorage.saveReport(reportName, buffer, normalizeReportExtension(extension));
 
         console.log(`✅ Report saved: ${publicUrl}`);
 

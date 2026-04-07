@@ -146,7 +146,7 @@ export function GlobalSearch({ compact = false }: GlobalSearchProps) {
 
                   {!searchQuery && (
                     <CommandGroup heading="Quick Links">
-                      <CommandItem onSelect={() => { setLocation('/orders/new'); setIsOpen(false); }}>
+                      <CommandItem onSelect={() => { setLocation('/create-order'); setIsOpen(false); }}>
                         <ShoppingCart className="mr-2 h-4 w-4" />
                         <span>New Order</span>
                         <CommandShortcut>{modSymbolShort}N</CommandShortcut>

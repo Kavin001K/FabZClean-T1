@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db as storage } from "../db";
 import { authMiddleware } from "../middleware/employee-auth";
+import { extractListData } from "../utils/list-result";
 
 const router = Router();
 
@@ -43,7 +44,7 @@ router.get("/overview", authMiddleware, async (req, res) => {
         const filteredOrders = allOrders.filter(o => new Date(o.createdAt || 0) >= startDate);
 
         // Fetch customers for the franchise to get total count
-        const allCustomersRaw = await storage.listCustomers();
+        const allCustomersRaw = extractListData(await storage.listCustomers());
         const allCustomers = franchiseId
             ? allCustomersRaw.filter(c => c.franchiseId === franchiseId)
             : allCustomersRaw;
@@ -158,4 +159,3 @@ router.get("/monthly-metrics", authMiddleware, async (req, res) => {
 });
 
 export default router;
-

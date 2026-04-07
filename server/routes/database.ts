@@ -1,7 +1,11 @@
 import express from 'express';
 import { getDatabaseInfo } from '../db-utils';
+import { authMiddleware, roleMiddleware } from '../middleware/employee-auth';
+import { extractListData } from '../utils/list-result';
 
 const router = express.Router();
+
+router.use(authMiddleware, roleMiddleware(['admin']));
 
 // Database info
 router.get('/info', async (req, res) => {
@@ -19,7 +23,7 @@ router.get('/fix-revenues', async (req, res) => {
     try {
         const { db } = await import('../db');
         console.log("Fetching all customers...");
-        const customers = await db.listCustomers();
+        const customers = extractListData(await db.listCustomers());
         const orders = await db.listOrders();
         let updatedCount = 0;
 
