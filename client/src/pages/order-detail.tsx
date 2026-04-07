@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Edit, Printer, X, CheckCircle, Clock, AlertCircle, XCircle, CreditCard, Truck, Package, Navigation } from 'lucide-react';
+import { ArrowLeft, Edit, Printer, X, CheckCircle, Clock, AlertCircle, XCircle, CreditCard, Truck, Package, Navigation, MessageCircle, Loader2 } from 'lucide-react';
 import { useInvoicePrint } from '@/hooks/use-invoice-print';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,8 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { ordersApi } from '@/lib/data-service';
 import { formatCurrency, formatDate, getNextStatus } from '@/lib/data-service';
+import { smartItemSummary } from '@/lib/item-summarizer';
+import { MAX_WHATSAPP_SENDS, WhatsAppService } from '@/lib/whatsapp-service';
 import type { Order } from "@shared/schema";
 import { cn } from '@/lib/utils';
 import LoadingSkeleton from '@/components/ui/loading-skeleton';
@@ -69,6 +71,62 @@ export default function OrderDetailPage() {
   };
 
   const { toast } = useToast();
+
+  const resendBillMutation = useMutation({
+    mutationFn: async (mutationOrder: Order) => {
+      const customerPhone = mutationOrder.customerPhone || (mutationOrder as any).customerPhone;
+      if (!customerPhone) {
+        throw new Error('Customer phone number is missing for this order.');
+      }
+
+      const sendCount = Number((mutationOrder as any).whatsappMessageCount || 0);
+      if (sendCount >= MAX_WHATSAPP_SENDS) {
+        throw new Error(`Maximum ${MAX_WHATSAPP_SENDS} WhatsApp bill attempts reached for this order.`);
+      }
+
+      const orderNumber = mutationOrder.orderNumber || mutationOrder.id;
+      const amount = parseFloat(String(mutationOrder.totalAmount || '0')) || 0;
+      const items = Array.isArray((mutationOrder as any).items) ? (mutationOrder as any).items : [];
+      const itemSummary = smartItemSummary(items) || (mutationOrder as any).service || 'Laundry Items';
+
+      const result = await WhatsAppService.sendOrderBill(
+        customerPhone,
+        orderNumber,
+        mutationOrder.customerName || 'Customer',
+        amount,
+        `${window.location.origin}/bill/${encodeURIComponent(orderNumber)}`,
+        (mutationOrder as any).invoiceUrl || undefined,
+        itemSummary,
+        sendCount
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send WhatsApp bill.');
+      }
+
+      return { mutationOrder, result };
+    },
+    onMutate: () => {
+      toast({
+        title: 'Sending Bill',
+        description: `Sending WhatsApp bill for ${order?.orderNumber || id}...`,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order', id] });
+      toast({
+        title: 'Bill Sent',
+        description: `WhatsApp bill sent successfully.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Bill Send Failed',
+        description: error?.message || 'Could not send WhatsApp bill.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   const updateOrderMutation = useMutation({
     mutationFn: (data: Partial<Order>) => ordersApi.update(id!, data),
@@ -265,6 +323,24 @@ export default function OrderDetailPage() {
             <Printer className="h-4 w-4 mr-2" />
             Print Invoice
           </Button>
+
+          {(order as any).customerPhone && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => resendBillMutation.mutate(order)}
+              disabled={resendBillMutation.isPending}
+              className="w-full sm:w-auto"
+            >
+              {resendBillMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <MessageCircle className="h-4 w-4 mr-2" />
+              )}
+              Resend Bill
+            </Button>
+          )}
+
           <Button
             variant="outline"
             size="sm"

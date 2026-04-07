@@ -49,15 +49,23 @@ export function OrderConfirmationDialog({
     const [autoSendTriggered, setAutoSendTriggered] = useState(false);
     const { toast } = useToast();
 
-    // Fetch customer details if phone is missing in order
+    // ALWAYS fetch full customer data from DB when customerId exists.
+    // This ensures name, phone, email, and address are ALL available for:
+    // 1. Invoice PDF generation
+    // 2. WhatsApp bill sending
+    // 3. Printed bills
+    // Name and phone are MANDATORY — we never generate a bill without them.
     const { data: customerData } = useQuery({
         queryKey: ['customer', order?.customerId],
         queryFn: () => order?.customerId ? customersApi.get(order.customerId) : null,
-        enabled: !!order?.customerId && !order?.customerPhone,
+        enabled: !!order?.customerId,
     });
 
-    // Get effective phone number
+    // Get effective customer details — order-level fields take priority, then DB customer fields
     const customerPhone = order?.customerPhone || customerData?.phone;
+    const customerName = order?.customerName || customerData?.name || 'Valued Customer';
+    const customerEmail = order?.customerEmail || customerData?.email || '';
+    const customerAddress = (order as any)?.deliveryAddress || (order as any)?.shippingAddress || customerData?.address || '';
 
     // Check if more sends are allowed
     const canSendWhatsApp = whatsappSendCount < MAX_WHATSAPP_SENDS;
@@ -185,8 +193,18 @@ export function OrderConfirmationDialog({
             // Import the conversion function
             const { convertOrderToInvoiceData } = await import('@/lib/print-driver');
 
+            // Enrich order with customer DB data before conversion
+            const enrichedOrder = {
+                ...order,
+                customerName: customerName,
+                customerPhone: customerPhone || '',
+                customerEmail: customerEmail || '',
+                customerAddress: customerAddress || '',
+                deliveryAddress: (order as any)?.deliveryAddress || customerAddress || '',
+            };
+
             // Convert order to invoice data format with GST setting
-            const invoiceData = convertOrderToInvoiceData(order, enableGST);
+            const invoiceData = convertOrderToInvoiceData(enrichedOrder, enableGST);
 
             console.log('Invoice data converted:', invoiceData);
 
@@ -253,7 +271,6 @@ export function OrderConfirmationDialog({
         setWhatsappStatus('sending');
         setWhatsappError(null);
 
-        const customerName = order.customerName || 'Valued Customer';
         const orderNum = order.orderNumber || order.id || 'N/A';
         const billUrl = `${window.location.origin}/bill/${orderNum}?enableGST=${enableGST}`;
 
@@ -267,9 +284,15 @@ export function OrderConfirmationDialog({
                 console.log('[WhatsApp] Generating invoice PDF...');
                 const { convertOrderToInvoiceData } = await import('@/lib/print-driver');
 
+                // Enrich the order with full customer data from DB
+                // This ensures the invoice PDF has complete customer info
                 const safeOrder = {
                     ...order,
                     customerName: customerName,
+                    customerPhone: customerPhone || '',
+                    customerEmail: customerEmail || '',
+                    customerAddress: customerAddress || '',
+                    deliveryAddress: (order as any)?.deliveryAddress || customerAddress || '',
                     orderNumber: orderNum,
                     totalAmount: totalAmount.toString(),
                     items: Array.isArray(order.items) ? order.items : [],
@@ -699,11 +722,13 @@ export function OrderConfirmationDialog({
                 open={showTagPrint}
                 onOpenChange={setShowTagPrint}
                 orderNumber={order?.orderNumber || ''}
-                customerName={order?.customerName}
+                customerName={customerName}
+                customerAddress={customerAddress}
                 franchiseId={(order as any)?.franchiseId || (order as any)?.franchise_id || null}
                 storeCode={resolveOrderStoreCodeFromOrder(order)}
                 commonNote={(order as any)?.specialInstructions || (order as any)?.special_instructions || undefined}
                 isExpressOrder={(order as any)?.isExpressOrder || (order as any)?.is_express_order || false}
+                billDate={order?.createdAt ? String(order.createdAt) : undefined}
                 dueDate={order?.pickupDate ? String(order.pickupDate) : (order as any)?.dueDate ? String((order as any).dueDate) : undefined}
                 items={(order?.items || []).map((item: any) => ({
                     orderNumber: order?.orderNumber || '',

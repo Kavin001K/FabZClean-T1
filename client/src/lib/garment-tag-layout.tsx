@@ -3,7 +3,7 @@ import { DEFAULT_COMPANY_INFO, getFranchiseById } from './franchise-config';
 import { normalizeOrderStoreCode } from './order-store';
 
 export const THERMAL_TAG_WIDTH_MM = 36;
-export const THERMAL_TAG_HEIGHT_MM = 23;
+export const THERMAL_TAG_HEIGHT_MM = 28;
 const THERMAL_TAG_STACK_PADDING_MM = 0.2;
 
 export interface ThermalTagItem {
@@ -19,9 +19,11 @@ export interface ThermalTagItem {
 export interface ThermalTagSource {
   orderNumber: string;
   customerName?: string;
+  customerAddress?: unknown;
   franchiseId?: string | null;
   storeCode?: string;
   commonNote?: string;
+  billDate?: string;
   dueDate?: string;
   items: ThermalTagItem[];
 }
@@ -29,25 +31,104 @@ export interface ThermalTagSource {
 export interface PreparedThermalTag {
   id: string;
   shortOrderId: string;
+  shortOrderFontMm: number;
+  billText: string;
+  billFontMm: number;
   customerText: string;
   branchText: string;
   serviceText: string;
   noteText: string;
+  hasNote: boolean;
   dueText: string;
   countText: string;
   customerFontMm: number;
+  branchFontMm: number;
   serviceFontMm: number;
   noteFontMm: number;
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-const normalizeText = (value: string | undefined | null, fallback: string) => {
+const normalizeWhitespace = (value: string | undefined | null, fallback = '') => {
   const raw = String(value || fallback).replace(/\s+/g, ' ').trim();
+  return raw || fallback;
+};
+
+const normalizeText = (value: string | undefined | null, fallback: string) => {
+  const raw = normalizeWhitespace(value, fallback);
   return raw ? raw.toUpperCase() : fallback.toUpperCase();
 };
 
-const fitUppercaseText = (
+const formatCustomerDisplay = (customerName?: string) => {
+  const fullName = normalizeWhitespace(customerName, 'CUSTOMER');
+  return normalizeText(fullName, 'CUSTOMER');
+};
+
+const SECONDARY_SERVICE_RULES: Array<[RegExp, string]> = [
+  [/\bDRY CLEAN ONLY\b/g, 'DCO'],
+  [/\bDRY CLEAN\b/g, 'DC'],
+  [/\bDRY WASH\b/g, 'DW'],
+  [/\bHAND WASH\b/g, 'HW'],
+  [/\bSTAIN REMOVAL\b/g, 'SR'],
+  [/\bWASH AND IRON\b/g, 'WI'],
+  [/\bWASH & IRON\b/g, 'WI'],
+  [/\bWASH AND FOLD\b/g, 'WF'],
+  [/\bWASH & FOLD\b/g, 'WF'],
+  [/\bSTEAM IRON\b/g, 'SI'],
+  [/\bWHITE\s*\/\s*COLOR\b/g, 'W/C'],
+  [/\bWHITE\s*&\s*COLOR\b/g, 'W/C'],
+  [/\bWHITE COLOR\b/g, 'W/C'],
+  [/\bWHITE\b/g, 'W'],
+  [/\bCOLOR\b/g, 'C'],
+  [/\bCOLOUR\b/g, 'C'],
+];
+
+const compactSecondaryText = (value: string | undefined | null) => {
+  let text = normalizeText(value, '');
+
+  SECONDARY_SERVICE_RULES.forEach(([pattern, replacement]) => {
+    text = text.replace(pattern, replacement);
+  });
+
+  return text
+    .replace(/[()]/g, ' ')
+    .replace(/\s*\/\s*/g, '/')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const formatCompactServiceDisplay = (serviceName?: string) => {
+  const normalized = normalizeText(serviceName, 'SERVICE')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const parenthesizedMatch = normalized.match(/^(.*?)\s*\((.*?)\)\s*$/);
+  const beforeParen = (parenthesizedMatch?.[1] || normalized).trim();
+  const inParen = (parenthesizedMatch?.[2] || '').trim();
+
+  const headTokens = beforeParen.split(/[\/\s]+/).map((token) => token.trim()).filter(Boolean);
+  const primary = headTokens[0] || 'SERVICE';
+
+  const remainderBeforeParen = headTokens.slice(1).join(' ');
+  const remainderRaw = [remainderBeforeParen, inParen].filter(Boolean).join(' ');
+
+  const secondary = compactSecondaryText(remainderRaw)
+    .split(/[\/\s]+/)
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .filter((token) => token !== 'ONLY' && token !== 'AND');
+
+  if (secondary.length === 0) {
+    return primary;
+  }
+
+  return `${primary}/${secondary.join('/')}`;
+};
+
+const formatCompactNoteDisplay = (value?: string) =>
+  normalizeWhitespace(value, '');
+
+const fitText = (
   value: string | undefined | null,
   fallback: string,
   config: {
@@ -59,7 +140,7 @@ const fitUppercaseText = (
     maxCharsAtMin: number;
   }
 ) => {
-  const normalized = normalizeText(value, fallback);
+  const normalized = normalizeWhitespace(value, fallback);
   const overflowChars = Math.max(0, normalized.length - config.shrinkStart);
   const steps = Math.ceil(overflowChars / config.shrinkStepChars);
   const fontSizeMm = clamp(
@@ -75,25 +156,38 @@ const fitUppercaseText = (
   return { text, fontSizeMm };
 };
 
+const fitUppercaseText = (
+  value: string | undefined | null,
+  fallback: string,
+  config: {
+    baseFontMm: number;
+    minFontMm: number;
+    shrinkStart: number;
+    shrinkStepChars: number;
+    shrinkFactor: number;
+    maxCharsAtMin: number;
+  }
+) => fitText(normalizeText(value, fallback), fallback.toUpperCase(), config);
+
 const formatShortOrderId = (orderNumber: string) => normalizeText(orderNumber.slice(-5), orderNumber);
 
-const formatDueDate = (dueDate?: string) => {
-  if (!dueDate) return '—';
-  const parsed = new Date(dueDate);
+const formatTagDate = (value?: string) => {
+  if (!value) return '—';
+  const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
-    return normalizeText(dueDate, '—');
+    return normalizeText(value, '—');
   }
 
-  const day = String(parsed.getDate()).padStart(2, '0');
+  const day = String(parsed.getDate());
   const month = parsed.toLocaleDateString('en-IN', { month: 'short' }).toUpperCase();
-  return `${day}\\${month}`;
+  return `${day}/${month}`;
 };
 
 const resolveBranchText = (franchiseId?: string | null, storeCode?: string) => {
   const franchise = franchiseId ? getFranchiseById(franchiseId) : DEFAULT_COMPANY_INFO;
   const normalizedStoreCode = normalizeOrderStoreCode(storeCode);
   const branchCode = normalizedStoreCode || normalizeText(franchise.branchCode, franchise.branchCode);
-  return `FAB CLEAN (${branchCode})`;
+  return `FAB CLEAN(${branchCode})`;
 };
 
 export const prepareThermalTags = ({
@@ -102,50 +196,93 @@ export const prepareThermalTags = ({
   franchiseId,
   storeCode,
   commonNote,
+  billDate,
   dueDate,
   items,
 }: ThermalTagSource): PreparedThermalTag[] => {
   const shortOrderId = formatShortOrderId(orderNumber);
-  const branchText = resolveBranchText(franchiseId, storeCode);
-  const customerFit = fitUppercaseText(customerName, 'CUSTOMER', {
-    baseFontMm: 2.6,
-    minFontMm: 1.9,
-    shrinkStart: 8,
-    shrinkStepChars: 3,
-    shrinkFactor: 0.22,
-    maxCharsAtMin: 16,
+  const shortOrderFit = fitUppercaseText(shortOrderId, shortOrderId, {
+    baseFontMm: 6,
+    minFontMm: 4.3,
+    shrinkStart: 5,
+    shrinkStepChars: 1,
+    shrinkFactor: 0.34,
+    maxCharsAtMin: 10,
   });
-  const dueText = formatDueDate(dueDate);
+  const branchText = resolveBranchText(franchiseId, storeCode);
+  const customerFit = fitText(formatCustomerDisplay(customerName), 'CUSTOMER', {
+    baseFontMm: 3.1,
+    minFontMm: 2.1,
+    shrinkStart: 12,
+    shrinkStepChars: 2,
+    shrinkFactor: 0.1,
+    maxCharsAtMin: 30,
+  });
+  const branchFit = fitUppercaseText(branchText, branchText, {
+    baseFontMm: 2.3,
+    minFontMm: 1.9,
+    shrinkStart: 12,
+    shrinkStepChars: 3,
+    shrinkFactor: 0.12,
+    maxCharsAtMin: 18,
+  });
+  const billText = formatTagDate(billDate);
+  const dueText = formatTagDate(dueDate);
+  const billFit = fitUppercaseText(`ORD ${billText}`, `ORD ${billText}`, {
+    baseFontMm: 2.75,
+    minFontMm: 2.15,
+    shrinkStart: 7,
+    shrinkStepChars: 1,
+    shrinkFactor: 0.12,
+    maxCharsAtMin: 12,
+  });
 
   return items.flatMap((item, itemIndex) => {
     const quantity = Math.max(1, Number(item.quantity) || 1);
-    const serviceFit = fitUppercaseText(item.serviceName, 'SERVICE', {
-      baseFontMm: 4.2,
-      minFontMm: 2.7,
-      shrinkStart: 10,
-      shrinkStepChars: 3,
-      shrinkFactor: 0.28,
-      maxCharsAtMin: 20,
-    });
-    const noteFit = fitUppercaseText(item.tagNote || commonNote || '', '', {
-      baseFontMm: 2.8,
-      minFontMm: 1.9,
-      shrinkStart: 12,
+    const compactServiceText = formatCompactServiceDisplay(item.serviceName);
+    const compactNoteText = formatCompactNoteDisplay(item.tagNote || commonNote || '');
+    const noteFit = fitText(compactNoteText, '', {
+      baseFontMm: 2.6,
+      minFontMm: 2.05,
+      shrinkStart: 80,
       shrinkStepChars: 4,
-      shrinkFactor: 0.22,
-      maxCharsAtMin: 24,
+      shrinkFactor: 0.14,
+      maxCharsAtMin: 160,
     });
+    const hasNote = noteFit.text.length > 0;
+    const serviceFit = fitText(compactServiceText, 'Service', hasNote
+      ? {
+        baseFontMm: 4.85,
+        minFontMm: 2.85,
+        shrinkStart: 12,
+        shrinkStepChars: 3,
+        shrinkFactor: 0.2,
+        maxCharsAtMin: 32,
+      }
+      : {
+        baseFontMm: 5.55,
+        minFontMm: 3.2,
+        shrinkStart: 14,
+        shrinkStepChars: 3,
+        shrinkFactor: 0.2,
+        maxCharsAtMin: 40,
+      });
 
     return Array.from({ length: quantity }, (_, tagIndex) => ({
       id: `${orderNumber}-${itemIndex}-${tagIndex}`,
       shortOrderId,
+      shortOrderFontMm: shortOrderFit.fontSizeMm,
+      billText,
+      billFontMm: billFit.fontSizeMm,
       customerText: customerFit.text,
-      branchText,
+      branchText: branchFit.text,
       serviceText: serviceFit.text,
-      noteText: noteFit.text || ' ',
+      noteText: noteFit.text,
+      hasNote,
       dueText,
-      countText: `${tagIndex + 1}\\${quantity}`,
+      countText: `${tagIndex + 1}/${quantity}`,
       customerFontMm: customerFit.fontSizeMm,
+      branchFontMm: branchFit.fontSizeMm,
       serviceFontMm: serviceFit.fontSizeMm,
       noteFontMm: noteFit.fontSizeMm,
     }));
@@ -177,7 +314,7 @@ export const getThermalTagPrintStyles = (pageHeightMm: number) => `
   }
 
   body {
-    font-family: "Arial Black", Arial, Helvetica, sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
   }
 
   .no-print {
@@ -197,112 +334,146 @@ export const getThermalTagPrintStyles = (pageHeightMm: number) => `
     height: ${THERMAL_TAG_HEIGHT_MM}mm;
     min-height: ${THERMAL_TAG_HEIGHT_MM}mm;
     max-height: ${THERMAL_TAG_HEIGHT_MM}mm;
-    padding: 1.2mm 1.4mm 1.1mm 1.4mm;
+    border-top: 0.4mm dashed #000000;
+    border-bottom: 0.4mm dashed #000000;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    gap: 0.45mm;
     break-inside: avoid;
     page-break-inside: avoid;
     overflow: hidden;
     background: #ffffff;
+    padding: 0.75mm 0.85mm 0.65mm;
   }
 
-  .tag-top {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 1mm;
-    min-height: 3.4mm;
+  .branch-bar {
+    line-height: 0.92;
+    font-weight: 700;
+    letter-spacing: 0.025mm;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+    padding-bottom: 0.25mm;
+    border-bottom: 0.2mm solid #000000;
+  }
+
+  .tag-head {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: end;
+    gap: 0.7mm;
+    min-height: 5.1mm;
   }
 
   .short-id {
-    font-size: 2.8mm;
-    line-height: 1;
+    line-height: 0.86;
     font-weight: 900;
-    letter-spacing: 0.05mm;
+    letter-spacing: 0.03mm;
     white-space: nowrap;
-    color: #000000;
+    overflow: visible;
+    text-overflow: clip;
   }
 
-  .customer {
-    line-height: 1;
-    font-weight: 900;
-    letter-spacing: 0.04mm;
-    text-align: right;
+  .bill-date {
+    line-height: 0.95;
+    font-weight: 800;
+    letter-spacing: 0.03mm;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: #000000;
-    max-width: 18.5mm;
+    padding: 0.25mm 0.55mm 0.15mm;
+    border: 0.22mm solid #000000;
+    border-radius: 99mm;
+    justify-self: end;
   }
 
-  .divider {
-    border-top: 0.45mm dashed #000000;
-    width: 100%;
-    margin: 0;
-  }
-
-  .branch {
-    font-size: 2.25mm;
-    line-height: 1.05;
-    font-weight: 900;
+  .customer-line {
+    font-weight: 800;
+    line-height: 0.94;
     letter-spacing: 0.03mm;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: #000000;
+    text-transform: uppercase;
+  }
+
+  .tag-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 0.45mm;
+    padding: 0.6mm 0.7mm 0.45mm;
+    border: 0.22mm solid #000000;
+    border-radius: 0.95mm;
+  }
+
+  .tag-body--with-note {
+    justify-content: flex-start;
+    gap: 0.45mm;
+  }
+
+  .tag-body--no-note {
+    justify-content: center;
+    gap: 0.15mm;
     padding-top: 0.35mm;
+    padding-bottom: 0.35mm;
   }
 
-  .service {
-    line-height: 1;
+  .service-line {
     font-weight: 900;
-    text-align: center;
-    letter-spacing: 0.05mm;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: #000000;
-    padding-top: 0.3mm;
-  }
-
-  .note {
-    line-height: 1;
-    font-weight: 900;
-    text-align: center;
+    line-height: 0.92;
     letter-spacing: 0.03mm;
-    white-space: nowrap;
+    white-space: normal;
     overflow: hidden;
-    text-overflow: ellipsis;
-    color: #000000;
-    min-height: 2.8mm;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .tag-body--no-note .service-line {
+    -webkit-line-clamp: 3;
+    line-height: 0.9;
+  }
+
+  .note-line {
+    font-weight: 700;
+    line-height: 0.94;
+    letter-spacing: 0.02mm;
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
   }
 
   .tag-footer {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 1mm;
-    min-height: 3.4mm;
-    padding-top: 0.2mm;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 0.65mm;
+    min-height: 3.6mm;
+    padding-top: 0.15mm;
   }
 
-  .due {
-    font-size: 2.45mm;
-    line-height: 1;
-    font-weight: 900;
+  .due-text {
+    font-size: 2.85mm;
+    line-height: 0.95;
+    font-weight: 800;
     letter-spacing: 0.03mm;
-    color: #000000;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0.35mm 0.85mm 0.25mm;
+    border: 0.22mm solid #000000;
+    border-radius: 99mm;
   }
 
-  .count {
-    font-size: 3mm;
-    line-height: 1;
+  .count-text {
+    font-size: 3.5mm;
+    line-height: 0.95;
     font-weight: 900;
-    letter-spacing: 0.05mm;
-    color: #000000;
+    letter-spacing: 0.02mm;
     white-space: nowrap;
   }
 
@@ -339,18 +510,19 @@ export const buildThermalTagPrintHtml = (tags: PreparedThermalTag[], title: stri
   const pageHeightMm = getThermalTagStripHeightMm(tags.length);
   const tagsHtml = tags.map((tag) => `
     <div class="thermal-tag">
-      <div class="tag-top">
-        <span class="short-id">${escapeHtml(tag.shortOrderId)}</span>
-        <span class="customer" style="font-size:${tag.customerFontMm}mm;">${escapeHtml(tag.customerText)}</span>
+      <div class="branch-bar" style="font-size:${tag.branchFontMm}mm;">${escapeHtml(tag.branchText)}</div>
+      <div class="tag-head">
+        <div class="short-id" style="font-size:${tag.shortOrderFontMm}mm;">${escapeHtml(tag.shortOrderId)}</div>
+        <div class="bill-date" style="font-size:${tag.billFontMm}mm;">ORD ${escapeHtml(tag.billText)}</div>
       </div>
-      <div class="divider"></div>
-      <div class="branch">${escapeHtml(tag.branchText)}</div>
-      <div class="service" style="font-size:${tag.serviceFontMm}mm;">${escapeHtml(tag.serviceText)}</div>
-      <div class="note" style="font-size:${tag.noteFontMm}mm;">${escapeHtml(tag.noteText)}</div>
-      <div class="divider"></div>
+      <div class="customer-line" style="font-size:${tag.customerFontMm}mm;">${escapeHtml(tag.customerText)}</div>
+      <div class="tag-body ${tag.hasNote ? 'tag-body--with-note' : 'tag-body--no-note'}">
+        <div class="service-line" style="font-size:${tag.serviceFontMm}mm;">${escapeHtml(tag.serviceText)}</div>
+        ${tag.hasNote ? `<div class="note-line" style="font-size:${tag.noteFontMm}mm;">${escapeHtml(tag.noteText)}</div>` : ''}
+      </div>
       <div class="tag-footer">
-        <span class="due">${escapeHtml(tag.dueText)}</span>
-        <span class="count">${escapeHtml(tag.countText)}</span>
+        <div class="due-text">DUE ${escapeHtml(tag.dueText)}</div>
+        <div class="count-text">${escapeHtml(tag.countText)}</div>
       </div>
     </div>
   `).join('');
@@ -392,128 +564,166 @@ export function ThermalTagLabel({ tag }: { tag: PreparedThermalTag }) {
         height: `${THERMAL_TAG_HEIGHT_MM}mm`,
         minHeight: `${THERMAL_TAG_HEIGHT_MM}mm`,
         maxHeight: `${THERMAL_TAG_HEIGHT_MM}mm`,
-        padding: '1.2mm 1.4mm 1.1mm 1.4mm',
+        borderTop: '0.4mm dashed #000000',
+        borderBottom: '0.4mm dashed #000000',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'space-between',
-        fontFamily: '"Arial Black", Arial, Helvetica, sans-serif',
+        gap: '0.45mm',
+        padding: '0.75mm 0.85mm 0.65mm',
+        fontFamily: 'Arial, Helvetica, sans-serif',
       }}
     >
       <div
         style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          justifyContent: 'space-between',
-          gap: '1mm',
-          minHeight: '3.4mm',
-          overflow: 'hidden',
-        }}
-      >
-        <span
-          style={{
-            fontSize: '2.8mm',
-            lineHeight: 1,
-            fontWeight: 900,
-            letterSpacing: '0.05mm',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {tag.shortOrderId}
-        </span>
-        <span
-          style={{
-            fontSize: `${tag.customerFontMm}mm`,
-            lineHeight: 1,
-            fontWeight: 900,
-            letterSpacing: '0.04mm',
-            textAlign: 'right',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            maxWidth: '18.5mm',
-          }}
-        >
-          {tag.customerText}
-        </span>
-      </div>
-      <div style={{ borderTop: '0.45mm dashed #000000', width: '100%' }} />
-      <div
-        style={{
-          fontSize: '2.25mm',
-          lineHeight: 1.05,
-          fontWeight: 900,
-          letterSpacing: '0.03mm',
+          fontSize: `${tag.branchFontMm}mm`,
+          lineHeight: 0.92,
+          fontWeight: 700,
+          letterSpacing: '0.025mm',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
-          paddingTop: '0.35mm',
+          textAlign: 'left',
+          paddingBottom: '0.25mm',
+          borderBottom: '0.2mm solid #000000',
         }}
       >
         {tag.branchText}
       </div>
       <div
         style={{
-          fontSize: `${tag.serviceFontMm}mm`,
-          lineHeight: 1,
-          fontWeight: 900,
-          textAlign: 'center',
-          letterSpacing: '0.05mm',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          paddingTop: '0.3mm',
+          display: 'grid',
+          gridTemplateColumns: 'max-content minmax(0, 1fr)',
+          alignItems: 'end',
+          gap: '0.7mm',
+          minHeight: '5.1mm',
         }}
       >
-        {tag.serviceText}
+        <div
+          style={{
+            fontSize: `${tag.shortOrderFontMm}mm`,
+            lineHeight: 0.86,
+            fontWeight: 900,
+            letterSpacing: '0.03mm',
+            whiteSpace: 'nowrap',
+            overflow: 'visible',
+            textOverflow: 'clip',
+          }}
+        >
+          {tag.shortOrderId}
+        </div>
+        <div
+          style={{
+            fontSize: `${tag.billFontMm}mm`,
+            lineHeight: 0.95,
+            fontWeight: 800,
+            letterSpacing: '0.03mm',
+            whiteSpace: 'nowrap',
+            padding: '0.25mm 0.55mm 0.15mm',
+            border: '0.22mm solid #000000',
+            borderRadius: '99mm',
+            justifySelf: 'end',
+          }}
+        >
+          {`ORD ${tag.billText}`}
+        </div>
       </div>
       <div
         style={{
-          fontSize: `${tag.noteFontMm}mm`,
-          lineHeight: 1,
-          fontWeight: 900,
-          textAlign: 'center',
+          fontSize: `${tag.customerFontMm}mm`,
+          fontWeight: 800,
+          lineHeight: 0.94,
           letterSpacing: '0.03mm',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
-          minHeight: '2.8mm',
+          textTransform: 'uppercase',
         }}
       >
-        {tag.noteText}
+        {tag.customerText}
       </div>
-      <div style={{ borderTop: '0.45mm dashed #000000', width: '100%' }} />
       <div
         style={{
+          flex: 1,
+          minHeight: 0,
           display: 'flex',
-          alignItems: 'baseline',
-          justifyContent: 'space-between',
-          gap: '1mm',
-          minHeight: '3.4mm',
-          paddingTop: '0.2mm',
+          flexDirection: 'column',
+          justifyContent: tag.hasNote ? 'flex-start' : 'center',
+          gap: tag.hasNote ? '0.45mm' : '0.15mm',
+          padding: tag.hasNote ? '0.6mm 0.7mm 0.45mm' : '0.35mm 0.7mm',
+          border: '0.22mm solid #000000',
+          borderRadius: '0.95mm',
         }}
       >
-        <span
+        <div
           style={{
-            fontSize: '2.45mm',
-            lineHeight: 1,
+            fontSize: `${tag.serviceFontMm}mm`,
             fontWeight: 900,
+            lineHeight: 0.92,
             letterSpacing: '0.03mm',
-            whiteSpace: 'nowrap',
+            whiteSpace: 'normal',
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitBoxOrient: 'vertical',
+            WebkitLineClamp: tag.hasNote ? 2 : 3,
           }}
         >
-          {tag.dueText}
-        </span>
-        <span
+          {tag.serviceText}
+        </div>
+        {tag.hasNote && (
+          <div
+            style={{
+              fontSize: `${tag.noteFontMm}mm`,
+              fontWeight: 700,
+              lineHeight: 0.94,
+              letterSpacing: '0.02mm',
+              whiteSpace: 'normal',
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: 3,
+            }}
+          >
+            {tag.noteText}
+          </div>
+        )}
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) auto',
+          alignItems: 'end',
+          gap: '0.65mm',
+          minHeight: '3.6mm',
+          paddingTop: '0.15mm',
+        }}
+      >
+        <div
           style={{
-            fontSize: '3mm',
-            lineHeight: 1,
+            fontSize: '2.85mm',
+            lineHeight: 0.95,
+            fontWeight: 800,
+            letterSpacing: '0.03mm',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            padding: '0.35mm 0.85mm 0.25mm',
+            border: '0.22mm solid #000000',
+            borderRadius: '99mm',
+          }}
+        >
+          {`DUE ${tag.dueText}`}
+        </div>
+        <div
+          style={{
+            fontSize: '3.5mm',
+            lineHeight: 0.95,
             fontWeight: 900,
-            letterSpacing: '0.05mm',
+            letterSpacing: '0.02mm',
             whiteSpace: 'nowrap',
           }}
         >
           {tag.countText}
-        </span>
+        </div>
       </div>
     </div>
   );

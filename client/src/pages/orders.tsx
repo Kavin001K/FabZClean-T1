@@ -94,6 +94,7 @@ import { exportOrdersToExcel } from '@/lib/excel-exports';
 import { smartItemSummary } from '@/lib/item-summarizer';
 import { getOrderStoreLabel, resolveOrderStoreCodeFromOrder } from '@/lib/order-store';
 import { MAX_WHATSAPP_SENDS, WhatsAppService } from '@/lib/whatsapp-service';
+import { printDriver, convertOrderToInvoiceData } from '@/lib/print-driver'; // Added imports
 import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { isElectron, isMac } from "@/lib/utils";
@@ -127,8 +128,17 @@ const hasBillSendFailed = (order: Order): boolean => {
   return status.startsWith('Order Confirmation Failed') || status.startsWith('Bill Updated - Failed');
 };
 
+const resolveOrderPhone = (order: Order): string => {
+  return String(
+    order.customerPhone ||
+    (order as any).customerPhone ||
+    (order as any).customers?.phone ||
+    ""
+  ).trim();
+};
+
 const canShowSendBillAction = (order: Order): boolean => {
-  const phone = order.customerPhone || (order as any).customerPhone;
+  const phone = resolveOrderPhone(order);
   const sendCount = Number((order as any).whatsappMessageCount || 0);
   return Boolean(phone) && hasBillSendFailed(order) && sendCount < MAX_WHATSAPP_SENDS;
 };
@@ -138,6 +148,16 @@ function OrdersComponent() {
   const { addNotification } = useNotifications();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  
+  const { printInvoice } = useInvoicePrint({
+    onSuccess: (invoiceData) => {
+      console.log('Invoice printed successfully:', invoiceData);
+    },
+    onError: (error) => {
+      console.error('Invoice print failed:', error);
+    }
+  });
+
   const [viewportHeight, setViewportHeight] = useState(() =>
     typeof window !== 'undefined' ? window.innerHeight : 900
   );
@@ -183,6 +203,7 @@ function OrdersComponent() {
   // Dialog States
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isUpdatingBill, setIsUpdatingBill] = useState(false); // Added state for background bill update
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedPaymentOrder, setSelectedPaymentOrder] = useState<Order | null>(null);
@@ -362,12 +383,50 @@ function OrdersComponent() {
       // Return a context object with the snapshotted value
       return { previousOrders };
     },
-    onSuccess: (updatedOrder, { orderId }) => {
+    onSuccess: async (updatedOrder, { orderId }) => {
       if (updatedOrder) {
         toast({
           title: "Order Updated",
           description: `Order ${orderId} has been updated successfully`,
         });
+
+        // AUTOMATICALLY RE-GENERATE INVOICE & RESEND BILL
+        try {
+          setIsUpdatingBill(true);
+          console.log('[Orders] Triggering automatic bill update for:', updatedOrder.orderNumber);
+          
+          // 1. Convert order to print data and trigger PDF generation/upload
+          // We use the same service as the Print button but set isUpdate: true
+          const invoiceData = convertOrderToInvoiceData(updatedOrder, false, true);
+          
+          // Generate and upload the new PDF
+          // This will return the saved document from the server
+          const savedDoc = await printDriver.printInvoice(invoiceData);
+          
+          if (savedDoc && savedDoc.url) {
+            console.log('[Orders] New invoice generated and uploaded:', savedDoc.url);
+            
+            // 2. Trigger the WhatsApp bill resend with the new URL and (Updated) tag
+            resendBillMutation.mutate({ 
+              order: updatedOrder, 
+              customInvoiceUrl: savedDoc.url,
+              isUpdate: true 
+            });
+          } else {
+            // Fallback: send without custom URL if generation failed
+            console.warn('[Orders] Could not get new invoice URL, falling back to standard resend');
+            resendBillMutation.mutate({ order: updatedOrder, isUpdate: true });
+          }
+        } catch (err) {
+          console.error('[Orders] Error in automatic bill resend:', err);
+          toast({
+            title: "Bill Update Failed",
+            description: "Order saved, but could not automatically resend updated bill.",
+            variant: "destructive"
+          });
+        } finally {
+          setIsUpdatingBill(false);
+        }
       }
     },
     onError: (error, _variables, context) => {
@@ -495,8 +554,8 @@ function OrdersComponent() {
   });
 
   const resendBillMutation = useMutation({
-    mutationFn: async (order: Order) => {
-      const customerPhone = order.customerPhone || (order as any).customerPhone;
+    mutationFn: async ({ order, customInvoiceUrl, isUpdate = false }: { order: Order; customInvoiceUrl?: string; isUpdate?: boolean }) => {
+      const customerPhone = resolveOrderPhone(order);
       if (!customerPhone) {
         throw new Error('Customer phone number is missing for this order.');
       }
@@ -509,7 +568,12 @@ function OrdersComponent() {
       const orderNumber = order.orderNumber || order.id;
       const amount = parseFloat(String(order.totalAmount || '0')) || 0;
       const items = Array.isArray((order as any).items) ? (order as any).items : [];
-      const itemSummary = smartItemSummary(items) || (order as any).service || 'Laundry Items';
+      
+      // Append (Updated) if it's an update resend
+      let itemSummary = smartItemSummary(items) || (order as any).service || 'Laundry Items';
+      if (isUpdate) {
+        itemSummary = `${itemSummary} (Updated)`;
+      }
 
       const result = await WhatsAppService.sendOrderBill(
         customerPhone,
@@ -517,7 +581,7 @@ function OrdersComponent() {
         order.customerName || 'Customer',
         amount,
         `${window.location.origin}/bill/${encodeURIComponent(orderNumber)}`,
-        (order as any).invoiceUrl || undefined,
+        customInvoiceUrl || (order as any).invoiceUrl || undefined,
         itemSummary,
         sendCount
       );
@@ -528,11 +592,11 @@ function OrdersComponent() {
 
       return { order, result };
     },
-    onMutate: async (order) => {
+    onMutate: async ({ order }) => {
       setSendingBillOrderId(order.id);
       toast({
         title: 'Sending Bill',
-        description: `Retrying WhatsApp bill for ${order.orderNumber || order.id}...`,
+        description: `Sending WhatsApp bill for ${order.orderNumber || order.id}...`,
       });
     },
     onSuccess: ({ order }) => {
@@ -541,7 +605,7 @@ function OrdersComponent() {
         description: `WhatsApp bill sent for ${order.orderNumber || order.id}.`,
       });
     },
-    onError: (error: any, order) => {
+    onError: (error: any, { order }) => {
       toast({
         title: 'Bill Send Failed',
         description: error?.message || `Could not send WhatsApp bill for ${order.orderNumber || order.id}.`,
@@ -607,21 +671,14 @@ function OrdersComponent() {
     });
   }, [updateOrderStatusMutation]);
 
-  const { printInvoice } = useInvoicePrint({
-    onSuccess: (invoiceData) => {
-      console.log('Invoice printed successfully:', invoiceData);
-    },
-    onError: (error) => {
-      console.error('Invoice print failed:', error);
-    }
-  });
+
 
   const handlePrintInvoice = useCallback((order: Order) => {
     printInvoice(order);
   }, [printInvoice]);
 
-  const handleSendBill = useCallback((order: Order) => {
-    resendBillMutation.mutate(order);
+   const handleSendBill = useCallback((order: Order) => {
+    resendBillMutation.mutate({ order });
   }, [resendBillMutation]);
 
   const handleNextStep = useCallback((order: Order) => {
@@ -2212,220 +2269,165 @@ function OrdersComponent() {
                       key={date}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: dateIndex * 0.1 }}
+                      transition={{ delay: dateIndex * 0.08 }}
                       className="relative"
                     >
                       {/* Date Header */}
-                      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-3 mb-4">
+                      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-2 mb-3">
                         <div className="flex items-center gap-3">
-                          <CalendarIcon className="h-5 w-5 text-primary" />
-                          <h3 className="text-lg font-semibold">{date}</h3>
-                          <div className="flex-1 h-px bg-border ml-4" />
-                          <Badge variant="secondary">{orders.length} orders</Badge>
+                          <CalendarIcon className="h-4 w-4 text-primary" />
+                          <h3 className="text-sm font-bold text-foreground">{date}</h3>
+                          <div className="flex-1 h-px bg-border ml-2" />
+                          <Badge variant="secondary" className="text-xs">{orders.length} orders</Badge>
                         </div>
                       </div>
 
                       {/* Timeline Items */}
-                      <div className="space-y-4 ml-8 border-l-2 border-primary/30 pl-6 relative">
+                      <div className="ml-5 border-l border-primary/20 pl-6 space-y-3 relative">
                         {orders.map((order, orderIndex) => {
-                          const statusIcon = order.status === 'completed' ? CheckCircle :
-                            order.status === 'processing' ? Clock :
-                              order.status === 'pending' ? AlertCircle :
-                                XCircle;
-                          const StatusIcon = statusIcon;
-
-                          const statusColor = order.status === 'completed' ? 'text-green-500 bg-green-500/10 border-green-500/20' :
-                            order.status === 'processing' ? 'text-blue-500 bg-blue-500/10 border-blue-500/20' :
-                              order.status === 'pending' ? 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' :
-                                'text-red-500 bg-red-500/10 border-red-500/20';
+                          const statusDotColor =
+                            order.status === 'completed' || order.status === 'delivered'
+                              ? 'bg-emerald-500 shadow-emerald-500/40'
+                              : order.status === 'processing'
+                                ? 'bg-blue-500 shadow-blue-500/40'
+                                : order.status === 'pending'
+                                  ? 'bg-amber-500 shadow-amber-500/40'
+                                  : order.status === 'ready_for_pickup' || order.status === 'ready_for_delivery'
+                                    ? 'bg-teal-500 shadow-teal-500/40'
+                                    : order.status === 'out_for_delivery' || order.status === 'in_transit'
+                                      ? 'bg-orange-500 shadow-orange-500/40'
+                                      : order.status === 'cancelled'
+                                        ? 'bg-red-500 shadow-red-500/40'
+                                        : 'bg-slate-400 shadow-slate-400/40';
 
                           return (
                             <motion.div
                               key={order.id}
-                              initial={{ opacity: 0, x: -20 }}
+                              initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: (dateIndex * 0.1) + (orderIndex * 0.05) }}
-                              className="relative group"
+                              transition={{ delay: (dateIndex * 0.08) + (orderIndex * 0.03) }}
+                              className="relative group cursor-pointer"
+                              onClick={() => handleViewOrder(order)}
                             >
                               {/* Timeline Dot */}
                               <div className={cn(
-                                "absolute -left-[29px] top-6 w-4 h-4 rounded-full border-2 border-background",
-                                statusColor,
-                                "group-hover:scale-125 transition-transform duration-200"
+                                "absolute -left-[31px] top-4 w-3 h-3 rounded-full shadow-md ring-2 ring-background",
+                                statusDotColor,
+                                "group-hover:scale-150 transition-transform duration-200"
                               )} />
 
-                              {/* Order Card */}
-                              <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 overflow-hidden">
-                                <CardContent className="p-6">
-                                  <div className="flex items-start gap-4">
-                                    {/* Status Icon */}
-                                    <div className={cn(
-                                      "p-3 rounded-xl border-2",
-                                      statusColor
-                                    )}>
-                                      <StatusIcon className="h-6 w-6" />
-                                    </div>
-
-                                    {/* Order Details */}
-                                    <div className="flex-1 min-w-0">
-                                      {/* Header Row */}
-                                      <div className="flex items-start justify-between gap-4 mb-3">
-                                        <div>
-                                          <div className="flex items-center gap-2 mb-1">
-                                            <h4 className="text-lg font-semibold">
-                                              Order #{order.orderNumber}
-                                            </h4>
-                                            <Badge
-                                              variant={
-                                                order.status === 'completed' ? 'default' :
-                                                  order.status === 'processing' ? 'secondary' :
-                                                    order.status === 'pending' ? 'outline' :
-                                                      'destructive'
-                                              }
-                                              className="capitalize"
-                                            >
-                                              {order.status.replace('_', ' ')}
-                                            </Badge>
-                                          </div>
-                                          <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                            <Clock className="h-3 w-3" />
-                                            {new Date(order.createdAt || new Date()).toLocaleTimeString('en-US', {
-                                              hour: '2-digit',
-                                              minute: '2-digit'
-                                            })}
-                                          </p>
-                                        </div>
-
-                                        <div className="text-right">
-                                          <p className="text-2xl font-bold text-primary">
-                                            {formatCurrency(parseFloat(order.totalAmount))}
-                                          </p>
-                                          {order.paymentStatus && (
-                                            <Badge
-                                              variant={order.paymentStatus === 'paid' ? 'default' : 'outline'}
-                                              className="mt-1"
-                                            >
-                                              {order.paymentStatus}
-                                            </Badge>
+                              {/* Compact Order Card */}
+                              <div className="rounded-xl border bg-card p-4 hover:shadow-md hover:border-primary/30 transition-all duration-200 group-hover:-translate-y-0.5">
+                                <div className="flex items-center gap-3">
+                                  {/* Left: Order info */}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="font-bold text-sm">#{order.orderNumber}</span>
+                                      <Badge
+                                        variant={
+                                          order.status === 'completed' || order.status === 'delivered' ? 'default' :
+                                            order.status === 'processing' ? 'secondary' :
+                                              order.status === 'cancelled' ? 'destructive' : 'outline'
+                                        }
+                                        className="text-[10px] px-1.5 py-0 capitalize"
+                                      >
+                                        {order.status.replace(/_/g, ' ')}
+                                      </Badge>
+                                      {order.paymentStatus && (
+                                        <Badge
+                                          variant={order.paymentStatus === 'paid' ? 'default' : 'outline'}
+                                          className={cn(
+                                            "text-[10px] px-1.5 py-0",
+                                            order.paymentStatus === 'paid' && "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400"
                                           )}
-                                        </div>
-                                      </div>
-
-                                      {/* Customer Info */}
-                                      <div className="flex items-center gap-6 mb-4 p-3 bg-muted/50 rounded-lg">
-                                        <div className="flex items-center gap-2">
-                                          <Users className="h-4 w-4 text-muted-foreground" />
-                                          <span className="text-sm font-medium">{order.customerName}</span>
-                                        </div>
-                                        {(order as any).service && (
-                                          <div className="flex items-center gap-2">
-                                            <Package className="h-4 w-4 text-muted-foreground" />
-                                            <span className="text-sm text-muted-foreground">
-                                              {(order as any).service}
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Actions */}
-                                      <div className="flex items-center gap-2">
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => {
-                                            setSelectedOrder(order);
-                                            setIsOrderDetailsOpen(true);
-                                          }}
-                                          className="gap-2"
                                         >
-                                          <Eye className="h-4 w-4" />
-                                          View Details
-                                        </Button>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => {
-                                            setEditingOrder(order);
-                                            setIsEditDialogOpen(true);
-                                          }}
-                                          className="gap-2"
-                                        >
-                                          <Edit className="h-4 w-4" />
-                                          Edit
-                                        </Button>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => handlePrintInvoice(order)}
-                                          className="gap-2"
-                                        >
-                                          <Printer className="h-4 w-4" />
-                                          Print
-                                        </Button>
-                                        {canShowSendBillAction(order) && (
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleSendBill(order)}
-                                            className="gap-2"
-                                            disabled={sendingBillOrderId === order.id}
-                                          >
-                                            {sendingBillOrderId === order.id ? (
-                                              <Loader2 className="h-4 w-4 animate-spin" />
-                                            ) : (
-                                              <MessageCircle className="h-4 w-4" />
-                                            )}
-                                            Send Bill
-                                          </Button>
-                                        )}
-
-                                        {/* More Actions Dropdown */}
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="sm">
-                                              <MoreHorizontal className="h-4 w-4" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end">
-                                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'pending')}>
-                                              Mark as Pending
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'in_progress')}>
-                                              Mark as In Progress
-                                            </DropdownMenuItem>
-                                            {order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit' && (
-                                              <>
-                                                <DropdownMenuItem onClick={() => {
-                                                  setSelectedPaymentOrder(order);
-                                                  setIsPaymentModalOpen(true);
-                                                }}>
-                                                  Process Payment
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleDebitFromWallet(order)}>
-                                                  Debit from Wallet
-                                                </DropdownMenuItem>
-                                              </>
-                                            )}
-                                            <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>
-                                              Mark as Completed
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                              onClick={() => handleDeleteOrder(order.id)}
-                                              className="text-destructive"
-                                            >
-                                              <Trash2 className="h-4 w-4 mr-2" />
-                                              Delete Order
-                                            </DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                      </div>
+                                          {order.paymentStatus}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                      <span className="flex items-center gap-1 font-medium text-foreground/80">
+                                        <Users className="h-3 w-3" />
+                                        {order.customerName}
+                                      </span>
+                                      <span className="flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        {new Date(order.createdAt || new Date()).toLocaleTimeString('en-US', {
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </span>
+                                      {(order as any).service && (
+                                        <span className="flex items-center gap-1 truncate">
+                                          <Package className="h-3 w-3" />
+                                          {(order as any).service}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
-                                </CardContent>
-                              </Card>
+
+                                  {/* Right: Amount + quick actions */}
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg font-bold text-primary tabular-nums">
+                                      {formatCurrency(parseFloat(order.totalAmount))}
+                                    </span>
+                                    <div className="flex items-center gap-1 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="outline" size="sm" className="h-9 gap-2 bg-background shadow-sm hover:bg-muted">
+                                            <MoreHorizontal className="h-4 w-4" />
+                                            More Actions
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-56">
+                                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem onClick={() => handleViewOrder(order)}>
+                                            <Eye className="mr-2 h-4 w-4" /> View Details
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => handleEditOrder(order)}>
+                                            <Edit className="mr-2 h-4 w-4" /> Edit Order
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => handlePrintInvoice(order)}>
+                                            <Printer className="mr-2 h-4 w-4" /> Print Invoice
+                                          </DropdownMenuItem>
+                                          {canShowSendBillAction(order) && (
+                                            <DropdownMenuItem
+                                              onClick={() => handleSendBill(order)}
+                                              disabled={sendingBillOrderId === order.id}
+                                            >
+                                              {sendingBillOrderId === order.id ? (
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                              ) : (
+                                                <MessageCircle className="mr-2 h-4 w-4" />
+                                              )}
+                                              Send Bill
+                                            </DropdownMenuItem>
+                                          )}
+                                          <DropdownMenuSeparator />
+                                          {order.status === 'processing' && <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>Mark as Completed</DropdownMenuItem>}
+                                          {order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit' && (
+                                            <>
+                                              <DropdownMenuSeparator />
+                                              <DropdownMenuItem onClick={() => { setSelectedPaymentOrder(order); setIsPaymentModalOpen(true); }}>
+                                                <IndianRupee className="mr-2 h-4 w-4" /> Process Payment
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem onClick={() => handleDebitFromWallet(order)} className="text-orange-600 focus:text-orange-600">
+                                                💳 Debit from Wallet
+                                              </DropdownMenuItem>
+                                            </>
+                                          )}
+                                          {order.status !== 'completed' && order.status !== 'cancelled' && (
+                                            <DropdownMenuItem onClick={() => handleCancelOrder(order)} className="text-red-600 focus:text-red-600">
+                                              <X className="mr-2 h-4 w-4" /> Cancel Order
+                                            </DropdownMenuItem>
+                                          )}
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
                             </motion.div>
                           );
                         })}
@@ -2484,6 +2486,8 @@ function OrdersComponent() {
         onNextStep={handleNextStep}
         onPrintInvoice={handlePrintInvoice}
         onUpdatePaymentStatus={handleMarkOrderPaid}
+        onResendBill={handleSendBill}
+        isResendingBill={sendingBillOrderId === selectedOrder?.id}
       />
 
       <EditOrderDialog

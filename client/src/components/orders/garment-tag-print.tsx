@@ -22,10 +22,12 @@ interface GarmentTagPrintProps {
   items: ThermalTagItem[];
   orderNumber: string;
   customerName?: string;
+  customerAddress?: unknown;
   franchiseId?: string | null;
   storeCode?: string;
   commonNote?: string;
   isExpressOrder?: boolean;
+  billDate?: string;
   dueDate?: string;
 }
 
@@ -35,20 +37,24 @@ export function GarmentTagPrint({
   items,
   orderNumber,
   customerName,
+  customerAddress,
   franchiseId,
   storeCode,
   commonNote,
+  billDate,
   dueDate,
 }: GarmentTagPrintProps) {
   const preparedTags = useMemo(() => prepareThermalTags({
     orderNumber,
     customerName,
+    customerAddress,
     franchiseId,
     storeCode,
     commonNote,
+    billDate,
     dueDate,
     items,
-  }), [orderNumber, customerName, franchiseId, storeCode, commonNote, dueDate, items]);
+  }), [orderNumber, customerName, customerAddress, franchiseId, storeCode, commonNote, billDate, dueDate, items]);
 
   const handlePrint = () => {
     if (preparedTags.length === 0) {

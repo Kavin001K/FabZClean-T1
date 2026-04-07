@@ -1095,7 +1095,7 @@ router.put('/:id', async (req, res) => {
             customerName: (updatedOrder as any)?.customerName || order.customerName || 'Customer',
             invoiceNumber: orderNumber,
             amount: nextTotal.toFixed(2),
-            itemName: itemSummary || 'Laundry Services',
+            itemName: (itemSummary || 'Laundry Services') + ' (Updated)',
           });
 
           const currentCount = Number((updatedOrder as any)?.whatsappMessageCount || 0);

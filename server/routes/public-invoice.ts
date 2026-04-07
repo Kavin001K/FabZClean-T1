@@ -406,9 +406,12 @@ router.get('/invoice/:orderNumber/pdf', async (req: Request, res: Response) => {
 
         console.log(`🔍 [PDF Redirect] Looking for invoice for order: ${orderNumber}`);
 
-        // Find the document record for this order
+        // Find the document record for this order - GET LATEST VERSION
         const documents = await storage.listDocuments({ type: 'invoice' });
-        const doc = documents.find((d: any) => 
+        // Sort by ID descending to get most recent first
+        const sortedDocs = [...documents].sort((a: any, b: any) => (b.id || 0) - (a.id || 0));
+        
+        const doc = sortedDocs.find((d: any) => 
             String(d.orderNumber) === String(orderNumber) || 
             (d.metadata && String(d.metadata.orderNumber) === String(orderNumber))
         );

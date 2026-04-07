@@ -164,6 +164,23 @@ export function CustomerAutocomplete({
         };
     }, [searchQuery, customers, searchCustomers]);
 
+    useEffect(() => {
+        if (isOpen && highlightedIndex >= 0) {
+            // Use a small timeout to ensure the element is rendered and IDs are assigned
+            const timer = setTimeout(() => {
+                const el = document.getElementById(`customer-item-${highlightedIndex}`);
+                if (el) {
+                    el.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'nearest',
+                        inline: 'start'
+                    });
+                }
+            }, 0);
+            return () => clearTimeout(timer);
+        }
+    }, [highlightedIndex, isOpen]);
+
     // Close dropdown when clicking outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -323,6 +340,7 @@ export function CustomerAutocomplete({
                         {filteredCustomers.map((customer, index) => (
                             <button
                                 key={customer.id || `search-result-${index}`}
+                                id={`customer-item-${index}`}
                                 onClick={() => handleSelect(customer)}
                                 onMouseEnter={() => setHighlightedIndex(index)}
                                 className={`w-full text-left px-3 py-3 rounded-md transition-colors ${index === highlightedIndex
@@ -377,6 +395,7 @@ export function CustomerAutocomplete({
                         {/* Create New Option */}
                         {onCreateNew && (
                             <button
+                                id={`customer-item-${filteredCustomers.length}`}
                                 onClick={() => {
                                     onCreateNew(searchQuery);
                                     setIsOpen(false);

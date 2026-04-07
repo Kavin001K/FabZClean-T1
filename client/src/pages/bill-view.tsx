@@ -31,7 +31,10 @@ export default function BillView() {
         enabled: !!orderNumber
     });
 
-    const { data: customer } = useQuery({
+    // ALWAYS fetch customer data from DB when customerId exists.
+    // This ensures name, phone, email, and address are always available
+    // even if the order record doesn't carry them.
+    const { data: customer, isLoading: isCustomerLoading } = useQuery({
         queryKey: ["bill-customer", order?.customerId],
         queryFn: async () => {
             if (!order?.customerId) return null;
@@ -242,7 +245,9 @@ export default function BillView() {
     }, [order, balanceDue]);
 
     // Handle loading state first
-    if (isLoading) {
+    // Wait for BOTH order and customer data before rendering the invoice.
+    // Customer data is mandatory for a complete bill.
+    if (isLoading || (order?.customerId && isCustomerLoading)) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50">
                 <div className="text-center">
@@ -273,7 +278,11 @@ export default function BillView() {
 
     // At this point, order is guaranteed to exist
     if (order) {
-        const linkedCustomer = (order as any).customer || (order as any).customers || customer || null;
+        // Merge customer data from DB with order data.
+        // Order-level fields take priority, then DB customer fields, then fallbacks.
+        // The customer variable is ALWAYS fetched from DB when customerId exists,
+        // so it contains the full customer record (name, phone, email, address).
+        const linkedCustomer = customer || (order as any).customer || (order as any).customers || null;
         const invoiceItems = buildInvoiceItems(order);
         const subtotal = invoiceItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
         const formattedAddress = firstNonEmpty(
@@ -282,11 +291,14 @@ export default function BillView() {
             parseAddress((order as any).address),
             parseAddress((order as any).customerAddress),
             parseAddress(linkedCustomer?.address),
-            "N/A"
+            parseAddress(linkedCustomer?.deliveryAddress),
+            ""
         );
-        const customerName = firstNonEmpty(order.customerName, linkedCustomer?.name, "Customer");
-        const customerPhone = firstNonEmpty(order.customerPhone, linkedCustomer?.phone, (order as any).phone, "N/A");
-        const customerEmail = firstNonEmpty(order.customerEmail, linkedCustomer?.email, (order as any).email, "N/A");
+        // MANDATORY: name and phone must always be present
+        const customerName = firstNonEmpty(order.customerName, linkedCustomer?.name, "") || "Customer";
+        const customerPhone = firstNonEmpty(order.customerPhone, linkedCustomer?.phone, (order as any).phone, "") || "N/A";
+        // OPTIONAL: email — show if available, otherwise empty string (template handles hiding)
+        const customerEmail = firstNonEmpty(order.customerEmail, linkedCustomer?.email, (order as any).email, "");
 
         // GST Invoice
         if (enableGST) {

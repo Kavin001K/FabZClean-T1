@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Switch } from "@/components/ui/switch";
-import { PlusCircle, User, Calendar as CalendarIcon, Truck, IndianRupee, Search, CheckCircle, X, Loader2, AlertCircle, History, Package, TrendingUp, Clock, ShoppingBag, Zap, CreditCard, Phone, Mail, TrendingDown, ShoppingCart, List, Store, MapPin, ChevronUp, ChevronDown } from "lucide-react";
+import { PlusCircle, User, Calendar as CalendarIcon, Truck, IndianRupee, Search, CheckCircle, X, Loader2, AlertCircle, History, Package, TrendingUp, Clock, ShoppingBag, Zap, CreditCard, Phone, Mail, TrendingDown, ShoppingCart, List, Store, MapPin, ChevronUp, ChevronDown, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -37,6 +37,8 @@ import { formatCurrencyWithSettings, roundInvoiceAmount } from "@/lib/settings-u
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ServiceItem {
+  /** Unique ID for this cart line item (allows same service added multiple times) */
+  instanceKey: string;
   service: Service;
   quantity: number;
   // Allows per‑order price override without mutating the original service price
@@ -49,6 +51,9 @@ interface ServiceItem {
   // Unique barcode for tracking lifecycle
   garmentBarcode?: string;
 }
+
+let instanceCounter = 0;
+const nextInstanceKey = (serviceId: string) => `${serviceId}_${++instanceCounter}_${Date.now()}`;
 
 const safeParseFloat = (val: any) => {
   const parsed = parseFloat(val);
@@ -76,6 +81,13 @@ export default function CreateOrder() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [searchingCustomer, setSearchingCustomer] = useState(false);
   const serviceComboboxRef = React.useRef<HTMLButtonElement>(null);
+  // Refs for keyboard-driven focus flow (qty/price inputs keyed by instanceKey)
+  const quantityRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const priceRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  // Track the last-added service instance for auto-focus
+  const [lastAddedInstanceKey, setLastAddedInstanceKey] = useState<string | null>(null);
+  // Collapsible extras state
+  const [showCouponExtras, setShowCouponExtras] = useState(false);
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -113,7 +125,14 @@ export default function CreateOrder() {
         if (draft.customerName) setCustomerName(draft.customerName);
         if (draft.customerPhone) setCustomerPhone(draft.customerPhone);
         if (draft.foundCustomer) setFoundCustomer(draft.foundCustomer);
-        if (draft.selectedServices) setSelectedServices(draft.selectedServices);
+        if (draft.selectedServices) {
+          // Add missing instanceKeys to support older carts
+          const withKeys = draft.selectedServices.map((s: any) => ({
+            ...s,
+            instanceKey: s.instanceKey || nextInstanceKey(s.service?.id || 'old')
+          }));
+          setSelectedServices(withKeys);
+        }
         if (draft.specialInstructions) setSpecialInstructions(draft.specialInstructions);
         if (draft.storeCode) setStoreCode(draft.storeCode);
         if (draft.billDate) setBillDate(toDateOnly(new Date(draft.billDate)));
@@ -156,7 +175,7 @@ export default function CreateOrder() {
   const [advancePayment, setAdvancePayment] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paymentStatus, setPaymentStatus] = useState('pending');
-  const [enableGST, setEnableGST] = useState(false);
+  const [enableGST, setEnableGST] = useState(false); // GST defaults to OFF
   const [gstNumber, setGstNumber] = useState('');
   const [panNumber, setPanNumber] = useState('');
 
@@ -264,6 +283,17 @@ export default function CreateOrder() {
   const finalPayable = useMemo(() => {
     return Math.max(0, totalAmount - walletApplied);
   }, [totalAmount, walletApplied]);
+
+  const positiveSelectedServices = useMemo(
+    () => selectedServices.filter((item) => item.quantity > 0),
+    [selectedServices]
+  );
+
+  const selectedServiceCount = positiveSelectedServices.length;
+  const totalSelectedItemCount = useMemo(
+    () => positiveSelectedServices.reduce((sum, item) => sum + item.quantity, 0),
+    [positiveSelectedServices]
+  );
 
   // Fetch services - only active ones
   const { data: servicesData, isLoading: servicesLoading, isError: servicesError } = useQuery<Service[]>({
@@ -532,47 +562,40 @@ export default function CreateOrder() {
     });
   };
 
-  // Add service to order
+  // Add service to order — always as a NEW line item (never merge duplicates)
   const handleAddService = (serviceId: string) => {
     const serviceToAdd = services?.find(s => s.id === serviceId);
     if (!serviceToAdd) return;
 
-    const existingIndex = selectedServices.findIndex(s => s.service.id === serviceId);
-
-    if (existingIndex >= 0) {
-      // Increase quantity
-      const updated = [...selectedServices];
-      updated[existingIndex].quantity += 1;
-      const price = updated[existingIndex].priceOverride;
-      updated[existingIndex].subtotal = updated[existingIndex].quantity * price;
-      setSelectedServices(updated);
-    } else {
-      // Add new service with its base price as the default override
-      setSelectedServices([...selectedServices, {
-        service: serviceToAdd,
-        quantity: 1,
-        priceOverride: parseFloat(serviceToAdd.price),
-        subtotal: parseFloat(serviceToAdd.price),
-        customName: serviceToAdd.name,
-        tagNote: '',
-      }]);
-    }
+    const key = nextInstanceKey(serviceId);
+    setSelectedServices(prev => [...prev, {
+      instanceKey: key,
+      service: serviceToAdd,
+      quantity: 1,
+      priceOverride: parseFloat(serviceToAdd.price),
+      subtotal: parseFloat(serviceToAdd.price),
+      customName: serviceToAdd.name,
+      tagNote: '',
+    }]);
+    setLastAddedInstanceKey(key);
   };
 
-  // Update service quantity
-  const handleUpdateQuantity = (serviceId: string, quantity: number) => {
-    if (quantity <= 0) {
-      handleRemoveService(serviceId);
-      return;
-    }
-
-    const updated = selectedServices.map(item => {
-      if (item.service.id === serviceId) {
-        const price = item.priceOverride;
+  // Update service quantity by instanceKey — allows 0 (waits for new input)
+  const handleUpdateQuantity = (instanceKey: string | undefined, qty: number | string) => {
+    if (!instanceKey) return;
+    
+    // If the input is empty or 0, we set it to 0 but DON'T remove the service.
+    // This allows the user to backspace and type a new number.
+    const safeQty = qty === "" ? 0 : Math.max(0, Number.isFinite(Number(qty)) ? Math.round(Number(qty)) : 0);
+    
+    const updated = selectedServices.map((item) => {
+      if (item.instanceKey === instanceKey) {
+        // Use the original price for subtotal calculation
+        const price = Number(item.priceOverride ?? item.service.price ?? 0);
         return {
           ...item,
-          quantity,
-          subtotal: quantity * price,
+          quantity: safeQty,
+          subtotal: safeQty * price,
         };
       }
       return item;
@@ -580,32 +603,70 @@ export default function CreateOrder() {
     setSelectedServices(updated);
   };
 
-  const handleAdjustQuantity = (serviceId: string, delta: number) => {
-    const currentItem = selectedServices.find((item) => item.service.id === serviceId);
-    if (!currentItem) return;
-    handleUpdateQuantity(serviceId, currentItem.quantity + delta);
-  };
-
-  const handleUpdatePrice = (serviceId: string, price: number) => {
-    const safePrice = Math.max(0, Number.isFinite(price) ? price : 0);
+  const handleUpdatePrice = (instanceKey: string | undefined, price: number) => {
+    if (!instanceKey) return;
+    const safePrice = Math.max(0, Number.isFinite(price) ? Math.round(price) : 0);
     const updated = selectedServices.map((item) =>
-      item.service.id === serviceId
+      item.instanceKey === instanceKey
         ? { ...item, priceOverride: safePrice, subtotal: item.quantity * safePrice }
         : item
     );
     setSelectedServices(updated);
   };
 
-  const handleAdjustPrice = (serviceId: string, delta: number) => {
-    const currentItem = selectedServices.find((item) => item.service.id === serviceId);
+  const handleAdjustPrice = (instanceKey: string | undefined, delta: number) => {
+    if (!instanceKey) return;
+    const currentItem = selectedServices.find((item) => item.instanceKey === instanceKey);
     if (!currentItem) return;
-    handleUpdatePrice(serviceId, Number((currentItem.priceOverride + delta).toFixed(2)));
+    handleUpdatePrice(instanceKey, Math.max(0, currentItem.priceOverride + delta));
   };
 
-  // Remove service
-  const handleRemoveService = (serviceId: string) => {
-    setSelectedServices(selectedServices.filter(s => s.service.id !== serviceId));
+  /**
+   * Handle price input with arithmetic notation (+N/-N).
+   * If value starts with + or -, treat as relative adjustment.
+   * Arrow keys: Up/Down adjusts by ₹5 (handled in onKeyDown).
+   */
+  const handlePriceInputChange = (instanceKey: string, rawValue: string) => {
+    const trimmed = rawValue.trim();
+    // If starts with + or - followed by digits, treat as arithmetic
+    const arithmeticMatch = trimmed.match(/^([+-])(\d+\.?\d*)$/);
+    if (arithmeticMatch) {
+      const [, op, numStr] = arithmeticMatch;
+      const num = parseFloat(numStr);
+      if (Number.isFinite(num) && num > 0) {
+        const currentItem = selectedServices.find(i => i.instanceKey === instanceKey);
+        if (currentItem) {
+          const newPrice = op === '+' ? currentItem.priceOverride + num : currentItem.priceOverride - num;
+          handleUpdatePrice(instanceKey, newPrice);
+        }
+      }
+      return;
+    }
+    // Normal numeric input
+    handleUpdatePrice(instanceKey, parseFloat(rawValue) || 0);
   };
+
+  // Remove service by instanceKey
+  const handleRemoveService = (instanceKey: string | undefined) => {
+    if (!instanceKey) return;
+    setSelectedServices(prev => prev.filter(s => s.instanceKey !== instanceKey));
+  };
+
+  // Auto-focus quantity input when a new service is added
+  useEffect(() => {
+    if (lastAddedInstanceKey) {
+      // Short delay for DOM to render
+      const timer = setTimeout(() => {
+        const qtyInput = quantityRefs.current[lastAddedInstanceKey];
+        if (qtyInput) {
+          qtyInput.focus();
+          qtyInput.select();
+        }
+        setLastAddedInstanceKey(null);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [lastAddedInstanceKey, selectedServices]);
 
   // Auto-set due date: 2 days for express, 7 days for regular
   useEffect(() => {
@@ -668,7 +729,7 @@ export default function CreateOrder() {
         // 2. Ensure Items (Critical for Tags/Bill)
         if (!newOrder.items || !Array.isArray(newOrder.items) || newOrder.items.length === 0) {
           console.warn('⚠️ Backend returned no items, using form state');
-          newOrder.items = selectedServices.map(item => ({
+          newOrder.items = positiveSelectedServices.map(item => ({
             productId: item.service.id,
             productName: item.service.name,
             quantity: item.quantity,
@@ -834,7 +895,7 @@ export default function CreateOrder() {
     setAdvancePayment('');
     setPaymentMethod('cash');
     setPaymentStatus('pending');
-    setEnableGST(true);
+    setEnableGST(false);
     setGstNumber('');
     setPanNumber('');
     // Reset express order and fulfillment
@@ -881,10 +942,12 @@ export default function CreateOrder() {
       return;
     }
 
-    if (selectedServices.length === 0) {
+    if (positiveSelectedServices.length === 0) {
       toast({
         title: "Validation Error",
-        description: "Please select at least one service",
+        description: selectedServices.length === 0
+          ? "Please select at least one service"
+          : "Please enter quantity greater than 0 for at least one service",
         variant: "destructive",
       });
       return;
@@ -977,7 +1040,7 @@ export default function CreateOrder() {
       status: "pending",
       paymentStatus: paymentStatus,
       totalAmount: totalAmount.toFixed(2),
-      items: selectedServices.map(item => ({
+      items: positiveSelectedServices.map(item => ({
         serviceId: item.service.id,
         serviceName: item.service.name,
         quantity: item.quantity,
@@ -1062,7 +1125,7 @@ export default function CreateOrder() {
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Create New Order</h1>
         <Button
           onClick={handleCreateOrder}
-          disabled={createOrderMutation.isPending}
+          disabled={createOrderMutation.isPending || selectedServiceCount === 0 || !customerName || !customerPhone}
           size="lg"
           className="hidden sm:inline-flex bg-primary hover:bg-primary/90 text-white shadow-lg"
         >
@@ -1140,6 +1203,39 @@ export default function CreateOrder() {
                             </>
                           )}
                         </p>
+                        {foundCustomer.address && (
+                          <div className="mt-2 space-y-1">
+                            {(() => {
+                              const addr = typeof foundCustomer.address === 'string' 
+                                ? JSON.parse(foundCustomer.address) 
+                                : foundCustomer.address;
+                                
+                              return (
+                                <>
+                                  {addr.street && (
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1.5 font-medium">
+                                      <MapPin className="h-3 w-3 text-primary/70" /> {addr.street}
+                                    </p>
+                                  )}
+                                  {(addr.city || addr.pincode) && (
+                                    <div className="flex items-center gap-2 ml-4.5 pl-0.5">
+                                      {addr.city && (
+                                        <Badge variant="outline" className="text-[10px] h-4 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 font-normal">
+                                          {addr.city}
+                                        </Badge>
+                                      )}
+                                      {addr.pincode && (
+                                        <Badge variant="outline" className="text-[10px] h-4 bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800 text-blue-600 dark:blue-400 font-mono">
+                                          {addr.pincode}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <Button 
@@ -1285,7 +1381,8 @@ export default function CreateOrder() {
                     ref={serviceComboboxRef}
                     services={services} 
                     onSelect={handleAddService} 
-                    disabled={servicesLoading} 
+                    disabled={servicesLoading}
+                    customerOrders={customerOrders}
                   />
                   )}
                 </div>
@@ -1302,7 +1399,7 @@ export default function CreateOrder() {
                         <AnimatePresence>
                           {selectedServices.map((item) => (
                             <motion.div
-                              key={item.service.id}
+                              key={item.instanceKey}
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -10 }}
@@ -1315,7 +1412,7 @@ export default function CreateOrder() {
                                     value={item.customName}
                                     onChange={(e) => {
                                       const updated = selectedServices.map((s) =>
-                                        s.service.id === item.service.id ? { ...s, customName: e.target.value } : s
+                                        s.instanceKey === item.instanceKey ? { ...s, customName: e.target.value } : s
                                       );
                                       setSelectedServices(updated);
                                     }}
@@ -1326,7 +1423,7 @@ export default function CreateOrder() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleRemoveService(item.service.id)}
+                                  onClick={() => handleRemoveService(item.instanceKey)}
                                   className="h-10 w-10 rounded-full text-slate-500 hover:bg-rose-50 hover:text-rose-600"
                                 >
                                   <X className="h-4 w-4" />
@@ -1336,33 +1433,19 @@ export default function CreateOrder() {
                               <div className="mt-4 grid grid-cols-2 gap-4">
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/80">
                                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 mb-2">Quantity</p>
-                                  <div className="flex items-center justify-between bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 h-11 overflow-hidden">
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleAdjustQuantity(item.service.id, -1)}
-                                      className="h-full w-10 flex-shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800"
-                                    >
-                                      <ChevronDown className="h-4 w-4" />
-                                    </Button>
-                                    <Input
-                                      type="number"
-                                      min="1"
-                                      value={item.quantity}
-                                      onChange={(e) => handleUpdateQuantity(item.service.id, parseInt(e.target.value, 10) || 0)}
-                                      className="h-full border-0 bg-transparent text-center text-lg font-black dark:text-white focus-visible:ring-0 px-0"
-                                    />
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleAdjustQuantity(item.service.id, 1)}
-                                      className="h-full w-10 flex-shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800"
-                                    >
-                                      <ChevronUp className="h-4 w-4" />
-                                    </Button>
-                                  </div>
+                                  <Input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={item.quantity === 0 ? "" : item.quantity}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val === "" || /^\d+$/.test(val)) {
+                                        handleUpdateQuantity(item.instanceKey, val);
+                                      }
+                                    }}
+                                    onFocus={(e) => e.target.select()}
+                                    className="h-11 w-full text-center font-bold text-lg bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-lg focus:border-primary focus:ring-primary/20 transition-all"
+                                  />
                                 </div>
 
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/80">
@@ -1370,11 +1453,16 @@ export default function CreateOrder() {
                                   <div className="flex items-center bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 h-11 pr-3">
                                     <span className="pl-3 text-slate-400 font-bold text-sm">₹</span>
                                     <Input
-                                      type="number"
-                                      min="0"
-                                      step="1"
+                                      ref={(el) => { priceRefs.current[item.instanceKey] = el; }}
+                                      type="text"
+                                      inputMode="numeric"
                                       value={item.priceOverride}
-                                      onChange={(e) => handleUpdatePrice(item.service.id, parseFloat(e.target.value) || 0)}
+                                      onChange={(e) => handlePriceInputChange(item.instanceKey, e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'ArrowUp') { e.preventDefault(); handleAdjustPrice(item.instanceKey, 5); }
+                                        if (e.key === 'ArrowDown') { e.preventDefault(); handleAdjustPrice(item.instanceKey, -5); }
+                                        if (e.key === 'Enter') { e.preventDefault(); serviceComboboxRef.current?.focus(); }
+                                      }}
                                       className="h-full border-0 bg-transparent text-right text-lg font-black dark:text-white focus-visible:ring-0 pr-0"
                                     />
                                   </div>
@@ -1395,7 +1483,7 @@ export default function CreateOrder() {
                                     value={item.tagNote}
                                     onChange={(e) => {
                                       const updated = selectedServices.map((s) =>
-                                        s.service.id === item.service.id ? { ...s, tagNote: e.target.value } : s
+                                        s.instanceKey === item.instanceKey ? { ...s, tagNote: e.target.value } : s
                                       );
                                       setSelectedServices(updated);
                                     }}
@@ -1409,7 +1497,7 @@ export default function CreateOrder() {
                                     value={item.garmentBarcode || ''}
                                     onChange={(e) => {
                                       const updated = selectedServices.map((s) =>
-                                        s.service.id === item.service.id ? { ...s, garmentBarcode: e.target.value } : s
+                                        s.instanceKey === item.instanceKey ? { ...s, garmentBarcode: e.target.value } : s
                                       );
                                       setSelectedServices(updated);
 
@@ -1445,7 +1533,7 @@ export default function CreateOrder() {
                           <TableBody>
                             <AnimatePresence>
                               {selectedServices.map((item) => (
-                                <React.Fragment key={item.service.id}>
+                                <React.Fragment key={item.instanceKey}>
                                   <motion.tr
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
@@ -1458,7 +1546,7 @@ export default function CreateOrder() {
                                         value={item.customName}
                                         onChange={(e) => {
                                           const updated = selectedServices.map(s =>
-                                            s.service.id === item.service.id ? { ...s, customName: e.target.value } : s
+                                            s.instanceKey === item.instanceKey ? { ...s, customName: e.target.value } : s
                                           );
                                           setSelectedServices(updated);
                                         }}
@@ -1468,20 +1556,31 @@ export default function CreateOrder() {
                                     </TableCell>
                                     <TableCell className="py-2">
                                       <Input
-                                        type="number"
-                                        min="1"
-                                        value={item.quantity}
-                                        onChange={(e) => handleUpdateQuantity(item.service.id, parseInt(e.target.value, 10) || 0)}
-                                        className="w-20 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={item.quantity === 0 ? "" : item.quantity}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          if (val === "" || /^\d+$/.test(val)) {
+                                            handleUpdateQuantity(item.instanceKey, val);
+                                          }
+                                        }}
+                                        onFocus={(e) => e.target.select()}
+                                        className="h-10 w-24 text-center font-bold text-lg bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-lg focus:border-primary focus:ring-primary/20 transition-all"
                                       />
                                     </TableCell>
                                     <TableCell className="py-2">
                                       <Input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
+                                        ref={(el) => { priceRefs.current[item.instanceKey] = el; }}
+                                        type="text"
+                                        inputMode="numeric"
                                         value={item.priceOverride}
-                                        onChange={(e) => handleUpdatePrice(item.service.id, parseFloat(e.target.value) || 0)}
+                                        onChange={(e) => handlePriceInputChange(item.instanceKey, e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'ArrowUp') { e.preventDefault(); handleAdjustPrice(item.instanceKey, 5); }
+                                          if (e.key === 'ArrowDown') { e.preventDefault(); handleAdjustPrice(item.instanceKey, -5); }
+                                          if (e.key === 'Enter') { e.preventDefault(); serviceComboboxRef.current?.focus(); }
+                                        }}
                                         className="w-24 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                                       />
                                     </TableCell>
@@ -1490,7 +1589,7 @@ export default function CreateOrder() {
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => handleRemoveService(item.service.id)}
+                                        onClick={() => handleRemoveService(item.instanceKey)}
                                         className="h-8 w-8 p-0"
                                       >
                                         <X className="h-4 w-4" />
@@ -1511,7 +1610,7 @@ export default function CreateOrder() {
                                             value={item.tagNote}
                                             onChange={(e) => {
                                               const updated = selectedServices.map(s =>
-                                                s.service.id === item.service.id ? { ...s, tagNote: e.target.value } : s
+                                                s.instanceKey === item.instanceKey ? { ...s, tagNote: e.target.value } : s
                                               );
                                               setSelectedServices(updated);
                                             }}
@@ -1525,7 +1624,7 @@ export default function CreateOrder() {
                                             value={item.garmentBarcode || ''}
                                             onChange={(e) => {
                                               const updated = selectedServices.map(s =>
-                                                s.service.id === item.service.id ? { ...s, garmentBarcode: e.target.value } : s
+                                                s.instanceKey === item.instanceKey ? { ...s, garmentBarcode: e.target.value } : s
                                               );
                                               setSelectedServices(updated);
 
@@ -1885,36 +1984,64 @@ export default function CreateOrder() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="couponCode">Coupon Code</Label>
-                  <Input
-                    id="couponCode"
-                    placeholder="Enter coupon code (optional)"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                  />
-                </div>
+                {/* Collapsible Coupon & Extra Charges */}
+                <div className="border rounded-lg overflow-hidden transition-all">
+                  <button
+                    type="button"
+                    onClick={() => setShowCouponExtras(prev => !prev)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <PlusCircle className="h-4 w-4" />
+                      Coupon & Extra Charges
+                    </span>
+                    <ChevronRight className={cn("h-4 w-4 transition-transform duration-200", showCouponExtras && "rotate-90")} />
+                  </button>
+                  <AnimatePresence>
+                    {showCouponExtras && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-4 pb-4 space-y-4 border-t dark:border-slate-700">
+                          <div className="space-y-2 pt-3">
+                            <Label htmlFor="couponCode">Coupon Code</Label>
+                            <Input
+                              id="couponCode"
+                              placeholder="Enter coupon code (optional)"
+                              value={couponCode}
+                              onChange={(e) => setCouponCode(e.target.value)}
+                            />
+                          </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="extraChargesLabel">Extra Charges Label</Label>
-                    <Input
-                      id="extraChargesLabel"
-                      placeholder="e.g., Delivery, Express"
-                      value={extraChargesLabel}
-                      onChange={(e) => setExtraChargesLabel(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="extraCharges">Extra Charges Amount</Label>
-                    <Input
-                      id="extraCharges"
-                      type="number"
-                      placeholder="0"
-                      value={extraCharges || ''}
-                      onChange={(e) => setExtraCharges(parseFloat(e.target.value) || 0)}
-                    />
-                  </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="extraChargesLabel">Extra Charges Label</Label>
+                              <Input
+                                id="extraChargesLabel"
+                                placeholder="e.g., Delivery, Express"
+                                value={extraChargesLabel}
+                                onChange={(e) => setExtraChargesLabel(e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="extraCharges">Extra Charges Amount</Label>
+                              <Input
+                                id="extraCharges"
+                                type="number"
+                                placeholder="0"
+                                value={extraCharges || ''}
+                                onChange={(e) => setExtraCharges(parseFloat(e.target.value) || 0)}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </CardContent>
             </Card>
@@ -2027,11 +2154,6 @@ export default function CreateOrder() {
                     <ShoppingBag className="h-5 w-5 text-primary" />
                     Bill Summary
                   </span>
-                  {selectedServices.length > 0 && (
-                    <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
-                      {selectedServices.length} {selectedServices.length === 1 ? 'Item' : 'Items'}
-                    </Badge>
-                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -2044,7 +2166,7 @@ export default function CreateOrder() {
                   ) : (
                     <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 scrollbar-thin">
                       {selectedServices.map(item => (
-                        <div key={item.service.id} className="flex justify-between items-start text-sm group gap-3">
+                        <div key={item.instanceKey} className="flex justify-between items-start text-sm group gap-3">
                           <div className="flex-1 min-w-0">
                             <p className="font-medium group-hover:text-primary transition-colors truncate">{item.service.name}</p>
                             <p className="text-[11px] text-muted-foreground truncate">
@@ -2059,9 +2181,21 @@ export default function CreateOrder() {
                 </div>
 
                 <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-                    <div className="flex justify-between gap-4 text-sm text-slate-900 dark:text-slate-100 font-medium">
-                      <span className="opacity-70 dark:opacity-80 min-w-0 truncate">Services Subtotal</span>
-                      <span className="font-black flex-shrink-0">₹{baseSubtotal.toFixed(2)}</span>
+                    <div className="flex justify-between items-center gap-4 text-sm text-slate-900 dark:text-slate-100 font-medium">
+                      <div className="flex items-center gap-2">
+                        <span className="opacity-70 dark:opacity-80 min-w-0 truncate">Services Subtotal</span>
+                        {selectedServiceCount > 0 && (
+                          <div className="flex items-center gap-1.5 ml-1">
+                            <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[10px] py-0 px-1.5 h-4 leading-none">
+                              {selectedServiceCount} {selectedServiceCount === 1 ? 'service' : 'services'}
+                            </Badge>
+                            <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-none text-[10px] py-0 px-1.5 h-4 leading-none">
+                              {totalSelectedItemCount} items
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                      <span className="font-black flex-shrink-0 text-base">₹{baseSubtotal.toFixed(2)}</span>
                     </div>
   
                     <AnimatePresence>
@@ -2176,7 +2310,7 @@ export default function CreateOrder() {
                 )}>
                   <Button
                     onClick={handleCreateOrder}
-                    disabled={createOrderMutation.isPending || selectedServices.length === 0 || !customerName || !customerPhone}
+          disabled={createOrderMutation.isPending || selectedServiceCount === 0 || !customerName || !customerPhone}
                     className="w-full h-12 text-lg font-black shadow-lg shadow-primary/25 hover:scale-[1.01] active:scale-[0.98] transition-all bg-primary hover:bg-primary/90"
                   >
                     {createOrderMutation.isPending ? (

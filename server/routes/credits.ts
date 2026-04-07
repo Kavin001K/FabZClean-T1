@@ -228,7 +228,8 @@ router.post('/:customerId/adjust', requireRole(ADMIN_ONLY), async (req, res) => 
     try {
         const { customerId } = req.params;
         const {
-            amount, // Can be positive (add credit) or negative (reduce credit)
+            amount, // Can be positive (add/increase) or negative (reduce/decrease)
+            target, // "outstanding" or "credit_limit"
             reason,
             notes
         } = req.body;
@@ -247,32 +248,69 @@ router.post('/:customerId/adjust', requireRole(ADMIN_ONLY), async (req, res) => 
         }
 
         const currentBalance = parseFloat(customer.creditBalance || '0');
-        const adjustmentAmount = parseFloat(amount);
-        const description = `Credit adjustment: ${reason}${notes ? ` - ${notes}` : ''}`;
+        const currentLimit = parseFloat(customer.creditLimit || '1000');
+        const changeAmount = parseFloat(amount);
+        const isLimitAdjustment = target === 'credit_limit';
 
-        const result = await storage.addCustomerCredit(
-            customerId,
-            adjustmentAmount,
-            'adjustment',
-            description,
-            undefined,
-            req.employee?.id
-        );
+        let result;
+        let finalMessage = 'Credit adjusted successfully';
+        let newBalance = currentBalance;
+        let newLimit = currentLimit;
+
+        if (isLimitAdjustment) {
+            newLimit = currentLimit + changeAmount;
+            if (newLimit < 0) {
+                return res.status(400).json(createErrorResponse('Credit limit cannot be negative', 400));
+            }
+            // Update the limit directly on the customer record
+            await storage.updateCustomer(customerId, {
+                creditLimit: newLimit.toString()
+            });
+
+            // Do NOT insert a wallet ledger entry for limit changes — the wallet_transactions
+            // table enforces a non-zero amount constraint, and limit changes don't affect
+            // the customer's financial balance. The audit log below captures the change.
+            result = {
+                type: 'limit_adjustment',
+                previousLimit: currentLimit,
+                newLimit: newLimit,
+                description: `Limit Updated: ₹${currentLimit} ➔ ₹${newLimit}. ${reason}${notes ? ` - ${notes}` : ''}`,
+            };
+            finalMessage = 'Credit limit updated successfully';
+        } else {
+            // Standard outstanding balance adjustment
+            newBalance = currentBalance + changeAmount;
+            if (newBalance < 0) {
+                return res.status(400).json(createErrorResponse('Outstanding balance cannot be negative', 400));
+            }
+            const description = `Manual Adjustment: ${reason}${notes ? ` - ${notes}` : ''}`;
+            result = await storage.addCustomerCredit(
+                customerId,
+                changeAmount,
+                'adjustment',
+                description,
+                undefined,
+                req.employee?.id
+            );
+        }
 
         // Log the action (important for admin adjustments)
         if (req.employee) {
             await AuthService.logAction(
                 req.employee.employeeId,
                 req.employee.username,
-                'adjust_customer_credit',
+                isLimitAdjustment ? 'update_customer_limit' : 'adjust_customer_credit',
                 'customer',
                 customerId,
                 {
-                    amount: adjustmentAmount,
+                    amount: changeAmount,
+                    target: target || 'outstanding',
                     reason,
                     notes,
                     previousBalance: currentBalance,
-                    newBalance: currentBalance + adjustmentAmount
+                    newBalance: newBalance,
+                    previousLimit: currentLimit,
+                    newLimit: newLimit
                 },
                 req.ip || req.connection.remoteAddress,
                 req.get('user-agent')
@@ -280,11 +318,13 @@ router.post('/:customerId/adjust', requireRole(ADMIN_ONLY), async (req, res) => 
         }
 
         res.json(createSuccessResponse({
-            message: 'Credit adjusted successfully',
+            message: finalMessage,
             creditId: customerId,
             previousBalance: currentBalance,
-            adjustment: adjustmentAmount,
-            newBalance: currentBalance + adjustmentAmount,
+            adjustment: changeAmount,
+            newBalance: newBalance,
+            previousLimit: currentLimit,
+            newLimit: newLimit,
             transaction: result
         }));
     } catch (error: any) {

@@ -477,22 +477,28 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                     </span>
                     <div style={{ minWidth: 0 }}>
                       <p style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: headingInk, lineHeight: 1.25 }}>{customer?.name || 'Customer'}</p>
-                      <p style={{ margin: '4px 0 0', fontSize: '12px', color: bodyInk, lineHeight: 1.65 }}>{customerAddress}</p>
+                      {customerAddress && customerAddress !== 'N/A' && customerAddress !== 'Address not provided' && (
+                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: bodyInk, lineHeight: 1.65 }}>{customerAddress}</p>
+                      )}
                     </div>
                   </div>
-                  <div className="invoice-grid-2" style={{ gap: '10px' }}>
+                  <div style={{ display: 'grid', gap: '10px', ...(customer?.email && customer.email !== 'N/A' ? { gridTemplateColumns: '1fr 1fr' } : {}) }}>
+                    {/* Phone - ALWAYS shown (mandatory field) */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                       <span style={iconBoxStyle(panelSoft, line)}>
                         <Phone size={14} color={accent} strokeWidth={2.2} />
                       </span>
                       <span style={{ fontSize: '12px', color: bodyInk, fontWeight: 600 }}>{customer?.phone || 'N/A'}</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                      <span style={iconBoxStyle(panelSoft, line)}>
-                        <Mail size={14} color={accent} strokeWidth={2.2} />
-                      </span>
-                      <span style={{ fontSize: '12px', color: bodyInk, fontWeight: 600, wordBreak: 'break-word' }}>{customer?.email || 'N/A'}</span>
-                    </div>
+                    {/* Email - only shown when available */}
+                    {customer?.email && customer.email !== 'N/A' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                        <span style={iconBoxStyle(panelSoft, line)}>
+                          <Mail size={14} color={accent} strokeWidth={2.2} />
+                        </span>
+                        <span style={{ fontSize: '12px', color: bodyInk, fontWeight: 600, wordBreak: 'break-word' }}>{customer.email}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

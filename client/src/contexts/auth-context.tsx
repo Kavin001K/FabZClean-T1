@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { isSupabaseConfigured, SupabaseAuthService, AuthEmployee } from '../lib/supabase-auth';
 import { SystemRole, ROLE_NAV_ACCESS, LOGIN_ROLES } from '../../../shared/schema';
+import { clearWalletCustomersCache, writeWalletCustomersCache } from '@/lib/wallet-cache';
 
 // Use the centralized SystemRole type
 export type EmployeeRole = SystemRole;
@@ -151,6 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     localStorage.removeItem('employee_token');
     localStorage.removeItem('session_start');
+    clearWalletCustomersCache();
 
     // Clear all timers
     if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
@@ -353,6 +355,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await fetchEmployee(token);
     }
   }, [fetchEmployee]);
+
+  // Background caching for wallet customers
+  useEffect(() => {
+    if (employee) {
+      const preloadCustomers = async () => {
+        try {
+          const token = localStorage.getItem('employee_token');
+          if (!token) return;
+          const batchSize = 500;
+          let page = 1;
+          let hasMore = true;
+          const allRows: unknown[] = [];
+
+          while (hasMore) {
+            const res = await fetch(`${apiBase}/customers?limit=${batchSize}&page=${page}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+
+            if (!res.ok) break;
+
+            const payload = await res.json();
+            const rows = Array.isArray(payload) ? payload : payload?.data;
+            const batch = Array.isArray(rows) ? rows : [];
+            allRows.push(...batch);
+
+            if (batch.length < batchSize) {
+              hasMore = false;
+            } else {
+              page += 1;
+            }
+          }
+
+          if (allRows.length > 0) {
+            writeWalletCustomersCache(allRows);
+          }
+        } catch (e) {
+          console.error("Failed to background cache ledger customers", e);
+        }
+      };
+      
+      // Delay preload slightly so it doesn't block critical login UI threads
+      const timeout = setTimeout(preloadCustomers, 1000);
+      return () => clearTimeout(timeout);
+    } else {
+      // Clear specific cache on logout handling it centrally
+      clearWalletCustomersCache();
+    }
+  }, [employee, apiBase]);
+
 
   const value: AuthContextType = {
     employee,

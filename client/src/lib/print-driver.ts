@@ -191,6 +191,7 @@ export interface InvoicePrintData {
   status?: string;
   qrCode?: string;
   isExpressOrder?: boolean;
+  isUpdate?: boolean; // Added isUpdate flag
   paymentBreakdown?: PaymentBreakdown;
 }
 
@@ -257,7 +258,7 @@ function parseAddressObject(addr: any): string {
 
 
 // Utility function to convert Order data to InvoicePrintData
-export function convertOrderToInvoiceData(order: any, enableGST: boolean = false): InvoicePrintData {
+export function convertOrderToInvoiceData(order: any, enableGST: boolean = false, isUpdate: boolean = false): InvoicePrintData {
   // Get franchise-specific company details
   const franchiseId = order?.franchiseId || order?.franchise_id;
   const franchise = getFranchiseById(franchiseId);
@@ -272,7 +273,7 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
   };
 
   // Parse customer address - always return human-readable text, never JSON
-  let customerAddress = 'Address not provided';
+  let customerAddress = '';
   const linkedCustomer = order.customer || order.customers || null;
   // Use delivery address if fulfillment type is delivery, otherwise fallback to standard address fields
   const rawAddress = (order.fulfillmentType === 'delivery' && order.deliveryAddress)
@@ -297,6 +298,10 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
       customerAddress = parseAddressObject(rawAddress);
     }
   }
+  // Remove placeholder text — let template decide how to display empty address
+  if (customerAddress === 'Address not provided') {
+    customerAddress = '';
+  }
 
   // Parse order items
   let items: InvoicePrintData['items'] = [];
@@ -308,7 +313,7 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
 
       return {
         name: item.serviceName || item.service_name || item.customName || item.name || item.productName || item.description || 'Laundry Service',
-        description: item.serviceName || item.service_name || item.customName || item.name || item.productName || item.description || 'Laundry Service',
+        description: (item.serviceName || item.service_name || item.customName || item.name || item.productName || item.description || 'Laundry Service') + (isUpdate ? ' (Updated)' : ''),
         note: item.tagNote || item.tag_note || item.notes || item.details || undefined,
         quantity,
         unitPrice,
@@ -323,7 +328,7 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
 
     items = [{
       name: serviceName,
-      description: `Order ${order.orderNumber || order.id}`,
+      description: `Order ${order.orderNumber || order.id}${isUpdate ? ' (Updated)' : ''}`,
       quantity: 1,
       unitPrice: enableGST ? totalAmount / 1.18 : totalAmount, // Remove GST from base price if GST enabled
       total: enableGST ? totalAmount / 1.18 : totalAmount,
@@ -417,6 +422,12 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
         }
       : undefined;
 
+  // CUSTOMER INFO — use all available sources, order-level data takes priority
+  // Name and phone are mandatory; email and address are optional
+  const resolvedName = order.customerName || linkedCustomer?.name || '';
+  const resolvedPhone = order.customerPhone || linkedCustomer?.phone || order.phone || '';
+  const resolvedEmail = order.customerEmail || linkedCustomer?.email || order.email || '';
+
   return {
     invoiceNumber,
     invoiceDate: order.createdAt ? new Date(order.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
@@ -425,10 +436,10 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
     franchiseId: franchiseId,
     enableGST,
     customerInfo: {
-      name: order.customerName || linkedCustomer?.name || 'Customer',
+      name: resolvedName || 'Customer',
       address: customerAddress,
-      phone: order.customerPhone || linkedCustomer?.phone || order.phone || 'N/A',
-      email: order.customerEmail || linkedCustomer?.email || order.email || 'N/A'
+      phone: resolvedPhone || 'N/A',
+      email: resolvedEmail
     },
     companyInfo,
     items,
@@ -443,6 +454,7 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
       : 'Payment due within 30 days of invoice date.',
     status: order.status,
     isExpressOrder: order.isExpressOrder || order.is_express_order || false,
+    isUpdate,
     paymentBreakdown,
   };
 }

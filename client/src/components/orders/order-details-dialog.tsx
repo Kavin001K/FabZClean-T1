@@ -26,13 +26,16 @@ import {
   MapPin,
   Calendar,
   User,
-  IndianRupee
+  IndianRupee,
+  Send,
+  Loader2
 } from "lucide-react";
 import { formatCurrency, formatDate, getNextStatus } from "@/lib/data-service";
 import type { Order } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { useInvoicePrint } from "@/hooks/use-invoice-print";
 import { getOrderStoreLabel, resolveOrderStoreCodeFromOrder } from "@/lib/order-store";
+import { MAX_WHATSAPP_SENDS } from "@/lib/whatsapp-service";
 
 export interface OrderDetailsDialogProps {
   order: Order | null;
@@ -43,6 +46,10 @@ export interface OrderDetailsDialogProps {
   onNextStep: (order: Order) => void;
   onPrintInvoice: (order: Order) => void;
   onUpdatePaymentStatus?: (order: Order, status: 'paid' | 'credit') => void;
+  /** Callback to resend WhatsApp bill — caller handles the mutation */
+  onResendBill?: (order: Order) => void;
+  /** Whether a bill resend is currently in progress */
+  isResendingBill?: boolean;
 }
 
 // Format status for display
@@ -116,6 +123,8 @@ export default React.memo(function OrderDetailsDialog({
   onNextStep,
   onPrintInvoice,
   onUpdatePaymentStatus,
+  onResendBill,
+  isResendingBill,
 }: OrderDetailsDialogProps) {
   const { printInvoice } = useInvoicePrint({
     onSuccess: (invoiceData) => {
@@ -157,6 +166,7 @@ export default React.memo(function OrderDetailsDialog({
   const outstandingAmount = Math.max(creditUsed, calculatedDue);
   const canMarkPaid = anyOrder.paymentStatus !== 'paid' && outstandingAmount > 0;
   const storeLabel = getOrderStoreLabel(resolveOrderStoreCodeFromOrder(anyOrder));
+  const resolvedCustomerPhone = order.customerPhone || anyOrder.customerPhone || anyOrder.customers?.phone || "";
 
   // Parse Address Helper
   const formatAddress = (addr: any) => {
@@ -425,6 +435,44 @@ export default React.memo(function OrderDetailsDialog({
             >
               <Navigation className="h-4 w-4 mr-2" /> Track
             </Button>
+
+            {/* Resend Bill Button */}
+            {onResendBill && (() => {
+              const sendCount = Number((order as any).whatsappMessageCount || 0);
+              const hasPhone = Boolean(resolvedCustomerPhone);
+              const limitReached = sendCount >= MAX_WHATSAPP_SENDS;
+              const canResend = hasPhone && !limitReached;
+              return (
+                <Button
+                  variant="outline"
+                  onClick={() => onResendBill(order)}
+                  disabled={!canResend || isResendingBill}
+                  className={cn(
+                    "relative",
+                    canResend
+                      ? "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800"
+                      : "opacity-50"
+                  )}
+                  title={
+                    !hasPhone
+                      ? 'No phone number available'
+                      : limitReached
+                        ? `Maximum ${MAX_WHATSAPP_SENDS} sends reached`
+                        : `Send bill via WhatsApp (${sendCount}/${MAX_WHATSAPP_SENDS})`
+                  }
+                >
+                  {isResendingBill ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  Resend Bill
+                  <span className="ml-1.5 text-[10px] font-bold opacity-70">
+                    {sendCount}/{MAX_WHATSAPP_SENDS}
+                  </span>
+                </Button>
+              );
+            })()}
 
             {nextStatus && (
               <Button

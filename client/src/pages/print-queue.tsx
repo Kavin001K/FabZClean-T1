@@ -237,9 +237,11 @@ export default function PrintTags() {
         const preparedTags = targetOrders.flatMap((order) => prepareThermalTags({
             orderNumber: order.orderNumber,
             customerName: order.customerName,
+            customerAddress: (order as any).deliveryAddress || (order as any).shippingAddress || undefined,
             franchiseId: (order as any).franchiseId || (order as any).franchise_id || null,
             storeCode: resolveOrderStoreCodeFromOrder(order),
             commonNote: (order as any).specialInstructions || (order as any).special_instructions || undefined,
+            billDate: order.createdAt ? String(order.createdAt) : undefined,
             dueDate: (order as any).pickupDate
                 ? String((order as any).pickupDate)
                 : (order as any).dueDate

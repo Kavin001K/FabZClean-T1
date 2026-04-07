@@ -187,10 +187,23 @@ const buildInvoiceBuffer = async (order: OrderLike): Promise<Buffer> => {
   doc.text('BILL TO', marginLeft, cursorY);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.text(String(order.customerName || 'Customer'), marginLeft, cursorY + 6);
-  doc.text(String(order.customerPhone || 'Phone not provided'), marginLeft, cursorY + 11);
-  const addressLines = doc.splitTextToSize(customerAddress, usableWidth * 0.55);
-  doc.text(addressLines, marginLeft, cursorY + 16);
+  const displayName = order.customerName && order.customerName !== 'Customer' ? order.customerName : 'Customer';
+  const displayPhone = order.customerPhone && order.customerPhone !== 'Phone not provided' ? order.customerPhone : '';
+  const displayEmail = order.customerEmail || '';
+  doc.text(displayName, marginLeft, cursorY + 6);
+  if (displayPhone) {
+    doc.text(displayPhone, marginLeft, cursorY + 11);
+  }
+  let billToOffsetY = displayPhone ? 16 : 11;
+  if (displayEmail) {
+    doc.text(displayEmail, marginLeft, cursorY + billToOffsetY);
+    billToOffsetY += 5;
+  }
+  if (customerAddress && customerAddress !== 'Address not provided') {
+    const addressLines = doc.splitTextToSize(customerAddress, usableWidth * 0.55);
+    doc.text(addressLines, marginLeft, cursorY + billToOffsetY);
+    billToOffsetY += addressLines.length * 4.5;
+  }
 
   doc.setFont('helvetica', 'bold');
   doc.text('STATUS', pageWidth - marginRight - 38, cursorY);
@@ -201,7 +214,7 @@ const buildInvoiceBuffer = async (order: OrderLike): Promise<Buffer> => {
   doc.setFont('helvetica', 'normal');
   doc.text(String(order.paymentStatus || order.paymentMethod || 'pending').toUpperCase(), pageWidth - marginRight - 38, cursorY + 20);
 
-  cursorY += Math.max(30, 16 + addressLines.length * 4.5);
+  cursorY += Math.max(30, billToOffsetY + 4);
   doc.line(marginLeft, cursorY, pageWidth - marginRight, cursorY);
   cursorY += 7;
 
@@ -305,6 +318,46 @@ export async function ensureOrderInvoiceDocument(order: OrderLike): Promise<{
       storageUsed: existingUrl.includes('/uploads/') ? 'local' : 'r2',
       reused: true,
     };
+  }
+
+  // ----- CRITICAL: Fetch full customer data from DB -----
+  // The order object may not carry complete customer info (name, phone, email, address).
+  // We MUST fetch from the database to ensure the invoice has all mandatory fields.
+  const customerId = (order as any).customerId || (order as any).customer_id;
+  if (customerId) {
+    try {
+      const customer = await db.getCustomer(customerId);
+      if (customer) {
+        // Merge customer data — order-level fields take priority, then DB data
+        if (!order.customerName || order.customerName === 'Customer') {
+          order.customerName = (customer as any).name || order.customerName;
+        }
+        if (!order.customerPhone || order.customerPhone === 'Phone not provided') {
+          order.customerPhone = (customer as any).phone || order.customerPhone;
+        }
+        if (!order.customerEmail) {
+          order.customerEmail = (customer as any).email || null;
+        }
+        // Address: try customer address if order has no address
+        const hasOrderAddress = order.deliveryAddress || order.shippingAddress || order.customerAddress || order.address;
+        if (!hasOrderAddress) {
+          const customerAddr = (customer as any).address || (customer as any).deliveryAddress;
+          if (customerAddr) {
+            order.customerAddress = customerAddr;
+          }
+        }
+      }
+    } catch (customerFetchError) {
+      console.warn(`⚠️ [Order Invoice] Could not fetch customer ${customerId}:`, customerFetchError);
+    }
+  }
+
+  // Validate mandatory fields before generating the invoice
+  if (!order.customerName || order.customerName === 'Customer') {
+    console.warn(`⚠️ [Order Invoice] Customer name missing for ${order.orderNumber}, using order data as-is`);
+  }
+  if (!order.customerPhone) {
+    console.warn(`⚠️ [Order Invoice] Customer phone missing for ${order.orderNumber}, using order data as-is`);
   }
 
   const pdfBuffer = await buildInvoiceBuffer(order);

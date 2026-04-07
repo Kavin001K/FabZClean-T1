@@ -42,6 +42,7 @@ import { authorizedFetch } from "@/lib/data-service";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { readWalletCustomersCache, writeWalletCustomersCache } from "@/lib/wallet-cache";
 
 type FilterType = "all" | "clear" | "outstanding" | "prepaid" | "exceeded";
 
@@ -74,7 +75,6 @@ const fetchCustomers = async (): Promise<WalletCustomer[]> => {
     const batch = Array.isArray(rows) ? rows : [];
     allCustomers.push(...batch);
 
-    // If we got fewer than batchSize, we've reached the end
     if (batch.length < batchSize) {
       hasMore = false;
     } else {
@@ -82,6 +82,7 @@ const fetchCustomers = async (): Promise<WalletCustomer[]> => {
     }
   }
 
+  writeWalletCustomersCache(allCustomers);
   return allCustomers;
 };
 
@@ -119,7 +120,7 @@ const walletApi = {
     if (!res.ok) throw new Error(data?.message || "Failed to record credit payment");
     return data;
   },
-  adjust: async (customerId: string, payload: { amount: number; reason: string; notes?: string }) => {
+  adjust: async (customerId: string, payload: { amount: number; target: string; reason: string; notes?: string }) => {
     const res = await authorizedFetch(`/credits/${customerId}/adjust`, {
       method: "POST",
       body: JSON.stringify(payload),
@@ -154,14 +155,18 @@ export default function WalletManagementPage() {
 
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
+  const [adjustTarget, setAdjustTarget] = useState("outstanding");
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
 
   const canAdjust = employee?.role === "admin";
+  const cachedCustomers = useMemo(() => readWalletCustomersCache<WalletCustomer>(), []);
 
   const { data: customers = [], isLoading, refetch } = useQuery({
     queryKey: ["wallet-management", "customers"],
     queryFn: fetchCustomers,
     staleTime: 15000,
+    initialData: cachedCustomers?.customers,
+    initialDataUpdatedAt: cachedCustomers?.updatedAt,
   });
 
   const { data: customerHistory = [], isLoading: historyLoading } = useQuery({
@@ -189,6 +194,19 @@ export default function WalletManagementPage() {
   });
 
   const selectedOrder = customerOrders.find((o: any) => o.id === selectedOrderId);
+  const selectedOutstandingAmount = Math.max(0, toNumber(selectedCustomer?.creditBalance, 0));
+  const selectedCreditLimitAmount = Math.max(0, toNumber(selectedCustomer?.creditLimit, 1000));
+  const adjustmentAmount = toNumber(amount, 0);
+  const currentAdjustmentBase = adjustTarget === "credit_limit"
+    ? selectedCreditLimitAmount
+    : selectedOutstandingAmount;
+  const projectedAdjustmentValue = currentAdjustmentBase + adjustmentAmount;
+  const adjustmentPreviewIsInvalid = projectedAdjustmentValue < 0;
+  const targetLabel = adjustTarget === "credit_limit" ? "Credit Limit" : "Outstanding Balance";
+  const targetHint = adjustTarget === "credit_limit"
+    ? "Allowance before the customer exceeds their approved limit."
+    : "Debt currently owed by the customer.";
+  const targetValueLabel = adjustTarget === "credit_limit" ? "Current limit" : "Current outstanding";
 
   const getLedgerDirection = useCallback((tx: any) => {
     const rawAmount = toNumber(tx?.amount, 0);
@@ -360,6 +378,7 @@ export default function WalletManagementPage() {
     setReason("");
     setNotes("");
     setSelectedOrderId("");
+    setAdjustTarget("outstanding");
   };
 
   const rechargeMutation = useMutation({
@@ -418,6 +437,7 @@ export default function WalletManagementPage() {
   const adjustMutation = useMutation({
     mutationFn: () => walletApi.adjust(selectedCustomer!.id, {
       amount: toNumber(amount, 0),
+      target: adjustTarget,
       reason: reason || "Manual adjustment",
       notes: `Adjustment by ${employee?.fullName || employee?.username} (${employee?.employeeId}). ${notes || ""}`.trim(),
     }),
@@ -425,7 +445,7 @@ export default function WalletManagementPage() {
       toast({ title: "Balance adjusted", description: "Manual adjustment posted successfully." });
       setAdjustOpen(false);
       resetDialogState();
-      refreshData();
+      refetch(); // Explicitly trigger refetch to push it down fast
     },
     onError: (error: Error) => {
       toast({ title: "Adjustment failed", description: error.message, variant: "destructive" });
@@ -1102,8 +1122,52 @@ export default function WalletManagementPage() {
           </div>
           <div className="space-y-3 py-2">
             <div className="space-y-2">
+              <Label>Target Balance</Label>
+              <Select value={adjustTarget} onValueChange={setAdjustTarget}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select what to adjust" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="outstanding">Outstanding Balance</SelectItem>
+                  <SelectItem value="credit_limit">Credit Limit</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Choose whether this adjustment changes the customer&apos;s debt or their allowed credit ceiling.
+              </p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-medium text-foreground">{targetLabel}</span>
+                <Badge variant="outline" className="font-semibold">
+                  {adjustTarget === "credit_limit" ? "Allowance" : "Debt"}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">{targetHint}</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{targetValueLabel}</p>
+                  <p className="font-bold">₹{currentAdjustmentBase.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">After adjustment</p>
+                  <p className={cn("font-bold", adjustmentPreviewIsInvalid ? "text-red-600" : "text-emerald-600")}>
+                    ₹{projectedAdjustmentValue.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              {adjustmentPreviewIsInvalid && (
+                <p className="text-xs text-red-600">
+                  This adjustment would make the {adjustTarget === "credit_limit" ? "credit limit" : "outstanding balance"} negative.
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
               <Label>Amount (+/-)</Label>
               <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <p className="text-xs text-muted-foreground">
+                Use positive numbers to increase and negative numbers to reduce the selected target.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Reason</Label>
@@ -1118,7 +1182,7 @@ export default function WalletManagementPage() {
             <Button variant="outline" onClick={() => setAdjustOpen(false)}>Cancel</Button>
             <Button
               onClick={() => adjustMutation.mutate()}
-              disabled={adjustMutation.isPending || toNumber(amount, 0) === 0 || !reason.trim()}
+              disabled={adjustMutation.isPending || adjustmentAmount === 0 || !reason.trim() || adjustmentPreviewIsInvalid}
             >
               Apply Adjustment
             </Button>

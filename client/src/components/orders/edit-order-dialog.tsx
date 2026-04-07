@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Calendar as CalendarIcon, Minus, Plus, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Minus, Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -61,7 +61,8 @@ export default React.memo(function EditOrderDialog({
   };
 
   const normalizeItem = (item: any, index: number): EditableOrderItem => {
-    const quantity = Math.max(1, Math.round(toMoney(item?.quantity, 1)));
+    // Allow 0 quantity temporarily for ergonomic editing without auto-removal
+    const quantity = Math.max(0, Math.floor(toMoney(item?.quantity, 0)));
     const unitPrice = toMoney(item?.price, toMoney(item?.unitPrice, 0));
     const subtotal = toMoney(item?.subtotal, unitPrice * quantity);
     return {
@@ -148,7 +149,7 @@ export default React.memo(function EditOrderDialog({
     setEditableItems((prev) => prev.map((item, i) => {
       if (i !== index) return item;
       const next = normalizeItem(updater(item), i);
-      const qty = Math.max(1, next.quantity);
+      const qty = Math.max(0, next.quantity);
       const price = toMoney(next.price, 0);
       return {
         ...next,
@@ -175,7 +176,7 @@ export default React.memo(function EditOrderDialog({
   const handleQuantityChange = (index: number, nextQuantity: number) => {
     updateItem(index, (item) => ({
       ...item,
-      quantity: Math.max(1, Math.round(nextQuantity)),
+      quantity: Math.max(0, Math.round(nextQuantity)),
     }));
   };
 
@@ -397,31 +398,39 @@ export default React.memo(function EditOrderDialog({
 
                     <div className="space-y-2">
                       <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Qty</Label>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center justify-between border rounded-md overflow-hidden h-10 w-[120px]">
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="ghost"
                           size="icon"
-                          className="h-9 w-9"
-                          onClick={() => handleQuantityChange(index, item.quantity - 1)}
+                          className="h-full w-10 shrink-0 rounded-none bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700"
+                          onClick={() => handleQuantityChange(index, Math.max(0, item.quantity - 1))}
                         >
-                          <Minus className="h-4 w-4" />
+                          <ChevronDown className="h-4 w-4" />
                         </Button>
                         <Input
                           type="number"
-                          min={1}
-                          value={item.quantity}
-                          onChange={(e) => handleQuantityChange(index, Number(e.target.value || 1))}
-                          className="text-center"
+                          min="0"
+                          value={item.quantity === 0 ? '' : item.quantity}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '') {
+                              handleQuantityChange(index, 0);
+                            } else {
+                              handleQuantityChange(index, Number(val));
+                            }
+                          }}
+                          className="h-full border-0 text-center font-medium shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0 rounded-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          placeholder="0"
                         />
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="ghost"
                           size="icon"
-                          className="h-9 w-9"
+                          className="h-full w-10 shrink-0 rounded-none bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700"
                           onClick={() => handleQuantityChange(index, item.quantity + 1)}
                         >
-                          <Plus className="h-4 w-4" />
+                          <ChevronUp className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
