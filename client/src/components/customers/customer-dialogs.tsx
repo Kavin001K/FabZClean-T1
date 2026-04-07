@@ -57,7 +57,7 @@ const customerFormSchema = z.object({
   }).optional(),
   phone: z.string().min(10, 'Phone number must be at least 10 digits').max(15, 'Phone number must be less than 15 digits'),
   // Separate address fields for clean data collection
-  addressStreet: z.string().optional(),
+  addressStreet: z.string().min(1, 'Street address is required'),
   addressCity: z.string().optional(),
   addressPincode: z.string().refine((val) => !val || /^\d{6}$/.test(val.replace(/\s/g, '')), {
     message: 'Pincode must be 6 digits',
@@ -673,22 +673,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="edit-email">Email</Label>
-                  <Input
-                    id="edit-email"
-                    type="email"
-                    {...editForm.register('email')}
-                    className={cn(
-                      editForm.formState.errors.email && 'border-red-500'
-                    )}
-                  />
-                  {editForm.formState.errors.email && (
-                    <p className="text-sm text-red-500">
-                      {editForm.formState.errors.email.message}
-                    </p>
-                  )}
-                </div>
+
 
                 <div className="space-y-2">
                   <Label htmlFor="edit-phone">Phone *</Label>
@@ -712,12 +697,20 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   <h4 className="font-semibold text-sm text-muted-foreground">Address</h4>
 
                   <div className="space-y-2">
-                    <Label htmlFor="edit-street">Street Address</Label>
+                    <Label htmlFor="edit-street">Street Address *</Label>
                     <Input
                       id="edit-street"
                       {...editForm.register('addressStreet')}
                       placeholder="e.g., 1/85 Zamin Kottampatty"
+                      className={cn(
+                        editForm.formState.errors.addressStreet && 'border-red-500'
+                      )}
                     />
+                    {editForm.formState.errors.addressStreet && (
+                      <p className="text-sm text-red-500">
+                        {editForm.formState.errors.addressStreet.message}
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -751,6 +744,23 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   <p className="text-xs text-muted-foreground">
                     State: Tamil Nadu, Country: India (default)
                   </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    {...editForm.register('email')}
+                    className={cn(
+                      editForm.formState.errors.email && 'border-red-500'
+                    )}
+                  />
+                  {editForm.formState.errors.email && (
+                    <p className="text-sm text-red-500">
+                      {editForm.formState.errors.email.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -952,23 +962,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="create-email">Email</Label>
-                <Input
-                  id="create-email"
-                  type="email"
-                  {...createForm.register('email')}
-                  placeholder="Enter email address"
-                  className={cn(
-                    createForm.formState.errors.email && 'border-red-500'
-                  )}
-                />
-                {createForm.formState.errors.email && (
-                  <p className="text-sm text-red-500">
-                    {createForm.formState.errors.email.message}
-                  </p>
-                )}
-              </div>
+
 
               <div className="space-y-2">
                 <Label htmlFor="create-phone">Phone *</Label>
@@ -990,15 +984,23 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
 
               {/* Address Fields - Collected Separately */}
               <div className="space-y-4 border-t pt-4">
-                <h4 className="font-semibold text-sm text-muted-foreground">Address (Optional)</h4>
+                <h4 className="font-semibold text-sm text-muted-foreground">Address</h4>
 
                 <div className="space-y-2">
-                  <Label htmlFor="create-street">Street Address</Label>
+                  <Label htmlFor="create-street">Street Address *</Label>
                   <Input
                     id="create-street"
                     {...createForm.register('addressStreet')}
                     placeholder="e.g., 1/85 Zamin Kottampatty"
+                    className={cn(
+                      createForm.formState.errors.addressStreet && 'border-red-500'
+                    )}
                   />
+                  {createForm.formState.errors.addressStreet && (
+                    <p className="text-sm text-red-500">
+                      {createForm.formState.errors.addressStreet.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1045,6 +1047,24 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                 <p className="text-xs text-muted-foreground">
                   Set the maximum unpaid amount allowed before staff are asked to collect payment.
                 </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-email">Email</Label>
+                <Input
+                  id="create-email"
+                  type="email"
+                  {...createForm.register('email')}
+                  placeholder="Enter email address"
+                  className={cn(
+                    createForm.formState.errors.email && 'border-red-500'
+                  )}
+                />
+                {createForm.formState.errors.email && (
+                  <p className="text-sm text-red-500">
+                    {createForm.formState.errors.email.message}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">

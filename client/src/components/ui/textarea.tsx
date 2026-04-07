@@ -1,11 +1,41 @@
 import * as React from "react"
 
-import { cn } from "@/lib/utils"
+import { cn, capitalizeFirst, toTitleCase } from "@/lib/utils"
 
 const Textarea = React.forwardRef<
   HTMLTextAreaElement,
   React.ComponentProps<"textarea">
->(({ className, ...props }, ref) => {
+>(({ className, onChange, ...props }, ref) => {
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const name = (props.name || '').toLowerCase();
+    const id = (props.id || '').toLowerCase();
+    const placeholder = (props.placeholder || '').toLowerCase();
+    
+    // Most textareas will be notes, but we check for address/name anyway
+    const isNameOrAddress = ['name', 'address', 'street', 'city', 'location', 'company'].some(
+      keyword => name.includes(keyword) || id.includes(keyword) || placeholder.includes(keyword)
+    );
+    
+    const originalValue = e.target.value;
+    const newValue = isNameOrAddress ? toTitleCase(originalValue) : capitalizeFirst(originalValue);
+    
+    if (originalValue !== newValue) {
+      const start = e.target.selectionStart;
+      e.target.value = newValue;
+      if (start !== null) {
+        window.requestAnimationFrame(() => {
+          if (e.target) {
+            e.target.setSelectionRange(start, start);
+          }
+        });
+      }
+    }
+    
+    if (onChange) {
+      onChange(e);
+    }
+  };
+
   return (
     <textarea
       className={cn(
@@ -13,6 +43,7 @@ const Textarea = React.forwardRef<
         className
       )}
       ref={ref}
+      onChange={handleChange}
       {...props}
     />
   )
@@ -20,3 +51,4 @@ const Textarea = React.forwardRef<
 Textarea.displayName = "Textarea"
 
 export { Textarea }
+

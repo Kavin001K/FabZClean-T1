@@ -4,7 +4,7 @@ import { PlusCircle, User, Calendar as CalendarIcon, Truck, IndianRupee, Search,
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+import { cn, toTitleCase } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -80,7 +80,9 @@ export default function CreateOrder() {
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [customerAddress, setCustomerAddress] = useState('');
+  const [customerStreet, setCustomerStreet] = useState('');
+  const [customerCity, setCustomerCity] = useState('');
+  const [customerPincode, setCustomerPincode] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
   const [storeCode, setStoreCode] = useState<OrderStoreCode>('POL');
   const [billDate, setBillDate] = useState<Date>(() => toDateOnly(new Date()));
@@ -385,9 +387,11 @@ export default function CreateOrder() {
         setCustomerEmail(customer.email || "");
         setCustomerPhone(customer.phone || phoneNumber);
 
-        // Use centralized address utility for proper formatting
-        const formattedAddress = parseAndFormatAddress(customer.address);
-        setCustomerAddress(formattedAddress === 'Address not provided' ? '' : formattedAddress);
+        // Use raw address object fields for our split state
+        const addrObj = customer.address as { street?: string, city?: string, pincode?: string };
+        setCustomerStreet(addrObj?.street || "");
+        setCustomerCity(addrObj?.city || "");
+        setCustomerPincode(addrObj?.pincode || "");
 
         toast({
           title: "Customer Found!",
@@ -417,9 +421,11 @@ export default function CreateOrder() {
     setCustomerEmail(customer.email || "");
     setCustomerPhone(customer.phone || "");
 
-    // Use centralized address utility for proper formatting
-    const formattedAddress = parseAndFormatAddress(customer.address);
-    setCustomerAddress(formattedAddress === 'Address not provided' ? '' : formattedAddress);
+    // Use raw address object fields for our split state
+    const addrObj = customer.address as { street?: string, city?: string, pincode?: string };
+    setCustomerStreet(addrObj?.street || "");
+    setCustomerCity(addrObj?.city || "");
+    setCustomerPincode(addrObj?.pincode || "");
 
     toast({
       title: "Customer Selected!",
@@ -446,9 +452,11 @@ export default function CreateOrder() {
         setCustomerEmail(newCustomer.email || "");
         setCustomerPhone(newCustomer.phone || "");
 
-        // Use centralized address utility for proper formatting
-        const formattedAddress = parseAndFormatAddress(newCustomer.address);
-        setCustomerAddress(formattedAddress === 'Address not provided' ? '' : formattedAddress);
+        // Use raw address object fields for our split state
+        const addrObj = newCustomer.address as { street?: string, city?: string, pincode?: string };
+        setCustomerStreet(addrObj?.street || "");
+        setCustomerCity(addrObj?.city || "");
+        setCustomerPincode(addrObj?.pincode || "");
 
         queryClient.invalidateQueries({ queryKey: ["customers"] });
 
@@ -480,10 +488,10 @@ export default function CreateOrder() {
 
   // Handle creating new customer
   const handleCreateCustomer = () => {
-    if (!newCustomerName || !newCustomerPhone) {
+    if (!newCustomerName || !newCustomerPhone || !newCustomerStreet) {
       toast({
         title: "Validation Error",
-        description: "Name and Phone are required",
+        description: "Name, Phone, and Street Address are required",
         variant: "destructive",
       });
       return;
@@ -810,7 +818,9 @@ export default function CreateOrder() {
     setCustomerName('');
     setCustomerEmail('');
     setCustomerPhone('');
-    setCustomerAddress('');
+    setCustomerStreet('');
+    setCustomerCity('');
+    setCustomerPincode('');
     setCustomerNotes('');
     setSelectedServices([]);
     setDiscountType('none');
@@ -900,7 +910,7 @@ export default function CreateOrder() {
           phone: customerPhone,
           email: customerEmail || undefined,
           // Send address as an object to satisfy jsonb requirement
-          address: customerAddress ? { line1: customerAddress } : undefined,
+          address: { street: customerStreet, city: customerCity, pincode: customerPincode },
         });
 
         if (newCustomer) {
@@ -919,27 +929,32 @@ export default function CreateOrder() {
       }
     } else if (foundCustomer) {
       // PERF: Fire-and-forget profile update — don't block order creation
-      const existingFormattedAddress = parseAndFormatAddress(foundCustomer.address);
-      const orderLevelAddress = deliveryAddress || customerAddress;
-      
       const hasNameChanged = foundCustomer.name !== customerName;
       const hasPhoneChanged = foundCustomer.phone !== customerPhone;
       const hasEmailChanged = foundCustomer.email !== (customerEmail || null);
-      const hasAddressChanged = orderLevelAddress && orderLevelAddress !== existingFormattedAddress && orderLevelAddress !== 'Address not provided';
+      
+      const addrObj = foundCustomer.address as { street?: string, city?: string, pincode?: string };
+      const hasAddressChanged = customerStreet !== (addrObj?.street || "") || 
+                                customerCity !== (addrObj?.city || "") || 
+                                customerPincode !== (addrObj?.pincode || "");
 
       if (hasNameChanged || hasPhoneChanged || hasEmailChanged || hasAddressChanged) {
         const updates: any = {};
         if (hasNameChanged) updates.name = customerName;
         if (hasPhoneChanged) updates.phone = customerPhone;
         if (hasEmailChanged) updates.email = customerEmail || null;
-        if (hasAddressChanged) updates.address = { line1: orderLevelAddress };
+        if (hasAddressChanged) updates.address = { street: customerStreet, city: customerCity, pincode: customerPincode };
 
-        customersApi.update(currentCustomerId, updates).then(() => {
+        try {
+          await customersApi.update(currentCustomerId, updates);
           console.log("Customer profile synchronized automatically");
-          queryClient.invalidateQueries({ queryKey: ["customers"] });
-        }).catch((e) => {
+          // Ensure we refetch autocomplete and search data
+          await queryClient.invalidateQueries({ queryKey: ["customers"] });
+          // Also update the local state so the next order in the same session has latest data
+          setFoundCustomer(prev => prev ? { ...prev, ...updates } : prev);
+        } catch (e) {
           console.warn("Soft fail: could not auto-sync customer profile", e);
-        });
+        }
       }
     }
 
@@ -976,12 +991,11 @@ export default function CreateOrder() {
       createdAt: toOrderCreatedAt(billDate),
       pickupDate: pickupDate ? new Date(pickupDate).toISOString() : undefined,
       specialInstructions: specialInstructions,
-      shippingAddress: customerAddress ? {
-        street: customerAddress,
-        city: "Bangalore", // Default or extract
-        zip: "560000", // Default
-        country: "India"
-      } : undefined,
+      shippingAddress: {
+        street: customerStreet || "",
+        city: customerCity || "",
+        pincode: customerPincode || "",
+      },
       advancePaid: advancePayment ? advancePayment : "0",
       paymentMethod: paymentMethod,
       discountType: discountType === 'none' ? undefined : discountType,
@@ -1136,7 +1150,9 @@ export default function CreateOrder() {
                         setCustomerName('');
                         setCustomerPhone('');
                         setCustomerEmail('');
-                        setCustomerAddress('');
+                        setCustomerStreet('');
+                        setCustomerCity('');
+                        setCustomerPincode('');
                       }}
                       className="text-muted-foreground hover:text-destructive hover:bg-destructive/5"
                     >
@@ -1199,16 +1215,40 @@ export default function CreateOrder() {
                     className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="customerAddress" className="text-slate-700 dark:text-slate-300">Address</Label>
-                  <Textarea
-                    id="customerAddress"
-                    placeholder="Customer's address (optional)"
-                    value={customerAddress}
-                    onChange={(e) => setCustomerAddress(e.target.value)}
-                    rows={3}
-                    className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                  />
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="customerStreet" className="text-slate-700 dark:text-slate-300">Street Address</Label>
+                    <Input
+                      id="customerStreet"
+                      placeholder="e.g., 1/85 Kavin Kottampatty"
+                      value={customerStreet}
+                      onChange={(e) => setCustomerStreet(toTitleCase(e.target.value))}
+                      className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="customerCity" className="text-slate-700 dark:text-slate-300">City</Label>
+                      <Input
+                        id="customerCity"
+                        placeholder="e.g., Pollachi"
+                        value={customerCity}
+                        onChange={(e) => setCustomerCity(toTitleCase(e.target.value))}
+                        className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="customerPincode" className="text-slate-700 dark:text-slate-300">Pincode</Label>
+                      <Input
+                        id="customerPincode"
+                        placeholder="e.g., 642123"
+                        maxLength={6}
+                        value={customerPincode}
+                        onChange={(e) => setCustomerPincode(e.target.value.replace(/[^0-9]/g, ''))}
+                        className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                      />
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -2403,21 +2443,12 @@ export default function CreateOrder() {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="newCustomerEmail">Email</Label>
-              <Input
-                id="newCustomerEmail"
-                placeholder="Email (optional)"
-                type="email"
-                value={newCustomerEmail}
-                onChange={(e) => setNewCustomerEmail(e.target.value)}
-              />
-            </div>
+
             {/* Address Fields - Collected Separately */}
             <div className="space-y-4 border-t pt-4">
-              <h4 className="font-semibold text-sm text-muted-foreground">Address (Optional)</h4>
+              <h4 className="font-semibold text-sm text-muted-foreground">Address</h4>
               <div className="space-y-2">
-                <Label htmlFor="newCustomerStreet">Street Address</Label>
+                <Label htmlFor="newCustomerStreet">Street Address *</Label>
                 <Input
                   id="newCustomerStreet"
                   placeholder="e.g., 1/85 Zamin Kottampatty"
@@ -2449,6 +2480,16 @@ export default function CreateOrder() {
               <p className="text-xs text-muted-foreground">
                 State: Tamil Nadu, Country: India (default)
               </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newCustomerEmail">Email</Label>
+              <Input
+                id="newCustomerEmail"
+                placeholder="Email (optional)"
+                type="email"
+                value={newCustomerEmail}
+                onChange={(e) => setNewCustomerEmail(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="newCustomerNotes">Notes</Label>
@@ -2612,7 +2653,9 @@ export default function CreateOrder() {
           setCustomerName('');
           setCustomerPhone('');
           setCustomerEmail('');
-          setCustomerAddress('');
+          setCustomerStreet('');
+          setCustomerCity('');
+          setCustomerPincode('');
           setSpecialInstructions('');
           setIsExpressOrder(false);
           setDiscountValue(0);

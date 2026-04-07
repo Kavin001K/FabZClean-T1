@@ -48,27 +48,33 @@ function calculateRelevance(customer: Customer, query: string): number {
     const normalizedQuery = normalizePhone(query);
     const normalizedCustomerPhone = customer.phone ? normalizePhone(customer.phone) : '';
 
+    const parsedAddress = customer.address as { street?: string, city?: string } | null;
+    const addressString = `${parsedAddress?.street || ''} ${parsedAddress?.city || ''}`.trim().toLowerCase();
+
     // Exact matches get highest score
-    if (customer.name?.toLowerCase() === queryLower) score += 100;
-    if (normalizedCustomerPhone === normalizedQuery) score += 100;
+    if (customer.name?.toLowerCase() === queryLower) score += 200;
+    if (normalizedCustomerPhone === normalizedQuery) score += 200;
     if (customer.email?.toLowerCase() === queryLower) score += 100;
+    if (customer.id?.toLowerCase() === queryLower) score += 100;
 
     // Starts with match gets high score
-    if (customer.name?.toLowerCase().startsWith(queryLower)) score += 50;
-    if (normalizedCustomerPhone.startsWith(normalizedQuery)) score += 50;
+    if (customer.name?.toLowerCase().startsWith(queryLower)) score += 80;
+    if (normalizedCustomerPhone.startsWith(normalizedQuery)) score += 80;
     if (customer.email?.toLowerCase().startsWith(queryLower)) score += 50;
 
-    // Contains match gets medium score
-    if (customer.id?.toLowerCase().includes(queryLower)) score += 25;
-    if (customer.name?.toLowerCase().includes(queryLower)) score += 25;
-    if (normalizedCustomerPhone.includes(normalizedQuery)) score += 25;
+    // Word boundary / contains match gets medium score
+    if (customer.id?.toLowerCase().includes(queryLower)) score += 40;
+    if (customer.name?.toLowerCase().includes(queryLower)) score += 40;
+    if (normalizedCustomerPhone.includes(normalizedQuery)) score += 40;
     if (customer.email?.toLowerCase().includes(queryLower)) score += 25;
+    if (addressString.includes(queryLower)) score += 25;
 
     // Fuzzy match gets low score
     if (fuzzyMatch(customer.id || '', query)) score += 10;
     if (fuzzyMatch(customer.name || '', query)) score += 10;
     if (fuzzyMatch(normalizedCustomerPhone, normalizedQuery)) score += 10;
-    if (fuzzyMatch(customer.email || '', query)) score += 10;
+    if (fuzzyMatch(customer.email || '', query)) score += 5;
+    if (fuzzyMatch(addressString, query)) score += 5;
 
     return score;
 }
@@ -149,7 +155,8 @@ export function CustomerAutocomplete({
             applyMatches(matches);
         };
 
-        const timer = window.setTimeout(runSearch, searchCustomers ? 250 : 50);
+        // Make search feel instant
+        const timer = window.setTimeout(runSearch, searchCustomers ? 100 : 0);
 
         return () => {
             isCancelled = true;
@@ -330,6 +337,11 @@ export function CustomerAutocomplete({
                                     <div className="flex-1 min-w-0">
                                         <div className="font-medium text-sm">
                                             {highlightMatch(customer.name || 'Unknown', searchQuery)}
+                                            {(customer.address as any)?.street && (
+                                                <span className="text-muted-foreground ml-1 font-normal opacity-80">
+                                                    ({highlightMatch((customer.address as any).street, searchQuery)})
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
                                                 <div className="flex items-center gap-1.5 text-primary/80 font-medium">

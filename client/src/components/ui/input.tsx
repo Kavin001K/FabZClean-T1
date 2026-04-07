@@ -1,9 +1,60 @@
 import * as React from "react"
 
-import { cn } from "@/lib/utils"
+import { cn, capitalizeFirst, toTitleCase } from "@/lib/utils"
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, onChange, ...props }, ref) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const nameAttr = (props.name || '').toLowerCase();
+      const idAttr = (props.id || '').toLowerCase();
+      
+      const isLoginOrEmailField = 
+        type === 'email' || 
+        type === 'password' || 
+        type === 'url' || 
+        nameAttr.includes('email') || 
+        idAttr.includes('email') ||
+        nameAttr.includes('username') ||
+        idAttr.includes('username');
+
+      if (
+        !isLoginOrEmailField &&
+        type !== 'number' &&
+        type !== 'tel' &&
+        type !== 'date' &&
+        type !== 'file'
+      ) {
+        const name = nameAttr;
+        const id = idAttr;
+        const placeholder = (props.placeholder || '').toLowerCase();
+        
+        // Exact match exclusions or keyword inclusions
+        const isNameOrAddress = ['name', 'address', 'street', 'city', 'location', 'company'].some(
+          keyword => name.includes(keyword) || id.includes(keyword) || placeholder.includes(keyword)
+        );
+        
+        const originalValue = e.target.value;
+        const newValue = isNameOrAddress ? toTitleCase(originalValue) : capitalizeFirst(originalValue);
+        
+        if (originalValue !== newValue) {
+          const start = e.target.selectionStart;
+          e.target.value = newValue;
+          if (start !== null) {
+            // Restore cursor position inside a microtask so it happens after React state potentially updates
+            window.requestAnimationFrame(() => {
+              if (e.target) {
+                e.target.setSelectionRange(start, start);
+              }
+            });
+          }
+        }
+      }
+      
+      if (onChange) {
+        onChange(e);
+      }
+    };
+
     return (
       <input
         type={type}
@@ -12,6 +63,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           className
         )}
         ref={ref}
+        onChange={handleChange}
         {...props}
       />
     )
@@ -20,3 +72,4 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
 Input.displayName = "Input"
 
 export { Input }
+

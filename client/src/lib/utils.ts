@@ -25,6 +25,25 @@ export function isElectron(): boolean {
 }
 
 /**
+ * Capitalizes the first letter of a string.
+ */
+export function capitalizeFirst(str: string): string {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * Capitalizes the first letter of every word (Title Case)
+ */
+export function toTitleCase(str: string): string {
+  if (!str) return '';
+  return str
+    .split(' ')
+    .map(word => word ? word.charAt(0).toUpperCase() + word.slice(1) : '')
+    .join(' ');
+}
+
+/**
  * Detect if running on Windows
  */
 export function isWindows(): boolean {
