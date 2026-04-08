@@ -79,17 +79,17 @@ export const DashboardRecentOrders: React.FC<DashboardRecentOrdersProps> = React
   return (
     <Card
       data-testid={getTestId(TEST_IDS.DASHBOARD.WIDGET, 'recent-orders')}
-      className="glass overflow-hidden border-none shadow-xl"
+      className="overflow-hidden border-border bg-card shadow-sm"
     >
-      <CardHeader className="pb-3 border-b border-white/5 bg-white/5 flex flex-row items-center justify-between">
-        <CardTitle className="text-base font-semibold text-muted-foreground flex items-center gap-2">
+      <CardHeader className="flex flex-row items-center justify-between border-b border-border pb-3">
+        <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
           <Package className="h-5 w-5 text-primary" />
           Recent Orders
         </CardTitle>
         <Button
           variant="ghost"
           size="sm"
-          className="h-8 text-xs hover:bg-primary/20 hover:text-primary transition-all duration-300"
+          className="h-8 rounded-xl text-xs hover:bg-muted"
           onClick={() => setLocation('/orders')}
           data-testid={getTestId(TEST_IDS.BUTTON.VIEW, 'all-orders')}
         >
@@ -97,7 +97,7 @@ export const DashboardRecentOrders: React.FC<DashboardRecentOrdersProps> = React
           <ChevronRight className="ml-1 h-3 w-3" />
         </Button>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-4">
         {displayOrders.length === 0 ? (
           <div
             className="text-center py-8 text-muted-foreground"
@@ -110,13 +110,13 @@ export const DashboardRecentOrders: React.FC<DashboardRecentOrdersProps> = React
             {displayOrders.map((order, index) => (
               <div
                 key={order.id || index}
-                className="flex items-center justify-between p-3 border border-white/5 bg-white/5 rounded-lg hover:bg-primary/10 hover:border-primary/30 transition-all duration-300 cursor-pointer group"
+                className="group flex items-center justify-between rounded-2xl border border-border bg-muted/25 p-3 transition-colors hover:bg-muted/45"
                 onClick={() => setLocation(`/orders/${order.id}`)}
                 data-testid={getTestId(TEST_IDS.DATA.ITEM, `order-${order.id || index}`)}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm truncate">
+                    <span className="truncate text-sm font-medium text-foreground">
                       {order.customerName || order.customer?.name || 'Unknown Customer'}
                     </span>
                     <Badge
@@ -126,12 +126,12 @@ export const DashboardRecentOrders: React.FC<DashboardRecentOrdersProps> = React
                       {getStatusText(order.status)}
                     </Badge>
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="truncate text-xs text-muted-foreground">
                     Order #{order.id || 'N/A'} • {order.service || 'Service'}
                   </div>
                 </div>
                 <div className="text-right flex flex-col items-end justify-between">
-                  <div className="font-medium text-sm">
+                  <div className="text-sm font-medium text-foreground">
                     {formatCurrency(order.totalAmount || order.total || 0)}
                   </div>
                   <div className="flex items-center justify-end gap-2 mt-2">
@@ -141,7 +141,7 @@ export const DashboardRecentOrders: React.FC<DashboardRecentOrdersProps> = React
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="h-6 text-[10px] px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                      className="h-6 px-2 text-[10px] text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
                       onClick={(e) => {
                         e.stopPropagation();
                         window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank');

@@ -117,10 +117,10 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
   return (
     <Card
       data-testid={getTestId(TEST_IDS.DASHBOARD.WIDGET, 'due-today')}
-      className="glass overflow-hidden border-none shadow-xl h-full flex flex-col"
+      className="h-full overflow-hidden border-border bg-card shadow-sm"
     >
-      <CardHeader className="pb-3 border-b border-white/5 bg-white/5 flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="flex items-center gap-2 text-base font-semibold text-muted-foreground">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border pb-3">
+        <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
           <Clock className="h-5 w-5 text-primary" />
           {isToday ? 'Due Today' : `Due: ${format(selectedDate, 'MMM d')}`}
           <Badge variant="secondary" className="ml-2 bg-primary/20 text-primary border-primary/20">
@@ -132,7 +132,7 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-8 w-8 rounded-xl"
             onClick={() => setSelectedDate(subDays(selectedDate, 1))}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -144,7 +144,7 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
                 variant="outline"
                 size="sm"
                 className={cn(
-                  "h-8 justify-start text-left font-normal px-2",
+                  "h-8 justify-start rounded-xl border-border px-2 text-left font-normal",
                   !selectedDate && "text-muted-foreground"
                 )}
               >
@@ -165,7 +165,7 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-8 w-8 rounded-xl"
             onClick={() => setSelectedDate(addDays(selectedDate, 1))}
           >
             <ChevronRight className="h-4 w-4" />
@@ -173,7 +173,7 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 overflow-auto">
+      <CardContent className="flex-1 overflow-auto pt-4">
         {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-16 w-full" />
@@ -200,13 +200,13 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
               return (
                 <div
                   key={order.id || index}
-                  className="flex flex-col p-3 border border-white/5 bg-white/5 rounded-lg hover:bg-primary/10 hover:border-primary/30 transition-all duration-300 cursor-pointer group"
+                  className="group flex cursor-pointer flex-col rounded-2xl border border-border bg-muted/25 p-3 transition-colors hover:bg-muted/45"
                   onClick={() => setLocation(`/orders/${order.id}`)}
                   data-testid={getTestId(TEST_IDS.DATA.ITEM, `due-order-${order.id || index}`)}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-medium text-sm truncate max-w-[120px]">
+                      <span className="max-w-[150px] truncate text-sm font-medium text-foreground">
                         {order.customerName || order.customer?.name || 'Unknown'}
                       </span>
                       <Badge
@@ -219,16 +219,16 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
                         </span>
                       </Badge>
                     </div>
-                    <span className="font-semibold text-sm">
+                    <span className="text-sm font-semibold text-foreground">
                       {formatCurrency(order.totalAmount || order.total || 0)}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                    <div className="flex min-w-0 items-center gap-2">
                       <span className="font-mono">#{order.orderNumber || order.id?.slice(0, 8)}</span>
                       <span>•</span>
-                      <span className="truncate max-w-[100px]">{order.service || 'Service'}</span>
+                      <span className="truncate">{order.service || 'Service'}</span>
                     </div>
 
                     {hoursLeft <= 6 && (

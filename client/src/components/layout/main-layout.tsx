@@ -63,14 +63,14 @@ export function MainLayout({ children }: MainLayoutProps) {
       <div className="app-shell flex h-[calc(var(--app-dvh,1dvh)*100)] min-h-[100svh] w-full overflow-hidden bg-background">
         {/* Desktop Sidebar */}
         {!isMobile && isSidebarOpen && (
-          <div className="hidden shrink-0 p-3 pr-0 lg:flex">
-            <Sidebar className="w-[17.5rem] shrink-0" />
+          <div className="hidden shrink-0 p-4 pr-0 lg:flex">
+            <Sidebar className="w-72 shrink-0" />
           </div>
         )}
 
         {/* Mobile/Tablet Sidebar Drawer */}
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-          <SheetContent side="left" className="w-72 max-w-[85vw] border-none bg-transparent p-3 pr-0 shadow-none">
+          <SheetContent side="left" className="w-72 max-w-[85vw] border-none bg-transparent p-4 pr-0 shadow-none">
             <Sidebar className="w-full border-none" onClose={() => setIsMobileMenuOpen(false)} />
           </SheetContent>
         </Sheet>
@@ -90,7 +90,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             isMobile ? "pb-[calc(5.75rem+env(safe-area-inset-bottom)+0.5rem)]" : "pb-[max(1.5rem,env(safe-area-inset-bottom))]"
           )}>
             <ErrorBoundary>
-              <div className="app-surface mx-auto w-full max-w-[1440px] min-w-0 rounded-[1.75rem]">
+              <div className="mx-auto w-full max-w-[1380px] min-w-0">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={location}

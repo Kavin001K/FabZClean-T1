@@ -29,7 +29,7 @@ export default function SettingsPage() {
     document.title = "Settings | FabzClean";
   }, []);
 
-  const { settings, updateSetting, isLoading } = useSettings();
+  const { settings, updateSetting, isLoading, isSaving } = useSettings();
 
   if (isLoading) {
     return (
@@ -44,11 +44,16 @@ export default function SettingsPage() {
       <div className="mx-auto max-w-4xl space-y-8">
         {/* Header */}
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Personal Settings
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Personal Settings
+            </h1>
+            <Badge variant="outline" className={cn("px-3 py-1 text-xs", isSaving ? "border-primary/30 text-primary" : "border-emerald-200 text-emerald-600")}>
+              {isSaving ? "Saving..." : "Saved"}
+            </Badge>
+          </div>
           <p className="text-muted-foreground">
-            Customize your workspace. These settings are saved to your account and sync across all your devices.
+            Customize your workspace. Changes should apply across the app immediately and persist to your account.
           </p>
         </div>
 

@@ -67,7 +67,7 @@ export const UserMenu = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-9 w-9 rounded-2xl border border-border/60 bg-background/70 p-0 shadow-sm hover:bg-background sm:h-10 sm:w-10">
+        <Button variant="ghost" className="relative h-9 w-9 rounded-xl border border-border/70 bg-card p-0 hover:bg-muted sm:h-10 sm:w-10">
           <Avatar>
             <AvatarImage src={profileImage || ''} alt={employee.fullName} />
             <AvatarFallback className="bg-primary text-white">

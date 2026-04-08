@@ -15,6 +15,11 @@ import { Loader2 } from "lucide-react";
 import { retryDynamicImport } from "@/lib/dynamic-import";
 import { UpdatePrompt } from "@/components/update-prompt";
 import { ShortcutsProvider } from "@/components/shortcuts-provider";
+import { useEffect } from "react";
+import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/auth-context";
+import { useSettings } from "@/contexts/settings-context";
+import { resolveLandingPage } from "@/lib/user-settings";
 
 // Critical pages - loaded immediately
 import NotFound from "@/pages/not-found";
@@ -53,6 +58,20 @@ const PageLoader = () => (
   </div>
 );
 
+function HomeRedirect() {
+  const { employee } = useAuth();
+  const { settings, isLoading } = useSettings();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!employee || isLoading) return;
+    const target = resolveLandingPage(settings.landingPage, employee.role);
+    setLocation(target);
+  }, [employee, isLoading, setLocation, settings.landingPage]);
+
+  return <PageLoader />;
+}
+
 function Router() {
   return (
     <Switch>
@@ -72,9 +91,7 @@ function Router() {
       {/* Protected routes - all authenticated users */}
       <Route path="/">
         <ProtectedRoute>
-          <MainLayout>
-            <Dashboard />
-          </MainLayout>
+          <HomeRedirect />
         </ProtectedRoute>
       </Route>
 

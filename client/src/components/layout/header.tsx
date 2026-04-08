@@ -88,14 +88,14 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
   };
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 px-2.5 pt-[env(safe-area-inset-top)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 sm:px-4 sm:pt-0 md:px-6">
+    <header className="sticky top-0 z-30 border-b border-border/70 bg-background/95 px-2.5 pt-[env(safe-area-inset-top)] backdrop-blur sm:px-4 sm:pt-0 md:px-6">
       <div className="flex min-h-14 items-center gap-2 sm:min-h-16 sm:gap-3 md:gap-4">
       {/* Sidebar toggle */}
       <Button
         variant="ghost"
         size="icon"
         onClick={onToggleSidebar}
-        className="h-9 w-9 shrink-0 rounded-2xl border border-border/70 bg-card/70 shadow-sm hover:bg-card"
+        className="h-9 w-9 shrink-0 rounded-xl border border-border/70 bg-card hover:bg-muted"
         title={isSidebarVisible ? "Hide menu" : "Show menu"}
       >
         {isMobile ? (
@@ -110,7 +110,7 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
       {/* Breadcrumbs — hide on mobile to save space */}
       {!isMobile && (
         <div className="hidden min-w-0 flex-1 items-center gap-3 sm:flex">
-          <div className="min-w-0 flex-1 rounded-2xl border border-border/70 bg-card/70 px-3 py-2 shadow-sm">
+          <div className="min-w-0 flex-1">
         <Breadcrumb className="min-w-0">
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -135,7 +135,7 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
           </BreadcrumbList>
         </Breadcrumb>
           </div>
-          <div className="hidden items-center gap-2 rounded-2xl border border-border/70 bg-card/70 px-3 py-2 text-xs font-semibold text-muted-foreground shadow-sm xl:flex">
+          <div className="hidden items-center gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs font-medium text-muted-foreground xl:flex">
             <CalendarDays className="h-3.5 w-3.5 text-primary" />
             <span>{todayLabel}</span>
           </div>
@@ -145,25 +145,25 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
       {/* Mobile: show current page title instead of breadcrumbs */}
       {isMobile && (
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Workspace</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Workspace</p>
           <h1 className="max-w-[42vw] truncate text-sm font-semibold">{currentPage}</h1>
         </div>
       )}
 
       {/* Search */}
-      <div className={isMobile ? "ml-auto" : "ml-auto min-w-0 w-[200px] sm:w-[240px] md:w-[300px] lg:w-[380px]"}>
+      <div className={isMobile ? "ml-auto" : "ml-auto min-w-0 w-[200px] sm:w-[230px] md:w-[280px] lg:w-[340px]"}>
         <GlobalSearch compact={isMobile} />
       </div>
 
       {/* Action buttons */}
-      <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-border/70 bg-card/70 px-1.5 py-1 shadow-sm sm:px-2">
+      <div className="flex shrink-0 items-center gap-1">
         {/* Keyboard shortcuts — hide on mobile */}
         {!isMobile && (
           <Button
             variant="ghost"
             size="icon"
             onClick={showShortcuts}
-            className="h-8 w-8 rounded-xl"
+            className="h-8 w-8 rounded-xl border border-transparent hover:border-border hover:bg-muted"
             title="Keyboard Shortcuts (F1)"
           >
             <Keyboard className="h-4 w-4" />
@@ -175,7 +175,7 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
             size="icon"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="h-8 w-8 rounded-xl"
+            className="h-8 w-8 rounded-xl border border-transparent hover:border-border hover:bg-muted"
             title="Refresh app (F5)"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />

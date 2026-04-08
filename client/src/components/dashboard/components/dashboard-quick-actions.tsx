@@ -114,26 +114,27 @@ export function DashboardQuickActions(_props: DashboardQuickActionsProps = {}) {
   }
 
   return (
-    <Card className="glass overflow-hidden border-none shadow-xl">
-      <CardHeader className="pb-3 border-b border-white/5 bg-white/5">
-        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+    <Card className="border-border bg-card shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm font-medium text-foreground">
           <Settings className="h-4 w-4" />
           Quick Actions
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
           {enabledActions.map((action) => {
             const IconComponent = action.icon;
             return (
               <Button
                 key={action.id}
                 variant="outline"
-                className="h-24 flex flex-col gap-2 bg-white/5 border-white/10 hover:bg-primary/20 hover:border-primary/50 hover:shadow-[0_0_15px_rgba(var(--primary),0.3)] transition-all duration-300 group"
+                className="flex h-20 flex-col items-start justify-center gap-1 rounded-2xl border-border bg-background px-4 text-left hover:bg-muted"
                 onClick={() => setLocation(action.route)}
               >
-                <IconComponent className={`h-8 w-8 ${action.color} group-hover:scale-110 transition-transform duration-300`} />
-                <span className="font-semibold text-sm group-hover:text-primary transition-colors">{action.label}</span>
+                <IconComponent className={`h-5 w-5 ${action.color}`} />
+                <span className="text-sm font-semibold text-foreground">{action.label}</span>
+                <span className="line-clamp-1 text-xs text-muted-foreground">{action.description}</span>
               </Button>
             );
           })}
@@ -145,4 +146,3 @@ export function DashboardQuickActions(_props: DashboardQuickActionsProps = {}) {
 
 // Default export for compatibility
 export default DashboardQuickActions;
-

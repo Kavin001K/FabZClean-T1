@@ -132,102 +132,97 @@ export default function AdminDashboard() {
             }));
     }, [orders]);
 
+    const statCards = [
+        {
+            title: 'Revenue',
+            value: formatCurrency(stats.totalRevenue),
+            growth: stats.revenueGrowth,
+            label: stats.revenueLabel,
+            icon: IndianRupee,
+        },
+        {
+            title: 'Orders',
+            value: String(stats.totalOrders),
+            growth: stats.ordersGrowth,
+            label: stats.ordersLabel,
+            icon: ShoppingBag,
+        },
+        {
+            title: 'Customers',
+            value: String(stats.activeCustomers),
+            growth: stats.customersGrowth,
+            label: stats.customersLabel,
+            icon: Users,
+        },
+    ];
+
     return (
-        <div className="container-desktop p-3 sm:p-4 md:p-8 space-y-4 sm:space-y-6 md:space-y-8 gradient-mesh min-h-screen">
-            {/* Header */}
-            <div className="pb-6 border-b border-primary/10">
-                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground flex items-center gap-4">
-                    <ShoppingBag className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
-                    Dashboard
-                </h1>
-                <p className="text-muted-foreground mt-2 text-sm sm:text-base max-w-xl font-medium">
-                    Welcome back! Here's an overview of your FabZClean POS operations and real-time business performance.
-                </p>
-            </div>
+        <div className="container-desktop space-y-6 py-2 sm:space-y-8 sm:py-4">
+            <section className="rounded-3xl border border-border bg-card p-5 shadow-sm sm:p-7">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="max-w-2xl">
+                        <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                            <ShoppingBag className="h-6 w-6" />
+                        </div>
+                        <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                            Dashboard
+                        </h1>
+                        <p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">
+                            A simple, live view of orders, customers, printing, and what needs attention today.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm sm:w-auto sm:grid-cols-3">
+                        <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Live sync</p>
+                            <p className="mt-1 font-semibold text-foreground">Every 5s</p>
+                        </div>
+                        <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Orders</p>
+                            <p className="mt-1 font-semibold text-foreground">{stats.totalOrders}</p>
+                        </div>
+                        <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Customers</p>
+                            <p className="mt-1 font-semibold text-foreground">{stats.activeCustomers}</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             {/* Key Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-                <Card className="glass hover:shadow-lg transition-all duration-300 border-t-primary/50">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                        <IndianRupee className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-xl sm:text-2xl font-bold truncate">{formatCurrency(stats.totalRevenue)}</div>
-                        <p className="text-xs text-muted-foreground flex items-center mt-1 h-5">
-                            {stats.revenueGrowth !== null ? (
-                                <>
-                                    {stats.revenueGrowth > 0 ? (
-                                        <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {statCards.map((card) => {
+                    const Icon = card.icon;
+                    return (
+                        <Card key={card.title} className="border-border bg-card shadow-sm">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                                    <Icon className="h-4 w-4" />
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="truncate text-2xl font-bold text-foreground">{card.value}</div>
+                                <p className="mt-2 flex min-h-5 items-center text-xs text-muted-foreground">
+                                    {card.growth !== null ? (
+                                        <>
+                                            {card.growth > 0 ? (
+                                                <ArrowUpRight className="mr-1 h-4 w-4 text-green-600" />
+                                            ) : (
+                                                <ArrowDownRight className="mr-1 h-4 w-4 text-red-500" />
+                                            )}
+                                            <span className={card.growth > 0 ? "text-green-600" : "text-red-500"}>
+                                                {Math.abs(card.growth)}%
+                                            </span>
+                                            <span className="ml-1">vs last {card.label}</span>
+                                        </>
                                     ) : (
-                                        <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
+                                        <span>No comparison data</span>
                                     )}
-                                    <span className={stats.revenueGrowth > 0 ? "text-green-500" : "text-red-500"}>
-                                        {Math.abs(stats.revenueGrowth)}%
-                                    </span>
-                                    <span className="ml-1 hidden sm:inline">from last {stats.revenueLabel}</span>
-                                </>
-                            ) : (
-                                <span className="text-muted-foreground italic">No comparison data</span>
-                            )}
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card className="glass hover:shadow-lg transition-all duration-300 border-t-accent/50">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-                        <ShoppingBag className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-xl sm:text-2xl font-bold">{stats.totalOrders}</div>
-                        <p className="text-xs text-muted-foreground flex items-center mt-1 h-5">
-                            {stats.ordersGrowth !== null ? (
-                                <>
-                                    {stats.ordersGrowth > 0 ? (
-                                        <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
-                                    ) : (
-                                        <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
-                                    )}
-                                    <span className={stats.ordersGrowth > 0 ? "text-green-500" : "text-red-500"}>
-                                        {Math.abs(stats.ordersGrowth)}%
-                                    </span>
-                                    <span className="ml-1 hidden sm:inline">from last {stats.ordersLabel}</span>
-                                </>
-                            ) : (
-                                <span className="text-muted-foreground italic">No comparison data</span>
-                            )}
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card className="glass hover:shadow-lg transition-all duration-300 border-t-blue-500/50">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-xl sm:text-2xl font-bold">{stats.activeCustomers}</div>
-                        <p className="text-xs text-muted-foreground flex items-center mt-1 h-5">
-                            {stats.customersGrowth !== null ? (
-                                <>
-                                    {stats.customersGrowth > 0 ? (
-                                        <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
-                                    ) : (
-                                        <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
-                                    )}
-                                    <span className={stats.customersGrowth > 0 ? "text-green-500" : "text-red-500"}>
-                                        {Math.abs(stats.customersGrowth)}%
-                                    </span>
-                                    <span className="ml-1 hidden sm:inline">from last {stats.customersLabel}</span>
-                                </>
-                            ) : (
-                                <span className="text-muted-foreground italic">No comparison data</span>
-                            )}
-                        </p>
-                    </CardContent>
-                </Card>
-
+                                </p>
+                            </CardContent>
+                        </Card>
+                    );
+                })}
                 <WeatherWidget />
             </div>
 

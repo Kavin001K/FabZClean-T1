@@ -93,9 +93,9 @@ export default function WeatherWidget() {
     };
 
     return (
-        <Card className="glass hover:shadow-lg transition-all duration-300 border-t-yellow-500/50">
+        <Card className="border-border bg-card shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Weather</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Weather</CardTitle>
                 {weather?.weather?.[0]?.description ? (
                     getLaundryAdvice(weather.weather[0].description).icon
                 ) : (
@@ -112,7 +112,7 @@ export default function WeatherWidget() {
                     <div className="text-xs text-red-500 mt-1">Unable to fetch weather</div>
                 ) : (
                     <>
-                        <div className="text-xl sm:text-2xl font-bold">
+                        <div className="text-2xl font-bold text-foreground">
                             {Math.round(weather.main.temp)}°C
                         </div>
                         <div className="flex flex-col gap-0.5 mt-1">

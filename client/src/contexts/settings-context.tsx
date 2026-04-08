@@ -3,73 +3,51 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './auth-context';
 import { useTheme } from '@/components/ui/theme-provider';
+import {
+  AVAILABLE_QUICK_ACTIONS,
+  DEFAULT_SETTINGS,
+  type LandingPage,
+  normalizeUserSettings,
+  readStoredUserSettings,
+  type Theme,
+  type UserSettings,
+  getUserSettingsStorageKey,
+} from '@/lib/user-settings';
 
-// --- Types: User Preferences ---
-export type Theme = 'light' | 'dark' | 'system';
-export type LandingPage = '/dashboard' | '/orders' | '/create-order' | '/customers'| '/services';
-
-// Available quick actions for dashboard
-export const AVAILABLE_QUICK_ACTIONS = [
-  { id: 'new-order', label: 'New Order', icon: 'Plus' },
-  { id: 'active-orders', label: 'Orders', icon: 'Receipt' },
-  { id: 'customer-search', label: 'Customers', icon: 'Users' },
-  { id: 'services', label: 'Services', icon: 'Settings' },
-  { id: 'print-queue', label: 'Print Tags', icon: 'FileText' },
-] as const;
-
-export type QuickActionId = typeof AVAILABLE_QUICK_ACTIONS[number]['id'];
-
-// User UI Preferences (stored in database)
-export interface UserSettings {
-  theme: Theme;
-  landingPage: string;
-  compactMode: boolean;
-  quickActions: string[];
-}
-
-// --- Defaults ---
-const DEFAULT_SETTINGS: UserSettings = {
-  theme: 'system',
-  landingPage: '/dashboard',
-  compactMode: false,
-  quickActions: ['new-order', 'active-orders', 'customer-search', 'print-queue'],
-};
+export { AVAILABLE_QUICK_ACTIONS, DEFAULT_SETTINGS };
+export type { LandingPage, Theme, UserSettings } from '@/lib/user-settings';
 
 // --- Context Type ---
 interface SettingsContextType {
   settings: UserSettings;
   updateSetting: <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => Promise<void>;
   isLoading: boolean;
+  isSaving: boolean;
   refreshSettings: () => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
-
-const STORAGE_KEY = 'fabzclean_user_settings_v1';
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { employee } = useAuth();
   const { setTheme: setProviderTheme } = useTheme();
+  const storageKey = getUserSettingsStorageKey(employee?.id);
 
   // Load from localStorage initially for immediate UI
-  const [localSettings, setLocalSettings] = useState<UserSettings>(() => {
-    if (typeof window === 'undefined') return DEFAULT_SETTINGS;
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } : DEFAULT_SETTINGS;
-    } catch (e) {
-      return DEFAULT_SETTINGS;
-    }
-  });
+  const [localSettings, setLocalSettings] = useState<UserSettings>(() => readStoredUserSettings(employee?.id));
+
+  useEffect(() => {
+    setLocalSettings(readStoredUserSettings(employee?.id));
+  }, [employee?.id]);
 
   // Fetch settings from database
   const { data: dbSettings, isLoading, refetch } = useQuery({
     queryKey: ['user-settings', employee?.id],
     queryFn: async () => {
       const token = localStorage.getItem('employee_token');
-      if (!token || !employee) return DEFAULT_SETTINGS;
+      if (!token || !employee) return undefined;
 
       const res = await fetch('/api/settings/me', {
         headers: {
@@ -80,24 +58,24 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
       if (!res.ok) {
         console.warn('[Settings] Failed to fetch from server, using defaults');
-        return DEFAULT_SETTINGS;
+        return undefined;
       }
       const data = await res.json();
-      return data.success ? { ...DEFAULT_SETTINGS, ...(data.settings || {}) } : DEFAULT_SETTINGS;
+      return data.success ? normalizeUserSettings(data.settings || {}) : undefined;
     },
     enabled: !!employee,
   });
 
   // Effective settings: prefer DB values if available
-  const settings = useMemo(() => ({
-    ...localSettings,
-    ...(dbSettings || {})
-  }), [localSettings, dbSettings]);
+  const settings = useMemo(
+    () => normalizeUserSettings(dbSettings ?? localSettings),
+    [localSettings, dbSettings]
+  );
 
   // Persist to LocalStorage
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  }, [settings]);
+    localStorage.setItem(storageKey, JSON.stringify(settings));
+  }, [settings, storageKey]);
 
   // Delegate theme application to ThemeProvider so it persists via fabzclean-theme key
   useEffect(() => {
@@ -120,6 +98,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     mutationFn: async (newSettings: Partial<UserSettings>) => {
       const token = localStorage.getItem('employee_token');
       if (!token) throw new Error('Not authenticated');
+      const normalizedSettings = normalizeUserSettings({ ...settings, ...newSettings });
 
       const res = await fetch('/api/settings/me', {
         method: 'PUT',
@@ -127,7 +106,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newSettings),
+        body: JSON.stringify(normalizedSettings),
       });
 
       if (!res.ok) {
@@ -141,14 +120,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       // Optimistic Update
       await queryClient.cancelQueries({ queryKey: ['user-settings', employee?.id] });
       const previousSettings = queryClient.getQueryData(['user-settings', employee?.id]);
+      const normalizedSettings = normalizeUserSettings({ ...settings, ...newSettings });
       
-      queryClient.setQueryData(['user-settings', employee?.id], (old: any) => ({
-        ...old,
-        ...newSettings
-      }));
+      queryClient.setQueryData(['user-settings', employee?.id], normalizedSettings);
 
       // Also update local state for zero-latency feel
-      setLocalSettings(prev => ({ ...prev, ...newSettings }));
+      setLocalSettings(normalizedSettings);
 
       return { previousSettings };
     },
@@ -174,6 +151,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       settings,
       updateSetting,
       isLoading,
+      isSaving: updateMutation.isPending,
       refreshSettings,
     }}>
       {children}

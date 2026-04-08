@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '../../contexts/auth-context';
-import { useSettings } from '../../contexts/settings-context';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Loader2, User, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { normalizeUserSettings, resolveLandingPage } from '@/lib/user-settings';
 
 export const LoginForm: React.FC = () => {
   const [, setLocation] = useLocation();
   const { signIn } = useAuth();
-  const { settings } = useSettings();
 
   const [mounted, setMounted] = useState(false);
   const [username, setUsername] = useState('');
@@ -43,8 +42,28 @@ export const LoginForm: React.FC = () => {
           setLocation(redirectTo);
           return;
         }
-        const targetPage = settings.landingPage || '/dashboard';
-        setLocation(targetPage);
+        try {
+          const token = localStorage.getItem('employee_token');
+          if (token && employee) {
+            const settingsResponse = await fetch('/api/settings/me', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (settingsResponse.ok) {
+              const settingsPayload = await settingsResponse.json();
+              const normalizedSettings = normalizeUserSettings(settingsPayload?.settings || {});
+              setLocation(resolveLandingPage(normalizedSettings.landingPage, employee.role));
+              return;
+            }
+          }
+        } catch (settingsError) {
+          console.warn('[Login] Falling back to default landing page:', settingsError);
+        }
+
+        setLocation(resolveLandingPage('/dashboard', employee?.role));
       }
     } catch (err) {
       console.error(err);

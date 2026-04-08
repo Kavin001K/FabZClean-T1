@@ -9,7 +9,7 @@ export function ThemeToggle() {
     <Button
       variant="ghost"
       size="icon"
-      className="h-9 w-9 rounded-xl px-0"
+      className="h-9 w-9 rounded-xl border border-transparent px-0 hover:border-border hover:bg-muted"
       onClick={() => setTheme(theme === "light" ? "dark" : "light")}
       title={`Toggle ${theme === 'light' ? 'dark' : 'light'} mode`}
     >
