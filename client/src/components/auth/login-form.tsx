@@ -6,7 +6,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Loader2, User, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
-import { normalizeUserSettings, resolveLandingPage } from '@/lib/user-settings';
+import { mergeUserSettings, readStoredUserSettings, resolveLandingPage } from '@/lib/user-settings';
 
 export const LoginForm: React.FC = () => {
   const [, setLocation] = useLocation();
@@ -45,6 +45,7 @@ export const LoginForm: React.FC = () => {
         try {
           const token = localStorage.getItem('employee_token');
           if (token && employee) {
+            const localSettings = readStoredUserSettings(employee.id);
             const settingsResponse = await fetch('/api/settings/me', {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -54,10 +55,13 @@ export const LoginForm: React.FC = () => {
 
             if (settingsResponse.ok) {
               const settingsPayload = await settingsResponse.json();
-              const normalizedSettings = normalizeUserSettings(settingsPayload?.settings || {});
+              const normalizedSettings = mergeUserSettings(settingsPayload?.settings, localSettings);
               setLocation(resolveLandingPage(normalizedSettings.landingPage, employee.role));
               return;
             }
+
+            setLocation(resolveLandingPage(localSettings.landingPage, employee.role));
+            return;
           }
         } catch (settingsError) {
           console.warn('[Login] Falling back to default landing page:', settingsError);

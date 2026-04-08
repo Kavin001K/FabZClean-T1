@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,10 +15,29 @@ import {
 } from '@/lib/pdf-templates';
 import { ReportGenerator } from '@/components/report-generator';
 import { SmartAnalyticsView } from '@/components/smart-analytics-view';
+import { REFRESH_DATA_EVENT } from '@/lib/shortcut-events';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
 export default function ReportsPage() {
+    const queryClient = useQueryClient();
+
+    useEffect(() => {
+        document.title = "Reports | FabzClean";
+    }, []);
+
+    useEffect(() => {
+        const handleRefreshData = (event: Event) => {
+            event.preventDefault();
+            void queryClient.invalidateQueries({ queryKey: ['franchise-performance'] });
+            void queryClient.invalidateQueries({ queryKey: ['employee-performance'] });
+            void queryClient.invalidateQueries({ queryKey: ['daily-summary'] });
+        };
+
+        window.addEventListener(REFRESH_DATA_EVENT, handleRefreshData);
+        return () => window.removeEventListener(REFRESH_DATA_EVENT, handleRefreshData);
+    }, [queryClient]);
+
     // Helper to get auth headers
     const getAuthHeaders = () => {
         const token = localStorage.getItem('employee_token');

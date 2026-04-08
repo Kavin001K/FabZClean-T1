@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/command";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { isMac } from '@/lib/utils';
+import { OPEN_GLOBAL_SEARCH_EVENT } from '@/lib/shortcut-events';
 
 interface GlobalSearchProps {
   compact?: boolean;
@@ -43,6 +44,29 @@ export function GlobalSearch({ compact = false }: GlobalSearchProps) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  useEffect(() => {
+    const handleOpenSearch = () => {
+      setIsOpen(true);
+    };
+
+    window.addEventListener(OPEN_GLOBAL_SEARCH_EVENT, handleOpenSearch as EventListener);
+    return () => window.removeEventListener(OPEN_GLOBAL_SEARCH_EVENT, handleOpenSearch as EventListener);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const input = document.querySelector('[data-global-search-input]') as HTMLInputElement | null;
+      input?.focus();
+      input?.select();
+    }, 50);
+
+    return () => window.clearTimeout(timer);
+  }, [isOpen]);
 
   const handleSelect = (result: SearchResult) => {
     setIsOpen(false);
@@ -100,6 +124,7 @@ export function GlobalSearch({ compact = false }: GlobalSearchProps) {
         <DialogContent className="overflow-hidden p-0 shadow-2xl max-w-2xl">
           <Command shouldFilter={false} className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
             <CommandInput
+              data-global-search-input
               placeholder="Type to search..."
               value={searchQuery}
               onValueChange={setSearchQuery}

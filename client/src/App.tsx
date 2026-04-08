@@ -35,6 +35,7 @@ const OrderDetail = lazy(() => retryDynamicImport(() => import("@/pages/order-de
 const CreateOrder = lazy(() => retryDynamicImport(() => import("@/pages/create-order")));
 const Customers = lazy(() => retryDynamicImport(() => import("@/pages/customers")));
 const Services = lazy(() => retryDynamicImport(() => import("@/pages/services")));
+const Reports = lazy(() => retryDynamicImport(() => import("@/pages/reports")));
 const PrintQueue = lazy(() => retryDynamicImport(() => import("@/pages/print-queue")));
 const UserManagement = lazy(() => retryDynamicImport(() => import("@/pages/user-management")));
 const WalletManagement = lazy(() => retryDynamicImport(() => import("@/pages/wallet-management")));
@@ -159,6 +160,14 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/reports">
+        <ProtectedRoute>
+          <MainLayout>
+            <Reports />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
       <Route path="/user-management">
         <ProtectedRoute allowedRoles={["admin"]}>
           <MainLayout>
@@ -218,9 +227,9 @@ function App() {
         {/* Nest additional error boundaries for critical sections */}
         <ErrorBoundary>
           <AuthProvider>
-            <SettingsProvider>
-              <RealtimeProvider>
-                <ThemeProvider defaultTheme="light" storageKey="fabzclean-theme">
+            <ThemeProvider defaultTheme="light" storageKey="fabzclean-theme">
+              <SettingsProvider>
+                <RealtimeProvider>
                   <TooltipProvider>
                     <NotificationProvider>
                       <ShortcutsProvider>
@@ -237,9 +246,9 @@ function App() {
                       </ShortcutsProvider>
                     </NotificationProvider>
                   </TooltipProvider>
-                </ThemeProvider>
-              </RealtimeProvider>
-            </SettingsProvider>
+                </RealtimeProvider>
+              </SettingsProvider>
+            </ThemeProvider>
           </AuthProvider>
         </ErrorBoundary>
       </QueryClientProvider>

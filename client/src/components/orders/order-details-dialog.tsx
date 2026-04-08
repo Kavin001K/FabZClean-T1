@@ -424,7 +424,7 @@ export default React.memo(function OrderDetailsDialog({
               <Edit className="h-4 w-4 mr-2" /> Edit
             </Button>
 
-            <Button variant="outline" onClick={handlePrintInvoice}>
+            <Button variant="outline" onClick={handlePrintInvoice} data-print-button>
               <Printer className="h-4 w-4 mr-2" /> Invoice
             </Button>
 

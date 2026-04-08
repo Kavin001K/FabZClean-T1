@@ -497,8 +497,8 @@ export default function PrintTags() {
             {/* ── Batch actions bar ──────────────────────────────────────── */}
             {selectedIds.length > 0 && (
                 <Card className="border-primary/50 bg-primary/5 animate-in slide-in-from-top-4">
-                    <CardContent className="p-3 flex flex-wrap items-center gap-2 justify-between">
-                        <span className="text-sm font-bold ml-2">
+                    <CardContent className="flex min-h-[3.75rem] flex-wrap items-center justify-between gap-3 px-4 py-3.5">
+                        <span className="text-sm font-bold leading-none">
                             {selectedIds.length} order(s) selected
                         </span>
                         <div className="flex items-center gap-2 flex-wrap">
@@ -529,13 +529,13 @@ export default function PrintTags() {
 
             {/* ── Select-all row ─────────────────────────────────────────── */}
             {filteredOrders.length > 0 && (
-                <div className="flex items-center gap-3 px-2 py-1 bg-white/5 rounded-lg border border-white/5 w-fit">
+                <div className="flex min-h-10 items-center gap-3 px-3 py-2 bg-white/5 rounded-lg border border-white/5 w-fit">
                     <Checkbox
                         checked={selectedIds.length === filteredOrders.length && filteredOrders.length > 0}
                         onCheckedChange={selectAll}
                         className="h-4 w-4"
                     />
-                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                    <span className="text-xs font-bold leading-none text-muted-foreground uppercase tracking-widest">
                         Check All ({filteredOrders.length})
                     </span>
                 </div>

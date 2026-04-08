@@ -1768,6 +1768,7 @@ function OrdersComponent() {
                     variant="outline"
                     size="sm"
                     onClick={handleRefresh}
+                    data-refresh-button
                     className="gap-2"
                   >
                     <RefreshCw className="h-4 w-4" />
@@ -1789,6 +1790,7 @@ function OrdersComponent() {
                       placeholder={searchPlaceholder}
                       value={filters.search}
                       onChange={(e) => handleSearchChange(e.target.value)}
+                      data-search-input
                       className="pl-10 pr-10 h-10 text-sm border-primary/10 focus:border-primary/30 transition-all bg-muted/20"
                     />
                     {filters.search && (

@@ -61,6 +61,7 @@ import { customersApi, ordersApi } from '@/lib/data-service';
 import { exportCustomersEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportCustomersToExcel } from '@/lib/excel-exports';
 import { createAddressObject } from '@/lib/address-utils';
+import { REFRESH_DATA_EVENT } from '@/lib/shortcut-events';
 import type { Customer, Order } from '@shared/schema';
 import * as XLSX from 'xlsx';
 
@@ -113,6 +114,21 @@ export default function Customers() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const handleRefreshData = (event: Event) => {
+      event.preventDefault();
+      void queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast({
+        title: 'Customers Refreshed',
+        description: 'Customer data has been updated.',
+        duration: 1500,
+      });
+    };
+
+    window.addEventListener(REFRESH_DATA_EVENT, handleRefreshData);
+    return () => window.removeEventListener(REFRESH_DATA_EVENT, handleRefreshData);
+  }, [queryClient, toast]);
 
   // Fetch customers data
   const {
@@ -620,6 +636,7 @@ export default function Customers() {
                     placeholder="Search by name, email, or phone..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    data-search-input
                     className="pl-9 h-11 border-muted bg-muted/5 focus-visible:ring-primary/20"
                   />
                   <AnimatePresence>

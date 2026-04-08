@@ -530,6 +530,7 @@ export default React.memo(function EditOrderDialog({
           </Button>
           <Button
             onClick={handleSave}
+            data-save-button
             disabled={isLoading}
             className="min-w-[140px] shadow-lg shadow-primary/20"
           >

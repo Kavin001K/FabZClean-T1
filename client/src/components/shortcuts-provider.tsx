@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useLocation } from 'wouter';
 import { ShortcutsDialog } from './shortcuts-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { dispatchShortcutEvent, OPEN_GLOBAL_SEARCH_EVENT, REFRESH_DATA_EVENT } from '@/lib/shortcut-events';
 
 interface ShortcutsContextType {
     showShortcuts: () => void;
@@ -24,7 +25,7 @@ interface ShortcutsProviderProps {
 
 export function ShortcutsProvider({ children }: ShortcutsProviderProps) {
     const [showDialog, setShowDialog] = useState(false);
-    const [, setLocation] = useLocation();
+    const [location, setLocation] = useLocation();
     const { toast } = useToast();
 
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -33,12 +34,17 @@ export function ShortcutsProvider({ children }: ShortcutsProviderProps) {
             target.tagName === 'TEXTAREA' ||
             target.tagName === 'SELECT' ||
             target.isContentEditable;
+        const modKey = e.ctrlKey || e.metaKey;
+        const isAltNavigation = e.altKey && ['1', '2', '3', '4'].includes(e.key);
+        const isShortcutKey =
+            e.key.startsWith('F') ||
+            e.key === 'Escape' ||
+            modKey ||
+            isAltNavigation;
 
-        if (isInput && e.key && !e.key.startsWith('F') && e.key !== 'Escape') {
+        if (isInput && !isShortcutKey) {
             return;
         }
-
-        const modKey = e.ctrlKey || e.metaKey;
 
         if (e.key === 'F1') {
             e.preventDefault();
@@ -64,11 +70,7 @@ export function ShortcutsProvider({ children }: ShortcutsProviderProps) {
                 searchInput.focus();
                 searchInput.select();
             } else {
-                toast({
-                    title: 'Search',
-                    description: 'Use the search bar at the top of the page',
-                    duration: 2000,
-                });
+                dispatchShortcutEvent(OPEN_GLOBAL_SEARCH_EVENT);
             }
             return;
         }
@@ -90,6 +92,21 @@ export function ShortcutsProvider({ children }: ShortcutsProviderProps) {
                     description: 'Open an order to print the bill',
                     duration: 2000,
                 });
+            }
+            return;
+        }
+
+        if (e.key === 'F5') {
+            e.preventDefault();
+            const refreshBtn = document.querySelector('[data-refresh-button]') as HTMLButtonElement;
+            if (refreshBtn) {
+                refreshBtn.click();
+                return;
+            }
+
+            const wasHandled = dispatchShortcutEvent(REFRESH_DATA_EVENT);
+            if (!wasHandled) {
+                window.location.reload();
             }
             return;
         }
@@ -120,6 +137,22 @@ export function ShortcutsProvider({ children }: ShortcutsProviderProps) {
                 closeBtn.click();
                 return;
             }
+
+            const hasOpenDialog = Boolean(document.querySelector('[role="dialog"][data-state="open"]'));
+            const hasOpenPopover = Boolean(document.querySelector('[data-radix-popper-content-wrapper]'));
+            if (hasOpenDialog || hasOpenPopover) {
+                return;
+            }
+
+            if (location !== '/' && location !== '/dashboard') {
+                e.preventDefault();
+                if (window.history.length > 1) {
+                    window.history.back();
+                } else {
+                    setLocation('/dashboard');
+                }
+            }
+            return;
         }
 
         if (e.altKey && e.key === '1') {
@@ -151,7 +184,7 @@ export function ShortcutsProvider({ children }: ShortcutsProviderProps) {
             setLocation('/employees');
             return;
         }
-    }, [setLocation, toast, showDialog]);
+    }, [location, setLocation, toast, showDialog]);
 
     useEffect(() => {
         window.addEventListener('keydown', handleKeyDown);

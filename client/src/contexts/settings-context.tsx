@@ -7,6 +7,7 @@ import {
   AVAILABLE_QUICK_ACTIONS,
   DEFAULT_SETTINGS,
   type LandingPage,
+  mergeUserSettings,
   normalizeUserSettings,
   readStoredUserSettings,
   type Theme,
@@ -61,14 +62,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         return undefined;
       }
       const data = await res.json();
-      return data.success ? normalizeUserSettings(data.settings || {}) : undefined;
+      return data.success ? data.settings || undefined : undefined;
     },
     enabled: !!employee,
   });
 
-  // Effective settings: prefer DB values if available
+  // Effective settings: keep local settings authoritative in runtime so stale/default
+  // server responses do not override the user's latest choices.
   const settings = useMemo(
-    () => normalizeUserSettings(dbSettings ?? localSettings),
+    () => mergeUserSettings(DEFAULT_SETTINGS, dbSettings, localSettings),
     [localSettings, dbSettings]
   );
 
@@ -98,7 +100,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     mutationFn: async (newSettings: Partial<UserSettings>) => {
       const token = localStorage.getItem('employee_token');
       if (!token) throw new Error('Not authenticated');
-      const normalizedSettings = normalizeUserSettings({ ...settings, ...newSettings });
+      const normalizedSettings = mergeUserSettings(settings, newSettings);
 
       const res = await fetch('/api/settings/me', {
         method: 'PUT',
@@ -132,6 +134,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     onError: (err, newSettings, context) => {
       queryClient.setQueryData(['user-settings', employee?.id], context?.previousSettings);
       console.warn('[Settings] Save to server failed, keeping local:', err);
+    },
+    onSuccess: (result) => {
+      const serverSettings = mergeUserSettings(result?.settings, localSettings);
+      queryClient.setQueryData(['user-settings', employee?.id], serverSettings);
+      setLocalSettings(serverSettings);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['user-settings', employee?.id] });

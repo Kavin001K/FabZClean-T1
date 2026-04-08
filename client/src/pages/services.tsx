@@ -65,6 +65,7 @@ import { servicesApi } from '@/lib/data-service';
 import type { Service } from '@shared/schema';
 import { EnhancedPDFExport, exportServicesEnhanced } from '@/lib/enhanced-pdf-export';
 import { exportServicesToExcel } from '@/lib/excel-exports';
+import { REFRESH_DATA_EVENT } from '@/lib/shortcut-events';
 import { ServiceImportDialog } from '@/components/services/service-import-dialog';
 
 // Service icon mapping
@@ -115,6 +116,21 @@ export default function Services() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const handleRefreshData = (event: Event) => {
+      event.preventDefault();
+      void queryClient.invalidateQueries({ queryKey: ['services'] });
+      toast({
+        title: 'Services Refreshed',
+        description: 'Service catalog has been updated.',
+        duration: 1500,
+      });
+    };
+
+    window.addEventListener(REFRESH_DATA_EVENT, handleRefreshData);
+    return () => window.removeEventListener(REFRESH_DATA_EVENT, handleRefreshData);
+  }, [queryClient, toast]);
 
   // Fetch services data with React Query
   const {
@@ -550,6 +566,7 @@ export default function Services() {
                   placeholder="Search services by name, description, or category..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  data-search-input
                   className="pl-10 h-11 text-sm border-muted focus-visible:ring-primary/20 transition-all bg-muted/5 group-hover:bg-muted/10 font-medium"
                   aria-label="Search services by name, description, or category"
                 />

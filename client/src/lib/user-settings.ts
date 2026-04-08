@@ -71,6 +71,17 @@ export function normalizeUserSettings(value: unknown): UserSettings {
   };
 }
 
+export function mergeUserSettings(...values: unknown[]): UserSettings {
+  const merged = values.reduce<Record<string, unknown>>((acc, value) => {
+    if (value && typeof value === "object") {
+      Object.assign(acc, value);
+    }
+    return acc;
+  }, {});
+
+  return normalizeUserSettings(merged);
+}
+
 export function readStoredUserSettings(userId?: string | null): UserSettings {
   if (typeof window === "undefined") {
     return DEFAULT_SETTINGS;

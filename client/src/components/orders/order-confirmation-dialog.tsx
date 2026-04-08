@@ -632,6 +632,7 @@ export function OrderConfirmationDialog({
                     <div className="grid grid-cols-2 gap-3 w-full">
                         <Button
                             onClick={handlePrintBill}
+                            data-print-button
                             variant="outline"
                             className="w-full border-gray-200 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 transition-all font-medium"
                         >

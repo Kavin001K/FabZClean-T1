@@ -88,6 +88,7 @@ export default function CreateOrder() {
   const [lastAddedInstanceKey, setLastAddedInstanceKey] = useState<string | null>(null);
   // Collapsible extras state
   const [showCouponExtras, setShowCouponExtras] = useState(false);
+  const [showCustomerInfo, setShowCustomerInfo] = useState(false);
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -1125,6 +1126,7 @@ export default function CreateOrder() {
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Create New Order</h1>
         <Button
           onClick={handleCreateOrder}
+          data-save-button
           disabled={createOrderMutation.isPending || selectedServiceCount === 0 || !customerName || !customerPhone}
           size="lg"
           className="hidden sm:inline-flex bg-primary hover:bg-primary/90 text-white shadow-lg"
@@ -1267,14 +1269,30 @@ export default function CreateOrder() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
           >
-            <Card className="border dark:border-slate-700/50 dark:bg-slate-900/40 shadow-sm">
-              <CardHeader className="dark:border-slate-800">
-                <CardTitle className="flex items-center text-slate-900 dark:text-white">
+            <Card className="border dark:border-slate-700/50 dark:bg-slate-900/40 shadow-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowCustomerInfo(prev => !prev)}
+                className="w-full flex flex-row items-center justify-between p-6 text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+              >
+                <div className="flex items-center font-semibold text-lg tracking-tight leading-none">
                   <User className="h-5 w-5 mr-2 text-primary" />
                   Customer Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+                </div>
+                <ChevronRight className={cn("h-5 w-5 transition-transform duration-200 text-slate-500", showCustomerInfo && "rotate-90")} />
+              </button>
+              
+              <AnimatePresence>
+                {showCustomerInfo && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="border-t dark:border-slate-800" />
+                    <CardContent className="space-y-4 pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="customerName" className="text-slate-700 dark:text-slate-300">Name *</Label>
@@ -1347,6 +1365,9 @@ export default function CreateOrder() {
                   </div>
                 </div>
               </CardContent>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </Card>
           </motion.div>
 
@@ -2310,6 +2331,7 @@ export default function CreateOrder() {
                 )}>
                   <Button
                     onClick={handleCreateOrder}
+                    data-save-button
           disabled={createOrderMutation.isPending || selectedServiceCount === 0 || !customerName || !customerPhone}
                     className="w-full h-12 text-lg font-black shadow-lg shadow-primary/25 hover:scale-[1.01] active:scale-[0.98] transition-all bg-primary hover:bg-primary/90"
                   >
