@@ -13,7 +13,7 @@ import { PageTransition, FadeIn } from "@/components/ui/page-transition";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, isSameDay, startOfDay } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
@@ -107,6 +107,8 @@ interface OrderFilters {
   search: string;
   dateFrom: Date | undefined;
   dateTo: Date | undefined;
+  dueDate: Date | undefined;
+  dueDatePreset: 'today' | 'custom' | undefined;
   amountMin: string;
   amountMax: string;
 }
@@ -141,6 +143,14 @@ const canShowSendBillAction = (order: Order): boolean => {
   const phone = resolveOrderPhone(order);
   const sendCount = Number((order as any).whatsappMessageCount || 0);
   return Boolean(phone) && hasBillSendFailed(order) && sendCount < MAX_WHATSAPP_SENDS;
+};
+
+const resolveOrderDueDate = (order: Order): Date | null => {
+  const dueDateValue = (order as any).pickupDate || (order as any).dueDate;
+  if (!dueDateValue) return null;
+
+  const dueDate = new Date(dueDateValue);
+  return Number.isNaN(dueDate.getTime()) ? null : dueDate;
 };
 
 function OrdersComponent() {
@@ -191,6 +201,8 @@ function OrdersComponent() {
     search: '',
     dateFrom: undefined,
     dateTo: undefined,
+    dueDate: undefined,
+    dueDatePreset: undefined,
     amountMin: '',
     amountMax: '',
   });
@@ -291,6 +303,14 @@ function OrdersComponent() {
         const orderDateStr = orderDate.toISOString();
         if (filters.dateFrom && new Date(orderDateStr) < filters.dateFrom) return false;
         if (filters.dateTo && new Date(orderDateStr) > filters.dateTo) return false;
+      }
+
+      // Due date filter
+      if (filters.dueDate) {
+        const dueDate = resolveOrderDueDate(order);
+        if (!dueDate || !isSameDay(dueDate, filters.dueDate)) {
+          return false;
+        }
       }
 
       // Amount range filter
@@ -926,6 +946,11 @@ function OrdersComponent() {
       dateRange: filters.dateFrom || filters.dateTo
         ? `${filters.dateFrom ? formatDate(filters.dateFrom.toISOString()) : 'Any'} - ${filters.dateTo ? formatDate(filters.dateTo.toISOString()) : 'Any'}`
         : undefined,
+      dueDate: filters.dueDate
+        ? filters.dueDatePreset === 'today'
+          ? 'Today'
+          : format(filters.dueDate, "PPP")
+        : undefined,
       amountRange: filters.amountMin || filters.amountMax
         ? `${filters.amountMin || 'Any'} - ${filters.amountMax || 'Any'}`
         : undefined,
@@ -978,6 +1003,15 @@ function OrdersComponent() {
     setPagination(prev => ({ ...prev, currentPage: 1 }));
   }, []);
 
+  const handleDueDateFilterChange = useCallback((preset: 'today' | 'custom' | undefined, date?: Date) => {
+    setFilters(prev => ({
+      ...prev,
+      dueDatePreset: preset,
+      dueDate: date ? startOfDay(date) : undefined,
+    }));
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
+  }, []);
+
   const handleClearFilters = useCallback(() => {
     setFilters({
       status: [],
@@ -985,6 +1019,8 @@ function OrdersComponent() {
       search: '',
       dateFrom: undefined,
       dateTo: undefined,
+      dueDate: undefined,
+      dueDatePreset: undefined,
       amountMin: '',
       amountMax: '',
     });
@@ -1343,9 +1379,16 @@ function OrdersComponent() {
       filters.paymentStatus.length > 0 ||
       filters.dateFrom ||
       filters.dateTo ||
+      filters.dueDate ||
       filters.amountMin ||
       filters.amountMax;
   }, [filters]);
+
+  const dueFilterLabel = filters.dueDate
+    ? filters.dueDatePreset === 'today'
+      ? 'Due Today'
+      : `Due on ${format(filters.dueDate, "PPP")}`
+    : null;
 
   const ordersGridColumns = "grid-cols-[48px_168px_minmax(220px,1.6fr)_110px_minmax(140px,1.1fr)_minmax(140px,1fr)_minmax(130px,1fr)_110px_130px_130px_84px]";
   const ordersTableMinWidth = "min-w-[1430px]";
@@ -1748,10 +1791,11 @@ function OrdersComponent() {
             <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-accent/5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <CardTitle className="text-lg sm:text-2xl">All Orders</CardTitle>
+                  <CardTitle className="text-lg sm:text-2xl">{filters.dueDate ? 'Due Orders' : 'All Orders'}</CardTitle>
                   <CardDescription className="text-sm sm:text-base mt-1">
                     Showing {filteredOrders.length} of {orders.length} orders
                     {hasActiveFilters && <span className="text-primary ml-2">(Filtered)</span>}
+                    {dueFilterLabel && <span className="text-amber-600 ml-2">({dueFilterLabel})</span>}
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1824,6 +1868,7 @@ function OrdersComponent() {
                               (filters.paymentStatus.length || 0) +
                               (filters.dateFrom ? 1 : 0) +
                               (filters.dateTo ? 1 : 0) +
+                              (filters.dueDate ? 1 : 0) +
                               (filters.amountMin ? 1 : 0) +
                               (filters.amountMax ? 1 : 0)}
                           </Badge>
@@ -1953,6 +1998,66 @@ function OrdersComponent() {
                           </div>
                         </div>
 
+                        {/* Due Date */}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <label className="text-sm font-medium">Due Orders</label>
+                            {filters.dueDate && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDueDateFilterChange(undefined)}
+                                className="h-7 px-2 text-xs text-muted-foreground"
+                              >
+                                Clear Due Filter
+                              </Button>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              variant={filters.dueDatePreset === 'today' ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() =>
+                                filters.dueDatePreset === 'today'
+                                  ? handleDueDateFilterChange(undefined)
+                                  : handleDueDateFilterChange('today', new Date())
+                              }
+                              className="gap-2"
+                            >
+                              <CalendarIcon className="h-4 w-4" />
+                              Due Today
+                            </Button>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant={filters.dueDatePreset === 'custom' ? 'default' : 'outline'}
+                                  size="sm"
+                                  className="justify-start text-left font-normal"
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {filters.dueDatePreset === 'custom' && filters.dueDate
+                                    ? format(filters.dueDate, "PPP")
+                                    : 'Custom due date'}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={filters.dueDatePreset === 'custom' ? filters.dueDate : undefined}
+                                  onSelect={(date) => handleDueDateFilterChange(date ? 'custom' : undefined, date)}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Show all orders due on a selected pickup date.
+                          </p>
+                        </div>
+
                         {/* Amount Range */}
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
@@ -1995,6 +2100,24 @@ function OrdersComponent() {
                       </div>
                     </PopoverContent>
                   </Popover>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    onClick={() =>
+                      filters.dueDatePreset === 'today'
+                        ? handleDueDateFilterChange(undefined)
+                        : handleDueDateFilterChange('today', new Date())
+                    }
+                    className={cn(
+                      "gap-2",
+                      filters.dueDatePreset === 'today' && "border-primary bg-primary/10"
+                    )}
+                  >
+                    <CalendarIcon className="h-5 w-5" />
+                    Due Today
+                  </Button>
 
                   {/* Bulk Actions */}
                   <AnimatePresence>
@@ -2165,6 +2288,17 @@ function OrdersComponent() {
                         <X
                           className="h-3 w-3 cursor-pointer"
                           onClick={() => setFilters(prev => ({ ...prev, dateTo: undefined }))}
+                        />
+                      </Badge>
+                    )}
+                    {filters.dueDate && (
+                      <Badge variant="secondary" className="gap-1">
+                        {filters.dueDatePreset === 'today'
+                          ? 'Due Today'
+                          : `Due: ${format(filters.dueDate, "PPP")}`}
+                        <X
+                          className="h-3 w-3 cursor-pointer"
+                          onClick={() => handleDueDateFilterChange(undefined)}
                         />
                       </Badge>
                     )}

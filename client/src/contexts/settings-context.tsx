@@ -67,10 +67,20 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     enabled: !!employee,
   });
 
-  // Effective settings: keep local settings authoritative in runtime so stale/default
-  // server responses do not override the user's latest choices.
+  // Sync fetched dbSettings into localSettings so that new devices receive the cloud settings
+  useEffect(() => {
+    if (dbSettings) {
+      setLocalSettings(prev => {
+        const merged = mergeUserSettings(prev, dbSettings);
+        return JSON.stringify(merged) !== JSON.stringify(prev) ? merged : prev;
+      });
+    }
+  }, [dbSettings]);
+
+  // Effective settings: combine DEFAULT_SETTINGS, localSettings, and then dbSettings
+  // dbSettings is authoritative when it exists, but localSettings provides the immediate UI state.
   const settings = useMemo(
-    () => mergeUserSettings(DEFAULT_SETTINGS, dbSettings, localSettings),
+    () => mergeUserSettings(DEFAULT_SETTINGS, localSettings, dbSettings),
     [localSettings, dbSettings]
   );
 
@@ -136,9 +146,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       console.warn('[Settings] Save to server failed, keeping local:', err);
     },
     onSuccess: (result) => {
-      const serverSettings = mergeUserSettings(result?.settings, localSettings);
-      queryClient.setQueryData(['user-settings', employee?.id], serverSettings);
-      setLocalSettings(serverSettings);
+      if (result?.settings) {
+        setLocalSettings(result.settings);
+        queryClient.setQueryData(['user-settings', employee?.id], result.settings);
+      }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['user-settings', employee?.id] });

@@ -27,7 +27,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: "/", label: "Dashboard", icon: Home },
+  { to: "/dashboard", label: "Dashboard", icon: Home },
   { to: "/create-order", label: "New Order", icon: PlusCircle, allowedRoles: ["admin", "store_manager", "store_staff"] },
   { to: "/orders", label: "Active Orders", icon: ListOrdered },
   { to: "/customers", label: "Customers", icon: Users2, allowedRoles: ["admin", "store_manager", "store_staff"] },
@@ -65,7 +65,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
       </div>
       <nav className="scrollbar-thin flex flex-1 min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain scroll-smooth px-3 py-3 font-medium">
         {filteredNav.map((item) => {
-          const isActive = item.to === "/"
+          const isActive = item.to === "/dashboard"
             ? location === "/" || location === "/dashboard"
             : location === item.to || location.startsWith(`${item.to}/`);
 
