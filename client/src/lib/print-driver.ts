@@ -14,6 +14,7 @@ import {
   type StoreConfig,
 } from '@shared/business-config';
 import { businessConfigApi, getBillingCache } from './business-config-service';
+import { authorizedFetch } from './data-service';
 import { isElectron } from './utils';
 
 export interface PrintSettings {
@@ -1343,11 +1344,12 @@ export class PrintDriver {
   ): Promise<any> {
     try {
       const formData = new FormData();
-      formData.append('file', pdfBlob, filename);
+      const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+      formData.append('file', pdfFile, filename);
       formData.append('type', metadata.type);
       formData.append('metadata', JSON.stringify(metadata));
 
-      const response = await fetch('/api/documents/upload', {
+      const response = await authorizedFetch('/documents/upload', {
         method: 'POST',
         body: formData,
       });

@@ -16,9 +16,18 @@ const upload = multer({
         fileSize: 50 * 1024 * 1024, // 50MB limit
     },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype === 'application/pdf') {
+        const filename = String(file.originalname || '').toLowerCase();
+        const mimeType = String(file.mimetype || '').toLowerCase();
+        const looksLikePdf = filename.endsWith('.pdf');
+        const isAcceptedMime =
+            mimeType === 'application/pdf' ||
+            mimeType === 'application/x-pdf' ||
+            mimeType === 'application/octet-stream';
+
+        if (looksLikePdf || isAcceptedMime) {
             cb(null, true);
         } else {
+            console.warn(`❌ [Documents] Rejected upload "${file.originalname}" with mimetype "${file.mimetype}"`);
             cb(new Error('Only PDF files are allowed'));
         }
     },
