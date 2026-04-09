@@ -1,6 +1,7 @@
 import React from 'react';
 import { DEFAULT_COMPANY_INFO, getFranchiseById } from './franchise-config';
 import { normalizeOrderStoreCode } from './order-store';
+import { DEFAULT_TAG_TEMPLATE_CONFIG, type TagTemplateConfig } from '@shared/business-config';
 
 export const THERMAL_TAG_WIDTH_MM = 36;
 export const THERMAL_TAG_HEIGHT_MM = 28;
@@ -25,6 +26,7 @@ export interface ThermalTagSource {
   commonNote?: string;
   billDate?: string;
   dueDate?: string;
+  templateConfig?: Partial<TagTemplateConfig>;
   items: ThermalTagItem[];
 }
 
@@ -198,8 +200,13 @@ export const prepareThermalTags = ({
   commonNote,
   billDate,
   dueDate,
+  templateConfig,
   items,
 }: ThermalTagSource): PreparedThermalTag[] => {
+  const resolvedConfig = {
+    ...DEFAULT_TAG_TEMPLATE_CONFIG,
+    ...(templateConfig || {}),
+  };
   const shortOrderId = formatShortOrderId(orderNumber);
   const shortOrderFit = fitUppercaseText(shortOrderId, shortOrderId, {
     baseFontMm: 6,
@@ -227,7 +234,7 @@ export const prepareThermalTags = ({
     maxCharsAtMin: 18,
   });
   const billText = formatTagDate(billDate);
-  const dueText = formatTagDate(dueDate);
+  const dueText = resolvedConfig.showDueDate ? formatTagDate(dueDate) : '';
   const billFit = fitUppercaseText(`ORD ${billText}`, `ORD ${billText}`, {
     baseFontMm: 2.75,
     minFontMm: 2.15,
@@ -239,8 +246,10 @@ export const prepareThermalTags = ({
 
   return items.flatMap((item, itemIndex) => {
     const quantity = Math.max(1, Number(item.quantity) || 1);
-    const compactServiceText = formatCompactServiceDisplay(item.serviceName);
-    const compactNoteText = formatCompactNoteDisplay(item.tagNote || commonNote || '');
+    const compactServiceText = resolvedConfig.showServiceName ? formatCompactServiceDisplay(item.serviceName) : '';
+    const compactNoteText = resolvedConfig.showTagNote
+      ? formatCompactNoteDisplay(item.tagNote || commonNote || '').slice(0, resolvedConfig.maxNoteChars || DEFAULT_TAG_TEMPLATE_CONFIG.maxNoteChars)
+      : '';
     const noteFit = fitText(compactNoteText, '', {
       baseFontMm: 2.6,
       minFontMm: 2.05,
@@ -270,17 +279,17 @@ export const prepareThermalTags = ({
 
     return Array.from({ length: quantity }, (_, tagIndex) => ({
       id: `${orderNumber}-${itemIndex}-${tagIndex}`,
-      shortOrderId,
+      shortOrderId: resolvedConfig.showOrderNumber ? shortOrderId : '',
       shortOrderFontMm: shortOrderFit.fontSizeMm,
-      billText,
+      billText: resolvedConfig.showOrderNumber ? billText : '',
       billFontMm: billFit.fontSizeMm,
-      customerText: customerFit.text,
-      branchText: branchFit.text,
+      customerText: resolvedConfig.showCustomerName ? customerFit.text : '',
+      branchText: resolvedConfig.showStoreCode ? branchFit.text : '',
       serviceText: serviceFit.text,
       noteText: noteFit.text,
       hasNote,
       dueText,
-      countText: `${tagIndex + 1}/${quantity}`,
+      countText: resolvedConfig.showQuantity ? `${tagIndex + 1}/${quantity}` : '',
       customerFontMm: customerFit.fontSizeMm,
       branchFontMm: branchFit.fontSizeMm,
       serviceFontMm: serviceFit.fontSizeMm,

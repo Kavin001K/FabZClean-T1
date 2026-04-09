@@ -82,6 +82,8 @@ export default function CreateOrder() {
   // Refs for keyboard-driven focus flow (qty/price inputs keyed by instanceKey)
   const quantityRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const priceRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const nameRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const noteRefs = useRef<Record<string, HTMLInputElement | null>>({});
   // Track the last-added service instance for auto-focus
   const [lastAddedInstanceKey, setLastAddedInstanceKey] = useState<string | null>(null);
   // Collapsible extras state
@@ -687,10 +689,10 @@ export default function CreateOrder() {
     if (lastAddedInstanceKey) {
       // Short delay for DOM to render
       const timer = setTimeout(() => {
-        const qtyInput = quantityRefs.current[lastAddedInstanceKey];
-        if (qtyInput) {
-          qtyInput.focus();
-          qtyInput.select();
+        const nameInput = nameRefs.current[lastAddedInstanceKey];
+        if (nameInput) {
+          nameInput.focus();
+          nameInput.select();
         }
         setLastAddedInstanceKey(null);
       }, 100);
@@ -1473,17 +1475,25 @@ export default function CreateOrder() {
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
                                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Service</p>
-                                  <Input
-                                    value={item.customName}
-                                    onChange={(e) => {
-                                      const updated = selectedServices.map((s) =>
-                                        s.instanceKey === item.instanceKey ? { ...s, customName: e.target.value } : s
-                                      );
-                                      setSelectedServices(updated);
-                                    }}
-                                    className="mt-2 h-11 rounded-xl border-slate-200 bg-white text-base font-semibold dark:border-slate-700 dark:bg-slate-800"
-                                    placeholder="Service name"
-                                  />
+                                    <Input
+                                      ref={(el) => { nameRefs.current[item.instanceKey] = el; }}
+                                      value={item.customName}
+                                      onChange={(e) => {
+                                        const updated = selectedServices.map((s) =>
+                                          s.instanceKey === item.instanceKey ? { ...s, customName: e.target.value } : s
+                                        );
+                                        setSelectedServices(updated);
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          quantityRefs.current[item.instanceKey]?.focus();
+                                        }
+                                      }}
+                                      onFocus={(e) => e.target.select()}
+                                      className="mt-2 h-11 rounded-xl border-slate-200 bg-white text-base font-semibold dark:border-slate-700 dark:bg-slate-800"
+                                      placeholder="Service name"
+                                    />
                                 </div>
                                 <Button
                                   variant="ghost"
@@ -1499,6 +1509,7 @@ export default function CreateOrder() {
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/80">
                                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 mb-2">Quantity</p>
                                   <Input
+                                    ref={(el) => { quantityRefs.current[item.instanceKey] = el; }}
                                     type="text"
                                     inputMode="numeric"
                                     value={item.quantity === 0 ? "" : item.quantity}
@@ -1506,6 +1517,12 @@ export default function CreateOrder() {
                                       const val = e.target.value;
                                       if (val === "" || /^\d+$/.test(val)) {
                                         handleUpdateQuantity(item.instanceKey, val);
+                                      }
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        priceRefs.current[item.instanceKey]?.focus();
                                       }
                                     }}
                                     onFocus={(e) => e.target.select()}
@@ -1526,7 +1543,7 @@ export default function CreateOrder() {
                                       onKeyDown={(e) => {
                                         if (e.key === 'ArrowUp') { e.preventDefault(); handleAdjustPrice(item.instanceKey, 5); }
                                         if (e.key === 'ArrowDown') { e.preventDefault(); handleAdjustPrice(item.instanceKey, -5); }
-                                        if (e.key === 'Enter') { e.preventDefault(); serviceComboboxRef.current?.focus(); }
+                                        if (e.key === 'Enter') { e.preventDefault(); noteRefs.current[item.instanceKey]?.focus(); }
                                       }}
                                       className="h-full border-0 bg-transparent text-right text-lg font-black dark:text-white focus-visible:ring-0 pr-0"
                                     />
@@ -1545,6 +1562,7 @@ export default function CreateOrder() {
                                 <div className="space-y-1.5">
                                   <Label className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Tag note</Label>
                                   <Input
+                                    ref={(el) => { noteRefs.current[item.instanceKey] = el; }}
                                     value={item.tagNote}
                                     onChange={(e) => {
                                       const updated = selectedServices.map((s) =>
@@ -1552,6 +1570,13 @@ export default function CreateOrder() {
                                       );
                                       setSelectedServices(updated);
                                     }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        serviceComboboxRef.current?.focus();
+                                      }
+                                    }}
+                                    onFocus={(e) => e.target.select()}
                                     className="h-10 rounded-xl"
                                     placeholder="Delicate fabric, no bleach"
                                   />
@@ -1608,6 +1633,7 @@ export default function CreateOrder() {
                                   >
                                     <TableCell className="font-medium py-2">
                                       <Input
+                                        ref={(el) => { nameRefs.current[item.instanceKey] = el; }}
                                         value={item.customName}
                                         onChange={(e) => {
                                           const updated = selectedServices.map(s =>
@@ -1615,12 +1641,20 @@ export default function CreateOrder() {
                                           );
                                           setSelectedServices(updated);
                                         }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            quantityRefs.current[item.instanceKey]?.focus();
+                                          }
+                                        }}
+                                        onFocus={(e) => e.target.select()}
                                         className="w-full font-medium text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                                         placeholder="Service name"
                                       />
                                     </TableCell>
                                     <TableCell className="py-2">
                                       <Input
+                                        ref={(el) => { quantityRefs.current[item.instanceKey] = el; }}
                                         type="text"
                                         inputMode="numeric"
                                         value={item.quantity === 0 ? "" : item.quantity}
@@ -1628,6 +1662,12 @@ export default function CreateOrder() {
                                           const val = e.target.value;
                                           if (val === "" || /^\d+$/.test(val)) {
                                             handleUpdateQuantity(item.instanceKey, val);
+                                          }
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            priceRefs.current[item.instanceKey]?.focus();
                                           }
                                         }}
                                         onFocus={(e) => e.target.select()}
@@ -1644,8 +1684,9 @@ export default function CreateOrder() {
                                         onKeyDown={(e) => {
                                           if (e.key === 'ArrowUp') { e.preventDefault(); handleAdjustPrice(item.instanceKey, 5); }
                                           if (e.key === 'ArrowDown') { e.preventDefault(); handleAdjustPrice(item.instanceKey, -5); }
-                                          if (e.key === 'Enter') { e.preventDefault(); serviceComboboxRef.current?.focus(); }
+                                          if (e.key === 'Enter') { e.preventDefault(); noteRefs.current[item.instanceKey]?.focus(); }
                                         }}
+                                        onFocus={(e) => e.target.select()}
                                         className="w-24 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                                       />
                                     </TableCell>
@@ -1672,6 +1713,7 @@ export default function CreateOrder() {
                                         <div className="flex items-center gap-2 flex-1">
                                           <span className="text-xs text-muted-foreground whitespace-nowrap">Tag Note:</span>
                                           <Input
+                                            ref={(el) => { noteRefs.current[item.instanceKey] = el; }}
                                             value={item.tagNote}
                                             onChange={(e) => {
                                               const updated = selectedServices.map(s =>
@@ -1679,6 +1721,13 @@ export default function CreateOrder() {
                                               );
                                               setSelectedServices(updated);
                                             }}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                serviceComboboxRef.current?.focus();
+                                              }
+                                            }}
+                                            onFocus={(e) => e.target.select()}
                                             className="h-8 text-sm flex-1"
                                             placeholder="e.g., Delicate fabric, No bleach"
                                           />
