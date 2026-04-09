@@ -3,6 +3,20 @@ import { db as storage } from "../db";
 
 const router = Router();
 
+const findLatestInvoiceDocument = async (orderNumber: string) => {
+    const documents = await storage.listDocuments({ type: 'invoice' });
+    return [...documents]
+        .filter((doc: any) =>
+            String(doc.orderNumber || '') === String(orderNumber) ||
+            String(doc.metadata?.orderNumber || '') === String(orderNumber)
+        )
+        .sort((a: any, b: any) => {
+            const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const bTime = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return bTime - aTime;
+        })[0] || null;
+};
+
 /**
  * Public Invoice Generation API
  * Generates a printable HTML invoice for an order
@@ -19,6 +33,11 @@ router.get('/invoice/:orderNumber', async (req: Request, res: Response) => {
         }
 
         console.log(`[Invoice] Generating invoice for order: ${orderNumber}`);
+
+        const latestDocument = await findLatestInvoiceDocument(orderNumber);
+        if (latestDocument?.fileUrl) {
+            return res.redirect(latestDocument.fileUrl);
+        }
 
         // Find the order
         const orders = await storage.listOrders();
@@ -407,14 +426,7 @@ router.get('/invoice/:orderNumber/pdf', async (req: Request, res: Response) => {
         console.log(`🔍 [PDF Redirect] Looking for invoice for order: ${orderNumber}`);
 
         // Find the document record for this order - GET LATEST VERSION
-        const documents = await storage.listDocuments({ type: 'invoice' });
-        // Sort by ID descending to get most recent first
-        const sortedDocs = [...documents].sort((a: any, b: any) => (b.id || 0) - (a.id || 0));
-        
-        const doc = sortedDocs.find((d: any) => 
-            String(d.orderNumber) === String(orderNumber) || 
-            (d.metadata && String(d.metadata.orderNumber) === String(orderNumber))
-        );
+        const doc = await findLatestInvoiceDocument(orderNumber);
 
         if (doc && doc.fileUrl) {
             console.log(`✅ [PDF Redirect] Found document: ${doc.id}, redirecting to: ${doc.fileUrl}`);

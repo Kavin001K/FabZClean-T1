@@ -19,6 +19,11 @@ export default function BillView() {
     const qrcodeRef = useRef<HTMLCanvasElement>(null);
     const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
 
+    useEffect(() => {
+        if (!orderNumber) return;
+        window.location.replace(`/api/public/invoice/${encodeURIComponent(orderNumber)}`);
+    }, [orderNumber]);
+
 
 
     const { data: order, isLoading, error } = useQuery({

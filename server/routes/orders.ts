@@ -17,6 +17,7 @@ import { loyaltyProgram } from "../loyalty-program";
 import { barcodeService } from "../barcode-service";
 import { OrderService } from "../services/order.service";
 import { AuthService } from "../auth-service";
+import { businessConfigService } from "../services/business-config-service";
 import {
   handleOrderStatusChange,
   sendInvoiceWhatsApp,
@@ -36,6 +37,10 @@ const FINANCIAL_MUTATION_FIELDS = new Set(['paymentStatus', 'advancePaid', 'wall
 const ORDER_UPDATE_FIELDS = new Set([
   'status',
   'priority',
+  'storeId',
+  'storeCode',
+  'invoiceTemplateId',
+  'tagTemplateId',
   'pickupDate',
   'deliveryAddress',
   'shippingAddress',
@@ -694,6 +699,43 @@ router.post(
         orderData.franchiseId = null;
       }
 
+      const requestedStore = Boolean(orderData.storeId || orderData.storeCode);
+      let resolvedStore = null;
+      if (orderData.storeId) {
+        resolvedStore = await businessConfigService.getStoreById(orderData.storeId);
+      } else if (orderData.storeCode) {
+        resolvedStore = await businessConfigService.getStoreByCode(orderData.storeCode);
+      } else {
+        resolvedStore = await businessConfigService.resolveDefaultStore({
+          employeeStoreId: (req.employee as any)?.storeId,
+          employeeFranchiseId: (req.employee as any)?.franchiseId,
+          activeOnly: true,
+        });
+      }
+
+      if (requestedStore && !resolvedStore) {
+        return res.status(400).json(createErrorResponse('Selected store is invalid or inactive', 400));
+      }
+
+      if (resolvedStore) {
+        orderData.storeId = resolvedStore.id;
+        orderData.storeCode = resolvedStore.code;
+      }
+
+      if (orderData.invoiceTemplateId) {
+        const invoiceTemplate = await businessConfigService.getInvoiceTemplateById(orderData.invoiceTemplateId);
+        if (!invoiceTemplate) {
+          return res.status(400).json(createErrorResponse('Selected invoice template does not exist', 400));
+        }
+      }
+
+      if (orderData.tagTemplateId) {
+        const tagTemplate = await businessConfigService.getTagTemplateById(orderData.tagTemplateId);
+        if (!tagTemplate) {
+          return res.status(400).json(createErrorResponse('Selected tag template does not exist', 400));
+        }
+      }
+
       const requestedCashAtCreate = parseAmount(orderData.advancePaid);
       const requestedWalletDebitAtCreate = parseAmount(
         orderData.walletDebitRequested ?? orderData.walletAmount ?? orderData.walletUsed
@@ -930,6 +972,31 @@ router.put('/:id', async (req, res) => {
         updateData[key] = value;
       }
     });
+
+    if (updateData.storeId || updateData.storeCode) {
+      const resolvedStore = updateData.storeId
+        ? await businessConfigService.getStoreById(updateData.storeId)
+        : await businessConfigService.getStoreByCode(updateData.storeCode);
+      if (!resolvedStore) {
+        return res.status(400).json(createErrorResponse('Selected store is invalid or inactive', 400));
+      }
+      updateData.storeId = resolvedStore.id;
+      updateData.storeCode = resolvedStore.code;
+    }
+
+    if (updateData.invoiceTemplateId) {
+      const invoiceTemplate = await businessConfigService.getInvoiceTemplateById(updateData.invoiceTemplateId);
+      if (!invoiceTemplate) {
+        return res.status(400).json(createErrorResponse('Selected invoice template does not exist', 400));
+      }
+    }
+
+    if (updateData.tagTemplateId) {
+      const tagTemplate = await businessConfigService.getTagTemplateById(updateData.tagTemplateId);
+      if (!tagTemplate) {
+        return res.status(400).json(createErrorResponse('Selected tag template does not exist', 400));
+      }
+    }
 
     const hasItemPayload = Object.prototype.hasOwnProperty.call(updateData, 'items');
     const oldItems = parseOrderItems((order as any).items);

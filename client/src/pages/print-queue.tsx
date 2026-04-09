@@ -36,12 +36,13 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useInvoicePrint } from "@/hooks/use-invoice-print";
 import { ordersApi, formatCurrency } from "@/lib/data-service";
+import { businessConfigApi } from "@/lib/business-config-service";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { Order, OrderItem } from "@shared/schema";
 import { buildThermalTagPrintHtml, prepareThermalTags } from "@/lib/garment-tag-layout";
 import {
-    ORDER_STORE_OPTIONS,
+    getOrderStoreOptions,
     getOrderStoreLabel,
     resolveOrderStoreCodeFromOrder,
 } from "@/lib/order-store";
@@ -126,6 +127,22 @@ export default function PrintTags() {
         refetchOnWindowFocus: true,
         refetchInterval: 60_000,
     });
+
+    const { data: activeStores = [] } = useQuery({
+        queryKey: ["active-stores"],
+        queryFn: () => businessConfigApi.listStores(true),
+        staleTime: 60_000,
+    });
+
+    const storeOptions = useMemo(() => {
+        if (activeStores.length > 0) {
+            return activeStores.map((store) => ({
+                value: store.code,
+                label: `${store.code} · ${store.name}`,
+            }));
+        }
+        return getOrderStoreOptions();
+    }, [activeStores]);
 
     // Mark tags as printed
     const markPrintedMutation = useMutation({
@@ -228,33 +245,48 @@ export default function PrintTags() {
     // ── Print handlers ───────────────────────────────────────────────────────
 
     /** Print garment tags for one or many orders in a single popup */
-    const handlePrintTags = useCallback((targetOrders: Order[]) => {
+    const handlePrintTags = useCallback(async (targetOrders: Order[]) => {
         if (targetOrders.length === 0) {
             toast({ title: "No orders selected", variant: "destructive" });
             return;
         }
 
-        const preparedTags = targetOrders.flatMap((order) => prepareThermalTags({
-            orderNumber: order.orderNumber,
-            customerName: order.customerName,
-            customerAddress: (order as any).deliveryAddress || (order as any).shippingAddress || undefined,
-            franchiseId: (order as any).franchiseId || (order as any).franchise_id || null,
-            storeCode: resolveOrderStoreCodeFromOrder(order),
-            commonNote: (order as any).specialInstructions || (order as any).special_instructions || undefined,
-            billDate: order.createdAt ? String(order.createdAt) : undefined,
-            dueDate: (order as any).pickupDate
-                ? String((order as any).pickupDate)
-                : (order as any).dueDate
-                    ? String((order as any).dueDate)
-                    : undefined,
-            items: (Array.isArray(order.items) ? order.items : []).map((item: OrderItem) => ({
+        const preparedTagGroups = await Promise.all(targetOrders.map(async (order) => {
+            let templateConfig = undefined;
+            try {
+                const resolved = await businessConfigApi.resolveTagTemplate({
+                    storeId: (order as any).storeId || (order as any).store_id || null,
+                    templateId: (order as any).tagTemplateId || (order as any).tag_template_id || null,
+                });
+                templateConfig = resolved.template?.config;
+            } catch (error) {
+                console.warn('Failed to resolve tag template for print queue order:', error);
+            }
+
+            return prepareThermalTags({
                 orderNumber: order.orderNumber,
-                serviceName: item.serviceName || item.customName || "Item",
-                tagNote: item.tagNote || "",
-                quantity: item.quantity || 1,
                 customerName: order.customerName,
-            })),
+                customerAddress: (order as any).deliveryAddress || (order as any).shippingAddress || undefined,
+                franchiseId: (order as any).franchiseId || (order as any).franchise_id || null,
+                storeCode: resolveOrderStoreCodeFromOrder(order),
+                commonNote: (order as any).specialInstructions || (order as any).special_instructions || undefined,
+                billDate: order.createdAt ? String(order.createdAt) : undefined,
+                dueDate: (order as any).pickupDate
+                    ? String((order as any).pickupDate)
+                    : (order as any).dueDate
+                        ? String((order as any).dueDate)
+                        : undefined,
+                templateConfig,
+                items: (Array.isArray(order.items) ? order.items : []).map((item: OrderItem) => ({
+                    orderNumber: order.orderNumber,
+                    serviceName: item.serviceName || item.customName || "Item",
+                    tagNote: item.tagNote || "",
+                    quantity: item.quantity || 1,
+                    customerName: order.customerName,
+                })),
+            });
         }));
+        const preparedTags = preparedTagGroups.flat();
 
         if (preparedTags.length === 0) {
             toast({ title: "No printable tags", description: "The selected orders do not contain any tag items.", variant: "destructive" });
@@ -282,7 +314,7 @@ export default function PrintTags() {
     /** Print selected orders' tags */
     const handlePrintSelectedTags = useCallback(() => {
         const selected = filteredOrders.filter((o: Order) => selectedIds.includes(o.id));
-        handlePrintTags(selected);
+        void handlePrintTags(selected);
     }, [filteredOrders, selectedIds, handlePrintTags]);
 
     /** Mark selected as printed */
@@ -450,7 +482,7 @@ export default function PrintTags() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Stores</SelectItem>
-                                    {ORDER_STORE_OPTIONS.map((option) => (
+                                    {storeOptions.map((option) => (
                                         <SelectItem key={option.value} value={option.value}>
                                             {option.label}
                                         </SelectItem>

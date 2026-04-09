@@ -72,10 +72,13 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 title: (metadata as any).invoiceNumber ? `Invoice ${(metadata as any).invoiceNumber}` : req.file.originalname,
                 filename: originalName,
                 fileUrl,
+                filepath,
                 status: (metadata as any).status || 'sent',
                 amount: (metadata as any).amount ? String((metadata as any).amount) : null,
                 customerName: (metadata as any).customerName || null,
                 orderNumber: (metadata as any).orderNumber || null,
+                storeId: (metadata as any).storeId || null,
+                templateKey: (metadata as any).templateKey || null,
                 metadata: {
                     filepath,
                     ...(metadata as any).metadata || {},
@@ -167,6 +170,10 @@ router.get('/:id/download', async (req, res) => {
 
         if (!document) {
             return res.status(404).json({ error: 'Document not found' });
+        }
+
+        if (document.fileUrl && /^https?:\/\//i.test(document.fileUrl)) {
+            return res.redirect(document.fileUrl);
         }
 
         // Logic to resolve file path

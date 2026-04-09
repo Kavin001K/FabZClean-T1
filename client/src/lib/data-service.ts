@@ -131,7 +131,8 @@ function normalizeHeaders(headers?: HeadersInit): HeadersMap {
 
 function withAuth(init: RequestInit = {}): RequestInit {
   const headers = normalizeHeaders(init.headers);
-  if (!headers["Content-Type"]) {
+  const isFormDataBody = typeof FormData !== "undefined" && init.body instanceof FormData;
+  if (!headers["Content-Type"] && !isFormDataBody) {
     headers["Content-Type"] = "application/json";
   }
   const token = getAccessToken();

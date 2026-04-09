@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Service, Order, Customer, OrderStoreCode } from "@shared/schema";
+import type { Service, Order, Customer } from "@shared/schema";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -28,13 +28,11 @@ import { OrderConfirmationDialog } from "@/components/orders/order-confirmation-
 import OrderDetailsDialog from "@/components/orders/order-details-dialog";
 import { useAuth } from "@/contexts/auth-context";
 import { createAddressObject, parseAndFormatAddress } from "@/lib/address-utils";
-import {
-  ORDER_STORE_OPTIONS,
-  getOrderStoreLabel,
-  resolveOrderStoreCodeFromEmployee,
-} from "@/lib/order-store";
+import { resolveOrderStoreCodeFromEmployee } from "@/lib/order-store";
 import { formatCurrencyWithSettings, roundInvoiceAmount } from "@/lib/settings-utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { businessConfigApi, getBillingCache } from "@/lib/business-config-service";
+import type { StoreConfig } from "@shared/business-config";
 
 interface ServiceItem {
   /** Unique ID for this cart line item (allows same service added multiple times) */
@@ -97,7 +95,7 @@ export default function CreateOrder() {
   const [customerCity, setCustomerCity] = useState('');
   const [customerPincode, setCustomerPincode] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
-  const [storeCode, setStoreCode] = useState<OrderStoreCode>('POL');
+  const [storeId, setStoreId] = useState<string>('');
   const [billDate, setBillDate] = useState<Date>(() => toDateOnly(new Date()));
 
   // Services state (must be before useEffect that references it)
@@ -109,12 +107,42 @@ export default function CreateOrder() {
   // Abandoned Cart Recovery
   const ABANDONED_CART_KEY = "fabzclean_cart_draft_v1";
 
+  const { data: stores = [] } = useQuery<StoreConfig[]>({
+    queryKey: ['active-stores'],
+    queryFn: () => businessConfigApi.listStores(true),
+    initialData: getBillingCache().stores || [],
+    staleTime: 60_000,
+  });
+  const { data: businessProfile } = useQuery({
+    queryKey: ['business-profile'],
+    queryFn: () => businessConfigApi.getBusinessProfile(),
+    initialData: getBillingCache().businessProfile,
+    staleTime: 60_000,
+  });
+
+  const selectedStore = useMemo(
+    () => stores.find((store) => store.id === storeId) || stores.find((store) => store.code === storeId) || null,
+    [stores, storeId]
+  );
+  const selectedStoreCode = selectedStore?.code || 'POL';
+
   useEffect(() => {
     const hasDraft = Boolean(localStorage.getItem(ABANDONED_CART_KEY));
-    if (!hasDraft) {
-      setStoreCode(resolveOrderStoreCodeFromEmployee(currentUser as any));
+    if (!hasDraft && stores.length > 0 && !storeId) {
+      const hintedCode = resolveOrderStoreCodeFromEmployee(currentUser as any);
+      const employeeHint = String((currentUser as any)?.storeId || (currentUser as any)?.franchiseId || '').trim();
+      const resolvedStore =
+        stores.find((store) => store.id === employeeHint) ||
+        stores.find((store) => store.code === employeeHint.toUpperCase()) ||
+        stores.find((store) => store.code === hintedCode) ||
+        stores.find((store) => store.isDefault) ||
+        stores[0];
+
+      if (resolvedStore) {
+        setStoreId(resolvedStore.id || resolvedStore.code);
+      }
     }
-  }, [currentUser]);
+  }, [currentUser, storeId, stores]);
 
   // Load draft on mount
   useEffect(() => {
@@ -135,7 +163,8 @@ export default function CreateOrder() {
           setSelectedServices(withKeys);
         }
         if (draft.specialInstructions) setSpecialInstructions(draft.specialInstructions);
-        if (draft.storeCode) setStoreCode(draft.storeCode);
+        if (draft.storeId) setStoreId(draft.storeId);
+        else if (draft.storeCode) setStoreId(draft.storeCode);
         if (draft.billDate) setBillDate(toDateOnly(new Date(draft.billDate)));
 
         toast({ title: "Draft Restored", description: "Taking you back to where you left off." });
@@ -148,10 +177,10 @@ export default function CreateOrder() {
   // Save draft on change
   useEffect(() => {
     const draft = {
-      phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate
+      phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeId, storeCode: selectedStoreCode, billDate
     };
     localStorage.setItem(ABANDONED_CART_KEY, JSON.stringify(draft));
-  }, [phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate]);
+  }, [phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeId, selectedStoreCode, billDate]);
 
   // Customer creation popup
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
@@ -671,10 +700,11 @@ export default function CreateOrder() {
 
   // Auto-set due date: 2 days for express, 7 days for regular
   useEffect(() => {
-    const daysToAdd = isExpressOrder ? 2 : 7;
+    const configuredDueDays = Math.max(0, Number(businessProfile?.invoiceDefaults?.defaultDueDays || 2));
+    const daysToAdd = isExpressOrder ? Math.min(2, configuredDueDays || 2) : configuredDueDays;
     const dueDate = new Date(toDateOnly(billDate).getTime() + daysToAdd * 24 * 60 * 60 * 1000);
     setPickupDate(dueDate);
-  }, [billDate, isExpressOrder]);
+  }, [billDate, businessProfile?.invoiceDefaults?.defaultDueDays, isExpressOrder]);
 
   // Mutation for updating order status from history
   const updateOrderStatusMutation = useMutation({
@@ -756,7 +786,10 @@ export default function CreateOrder() {
 
         // 4b. Ensure Store Code for tags and filtering
         if (!newOrder.storeCode) {
-          newOrder.storeCode = newOrder.store_code || storeCode;
+          newOrder.storeCode = newOrder.store_code || selectedStoreCode;
+        }
+        if (!newOrder.storeId) {
+          newOrder.storeId = newOrder.store_id || selectedStore?.id;
         }
 
         // 5. Ensure Customer Name
@@ -906,6 +939,16 @@ export default function CreateOrder() {
     setDeliveryCharges(0);
     setUseWallet(false);
     setCreditOverridePrompt(null);
+    const cachedStores = getBillingCache().stores || stores;
+    const employeeHint = String((currentUser as any)?.storeId || (currentUser as any)?.franchiseId || '').trim();
+    const hintedCode = resolveOrderStoreCodeFromEmployee(currentUser as any);
+    const resolvedStore =
+      cachedStores.find((store) => store.id === employeeHint) ||
+      cachedStores.find((store) => store.code === employeeHint.toUpperCase()) ||
+      cachedStores.find((store) => store.code === hintedCode) ||
+      cachedStores.find((store) => store.isDefault) ||
+      cachedStores[0];
+    setStoreId(resolvedStore?.id || resolvedStore?.code || '');
   };
 
   // Validate phone number - flexible to accept various international formats
@@ -1034,7 +1077,8 @@ export default function CreateOrder() {
     // Don't set orderNumber here - let server generate it with proper sequential format
     const orderData: any = {
       customerId: currentCustomerId,
-      storeCode,
+      storeId: selectedStore?.id,
+      storeCode: selectedStoreCode,
       customerName,
       customerEmail: customerEmail || undefined,
       customerPhone,
@@ -1759,23 +1803,31 @@ export default function CreateOrder() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="storeCode" className="text-slate-700 dark:text-slate-300">Store Code</Label>
-                  <Select value={storeCode} onValueChange={(value: OrderStoreCode) => setStoreCode(value)}>
-                    <SelectTrigger id="storeCode" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                  <Label htmlFor="storeId" className="text-slate-700 dark:text-slate-300">Store</Label>
+                  <Select value={storeId} onValueChange={setStoreId}>
+                    <SelectTrigger id="storeId" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                       <SelectValue placeholder="Select store">
-                        {getOrderStoreLabel(storeCode)}
+                        {selectedStore ? `${selectedStore.code} · ${selectedStore.name}` : 'Select store'}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {ORDER_STORE_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
+                      {stores.map((store) => (
+                        <SelectItem key={store.id || store.code} value={store.id || store.code}>
+                          {store.code} · {store.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {selectedStore && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200">
+                      <p className="font-semibold">{selectedStore.name}</p>
+                      <p className="mt-1">{parseAndFormatAddress(selectedStore.address)}</p>
+                      {selectedStore.contactDetails?.phone && <p className="mt-1">Phone: {selectedStore.contactDetails.phone}</p>}
+                      {selectedStore.contactDetails?.email && <p>Email: {selectedStore.contactDetails.email}</p>}
+                    </div>
+                  )}
                   <p className="text-xs text-muted-foreground">
-                    Printed tags will show this branch code as `FAB CLEAN ({storeCode})`.
+                    Bills and tags will use this store profile. Printed tags will show `FAB CLEAN ({selectedStoreCode})`.
                   </p>
                 </div>
               </CardContent>

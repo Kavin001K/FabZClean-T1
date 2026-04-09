@@ -196,13 +196,33 @@ export class SupabaseStorage {
             'percentage_change_mom': 'percentageChangeMoM',
             'last_computed_at': 'lastComputedAt',
             'invoice_url': 'invoiceUrl',
+            'invoice_template_id': 'invoiceTemplateId',
+            'tag_template_id': 'tagTemplateId',
             'last_whatsapp_sent_at': 'lastWhatsappSentAt',
             'whatsapp_message_count': 'whatsappMessageCount',
             'avatar_url': 'avatarUrl',
             'user_id': 'userId',
             'landing_page': 'landingPage',
             'compact_mode': 'compactMode',
-            'quick_actions': 'quickActions'
+            'quick_actions': 'quickActions',
+            'template_key': 'templateKey',
+            'scope_key': 'scopeKey',
+            'company_name': 'companyName',
+            'legal_name': 'legalName',
+            'company_address': 'companyAddress',
+            'contact_details': 'contactDetails',
+            'tax_details': 'taxDetails',
+            'payment_details': 'paymentDetails',
+            'invoice_defaults': 'invoiceDefaults',
+            'is_default': 'isDefault',
+            'sort_order': 'sortOrder',
+            'invoice_overrides': 'invoiceOverrides',
+            'tag_overrides': 'tagOverrides',
+            'legal_details': 'legalDetails',
+            'preset_key': 'presetKey',
+            'layout_key': 'layoutKey',
+            'config': 'config',
+            'short_name': 'shortName'
         };
 
         Object.entries(mappings).forEach(([snake, camel]) => {
@@ -395,6 +415,8 @@ export class SupabaseStorage {
             'orderLetter': 'order_letter',
             'recordedByName': 'recorded_by_name',
             'invoiceUrl': 'invoice_url',
+            'invoiceTemplateId': 'invoice_template_id',
+            'tagTemplateId': 'tag_template_id',
             'monthYear': 'month_year',
             'metricType': 'metric_type',
             'percentageChangeMoM': 'percentage_change_mom',
@@ -409,7 +431,24 @@ export class SupabaseStorage {
             'userId': 'user_id',
             'landingPage': 'landing_page',
             'compactMode': 'compact_mode',
-            'quickActions': 'quick_actions'
+            'quickActions': 'quick_actions',
+            'templateKey': 'template_key',
+            'scopeKey': 'scope_key',
+            'companyName': 'company_name',
+            'legalName': 'legal_name',
+            'companyAddress': 'company_address',
+            'contactDetails': 'contact_details',
+            'taxDetails': 'tax_details',
+            'paymentDetails': 'payment_details',
+            'invoiceDefaults': 'invoice_defaults',
+            'isDefault': 'is_default',
+            'sortOrder': 'sort_order',
+            'invoiceOverrides': 'invoice_overrides',
+            'tagOverrides': 'tag_overrides',
+            'legalDetails': 'legal_details',
+            'presetKey': 'preset_key',
+            'layoutKey': 'layout_key',
+            'shortName': 'short_name'
         };
 
         // If key exists in mappings, use snake_case. If not, preserve original (e.g. 'status', 'email', 'name')
@@ -855,10 +894,11 @@ export class SupabaseStorage {
                 'items', 'notes', 'special_instructions', 'shipping_address', 'pickup_date',
                 'advance_paid', 'discount_type', 'discount_value', 'coupon_code',
                 'extra_charges', 'gst_enabled', 'gst_rate', 'gst_amount', 'pan_number',
-                'gst_number', 'franchise_id', 'store_code', 'created_at', 'priority',
+                'gst_number', 'franchise_id', 'store_code', 'store_id', 'created_at', 'priority',
                 'is_express_order', 'fulfillment_type', 'delivery_charges', 'delivery_address',
                 'tag_note', 'barcode_id', 'assigned_to', 'wallet_used', 'credit_used',
-                'is_credit_order', 'delivery_earnings_calculated', 'delivery_cash_collected'
+                'is_credit_order', 'delivery_earnings_calculated', 'delivery_cash_collected',
+                'invoice_template_id', 'tag_template_id'
             ];
             const safeData: any = {};
             for (const key of Object.keys(snakeCaseData)) {
@@ -1701,6 +1741,152 @@ export class SupabaseStorage {
     async deleteAllSettings(): Promise<void> {
         const { error } = await this.supabase.from('settings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
         if (error) throw error;
+    }
+
+    // ======= BUSINESS CONFIG =======
+    async getBusinessProfile(scopeKey: string = 'global'): Promise<any | undefined> {
+        const { data, error } = await this.supabase
+            .from('business_profiles')
+            .select('*')
+            .eq('scope_key', scopeKey)
+            .maybeSingle();
+
+        if (error) {
+            throw error;
+        }
+
+        return data ? this.mapDates(data) : undefined;
+    }
+
+    async upsertBusinessProfile(data: any): Promise<any> {
+        const payload = this.toSnakeCase(data);
+        const { data: result, error } = await this.supabase
+            .from('business_profiles')
+            .upsert({ scope_key: 'global', ...payload, updated_at: new Date().toISOString() }, { onConflict: 'scope_key' })
+            .select('*')
+            .single();
+
+        if (error) throw error;
+        return this.mapDates(result);
+    }
+
+    async listStores(filters: any = {}): Promise<any[]> {
+        let query = this.supabase.from('stores').select('*');
+        if (filters.isActive !== undefined) query = query.eq('is_active', filters.isActive);
+        const { data, error } = await query.order('sort_order', { ascending: true }).order('name', { ascending: true });
+        if (error) throw error;
+        return (data || []).map((item) => this.mapDates(item));
+    }
+
+    async getStore(id: string): Promise<any | undefined> {
+        const { data, error } = await this.supabase.from('stores').select('*').eq('id', id).maybeSingle();
+        if (error) throw error;
+        return data ? this.mapDates(data) : undefined;
+    }
+
+    async getStoreByCode(code: string): Promise<any | undefined> {
+        const { data, error } = await this.supabase
+            .from('stores')
+            .select('*')
+            .eq('code', String(code || '').trim().toUpperCase())
+            .maybeSingle();
+        if (error) throw error;
+        return data ? this.mapDates(data) : undefined;
+    }
+
+    async createStore(data: any): Promise<any> {
+        const payload = this.toSnakeCase(data);
+        const { data: result, error } = await this.supabase.from('stores').insert(payload).select('*').single();
+        if (error) throw error;
+        return this.mapDates(result);
+    }
+
+    async updateStore(id: string, data: any): Promise<any> {
+        const payload = this.toSnakeCase(data);
+        const { data: result, error } = await this.supabase
+            .from('stores')
+            .update({ ...payload, updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .select('*')
+            .single();
+        if (error) throw error;
+        return this.mapDates(result);
+    }
+
+    async listInvoiceTemplates(filters: any = {}): Promise<any[]> {
+        let query = this.supabase.from('invoice_templates').select('*');
+        if (filters.isActive !== undefined) query = query.eq('is_active', filters.isActive);
+        if (filters.storeId === null) {
+            query = query.is('store_id', null);
+        } else if (filters.storeId) {
+            query = query.eq('store_id', filters.storeId);
+        }
+        const { data, error } = await query.order('sort_order', { ascending: true }).order('name', { ascending: true });
+        if (error) throw error;
+        return (data || []).map((item) => this.mapDates(item));
+    }
+
+    async getInvoiceTemplate(id: string): Promise<any | undefined> {
+        const { data, error } = await this.supabase.from('invoice_templates').select('*').eq('id', id).maybeSingle();
+        if (error) throw error;
+        return data ? this.mapDates(data) : undefined;
+    }
+
+    async createInvoiceTemplate(data: any): Promise<any> {
+        const payload = this.toSnakeCase(data);
+        const { data: result, error } = await this.supabase.from('invoice_templates').insert(payload).select('*').single();
+        if (error) throw error;
+        return this.mapDates(result);
+    }
+
+    async updateInvoiceTemplate(id: string, data: any): Promise<any> {
+        const payload = this.toSnakeCase(data);
+        const { data: result, error } = await this.supabase
+            .from('invoice_templates')
+            .update({ ...payload, updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .select('*')
+            .single();
+        if (error) throw error;
+        return this.mapDates(result);
+    }
+
+    async listTagTemplates(filters: any = {}): Promise<any[]> {
+        let query = this.supabase.from('tag_templates').select('*');
+        if (filters.isActive !== undefined) query = query.eq('is_active', filters.isActive);
+        if (filters.storeId === null) {
+            query = query.is('store_id', null);
+        } else if (filters.storeId) {
+            query = query.eq('store_id', filters.storeId);
+        }
+        const { data, error } = await query.order('sort_order', { ascending: true }).order('name', { ascending: true });
+        if (error) throw error;
+        return (data || []).map((item) => this.mapDates(item));
+    }
+
+    async getTagTemplate(id: string): Promise<any | undefined> {
+        const { data, error } = await this.supabase.from('tag_templates').select('*').eq('id', id).maybeSingle();
+        if (error) throw error;
+        return data ? this.mapDates(data) : undefined;
+    }
+
+    async createTagTemplate(data: any): Promise<any> {
+        const payload = this.toSnakeCase(data);
+        const { data: result, error } = await this.supabase.from('tag_templates').insert(payload).select('*').single();
+        if (error) throw error;
+        return this.mapDates(result);
+    }
+
+    async updateTagTemplate(id: string, data: any): Promise<any> {
+        const payload = this.toSnakeCase(data);
+        const { data: result, error } = await this.supabase
+            .from('tag_templates')
+            .update({ ...payload, updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .select('*')
+            .single();
+        if (error) throw error;
+        return this.mapDates(result);
     }
 
     // ======= FRANCHISES =======
