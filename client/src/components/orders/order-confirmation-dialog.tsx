@@ -47,6 +47,8 @@ export function OrderConfirmationDialog({
     const [whatsappStatus, setWhatsappStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
     const [whatsappError, setWhatsappError] = useState<string | null>(null);
     const [autoSendTriggered, setAutoSendTriggered] = useState(false);
+    const lastPdfUrlRef = useRef<string | null>(null);
+    const lastFailureStageRef = useRef<'pdf' | 'whatsapp' | null>(null);
     const { toast } = useToast();
 
     // ALWAYS fetch full customer data from DB when customerId exists.
@@ -161,6 +163,8 @@ export function OrderConfirmationDialog({
             setWhatsappStatus('idle');
             setWhatsappError(null);
             setAutoSendTriggered(false);
+            lastPdfUrlRef.current = null;
+            lastFailureStageRef.current = null;
             return;
         }
 
@@ -184,6 +188,50 @@ export function OrderConfirmationDialog({
 
         setWhatsappStatus('idle');
     }, [open, order]);
+
+    const ensureInvoicePdfUrl = async (orderNum: string) => {
+        if (lastFailureStageRef.current === 'whatsapp' && lastPdfUrlRef.current) {
+            return lastPdfUrlRef.current;
+        }
+
+        const existingInvoiceUrl = String((order as any)?.invoiceUrl || '').trim();
+        if (existingInvoiceUrl) {
+            lastPdfUrlRef.current = existingInvoiceUrl;
+            return existingInvoiceUrl;
+        }
+
+        console.log('[WhatsApp] Generating invoice PDF...');
+        const { convertOrderToInvoiceData } = await import('@/lib/print-driver');
+
+        const safeOrder = {
+            ...order,
+            customerName: customerName,
+            customerPhone: customerPhone || '',
+            customerEmail: customerEmail || '',
+            customerAddress: customerAddress || '',
+            deliveryAddress: (order as any)?.deliveryAddress || customerAddress || '',
+            orderNumber: orderNum,
+            totalAmount: totalAmount.toString(),
+            items: Array.isArray(order?.items) ? order.items : [],
+        };
+
+        const invoiceData = convertOrderToInvoiceData(safeOrder, enableGST);
+        if (!invoiceData || !(invoiceData as any).customerInfo) {
+            throw new Error('Invalid invoice data generated');
+        }
+
+        const uploadedDoc = await printDriver.generateInvoiceDocument(invoiceData, 'invoice', {
+            outputMode: 'none',
+        });
+
+        const pdfUrl = String(uploadedDoc?.fileUrl || uploadedDoc?.document?.fileUrl || '').trim();
+        if (!pdfUrl) {
+            throw new Error('Invoice PDF generation/upload failed. No PDF URL was returned.');
+        }
+
+        lastPdfUrlRef.current = pdfUrl;
+        return pdfUrl;
+    };
 
     const handlePrintBill = async () => {
         if (!order) return;
@@ -277,47 +325,58 @@ export function OrderConfirmationDialog({
         try {
             console.log(`[WhatsApp] Send #${whatsappSendCount + 1} starting...`);
 
-            let pdfUrl: string | undefined;
-
-            // Try to generate and upload PDF (with error fallback)
             try {
-                console.log('[WhatsApp] Generating invoice PDF...');
-                const { convertOrderToInvoiceData } = await import('@/lib/print-driver');
+                const pdfUrl = await ensureInvoicePdfUrl(orderNum);
+                lastFailureStageRef.current = null;
+                console.log('[WhatsApp] PDF ready:', pdfUrl);
 
-                // Enrich the order with full customer data from DB
-                // This ensures the invoice PDF has complete customer info
-                const safeOrder = {
-                    ...order,
-                    customerName: customerName,
-                    customerPhone: customerPhone || '',
-                    customerEmail: customerEmail || '',
-                    customerAddress: customerAddress || '',
-                    deliveryAddress: (order as any)?.deliveryAddress || customerAddress || '',
-                    orderNumber: orderNum,
-                    totalAmount: totalAmount.toString(),
-                    items: Array.isArray(order.items) ? order.items : [],
-                };
+                // Smart Item Summarization
+                const mainItemName = smartItemSummary(order.items as any[]);
+                console.log(`[WhatsApp] Item summary: "${mainItemName}"`);
 
-                const invoiceData = convertOrderToInvoiceData(safeOrder, enableGST);
+                // Send WhatsApp message with current send count
+                console.log(`[WhatsApp] Sending message (sendCount: ${whatsappSendCount})...`);
+                const result = await WhatsAppService.sendOrderBill(
+                    customerPhone,
+                    orderNum,
+                    customerName,
+                    totalAmount,
+                    billUrl,
+                    pdfUrl,
+                    mainItemName,
+                    whatsappSendCount // Pass current send count
+                );
 
-                if (!invoiceData || !(invoiceData as any).customerInfo) {
-                    throw new Error('Invalid invoice data generated');
-                }
+                if (result.success) {
+                    const newCount = result.newSendCount ?? (whatsappSendCount + 1);
+                    setWhatsappSendCount(newCount);
+                    lastFailureStageRef.current = null;
 
-                const uploadedDoc = await printDriver.generateInvoiceDocument(invoiceData, 'invoice', {
-                    outputMode: 'none',
-                });
+                    const templateName = result.templateUsed || 'Confirmation';
 
-                if (uploadedDoc?.fileUrl) {
-                    pdfUrl = uploadedDoc.fileUrl;
-                    console.log('[WhatsApp] PDF uploaded:', pdfUrl);
+                    toast({
+                        title: "Sent!",
+                        description: result.canResendAgain
+                            ? `WhatsApp ${templateName} sent. ${MAX_WHATSAPP_SENDS - newCount} resend(s) remaining.`
+                            : `WhatsApp ${templateName} sent. No more resends available.`,
+                    });
+                    setWhatsappStatus('sent');
+                } else {
+                    lastFailureStageRef.current = 'whatsapp';
+                    toast({
+                        title: "Failed",
+                        description: result.error || "Could not send WhatsApp message. Please try again.",
+                        variant: "destructive",
+                    });
+                    setWhatsappStatus('failed');
+                    setWhatsappError(result.error || "Could not send WhatsApp message.");
                 }
             } catch (pdfError) {
-                console.error('[WhatsApp] PDF generation failed:', pdfError);
-            }
-
-            if (!pdfUrl) {
-                const errorMessage = 'Invoice PDF generation/upload failed. WhatsApp cannot be sent without the PDF.';
+                const errorMessage = pdfError instanceof Error
+                    ? pdfError.message
+                    : 'Invoice PDF generation/upload failed. WhatsApp cannot be sent without the PDF.';
+                lastFailureStageRef.current = 'pdf';
+                console.error('[WhatsApp] Flow failed:', pdfError);
                 setWhatsappStatus('failed');
                 setWhatsappError(errorMessage);
                 toast({
@@ -325,48 +384,6 @@ export function OrderConfirmationDialog({
                     description: errorMessage,
                     variant: "destructive",
                 });
-                return;
-            }
-
-            // Smart Item Summarization
-            const mainItemName = smartItemSummary(order.items as any[]);
-            console.log(`[WhatsApp] Item summary: "${mainItemName}"`);
-
-            // Send WhatsApp message with current send count
-            console.log(`[WhatsApp] Sending message (sendCount: ${whatsappSendCount})...`);
-            const result = await WhatsAppService.sendOrderBill(
-                customerPhone,
-                orderNum,
-                customerName,
-                totalAmount,
-                billUrl,
-                pdfUrl,
-                mainItemName,
-                whatsappSendCount // Pass current send count
-            );
-
-            if (result.success) {
-                // Update send count
-                const newCount = result.newSendCount ?? (whatsappSendCount + 1);
-                setWhatsappSendCount(newCount);
-
-                const templateName = result.templateUsed || 'Confirmation';
-
-                toast({
-                    title: "Sent!",
-                    description: result.canResendAgain
-                        ? `WhatsApp ${templateName} sent. ${MAX_WHATSAPP_SENDS - newCount} resend(s) remaining.`
-                        : `WhatsApp ${templateName} sent. No more resends available.`,
-                });
-                setWhatsappStatus('sent');
-            } else {
-                toast({
-                    title: "Failed",
-                    description: result.error || "Could not send WhatsApp message. Please try again.",
-                    variant: "destructive",
-                });
-                setWhatsappStatus('failed');
-                setWhatsappError(result.error || "Could not send WhatsApp message.");
             }
         } catch (error) {
             console.error("[WhatsApp] Error:", error);

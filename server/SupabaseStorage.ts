@@ -43,6 +43,50 @@ export class SupabaseStorage {
         return uuidRegex.test(trimmed) ? trimmed : null;
     }
 
+    private extractMissingColumn(error: any, tableName: string): string | null {
+        const message = String(error?.message || '');
+        const match = message.match(new RegExp(`Could not find the '([^']+)' column of '${tableName}'`, 'i'));
+        return match?.[1] || null;
+    }
+
+    private async insertDocumentWithFallback(payload: Record<string, any>): Promise<any> {
+        let currentPayload = { ...payload };
+
+        for (let attempt = 0; attempt < 4; attempt++) {
+            const { data: document, error } = await this.supabase
+                .from('documents')
+                .insert(currentPayload)
+                .select()
+                .single();
+
+            if (!error) {
+                return document;
+            }
+
+            const missingColumn = this.extractMissingColumn(error, 'documents');
+            if (!missingColumn || !(missingColumn in currentPayload)) {
+                throw error;
+            }
+
+            console.warn(`[SupabaseStorage] documents insert retry: removing unsupported column "${missingColumn}"`);
+            const metadata = currentPayload.metadata && typeof currentPayload.metadata === 'object'
+                ? { ...currentPayload.metadata }
+                : {};
+
+            if (missingColumn === 'filepath' && currentPayload.filepath) {
+                metadata.filepath = currentPayload.filepath;
+            }
+
+            delete currentPayload[missingColumn];
+
+            if (Object.keys(metadata).length > 0) {
+                currentPayload.metadata = metadata;
+            }
+        }
+
+        throw new Error('Failed to insert document after schema fallback attempts');
+    }
+
     // Map DB snake_case to App camelCase
     private mapDates(record: any): any {
         if (!record) return record;
@@ -1324,6 +1368,10 @@ export class SupabaseStorage {
                     console.warn('[SupabaseStorage] user_settings table does not exist. Settings saved locally only.');
                     return data;
                 }
+                if (error.code === '23503' || error.message?.includes('violates foreign key constraint')) {
+                    console.warn('[SupabaseStorage] user_settings foreign key mismatch. Falling back to client-side settings only.');
+                    return data;
+                }
                 console.error('[SupabaseStorage] updateUserSettings Error:', error);
                 throw new Error(`Failed to update user settings: ${error.message}`);
             }
@@ -2035,8 +2083,8 @@ export class SupabaseStorage {
 
     // ======= DOCUMENTS =======
     async createDocument(data: any): Promise<any> {
-        const { data: document, error } = await this.supabase.from('documents').insert(this.toSnakeCase(data)).select().single();
-        if (error) throw error;
+        const payload = this.toSnakeCase(data);
+        const document = await this.insertDocumentWithFallback(payload);
         return this.mapDates(document);
     }
 

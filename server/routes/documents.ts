@@ -73,6 +73,22 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             console.log(`✅ [Documents] Saved to LocalStorage (Fallback): ${filepath}`);
         }
 
+        const linkInvoiceUrlToOrder = async () => {
+            if ((type === 'invoice' || !type) && (metadata as any).orderNumber) {
+                try {
+                    const orderNum = (metadata as any).orderNumber;
+                    const orders = await db.listOrders();
+                    const order = orders.find((o: any) => o.orderNumber === orderNum);
+                    if (order) {
+                        await db.updateOrder(order.id, { invoiceUrl: fileUrl } as any);
+                        console.log(`🔗 [Documents] Linked invoice URL to order: ${orderNum}`);
+                    }
+                } catch (linkErr) {
+                    console.warn('[Documents] Failed to link invoice URL to order:', linkErr);
+                }
+            }
+        };
+
         // Save document record to database
         try {
             const document = await db.createDocument({
@@ -96,30 +112,32 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 },
             });
 
-            // Update order invoiceUrl if this was an invoice
-            if ((type === 'invoice' || !type) && (metadata as any).orderNumber) {
-                try {
-                    const orderNum = (metadata as any).orderNumber;
-                    const orders = await db.listOrders();
-                    const order = orders.find((o: any) => o.orderNumber === orderNum);
-                    if (order) {
-                        await db.updateOrder(order.id, { invoiceUrl: fileUrl } as any);
-                        console.log(`🔗 [Documents] Linked invoice URL to order: ${orderNum}`);
-                    }
-                } catch (linkErr) {
-                    console.warn('[Documents] Failed to link invoice URL to order:', linkErr);
-                }
-            }
+            await linkInvoiceUrlToOrder();
 
             res.json({
                 success: true,
                 document,
+                fileUrl,
+                filepath,
                 storageUsed,
                 message: 'Document uploaded successfully',
             });
         } catch (dbError) {
             console.error('Database insert error:', dbError);
-            return res.status(500).json({ error: 'Failed to save document record', details: dbError instanceof Error ? dbError.message : String(dbError) });
+            await linkInvoiceUrlToOrder();
+            return res.status(200).json({
+                success: true,
+                document: null,
+                fileUrl,
+                filepath,
+                storageUsed,
+                warning: 'Document file stored, but database record could not be created.',
+                details: dbError instanceof Error
+                    ? dbError.message
+                    : typeof dbError === 'object'
+                        ? JSON.stringify(dbError)
+                        : String(dbError),
+            });
         }
     } catch (error) {
         console.error('Document upload error:', error);
