@@ -4,17 +4,6 @@ import { createRoot } from 'react-dom/client';
 import React from 'react';
 import * as QRCode from 'qrcode';
 import InvoiceTemplateIN from '../components/print/invoice-template-in';
-import {
-  DEFAULT_INVOICE_TEMPLATE_CONFIG,
-  type BusinessProfile,
-  type InvoiceSnapshot,
-  type InvoiceTemplateConfig,
-  type InvoiceTemplatePresetKey,
-  type InvoiceTemplateProfile,
-  type StoreConfig,
-} from '@shared/business-config';
-import { businessConfigApi, getBillingCache } from './business-config-service';
-import { authorizedFetch } from './data-service';
 import { isElectron } from './utils';
 
 export interface PrintSettings {
@@ -166,17 +155,8 @@ export interface InvoicePrintData {
   invoiceNumber: string;
   invoiceDate: string;
   dueDate?: string;
-  orderId?: string;
   orderNumber?: string;
   franchiseId?: string; // For franchise-specific details
-  storeId?: string | null;
-  storeCode?: string | null;
-  invoiceTemplateId?: string | null;
-  templateKey?: string | null;
-  templatePreset?: InvoiceTemplatePresetKey;
-  templateConfig?: Partial<InvoiceTemplateConfig>;
-  businessProfile?: BusinessProfile;
-  store?: StoreConfig | null;
   enableGST?: boolean; // Whether to show GST on invoice
   customerInfo: {
     name: string;
@@ -191,7 +171,6 @@ export interface InvoicePrintData {
     email: string;
     website?: string;
     taxId?: string;
-    logo?: string;
   };
   items: Array<{
     name: string;
@@ -213,16 +192,13 @@ export interface InvoicePrintData {
   qrCode?: string;
   isExpressOrder?: boolean;
   isUpdate?: boolean; // Added isUpdate flag
-  deliveryCharges?: number;
-  expressSurcharge?: number;
   paymentBreakdown?: PaymentBreakdown;
-  fulfillmentType?: string;
-  deliveryAddress?: unknown;
 }
 
 // Import franchise config for company details
 import { getFranchiseById, getFormattedAddress } from './franchise-config';
 
+<<<<<<< Updated upstream
 const isPresetKey = (value: unknown): value is InvoiceTemplatePresetKey =>
   value === 'classic' || value === 'modern' || value === 'compact' || value === 'express' || value === 'edited';
 
@@ -314,6 +290,8 @@ const buildUpiPaymentUrl = (
   return `upi://pay?${params.toString()}`;
 };
 
+=======
+>>>>>>> Stashed changes
 /**
  * Parse address object to human-readable string
  * Handles all common address formats and returns clean text
@@ -375,35 +353,17 @@ function parseAddressObject(addr: any): string {
 
 // Utility function to convert Order data to InvoicePrintData
 export function convertOrderToInvoiceData(order: any, enableGST: boolean = false, isUpdate: boolean = false): InvoicePrintData {
-  const cache = getBillingCache();
-  const cachedBusinessProfile = cache.businessProfile;
-  const cachedStore =
-    cache.stores?.find((store) =>
-      store.id === (order?.storeId || order?.store_id) ||
-      store.code === String(order?.storeCode || order?.store_code || '').trim().toUpperCase()
-    ) || null;
   // Get franchise-specific company details
   const franchiseId = order?.franchiseId || order?.franchise_id;
   const franchise = getFranchiseById(franchiseId);
 
   const companyInfo = {
-    name: cachedBusinessProfile?.companyName || "FabZClean",
-    address: cachedStore
-      ? parseAddressObject(cachedStore.address)
-      : cachedBusinessProfile
-        ? parseAddressObject(cachedBusinessProfile.companyAddress)
-        : getFormattedAddress(franchise),
-    phone: cachedStore?.contactDetails?.phone || cachedBusinessProfile?.contactDetails?.phone || franchise.phone,
-    email: cachedStore?.contactDetails?.email || cachedBusinessProfile?.contactDetails?.email || franchise.email || "support@myfabclean.com",
-    website: cachedBusinessProfile?.contactDetails?.website || "www.myfabclean.com",
-    logo:
-      String((cachedStore?.invoiceOverrides as any)?.logoUrl || '') ||
-      cachedBusinessProfile?.invoiceDefaults?.logoUrl ||
-      franchise.logoUrl ||
-      '/assets/logo.webp',
-    taxId: enableGST
-      ? String(cachedStore?.legalDetails?.gstin || cachedBusinessProfile?.taxDetails?.gstin || franchise.gstNumber || '')
-      : undefined
+    name: "FabZClean",
+    address: getFormattedAddress(franchise),
+    phone: franchise.phone,
+    email: franchise.email || "support@myfabclean.com",
+    website: "www.myfabclean.com",
+    taxId: enableGST ? franchise.gstNumber : undefined
   };
 
   // Parse customer address - always return human-readable text, never JSON
@@ -439,13 +399,11 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
 
   // Parse order items
   let items: InvoicePrintData['items'] = [];
-  let baseServiceSubtotal = 0;
   if (order.items && Array.isArray(order.items)) {
     items = order.items.map((item: any) => {
       const quantity = parseInt(String(item.quantity)) || 1;
       const unitPrice = parseFloat(String(item.unitPrice || item.price || 0));
       const total = item.total ? parseFloat(String(item.total)) : (quantity * unitPrice);
-      baseServiceSubtotal += total;
 
       return {
         name: item.serviceName || item.service_name || item.customName || item.name || item.productName || item.description || 'Laundry Service',
@@ -462,13 +420,12 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
     const totalAmount = parseFloat(String(order.totalAmount)) || 0;
     const serviceName = order.serviceName || order.service || 'Dry Cleaning Service';
 
-    baseServiceSubtotal = enableGST ? totalAmount / 1.18 : totalAmount;
     items = [{
       name: serviceName,
       description: `Order ${order.orderNumber || order.id}${isUpdate ? ' (Updated)' : ''}`,
       quantity: 1,
-      unitPrice: baseServiceSubtotal, // Remove GST from base price if GST enabled
-      total: baseServiceSubtotal,
+      unitPrice: enableGST ? totalAmount / 1.18 : totalAmount, // Remove GST from base price if GST enabled
+      total: enableGST ? totalAmount / 1.18 : totalAmount,
       taxRate: enableGST ? 18 : 0
     }];
   }
@@ -479,6 +436,19 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
     items.push({
       name: 'Extra Charges',
       description: 'Additional fees',
+      quantity: 1,
+      unitPrice: charge,
+      total: charge,
+      taxRate: enableGST ? 18 : 0
+    });
+  }
+
+  // Add Delivery Charges
+  if (order.deliveryCharges && parseFloat(String(order.deliveryCharges)) > 0) {
+    const charge = parseFloat(String(order.deliveryCharges));
+    items.push({
+      name: 'Delivery Charges',
+      description: 'Fee for home delivery',
       quantity: 1,
       unitPrice: charge,
       total: charge,
@@ -511,17 +481,8 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
   }
 
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-  const deliveryCharges = parseFloat(String(order.deliveryCharges || order.delivery_charges || 0)) || 0;
-  const expressSurcharge = (order.isExpressOrder || order.is_express_order) && Array.isArray(order.items) && order.items.length > 0
-    ? (baseServiceSubtotal * 0.5)
-    : 0;
-  const explicitTax = parseFloat(String(order.gstAmount || order.gst_amount || 0));
-  const tax = enableGST
-    ? (Number.isFinite(explicitTax) && explicitTax > 0
-        ? explicitTax
-        : Math.max(0, (parseFloat(String(order.totalAmount || 0)) || 0) - subtotal - deliveryCharges - expressSurcharge))
-    : 0;
-  const total = parseFloat(String(order.totalAmount || 0)) || (subtotal + deliveryCharges + expressSurcharge + tax);
+  const tax = enableGST ? items.reduce((sum, item) => sum + (item.total * (item.taxRate || 0) / 100), 0) : 0;
+  const total = subtotal + tax;
 
   // Generate invoice number with franchise prefix
   const branchCode = franchise.branchCode;
@@ -561,36 +522,13 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
   const resolvedPhone = order.customerPhone || linkedCustomer?.phone || order.phone || '';
   const resolvedEmail = order.customerEmail || linkedCustomer?.email || order.email || '';
 
-  const orderCreatedAt = order.createdAt || order.created_at;
-  const pickupDate = order.pickupDate || order.pickup_date;
-  const defaultDueDays = Number(cachedBusinessProfile?.invoiceDefaults?.defaultDueDays || 2);
-  const dueDateSource = pickupDate
-    ? new Date(pickupDate)
-    : orderCreatedAt
-      ? new Date(new Date(orderCreatedAt).getTime() + defaultDueDays * 24 * 60 * 60 * 1000)
-      : new Date(Date.now() + defaultDueDays * 24 * 60 * 60 * 1000);
-
-  const hasExplicitTemplateSelection = Boolean(
-    order.invoiceTemplateId ||
-    order.invoice_template_id ||
-    order.templateKey ||
-    order.template_key
-  );
-
   return {
     invoiceNumber,
-    invoiceDate: orderCreatedAt ? new Date(orderCreatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-    dueDate: Number.isNaN(dueDateSource.getTime()) ? new Date().toISOString().split('T')[0] : dueDateSource.toISOString().split('T')[0],
-    orderId: order.id,
+    invoiceDate: order.createdAt ? new Date(order.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
     orderNumber: order.orderNumber || order.id,
     franchiseId: franchiseId,
-    storeId: order.storeId || order.store_id || null,
-    storeCode: order.storeCode || order.store_code || null,
-    invoiceTemplateId: order.invoiceTemplateId || order.invoice_template_id || null,
-    templateKey: order.templateKey || order.template_key || null,
     enableGST,
-    businessProfile: cachedBusinessProfile,
-    store: cachedStore,
     customerInfo: {
       name: resolvedName || 'Customer',
       address: customerAddress,
@@ -606,19 +544,20 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
     paymentStatus: order.paymentStatus || order.status || 'Pending',
     notes: order.notes || order.specialInstructions || `Order Status: ${order.status}`,
     terms: enableGST
-      ? (cachedBusinessProfile?.invoiceDefaults?.termsAndConditions || 'GST invoice. Tax is calculated at applicable rates.')
-      : (cachedBusinessProfile?.invoiceDefaults?.defaultPickupWording || 'Payment due on pickup.'),
+      ? 'GST Invoice. Tax is calculated at applicable rates. Payment due within 30 days.'
+      : 'Payment due within 30 days of invoice date.',
     status: order.status,
     isExpressOrder: order.isExpressOrder || order.is_express_order || false,
     isUpdate,
+<<<<<<< Updated upstream
     deliveryCharges,
     expressSurcharge,
     templatePreset: !hasExplicitTemplateSelection
       ? ((order.isExpressOrder || order.is_express_order) ? 'express' : undefined)
       : undefined,
+=======
+>>>>>>> Stashed changes
     paymentBreakdown,
-    fulfillmentType: order.fulfillmentType || order.fulfillment_type || 'pickup',
-    deliveryAddress: order.deliveryAddress || order.delivery_address || undefined,
   };
 }
 
@@ -702,8 +641,8 @@ export class PrintDriver {
     // Invoice Template
     this.templates.set('invoice', {
       id: 'invoice',
-      name: 'Classic Invoice',
-      description: 'Classic invoice template with company branding',
+      name: 'Professional Invoice',
+      description: 'Professional invoice template with company branding',
       category: 'invoice',
       settings: {
         pageSize: 'A4',
@@ -737,79 +676,6 @@ export class PrintDriver {
         fontSize: 9,
         fontFamily: 'helvetica',
         color: '#2C3E50',
-        backgroundColor: '#FFFFFF'
-      },
-      layout: {
-        header: true,
-        footer: true,
-        logo: true,
-        companyInfo: true,
-        table: true,
-        signature: true
-      }
-    });
-
-    // Compact Invoice Template
-    this.templates.set('compact-invoice', {
-      id: 'compact-invoice',
-      name: 'Compact Invoice',
-      description: 'Dense low-ink invoice template',
-      category: 'invoice',
-      settings: {
-        pageSize: 'A4',
-        orientation: 'portrait',
-        margin: { top: 10, right: 10, bottom: 10, left: 10 },
-        fontSize: 8,
-        fontFamily: 'helvetica',
-        color: '#111827',
-        backgroundColor: '#FFFFFF'
-      },
-      layout: {
-        header: true,
-        footer: true,
-        logo: false,
-        companyInfo: true,
-        table: true,
-        signature: false
-      }
-    });
-
-    this.templates.set('express-invoice', {
-      id: 'express-invoice',
-      name: 'Express Bill',
-      description: 'Priority bill layout for fast-turnaround orders',
-      category: 'invoice',
-      settings: {
-        pageSize: 'A4',
-        orientation: 'portrait',
-        margin: { top: 12, right: 12, bottom: 12, left: 12 },
-        fontSize: 9,
-        fontFamily: 'helvetica',
-        color: '#9A3412',
-        backgroundColor: '#FFFFFF'
-      },
-      layout: {
-        header: true,
-        footer: true,
-        logo: true,
-        companyInfo: true,
-        table: true,
-        signature: true
-      }
-    });
-
-    this.templates.set('edited-invoice', {
-      id: 'edited-invoice',
-      name: 'Edited Order Bill',
-      description: 'Revision-focused bill layout for updated orders',
-      category: 'invoice',
-      settings: {
-        pageSize: 'A4',
-        orientation: 'portrait',
-        margin: { top: 14, right: 14, bottom: 14, left: 14 },
-        fontSize: 9,
-        fontFamily: 'helvetica',
-        color: '#1E293B',
         backgroundColor: '#FFFFFF'
       },
       layout: {
@@ -1004,16 +870,6 @@ export class PrintDriver {
   }
 
   public async printInvoice(data: InvoicePrintData, templateId: string = 'invoice'): Promise<any> {
-    return this.generateInvoiceDocument(data, templateId, {
-      outputMode: isElectron() ? 'print' : 'download',
-    });
-  }
-
-  public async generateInvoiceDocument(
-    data: InvoicePrintData,
-    templateId: string = 'invoice',
-    options: { outputMode?: 'download' | 'print' | 'none' } = {}
-  ): Promise<any> {
     const template = this.getTemplate(templateId);
     if (!template) {
       throw new Error(`Template ${templateId} not found`);
@@ -1026,6 +882,7 @@ export class PrintDriver {
       console.log('🚀 Starting invoice generation flow...');
       console.log('📦 Invoice data:', data);
 
+<<<<<<< Updated upstream
       let resolvedBusinessProfile: BusinessProfile | undefined;
       let resolvedStore: StoreConfig | null = data.store || null;
       let resolvedTemplateProfile: InvoiceTemplateProfile | null = null;
@@ -1072,18 +929,20 @@ export class PrintDriver {
         ? mergeInvoiceTemplateConfig(displayConfig, resolvedTemplateProfile?.config, data.templateConfig)
         : mergeInvoiceTemplateConfig(displayConfig);
 
+=======
+      // Generate QR Code for UPI Payment
+>>>>>>> Stashed changes
       let qrCodeDataUrl: string | undefined = undefined;
       try {
-        const upiUrl = buildUpiPaymentUrl(
-          resolvedBusinessProfile?.paymentDetails as Record<string, unknown> | undefined,
-          data.total,
-          data.orderNumber
-        );
+        // Use centralized UPI configuration
+        const { generateUPIUrl } = await import('./franchise-config');
+        const upiUrl = generateUPIUrl(data.total, data.orderNumber);
         qrCodeDataUrl = await QRCode.toDataURL(upiUrl);
       } catch (e) {
         console.error("Failed to generate QR code", e);
       }
 
+<<<<<<< Updated upstream
       const resolvedCompanyInfo = resolvedBusinessProfile
         ? {
             name: resolvedBusinessProfile.companyName || data.companyInfo.name,
@@ -1132,6 +991,8 @@ export class PrintDriver {
         businessProfile: resolvedBusinessProfile || data.businessProfile,
       };
 
+=======
+>>>>>>> Stashed changes
       // 1. Prepare Data with franchise and GST info
       const invoiceData = {
         invoiceNumber: data.invoiceNumber,
@@ -1142,12 +1003,12 @@ export class PrintDriver {
         // Pass GST flag for tax invoice generation
         enableGST: data.enableGST || false,
         company: {
-          name: resolvedCompanyInfo.name,
-          address: resolvedCompanyInfo.address,
-          phone: resolvedCompanyInfo.phone,
-          email: resolvedCompanyInfo.email,
-          taxId: resolvedCompanyInfo.taxId || '33AITPD3522F1ZK',
-          logo: resolvedCompanyInfo.logo || '/assets/fabclean-logo.png'
+          name: data.companyInfo.name,
+          address: data.companyInfo.address,
+          phone: data.companyInfo.phone,
+          email: data.companyInfo.email,
+          taxId: data.companyInfo.taxId || '33AITPD3522F1ZK',
+          logo: '/assets/fabclean-logo.png'
         },
         customer: {
           name: data.customerInfo.name,
@@ -1157,8 +1018,7 @@ export class PrintDriver {
           taxId: undefined
         },
         items: data.items.map(item => ({
-          description: item.description || item.name || 'Laundry Service',
-          note: (item as any).note,
+          description: item.name || item.description || 'Laundry Service',
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           total: item.total,
@@ -1167,22 +1027,64 @@ export class PrintDriver {
         })),
         subtotal: data.subtotal,
         taxAmount: data.tax,
-        deliveryCharges: data.deliveryCharges || 0,
-        expressSurcharge: data.expressSurcharge || 0,
+        deliveryCharges: 0, // Will be included in items if applicable
         total: data.total,
-        paymentTerms: templateTerms,
-        notes: templateNotes,
+        paymentTerms: data.terms || 'Payment due within 7 days',
+        notes: data.notes,
         status: data.status,
         qrCode: qrCodeDataUrl,
         isExpressOrder: data.isExpressOrder || false,
-        isUpdate: data.isUpdate || false,
         paymentBreakdown: data.paymentBreakdown,
-        fulfillmentType: data.fulfillmentType,
-        deliveryAddress: data.deliveryAddress,
       };
 
       console.log('✅ Data prepared');
 
+<<<<<<< Updated upstream
+=======
+      // 2. Render React Component
+      container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      container.style.top = '0';
+      container.style.width = '210mm';
+      container.style.background = 'white';
+      document.body.appendChild(container);
+
+      console.log('📄 Rendering invoice template...');
+      root = createRoot(container);
+
+      await new Promise<void>((resolve) => {
+        root.render(React.createElement(InvoiceTemplateIN, { data: invoiceData }));
+        // Wait for rendering to complete
+        setTimeout(resolve, 2000); // Generous timeout to ensure rendering
+      });
+      console.log('✅ Template rendered');
+
+      // 3. Convert to Image (html2canvas) - OPTIMIZED for smaller file size
+      console.log('🎨 Converting to image (optimized)...');
+      const canvas = await html2canvas(container, {
+        scale: 1.5, // Balanced scale for quality/size
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: 794,
+        windowHeight: 1123,
+        imageTimeout: 5000,
+        removeContainer: false,
+      });
+      console.log('✅ Image created:', canvas.width, 'x', canvas.height);
+
+      // 4. Generate PDF with SMART COMPRESSION
+      console.log('📄 Generating PDF with smart compression...');
+
+      // Smart compression algorithm - finds optimal quality
+      const MAX_SIZE_KB = 8000; // 8MB target (buffer for 10MB limit)
+      const MIN_QUALITY = 0.5;
+      const QUALITY_STEP = 0.05;
+
+      let currentQuality = 0.8; // Start at 80%
+>>>>>>> Stashed changes
       let pdfBlob: Blob;
 
       try {
@@ -1287,6 +1189,7 @@ export class PrintDriver {
       const filename = `invoice-${data.invoiceNumber}-${Date.now()}.pdf`;
       console.log('✅ PDF generated');
 
+<<<<<<< Updated upstream
       const snapshotTemplate = rendererMode === 'template' && resolvedTemplateProfile && resolvedTemplateProfile.presetKey === presetKey
         ? { ...resolvedTemplateProfile, config: effectiveConfig }
         : rendererMode === 'template' ? {
@@ -1302,6 +1205,8 @@ export class PrintDriver {
             config: effectiveConfig,
           } : null;
 
+=======
+>>>>>>> Stashed changes
       // 5. Save to Server (CRITICAL STEP)
       console.log('💾 Saving to server...');
       let savedDoc = null;
@@ -1313,6 +1218,7 @@ export class PrintDriver {
           customerName: data.customerInfo.name,
           amount: data.total,
           status: data.paymentStatus || 'sent',
+<<<<<<< Updated upstream
           storeId: resolvedStore?.id || data.storeId || null,
           templateKey: rendererMode === 'template'
             ? (resolvedTemplateProfile?.templateKey || data.templateKey || activeVariantKey)
@@ -1336,6 +1242,12 @@ export class PrintDriver {
                 storeCode: data.storeCode || resolvedStore?.code,
               },
             } satisfies InvoiceSnapshot,
+=======
+          metadata: {
+            invoiceDate: data.invoiceDate,
+            items: data.items.length,
+            total: data.total
+>>>>>>> Stashed changes
           }
         });
         console.log('✅ Saved to server successfully:', savedDoc);
@@ -1348,7 +1260,7 @@ export class PrintDriver {
       // 6. Download to User or Print (Electron)
       console.log('⬇️ Processing output...');
 
-      if (options.outputMode === 'print') {
+      if (isElectron()) {
         console.log('🖥️ Electron detected, initiating direct print...');
         // Create blob URL for printing
         const blobUrl = URL.createObjectURL(pdfBlob);
@@ -1372,7 +1284,7 @@ export class PrintDriver {
             URL.revokeObjectURL(blobUrl);
           }, 60000); // 1 minute cleanup
         }, 1000);
-      } else if (options.outputMode === 'download') {
+      } else {
         // Download the PDF blob
         const blobUrl = URL.createObjectURL(pdfBlob);
         const link = document.createElement('a');
@@ -1385,7 +1297,7 @@ export class PrintDriver {
         console.log('✅ Download initiated');
       }
 
-      return savedDoc?.document || savedDoc; // Return the saved document info
+      return savedDoc; // Return the saved document info
 
     } catch (error) {
       console.error('❌ Critical error in printInvoice:', error);
@@ -1408,12 +1320,16 @@ export class PrintDriver {
   ): Promise<any> {
     try {
       const formData = new FormData();
+<<<<<<< Updated upstream
       const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
       formData.append('file', pdfFile);
+=======
+      formData.append('file', pdfBlob, filename);
+>>>>>>> Stashed changes
       formData.append('type', metadata.type);
       formData.append('metadata', JSON.stringify(metadata));
 
-      const response = await authorizedFetch('/documents/upload', {
+      const response = await fetch('/api/documents/upload', {
         method: 'POST',
         body: formData,
       });

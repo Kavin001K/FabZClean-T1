@@ -1,7 +1,5 @@
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { useSettings, Theme, LandingPage, AVAILABLE_QUICK_ACTIONS } from '@/contexts/settings-context';
-import { useAuth } from '@/contexts/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -10,32 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Moon, Sun, Laptop, Plus, Search, Receipt,
-  FileText, Settings, Loader2, Building2, Store, Tags, Sparkles, Save, Upload, Trash2
+import { 
+  Moon, Sun, Laptop, Zap, 
+  LayoutDashboard, Plus, Search, Receipt, 
+  FileText, Users, Settings, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-  businessConfigApi,
-  getBillingCache,
-} from '@/lib/business-config-service';
-import {
-  DEFAULT_INVOICE_TEMPLATE_CONFIG,
-  DEFAULT_TAG_TEMPLATE_CONFIG,
-  invoiceTemplateProfileSchema,
-  storeConfigSchema,
-  tagTemplateProfileSchema,
-  type BusinessProfile,
-  type InvoiceTemplateProfile,
-  type StoreConfig,
-  type TagTemplateProfile,
-} from '@shared/business-config';
-import InvoiceTemplateIN from '@/components/print/invoice-template-in';
-import { ThermalTagLabel, prepareThermalTags } from '@/lib/garment-tag-layout';
-import { useToast } from '@/hooks/use-toast';
 
+// Icon map for quick actions
 const ICON_MAP: Record<string, React.ElementType> = {
   'new-order': Plus,
   'active-orders': Receipt,
@@ -44,43 +24,13 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'print-queue': FileText,
 };
 
-const SAMPLE_INVOICE_DATA = {
-  invoiceNumber: 'POL-FZC-2026POL0001A',
-  invoiceDate: new Date().toISOString().split('T')[0],
-  dueDate: new Date().toISOString().split('T')[0],
-  company: {
-    name: 'FabZClean',
-    address: '#16, Venkatramana Round Road, Pollachi',
-    phone: '+91 93630 59595',
-    email: 'support@myfabclean.com',
-    taxId: '33AITPD3522F1ZK',
-    logo: '/assets/logo.webp',
-  },
-  customer: {
-    name: 'Sample Customer',
-    address: '12 Market Street, Pollachi',
-    phone: '+91 90000 11111',
-    email: 'sample@customer.com',
-  },
-  items: [
-    { description: 'Shirt / Dry Clean', quantity: 3, unitPrice: 80, total: 240, note: 'Collar stain check', hsn: '998314' },
-    { description: 'Silk Saree', quantity: 1, unitPrice: 180, total: 180, hsn: '998314' },
-  ],
-  subtotal: 420,
-  taxAmount: 75.6,
-  total: 495.6,
-  paymentTerms: 'Collect on pickup',
-  notes: 'Ready after quality check',
-  qrCode: '',
-  fulfillmentType: 'pickup',
-};
-
 export default function SettingsPage() {
   useEffect(() => {
     document.title = "Settings | FabzClean";
   }, []);
 
   const { settings, updateSetting, isLoading, isSaving } = useSettings();
+<<<<<<< Updated upstream
   const { employee, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -452,6 +402,8 @@ export default function SettingsPage() {
     const store = stores.find((entry) => entry.id === storeId);
     return store ? `${store.code} · ${store.name}` : 'Store';
   };
+=======
+>>>>>>> Stashed changes
 
   const applyAiTemplateVersion = () => {
     if (!aiOptimizedTemplateDraft) return;
@@ -501,66 +453,50 @@ export default function SettingsPage() {
 
   return (
     <div className="container-desktop min-h-screen py-8 pb-20 sm:pb-8 gradient-mesh">
-      <div className="mx-auto max-w-7xl space-y-8">
+      <div className="mx-auto max-w-4xl space-y-8">
+        {/* Header */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Settings Studio</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Personal Settings
+            </h1>
             <Badge variant="outline" className={cn("px-3 py-1 text-xs", isSaving ? "border-primary/30 text-primary" : "border-emerald-200 text-emerald-600")}>
               {isSaving ? "Saving..." : "Saved"}
             </Badge>
-            {isAdmin && <Badge className="bg-primary/10 text-primary border-primary/20">Admin</Badge>}
           </div>
           <p className="text-muted-foreground">
-            Personal workspace settings stay instant. Business, store, invoice, and tag settings update what the next generated bill will use.
+            Customize your workspace. Changes should apply across the app immediately and persist to your account.
           </p>
         </div>
 
-        <Tabs defaultValue="workspace" className="w-full">
-          <TabsList className={cn("grid w-full lg:w-full", isAdmin ? "grid-cols-5" : "grid-cols-1")}>
-            <TabsTrigger value="workspace" className="gap-2">
+        <Tabs defaultValue="appearance" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+            <TabsTrigger value="appearance" className="gap-2">
               <Laptop className="h-4 w-4" />
-              Workspace
+              Appearance
             </TabsTrigger>
-            {isAdmin && (
-              <TabsTrigger value="business" className="gap-2">
-                <Building2 className="h-4 w-4" />
-                Business Profile
-              </TabsTrigger>
-            )}
-            {isAdmin && (
-              <TabsTrigger value="stores" className="gap-2">
-                <Store className="h-4 w-4" />
-                Stores
-              </TabsTrigger>
-            )}
-            {isAdmin && (
-              <TabsTrigger value="invoice" className="gap-2">
-                <Sparkles className="h-4 w-4" />
-                Invoice Studio
-              </TabsTrigger>
-            )}
-            {isAdmin && (
-              <TabsTrigger value="tags" className="gap-2">
-                <Tags className="h-4 w-4" />
-                Tag Studio
-              </TabsTrigger>
-            )}
+            <TabsTrigger value="workflow" className="gap-2">
+              <Zap className="h-4 w-4" />
+              Workflow
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="workspace" className="space-y-6 mt-6">
+          {/* === APPEARANCE TAB === */}
+          <TabsContent value="appearance" className="space-y-6 mt-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <Card className="glass border-none shadow-xl overflow-hidden">
               <CardHeader className="border-b border-white/5 bg-white/5">
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
                   <Sun className="h-5 w-5 text-amber-500" />
-                  Theme & Workflow
+                  Theme & Visuals
                 </CardTitle>
-                <CardDescription>Per-user preferences stored against {employee?.username || 'your account'}.</CardDescription>
+                <CardDescription>Choose how FabZClean looks on your screen.</CardDescription>
               </CardHeader>
               <CardContent className="p-6 space-y-8">
+                {/* Theme Selection */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <Label className="text-base">Color Theme</Label>
-                    <p className="text-sm text-muted-foreground">Switch between light, dark, or system.</p>
+                    <p className="text-sm text-muted-foreground">Switch between light, dark, or follow your system.</p>
                   </div>
                   <div className="flex bg-muted p-1 rounded-xl w-fit">
                     {(['light', 'dark', 'system'] as Theme[]).map((t) => (
@@ -569,7 +505,10 @@ export default function SettingsPage() {
                         variant={settings.theme === t ? 'default' : 'ghost'}
                         size="sm"
                         onClick={() => updateSetting('theme', t)}
-                        className={cn("rounded-lg capitalize px-4 h-9", settings.theme === t && "shadow-lg bg-primary text-primary-foreground")}
+                        className={cn(
+                          "rounded-lg capitalize px-4 h-9",
+                          settings.theme === t && "shadow-lg bg-primary text-primary-foreground"
+                        )}
                       >
                         {t === 'light' && <Sun className="h-4 w-4 mr-2" />}
                         {t === 'dark' && <Moon className="h-4 w-4 mr-2" />}
@@ -582,22 +521,43 @@ export default function SettingsPage() {
 
                 <Separator className="bg-white/5" />
 
+                {/* Compact Mode */}
                 <div className="flex items-center justify-between gap-4">
                   <div className="space-y-1">
                     <Label className="text-base">Compact Mode</Label>
-                    <p className="text-sm text-muted-foreground">Reduce spacing to fit more information on screen.</p>
+                    <p className="text-sm text-muted-foreground">Reduce spacing to fit more information on the screen.</p>
                   </div>
-                  <Switch checked={settings.compactMode} onCheckedChange={(c) => updateSetting('compactMode', c)} className="data-[state=checked]:bg-primary" />
+                  <Switch
+                    checked={settings.compactMode}
+                    onCheckedChange={(c) => updateSetting('compactMode', c)}
+                    className="data-[state=checked]:bg-primary"
+                  />
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                <Separator className="bg-white/5" />
-
+          {/* === WORKFLOW TAB === */}
+          <TabsContent value="workflow" className="space-y-6 mt-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <Card className="glass border-none shadow-xl overflow-hidden">
+              <CardHeader className="border-b border-white/5 bg-white/5">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <LayoutDashboard className="h-5 w-5 text-indigo-500" />
+                  Navigation & Shortcuts
+                </CardTitle>
+                <CardDescription>Optimize your daily workflow with custom shortcuts.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-6 space-y-8">
+                {/* Default Landing Page */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <Label className="text-base">Default Landing Page</Label>
-                    <p className="text-sm text-muted-foreground">First screen after login.</p>
+                    <p className="text-sm text-muted-foreground">The first page you see after logging in.</p>
                   </div>
-                  <Select value={settings.landingPage} onValueChange={(v: LandingPage) => updateSetting('landingPage', v)}>
+                  <Select
+                    value={settings.landingPage}
+                    onValueChange={(v: LandingPage) => updateSetting('landingPage', v)}
+                  >
                     <SelectTrigger className="w-full sm:w-[220px] rounded-xl glass border-white/10 shadow-inner">
                       <SelectValue placeholder="Select page" />
                     </SelectTrigger>
@@ -613,11 +573,14 @@ export default function SettingsPage() {
 
                 <Separator className="bg-white/5" />
 
+                {/* Quick Actions Selector */}
                 <div className="space-y-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="space-y-1">
                       <Label className="text-base">Dashboard Quick Actions</Label>
-                      <p className="text-sm text-muted-foreground">Pick up to 4 shortcuts for your dashboard.</p>
+                      <p className="text-sm text-muted-foreground">
+                        Select up to 4 shortcuts for your main dashboard.
+                      </p>
                     </div>
                     <Badge variant="outline" className="w-fit py-1 px-3 border-primary/20 bg-primary/5 text-primary">
                       {settings.quickActions.length} / 4 Selected
@@ -643,18 +606,31 @@ export default function SettingsPage() {
                           disabled={isMaxed}
                           className={cn(
                             "group flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-300 text-left relative overflow-hidden",
-                            isSelected ? "border-primary bg-primary/10 shadow-lg shadow-primary/5" : "border-white/5 bg-white/5 hover:border-white/20 hover:bg-white/10",
+                            isSelected
+                              ? "border-primary bg-primary/10 shadow-lg shadow-primary/5"
+                              : "border-white/5 bg-white/5 hover:border-white/20 hover:bg-white/10",
                             isMaxed && "opacity-40 cursor-not-allowed grayscale"
                           )}
                         >
-                          <div className={cn("p-2.5 rounded-xl transition-colors", isSelected ? "bg-primary text-primary-foreground shadow-md" : "bg-white/5 text-muted-foreground group-hover:text-primary")}>
+                          <div className={cn(
+                            "p-2.5 rounded-xl transition-colors",
+                            isSelected ? "bg-primary text-primary-foreground shadow-md" : "bg-white/5 text-muted-foreground group-hover:text-primary"
+                          )}>
                             <IconComponent className="h-5 w-5" />
                           </div>
                           <div className="flex flex-col">
-                            <span className={cn("text-sm font-semibold transition-colors", isSelected ? "text-primary" : "text-foreground group-hover:text-primary")}>
+                            <span className={cn(
+                              "text-sm font-semibold transition-colors",
+                              isSelected ? "text-primary" : "text-foreground group-hover:text-primary"
+                            )}>
                               {action.label}
                             </span>
                           </div>
+                          {isSelected && (
+                            <div className="absolute top-2 right-2">
+                              <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                            </div>
+                          )}
                         </button>
                       );
                     })}
@@ -663,6 +639,7 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </TabsContent>
+<<<<<<< Updated upstream
 
           {isAdmin && profileDraft && (
             <TabsContent value="business" className="space-y-6 mt-6">
@@ -1521,6 +1498,8 @@ export default function SettingsPage() {
               </div>
             </TabsContent>
           )}
+=======
+>>>>>>> Stashed changes
         </Tabs>
       </div>
     </div>

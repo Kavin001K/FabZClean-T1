@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Service, Order, Customer } from "@shared/schema";
+import type { Service, Order, Customer, OrderStoreCode } from "@shared/schema";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -28,11 +28,13 @@ import { OrderConfirmationDialog } from "@/components/orders/order-confirmation-
 import OrderDetailsDialog from "@/components/orders/order-details-dialog";
 import { useAuth } from "@/contexts/auth-context";
 import { createAddressObject, parseAndFormatAddress } from "@/lib/address-utils";
-import { resolveOrderStoreCodeFromEmployee } from "@/lib/order-store";
+import {
+  ORDER_STORE_OPTIONS,
+  getOrderStoreLabel,
+  resolveOrderStoreCodeFromEmployee,
+} from "@/lib/order-store";
 import { formatCurrencyWithSettings, roundInvoiceAmount } from "@/lib/settings-utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { businessConfigApi, getBillingCache } from "@/lib/business-config-service";
-import type { StoreConfig } from "@shared/business-config";
 
 interface ServiceItem {
   /** Unique ID for this cart line item (allows same service added multiple times) */
@@ -82,8 +84,6 @@ export default function CreateOrder() {
   // Refs for keyboard-driven focus flow (qty/price inputs keyed by instanceKey)
   const quantityRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const priceRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const nameRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const noteRefs = useRef<Record<string, HTMLInputElement | null>>({});
   // Track the last-added service instance for auto-focus
   const [lastAddedInstanceKey, setLastAddedInstanceKey] = useState<string | null>(null);
   // Collapsible extras state
@@ -97,7 +97,7 @@ export default function CreateOrder() {
   const [customerCity, setCustomerCity] = useState('');
   const [customerPincode, setCustomerPincode] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
-  const [storeId, setStoreId] = useState<string>('');
+  const [storeCode, setStoreCode] = useState<OrderStoreCode>('POL');
   const [billDate, setBillDate] = useState<Date>(() => toDateOnly(new Date()));
 
   // Services state (must be before useEffect that references it)
@@ -109,42 +109,12 @@ export default function CreateOrder() {
   // Abandoned Cart Recovery
   const ABANDONED_CART_KEY = "fabzclean_cart_draft_v1";
 
-  const { data: stores = [] } = useQuery<StoreConfig[]>({
-    queryKey: ['active-stores'],
-    queryFn: () => businessConfigApi.listStores(true),
-    initialData: getBillingCache().stores || [],
-    staleTime: 60_000,
-  });
-  const { data: businessProfile } = useQuery({
-    queryKey: ['business-profile'],
-    queryFn: () => businessConfigApi.getBusinessProfile(),
-    initialData: getBillingCache().businessProfile,
-    staleTime: 60_000,
-  });
-
-  const selectedStore = useMemo(
-    () => stores.find((store) => store.id === storeId) || stores.find((store) => store.code === storeId) || null,
-    [stores, storeId]
-  );
-  const selectedStoreCode = selectedStore?.code || 'POL';
-
   useEffect(() => {
     const hasDraft = Boolean(localStorage.getItem(ABANDONED_CART_KEY));
-    if (!hasDraft && stores.length > 0 && !storeId) {
-      const hintedCode = resolveOrderStoreCodeFromEmployee(currentUser as any);
-      const employeeHint = String((currentUser as any)?.storeId || (currentUser as any)?.franchiseId || '').trim();
-      const resolvedStore =
-        stores.find((store) => store.id === employeeHint) ||
-        stores.find((store) => store.code === employeeHint.toUpperCase()) ||
-        stores.find((store) => store.code === hintedCode) ||
-        stores.find((store) => store.isDefault) ||
-        stores[0];
-
-      if (resolvedStore) {
-        setStoreId(resolvedStore.id || resolvedStore.code);
-      }
+    if (!hasDraft) {
+      setStoreCode(resolveOrderStoreCodeFromEmployee(currentUser as any));
     }
-  }, [currentUser, storeId, stores]);
+  }, [currentUser]);
 
   // Load draft on mount
   useEffect(() => {
@@ -165,8 +135,7 @@ export default function CreateOrder() {
           setSelectedServices(withKeys);
         }
         if (draft.specialInstructions) setSpecialInstructions(draft.specialInstructions);
-        if (draft.storeId) setStoreId(draft.storeId);
-        else if (draft.storeCode) setStoreId(draft.storeCode);
+        if (draft.storeCode) setStoreCode(draft.storeCode);
         if (draft.billDate) setBillDate(toDateOnly(new Date(draft.billDate)));
 
         toast({ title: "Draft Restored", description: "Taking you back to where you left off." });
@@ -179,10 +148,10 @@ export default function CreateOrder() {
   // Save draft on change
   useEffect(() => {
     const draft = {
-      phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeId, storeCode: selectedStoreCode, billDate
+      phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate
     };
     localStorage.setItem(ABANDONED_CART_KEY, JSON.stringify(draft));
-  }, [phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeId, selectedStoreCode, billDate]);
+  }, [phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate]);
 
   // Customer creation popup
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
@@ -689,10 +658,10 @@ export default function CreateOrder() {
     if (lastAddedInstanceKey) {
       // Short delay for DOM to render
       const timer = setTimeout(() => {
-        const nameInput = nameRefs.current[lastAddedInstanceKey];
-        if (nameInput) {
-          nameInput.focus();
-          nameInput.select();
+        const qtyInput = quantityRefs.current[lastAddedInstanceKey];
+        if (qtyInput) {
+          qtyInput.focus();
+          qtyInput.select();
         }
         setLastAddedInstanceKey(null);
       }, 100);
@@ -702,11 +671,10 @@ export default function CreateOrder() {
 
   // Auto-set due date: 2 days for express, 7 days for regular
   useEffect(() => {
-    const configuredDueDays = Math.max(0, Number(businessProfile?.invoiceDefaults?.defaultDueDays || 2));
-    const daysToAdd = isExpressOrder ? Math.min(2, configuredDueDays || 2) : configuredDueDays;
+    const daysToAdd = isExpressOrder ? 2 : 7;
     const dueDate = new Date(toDateOnly(billDate).getTime() + daysToAdd * 24 * 60 * 60 * 1000);
     setPickupDate(dueDate);
-  }, [billDate, businessProfile?.invoiceDefaults?.defaultDueDays, isExpressOrder]);
+  }, [billDate, isExpressOrder]);
 
   // Mutation for updating order status from history
   const updateOrderStatusMutation = useMutation({
@@ -788,10 +756,7 @@ export default function CreateOrder() {
 
         // 4b. Ensure Store Code for tags and filtering
         if (!newOrder.storeCode) {
-          newOrder.storeCode = newOrder.store_code || selectedStoreCode;
-        }
-        if (!newOrder.storeId) {
-          newOrder.storeId = newOrder.store_id || selectedStore?.id;
+          newOrder.storeCode = newOrder.store_code || storeCode;
         }
 
         // 5. Ensure Customer Name
@@ -941,16 +906,6 @@ export default function CreateOrder() {
     setDeliveryCharges(0);
     setUseWallet(false);
     setCreditOverridePrompt(null);
-    const cachedStores = getBillingCache().stores || stores;
-    const employeeHint = String((currentUser as any)?.storeId || (currentUser as any)?.franchiseId || '').trim();
-    const hintedCode = resolveOrderStoreCodeFromEmployee(currentUser as any);
-    const resolvedStore =
-      cachedStores.find((store) => store.id === employeeHint) ||
-      cachedStores.find((store) => store.code === employeeHint.toUpperCase()) ||
-      cachedStores.find((store) => store.code === hintedCode) ||
-      cachedStores.find((store) => store.isDefault) ||
-      cachedStores[0];
-    setStoreId(resolvedStore?.id || resolvedStore?.code || '');
   };
 
   // Validate phone number - flexible to accept various international formats
@@ -1079,8 +1034,7 @@ export default function CreateOrder() {
     // Don't set orderNumber here - let server generate it with proper sequential format
     const orderData: any = {
       customerId: currentCustomerId,
-      storeId: selectedStore?.id,
-      storeCode: selectedStoreCode,
+      storeCode,
       customerName,
       customerEmail: customerEmail || undefined,
       customerPhone,
@@ -1475,25 +1429,17 @@ export default function CreateOrder() {
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
                                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Service</p>
-                                    <Input
-                                      ref={(el) => { nameRefs.current[item.instanceKey] = el; }}
-                                      value={item.customName}
-                                      onChange={(e) => {
-                                        const updated = selectedServices.map((s) =>
-                                          s.instanceKey === item.instanceKey ? { ...s, customName: e.target.value } : s
-                                        );
-                                        setSelectedServices(updated);
-                                      }}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          quantityRefs.current[item.instanceKey]?.focus();
-                                        }
-                                      }}
-                                      onFocus={(e) => e.target.select()}
-                                      className="mt-2 h-11 rounded-xl border-slate-200 bg-white text-base font-semibold dark:border-slate-700 dark:bg-slate-800"
-                                      placeholder="Service name"
-                                    />
+                                  <Input
+                                    value={item.customName}
+                                    onChange={(e) => {
+                                      const updated = selectedServices.map((s) =>
+                                        s.instanceKey === item.instanceKey ? { ...s, customName: e.target.value } : s
+                                      );
+                                      setSelectedServices(updated);
+                                    }}
+                                    className="mt-2 h-11 rounded-xl border-slate-200 bg-white text-base font-semibold dark:border-slate-700 dark:bg-slate-800"
+                                    placeholder="Service name"
+                                  />
                                 </div>
                                 <Button
                                   variant="ghost"
@@ -1509,7 +1455,6 @@ export default function CreateOrder() {
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/80">
                                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 mb-2">Quantity</p>
                                   <Input
-                                    ref={(el) => { quantityRefs.current[item.instanceKey] = el; }}
                                     type="text"
                                     inputMode="numeric"
                                     value={item.quantity === 0 ? "" : item.quantity}
@@ -1517,12 +1462,6 @@ export default function CreateOrder() {
                                       const val = e.target.value;
                                       if (val === "" || /^\d+$/.test(val)) {
                                         handleUpdateQuantity(item.instanceKey, val);
-                                      }
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        priceRefs.current[item.instanceKey]?.focus();
                                       }
                                     }}
                                     onFocus={(e) => e.target.select()}
@@ -1543,7 +1482,7 @@ export default function CreateOrder() {
                                       onKeyDown={(e) => {
                                         if (e.key === 'ArrowUp') { e.preventDefault(); handleAdjustPrice(item.instanceKey, 5); }
                                         if (e.key === 'ArrowDown') { e.preventDefault(); handleAdjustPrice(item.instanceKey, -5); }
-                                        if (e.key === 'Enter') { e.preventDefault(); noteRefs.current[item.instanceKey]?.focus(); }
+                                        if (e.key === 'Enter') { e.preventDefault(); serviceComboboxRef.current?.focus(); }
                                       }}
                                       className="h-full border-0 bg-transparent text-right text-lg font-black dark:text-white focus-visible:ring-0 pr-0"
                                     />
@@ -1562,7 +1501,6 @@ export default function CreateOrder() {
                                 <div className="space-y-1.5">
                                   <Label className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Tag note</Label>
                                   <Input
-                                    ref={(el) => { noteRefs.current[item.instanceKey] = el; }}
                                     value={item.tagNote}
                                     onChange={(e) => {
                                       const updated = selectedServices.map((s) =>
@@ -1570,13 +1508,6 @@ export default function CreateOrder() {
                                       );
                                       setSelectedServices(updated);
                                     }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        serviceComboboxRef.current?.focus();
-                                      }
-                                    }}
-                                    onFocus={(e) => e.target.select()}
                                     className="h-10 rounded-xl"
                                     placeholder="Delicate fabric, no bleach"
                                   />
@@ -1633,7 +1564,6 @@ export default function CreateOrder() {
                                   >
                                     <TableCell className="font-medium py-2">
                                       <Input
-                                        ref={(el) => { nameRefs.current[item.instanceKey] = el; }}
                                         value={item.customName}
                                         onChange={(e) => {
                                           const updated = selectedServices.map(s =>
@@ -1641,20 +1571,12 @@ export default function CreateOrder() {
                                           );
                                           setSelectedServices(updated);
                                         }}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            quantityRefs.current[item.instanceKey]?.focus();
-                                          }
-                                        }}
-                                        onFocus={(e) => e.target.select()}
                                         className="w-full font-medium text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                                         placeholder="Service name"
                                       />
                                     </TableCell>
                                     <TableCell className="py-2">
                                       <Input
-                                        ref={(el) => { quantityRefs.current[item.instanceKey] = el; }}
                                         type="text"
                                         inputMode="numeric"
                                         value={item.quantity === 0 ? "" : item.quantity}
@@ -1662,12 +1584,6 @@ export default function CreateOrder() {
                                           const val = e.target.value;
                                           if (val === "" || /^\d+$/.test(val)) {
                                             handleUpdateQuantity(item.instanceKey, val);
-                                          }
-                                        }}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            priceRefs.current[item.instanceKey]?.focus();
                                           }
                                         }}
                                         onFocus={(e) => e.target.select()}
@@ -1684,9 +1600,8 @@ export default function CreateOrder() {
                                         onKeyDown={(e) => {
                                           if (e.key === 'ArrowUp') { e.preventDefault(); handleAdjustPrice(item.instanceKey, 5); }
                                           if (e.key === 'ArrowDown') { e.preventDefault(); handleAdjustPrice(item.instanceKey, -5); }
-                                          if (e.key === 'Enter') { e.preventDefault(); noteRefs.current[item.instanceKey]?.focus(); }
+                                          if (e.key === 'Enter') { e.preventDefault(); serviceComboboxRef.current?.focus(); }
                                         }}
-                                        onFocus={(e) => e.target.select()}
                                         className="w-24 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                                       />
                                     </TableCell>
@@ -1713,7 +1628,6 @@ export default function CreateOrder() {
                                         <div className="flex items-center gap-2 flex-1">
                                           <span className="text-xs text-muted-foreground whitespace-nowrap">Tag Note:</span>
                                           <Input
-                                            ref={(el) => { noteRefs.current[item.instanceKey] = el; }}
                                             value={item.tagNote}
                                             onChange={(e) => {
                                               const updated = selectedServices.map(s =>
@@ -1721,13 +1635,6 @@ export default function CreateOrder() {
                                               );
                                               setSelectedServices(updated);
                                             }}
-                                            onKeyDown={(e) => {
-                                              if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                serviceComboboxRef.current?.focus();
-                                              }
-                                            }}
-                                            onFocus={(e) => e.target.select()}
                                             className="h-8 text-sm flex-1"
                                             placeholder="e.g., Delicate fabric, No bleach"
                                           />
@@ -1852,31 +1759,23 @@ export default function CreateOrder() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="storeId" className="text-slate-700 dark:text-slate-300">Store</Label>
-                  <Select value={storeId} onValueChange={setStoreId}>
-                    <SelectTrigger id="storeId" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                  <Label htmlFor="storeCode" className="text-slate-700 dark:text-slate-300">Store Code</Label>
+                  <Select value={storeCode} onValueChange={(value: OrderStoreCode) => setStoreCode(value)}>
+                    <SelectTrigger id="storeCode" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                       <SelectValue placeholder="Select store">
-                        {selectedStore ? `${selectedStore.code} · ${selectedStore.name}` : 'Select store'}
+                        {getOrderStoreLabel(storeCode)}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {stores.map((store) => (
-                        <SelectItem key={store.id || store.code} value={store.id || store.code}>
-                          {store.code} · {store.name}
+                      {ORDER_STORE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {selectedStore && (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200">
-                      <p className="font-semibold">{selectedStore.name}</p>
-                      <p className="mt-1">{parseAndFormatAddress(selectedStore.address)}</p>
-                      {selectedStore.contactDetails?.phone && <p className="mt-1">Phone: {selectedStore.contactDetails.phone}</p>}
-                      {selectedStore.contactDetails?.email && <p>Email: {selectedStore.contactDetails.email}</p>}
-                    </div>
-                  )}
                   <p className="text-xs text-muted-foreground">
-                    Bills and tags will use this store profile. Printed tags will show `FAB CLEAN ({selectedStoreCode})`.
+                    Printed tags will show this branch code as `FAB CLEAN ({storeCode})`.
                   </p>
                 </div>
               </CardContent>

@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { printDriver } from '@/lib/print-driver';
 import { GarmentTagPrint } from './garment-tag-print';
-import { generateUPIUrl } from '@/lib/franchise-config';
+import { generateUPIUrl, PAYMENT_CONFIG } from '@/lib/franchise-config';
 import { resolveOrderStoreCodeFromOrder } from '@/lib/order-store';
 import { smartItemSummary } from '@/lib/item-summarizer';
 
@@ -47,8 +47,11 @@ export function OrderConfirmationDialog({
     const [whatsappStatus, setWhatsappStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
     const [whatsappError, setWhatsappError] = useState<string | null>(null);
     const [autoSendTriggered, setAutoSendTriggered] = useState(false);
+<<<<<<< Updated upstream
     const lastPdfUrlRef = useRef<string | null>(null);
     const lastFailureStageRef = useRef<'pdf' | 'send' | null>(null);
+=======
+>>>>>>> Stashed changes
     const { toast } = useToast();
 
     // ALWAYS fetch full customer data from DB when customerId exists.
@@ -274,12 +277,13 @@ export function OrderConfirmationDialog({
         setWhatsappError(null);
 
         const orderNum = order.orderNumber || order.id || 'N/A';
-        const billUrl = `${window.location.origin}/api/public/invoice/${encodeURIComponent(orderNum)}`;
+        const billUrl = `${window.location.origin}/bill/${orderNum}?enableGST=${enableGST}`;
 
         try {
             console.log(`[WhatsApp] Send #${whatsappSendCount + 1} starting...`);
 
             let pdfUrl: string | undefined;
+<<<<<<< Updated upstream
 
             if (lastPdfUrlRef.current && lastFailureStageRef.current === 'send') {
                 pdfUrl = lastPdfUrlRef.current;
@@ -321,6 +325,59 @@ export function OrderConfirmationDialog({
                     lastFailureStageRef.current = 'pdf';
                     console.error('[WhatsApp] PDF generation failed:', pdfError);
                 }
+=======
+
+            // Try to generate and upload PDF (with error fallback)
+            try {
+                console.log('[WhatsApp] Generating invoice PDF...');
+                const { convertOrderToInvoiceData } = await import('@/lib/print-driver');
+
+                // Enrich the order with full customer data from DB
+                // This ensures the invoice PDF has complete customer info
+                const safeOrder = {
+                    ...order,
+                    customerName: customerName,
+                    customerPhone: customerPhone || '',
+                    customerEmail: customerEmail || '',
+                    customerAddress: customerAddress || '',
+                    deliveryAddress: (order as any)?.deliveryAddress || customerAddress || '',
+                    orderNumber: orderNum,
+                    totalAmount: totalAmount.toString(),
+                    items: Array.isArray(order.items) ? order.items : [],
+                };
+
+                const invoiceData = convertOrderToInvoiceData(safeOrder);
+
+                if (!invoiceData || !(invoiceData as any).customerInfo) {
+                    throw new Error('Invalid invoice data generated');
+                }
+
+                // Generate QR Code for PDF
+                try {
+                    const QRCodeModule = await import('qrcode');
+                    const toDataURL = QRCodeModule.toDataURL || (QRCodeModule.default && QRCodeModule.default.toDataURL);
+                    if (toDataURL) {
+                        const upiUrl = generateUPIUrl(totalAmount);
+                        invoiceData.qrCode = await toDataURL(upiUrl);
+                    }
+                } catch (e) {
+                    console.warn("[WhatsApp] QR gen failed (non-blocking)", e);
+                }
+
+                // Generate PDF blob
+                const pdfBlob = await generatePDFBlob(invoiceData);
+
+                // Upload PDF to server
+                console.log('[WhatsApp] Uploading PDF to server...');
+                const uploadedDoc = await uploadPDFToServer(pdfBlob, invoiceData);
+
+                if (uploadedDoc?.fileUrl) {
+                    pdfUrl = uploadedDoc.fileUrl;
+                    console.log('[WhatsApp] PDF uploaded:', pdfUrl);
+                }
+            } catch (pdfError) {
+                console.error('[WhatsApp] PDF generation failed:', pdfError);
+>>>>>>> Stashed changes
             }
 
             if (!pdfUrl) {
@@ -353,7 +410,10 @@ export function OrderConfirmationDialog({
             );
 
             if (result.success) {
+<<<<<<< Updated upstream
                 lastFailureStageRef.current = null;
+=======
+>>>>>>> Stashed changes
                 // Update send count
                 const newCount = result.newSendCount ?? (whatsappSendCount + 1);
                 setWhatsappSendCount(newCount);
@@ -368,7 +428,10 @@ export function OrderConfirmationDialog({
                 });
                 setWhatsappStatus('sent');
             } else {
+<<<<<<< Updated upstream
                 lastFailureStageRef.current = 'send';
+=======
+>>>>>>> Stashed changes
                 toast({
                     title: "Failed",
                     description: result.error || "Could not send WhatsApp message. Please try again.",
@@ -416,12 +479,149 @@ export function OrderConfirmationDialog({
         canSendWhatsApp,
     ]);
 
+<<<<<<< Updated upstream
     useEffect(() => {
         if (open) {
             lastPdfUrlRef.current = null;
             lastFailureStageRef.current = null;
         }
     }, [open, order?.id]);
+=======
+    // Helper function to generate PDF blob
+    // Helper function to generate PDF blob - OPTIMIZED for lightweight files
+    const generatePDFBlob = async (invoiceData: any): Promise<Blob> => {
+        const jsPDF = (await import('jspdf')).default;
+        const html2canvas = (await import('html2canvas')).default;
+        const { createRoot } = await import('react-dom/client');
+        const React = await import('react');
+        const { default: InvoiceTemplateIN } = await import('@/components/print/invoice-template-in');
+
+        const renderToCanvas = async (scale: number) => {
+            const container = document.createElement('div');
+            container.style.position = 'absolute';
+            container.style.left = '-9999px';
+            container.style.width = '210mm';
+            container.style.background = 'white';
+            document.body.appendChild(container);
+
+            const root = createRoot(container);
+            await new Promise<void>((resolve) => {
+                root.render(React.createElement(InvoiceTemplateIN, { data: invoiceData }));
+                setTimeout(resolve, 1500);
+            });
+
+            const canvas = await html2canvas(container, {
+                scale,
+                useCORS: true,
+                allowTaint: false,
+                backgroundColor: '#ffffff',
+                logging: false,
+                imageTimeout: 5000,
+            });
+
+            root.unmount();
+            document.body.removeChild(container);
+
+            return canvas;
+        };
+
+        const buildPdfFromCanvas = (canvas: HTMLCanvasElement, quality: number): Blob => {
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4',
+                compress: true
+            });
+
+            const imgData = canvas.toDataURL('image/jpeg', quality);
+            const imgFormat: 'JPEG' = 'JPEG';
+
+            const imgWidth = 210;
+            const pageHeight = 297;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight, undefined, 'FAST');
+            heightLeft -= pageHeight;
+
+            while (heightLeft > 5) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight, undefined, 'FAST');
+                heightLeft -= pageHeight;
+            }
+
+            return pdf.output('blob');
+        };
+
+        const attempts = [
+            { scale: 1.5, quality: 0.7 },
+            { scale: 1.2, quality: 0.55 },
+            { scale: 1.0, quality: 0.45 },
+        ];
+
+        let lastBlob: Blob | null = null;
+
+        for (const attempt of attempts) {
+            const canvas = await renderToCanvas(attempt.scale);
+            const pdfBlob = buildPdfFromCanvas(canvas, attempt.quality);
+            lastBlob = pdfBlob;
+            const sizeMb = pdfBlob.size / (1024 * 1024);
+            console.log(`📊 PDF size: ${sizeMb.toFixed(2)} MB (scale ${attempt.scale}, quality ${attempt.quality})`);
+            if (sizeMb <= 5) {
+                return pdfBlob;
+            }
+        }
+
+        if (lastBlob) {
+            const sizeMb = lastBlob.size / (1024 * 1024);
+            if (sizeMb > 5) {
+                throw new Error('Generated PDF exceeds 5 MB');
+            }
+            return lastBlob;
+        }
+
+        throw new Error('Failed to generate PDF');
+    };
+
+    // Helper function to upload PDF to server
+    const uploadPDFToServer = async (pdfBlob: Blob, invoiceData: any): Promise<any> => {
+        const metadataCustomerName =
+            invoiceData?.customerInfo?.name ||
+            invoiceData?.customer?.name ||
+            order?.customerName ||
+            'Customer';
+        const metadataOrderNumber =
+            order?.orderNumber ||
+            invoiceData?.orderNumber ||
+            invoiceData?.invoiceNumber;
+
+        const formData = new FormData();
+        const filename = `invoice-${invoiceData.invoiceNumber}-${Date.now()}.pdf`;
+        formData.append('file', pdfBlob, filename);
+        formData.append('type', 'invoice');
+        formData.append('metadata', JSON.stringify({
+            invoiceNumber: invoiceData.invoiceNumber,
+            orderNumber: metadataOrderNumber,
+            customerName: metadataCustomerName,
+            amount: invoiceData.total,
+            status: 'sent',
+        }));
+
+        const response = await fetch('/api/documents/upload', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error(`Upload failed: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        return result.document;
+    };
+>>>>>>> Stashed changes
 
     if (!order) return null;
 
@@ -593,9 +793,7 @@ export function OrderConfirmationDialog({
                 customerName={customerName}
                 customerAddress={customerAddress}
                 franchiseId={(order as any)?.franchiseId || (order as any)?.franchise_id || null}
-                storeId={(order as any)?.storeId || (order as any)?.store_id || null}
                 storeCode={resolveOrderStoreCodeFromOrder(order)}
-                tagTemplateId={(order as any)?.tagTemplateId || (order as any)?.tag_template_id || null}
                 commonNote={(order as any)?.specialInstructions || (order as any)?.special_instructions || undefined}
                 isExpressOrder={(order as any)?.isExpressOrder || (order as any)?.is_express_order || false}
                 billDate={order?.createdAt ? String(order.createdAt) : undefined}

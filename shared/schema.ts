@@ -100,8 +100,7 @@ export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderNumber: text("order_number").notNull(),
   franchiseId: text("franchise_id"),
-  storeCode: text("store_code").default(DEFAULT_ORDER_STORE_CODE),
-  storeId: text("store_id"),
+  storeCode: text("store_code", { enum: ORDER_STORE_CODES }).default(DEFAULT_ORDER_STORE_CODE),
   customerId: text("customer_id").references(() => customers.id),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
@@ -138,10 +137,13 @@ export const orders = pgTable("orders", {
   whatsappMessageCount: integer("whatsapp_message_count").default(0),
   // Bill / Invoice URL tracking
   invoiceUrl: text("invoice_url"),
+<<<<<<< Updated upstream
   invoiceTemplateId: text("invoice_template_id"),
   appliedTemplateId: uuid("applied_template_id"),
   whatsappBillStatus: text("whatsapp_bill_status", { enum: ["pending", "sent", "failed"] }).default("pending"),
   tagTemplateId: text("tag_template_id"),
+=======
+>>>>>>> Stashed changes
   // Tag printing tracking
   tagsPrinted: boolean("tags_printed").default(false),
   // Delivery earnings & credit tracking
@@ -323,8 +325,6 @@ export const documents = pgTable("documents", {
   amount: decimal("amount", { precision: 10, scale: 2 }),
   customerName: text("customer_name"),
   orderNumber: text("order_number"),
-  storeId: text("store_id"),
-  templateKey: text("template_key"),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -356,10 +356,7 @@ export const insertOrderSchema = z.object({
   id: z.string().optional(),
   orderNumber: z.string().optional(),
   customerId: z.string().optional().nullable(),
-  storeCode: z.string().min(2).max(10).optional().default(DEFAULT_ORDER_STORE_CODE),
-  storeId: z.string().optional().nullable(),
-  invoiceTemplateId: z.string().optional().nullable(),
-  tagTemplateId: z.string().optional().nullable(),
+  storeCode: z.enum(ORDER_STORE_CODES).optional().default(DEFAULT_ORDER_STORE_CODE),
   customerName: z.string(),
   customerEmail: z.string().optional().nullable(),
   customerPhone: z.string().optional().nullable(),

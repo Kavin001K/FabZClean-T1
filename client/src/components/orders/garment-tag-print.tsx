@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,7 +15,6 @@ import {
   ThermalTagItem,
   ThermalTagLabel,
 } from '@/lib/garment-tag-layout';
-import { businessConfigApi } from '@/lib/business-config-service';
 
 interface GarmentTagPrintProps {
   open: boolean;
@@ -26,9 +24,7 @@ interface GarmentTagPrintProps {
   customerName?: string;
   customerAddress?: unknown;
   franchiseId?: string | null;
-  storeId?: string | null;
   storeCode?: string;
-  tagTemplateId?: string | null;
   commonNote?: string;
   isExpressOrder?: boolean;
   billDate?: string;
@@ -43,35 +39,22 @@ export function GarmentTagPrint({
   customerName,
   customerAddress,
   franchiseId,
-  storeId,
   storeCode,
-  tagTemplateId,
   commonNote,
   billDate,
   dueDate,
 }: GarmentTagPrintProps) {
-  const { data: resolvedTagTemplate } = useQuery({
-    queryKey: ['resolved-tag-template', storeId, tagTemplateId],
-    queryFn: async () => {
-      const resolved = await businessConfigApi.resolveTagTemplate({ storeId, templateId: tagTemplateId });
-      return resolved.template;
-    },
-    enabled: !!storeId || !!tagTemplateId,
-    staleTime: 60_000,
-  });
-
   const preparedTags = useMemo(() => prepareThermalTags({
     orderNumber,
     customerName,
     customerAddress,
     franchiseId,
-    templateConfig: resolvedTagTemplate?.config,
     storeCode,
     commonNote,
     billDate,
     dueDate,
     items,
-  }), [orderNumber, customerName, customerAddress, franchiseId, storeCode, commonNote, billDate, dueDate, items, resolvedTagTemplate?.config]);
+  }), [orderNumber, customerName, customerAddress, franchiseId, storeCode, commonNote, billDate, dueDate, items]);
 
   const handlePrint = () => {
     if (preparedTags.length === 0) {

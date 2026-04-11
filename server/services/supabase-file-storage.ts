@@ -16,60 +16,6 @@ const supabase = createClient(supabaseUrl || '', supabaseKey || '');
  * Handles cloud file storage using Supabase Storage buckets
  */
 export const SupabaseFileStorage = {
-    async saveBillLogo(entityKey: string, buffer: Buffer, originalName: string, mimeType: string): Promise<string> {
-        const fileName = `bill-logo-${entityKey.replace(/[^a-zA-Z0-9_-]/g, '-')}-${Date.now()}.webp`;
-        const filePath = `logos/${fileName}`;
-
-        let uploadBuffer = buffer;
-        let contentType = mimeType;
-
-        try {
-            uploadBuffer = await sharp(buffer)
-                .resize(720, 240, {
-                    fit: 'contain',
-                    background: { r: 255, g: 255, b: 255, alpha: 0 }
-                })
-                .webp({ quality: 92 })
-                .toBuffer();
-            contentType = 'image/webp';
-        } catch (e) {
-            console.log('⚠️ Sharp optimization unavailable, uploading original logo image');
-        }
-
-        const { error } = await supabase.storage
-            .from('branding')
-            .upload(filePath, uploadBuffer, {
-                contentType,
-                upsert: true
-            });
-
-        if (error) {
-            console.error('❌ Brand logo upload failed:', error);
-            if (error.statusCode === '404' || error.message?.includes('not found')) {
-                console.log('📦 Attempting to create "branding" bucket...');
-                try {
-                    const { error: bucketError } = await supabase.storage.createBucket('branding', { public: true });
-                    if (!bucketError) {
-                        const { error: retryError } = await supabase.storage
-                            .from('branding')
-                            .upload(filePath, uploadBuffer, { contentType, upsert: true });
-                        if (!retryError) {
-                            return this.getPublicUrl('branding', filePath);
-                        }
-                        console.error('❌ Retry logo upload failed:', retryError?.message);
-                    } else {
-                        console.warn('⚠️ Could not auto-create branding bucket:', bucketError?.message);
-                    }
-                } catch (e) {
-                    console.error('❌ Error creating branding bucket:', e);
-                }
-            }
-            throw new Error(`Upload failed: ${error.message}`);
-        }
-
-        return this.getPublicUrl('branding', filePath);
-    },
-
     /**
      * Upload a profile image to 'avatars' bucket
      */

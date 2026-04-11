@@ -1,7 +1,6 @@
 import React from 'react';
 import { getFranchiseById, getFormattedAddress } from '@/lib/franchise-config';
 import { parseAndFormatAddress } from '@/lib/address-utils';
-import { DEFAULT_INVOICE_TEMPLATE_CONFIG, type InvoiceTemplateConfig, type InvoiceTemplatePresetKey } from '@shared/business-config';
 import {
   CalendarDays,
   CircleDollarSign,
@@ -62,7 +61,6 @@ export interface InvoiceData {
   qrCode?: string;
   signature?: string;
   isExpressOrder?: boolean;
-  isUpdate?: boolean;
   fulfillmentType?: string;
   deliveryAddress?: unknown;
   paymentBreakdown?: {
@@ -157,11 +155,7 @@ const sectionTitleStyle = (accent: string): React.CSSProperties => ({
   margin: 0,
 });
 
-const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplatePresetKey; config?: Partial<InvoiceTemplateConfig> }> = ({
-  data,
-  preset = 'classic',
-  config,
-}) => {
+const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
   if (!data) {
     return <div style={{ padding: 24, color: '#b91c1c', textAlign: 'center' }}>Invoice data is missing.</div>;
   }
@@ -184,17 +178,13 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
     enableGST = false,
     franchiseId,
     isExpressOrder = false,
-    isUpdate = false,
     fulfillmentType = 'pickup',
     deliveryAddress,
     paymentBreakdown,
   } = data;
 
-  const templateConfig = {
-    ...DEFAULT_INVOICE_TEMPLATE_CONFIG,
-    ...(config || {}),
-  };
   const franchise = getFranchiseById(franchiseId);
+<<<<<<< Updated upstream
   const usesEditedVisual = preset === 'edited';
   const isEditedInvoice = usesEditedVisual || isUpdate;
   const visualPreset: InvoiceTemplatePresetKey = usesEditedVisual
@@ -253,13 +243,18 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
   const accent = visual.accent;
   const accentSoft = visual.accentSoft;
   const accentBorder = visual.accentBorder;
+=======
+  const accent = isExpressOrder ? '#c2410c' : '#0f766e';
+  const accentSoft = isExpressOrder ? '#fff7ed' : '#ecfdf5';
+  const accentBorder = isExpressOrder ? '#fdba74' : '#99f6e4';
+>>>>>>> Stashed changes
   const headingInk = '#0f172a';
   const bodyInk = '#334155';
   const mutedInk = '#64748b';
   const panel = '#ffffff';
   const panelSoft = '#f8fafc';
   const line = '#e2e8f0';
-  const shadow = visual.shellShadow;
+  const shadow = '0 22px 60px rgba(15, 23, 42, 0.08)';
 
   const safeItems = Array.isArray(items) ? items : [];
   const customerAddress = parseAndFormatAddress(customer?.address);
@@ -269,10 +264,10 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
 
   const companyDetails = {
     name: company?.name || 'Fab Clean',
-    branchName: company?.name || franchise?.name || 'Fab Clean',
-    address: company?.address || (franchise ? getFormattedAddress(franchise) : 'Pollachi, Tamil Nadu'),
-    phone: company?.phone || franchise?.phone || '+91 93630 59595',
-    email: company?.email || franchise?.email || 'support@myfabclean.com',
+    branchName: franchise?.name || company?.name || 'Fab Clean',
+    address: franchise ? getFormattedAddress(franchise) : company?.address || 'Pollachi, Tamil Nadu',
+    phone: franchise?.phone || company?.phone || '+91 93630 59595',
+    email: franchise?.email || company?.email || 'support@myfabclean.com',
     gstin: company?.taxId || COMPANY_GSTIN,
     pan: COMPANY_PAN,
     logo: company?.logo || '/assets/logo.webp',
@@ -302,6 +297,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
     { label: 'Fulfillment', value: fulfillmentType === 'delivery' ? 'Home Delivery' : 'Store Pickup', Icon: fulfillmentType === 'delivery' ? Truck : Store },
     { label: 'Payment Status', value: paymentStatus, Icon: CircleDollarSign },
   ];
+<<<<<<< Updated upstream
   const documentTitle = visualPreset === 'express'
     ? 'Express Bill'
     : usesEditedVisual
@@ -317,13 +313,15 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
     : usesEditedVisual
       ? 'This document supersedes the previous bill for the same order and reflects the latest confirmed order changes.'
       : 'This preset keeps billing clean, branded, and easy to scan at the counter.';
+=======
+>>>>>>> Stashed changes
 
   return (
     <div
       style={{
         width: '210mm',
         margin: '0 auto',
-        background: visual.pageBackground,
+        background: '#f6f8fb',
         color: bodyInk,
         fontFamily: '"Aptos", "Segoe UI Variable", "Segoe UI", sans-serif',
       }}
@@ -413,38 +411,29 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
           <header
             className="invoice-section"
             style={{
-              background: visual.headerGradient,
+              background: `linear-gradient(135deg, ${isExpressOrder ? '#ea580c' : '#059669'} 0%, ${isExpressOrder ? '#f97316' : '#10b981'} 100%)`,
               color: '#ffffff',
               padding: '18px 22px',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
-                {templateConfig.showLogo && (
-                  <div
-                    style={{
-                      background: '#ffffff',
-                      borderRadius: '8px',
-                      padding: '8px 12px',
-                      minWidth: preset === 'compact' ? '76px' : '112px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 8px 18px rgba(15, 23, 42, 0.14)',
-                    }}
-                  >
-                    <img
-                      src={companyDetails.logo}
-                      alt={companyDetails.name}
-                      onError={(event) => {
-                        event.currentTarget.style.display = 'none';
-                      }}
-                      style={{ width: preset === 'compact' ? '64px' : '92px', height: 'auto', objectFit: 'contain' }}
-                    />
-                  </div>
-                )}
+                <div
+                  style={{
+                    background: '#ffffff',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    minWidth: '112px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 8px 18px rgba(15, 23, 42, 0.14)',
+                  }}
+                >
+                  <img src={companyDetails.logo} alt="Fab Clean" style={{ width: '92px', height: 'auto', objectFit: 'contain' }} />
+                </div>
                 <div style={{ minWidth: 0 }}>
-                  <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 900, lineHeight: 1.05 }}>{companyDetails.name}</h1>
+                  <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 900, lineHeight: 1.05 }}>Fab Clean</h1>
                   <p style={{ margin: '4px 0 0', fontSize: '12px', opacity: 0.94 }}>
                     Premium Laundry & Dry Cleaning Services
                   </p>
@@ -473,6 +462,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                       Express Order
                     </span>
                   )}
+<<<<<<< Updated upstream
                   {isEditedInvoice && (
                     <span
                       style={{
@@ -493,6 +483,8 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                       Revised Bill
                     </span>
                   )}
+=======
+>>>>>>> Stashed changes
                   <span
                     style={{
                       display: 'inline-flex',
@@ -508,7 +500,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                       letterSpacing: '0.12em',
                     }}
                   >
-                    {documentTitle}
+                    Invoice
                   </span>
                 </div>
                 <p style={{ margin: 0, fontSize: '11px', opacity: 0.78, textTransform: 'uppercase', letterSpacing: '0.14em' }}>
@@ -521,6 +513,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
             </div>
           </header>
 
+<<<<<<< Updated upstream
           {(visualPreset === 'express' || usesEditedVisual) && (
             <section className="invoice-section" style={{ padding: '14px 18px 0' }}>
               <div
@@ -562,6 +555,8 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
             </section>
           )}
 
+=======
+>>>>>>> Stashed changes
           <div style={{ padding: '16px 18px 0' }}>
             <section className="invoice-section invoice-grid-2" style={{ marginBottom: '12px' }}>
               <div
@@ -581,9 +576,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                     </span>
                     <div>
                       <p style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: headingInk }}>{companyDetails.branchName}</p>
-                      {templateConfig.showStoreAddress && (
-                        <p style={{ margin: '4px 0 0', fontSize: '12px', lineHeight: 1.65, color: bodyInk }}>{companyDetails.address}</p>
-                      )}
+                      <p style={{ margin: '4px 0 0', fontSize: '12px', lineHeight: 1.65, color: bodyInk }}>{companyDetails.address}</p>
                     </div>
                   </div>
                   <div style={{ display: 'grid', gap: '8px' }}>
@@ -630,7 +623,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                     </span>
                     <div style={{ minWidth: 0 }}>
                       <p style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: headingInk, lineHeight: 1.25 }}>{customer?.name || 'Customer'}</p>
-                      {templateConfig.showCustomerAddress && customerAddress && customerAddress !== 'N/A' && customerAddress !== 'Address not provided' && (
+                      {customerAddress && customerAddress !== 'N/A' && customerAddress !== 'Address not provided' && (
                         <p style={{ margin: '4px 0 0', fontSize: '12px', color: bodyInk, lineHeight: 1.65 }}>{customerAddress}</p>
                       )}
                     </div>
@@ -682,7 +675,6 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
               ))}
             </section>
 
-            {templateConfig.showDeliveryBlock && (
             <section
               className="invoice-section invoice-card"
               style={{
@@ -715,7 +707,6 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                 )}
               </div>
             </section>
-            )}
 
             <section className="invoice-section" style={{ marginBottom: '12px' }}>
               <table className="invoice-items-table">
@@ -739,7 +730,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                         <div style={{ fontSize: '14px', fontWeight: 800, color: headingInk, lineHeight: 1.45 }}>
                           {item.description || 'Laundry Service'}
                         </div>
-                        {templateConfig.showItemNotes && item.note && (
+                        {item.note && (
                           <div style={{ marginTop: '4px', fontSize: '11px', color: mutedInk, lineHeight: 1.5 }}>
                             {item.note}
                           </div>
@@ -777,7 +768,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                   }}
                 >
                   <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                    {templateConfig.showPaymentQr && qrCode && (
+                    {qrCode && (
                       <div
                         style={{
                           width: '92px',
@@ -794,14 +785,13 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                       </div>
                     )}
                     <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: '14px', color: accent, fontWeight: 900 }}>{templateConfig.paymentQrLabel || 'Scan to Pay'}</p>
+                      <p style={{ margin: 0, fontSize: '14px', color: accent, fontWeight: 900 }}>Scan to Pay</p>
                       <p style={{ margin: '4px 0 0', fontSize: '12px', color: mutedInk }}>UPI / GPay / PhonePe</p>
-                      <p style={{ margin: '6px 0 0', fontSize: '12px', color: headingInk, fontWeight: 700 }}>{companyDetails.name}</p>
+                      <p style={{ margin: '6px 0 0', fontSize: '12px', color: headingInk, fontWeight: 700 }}>Fab Clean</p>
                     </div>
                   </div>
                 </div>
 
-                {templateConfig.showTerms && (
                 <div
                   className="invoice-payment-card"
                   style={{
@@ -816,11 +806,9 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                     <div>1. Payment due on delivery or pickup.</div>
                     <div>2. We are not responsible for natural wear and tear.</div>
                     <div>3. Review garments at the time of handover.</div>
-                    {(notes || paymentTerms) && <div>4. {paymentTerms || notes}</div>}
-                    {templateConfig.footerNote && <div>5. {templateConfig.footerNote}</div>}
+                    {(notes || paymentTerms) && <div>4. {notes || paymentTerms}</div>}
                   </div>
                 </div>
-                )}
               </div>
 
               <div
@@ -833,7 +821,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                   position: 'relative',
                 }}
               >
-                {visualPreset === 'express' && (
+                {isExpressOrder && (
                   <div
                     style={{
                       position: 'absolute',
@@ -858,6 +846,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                     </div>
                   </div>
                 )}
+<<<<<<< Updated upstream
                 {usesEditedVisual && (
                   <div
                     style={{
@@ -877,6 +866,8 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                     <div style={{ fontSize: '14px', fontWeight: 900, lineHeight: 1.1 }}>LATEST BILL</div>
                   </div>
                 )}
+=======
+>>>>>>> Stashed changes
 
                 <div style={{ display: 'grid', gap: '10px', position: 'relative', zIndex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
@@ -895,7 +886,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                       <strong style={{ fontFamily: '"IBM Plex Mono", monospace' }}>{formatIndianCurrency(expressTotal)}</strong>
                     </div>
                   )}
-                  {enableGST && templateConfig.showGstBreakup && (
+                  {enableGST && (
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                         <span style={{ color: mutedInk }}>CGST @ 9%</span>
@@ -931,7 +922,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
               </div>
             </section>
 
-            {templateConfig.showPaymentBreakdown && paymentBreakdown && (
+            {paymentBreakdown && (
               <section
                 className="invoice-section invoice-payment-card"
                 style={{
@@ -1028,10 +1019,8 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
               alignItems: 'center',
             }}
           >
-            <p style={{ margin: 0, fontSize: '13px', fontWeight: 700 }}>{templateConfig.footerNote || `Thank you for choosing ${companyDetails.name}.`}</p>
-            <p style={{ margin: 0, fontSize: '10px', opacity: 0.72 }}>
-              {templateConfig.showSignature ? 'Authorised signature not required for computer-generated invoice.' : 'This is a computer-generated invoice.'}
-            </p>
+            <p style={{ margin: 0, fontSize: '13px', fontWeight: 700 }}>Thank you for choosing Fab Clean.</p>
+            <p style={{ margin: 0, fontSize: '10px', opacity: 0.72 }}>This is a computer-generated invoice. No signature required.</p>
           </footer>
         </div>
       </div>
