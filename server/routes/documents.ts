@@ -27,13 +27,9 @@ const upload = multer({
         fileSize: 50 * 1024 * 1024, // 50MB limit
     },
     fileFilter: (req, file, cb) => {
-<<<<<<< Updated upstream
         const isPdfMime = file.mimetype === 'application/pdf' || file.mimetype === 'application/octet-stream';
         const isPdfName = /\.pdf$/i.test(file.originalname || '');
         if (isPdfMime || isPdfName) {
-=======
-        if (file.mimetype === 'application/pdf') {
->>>>>>> Stashed changes
             cb(null, true);
         } else {
             cb(new Error('Only PDF files are allowed'));
@@ -89,19 +85,13 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 title: (metadata as any).invoiceNumber ? `Invoice ${(metadata as any).invoiceNumber}` : req.file.originalname,
                 filename: originalName,
                 fileUrl,
-<<<<<<< Updated upstream
                 filepath,
-=======
->>>>>>> Stashed changes
                 status: (metadata as any).status || 'sent',
                 amount: (metadata as any).amount ? String((metadata as any).amount) : null,
                 customerName: (metadata as any).customerName || null,
                 orderNumber: (metadata as any).orderNumber || null,
-<<<<<<< Updated upstream
                 storeId: (metadata as any).storeId || null,
                 templateKey: (metadata as any).templateKey || null,
-=======
->>>>>>> Stashed changes
                 metadata: {
                     filepath,
                     ...(metadata as any).metadata || {},
@@ -133,8 +123,6 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             });
         } catch (dbError) {
             console.error('Database insert error:', dbError);
-<<<<<<< Updated upstream
-
             if ((type === 'invoice' || !type) && (metadata as any).orderNumber) {
                 try {
                     const orderNum = (metadata as any).orderNumber;
@@ -157,9 +145,6 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                 storageUsed,
                 details: serializeError(dbError),
             });
-=======
-            return res.status(500).json({ error: 'Failed to save document record', details: dbError instanceof Error ? dbError.message : String(dbError) });
->>>>>>> Stashed changes
         }
     } catch (error) {
         console.error('Document upload error:', error);

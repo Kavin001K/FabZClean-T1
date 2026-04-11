@@ -1,19 +1,78 @@
-import { useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo, type ChangeEvent } from 'react';
 import { useSettings, Theme, LandingPage, AVAILABLE_QUICK_ACTIONS } from '@/contexts/settings-context';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/contexts/auth-context';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Moon, Sun, Laptop, Zap, 
-  LayoutDashboard, Plus, Search, Receipt, 
-  FileText, Users, Settings, Loader2
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Moon, Sun, Laptop, Zap,
+  LayoutDashboard, Plus, Search, Receipt,
+  FileText, Users, Settings, Loader2,
+  Save, Upload, Trash2, Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { businessConfigApi, getBillingCache } from '@/lib/business-config-service';
+import {
+  invoiceTemplateProfileSchema,
+  tagTemplateProfileSchema,
+  DEFAULT_INVOICE_TEMPLATE_CONFIG,
+  DEFAULT_TAG_TEMPLATE_CONFIG,
+  type BusinessProfile,
+  type StoreConfig,
+  type InvoiceTemplateProfile,
+  type TagTemplateProfile,
+} from '@shared/business-config';
+import { prepareThermalTags, ThermalTagLabel } from '@/lib/garment-tag-layout';
+import InvoiceTemplateIN from '@/components/print/invoice-template-in';
+
+// Mock data for preview
+const SAMPLE_INVOICE_DATA = {
+  invoiceNumber: 'INV-2026-0001',
+  invoiceDate: new Date().toISOString().split('T')[0],
+  dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  company: {
+    name: 'FabZClean Main',
+    address: '123 Laundry Lane, Pollachi',
+    phone: '+91 9876543210',
+    email: 'hello@fabzclean.com',
+    logo: '/assets/logo.webp',
+  },
+  customer: {
+    name: 'Jane Doe',
+    address: '456 Customer Ave, Coimbatore',
+    phone: '+91 1234567890',
+    email: 'jane@example.com',
+  },
+  items: [
+    { description: 'Silk Saree Dry Clean', quantity: 2, unitPrice: 250, total: 500 },
+    { description: 'Gent’s Suit Press', quantity: 1, unitPrice: 150, total: 150 },
+  ],
+  subtotal: 650,
+  taxAmount: 0,
+  total: 650,
+  notes: 'Standard processing apply.',
+};
 
 // Icon map for quick actions
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -30,7 +89,6 @@ export default function SettingsPage() {
   }, []);
 
   const { settings, updateSetting, isLoading, isSaving } = useSettings();
-<<<<<<< Updated upstream
   const { employee, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -402,8 +460,7 @@ export default function SettingsPage() {
     const store = stores.find((entry) => entry.id === storeId);
     return store ? `${store.code} · ${store.name}` : 'Store';
   };
-=======
->>>>>>> Stashed changes
+
 
   const applyAiTemplateVersion = () => {
     if (!aiOptimizedTemplateDraft) return;
@@ -639,8 +696,6 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </TabsContent>
-<<<<<<< Updated upstream
-
           {isAdmin && profileDraft && (
             <TabsContent value="business" className="space-y-6 mt-6">
               <Card>
@@ -1498,8 +1553,6 @@ export default function SettingsPage() {
               </div>
             </TabsContent>
           )}
-=======
->>>>>>> Stashed changes
         </Tabs>
       </div>
     </div>

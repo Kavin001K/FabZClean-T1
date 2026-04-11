@@ -5,6 +5,16 @@ import React from 'react';
 import * as QRCode from 'qrcode';
 import InvoiceTemplateIN from '../components/print/invoice-template-in';
 import { isElectron } from './utils';
+import {
+  type InvoiceTemplatePresetKey,
+  type InvoiceTemplateConfig,
+  type BusinessProfile,
+  type StoreConfig,
+  type InvoiceTemplateProfile,
+  type InvoiceSnapshot,
+  DEFAULT_INVOICE_TEMPLATE_CONFIG,
+} from '@shared/business-config';
+import { businessConfigApi, getBillingCache } from './business-config-service';
 
 export interface PrintSettings {
   pageSize: 'A4' | 'A5' | 'Letter' | 'Legal';
@@ -198,7 +208,6 @@ export interface InvoicePrintData {
 // Import franchise config for company details
 import { getFranchiseById, getFormattedAddress } from './franchise-config';
 
-<<<<<<< Updated upstream
 const isPresetKey = (value: unknown): value is InvoiceTemplatePresetKey =>
   value === 'classic' || value === 'modern' || value === 'compact' || value === 'express' || value === 'edited';
 
@@ -289,9 +298,6 @@ const buildUpiPaymentUrl = (
   }
   return `upi://pay?${params.toString()}`;
 };
-
-=======
->>>>>>> Stashed changes
 /**
  * Parse address object to human-readable string
  * Handles all common address formats and returns clean text
@@ -549,14 +555,6 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
     status: order.status,
     isExpressOrder: order.isExpressOrder || order.is_express_order || false,
     isUpdate,
-<<<<<<< Updated upstream
-    deliveryCharges,
-    expressSurcharge,
-    templatePreset: !hasExplicitTemplateSelection
-      ? ((order.isExpressOrder || order.is_express_order) ? 'express' : undefined)
-      : undefined,
-=======
->>>>>>> Stashed changes
     paymentBreakdown,
   };
 }
@@ -869,7 +867,7 @@ export class PrintDriver {
     doc.save(`${data.title ? data.title.toLowerCase().replace(/\s+/g, '-') : 'document'}-label.pdf`);
   }
 
-  public async printInvoice(data: InvoicePrintData, templateId: string = 'invoice'): Promise<any> {
+  public async generateInvoiceDocument(data: InvoicePrintData, templateId: string = 'invoice', options: { outputMode?: 'none' | 'download' } = {}): Promise<any> {
     const template = this.getTemplate(templateId);
     if (!template) {
       throw new Error(`Template ${templateId} not found`);
@@ -882,17 +880,16 @@ export class PrintDriver {
       console.log('🚀 Starting invoice generation flow...');
       console.log('📦 Invoice data:', data);
 
-<<<<<<< Updated upstream
       let resolvedBusinessProfile: BusinessProfile | undefined;
-      let resolvedStore: StoreConfig | null = data.store || null;
+      let resolvedStore: StoreConfig | null = (data as any).store || null;
       let resolvedTemplateProfile: InvoiceTemplateProfile | null = null;
 
       try {
         const resolved = await businessConfigApi.resolveInvoiceContext({
           storeId: data.storeId || undefined,
-          storeCode: data.storeCode || undefined,
-          templateId: data.invoiceTemplateId || undefined,
-          templateKey: data.templateKey || (templateId !== 'invoice' ? templateId : undefined),
+          storeCode: (data as any).storeCode || undefined,
+          templateId: (data as any).invoiceTemplateId || undefined,
+          templateKey: (data as any).templateKey || (templateId !== 'invoice' ? templateId : undefined),
         });
         resolvedBusinessProfile = resolved.businessProfile;
         resolvedStore = resolved.store;
@@ -900,11 +897,11 @@ export class PrintDriver {
       } catch (resolutionError) {
         console.warn('[PrintDriver] Falling back to cached invoice config:', resolutionError);
         const cache = getBillingCache();
-        resolvedBusinessProfile = data.businessProfile || cache.businessProfile;
-        resolvedStore = data.store || cache.stores?.find((item) => item.id === data.storeId) || null;
+        resolvedBusinessProfile = (data as any).businessProfile || cache.businessProfile;
+        resolvedStore = (data as any).store || cache.stores?.find((item: any) => item.id === data.storeId) || null;
         resolvedTemplateProfile =
-          cache.invoiceTemplates?.find((item) => item.id === data.invoiceTemplateId) ||
-          cache.invoiceTemplates?.find((item) => item.templateKey === data.templateKey) ||
+          cache.invoiceTemplates?.find((item) => item.id === (data as any).invoiceTemplateId) ||
+          cache.invoiceTemplates?.find((item) => item.templateKey === (data as any).templateKey) ||
           cache.invoiceTemplates?.find((item) => item.isDefault) ||
           null;
       }
@@ -915,26 +912,22 @@ export class PrintDriver {
       const presetKey: InvoiceTemplatePresetKey = rendererMode === 'standard'
         ? resolvePresetFromStandardVariant(standardVariantKey)
         : (
-            (data.templatePreset && isPresetKey(data.templatePreset) && data.templatePreset) ||
+            ((data as any).templatePreset && isPresetKey((data as any).templatePreset) && (data as any).templatePreset) ||
             (resolvedTemplateProfile?.presetKey && isPresetKey(resolvedTemplateProfile.presetKey) && resolvedTemplateProfile.presetKey) ||
             resolvePresetFromTemplateId(templateId)
           );
       const activeVariantKey = rendererMode === 'standard'
         ? standardVariantKey
-        : (resolvedTemplateProfile?.templateKey || data.templateKey || `preset:${presetKey}`);
+        : (resolvedTemplateProfile?.templateKey || (data as any).templateKey || `preset:${presetKey}`);
       const effectiveTemplateId = resolveTemplateIdFromPreset(presetKey);
       const effectiveTemplate = this.getTemplate(effectiveTemplateId) || template;
       const displayConfig = pickInvoiceDisplayConfig(resolvedBusinessProfile, resolvedStore);
       const effectiveConfig = rendererMode === 'template'
-        ? mergeInvoiceTemplateConfig(displayConfig, resolvedTemplateProfile?.config, data.templateConfig)
+        ? mergeInvoiceTemplateConfig(displayConfig, resolvedTemplateProfile?.config, (data as any).templateConfig)
         : mergeInvoiceTemplateConfig(displayConfig);
 
-=======
-      // Generate QR Code for UPI Payment
->>>>>>> Stashed changes
       let qrCodeDataUrl: string | undefined = undefined;
       try {
-        // Use centralized UPI configuration
         const { generateUPIUrl } = await import('./franchise-config');
         const upiUrl = generateUPIUrl(data.total, data.orderNumber);
         qrCodeDataUrl = await QRCode.toDataURL(upiUrl);
@@ -942,20 +935,19 @@ export class PrintDriver {
         console.error("Failed to generate QR code", e);
       }
 
-<<<<<<< Updated upstream
       const resolvedCompanyInfo = resolvedBusinessProfile
         ? {
-            name: resolvedBusinessProfile.companyName || data.companyInfo.name,
+            name: resolvedBusinessProfile.companyName || (data.companyInfo as any).name,
             address: resolvedStore
               ? parseAddressObject(resolvedStore.address)
-              : parseAddressObject(resolvedBusinessProfile.companyAddress) || data.companyInfo.address,
-            phone: resolvedStore?.contactDetails?.phone || resolvedBusinessProfile.contactDetails?.phone || data.companyInfo.phone,
-            email: resolvedStore?.contactDetails?.email || resolvedBusinessProfile.contactDetails?.email || data.companyInfo.email,
-            taxId: String(resolvedStore?.legalDetails?.gstin || resolvedBusinessProfile.taxDetails?.gstin || data.companyInfo.taxId || ''),
+              : parseAddressObject(resolvedBusinessProfile.companyAddress) || (data.companyInfo as any).address,
+            phone: resolvedStore?.contactDetails?.phone || resolvedBusinessProfile.contactDetails?.phone || (data.companyInfo as any).phone,
+            email: resolvedStore?.contactDetails?.email || resolvedBusinessProfile.contactDetails?.email || (data.companyInfo as any).email,
+            taxId: String(resolvedStore?.legalDetails?.gstin || resolvedBusinessProfile.taxDetails?.gstin || (data.companyInfo as any).taxId || ''),
             logo:
               String((resolvedStore?.invoiceOverrides as any)?.logoUrl || '') ||
               resolvedBusinessProfile.invoiceDefaults.logoUrl ||
-              data.companyInfo.logo,
+              (data.companyInfo as any).logo,
           }
         : data.companyInfo;
 
@@ -976,38 +968,33 @@ export class PrintDriver {
         ...data,
         companyInfo: {
           ...data.companyInfo,
-          name: resolvedCompanyInfo.name,
-          address: resolvedCompanyInfo.address,
-          phone: resolvedCompanyInfo.phone,
-          email: resolvedCompanyInfo.email,
-          taxId: resolvedCompanyInfo.taxId,
-          logo: resolvedCompanyInfo.logo,
+          name: (resolvedCompanyInfo as any).name,
+          address: (resolvedCompanyInfo as any).address,
+          phone: (resolvedCompanyInfo as any).phone,
+          email: (resolvedCompanyInfo as any).email,
+          taxId: (resolvedCompanyInfo as any).taxId,
+          logo: (resolvedCompanyInfo as any).logo,
         },
         terms: templateTerms,
         notes: templateNotes,
         storeId: resolvedStore?.id || data.storeId || null,
-        storeCode: resolvedStore?.code || data.storeCode || null,
-        store: resolvedStore || data.store || null,
-        businessProfile: resolvedBusinessProfile || data.businessProfile,
+        storeCode: (data as any).storeCode || resolvedStore?.code || null,
+        store: resolvedStore || (data as any).store || null,
+        businessProfile: resolvedBusinessProfile || (data as any).businessProfile,
       };
 
-=======
->>>>>>> Stashed changes
-      // 1. Prepare Data with franchise and GST info
       const invoiceData = {
         invoiceNumber: data.invoiceNumber,
         invoiceDate: data.invoiceDate,
         dueDate: data.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        // Pass franchiseId for strict franchise isolation
         franchiseId: data.franchiseId,
-        // Pass GST flag for tax invoice generation
-        enableGST: data.enableGST || false,
+        enableGST: (data as any).enableGST || false,
         company: {
-          name: data.companyInfo.name,
-          address: data.companyInfo.address,
-          phone: data.companyInfo.phone,
-          email: data.companyInfo.email,
-          taxId: data.companyInfo.taxId || '33AITPD3522F1ZK',
+          name: (data.companyInfo as any).name,
+          address: (data.companyInfo as any).address,
+          phone: (data.companyInfo as any).phone,
+          email: (data.companyInfo as any).email,
+          taxId: (data.companyInfo as any).taxId || '33AITPD3522F1ZK',
           logo: '/assets/fabclean-logo.png'
         },
         customer: {
@@ -1022,16 +1009,15 @@ export class PrintDriver {
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           total: item.total,
-          taxRate: data.enableGST ? (item.taxRate || 18) : 0,
-          hsn: '998314' // HSN for laundry services
+          taxRate: (data as any).enableGST ? (item.taxRate || 18) : 0,
+          hsn: '998314'
         })),
         subtotal: data.subtotal,
         taxAmount: data.tax,
-        deliveryCharges: 0, // Will be included in items if applicable
         total: data.total,
         paymentTerms: data.terms || 'Payment due within 7 days',
         notes: data.notes,
-        status: data.status,
+        status: (data as any).status,
         qrCode: qrCodeDataUrl,
         isExpressOrder: data.isExpressOrder || false,
         paymentBreakdown: data.paymentBreakdown,
@@ -1039,52 +1025,6 @@ export class PrintDriver {
 
       console.log('✅ Data prepared');
 
-<<<<<<< Updated upstream
-=======
-      // 2. Render React Component
-      container = document.createElement('div');
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.style.top = '0';
-      container.style.width = '210mm';
-      container.style.background = 'white';
-      document.body.appendChild(container);
-
-      console.log('📄 Rendering invoice template...');
-      root = createRoot(container);
-
-      await new Promise<void>((resolve) => {
-        root.render(React.createElement(InvoiceTemplateIN, { data: invoiceData }));
-        // Wait for rendering to complete
-        setTimeout(resolve, 2000); // Generous timeout to ensure rendering
-      });
-      console.log('✅ Template rendered');
-
-      // 3. Convert to Image (html2canvas) - OPTIMIZED for smaller file size
-      console.log('🎨 Converting to image (optimized)...');
-      const canvas = await html2canvas(container, {
-        scale: 1.5, // Balanced scale for quality/size
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
-        logging: false,
-        windowWidth: 794,
-        windowHeight: 1123,
-        imageTimeout: 5000,
-        removeContainer: false,
-      });
-      console.log('✅ Image created:', canvas.width, 'x', canvas.height);
-
-      // 4. Generate PDF with SMART COMPRESSION
-      console.log('📄 Generating PDF with smart compression...');
-
-      // Smart compression algorithm - finds optimal quality
-      const MAX_SIZE_KB = 8000; // 8MB target (buffer for 10MB limit)
-      const MIN_QUALITY = 0.5;
-      const QUALITY_STEP = 0.05;
-
-      let currentQuality = 0.8; // Start at 80%
->>>>>>> Stashed changes
       let pdfBlob: Blob;
 
       try {
@@ -1101,15 +1041,14 @@ export class PrintDriver {
 
         await new Promise<void>((resolve) => {
           root.render(React.createElement(InvoiceTemplateIN, {
-            data: invoiceData,
-            preset: presetKey,
-            config: effectiveConfig,
+            data: invoiceData as any,
+            preset: presetKey as any,
+            config: effectiveConfig as any,
           }));
           setTimeout(resolve, 2000);
         });
         console.log('✅ Template rendered');
 
-        console.log('🎨 Converting to image (optimized)...');
         const canvas = await html2canvas(container, {
           scale: 1.5,
           useCORS: true,
@@ -1121,9 +1060,7 @@ export class PrintDriver {
           imageTimeout: 5000,
           removeContainer: false,
         });
-        console.log('✅ Image created:', canvas.width, 'x', canvas.height);
 
-        console.log('📄 Generating PDF with smart compression...');
         const MAX_SIZE_KB = 8000;
         const MIN_QUALITY = 0.5;
         const QUALITY_STEP = 0.05;
@@ -1134,11 +1071,7 @@ export class PrintDriver {
 
         do {
           attempts++;
-          console.log(`   Attempt ${attempts}: Quality=${(currentQuality * 100).toFixed(0)}%`);
-
           const imgData = canvas.toDataURL('image/jpeg', currentQuality);
-          const imgFormat: 'JPEG' = 'JPEG';
-
           const pdf = new jsPDF({
             orientation: 'portrait',
             unit: 'mm',
@@ -1152,49 +1085,32 @@ export class PrintDriver {
           let heightLeft = imgHeight;
           let position = 0;
 
-          pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight, undefined, 'FAST');
+          pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
           heightLeft -= pageHeight;
 
           while (heightLeft > 5) {
             position = heightLeft - imgHeight;
             pdf.addPage();
-            pdf.addImage(imgData, imgFormat, 0, position, imgWidth, imgHeight, undefined, 'FAST');
+            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
             heightLeft -= pageHeight;
           }
 
           pdfBlob = pdf.output('blob');
           const sizeKB = pdfBlob.size / 1024;
-          console.log(`   Result: ${sizeKB.toFixed(0)} KB`);
 
-          if (sizeKB <= MAX_SIZE_KB) {
-            console.log(`✅ Compression successful: ${sizeKB.toFixed(0)} KB at ${(currentQuality * 100).toFixed(0)}% quality`);
-            break;
-          }
-
+          if (sizeKB <= MAX_SIZE_KB) break;
           currentQuality = Math.max(MIN_QUALITY, currentQuality - QUALITY_STEP);
-
-          if (currentQuality <= MIN_QUALITY && attempts >= maxAttempts) {
-            console.warn(`⚠️ Reached minimum quality. Final size: ${sizeKB.toFixed(0)} KB`);
-            break;
-          }
         } while (attempts < maxAttempts);
       } catch (renderError) {
         console.error('❌ Styled invoice render failed, falling back to emergency PDF renderer:', renderError);
         pdfBlob = this.buildLegacyInvoicePdf(this.getTemplate('invoice') || template, fallbackInvoiceData);
       }
 
-      const fileSizeMB = (pdfBlob.size / (1024 * 1024)).toFixed(2);
-      console.log(`📊 Final PDF size: ${fileSizeMB} MB`);
-
-      const filename = `invoice-${data.invoiceNumber}-${Date.now()}.pdf`;
-      console.log('✅ PDF generated');
-
-<<<<<<< Updated upstream
       const snapshotTemplate = rendererMode === 'template' && resolvedTemplateProfile && resolvedTemplateProfile.presetKey === presetKey
         ? { ...resolvedTemplateProfile, config: effectiveConfig }
         : rendererMode === 'template' ? {
-            id: data.invoiceTemplateId || resolvedTemplateProfile?.id || undefined,
-            templateKey: resolvedTemplateProfile?.templateKey || data.templateKey || activeVariantKey,
+            id: (data as any).invoiceTemplateId || resolvedTemplateProfile?.id || undefined,
+            templateKey: resolvedTemplateProfile?.templateKey || (data as any).templateKey || activeVariantKey,
             name: resolvedTemplateProfile?.name || effectiveTemplate.name,
             description: resolvedTemplateProfile?.description || effectiveTemplate.description,
             presetKey,
@@ -1205,10 +1121,7 @@ export class PrintDriver {
             config: effectiveConfig,
           } : null;
 
-=======
->>>>>>> Stashed changes
-      // 5. Save to Server (CRITICAL STEP)
-      console.log('💾 Saving to server...');
+      const filename = `invoice-${data.invoiceNumber}-${Date.now()}.pdf`;
       let savedDoc = null;
       try {
         savedDoc = await this.savePDFToServer(pdfBlob, filename, {
@@ -1217,75 +1130,37 @@ export class PrintDriver {
           orderNumber: data.orderNumber,
           customerName: data.customerInfo.name,
           amount: data.total,
-          status: data.paymentStatus || 'sent',
-<<<<<<< Updated upstream
+          status: (data as any).paymentStatus || 'sent',
           storeId: resolvedStore?.id || data.storeId || null,
           templateKey: rendererMode === 'template'
-            ? (resolvedTemplateProfile?.templateKey || data.templateKey || activeVariantKey)
+            ? (resolvedTemplateProfile?.templateKey || (data as any).templateKey || activeVariantKey)
             : activeVariantKey,
           metadata: {
             invoiceDate: data.invoiceDate,
             items: data.items.length,
             total: data.total,
             invoiceSnapshot: {
-              businessProfile: resolvedBusinessProfile || data.businessProfile || null,
+              businessProfile: resolvedBusinessProfile || (data as any).businessProfile || null,
               store: resolvedStore || null,
               template: snapshotTemplate,
               rendererMode,
               variantKey: activeVariantKey,
               generatedAt: new Date().toISOString(),
               orderSummary: {
-                orderId: data.orderId,
+                orderId: (data as any).orderId,
                 orderNumber: data.orderNumber,
                 customerName: data.customerInfo.name,
                 total: data.total,
-                storeCode: data.storeCode || resolvedStore?.code,
+                storeCode: (data as any).storeCode || resolvedStore?.code,
               },
             } satisfies InvoiceSnapshot,
-=======
-          metadata: {
-            invoiceDate: data.invoiceDate,
-            items: data.items.length,
-            total: data.total
->>>>>>> Stashed changes
           }
         });
-        console.log('✅ Saved to server successfully:', savedDoc);
       } catch (uploadError) {
         console.error('❌ Failed to save to server:', uploadError);
-        console.warn('⚠️ Proceeding with download despite upload failure.');
-        // We do NOT throw here anymore. We let the user download the file.
       }
 
-      // 6. Download to User or Print (Electron)
-      console.log('⬇️ Processing output...');
-
-      if (isElectron()) {
-        console.log('🖥️ Electron detected, initiating direct print...');
-        // Create blob URL for printing
-        const blobUrl = URL.createObjectURL(pdfBlob);
-
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.width = '0px';
-        iframe.style.height = '0px';
-        iframe.style.border = 'none';
-        iframe.src = blobUrl;
-        document.body.appendChild(iframe);
-
-        // Allow time for PDF to load in iframe
-        setTimeout(() => {
-          if (iframe.contentWindow) {
-            iframe.contentWindow.print();
-          }
-          // Cleanup after a delay
-          setTimeout(() => {
-            document.body.removeChild(iframe);
-            URL.revokeObjectURL(blobUrl);
-          }, 60000); // 1 minute cleanup
-        }, 1000);
-      } else {
-        // Download the PDF blob
+      if (options.outputMode !== 'none') {
         const blobUrl = URL.createObjectURL(pdfBlob);
         const link = document.createElement('a');
         link.href = blobUrl;
@@ -1294,23 +1169,20 @@ export class PrintDriver {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(blobUrl);
-        console.log('✅ Download initiated');
       }
 
-      return savedDoc; // Return the saved document info
-
+      return savedDoc;
     } catch (error) {
-      console.error('❌ Critical error in printInvoice:', error);
+      console.error('❌ Critical error in generateInvoiceDocument:', error);
       throw error;
     } finally {
-      // Cleanup
-      if (root) {
-        setTimeout(() => root.unmount(), 1000);
-      }
-      if (container && document.body.contains(container)) {
-        setTimeout(() => document.body.removeChild(container!), 1000);
-      }
+      if (root) root.unmount();
+      if (container && document.body.contains(container)) document.body.removeChild(container);
     }
+  }
+
+  public async printInvoice(data: InvoicePrintData, templateId: string = 'invoice'): Promise<any> {
+    return this.generateInvoiceDocument(data, templateId, { outputMode: 'download' });
   }
 
   private async savePDFToServer(
@@ -1320,12 +1192,8 @@ export class PrintDriver {
   ): Promise<any> {
     try {
       const formData = new FormData();
-<<<<<<< Updated upstream
       const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
       formData.append('file', pdfFile);
-=======
-      formData.append('file', pdfBlob, filename);
->>>>>>> Stashed changes
       formData.append('type', metadata.type);
       formData.append('metadata', JSON.stringify(metadata));
 

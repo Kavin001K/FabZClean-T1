@@ -137,13 +137,10 @@ export const orders = pgTable("orders", {
   whatsappMessageCount: integer("whatsapp_message_count").default(0),
   // Bill / Invoice URL tracking
   invoiceUrl: text("invoice_url"),
-<<<<<<< Updated upstream
   invoiceTemplateId: text("invoice_template_id"),
   appliedTemplateId: uuid("applied_template_id"),
   whatsappBillStatus: text("whatsapp_bill_status", { enum: ["pending", "sent", "failed"] }).default("pending"),
   tagTemplateId: text("tag_template_id"),
-=======
->>>>>>> Stashed changes
   // Tag printing tracking
   tagsPrinted: boolean("tags_printed").default(false),
   // Delivery earnings & credit tracking
@@ -188,6 +185,7 @@ export const customers = pgTable("customers", {
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
+  secondaryPhone: text("secondary_phone"),
   franchiseId: text("franchise_id"),
   address: jsonb("address"),
   totalOrders: integer("total_orders").default(0),

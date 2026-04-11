@@ -16,6 +16,7 @@ import {
   Truck,
   UserRound,
 } from 'lucide-react';
+import { type InvoiceTemplatePresetKey } from '@shared/business-config';
 
 const COMPANY_GSTIN = '33AITPD3522F1ZK';
 const COMPANY_PAN = 'AITPD3522F';
@@ -71,6 +72,8 @@ export interface InvoiceData {
     newOutstanding: number;
     paymentMethod: string;
   };
+  preset?: InvoiceTemplatePresetKey;
+  isUpdate?: boolean;
 }
 
 const formatIndianCurrency = (amount: number): string =>
@@ -181,10 +184,11 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
     fulfillmentType = 'pickup',
     deliveryAddress,
     paymentBreakdown,
+    preset = 'classic',
+    isUpdate = false,
   } = data;
 
   const franchise = getFranchiseById(franchiseId);
-<<<<<<< Updated upstream
   const usesEditedVisual = preset === 'edited';
   const isEditedInvoice = usesEditedVisual || isUpdate;
   const visualPreset: InvoiceTemplatePresetKey = usesEditedVisual
@@ -239,15 +243,10 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
       shellShadow: '0 20px 54px rgba(76, 29, 149, 0.12)',
     },
   };
-  const visual = presetVisuals[visualPreset];
+  const visual = presetVisuals[visualPreset] || presetVisuals.classic;
   const accent = visual.accent;
   const accentSoft = visual.accentSoft;
   const accentBorder = visual.accentBorder;
-=======
-  const accent = isExpressOrder ? '#c2410c' : '#0f766e';
-  const accentSoft = isExpressOrder ? '#fff7ed' : '#ecfdf5';
-  const accentBorder = isExpressOrder ? '#fdba74' : '#99f6e4';
->>>>>>> Stashed changes
   const headingInk = '#0f172a';
   const bodyInk = '#334155';
   const mutedInk = '#64748b';
@@ -297,7 +296,6 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
     { label: 'Fulfillment', value: fulfillmentType === 'delivery' ? 'Home Delivery' : 'Store Pickup', Icon: fulfillmentType === 'delivery' ? Truck : Store },
     { label: 'Payment Status', value: paymentStatus, Icon: CircleDollarSign },
   ];
-<<<<<<< Updated upstream
   const documentTitle = visualPreset === 'express'
     ? 'Express Bill'
     : usesEditedVisual
@@ -313,8 +311,6 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
     : usesEditedVisual
       ? 'This document supersedes the previous bill for the same order and reflects the latest confirmed order changes.'
       : 'This preset keeps billing clean, branded, and easy to scan at the counter.';
-=======
->>>>>>> Stashed changes
 
   return (
     <div
@@ -462,7 +458,6 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                       Express Order
                     </span>
                   )}
-<<<<<<< Updated upstream
                   {isEditedInvoice && (
                     <span
                       style={{
@@ -483,8 +478,6 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                       Revised Bill
                     </span>
                   )}
-=======
->>>>>>> Stashed changes
                   <span
                     style={{
                       display: 'inline-flex',
@@ -513,7 +506,6 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
             </div>
           </header>
 
-<<<<<<< Updated upstream
           {(visualPreset === 'express' || usesEditedVisual) && (
             <section className="invoice-section" style={{ padding: '14px 18px 0' }}>
               <div
@@ -554,9 +546,6 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
               </div>
             </section>
           )}
-
-=======
->>>>>>> Stashed changes
           <div style={{ padding: '16px 18px 0' }}>
             <section className="invoice-section invoice-grid-2" style={{ marginBottom: '12px' }}>
               <div
@@ -846,7 +835,6 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                     </div>
                   </div>
                 )}
-<<<<<<< Updated upstream
                 {usesEditedVisual && (
                   <div
                     style={{
@@ -866,8 +854,6 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                     <div style={{ fontSize: '14px', fontWeight: 900, lineHeight: 1.1 }}>LATEST BILL</div>
                   </div>
                 )}
-=======
->>>>>>> Stashed changes
 
                 <div style={{ display: 'grid', gap: '10px', position: 'relative', zIndex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>

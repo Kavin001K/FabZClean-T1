@@ -63,6 +63,7 @@ export class SupabaseStorage {
             'customer_name': 'customerName',
             'customer_email': 'customerEmail',
             'customer_phone': 'customerPhone',
+            'secondary_phone': 'secondaryPhone',
             'feedback_date': 'feedbackDate',
             'feedback_time': 'feedbackTime',
             'feedback_status': 'feedbackStatus',
@@ -196,20 +197,16 @@ export class SupabaseStorage {
             'percentage_change_mom': 'percentageChangeMoM',
             'last_computed_at': 'lastComputedAt',
             'invoice_url': 'invoiceUrl',
-<<<<<<< Updated upstream
             'invoice_template_id': 'invoiceTemplateId',
             'applied_template_id': 'appliedTemplateId',
             'whatsapp_bill_status': 'whatsappBillStatus',
             'tag_template_id': 'tagTemplateId',
-=======
->>>>>>> Stashed changes
             'last_whatsapp_sent_at': 'lastWhatsappSentAt',
             'whatsapp_message_count': 'whatsappMessageCount',
             'avatar_url': 'avatarUrl',
             'user_id': 'userId',
             'landing_page': 'landingPage',
             'compact_mode': 'compactMode',
-<<<<<<< Updated upstream
             'quick_actions': 'quickActions',
             'template_key': 'templateKey',
             'scope_key': 'scopeKey',
@@ -230,9 +227,6 @@ export class SupabaseStorage {
             'config': 'config',
             'is_ai_optimized': 'isAiOptimized',
             'short_name': 'shortName'
-=======
-            'quick_actions': 'quickActions'
->>>>>>> Stashed changes
         };
 
         Object.entries(mappings).forEach(([snake, camel]) => {
@@ -425,13 +419,10 @@ export class SupabaseStorage {
             'orderLetter': 'order_letter',
             'recordedByName': 'recorded_by_name',
             'invoiceUrl': 'invoice_url',
-<<<<<<< Updated upstream
             'invoiceTemplateId': 'invoice_template_id',
             'appliedTemplateId': 'applied_template_id',
             'whatsappBillStatus': 'whatsapp_bill_status',
             'tagTemplateId': 'tag_template_id',
-=======
->>>>>>> Stashed changes
             'monthYear': 'month_year',
             'metricType': 'metric_type',
             'percentageChangeMoM': 'percentage_change_mom',
@@ -446,7 +437,6 @@ export class SupabaseStorage {
             'userId': 'user_id',
             'landingPage': 'landing_page',
             'compactMode': 'compact_mode',
-<<<<<<< Updated upstream
             'quickActions': 'quick_actions',
             'templateKey': 'template_key',
             'scopeKey': 'scope_key',
@@ -466,9 +456,6 @@ export class SupabaseStorage {
             'layoutKey': 'layout_key',
             'isAiOptimized': 'is_ai_optimized',
             'shortName': 'short_name'
-=======
-            'quickActions': 'quick_actions'
->>>>>>> Stashed changes
         };
 
         // If key exists in mappings, use snake_case. If not, preserve original (e.g. 'status', 'email', 'name')
@@ -749,6 +736,7 @@ export class SupabaseStorage {
             
             if (digitsOnly.length >= 1) {
                 conditions.push(`phone.ilike.%${digitsOnly}%`);
+                conditions.push(`secondary_phone.ilike.%${digitsOnly}%`);
             }
             
             if (conditions.length > 0) {
@@ -758,7 +746,7 @@ export class SupabaseStorage {
 
         const phone = String(options.phone || '').trim();
         if (phone) {
-            query = query.eq('phone', phone);
+            query = query.or(`phone.eq.${phone},secondary_phone.eq.${phone}`);
         }
 
         // Apply sorting
@@ -1762,7 +1750,6 @@ export class SupabaseStorage {
         if (error) throw error;
     }
 
-<<<<<<< Updated upstream
     // ======= BUSINESS CONFIG =======
     async getBusinessProfile(scopeKey: string = 'global'): Promise<any | undefined> {
         const { data, error } = await this.supabase
@@ -1988,9 +1975,6 @@ export class SupabaseStorage {
 
         throw new Error('Failed to update tag template after removing unknown columns');
     }
-
-=======
->>>>>>> Stashed changes
     // ======= FRANCHISES =======
     async createFranchise(data: any): Promise<any> {
         const { data: franchise, error } = await this.supabase.from('franchises').insert(this.toSnakeCase(data)).select().single();
@@ -2137,7 +2121,6 @@ export class SupabaseStorage {
 
     // ======= DOCUMENTS =======
     async createDocument(data: any): Promise<any> {
-<<<<<<< Updated upstream
         const payload = this.toSnakeCase(data);
         const attemptInsert = async (value: any) => {
             const { data: document, error } = await this.supabase.from('documents').insert(value).select().single();
@@ -2154,7 +2137,6 @@ export class SupabaseStorage {
             if (!missingFilepathColumn) {
                 throw error;
             }
-
             const fallbackMetadata = {
                 ...((payload.metadata && typeof payload.metadata === 'object') ? payload.metadata : {}),
                 filepath: payload.filepath,
@@ -2169,11 +2151,6 @@ export class SupabaseStorage {
 
             return await attemptInsert(fallbackPayload);
         }
-=======
-        const { data: document, error } = await this.supabase.from('documents').insert(this.toSnakeCase(data)).select().single();
-        if (error) throw error;
-        return this.mapDates(document);
->>>>>>> Stashed changes
     }
 
     async listDocuments(filters: any = {}): Promise<any[]> {
@@ -2191,7 +2168,6 @@ export class SupabaseStorage {
         if (error) return undefined;
         return this.mapDates(document);
     }
-
     async deleteDocument(id: string): Promise<boolean> {
         const { error } = await this.supabase.from('documents').delete().eq('id', id);
         return !error;

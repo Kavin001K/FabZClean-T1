@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db as storage } from "../db";
 import { insertCustomerSchema, type Customer, type Order } from "../../shared/schema";
+import { normalizePhoneForComparison, parseCustomerPhones, sanitizePhoneForStorage } from "../../shared/customer-phone";
 import {
   jwtRequired,
   validateInput,
@@ -27,11 +28,60 @@ const CUSTOMER_EDITOR_ROLES: string[] = [
 ];
 const CUSTOMER_ADMIN_ROLES: string[] = ["admin", "franchise_manager"];
 
-const normalizePhone = (value?: string | null) => (value || "").replace(/\D/g, "").slice(-10);
+const normalizePhone = (value?: string | null) => normalizePhoneForComparison(value);
 const toNumeric = (value: unknown) => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 };
+
+const splitRawPhoneInput = (value?: string | null) =>
+  String(value || "")
+    .split(/[,\n;]+/)
+    .map((part) => sanitizePhoneForStorage(part))
+    .filter(Boolean);
+
+function normalizeCustomerPhonePayload(payload: Record<string, unknown>) {
+  const hasPhoneField = Object.prototype.hasOwnProperty.call(payload, 'phone');
+  const hasSecondaryField = Object.prototype.hasOwnProperty.call(payload, 'secondaryPhone');
+  if (!hasPhoneField && !hasSecondaryField) {
+    return payload;
+  }
+
+  const rawTokens = [
+    ...splitRawPhoneInput(payload.phone as string | null | undefined),
+    ...splitRawPhoneInput(payload.secondaryPhone as string | null | undefined),
+  ];
+
+  const dedupedTokens = rawTokens.filter((token, index) => {
+    const key = normalizePhone(token) || token;
+    return rawTokens.findIndex((candidate) => (normalizePhone(candidate) || candidate) === key) === index;
+  });
+
+  if (dedupedTokens.length > 2) {
+    throw new Error('Please provide at most two phone numbers');
+  }
+
+  const parsedPhones = parseCustomerPhones(dedupedTokens.join(", "));
+  if (parsedPhones.primaryPhone && !normalizePhone(parsedPhones.primaryPhone)) {
+    throw new Error('Primary phone number is invalid');
+  }
+  if (parsedPhones.secondaryPhone && !normalizePhone(parsedPhones.secondaryPhone)) {
+    throw new Error('Secondary phone number is invalid');
+  }
+  if (
+    parsedPhones.primaryPhone &&
+    parsedPhones.secondaryPhone &&
+    normalizePhone(parsedPhones.primaryPhone) === normalizePhone(parsedPhones.secondaryPhone)
+  ) {
+    throw new Error('Primary and secondary phone numbers must be different');
+  }
+
+  return {
+    ...payload,
+    phone: parsedPhones.primaryPhone || null,
+    secondaryPhone: parsedPhones.secondaryPhone,
+  };
+}
 
 type CustomerFeedbackSummary = {
   id: string;
@@ -375,7 +425,7 @@ router.post(
   validateInput(insertCustomerSchema),
   async (req, res) => {
     try {
-      const customerData = req.body;
+      const customerData = normalizeCustomerPhonePayload(req.body);
 
       // Check if customer already exists
       const { data: existingCustomers } = await storage.listCustomers();
@@ -387,7 +437,15 @@ router.post(
 
       // Check if phone already exists
       if (customerData.phone) {
-        const phoneExists = existingCustomers.some((c: Customer) => c.phone === customerData.phone);
+        const primaryKey = normalizePhone(customerData.phone as string);
+        const secondaryKey = normalizePhone(customerData.secondaryPhone as string | null | undefined);
+        const phoneExists = existingCustomers.some((c: Customer) => {
+          const existingNumbers = [c.phone, (c as any).secondaryPhone].map((value) => normalizePhone(value));
+          return (
+            (primaryKey && existingNumbers.includes(primaryKey)) ||
+            (secondaryKey && existingNumbers.includes(secondaryKey))
+          );
+        });
         if (phoneExists) {
           return res.status(400).json(createErrorResponse('Customer with this phone number already exists', 400));
         }
@@ -436,11 +494,27 @@ router.post(
 router.put('/:id', requireRole(CUSTOMER_EDITOR_ROLES), async (req, res) => {
   try {
     const customerId = req.params.id;
-    const updateData = req.body;
+    const updateData = normalizeCustomerPhonePayload(req.body);
 
     const customer = await storage.getCustomer(customerId);
     if (!customer) {
       return res.status(404).json(createErrorResponse('Customer not found', 404));
+    }
+
+    const { data: existingCustomers } = await storage.listCustomers();
+    const primaryKey = normalizePhone(updateData.phone as string | null | undefined);
+    const secondaryKey = normalizePhone(updateData.secondaryPhone as string | null | undefined);
+    const conflictingCustomer = existingCustomers.find((entry: Customer) => {
+      if (entry.id === customerId) return false;
+      const existingNumbers = [entry.phone, (entry as any).secondaryPhone].map((value) => normalizePhone(value));
+      return (
+        (primaryKey && existingNumbers.includes(primaryKey)) ||
+        (secondaryKey && existingNumbers.includes(secondaryKey))
+      );
+    });
+
+    if (conflictingCustomer) {
+      return res.status(400).json(createErrorResponse('Customer with this phone number already exists', 400));
     }
 
     const updatedCustomer = await storage.updateCustomer(customerId, updateData);
