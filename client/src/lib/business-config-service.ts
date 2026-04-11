@@ -20,10 +20,53 @@ type BillingCache = {
   updatedAt?: string;
 };
 
+function mergeByKey<T>(
+  existing: T[] | undefined,
+  incoming: T[] | undefined,
+  getKey: (item: T) => string | undefined | null
+): T[] | undefined {
+  if (!incoming?.length) {
+    return existing;
+  }
+
+  const merged = [...(existing || [])];
+
+  for (const item of incoming) {
+    const key = getKey(item);
+    if (!key) {
+      merged.push(item);
+      continue;
+    }
+
+    const index = merged.findIndex((entry) => getKey(entry) === key);
+    if (index >= 0) {
+      merged[index] = item;
+    } else {
+      merged.push(item);
+    }
+  }
+
+  return merged;
+}
+
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(text || `Request failed with ${response.status}`);
+    if (text) {
+      let parsed: any = null;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        throw new Error(text || `Request failed with ${response.status}`);
+      }
+      const message =
+        parsed?.message ||
+        parsed?.error ||
+        parsed?.details?.message ||
+        parsed?.details?.error;
+      throw new Error(message || text || `Request failed with ${response.status}`);
+    }
+    throw new Error(`Request failed with ${response.status}`);
   }
   return response.json();
 }
@@ -94,7 +137,11 @@ export const businessConfigApi = {
         const result = storeConfigSchema.safeParse(store);
         return result.success ? result.data : { ...store } as StoreConfig;
     });
-    persistCache({ stores });
+    persistCache({
+      stores: activeOnly
+        ? mergeByKey(getBillingCache().stores, stores, (store) => store.id || store.code)
+        : stores,
+    });
     return stores;
   },
 
@@ -104,7 +151,11 @@ export const businessConfigApi = {
       body: JSON.stringify(payload),
     });
     const data = await readJson<{ success: true; store: StoreConfig }>(response);
-    return storeConfigSchema.parse(data.store);
+    const store = storeConfigSchema.parse(data.store);
+    persistCache({
+      stores: mergeByKey(getBillingCache().stores, [store], (entry) => entry.id || entry.code),
+    });
+    return store;
   },
 
   async updateStore(id: string, payload: Partial<StoreConfig>): Promise<StoreConfig> {
@@ -113,7 +164,11 @@ export const businessConfigApi = {
       body: JSON.stringify(payload),
     });
     const data = await readJson<{ success: true; store: StoreConfig }>(response);
-    return storeConfigSchema.parse(data.store);
+    const store = storeConfigSchema.parse(data.store);
+    persistCache({
+      stores: mergeByKey(getBillingCache().stores, [store], (entry) => entry.id || entry.code),
+    });
+    return store;
   },
 
   async uploadStoreLogo(id: string, file: File): Promise<StoreConfig> {
@@ -124,7 +179,11 @@ export const businessConfigApi = {
       body: formData,
     });
     const data = await readJson<{ success: true; store: StoreConfig }>(response);
-    return storeConfigSchema.parse(data.store);
+    const store = storeConfigSchema.parse(data.store);
+    persistCache({
+      stores: mergeByKey(getBillingCache().stores, [store], (entry) => entry.id || entry.code),
+    });
+    return store;
   },
 
   async listInvoiceTemplates(storeId?: string | null, activeOnly = false): Promise<InvoiceTemplateProfile[]> {
@@ -138,7 +197,11 @@ export const businessConfigApi = {
         const result = invoiceTemplateProfileSchema.safeParse(template);
         return result.success ? result.data : { ...template } as InvoiceTemplateProfile;
     });
-    persistCache({ invoiceTemplates: templates });
+    persistCache({
+      invoiceTemplates: storeId === undefined && !activeOnly
+        ? templates
+        : mergeByKey(getBillingCache().invoiceTemplates, templates, (template) => template.id || template.templateKey),
+    });
     return templates;
   },
 
@@ -148,7 +211,11 @@ export const businessConfigApi = {
       body: JSON.stringify(payload),
     });
     const data = await readJson<{ success: true; template: InvoiceTemplateProfile }>(response);
-    return invoiceTemplateProfileSchema.parse(data.template);
+    const template = invoiceTemplateProfileSchema.parse(data.template);
+    persistCache({
+      invoiceTemplates: mergeByKey(getBillingCache().invoiceTemplates, [template], (entry) => entry.id || entry.templateKey),
+    });
+    return template;
   },
 
   async updateInvoiceTemplate(id: string, payload: Partial<InvoiceTemplateProfile>): Promise<InvoiceTemplateProfile> {
@@ -157,7 +224,21 @@ export const businessConfigApi = {
       body: JSON.stringify(payload),
     });
     const data = await readJson<{ success: true; template: InvoiceTemplateProfile }>(response);
-    return invoiceTemplateProfileSchema.parse(data.template);
+    const template = invoiceTemplateProfileSchema.parse(data.template);
+    persistCache({
+      invoiceTemplates: mergeByKey(getBillingCache().invoiceTemplates, [template], (entry) => entry.id || entry.templateKey),
+    });
+    return template;
+  },
+
+  async optimizeInvoiceTemplate(payload: Partial<InvoiceTemplateProfile>): Promise<InvoiceTemplateProfile> {
+    const response = await authorizedFetch("/algorithms/invoice-template-optimize", {
+      method: "POST",
+      body: JSON.stringify({ template: payload }),
+    });
+    const data = await readJson<{ success: true; data?: { template: InvoiceTemplateProfile }; template?: InvoiceTemplateProfile }>(response);
+    const template = invoiceTemplateProfileSchema.parse(data.data?.template || data.template);
+    return template;
   },
 
   async resolveInvoiceContext(params: {
@@ -187,8 +268,8 @@ export const businessConfigApi = {
 
     persistCache({
       businessProfile: resolved.businessProfile,
-      stores: resolved.store ? [resolved.store] : getBillingCache().stores,
-      invoiceTemplates: resolved.template ? [resolved.template] : getBillingCache().invoiceTemplates,
+      stores: mergeByKey(getBillingCache().stores, resolved.store ? [resolved.store] : undefined, (store) => store.id || store.code),
+      invoiceTemplates: mergeByKey(getBillingCache().invoiceTemplates, resolved.template ? [resolved.template] : undefined, (template) => template.id || template.templateKey),
     });
 
     return resolved;
@@ -205,7 +286,11 @@ export const businessConfigApi = {
         const result = tagTemplateProfileSchema.safeParse(template);
         return result.success ? result.data : { ...template } as TagTemplateProfile;
     });
-    persistCache({ tagTemplates: templates });
+    persistCache({
+      tagTemplates: storeId === undefined && !activeOnly
+        ? templates
+        : mergeByKey(getBillingCache().tagTemplates, templates, (template) => template.id || template.templateKey),
+    });
     return templates;
   },
 
@@ -215,7 +300,11 @@ export const businessConfigApi = {
       body: JSON.stringify(payload),
     });
     const data = await readJson<{ success: true; template: TagTemplateProfile }>(response);
-    return tagTemplateProfileSchema.parse(data.template);
+    const template = tagTemplateProfileSchema.parse(data.template);
+    persistCache({
+      tagTemplates: mergeByKey(getBillingCache().tagTemplates, [template], (entry) => entry.id || entry.templateKey),
+    });
+    return template;
   },
 
   async updateTagTemplate(id: string, payload: Partial<TagTemplateProfile>): Promise<TagTemplateProfile> {
@@ -224,7 +313,21 @@ export const businessConfigApi = {
       body: JSON.stringify(payload),
     });
     const data = await readJson<{ success: true; template: TagTemplateProfile }>(response);
-    return tagTemplateProfileSchema.parse(data.template);
+    const template = tagTemplateProfileSchema.parse(data.template);
+    persistCache({
+      tagTemplates: mergeByKey(getBillingCache().tagTemplates, [template], (entry) => entry.id || entry.templateKey),
+    });
+    return template;
+  },
+
+  async optimizeTagTemplate(payload: Partial<TagTemplateProfile>): Promise<TagTemplateProfile> {
+    const response = await authorizedFetch("/algorithms/tag-template-optimize", {
+      method: "POST",
+      body: JSON.stringify({ template: payload }),
+    });
+    const data = await readJson<{ success: true; data?: { template: TagTemplateProfile }; template?: TagTemplateProfile }>(response);
+    const template = tagTemplateProfileSchema.parse(data.data?.template || data.template);
+    return template;
   },
 
   async resolveTagTemplate(params: {
@@ -243,8 +346,8 @@ export const businessConfigApi = {
       template: data.template ? tagTemplateProfileSchema.parse(data.template) : null,
     };
     persistCache({
-      stores: resolved.store ? [resolved.store] : getBillingCache().stores,
-      tagTemplates: resolved.template ? [resolved.template] : getBillingCache().tagTemplates,
+      stores: mergeByKey(getBillingCache().stores, resolved.store ? [resolved.store] : undefined, (store) => store.id || store.code),
+      tagTemplates: mergeByKey(getBillingCache().tagTemplates, resolved.template ? [resolved.template] : undefined, (template) => template.id || template.templateKey),
     });
     return resolved;
   },

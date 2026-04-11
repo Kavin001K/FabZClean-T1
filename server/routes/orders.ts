@@ -25,7 +25,7 @@ import {
   type FulfillmentType,
 } from "../services/whatsapp.service";
 import { sendOrderConfirmationEmail } from "../services/order-confirmation-email.service";
-import { smartItemSummary } from "../utils/item-summarizer";
+import { processOrderBillingPipeline } from "../services/order-invoice.service";
 
 const router = Router();
 const orderService = new OrderService();
@@ -61,8 +61,6 @@ const ORDER_UPDATE_FIELDS = new Set([
   'items',
   'totalAmount',
 ]);
-const APP_BASE_URL = (process.env.APP_BASE_URL || 'https://erp.myfabclean.com').replace(/\/$/, '');
-
 // Apply rate limiting to all order routes
 router.use(jwtRequired);
 
@@ -684,6 +682,8 @@ router.post(
 
       // Financial posting is now canonical via checkout engine only.
       orderData.paymentStatus = 'pending';
+      orderData.whatsappBillStatus = 'pending';
+      orderData.appliedTemplateId = null;
 
       // Add employee ID for order tracking
       if (req.employee) {
@@ -764,6 +764,9 @@ router.post(
         const customer = await storage.getCustomer(orderData.customerId);
         if (customer) {
           prefetchedCustomer = customer;
+          orderData.customerName = customer.name || orderData.customerName;
+          orderData.customerEmail = customer.email || orderData.customerEmail || null;
+          orderData.customerPhone = customer.phone || orderData.customerPhone || null;
           const totalAmount = parseAmount(orderData.totalAmount);
           const walletBalance = parseAmount((customer as any).walletBalanceCache || '0');
           const projectedWalletCover = useWalletAtCreate
@@ -808,7 +811,17 @@ router.post(
               });
             }
           }
+        } else {
+          return res.status(400).json(createErrorResponse('Selected customer could not be loaded from the database', 400));
         }
+      }
+
+      if (!String(orderData.customerName || '').trim()) {
+        return res.status(400).json(createErrorResponse('Customer name is required to create the order invoice correctly', 400));
+      }
+
+      if (!String(orderData.customerPhone || '').trim()) {
+        return res.status(400).json(createErrorResponse('Customer phone is required to create and send the order bill', 400));
       }
 
       // Use OrderService to create order
@@ -999,6 +1012,10 @@ router.put('/:id', async (req, res) => {
     }
 
     const hasItemPayload = Object.prototype.hasOwnProperty.call(updateData, 'items');
+    const brandingChanged =
+      Object.prototype.hasOwnProperty.call(updateData, 'storeId') ||
+      Object.prototype.hasOwnProperty.call(updateData, 'storeCode') ||
+      Object.prototype.hasOwnProperty.call(updateData, 'invoiceTemplateId');
     const oldItems = parseOrderItems((order as any).items);
     const oldTotal = coerceNonNegativeNumber((order as any).totalAmount);
     const advancePaid = coerceNonNegativeNumber((order as any).advancePaid);
@@ -1014,7 +1031,6 @@ router.put('/:id', async (req, res) => {
       updateData.items = normalizedItems;
       updateData.totalAmount = sumItemsTotal(normalizedItems).toFixed(2);
       updateData.tagsPrinted = false;
-      updateData.invoiceUrl = null;
     }
 
     const nextTotal = coerceNonNegativeNumber(
@@ -1033,6 +1049,13 @@ router.put('/:id', async (req, res) => {
       updateData.creditUsed = newOutstanding.toFixed(2);
       updateData.isCreditOrder = newOutstanding > 0;
       updateData.paymentStatus = newOutstanding > 0 ? 'credit' : 'paid';
+    }
+
+    const requiresInvoiceRegeneration = revisedOrderFinancials || brandingChanged;
+    if (requiresInvoiceRegeneration) {
+      updateData.invoiceUrl = null;
+      updateData.appliedTemplateId = null;
+      updateData.whatsappBillStatus = 'pending';
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -1149,32 +1172,13 @@ router.put('/:id', async (req, res) => {
     }
 
     // If order bill was revised (items/total), send updated WhatsApp bill automatically.
-    if (revisedOrderFinancials && (updatedOrder as any)?.customerPhone) {
+    if (requiresInvoiceRegeneration && (updatedOrder as any)?.customerPhone) {
       setImmediate(async () => {
         try {
-          const itemSummary = smartItemSummary((updatedOrder as any)?.items || normalizedItems || oldItems);
-          const orderNumber = (updatedOrder as any)?.orderNumber || order.orderNumber;
-          const fallbackPdfUrl = `${APP_BASE_URL}/api/public/invoice/${encodeURIComponent(orderNumber)}/pdf`;
-          const invoiceResult = await sendInvoiceWhatsApp({
-            phoneNumber: (updatedOrder as any).customerPhone,
-            pdfUrl: (updatedOrder as any)?.invoiceUrl || (order as any)?.invoiceUrl || fallbackPdfUrl,
-            filename: `Invoice-${orderNumber}.pdf`,
-            customerName: (updatedOrder as any)?.customerName || order.customerName || 'Customer',
-            invoiceNumber: orderNumber,
-            amount: nextTotal.toFixed(2),
-            itemName: (itemSummary || 'Laundry Services') + ' (Updated)',
-          });
-
-          const currentCount = Number((updatedOrder as any)?.whatsappMessageCount || 0);
-          if (invoiceResult.success) {
+          const billingResult = await processOrderBillingPipeline(orderId);
+          if (!billingResult.success) {
             await storage.updateOrder(orderId, {
-              lastWhatsappStatus: `Bill Updated - Sent`,
-              lastWhatsappSentAt: new Date(),
-              whatsappMessageCount: currentCount + 1,
-            } as any);
-          } else {
-            await storage.updateOrder(orderId, {
-              lastWhatsappStatus: `Bill Updated - Failed: ${invoiceResult.error || 'Unknown error'}`,
+              lastWhatsappStatus: `Bill Updated - Failed: ${billingResult.error || 'Unknown error'}`,
             } as any);
           }
         } catch (billSendError) {

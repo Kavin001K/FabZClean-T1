@@ -197,6 +197,8 @@ export class SupabaseStorage {
             'last_computed_at': 'lastComputedAt',
             'invoice_url': 'invoiceUrl',
             'invoice_template_id': 'invoiceTemplateId',
+            'applied_template_id': 'appliedTemplateId',
+            'whatsapp_bill_status': 'whatsappBillStatus',
             'tag_template_id': 'tagTemplateId',
             'last_whatsapp_sent_at': 'lastWhatsappSentAt',
             'whatsapp_message_count': 'whatsappMessageCount',
@@ -222,6 +224,7 @@ export class SupabaseStorage {
             'preset_key': 'presetKey',
             'layout_key': 'layoutKey',
             'config': 'config',
+            'is_ai_optimized': 'isAiOptimized',
             'short_name': 'shortName'
         };
 
@@ -416,6 +419,8 @@ export class SupabaseStorage {
             'recordedByName': 'recorded_by_name',
             'invoiceUrl': 'invoice_url',
             'invoiceTemplateId': 'invoice_template_id',
+            'appliedTemplateId': 'applied_template_id',
+            'whatsappBillStatus': 'whatsapp_bill_status',
             'tagTemplateId': 'tag_template_id',
             'monthYear': 'month_year',
             'metricType': 'metric_type',
@@ -448,6 +453,7 @@ export class SupabaseStorage {
             'legalDetails': 'legal_details',
             'presetKey': 'preset_key',
             'layoutKey': 'layout_key',
+            'isAiOptimized': 'is_ai_optimized',
             'shortName': 'short_name'
         };
 
@@ -1834,21 +1840,61 @@ export class SupabaseStorage {
 
     async createInvoiceTemplate(data: any): Promise<any> {
         const payload = this.toSnakeCase(data);
-        const { data: result, error } = await this.supabase.from('invoice_templates').insert(payload).select('*').single();
-        if (error) throw error;
-        return this.mapDates(result);
+        const insertPayload = { ...payload };
+
+        for (let attempt = 0; attempt < 4; attempt++) {
+            const { data: result, error } = await this.supabase
+                .from('invoice_templates')
+                .insert(insertPayload)
+                .select('*')
+                .single();
+
+            if (!error) {
+                return this.mapDates(result);
+            }
+
+            const missingColumnMatch = /Could not find the '([^']+)' column of 'invoice_templates' in the schema cache/i.exec(error.message || '');
+            const missingColumn = missingColumnMatch?.[1];
+            if (missingColumn && Object.prototype.hasOwnProperty.call(insertPayload, missingColumn)) {
+                console.warn(`[SupabaseStorage] Removing unknown invoice_templates column "${missingColumn}" and retrying insert`);
+                delete (insertPayload as any)[missingColumn];
+                continue;
+            }
+
+            throw error;
+        }
+
+        throw new Error('Failed to create invoice template after removing unknown columns');
     }
 
     async updateInvoiceTemplate(id: string, data: any): Promise<any> {
         const payload = this.toSnakeCase(data);
-        const { data: result, error } = await this.supabase
-            .from('invoice_templates')
-            .update({ ...payload, updated_at: new Date().toISOString() })
-            .eq('id', id)
-            .select('*')
-            .single();
-        if (error) throw error;
-        return this.mapDates(result);
+        const updatePayload = { ...payload, updated_at: new Date().toISOString() };
+
+        for (let attempt = 0; attempt < 4; attempt++) {
+            const { data: result, error } = await this.supabase
+                .from('invoice_templates')
+                .update(updatePayload)
+                .eq('id', id)
+                .select('*')
+                .single();
+
+            if (!error) {
+                return this.mapDates(result);
+            }
+
+            const missingColumnMatch = /Could not find the '([^']+)' column of 'invoice_templates' in the schema cache/i.exec(error.message || '');
+            const missingColumn = missingColumnMatch?.[1];
+            if (missingColumn && Object.prototype.hasOwnProperty.call(updatePayload, missingColumn)) {
+                console.warn(`[SupabaseStorage] Removing unknown invoice_templates column "${missingColumn}" and retrying update`);
+                delete (updatePayload as any)[missingColumn];
+                continue;
+            }
+
+            throw error;
+        }
+
+        throw new Error('Failed to update invoice template after removing unknown columns');
     }
 
     async listTagTemplates(filters: any = {}): Promise<any[]> {
@@ -1872,21 +1918,61 @@ export class SupabaseStorage {
 
     async createTagTemplate(data: any): Promise<any> {
         const payload = this.toSnakeCase(data);
-        const { data: result, error } = await this.supabase.from('tag_templates').insert(payload).select('*').single();
-        if (error) throw error;
-        return this.mapDates(result);
+        const insertPayload = { ...payload };
+
+        for (let attempt = 0; attempt < 4; attempt++) {
+            const { data: result, error } = await this.supabase
+                .from('tag_templates')
+                .insert(insertPayload)
+                .select('*')
+                .single();
+
+            if (!error) {
+                return this.mapDates(result);
+            }
+
+            const missingColumnMatch = /Could not find the '([^']+)' column of 'tag_templates' in the schema cache/i.exec(error.message || '');
+            const missingColumn = missingColumnMatch?.[1];
+            if (missingColumn && Object.prototype.hasOwnProperty.call(insertPayload, missingColumn)) {
+                console.warn(`[SupabaseStorage] Removing unknown tag_templates column "${missingColumn}" and retrying insert`);
+                delete (insertPayload as any)[missingColumn];
+                continue;
+            }
+
+            throw error;
+        }
+
+        throw new Error('Failed to create tag template after removing unknown columns');
     }
 
     async updateTagTemplate(id: string, data: any): Promise<any> {
         const payload = this.toSnakeCase(data);
-        const { data: result, error } = await this.supabase
-            .from('tag_templates')
-            .update({ ...payload, updated_at: new Date().toISOString() })
-            .eq('id', id)
-            .select('*')
-            .single();
-        if (error) throw error;
-        return this.mapDates(result);
+        const updatePayload = { ...payload, updated_at: new Date().toISOString() };
+
+        for (let attempt = 0; attempt < 4; attempt++) {
+            const { data: result, error } = await this.supabase
+                .from('tag_templates')
+                .update(updatePayload)
+                .eq('id', id)
+                .select('*')
+                .single();
+
+            if (!error) {
+                return this.mapDates(result);
+            }
+
+            const missingColumnMatch = /Could not find the '([^']+)' column of 'tag_templates' in the schema cache/i.exec(error.message || '');
+            const missingColumn = missingColumnMatch?.[1];
+            if (missingColumn && Object.prototype.hasOwnProperty.call(updatePayload, missingColumn)) {
+                console.warn(`[SupabaseStorage] Removing unknown tag_templates column "${missingColumn}" and retrying update`);
+                delete (updatePayload as any)[missingColumn];
+                continue;
+            }
+
+            throw error;
+        }
+
+        throw new Error('Failed to update tag template after removing unknown columns');
     }
 
     // ======= FRANCHISES =======
@@ -2035,9 +2121,37 @@ export class SupabaseStorage {
 
     // ======= DOCUMENTS =======
     async createDocument(data: any): Promise<any> {
-        const { data: document, error } = await this.supabase.from('documents').insert(this.toSnakeCase(data)).select().single();
-        if (error) throw error;
-        return this.mapDates(document);
+        const payload = this.toSnakeCase(data);
+        const attemptInsert = async (value: any) => {
+            const { data: document, error } = await this.supabase.from('documents').insert(value).select().single();
+            if (error) throw error;
+            return this.mapDates(document);
+        };
+
+        try {
+            return await attemptInsert(payload);
+        } catch (error: any) {
+            const message = String(error?.message || '');
+            const missingFilepathColumn = message.includes("'filepath' column") || message.includes("file_path");
+
+            if (!missingFilepathColumn) {
+                throw error;
+            }
+
+            const fallbackMetadata = {
+                ...((payload.metadata && typeof payload.metadata === 'object') ? payload.metadata : {}),
+                filepath: payload.filepath,
+            };
+
+            const fallbackPayload = {
+                ...payload,
+                metadata: fallbackMetadata,
+            };
+
+            delete fallbackPayload.filepath;
+
+            return await attemptInsert(fallbackPayload);
+        }
     }
 
     async listDocuments(filters: any = {}): Promise<any[]> {

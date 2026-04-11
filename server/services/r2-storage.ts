@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 const r2Endpoint = process.env.R2_ENDPOINT || (process.env.R2_ACCOUNT_ID
     ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
@@ -42,6 +42,35 @@ function buildPublicUrl(baseUrl: string, bucket: string, key: string): string {
     }
     const endpoint = r2Endpoint.replace(/\/$/, '');
     return `${endpoint}/${bucket}/${key}`;
+}
+
+function stripInvoicePublicPrefix(value: string): string | null {
+    if (!value) return null;
+
+    const normalized = value.trim();
+    if (!normalized) return null;
+
+    if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+        return normalized.replace(/^\/+/, '');
+    }
+
+    const knownPrefixes = [
+        invoicePublicBaseUrl,
+        `${r2Endpoint || ''}/${invoiceBucket}`,
+    ].filter(Boolean).map((prefix) => prefix.replace(/\/$/, ''));
+
+    for (const prefix of knownPrefixes) {
+        if (normalized.startsWith(prefix)) {
+            return normalized.slice(prefix.length).replace(/^\/+/, '');
+        }
+    }
+
+    try {
+        const parsed = new URL(normalized);
+        return parsed.pathname.replace(new RegExp(`^/${invoiceBucket}/?`), '').replace(/^\/+/, '');
+    } catch {
+        return null;
+    }
 }
 
 async function uploadBuffer(params: {
@@ -103,5 +132,20 @@ export const R2Storage = {
 
         return { key, url };
     },
-};
 
+    async deleteInvoiceObject(keyOrUrl: string): Promise<boolean> {
+        requireR2Config();
+
+        const key = stripInvoicePublicPrefix(keyOrUrl);
+        if (!key) {
+            return false;
+        }
+
+        await r2Client.send(new DeleteObjectCommand({
+            Bucket: invoiceBucket,
+            Key: key,
+        }));
+
+        return true;
+    },
+};

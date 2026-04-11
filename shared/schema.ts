@@ -139,6 +139,8 @@ export const orders = pgTable("orders", {
   // Bill / Invoice URL tracking
   invoiceUrl: text("invoice_url"),
   invoiceTemplateId: text("invoice_template_id"),
+  appliedTemplateId: uuid("applied_template_id"),
+  whatsappBillStatus: text("whatsapp_bill_status", { enum: ["pending", "sent", "failed"] }).default("pending"),
   tagTemplateId: text("tag_template_id"),
   // Tag printing tracking
   tagsPrinted: boolean("tags_printed").default(false),
@@ -294,6 +296,22 @@ export const userSettings = pgTable("user_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const invoiceTemplates = pgTable("invoice_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  templateKey: text("template_key").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  presetKey: text("preset_key").notNull(),
+  storeId: uuid("store_id"),
+  isAiOptimized: boolean("is_ai_optimized").default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  isDefault: boolean("is_default").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  config: jsonb("config").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const documents = pgTable("documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   type: text("type", { enum: ["invoice", "receipt", "report", "label", "other", "legal"] }).notNull().default("invoice"),
@@ -373,6 +391,8 @@ export const insertOrderSchema = z.object({
   lastWhatsappSentAt: z.coerce.date().optional().nullable(),
   whatsappMessageCount: z.number().optional().default(0),
   invoiceUrl: z.string().optional().nullable(),
+  appliedTemplateId: z.string().uuid().optional().nullable(),
+  whatsappBillStatus: z.enum(["pending", "sent", "failed"]).optional().default("pending"),
   tagsPrinted: z.coerce.boolean().optional().default(false),
   deliveryEarningsCalculated: z.number().optional().default(0),
   isCreditOrder: z.coerce.boolean().optional().default(false),
@@ -399,6 +419,7 @@ export const insertBarcodeSchema = createInsertSchema(barcodes);
 export const insertEmployeeSchema = createInsertSchema(employees);
 
 export const insertUserSettingsSchema = createInsertSchema(userSettings);
+export const insertInvoiceTemplateSchema = createInsertSchema(invoiceTemplates);
 
 export const insertDocumentSchema = createInsertSchema(documents);
 
@@ -435,6 +456,9 @@ export type Employee = typeof employees.$inferSelect;
 
 export type InsertUserSettings = z.infer<typeof insertUserSettingsSchema>;
 export type UserSettings = typeof userSettings.$inferSelect;
+
+export type InsertInvoiceTemplate = z.infer<typeof insertInvoiceTemplateSchema>;
+export type InvoiceTemplate = typeof invoiceTemplates.$inferSelect;
 
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;

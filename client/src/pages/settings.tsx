@@ -137,11 +137,13 @@ export default function SettingsPage() {
     description: '',
     presetKey: 'classic',
     storeId: null,
+    isAiOptimized: false,
     isActive: true,
     isDefault: false,
     sortOrder: 0,
     config: { ...DEFAULT_INVOICE_TEMPLATE_CONFIG },
   });
+  const [aiOptimizedTemplateDraft, setAiOptimizedTemplateDraft] = useState<Partial<InvoiceTemplateProfile> | null>(null);
   const [selectedTagTemplateId, setSelectedTagTemplateId] = useState<string>('new');
   const [tagTemplateDraft, setTagTemplateDraft] = useState<Partial<TagTemplateProfile>>({
     templateKey: '',
@@ -149,11 +151,13 @@ export default function SettingsPage() {
     description: '',
     layoutKey: 'thermal_compact',
     storeId: null,
+    isAiOptimized: false,
     isActive: true,
     isDefault: false,
     sortOrder: 0,
     config: { ...DEFAULT_TAG_TEMPLATE_CONFIG },
   });
+  const [aiOptimizedTagTemplateDraft, setAiOptimizedTagTemplateDraft] = useState<Partial<TagTemplateProfile> | null>(null);
 
   useEffect(() => {
     if (businessProfile) {
@@ -193,11 +197,13 @@ export default function SettingsPage() {
         description: '',
         presetKey: 'classic',
         storeId: null,
+        isAiOptimized: false,
         isActive: true,
         isDefault: false,
         sortOrder: invoiceTemplates.length + 1,
         config: { ...DEFAULT_INVOICE_TEMPLATE_CONFIG },
       });
+      setAiOptimizedTemplateDraft(null);
       return;
     }
 
@@ -207,6 +213,7 @@ export default function SettingsPage() {
         ...current,
         config: { ...DEFAULT_INVOICE_TEMPLATE_CONFIG, ...(current.config || {}) },
       });
+      setAiOptimizedTemplateDraft(null);
     }
   }, [selectedInvoiceTemplateId, invoiceTemplates]);
 
@@ -218,11 +225,13 @@ export default function SettingsPage() {
         description: '',
         layoutKey: 'thermal_compact',
         storeId: null,
+        isAiOptimized: false,
         isActive: true,
         isDefault: false,
         sortOrder: tagTemplates.length + 1,
         config: { ...DEFAULT_TAG_TEMPLATE_CONFIG },
       });
+      setAiOptimizedTagTemplateDraft(null);
       return;
     }
 
@@ -232,6 +241,7 @@ export default function SettingsPage() {
         ...current,
         config: { ...DEFAULT_TAG_TEMPLATE_CONFIG, ...(current.config || {}) },
       });
+      setAiOptimizedTagTemplateDraft(null);
     }
   }, [selectedTagTemplateId, tagTemplates]);
 
@@ -304,7 +314,30 @@ export default function SettingsPage() {
     },
     onSuccess: async (template) => {
       setSelectedInvoiceTemplateId(template.id || 'new');
+      setAiOptimizedTemplateDraft(null);
       await queryClient.invalidateQueries({ queryKey: ['invoice-templates-admin'] });
+    },
+  });
+
+  const optimizeInvoiceTemplate = useMutation({
+    mutationFn: async (payload: Partial<InvoiceTemplateProfile>) => businessConfigApi.optimizeInvoiceTemplate(payload),
+    onSuccess: (template) => {
+      setAiOptimizedTemplateDraft({
+        ...invoiceTemplateDraft,
+        ...template,
+        config: { ...DEFAULT_INVOICE_TEMPLATE_CONFIG, ...(template.config || {}) },
+      });
+      toast({
+        title: 'AI Version Ready',
+        description: 'Compare the manual and AI versions, then choose which one to save.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'AI Optimization Failed',
+        description: error.message || 'Could not optimize this template right now.',
+        variant: 'destructive',
+      });
     },
   });
 
@@ -316,7 +349,30 @@ export default function SettingsPage() {
     },
     onSuccess: async (template) => {
       setSelectedTagTemplateId(template.id || 'new');
+      setAiOptimizedTagTemplateDraft(null);
       await queryClient.invalidateQueries({ queryKey: ['tag-templates-admin'] });
+    },
+  });
+
+  const optimizeTagTemplate = useMutation({
+    mutationFn: async (payload: Partial<TagTemplateProfile>) => businessConfigApi.optimizeTagTemplate(payload),
+    onSuccess: (template) => {
+      setAiOptimizedTagTemplateDraft({
+        ...tagTemplateDraft,
+        ...template,
+        config: { ...DEFAULT_TAG_TEMPLATE_CONFIG, ...(template.config || {}) },
+      });
+      toast({
+        title: 'AI Tag Version Ready',
+        description: 'Compare the current and AI versions, then choose what to save.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'AI Tag Optimization Failed',
+        description: error.message || 'Could not optimize the tag template right now.',
+        variant: 'destructive',
+      });
     },
   });
 
@@ -395,6 +451,44 @@ export default function SettingsPage() {
     if (!storeId) return 'Global';
     const store = stores.find((entry) => entry.id === storeId);
     return store ? `${store.code} · ${store.name}` : 'Store';
+  };
+
+  const applyAiTemplateVersion = () => {
+    if (!aiOptimizedTemplateDraft) return;
+    setInvoiceTemplateDraft({
+      ...aiOptimizedTemplateDraft,
+      config: { ...DEFAULT_INVOICE_TEMPLATE_CONFIG, ...(aiOptimizedTemplateDraft.config || {}) },
+      isAiOptimized: true,
+    });
+    setAiOptimizedTemplateDraft(null);
+  };
+
+  const persistInvoiceTemplate = (setDefault: boolean) => {
+    saveInvoiceTemplate.mutate(invoiceTemplateProfileSchema.parse({
+      ...invoiceTemplateDraft,
+      isAiOptimized: invoiceTemplateDraft.isAiOptimized ?? false,
+      isDefault: setDefault ? true : (invoiceTemplateDraft.isDefault ?? false),
+      config: { ...DEFAULT_INVOICE_TEMPLATE_CONFIG, ...(invoiceTemplateDraft.config || {}) },
+    }));
+  };
+
+  const applyAiTagTemplateVersion = () => {
+    if (!aiOptimizedTagTemplateDraft) return;
+    setTagTemplateDraft({
+      ...aiOptimizedTagTemplateDraft,
+      config: { ...DEFAULT_TAG_TEMPLATE_CONFIG, ...(aiOptimizedTagTemplateDraft.config || {}) },
+      isAiOptimized: true,
+    });
+    setAiOptimizedTagTemplateDraft(null);
+  };
+
+  const persistTagTemplate = (setDefault: boolean) => {
+    saveTagTemplate.mutate(tagTemplateProfileSchema.parse({
+      ...tagTemplateDraft,
+      isAiOptimized: tagTemplateDraft.isAiOptimized ?? false,
+      isDefault: setDefault ? true : (tagTemplateDraft.isDefault ?? false),
+      config: { ...DEFAULT_TAG_TEMPLATE_CONFIG, ...(tagTemplateDraft.config || {}) },
+    }));
   };
 
   if (isLoading) {
@@ -720,6 +814,24 @@ export default function SettingsPage() {
                     <Label>Default Print Copies</Label>
                     <Input type="number" value={profileDraft.invoiceDefaults.defaultPrintCopies || 1} onChange={(e) => setProfileDraft({ ...profileDraft, invoiceDefaults: { ...profileDraft.invoiceDefaults, defaultPrintCopies: Number(e.target.value) || 1 } })} />
                   </div>
+                  <div className="md:col-span-2 flex items-center justify-between rounded-xl border p-4">
+                    <div className="space-y-1">
+                      <Label>Use Template-Based Invoices</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Keep this off to use the traditional FabZClean bill layout. Turn it on only when you want invoice presets and template profiles to drive generated bills.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={Boolean(profileDraft.invoiceDefaults.useTemplateBasedInvoices)}
+                      onCheckedChange={(checked) => setProfileDraft({
+                        ...profileDraft,
+                        invoiceDefaults: {
+                          ...profileDraft.invoiceDefaults,
+                          useTemplateBasedInvoices: checked,
+                        },
+                      })}
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label>Payment QR Label</Label>
                     <Input value={profileDraft.invoiceDefaults.paymentQrLabel || ''} onChange={(e) => setProfileDraft({ ...profileDraft, invoiceDefaults: { ...profileDraft.invoiceDefaults, paymentQrLabel: e.target.value } })} />
@@ -995,8 +1107,17 @@ export default function SettingsPage() {
               <div className="grid gap-6 xl:grid-cols-[340px_1fr_1fr]">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Invoice Templates</CardTitle>
-                    <CardDescription>Preset-based templates with safe switches and per-store defaults.</CardDescription>
+                    <div className="flex items-center justify-between gap-3">
+                      <CardTitle>Invoice Templates</CardTitle>
+                      <Badge variant={profileDraft?.invoiceDefaults.useTemplateBasedInvoices ? 'default' : 'outline'}>
+                        {profileDraft?.invoiceDefaults.useTemplateBasedInvoices ? 'Active' : 'Stored Only'}
+                      </Badge>
+                    </div>
+                    <CardDescription>
+                      {profileDraft?.invoiceDefaults.useTemplateBasedInvoices
+                        ? 'Template mode is enabled. The next generated invoice uses these profiles.'
+                        : 'Template mode is off. Bills keep the built-in normal or express design until Business Profile enables template-based invoices.'}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <Button variant={selectedInvoiceTemplateId === 'new' ? 'default' : 'outline'} className="w-full justify-start" onClick={() => setSelectedInvoiceTemplateId('new')}>
@@ -1011,7 +1132,10 @@ export default function SettingsPage() {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <p className="font-semibold">{template.name}</p>
-                          {template.isDefault && <Badge variant="secondary">Default</Badge>}
+                          <div className="flex items-center gap-2">
+                            {template.isAiOptimized && <Badge variant="outline">AI</Badge>}
+                            {template.isDefault && <Badge variant="secondary">Default</Badge>}
+                          </div>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">{template.presetKey} · {selectedStoreLabel(template.storeId)}</p>
                       </button>
@@ -1050,6 +1174,35 @@ export default function SettingsPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => optimizeInvoiceTemplate.mutate({
+                          ...invoiceTemplateDraft,
+                          config: { ...DEFAULT_INVOICE_TEMPLATE_CONFIG, ...(invoiceTemplateDraft.config || {}) },
+                        })}
+                        disabled={optimizeInvoiceTemplate.isPending}
+                      >
+                        {optimizeInvoiceTemplate.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                        AI Optimize
+                      </Button>
+                      {aiOptimizedTemplateDraft && (
+                        <>
+                          <Button type="button" variant="outline" onClick={applyAiTemplateVersion}>
+                            Use AI Version
+                          </Button>
+                          <Button type="button" variant="ghost" onClick={() => setAiOptimizedTemplateDraft(null)}>
+                            Keep Manual
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    {aiOptimizedTemplateDraft && (
+                      <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
+                        AI generated an alternate version of this template. Compare both previews on the right, then apply the one you want to save.
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label>Scope</Label>
                       <Select value={invoiceTemplateDraft.storeId || 'global'} onValueChange={(value) => setInvoiceTemplateDraft({ ...invoiceTemplateDraft, storeId: value === 'global' ? null : value })}>
@@ -1101,10 +1254,14 @@ export default function SettingsPage() {
                       <Label>Default Template</Label>
                       <Switch checked={invoiceTemplateDraft.isDefault ?? false} onCheckedChange={(checked) => setInvoiceTemplateDraft({ ...invoiceTemplateDraft, isDefault: checked })} />
                     </div>
-                    <div className="flex justify-end">
-                      <Button onClick={() => saveInvoiceTemplate.mutate(invoiceTemplateProfileSchema.parse(invoiceTemplateDraft))} disabled={saveInvoiceTemplate.isPending}>
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="outline" onClick={() => persistInvoiceTemplate(true)} disabled={saveInvoiceTemplate.isPending}>
                         {saveInvoiceTemplate.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                        Save Invoice Template
+                        Save & Set Default
+                      </Button>
+                      <Button type="button" onClick={() => persistInvoiceTemplate(false)} disabled={saveInvoiceTemplate.isPending}>
+                        {saveInvoiceTemplate.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                        Save Template
                       </Button>
                     </div>
                   </CardContent>
@@ -1113,16 +1270,61 @@ export default function SettingsPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>Live Preview</CardTitle>
-                    <CardDescription>Preview scales down here, but the generated PDF keeps full size.</CardDescription>
+                    <CardDescription>
+                      {aiOptimizedTemplateDraft
+                        ? 'Manual and AI variants are shown side by side. The generated PDF keeps full size.'
+                        : 'Preview scales down here, but the generated PDF keeps full size.'}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="overflow-auto">
-                    <div className="origin-top-left scale-[0.52] w-[190%]">
-                      <InvoiceTemplateIN
-                        data={invoicePreviewData as any}
-                        preset={(invoiceTemplateDraft.presetKey || 'classic') as any}
-                        config={invoiceTemplateDraft.config}
-                      />
-                    </div>
+                    {aiOptimizedTemplateDraft ? (
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        <div className="rounded-xl border p-3">
+                          <div className="mb-3 flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold">Manual Version</p>
+                              <p className="text-xs text-muted-foreground">{invoiceTemplateDraft.presetKey || 'classic'}</p>
+                            </div>
+                            <Badge variant="secondary">Current</Badge>
+                          </div>
+                          <div className="overflow-auto">
+                            <div className="origin-top-left scale-[0.42] w-[235%]">
+                              <InvoiceTemplateIN
+                                data={invoicePreviewData as any}
+                                preset={(invoiceTemplateDraft.presetKey || 'classic') as any}
+                                config={invoiceTemplateDraft.config}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-primary/20 p-3">
+                          <div className="mb-3 flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold">AI Optimized Version</p>
+                              <p className="text-xs text-muted-foreground">{aiOptimizedTemplateDraft.presetKey || 'classic'}</p>
+                            </div>
+                            <Badge variant="outline">AI</Badge>
+                          </div>
+                          <div className="overflow-auto">
+                            <div className="origin-top-left scale-[0.42] w-[235%]">
+                              <InvoiceTemplateIN
+                                data={invoicePreviewData as any}
+                                preset={(aiOptimizedTemplateDraft.presetKey || 'classic') as any}
+                                config={aiOptimizedTemplateDraft.config}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="origin-top-left scale-[0.52] w-[190%]">
+                        <InvoiceTemplateIN
+                          data={invoicePreviewData as any}
+                          preset={(invoiceTemplateDraft.presetKey || 'classic') as any}
+                          config={invoiceTemplateDraft.config}
+                        />
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -1150,7 +1352,10 @@ export default function SettingsPage() {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <p className="font-semibold">{template.name}</p>
-                          {template.isDefault && <Badge variant="secondary">Default</Badge>}
+                          <div className="flex items-center gap-2">
+                            {template.isAiOptimized && <Badge variant="outline">AI</Badge>}
+                            {template.isDefault && <Badge variant="secondary">Default</Badge>}
+                          </div>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">{selectedStoreLabel(template.storeId)}</p>
                       </button>
@@ -1176,6 +1381,35 @@ export default function SettingsPage() {
                       <Label>Description</Label>
                       <Input value={tagTemplateDraft.description || ''} onChange={(e) => setTagTemplateDraft({ ...tagTemplateDraft, description: e.target.value })} />
                     </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => optimizeTagTemplate.mutate({
+                          ...tagTemplateDraft,
+                          config: { ...DEFAULT_TAG_TEMPLATE_CONFIG, ...(tagTemplateDraft.config || {}) },
+                        })}
+                        disabled={optimizeTagTemplate.isPending}
+                      >
+                        {optimizeTagTemplate.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                        AI Optimize
+                      </Button>
+                      {aiOptimizedTagTemplateDraft && (
+                        <>
+                          <Button type="button" variant="outline" onClick={applyAiTagTemplateVersion}>
+                            Use AI Version
+                          </Button>
+                          <Button type="button" variant="ghost" onClick={() => setAiOptimizedTagTemplateDraft(null)}>
+                            Keep Current
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    {aiOptimizedTagTemplateDraft && (
+                      <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
+                        AI generated an alternate tag configuration focused on compact thermal readability.
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label>Scope</Label>
                       <Select value={tagTemplateDraft.storeId || 'global'} onValueChange={(value) => setTagTemplateDraft({ ...tagTemplateDraft, storeId: value === 'global' ? null : value })}>
@@ -1217,8 +1451,12 @@ export default function SettingsPage() {
                       <Label>Default Template</Label>
                       <Switch checked={tagTemplateDraft.isDefault ?? false} onCheckedChange={(checked) => setTagTemplateDraft({ ...tagTemplateDraft, isDefault: checked })} />
                     </div>
-                    <div className="flex justify-end">
-                      <Button onClick={() => saveTagTemplate.mutate(tagTemplateProfileSchema.parse(tagTemplateDraft))} disabled={saveTagTemplate.isPending}>
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="outline" onClick={() => persistTagTemplate(true)} disabled={saveTagTemplate.isPending}>
+                        {saveTagTemplate.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                        Save & Set Default
+                      </Button>
+                      <Button type="button" onClick={() => persistTagTemplate(false)} disabled={saveTagTemplate.isPending}>
                         {saveTagTemplate.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                         Save Tag Template
                       </Button>
@@ -1229,13 +1467,55 @@ export default function SettingsPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>Tag Preview</CardTitle>
-                    <CardDescription>Preview uses the same thermal layout renderer as printing.</CardDescription>
+                    <CardDescription>
+                      {aiOptimizedTagTemplateDraft
+                        ? 'Current and AI variants are shown side by side using the same thermal renderer as printing.'
+                        : 'Preview uses the same thermal layout renderer as printing.'}
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="flex justify-center rounded-xl bg-neutral-900 p-4">
-                    <div className="space-y-3">
-                      {sampleTag ? <ThermalTagLabel tag={sampleTag} /> : <p className="text-sm text-muted-foreground">No tag preview</p>}
-                      <p className="text-xs text-slate-300">Preview warnings: hidden fields are removed, missing optional data falls back safely, and long notes are clipped.</p>
-                    </div>
+                  <CardContent className="rounded-xl bg-neutral-900 p-4">
+                    {aiOptimizedTagTemplateDraft ? (
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        <div className="space-y-3 rounded-xl border border-white/10 p-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-semibold text-white">Current Version</p>
+                            <Badge variant="secondary">Current</Badge>
+                          </div>
+                          <div className="flex justify-center">
+                            {sampleTag ? <ThermalTagLabel tag={sampleTag} /> : <p className="text-sm text-muted-foreground">No tag preview</p>}
+                          </div>
+                        </div>
+                        <div className="space-y-3 rounded-xl border border-primary/30 p-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-semibold text-white">AI Optimized Version</p>
+                            <Badge variant="outline">AI</Badge>
+                          </div>
+                          <div className="flex justify-center">
+                            <ThermalTagLabel tag={prepareThermalTags({
+                              orderNumber: 'FZC-2026POL0001A',
+                              customerName: 'Sample Customer',
+                              storeCode: 'POL',
+                              billDate: new Date().toISOString(),
+                              dueDate: new Date().toISOString(),
+                              templateConfig: aiOptimizedTagTemplateDraft.config,
+                              items: [
+                                {
+                                  orderNumber: 'FZC-2026POL0001A',
+                                  serviceName: 'Silk Saree',
+                                  quantity: 1,
+                                  tagNote: 'Handle gently',
+                                },
+                              ],
+                            })[0]} />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {sampleTag ? <ThermalTagLabel tag={sampleTag} /> : <p className="text-sm text-muted-foreground">No tag preview</p>}
+                      </div>
+                    )}
+                    <p className="mt-3 text-xs text-slate-300">Preview warnings: hidden fields are removed, missing optional data falls back safely, and long notes are clipped.</p>
                   </CardContent>
                 </Card>
               </div>

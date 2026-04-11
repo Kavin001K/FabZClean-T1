@@ -10,13 +10,26 @@ const documentsDir = path.join(process.cwd(), 'server', 'uploads', 'documents');
 
 const router = Router();
 
+const serializeError = (error: unknown) => {
+    if (error instanceof Error) {
+        return error.message;
+    }
+    try {
+        return JSON.stringify(error);
+    } catch {
+        return String(error);
+    }
+};
+
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
         fileSize: 50 * 1024 * 1024, // 50MB limit
     },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype === 'application/pdf') {
+        const isPdfMime = file.mimetype === 'application/pdf' || file.mimetype === 'application/octet-stream';
+        const isPdfName = /\.pdf$/i.test(file.originalname || '');
+        if (isPdfMime || isPdfName) {
             cb(null, true);
         } else {
             cb(new Error('Only PDF files are allowed'));
@@ -105,18 +118,42 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             res.json({
                 success: true,
                 document,
+                fileUrl,
+                filepath,
                 storageUsed,
                 message: 'Document uploaded successfully',
             });
         } catch (dbError) {
             console.error('Database insert error:', dbError);
-            return res.status(500).json({ error: 'Failed to save document record', details: dbError instanceof Error ? dbError.message : String(dbError) });
+
+            if ((type === 'invoice' || !type) && (metadata as any).orderNumber) {
+                try {
+                    const orderNum = (metadata as any).orderNumber;
+                    const orders = await db.listOrders();
+                    const order = orders.find((o: any) => o.orderNumber === orderNum);
+                    if (order) {
+                        await db.updateOrder(order.id, { invoiceUrl: fileUrl } as any);
+                        console.log(`🔗 [Documents] Linked invoice URL to order without document row: ${orderNum}`);
+                    }
+                } catch (linkErr) {
+                    console.warn('[Documents] Failed to link invoice URL after document row error:', linkErr);
+                }
+            }
+
+            return res.json({
+                success: true,
+                warning: 'Document file uploaded, but metadata row could not be saved.',
+                fileUrl,
+                filepath,
+                storageUsed,
+                details: serializeError(dbError),
+            });
         }
     } catch (error) {
         console.error('Document upload error:', error);
         res.status(500).json({
             error: 'Failed to upload document',
-            details: error instanceof Error ? error.message : 'Unknown error'
+            details: serializeError(error),
         });
     }
 });

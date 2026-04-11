@@ -81,6 +81,7 @@ export const invoiceDefaultsSchema = z.object({
   defaultDueDays: z.number().int().min(0).max(365).default(2),
   defaultPickupWording: z.string().optional().default("Pickup"),
   defaultPrintCopies: z.number().int().min(1).max(10).default(1),
+  useTemplateBasedInvoices: z.boolean().default(false),
   logoUrl: z.string().optional().default(""),
   showLogo: z.boolean().default(true),
   showStoreAddress: z.boolean().default(true),
@@ -144,6 +145,7 @@ export const invoiceTemplateProfileSchema = z.object({
   description: z.string().optional().default(""),
   presetKey: z.enum(invoiceTemplatePresetKeys),
   storeId: z.string().optional().nullable(),
+  isAiOptimized: z.boolean().default(false),
   isActive: z.boolean().default(true),
   isDefault: z.boolean().default(false),
   sortOrder: z.number().int().default(0),
@@ -161,6 +163,7 @@ export const tagTemplateProfileSchema = z.object({
   description: z.string().optional().default(""),
   layoutKey: z.enum(tagTemplateLayoutKeys).default("thermal_compact"),
   storeId: z.string().optional().nullable(),
+  isAiOptimized: z.boolean().default(false),
   isActive: z.boolean().default(true),
   isDefault: z.boolean().default(false),
   sortOrder: z.number().int().default(0),
@@ -175,6 +178,8 @@ export interface InvoiceSnapshot {
   businessProfile: BusinessProfile | null;
   store: StoreConfig | null;
   template: InvoiceTemplateProfile | null;
+  rendererMode: "standard" | "template";
+  variantKey: string;
   generatedAt: string;
   orderSummary: {
     orderId?: string;

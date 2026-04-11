@@ -34,11 +34,6 @@ router.get('/invoice/:orderNumber', async (req: Request, res: Response) => {
 
         console.log(`[Invoice] Generating invoice for order: ${orderNumber}`);
 
-        const latestDocument = await findLatestInvoiceDocument(orderNumber);
-        if (latestDocument?.fileUrl) {
-            return res.redirect(latestDocument.fileUrl);
-        }
-
         // Find the order
         const orders = await storage.listOrders();
         const searchTerm = orderNumber.trim().replace(/^#/, '').toLowerCase();
@@ -54,13 +49,30 @@ router.get('/invoice/:orderNumber', async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Order not found' });
         }
 
+        if ((order as any).invoiceUrl) {
+            return res.redirect((order as any).invoiceUrl);
+        }
+
+        const latestDocument = await findLatestInvoiceDocument(orderNumber);
+        if (latestDocument?.fileUrl) {
+            return res.redirect(latestDocument.fileUrl);
+        }
+
         const o: any = order;
+        let hydratedCustomer: any = null;
+        if (o.customerId || o.customer_id) {
+            try {
+                hydratedCustomer = await storage.getCustomer(o.customerId || o.customer_id);
+            } catch (customerError) {
+                console.warn('[Invoice] Failed to hydrate customer from database:', customerError);
+            }
+        }
         const mappedOrder: any = {
             ...o,
             orderNumber: o.order_number || o.orderNumber,
-            customerName: o.customer_name || o.customerName,
-            customerPhone: o.customer_phone || o.customerPhone,
-            customerAddress: o.customerAddress || o.customer_address,
+            customerName: hydratedCustomer?.name || o.customer_name || o.customerName,
+            customerPhone: hydratedCustomer?.phone || o.customer_phone || o.customerPhone,
+            customerAddress: hydratedCustomer?.address || o.customerAddress || o.customer_address,
             createdAt: o.created_at || o.createdAt,
             items: (o.items || []).map((item: any) => ({
                 ...item,

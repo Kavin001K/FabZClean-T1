@@ -7,6 +7,7 @@ import {
     getTemplateForSendCount,
     MAX_RESENDS,
 } from "../services/whatsapp.service";
+import { processOrderBillingPipeline } from "../services/order-invoice.service";
 import { smartItemSummary } from "../utils/item-summarizer";
 import { storage } from "../storage";
 
@@ -148,6 +149,18 @@ router.post("/send-bill", async (req, res) => {
         matchedOrder = allOrders.find((order: any) =>
             String(order.orderNumber || '') === String(orderId || '')
         );
+
+        if (matchedOrder?.id) {
+            const billingResult = await processOrderBillingPipeline(matchedOrder.id);
+            return res.status(billingResult.success ? 200 : 500).json({
+                success: billingResult.success,
+                error: billingResult.error,
+                invoiceUrl: billingResult.invoiceUrl || null,
+                message: billingResult.success
+                    ? 'WhatsApp order confirmation sent successfully'
+                    : 'Failed to regenerate and send the invoice',
+            });
+        }
 
         if (!resolvedPdfUrl) {
             try {

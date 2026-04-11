@@ -4,6 +4,7 @@ import { routeOptimizationService } from '../../services/route-optimization.serv
 import { paginationService } from '../../services/pagination.service';
 import { 
   adminLoginRequired, 
+  jwtRequired,
   rateLimit,
   validateInput 
 } from '../../middleware/auth';
@@ -12,11 +13,18 @@ import {
   createSuccessResponse 
 } from '../../services/serialization';
 import { z } from 'zod';
+import {
+  DEFAULT_INVOICE_TEMPLATE_CONFIG,
+  DEFAULT_TAG_TEMPLATE_CONFIG,
+  invoiceTemplateProfileSchema,
+  tagTemplateProfileSchema,
+} from '../../../shared/business-config';
 
 const router = Router();
 
 // Apply rate limiting
 router.use(rateLimit(60000, 100));
+router.use(jwtRequired);
 
 // Route optimization schema
 const routeOptimizationSchema = z.object({
@@ -50,6 +58,70 @@ const routeOptimizationSchema = z.object({
     algorithm: z.enum(['tsp', 'vrp', 'genetic']).optional()
   }).optional()
 });
+
+const invoiceTemplateOptimizationSchema = z.object({
+  template: z.record(z.any()),
+});
+
+const tagTemplateOptimizationSchema = z.object({
+  template: z.record(z.any()),
+});
+
+const extractJsonPayload = (value: string): string => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    throw new Error('AI returned an empty response');
+  }
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) {
+    return fenced[1].trim();
+  }
+
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return trimmed.slice(firstBrace, lastBrace + 1);
+  }
+
+  return trimmed;
+};
+
+const cleanOptionalString = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  return normalized ? normalized : undefined;
+};
+
+const slugifyTemplateKey = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'template';
+
+const invoicePresetLabel = (presetKey: unknown): string => {
+  switch (presetKey) {
+    case 'modern':
+      return 'Modern Invoice';
+    case 'compact':
+      return 'Compact Invoice';
+    case 'express':
+      return 'Express Bill';
+    case 'edited':
+      return 'Edited Order Bill';
+    default:
+      return 'Classic Invoice';
+  }
+};
+
+const tagLayoutLabel = (layoutKey: unknown): string => {
+  switch (layoutKey) {
+    case 'thermal_detailed':
+      return 'Detailed Tag';
+    default:
+      return 'Thermal Tag';
+  }
+};
 
 // Route optimization endpoint
 router.post('/optimize-route', adminLoginRequired, validateInput(routeOptimizationSchema), async (req, res) => {
@@ -88,6 +160,196 @@ router.post('/route-preview', adminLoginRequired, async (req, res) => {
   } catch (error) {
     console.error('Route preview error:', error);
     res.status(500).json(createErrorResponse('Route preview failed', 500));
+  }
+});
+
+router.post('/invoice-template-optimize', adminLoginRequired, async (req, res) => {
+  try {
+    const parsed = invoiceTemplateOptimizationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json(createErrorResponse('Template payload is required', 400, parsed.error.flatten()));
+    }
+
+    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
+    if (!geminiApiKey) {
+      return res.status(503).json(createErrorResponse('Gemini is not configured on this server', 503));
+    }
+
+    const rawTemplate = parsed.data.template || {};
+    const baseTemplate = invoiceTemplateProfileSchema.partial().parse({
+      ...rawTemplate,
+      templateKey: cleanOptionalString((rawTemplate as any)?.templateKey),
+      name: cleanOptionalString((rawTemplate as any)?.name),
+      description: cleanOptionalString((rawTemplate as any)?.description) ?? '',
+      config: {
+        ...DEFAULT_INVOICE_TEMPLATE_CONFIG,
+        ...((rawTemplate as any)?.config || {}),
+      },
+    });
+
+    const prompt = [
+      'Optimize this invoice layout configuration for A4 and thermal-printer readability.',
+      'Prioritize brand visibility, clear customer details, and strong grand-total emphasis.',
+      'Keep the response as JSON only, with this shape:',
+      '{"name":"...", "description":"...", "presetKey":"classic|modern|compact|express|edited", "config":{...}}',
+      'Do not include markdown fences or explanations.',
+      `Current template JSON: ${JSON.stringify(baseTemplate)}`,
+    ].join('\n');
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            role: 'user',
+            parts: [{ text: prompt }],
+          }],
+          generationConfig: {
+            temperature: 0.2,
+            responseMimeType: 'application/json',
+          },
+        }),
+      }
+    );
+
+    const raw = await response.text();
+    if (!response.ok) {
+      return res.status(502).json(createErrorResponse(`Gemini request failed: ${raw || response.statusText}`, 502));
+    }
+
+    const envelope = JSON.parse(raw);
+    const aiText = envelope?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || '').join('') || '';
+    const optimizedPayload = JSON.parse(extractJsonPayload(aiText));
+    const mergedPresetKey = (optimizedPayload?.presetKey || baseTemplate.presetKey || 'classic') as 'classic' | 'modern' | 'compact' | 'express' | 'edited';
+    const mergedName = cleanOptionalString(optimizedPayload?.name) || baseTemplate.name || invoicePresetLabel(mergedPresetKey);
+    const mergedDescription = cleanOptionalString(optimizedPayload?.description) || baseTemplate.description || `AI optimized ${mergedName.toLowerCase()} layout`;
+    const mergedTemplateKey = cleanOptionalString((rawTemplate as any)?.templateKey)
+      || baseTemplate.templateKey
+      || slugifyTemplateKey(mergedName);
+
+    const optimizedTemplate = invoiceTemplateProfileSchema.parse({
+      ...baseTemplate,
+      ...optimizedPayload,
+      templateKey: mergedTemplateKey,
+      name: mergedName,
+      description: mergedDescription,
+      presetKey: mergedPresetKey,
+      isAiOptimized: true,
+      config: {
+        ...DEFAULT_INVOICE_TEMPLATE_CONFIG,
+        ...(baseTemplate.config || {}),
+        ...(optimizedPayload?.config || {}),
+      },
+    });
+
+    res.json(createSuccessResponse({ template: optimizedTemplate }, 'Invoice template optimized'));
+  } catch (error: any) {
+    console.error('Invoice template optimization error:', error);
+    const message = Array.isArray(error?.issues)
+      ? error.issues.map((issue: any) => issue?.message).filter(Boolean).join(', ')
+      : error.message || 'Failed to optimize invoice template';
+    res.status(500).json(createErrorResponse(message, 500));
+  }
+});
+
+router.post('/tag-template-optimize', adminLoginRequired, async (req, res) => {
+  try {
+    const parsed = tagTemplateOptimizationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json(createErrorResponse('Template payload is required', 400, parsed.error.flatten()));
+    }
+
+    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
+    if (!geminiApiKey) {
+      return res.status(503).json(createErrorResponse('Gemini is not configured on this server', 503));
+    }
+
+    const rawTemplate = parsed.data.template || {};
+    const baseTemplate = tagTemplateProfileSchema.partial().parse({
+      ...rawTemplate,
+      templateKey: cleanOptionalString((rawTemplate as any)?.templateKey),
+      name: cleanOptionalString((rawTemplate as any)?.name),
+      description: cleanOptionalString((rawTemplate as any)?.description) ?? '',
+      config: {
+        ...DEFAULT_TAG_TEMPLATE_CONFIG,
+        ...((rawTemplate as any)?.config || {}),
+      },
+    });
+
+    const prompt = [
+      'Optimize this garment tag configuration for thermal-printer readability.',
+      'Prioritize quick scanning, visible order number, compact customer identity, and reduced clutter.',
+      'Keep the response as JSON only, with this shape:',
+      '{"name":"...", "description":"...", "layoutKey":"thermal_compact", "config":{...}}',
+      'Do not include markdown fences or explanations.',
+      `Current template JSON: ${JSON.stringify(baseTemplate)}`,
+    ].join('\n');
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            role: 'user',
+            parts: [{ text: prompt }],
+          }],
+          generationConfig: {
+            temperature: 0.2,
+            responseMimeType: 'application/json',
+          },
+        }),
+      }
+    );
+
+    const raw = await response.text();
+    if (!response.ok) {
+      return res.status(502).json(createErrorResponse(`Gemini request failed: ${raw || response.statusText}`, 502));
+    }
+
+    const envelope = JSON.parse(raw);
+    const aiText = envelope?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || '').join('') || '';
+    const optimizedPayload = JSON.parse(extractJsonPayload(aiText));
+    const mergedLayoutKey = (optimizedPayload?.layoutKey || baseTemplate.layoutKey || 'thermal_compact') as 'thermal_compact' | 'thermal_detailed';
+    const mergedName = cleanOptionalString(optimizedPayload?.name) || baseTemplate.name || tagLayoutLabel(mergedLayoutKey);
+    const mergedDescription = cleanOptionalString(optimizedPayload?.description) || baseTemplate.description || `AI optimized ${mergedName.toLowerCase()} layout`;
+    const mergedTemplateKey = cleanOptionalString((rawTemplate as any)?.templateKey)
+      || baseTemplate.templateKey
+      || slugifyTemplateKey(mergedName);
+
+    const optimizedTemplate = tagTemplateProfileSchema.parse({
+      ...baseTemplate,
+      ...optimizedPayload,
+      templateKey: mergedTemplateKey,
+      name: mergedName,
+      description: mergedDescription,
+      layoutKey: mergedLayoutKey,
+      isAiOptimized: true,
+      config: {
+        ...DEFAULT_TAG_TEMPLATE_CONFIG,
+        ...(baseTemplate.config || {}),
+        ...(optimizedPayload?.config || {}),
+      },
+    });
+
+    res.json(createSuccessResponse({ template: optimizedTemplate }, 'Tag template optimized'));
+  } catch (error: any) {
+    console.error('Tag template optimization error:', error);
+    const message = Array.isArray(error?.issues)
+      ? error.issues.map((issue: any) => issue?.message).filter(Boolean).join(', ')
+      : error.message || 'Failed to optimize tag template';
+    res.status(500).json(createErrorResponse(message, 500));
   }
 });
 

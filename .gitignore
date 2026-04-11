@@ -53,6 +53,7 @@ server/secure_data/
 *.tmp
 *.temp
 *~
+server/uploads/tmp_invoices/
 
 # OS files
 Thumbs.db

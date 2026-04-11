@@ -195,8 +195,9 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
     ...(config || {}),
   };
   const franchise = getFranchiseById(franchiseId);
-  const isEditedInvoice = preset === 'edited' || isUpdate;
-  const visualPreset: InvoiceTemplatePresetKey = isEditedInvoice
+  const usesEditedVisual = preset === 'edited';
+  const isEditedInvoice = usesEditedVisual || isUpdate;
+  const visualPreset: InvoiceTemplatePresetKey = usesEditedVisual
     ? 'edited'
     : (preset === 'express' || isExpressOrder ? 'express' : preset);
   const presetVisuals: Record<InvoiceTemplatePresetKey, {
@@ -303,17 +304,17 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
   ];
   const documentTitle = visualPreset === 'express'
     ? 'Express Bill'
-    : isEditedInvoice
+    : usesEditedVisual
       ? 'Edited Order Bill'
       : 'Invoice';
   const heroTitle = visualPreset === 'express'
     ? 'Priority processing enabled'
-    : isEditedInvoice
+    : usesEditedVisual
       ? 'Latest approved revision'
       : 'Ready for billing and collection';
   const heroCopy = visualPreset === 'express'
     ? 'Fast-turnaround handling is reflected on this bill. Pickup timing and totals already include express service uplift.'
-    : isEditedInvoice
+    : usesEditedVisual
       ? 'This document supersedes the previous bill for the same order and reflects the latest confirmed order changes.'
       : 'This preset keeps billing clean, branded, and easy to scan at the counter.';
 
@@ -481,7 +482,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                         padding: '5px 10px',
                         borderRadius: '999px',
                         background: 'rgba(255,255,255,0.92)',
-                        color: '#6d28d9',
+                        color: usesEditedVisual ? '#6d28d9' : accent,
                         fontSize: '10px',
                         fontWeight: 900,
                         textTransform: 'uppercase',
@@ -520,7 +521,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
             </div>
           </header>
 
-          {(visualPreset === 'express' || isEditedInvoice) && (
+          {(visualPreset === 'express' || usesEditedVisual) && (
             <section className="invoice-section" style={{ padding: '14px 18px 0' }}>
               <div
                 className="invoice-card"
@@ -857,7 +858,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData; preset?: InvoiceTemplateP
                     </div>
                   </div>
                 )}
-                {isEditedInvoice && (
+                {usesEditedVisual && (
                   <div
                     style={{
                       position: 'absolute',
