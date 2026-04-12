@@ -725,6 +725,7 @@ router.post(
           orderData.customerName = customer.name || orderData.customerName;
           orderData.customerEmail = customer.email || orderData.customerEmail || null;
           orderData.customerPhone = customer.phone || orderData.customerPhone || null;
+          orderData.secondaryPhone = (customer as any).secondaryPhone || orderData.secondaryPhone || null;
           const totalAmount = parseAmount(orderData.totalAmount);
           const walletBalance = parseAmount((customer as any).walletBalanceCache || '0');
           const projectedWalletCover = useWalletAtCreate

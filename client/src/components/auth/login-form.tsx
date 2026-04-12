@@ -7,6 +7,7 @@ import { Label } from '../ui/label';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Loader2, User, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { mergeUserSettings, readStoredUserSettings, resolveLandingPage } from '@/lib/user-settings';
+import { handleFormEnterNavigation } from '@/lib/enter-navigation';
 
 export const LoginForm: React.FC = () => {
   const [, setLocation] = useLocation();
@@ -103,7 +104,7 @@ export const LoginForm: React.FC = () => {
             <p className="text-slate-400 text-sm mt-1">Sign in to your employee account</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} onKeyDownCapture={handleFormEnterNavigation} className="space-y-5">
             {error && (
               <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-300">
                 <AlertCircle className="h-4 w-4" />

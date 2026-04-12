@@ -16,6 +16,7 @@ export interface SendInvoiceParams {
 export interface SendResult {
     success: boolean;
     error?: string;
+    warning?: string;
     templateUsed?: string;
     newSendCount?: number;
     canResendAgain?: boolean;
@@ -77,6 +78,7 @@ export class WhatsAppService {
         billUrl: string,
         pdfUrl?: string,
         mainItem?: string,
+        secondaryPhone?: string,
         sendCount: number = 0
     ): Promise<SendResult> {
         try {
@@ -98,6 +100,7 @@ export class WhatsAppService {
                 body: JSON.stringify({
                     customerName,
                     customerPhone: phone,
+                    secondaryPhone,
                     orderId: orderNumber,
                     amount: totalAmount,
                     pdfUrl,
@@ -120,6 +123,7 @@ export class WhatsAppService {
 
             return {
                 success: result.success,
+                warning: result.warning,
                 templateUsed: result.templateUsed,
                 newSendCount: result.newSendCount,
                 canResendAgain: result.canResendAgain,

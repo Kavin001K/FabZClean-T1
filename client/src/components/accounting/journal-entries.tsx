@@ -54,6 +54,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
+import { handleFormEnterNavigation } from '@/lib/enter-navigation';
 import { format } from 'date-fns';
 import { formatINR } from '@/lib/format';
 
@@ -436,7 +437,7 @@ function JournalEntryDialog({ open, onOpenChange, onSubmit, accounts }: JournalE
           <DialogTitle>Create Journal Entry</DialogTitle>
           <DialogDescription>Add a new journal entry with debits and credits</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDownCapture={handleFormEnterNavigation}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>

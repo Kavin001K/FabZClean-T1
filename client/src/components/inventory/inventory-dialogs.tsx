@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { handleFormEnterNavigation } from '@/lib/enter-navigation';
 import type { InventoryItem } from '@/lib/data-service';
 
 // Form validation schemas
@@ -152,7 +153,7 @@ export const InventoryDialogs: React.FC<InventoryDialogsProps> = React.memo(({
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={editForm.handleSubmit(handleEditSubmit)} className="space-y-4">
+          <form onSubmit={editForm.handleSubmit(handleEditSubmit)} onKeyDownCapture={handleFormEnterNavigation} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="edit-name">Item Name *</Label>
               <Input
@@ -309,7 +310,7 @@ export const InventoryDialogs: React.FC<InventoryDialogsProps> = React.memo(({
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={createForm.handleSubmit(handleCreateSubmit)} className="space-y-4">
+          <form onSubmit={createForm.handleSubmit(handleCreateSubmit)} onKeyDownCapture={handleFormEnterNavigation} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="create-name">Item Name *</Label>
               <Input

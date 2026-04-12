@@ -43,6 +43,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { handleFormEnterNavigation } from "@/lib/enter-navigation";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { analyticsApi, ordersApi, customersApi, employeesApi, formatCurrency } from '@/lib/data-service';
@@ -620,7 +621,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
                               Create a new customer profile for order management.
                             </DialogDescription>
                           </DialogHeader>
-                          <form onSubmit={handleSaveCustomer} className="py-4 space-y-4" aria-label="Add new customer form">
+                          <form onSubmit={handleSaveCustomer} onKeyDownCapture={handleFormEnterNavigation} className="py-4 space-y-4" aria-label="Add new customer form">
                             <div>
                               <Label htmlFor="customerName">Name</Label>
                               <Input
@@ -718,7 +719,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
                               Register a new employee in the system.
                             </DialogDescription>
                           </DialogHeader>
-                          <form onSubmit={handleSaveEmployee} className="py-4 space-y-4" aria-label="Add new employee form">
+                          <form onSubmit={handleSaveEmployee} onKeyDownCapture={handleFormEnterNavigation} className="py-4 space-y-4" aria-label="Add new employee form">
                             <div>
                               <Label htmlFor="employeeName">Name</Label>
                               <Input
@@ -840,7 +841,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
                               Create a new task and assign it to an employee.
                             </DialogDescription>
                           </DialogHeader>
-                          <form onSubmit={handleSaveTask} className="py-4 space-y-4">
+                          <form onSubmit={handleSaveTask} onKeyDownCapture={handleFormEnterNavigation} className="py-4 space-y-4">
                             <div className="space-y-2">
                               <Label htmlFor="taskTitle">Task Title *</Label>
                               <Input

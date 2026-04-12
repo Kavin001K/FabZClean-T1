@@ -37,7 +37,7 @@ export function ShortcutsProvider({ children }: ShortcutsProviderProps) {
         const modKey = e.ctrlKey || e.metaKey;
         const isAltNavigation = e.altKey && ['1', '2', '3', '4'].includes(e.key);
         const isShortcutKey =
-            e.key.startsWith('F') ||
+            e.key?.startsWith('F') ||
             e.key === 'Escape' ||
             modKey ||
             isAltNavigation;

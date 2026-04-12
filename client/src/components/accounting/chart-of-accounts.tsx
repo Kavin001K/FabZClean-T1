@@ -50,6 +50,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
+import { handleFormEnterNavigation } from '@/lib/enter-navigation';
 import { formatINR } from '@/lib/format';
 
 interface Account {
@@ -526,7 +527,7 @@ function AccountDialog({ open, onOpenChange, account, onSubmit, accounts }: Acco
             {account ? 'Update account details' : 'Add a new account to your chart'}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDownCapture={handleFormEnterNavigation}>
           <div className="space-y-4">
             <div>
               <Label htmlFor="accountCode">Account Code</Label>

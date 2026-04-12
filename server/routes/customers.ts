@@ -438,14 +438,7 @@ router.post(
       // Check if phone already exists
       if (customerData.phone) {
         const primaryKey = normalizePhone(customerData.phone as string);
-        const secondaryKey = normalizePhone(customerData.secondaryPhone as string | null | undefined);
-        const phoneExists = existingCustomers.some((c: Customer) => {
-          const existingNumbers = [c.phone, (c as any).secondaryPhone].map((value) => normalizePhone(value));
-          return (
-            (primaryKey && existingNumbers.includes(primaryKey)) ||
-            (secondaryKey && existingNumbers.includes(secondaryKey))
-          );
-        });
+        const phoneExists = existingCustomers.some((c: Customer) => c.phone && normalizePhone(c.phone) === primaryKey);
         if (phoneExists) {
           return res.status(400).json(createErrorResponse('Customer with this phone number already exists', 400));
         }
@@ -503,14 +496,9 @@ router.put('/:id', requireRole(CUSTOMER_EDITOR_ROLES), async (req, res) => {
 
     const { data: existingCustomers } = await storage.listCustomers();
     const primaryKey = normalizePhone(updateData.phone as string | null | undefined);
-    const secondaryKey = normalizePhone(updateData.secondaryPhone as string | null | undefined);
     const conflictingCustomer = existingCustomers.find((entry: Customer) => {
       if (entry.id === customerId) return false;
-      const existingNumbers = [entry.phone, (entry as any).secondaryPhone].map((value) => normalizePhone(value));
-      return (
-        (primaryKey && existingNumbers.includes(primaryKey)) ||
-        (secondaryKey && existingNumbers.includes(secondaryKey))
-      );
+      return entry.phone && normalizePhone(entry.phone) === primaryKey;
     });
 
     if (conflictingCustomer) {

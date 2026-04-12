@@ -61,6 +61,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import { handleFormEnterNavigation } from '@/lib/enter-navigation';
 import { formatINR } from '@/lib/format';
 
 interface BudgetLine {
@@ -503,7 +504,7 @@ function CreateBudgetDialog({ open, onOpenChange, onSubmit }: CreateBudgetDialog
           <DialogTitle>Create New Budget</DialogTitle>
           <DialogDescription>Set up a new budget period</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDownCapture={handleFormEnterNavigation}>
           <div className="space-y-4">
             <div>
               <Label htmlFor="name">Budget Name</Label>
@@ -591,7 +592,7 @@ function EditBudgetLineDialog({ open, onOpenChange, line, onSubmit }: EditBudget
           <DialogTitle>Edit Budget Line</DialogTitle>
           <DialogDescription>{line.category} - {line.accountName}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDownCapture={handleFormEnterNavigation}>
           <div className="space-y-4">
             <div>
               <Label htmlFor="budgeted">Budgeted Amount</Label>

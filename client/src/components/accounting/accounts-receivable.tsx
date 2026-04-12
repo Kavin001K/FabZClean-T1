@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { handleFormEnterNavigation } from '@/lib/enter-navigation';
 import { formatINR } from '@/lib/format';
 
 interface AccountsReceivable {
@@ -467,7 +468,7 @@ function PaymentDialog({ open, onOpenChange, invoice, onSubmit }: PaymentDialogP
           <DialogTitle>Record Payment</DialogTitle>
           <DialogDescription>Invoice {invoice.invoiceNumber}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDownCapture={handleFormEnterNavigation}>
           <div className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground">Customer</p>

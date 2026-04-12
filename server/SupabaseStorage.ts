@@ -271,6 +271,7 @@ export class SupabaseStorage {
             'customerName': 'customer_name',
             'customerEmail': 'customer_email',
             'customerPhone': 'customer_phone',
+            'secondaryPhone': 'secondary_phone',
             'feedbackDate': 'feedback_date',
             'feedbackTime': 'feedback_time',
             'feedbackStatus': 'feedback_status',
@@ -811,7 +812,10 @@ export class SupabaseStorage {
                 return result.data;
             }
 
-            if (!data || !Array.isArray(data)) return [];
+            if (!data || !Array.isArray(data) || data.length === 0) {
+                const result = await this.listCustomers(undefined, { search: trimmed, limit });
+                return result.data;
+            }
 
             return data.map((item: any) => this.mapDates(item));
         } catch (err) {

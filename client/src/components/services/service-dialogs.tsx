@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { handleFormEnterNavigation } from '@/lib/enter-navigation';
 import type { Service } from '@shared/schema';
 
 // Form validation schemas
@@ -189,7 +190,7 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={editForm.handleSubmit(handleEditSubmit)} className="space-y-4">
+          <form onSubmit={editForm.handleSubmit(handleEditSubmit)} onKeyDownCapture={handleFormEnterNavigation} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="edit-name">Service Name *</Label>
               <Input
@@ -334,7 +335,7 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={createForm.handleSubmit(handleCreateSubmit)} className="space-y-4">
+          <form onSubmit={createForm.handleSubmit(handleCreateSubmit)} onKeyDownCapture={handleFormEnterNavigation} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="create-name">Service Name *</Label>
               <Input
@@ -481,7 +482,7 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={productForm.handleSubmit(handleProductSubmit)} className="space-y-4">
+          <form onSubmit={productForm.handleSubmit(handleProductSubmit)} onKeyDownCapture={handleFormEnterNavigation} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="product-name">Product Name *</Label>
               <Input

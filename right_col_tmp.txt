@@ -1,0 +1,388 @@
+  2253	        {/* Right Column: Order Summary & Activity Tracker */}
+  2254	        <div className="lg:col-span-1 space-y-6">
+  2255	          <motion.div
+  2256	            initial={{ opacity: 0, x: 20 }}
+  2257	            animate={{ opacity: 1, x: 0 }}
+  2258	            transition={{ duration: 0.3, delay: 0.2 }}
+  2259	            className="sticky top-24 z-10"
+  2260	          >
+  2261	            <Card className="border-none shadow-xl bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 overflow-hidden ring-1 ring-slate-200 dark:ring-slate-800 rounded-2xl md:rounded-xl">
+  2262	              <div className="h-1.5 w-full bg-primary" />
+  2263	              <CardHeader className="pb-4 border-b dark:border-slate-700/50">
+  2264	                <CardTitle className="flex items-center justify-between text-slate-900 dark:text-white">
+  2265	                  <span className="flex items-center gap-2">
+  2266	                    <ShoppingBag className="h-5 w-5 text-primary" />
+  2267	                    Bill Summary
+  2268	                  </span>
+  2269	                </CardTitle>
+  2270	              </CardHeader>
+  2271	              <CardContent className="space-y-4">
+  2272	                <div className="space-y-3">
+  2273	                  {selectedServices.length === 0 ? (
+  2274	                    <div className="text-center py-6 border-2 border-dashed rounded-lg bg-slate-50/50 dark:bg-slate-900/50">
+  2275	                      <ShoppingCart className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+  2276	                      <p className="text-sm text-slate-400">Add services to see summary</p>
+  2277	                    </div>
+  2278	                  ) : (
+  2279	                    <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 scrollbar-thin">
+  2280	                      {selectedServices.map(item => (
+  2281	                        <div key={item.instanceKey} className="flex justify-between items-start text-sm group gap-3">
+  2282	                          <div className="flex-1 min-w-0">
+  2283	                            <p className="font-medium group-hover:text-primary transition-colors truncate">{item.service.name}</p>
+  2284	                            <p className="text-[11px] text-muted-foreground truncate">
+  2285	                              ₹{safeParseFloat(item.priceOverride).toFixed(2)} × {item.quantity}
+  2286	                            </p>
+  2287	                          </div>
+  2288	                          <span className="font-bold text-slate-700 dark:text-slate-300 flex-shrink-0">₹{item.subtotal.toFixed(2)}</span>
+  2289	                        </div>
+  2290	                      ))}
+  2291	                    </div>
+  2292	                  )}
+  2293	                </div>
+  2294	
+  2295	                <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+  2296	                    <div className="flex justify-between items-center gap-4 text-sm text-slate-900 dark:text-slate-100 font-medium">
+  2297	                      <div className="flex items-center gap-2">
+  2298	                        <span className="opacity-70 dark:opacity-80 min-w-0 truncate">Services Subtotal</span>
+  2299	                        {selectedServiceCount > 0 && (
+  2300	                          <div className="flex items-center gap-1.5 ml-1">
+  2301	                            <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[10px] py-0 px-1.5 h-4 leading-none">
+  2302	                              {selectedServiceCount} {selectedServiceCount === 1 ? 'service' : 'services'}
+  2303	                            </Badge>
+  2304	                            <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-none text-[10px] py-0 px-1.5 h-4 leading-none">
+  2305	                              {totalSelectedItemCount} items
+  2306	                            </Badge>
+  2307	                          </div>
+  2308	                        )}
+  2309	                      </div>
+  2310	                      <span className="font-black flex-shrink-0 text-base">₹{baseSubtotal.toFixed(2)}</span>
+  2311	                    </div>
+  2312	  
+  2313	                    <AnimatePresence>
+  2314	                      {isExpressOrder && (
+  2315	                        <motion.div
+  2316	                          initial={{ opacity: 0, height: 0 }}
+  2317	                          animate={{ opacity: 1, height: 'auto' }}
+  2318	                          className="flex justify-between gap-4 text-sm text-amber-600 dark:text-amber-400 font-bold"
+  2319	                        >
+  2320	                          <span className="flex items-center gap-1 min-w-0">
+  2321	                            <Zap className="h-3.5 w-3.5 flex-shrink-0" /> <span className="truncate">Express Charge (50%)</span>
+  2322	                          </span>
+  2323	                          <span className="flex-shrink-0">+₹{expressSurcharge.toFixed(2)}</span>
+  2324	                        </motion.div>
+  2325	                      )}
+  2326	  
+  2327	                      {discountAmount > 0 && (
+  2328	                        <motion.div
+  2329	                          initial={{ opacity: 0, height: 0 }}
+  2330	                          animate={{ opacity: 1, height: 'auto' }}
+  2331	                          className="flex justify-between gap-4 text-sm text-emerald-600 dark:text-emerald-400 font-bold"
+  2332	                        >
+  2333	                          <span className="flex items-center gap-1 min-w-0">
+  2334	                            <TrendingDown className="h-3.5 w-3.5 flex-shrink-0" /> 
+  2335	                            <span className="truncate">Discount {discountType === 'percentage' ? `(${discountValue}%)` : '(Fixed)'}</span>
+  2336	                          </span>
+  2337	                          <span className="flex-shrink-0">-₹{discountAmount.toFixed(2)}</span>
+  2338	                        </motion.div>
+  2339	                      )}
+  2340	  
+  2341	                      {extraCharges > 0 && (
+  2342	                        <motion.div
+  2343	                          initial={{ opacity: 0, height: 0 }}
+  2344	                          animate={{ opacity: 1, height: 'auto' }}
+  2345	                          className="flex justify-between gap-4 text-sm text-foreground/80 dark:text-slate-300"
+  2346	                        >
+  2347	                          <span className="flex items-center gap-1 italic min-w-0">
+  2348	                            <PlusCircle className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+  2349	                            <span className="truncate">{extraChargesLabel || 'Extra Charges'}</span>
+  2350	                          </span>
+  2351	                          <span className="flex-shrink-0">+₹{extraCharges.toFixed(2)}</span>
+  2352	                        </motion.div>
+  2353	                      )}
+  2354	  
+  2355	                      {enableGST && (
+  2356	                        <motion.div
+  2357	                          initial={{ opacity: 0, height: 0 }}
+  2358	                          animate={{ opacity: 1, height: 'auto' }}
+  2359	                          className="flex justify-between gap-4 text-sm text-slate-900 dark:text-slate-100 font-medium"
+  2360	                        >
+  2361	                          <span className="opacity-70 dark:opacity-80 min-w-0 truncate">GST (18%)</span>
+  2362	                          <span className="font-black flex-shrink-0">+₹{gstAmount.toFixed(2)}</span>
+  2363	                        </motion.div>
+  2364	                      )}
+  2365	                  </AnimatePresence>
+  2366	
+  2367	                  <div className="mt-4 p-5 rounded-2xl bg-primary text-white shadow-2xl transition-all duration-300 hover:scale-[1.03] ring-4 ring-primary/10">
+  2368	                    <div className="flex justify-between items-center gap-4">
+  2369	                      <div className="min-w-0">
+  2370	                         <span className="text-[10px] uppercase tracking-[0.2em] font-black opacity-80 block truncate">
+  2371	                           {useWallet && walletApplied > 0 ? 'Balance Due' : 'Payable Amount'}
+  2372	                         </span>
+  2373	                         {isExpressOrder && (
+  2374	                           <p className="text-[10px] text-amber-300 font-black uppercase mt-0.5 tracking-wider truncate">
+  2375	                             Express Order
+  2376	                           </p>
+  2377	                         )}
+  2378	                      </div>
+  2379	                      <span className="text-3xl font-black tabular-nums flex-shrink-0">₹{finalPayable.toFixed(2)}</span>
+  2380	                    </div>
+  2381	                  </div>
+  2382	
+  2383	                  <AnimatePresence>
+  2384	                    {useWallet && walletApplied > 0 && (
+  2385	                      <motion.div
+  2386	                        initial={{ opacity: 0, height: 0 }}
+  2387	                        animate={{ opacity: 1, height: 'auto' }}
+  2388	                        className="mt-2 flex justify-between text-sm text-emerald-600 dark:text-emerald-400 font-bold px-1"
+  2389	                      >
+  2390	                        <span className="flex items-center gap-1">
+  2391	                          <CreditCard className="h-3.5 w-3.5" /> Wallet Applied
+  2392	                        </span>
+  2393	                        <span>-₹{walletApplied.toFixed(2)}</span>
+  2394	                      </motion.div>
+  2395	                    )}
+  2396	                  </AnimatePresence>
+  2397	
+  2398	                  <AnimatePresence>
+  2399	                    {advancePayment && parseFloat(advancePayment) > 0 && (
+  2400	                      <motion.div
+  2401	                        initial={{ opacity: 0, y: 10 }}
+  2402	                        animate={{ opacity: 1, y: 0 }}
+  2403	                        className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/30 space-y-2"
+  2404	                      >
+  2405	                        <div className="flex justify-between items-center">
+  2406	                          <p className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400">Advance Paid</p>
+  2407	                          <span className="text-lg font-bold text-emerald-600">₹{parseFloat(advancePayment).toFixed(2)}</span>
+  2408	                        </div>
+  2409	                        <div className="flex justify-between items-center border-t border-emerald-100 dark:border-emerald-800 pt-1">
+  2410	                          <p className="text-xs font-bold text-red-600">Balance Due</p>
+  2411	                          <span className="text-sm font-bold text-red-600">₹{(totalAmount - parseFloat(advancePayment)).toFixed(2)}</span>
+  2412	                        </div>
+  2413	                      </motion.div>
+  2414	                    )}
+  2415	                  </AnimatePresence>
+  2416	                </div>
+  2417	
+  2418	                <div className={cn(
+  2419	                  "mt-6 pb-6",
+  2420	                  // Removed fixed positioning on mobile to move it "below payable amount" as requested
+  2421	                  // and avoid overlapping with bottom navigation bar
+  2422	                )}>
+  2423	                  <Button
+  2424	                    onClick={handleCreateOrder}
+  2425	                    data-save-button
+  2426	          disabled={createOrderMutation.isPending || selectedServiceCount === 0 || !customerName || !customerPhone}
+  2427	                    className="w-full h-12 text-lg font-black shadow-lg shadow-primary/25 hover:scale-[1.01] active:scale-[0.98] transition-all bg-primary hover:bg-primary/90"
+  2428	                  >
+  2429	                    {createOrderMutation.isPending ? (
+  2430	                      <>
+  2431	                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+  2432	                        Creating Order...
+  2433	                      </>
+  2434	                    ) : (
+  2435	                      <>
+  2436	                        <CheckCircle className="mr-2 h-5 w-5" />
+  2437	                        Place Order • ₹{Math.max(0, finalPayable - (parseFloat(advancePayment) || 0)).toFixed(0)}
+  2438	                      </>
+  2439	                    )}
+  2440	                  </Button>
+  2441	                  
+  2442	                  {isMobile && (
+  2443	                    <p className="text-[9px] text-center text-muted-foreground mt-2 italic leading-tight">
+  2444	                      Automatic WhatsApp bill will be sent.
+  2445	                    </p>
+  2446	                  )}
+  2447	                </div>
+  2448	                
+  2449	                {!isMobile && (
+  2450	                  <p className="text-[10px] text-center text-muted-foreground px-4 italic leading-relaxed">
+  2451	                    By placing this order, you agree to the service terms. A WhatsApp bill will be sent automatically.
+  2452	                  </p>
+  2453	                )}
+  2454	              </CardContent>
+  2455	            </Card>
+  2456	
+  2457	
+  2458	
+  2459	            {/* Customer History Section */}
+  2460	            <AnimatePresence>
+  2461	            {foundCustomer && (
+  2462	              <motion.div
+  2463	                initial={{ opacity: 0, y: 20 }}
+  2464	                animate={{ opacity: 1, y: 0 }}
+  2465	                exit={{ opacity: 0, y: -10 }}
+  2466	                transition={{ duration: 0.3, delay: 0.3 }}
+  2467	                className="mt-4"
+  2468	              >
+  2469	                <Card className="border-2 border-primary/20 bg-gradient-to-br from-background to-primary/5">
+  2470	                  <CardHeader className="pb-3">
+  2471	                    <CardTitle className="flex items-center gap-2 text-base">
+  2472	                      <div className="p-1.5 rounded-lg bg-primary/10">
+  2473	                        <History className="h-4 w-4 text-primary" />
+  2474	                      </div>
+  2475	                      Customer History
+  2476	                    </CardTitle>
+  2477	                  </CardHeader>
+  2478	                  <CardContent className="space-y-4">
+  2479	                    {customerOrdersLoading ? (
+  2480	                      <div className="flex items-center justify-center py-6">
+  2481	                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+  2482	                        <span className="ml-2 text-sm text-muted-foreground">Loading history...</span>
+  2483	                      </div>
+  2484	                    ) : customerStats ? (
+  2485	                      <>
+  2486	                        {/* Customer Stats Grid */}
+  2487	                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+  2488	                          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 p-3 rounded-lg border border-emerald-200/50 dark:border-emerald-800/50">
+  2489	                            <div className="flex items-center gap-2 mb-1">
+  2490	                              <ShoppingBag className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+  2491	                              <span className="text-[10px] uppercase tracking-wider font-medium text-emerald-600 dark:text-emerald-400">Total Orders</span>
+  2492	                            </div>
+  2493	                            <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">{customerStats.totalOrders}</p>
+  2494	                          </div>
+  2495	
+  2496	                          <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 p-3 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+  2497	                            <div className="flex items-center gap-2 mb-1">
+  2498	                              <TrendingUp className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+  2499	                              <span className="text-[10px] uppercase tracking-wider font-medium text-blue-600 dark:text-blue-400">Total Spent</span>
+  2500	                            </div>
+  2501	                            <p className="text-xl font-bold text-blue-700 dark:text-blue-300">₹{customerStats.totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+  2502	                          </div>
+  2503	
+  2504	                          <div className="bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20 p-3 rounded-lg border border-green-200/50 dark:border-green-800/50">
+  2505	                            <div className="flex items-center gap-2 mb-1">
+  2506	                              <CreditCard className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+  2507	                              <span className="text-[10px] uppercase tracking-wider font-medium text-green-600 dark:text-green-400">Wallet Balance</span>
+  2508	                            </div>
+  2509	                            <p className="text-xl font-bold text-green-700 dark:text-green-300">
+  2510	                              ₹{parseFloat(String(foundCustomer?.walletBalanceCache || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+  2511	                            </p>
+  2512	                          </div>
+  2513	
+  2514	                          <div className="bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 p-3 rounded-lg border border-red-200/50 dark:border-red-800/50">
+  2515	                            <div className="flex items-center gap-2 mb-1">
+  2516	                              <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+  2517	                              <span className="text-[10px] uppercase tracking-wider font-medium text-red-600 dark:text-red-400">Credit Due</span>
+  2518	                            </div>
+  2519	                            {(() => {
+  2520	                              const due = foundCustomer?.creditBalance ? Number(foundCustomer.creditBalance) : 0;
+  2521	                              const limit = Math.max(0, Number((foundCustomer as any)?.creditLimit ?? 1000));
+  2522	                              const dueClass = due > limit ? "text-red-700 dark:text-red-300" : due === 0 ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300";
+  2523	                              return (
+  2524	                                <p className={`text-xl font-bold ${dueClass}`}>
+  2525	                                  ₹{due.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+  2526	                                </p>
+  2527	                              );
+  2528	                            })()}
+  2529	                          </div>
+  2530	
+  2531	                          <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/30 dark:to-amber-900/20 p-3 rounded-lg border border-amber-200/50 dark:border-amber-800/50">
+  2532	                            <div className="flex items-center gap-2 mb-1">
+  2533	                              <CheckCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+  2534	                              <span className="text-[10px] uppercase tracking-wider font-medium text-amber-600 dark:text-amber-400">Credit Limit</span>
+  2535	                            </div>
+  2536	                            <p className="text-xl font-bold text-amber-700 dark:text-amber-300">
+  2537	                              ₹{Math.max(0, Number((foundCustomer as any)?.creditLimit ?? 1000)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+  2538	                            </p>
+  2539	                          </div>
+  2540	                        </div>
+  2541	
+  2542	
+  2543	                        {/* Favorite Services */}
+  2544	                        {customerStats.topServices.length > 0 && (
+  2545	                          <div className="space-y-2">
+  2546	                            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+  2547	                              <Package className="h-3 w-3" />
+  2548	                              Favorite Services
+  2549	                            </p>
+  2550	                            <div className="flex flex-wrap gap-1.5">
+  2551	                              {customerStats.topServices.map((service, idx) => (
+  2552	                                <Badge
+  2553	                                  key={idx}
+  2554	                                  variant="secondary"
+  2555	                                  className="text-[10px] bg-primary/10 text-primary hover:bg-primary/20"
+  2556	                                >
+  2557	                                  {service}
+  2558	                                </Badge>
+  2559	                              ))}
+  2560	                            </div>
+  2561	                          </div>
+  2562	                        )}
+  2563	
+  2564	                        {/* Last Order Date */}
+  2565	                        {customerStats.lastOrderDate && (
+  2566	                          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg">
+  2567	                            <Clock className="h-3 w-3" />
+  2568	                            <span>Last order: {format(new Date(customerStats.lastOrderDate), 'dd MMM yyyy')}</span>
+  2569	                          </div>
+  2570	                        )}
+  2571	
+  2572	                        {/* Recent Orders List */}
+  2573	                        {customerOrders.length > 0 && (
+  2574	                          <div className="space-y-2">
+  2575	                            <p className="text-xs font-medium text-muted-foreground">Recent Orders</p>
+  2576	                            <div className="max-h-[180px] overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+  2577	                              {customerOrders.slice(0, 5).map((order, idx) => (
+  2578	                                <div
+  2579	                                  key={order.id || idx}
+  2580	                                  onClick={() => {
+  2581	                                    setSelectedHistoryOrder(order);
+  2582	                                    setIsHistoryDetailsOpen(true);
+  2583	                                  }}
+  2584	                                  className="flex items-center justify-between p-2.5 bg-muted/30 hover:bg-muted/50 rounded-lg transition-colors border border-transparent hover:border-primary/10 cursor-pointer"
+  2585	                                >
+  2586	                                  <div className="flex-1 min-w-0">
+  2587	                                    <div className="flex items-center gap-2">
+  2588	                                      <span className="text-xs font-mono font-medium text-primary truncate">
+  2589	                                        {order.orderNumber || `#${order.id?.slice(0, 8)}`}
+  2590	                                      </span>
+  2591	                                      <Badge
+  2592	                                        variant="outline"
+  2593	                                        className={cn(
+  2594	                                          "text-[9px] px-1.5 py-0",
+  2595	                                          order.status === 'completed' || order.status === 'delivered'
+  2596	                                            ? "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400"
+  2597	                                            : order.status === 'processing'
+  2598	                                              ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400"
+  2599	                                              : order.status === 'cancelled'
+  2600	                                                ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400"
+  2601	                                                : "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400"
+  2602	                                        )}
+  2603	                                      >
+  2604	                                        {order.status?.replace(/_/g, ' ')}
+  2605	                                      </Badge>
+  2606	                                    </div>
+  2607	                                    <p className="text-[10px] text-muted-foreground mt-0.5">
+  2608	                                      {order.createdAt ? format(new Date(order.createdAt), 'dd MMM yy') : 'N/A'}
+  2609	                                    </p>
+  2610	                                  </div>
+  2611	                                  <span className="text-sm font-semibold text-foreground">
+  2612	                                    ₹{parseFloat(order.totalAmount || '0').toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+  2613	                                  </span>
+  2614	                                </div>
+  2615	                              ))}
+  2616	                            </div>
+  2617	                          </div>
+  2618	                        )}
+  2619	                      </>
+  2620	                    ) : (
+  2621	                      <div className="text-center py-6">
+  2622	                        <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
+  2623	                          <Package className="h-6 w-6 text-muted-foreground/50" />
+  2624	                        </div>
+  2625	                        <p className="text-sm text-muted-foreground">No previous orders</p>
+  2626	                        <p className="text-xs text-muted-foreground/70 mt-1">This is a new customer!</p>
+  2627	                      </div>
+  2628	                    )}
+  2629	                  </CardContent>
+  2630	                </Card>
+  2631	              </motion.div>
+  2632	            )}
+  2633	          </AnimatePresence>
+  2634	          </motion.div>
+  2635	
+  2636	
+  2637	        </div>
+  2638	      </div >
+  2639	
+  2640	

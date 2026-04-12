@@ -17,6 +17,7 @@ import { employeesApi } from '@/lib/data-service';
 import { useAuth } from '@/contexts/auth-context';
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { navigateOnEnter } from "@/lib/enter-navigation";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CustomCalendar } from "@/components/ui/calendar";
 import {
@@ -78,6 +79,8 @@ export default function EmployeeManagement() {
   const [resetPasswordValue, setResetPasswordValue] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const createUserButtonRef = React.useRef<HTMLButtonElement | null>(null);
+  const resetPasswordButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const [activeTab, setActiveTab] = useState("personal");
 
   // Form state - Comprehensive employee data
@@ -888,6 +891,7 @@ export default function EmployeeManagement() {
                         placeholder="Enter password"
                         value={employeeForm.password}
                         onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
+                        onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('confirmPassword') as HTMLElement | null })}
                       />
                     </div>
                     <div className="space-y-2">
@@ -898,6 +902,7 @@ export default function EmployeeManagement() {
                         placeholder="Confirm password"
                         value={employeeForm.confirmPassword}
                         onChange={(e) => setEmployeeForm({ ...employeeForm, confirmPassword: e.target.value })}
+                        onKeyDown={(e) => navigateOnEnter(e, { next: createUserButtonRef.current, selectText: false })}
                       />
                     </div>
                   </div>
@@ -905,7 +910,7 @@ export default function EmployeeManagement() {
               </Tabs>
 
               <div className="flex gap-2 pt-4">
-                <Button onClick={handleCreateEmployee} className="flex-1" disabled={createEmployeeMutation.isPending}>
+                <Button ref={createUserButtonRef} onClick={handleCreateEmployee} className="flex-1" disabled={createEmployeeMutation.isPending}>
                   {createEmployeeMutation.isPending ? "Creating..." : "Create User"}
                 </Button>
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
@@ -1435,6 +1440,7 @@ export default function EmployeeManagement() {
                 placeholder="Enter new password (min. 8 characters)"
                 value={resetPasswordValue}
                 onChange={(e) => setResetPasswordValue(e.target.value)}
+                onKeyDown={(e) => navigateOnEnter(e, { next: resetPasswordButtonRef.current, selectText: false })}
               />
             </div>
           </div>
@@ -1444,6 +1450,7 @@ export default function EmployeeManagement() {
               setResetPasswordValue("");
             }}>Cancel</Button>
             <Button
+              ref={resetPasswordButtonRef}
               onClick={() => {
                 if (!selectedEmployee) return;
                 if (resetPasswordValue.length < 8) {
@@ -1462,4 +1469,3 @@ export default function EmployeeManagement() {
     </div>
   );
 }
-

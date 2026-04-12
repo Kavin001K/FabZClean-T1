@@ -333,13 +333,13 @@ export default React.memo(function EditOrderDialog({
                     <Button
                       variant={"outline"}
                       className={cn(
-                        "w-full justify-start text-left font-normal border-primary/20 hover:border-primary/50 focus:ring-primary/20 transition-all",
-                        !(formData as any).pickupDate && "text-muted-foreground"
+                        "w-full justify-start text-left transition-all",
+                        (formData as any).pickupDate ? "border-primary/30 bg-primary/5 text-primary shadow-sm font-medium" : "text-muted-foreground font-normal border-primary/20 hover:border-primary/50 focus:ring-primary/20"
                       )}
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
+                      <CalendarIcon className={cn("mr-2 h-4 w-4", (formData as any).pickupDate ? "text-primary" : "text-primary")} />
                       {(formData as any).pickupDate ? (
-                        <span className="font-medium">{format(new Date((formData as any).pickupDate), "PPP")}</span>
+                        <span className="font-semibold">{format(new Date((formData as any).pickupDate), "PPP")}</span>
                       ) : (
                         <span>Pick a date</span>
                       )}

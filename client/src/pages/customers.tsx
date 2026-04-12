@@ -227,11 +227,14 @@ export default function Customers() {
       
       const normalizedQuery = normalizePhone(searchQuery);
       const normalizedCustomerPhone = normalizePhone(customer.phone);
+      const normalizedSecondaryPhone = normalizePhone((customer as any).secondaryPhone);
 
       const matchesSearch = customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         customer.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         customer.phone?.includes(searchQuery) ||
+        (customer as any).secondaryPhone?.includes(searchQuery) ||
         (normalizedQuery.length > 3 && normalizedCustomerPhone.includes(normalizedQuery)) ||
+        (normalizedQuery.length > 3 && normalizedSecondaryPhone.includes(normalizedQuery)) ||
         (normalizedCustomerPhone && normalizedQuery && normalizedCustomerPhone === normalizedQuery);
 
       if (!matchesSearch) return false;
@@ -374,6 +377,7 @@ export default function Customers() {
     const transformedData: Partial<Customer> = {
       name: customerData.name,
       phone: customerData.phone,
+      secondaryPhone: customerData.secondaryPhone || undefined,
       email: customerData.email || undefined,
       address: addressObj.street ? addressObj : undefined,
       creditLimit: normalizedCreditLimit,
@@ -407,6 +411,7 @@ export default function Customers() {
     const transformedData: Partial<Customer> = {
       name: customerData.name,
       phone: customerData.phone,
+      secondaryPhone: customerData.secondaryPhone || undefined,
       email: customerData.email || undefined,
       address: addressObj.street ? addressObj : undefined,
       creditLimit: normalizedCreditLimit,
@@ -855,7 +860,10 @@ export default function Customers() {
                             {customer.phone && (
                               <div className="flex items-center gap-2 text-sm">
                                 <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
-                                <span>{customer.phone}</span>
+                                <span>
+                                  {customer.phone}
+                                  {(customer as any).secondaryPhone ? `, ${(customer as any).secondaryPhone}` : ''}
+                                </span>
                               </div>
                             )}
                           </div>

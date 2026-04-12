@@ -50,6 +50,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { formatINR } from '@/lib/format';
+import { handleFormEnterNavigation } from '@/lib/enter-navigation';
 
 interface AccountsPayable {
   id: string;
@@ -482,7 +483,7 @@ function PaymentDialog({ open, onOpenChange, bill, onSubmit }: PaymentDialogProp
           <DialogTitle>Pay Bill</DialogTitle>
           <DialogDescription>Bill {bill.billNumber}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDownCapture={handleFormEnterNavigation}>
           <div className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground">Vendor</p>
@@ -578,7 +579,7 @@ function NewBillDialog({ open, onOpenChange, onSubmit }: NewBillDialogProps) {
           <DialogTitle>Create New Bill</DialogTitle>
           <DialogDescription>Add a new bill to accounts payable</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDownCapture={handleFormEnterNavigation}>
           <div className="space-y-4">
             <div>
               <Label htmlFor="billNumber">Bill Number</Label>

@@ -77,6 +77,8 @@ router.get('/apply-indexes', async (req, res) => {
             CREATE INDEX IF NOT EXISTS idx_customers_id_trgm ON public.customers USING gin (id gin_trgm_ops);
             CREATE INDEX IF NOT EXISTS idx_customers_email_trgm ON public.customers USING gin (email gin_trgm_ops);
 
+            DROP FUNCTION IF EXISTS public.search_customers_autocomplete(TEXT, INT);
+
             CREATE OR REPLACE FUNCTION public.search_customers_autocomplete(
               p_query TEXT,
               p_limit INT DEFAULT 10
@@ -85,6 +87,7 @@ router.get('/apply-indexes', async (req, res) => {
               id TEXT,
               name TEXT,
               phone TEXT,
+              secondary_phone TEXT,
               email TEXT,
               address JSONB,
               status TEXT,
@@ -113,19 +116,19 @@ router.get('/apply-indexes', async (req, res) => {
 
               RETURN QUERY
               SELECT
-                c.id, c.name, c.phone, c.email, c.address, c.status,
+                c.id, c.name, c.phone, c.secondary_phone, c.email, c.address, c.status,
                 c.credit_balance::TEXT, c.credit_limit::TEXT, c.total_orders,
                 c.total_spent::TEXT, c.last_order, c.wallet_balance_cache::TEXT,
                 c.created_at, c.updated_at,
                 (
                   CASE WHEN LOWER(c.name) = v_query_lower THEN 100 ELSE 0 END +
-                  CASE WHEN v_digits <> '' AND regexp_replace(regexp_replace(COALESCE(c.phone,''), '[^0-9]', '', 'g'), '^(91|0+)', '') = v_digits THEN 100 ELSE 0 END +
+                  CASE WHEN v_digits <> '' AND regexp_replace(regexp_replace(COALESCE(c.phone,'') || COALESCE(c.secondary_phone,''), '[^0-9]', '', 'g'), '^(91|0+)', '') = v_digits THEN 100 ELSE 0 END +
                   CASE WHEN LOWER(c.id) = v_query_lower THEN 100 ELSE 0 END +
                   CASE WHEN LOWER(c.name) LIKE v_query_lower || '%' THEN 80 ELSE 0 END +
-                  CASE WHEN v_digits <> '' AND regexp_replace(regexp_replace(COALESCE(c.phone,''), '[^0-9]', '', 'g'), '^(91|0+)', '') LIKE v_digits || '%' THEN 80 ELSE 0 END +
+                  CASE WHEN v_digits <> '' AND regexp_replace(regexp_replace(COALESCE(c.phone,'') || COALESCE(c.secondary_phone,''), '[^0-9]', '', 'g'), '^(91|0+)', '') LIKE v_digits || '%' THEN 80 ELSE 0 END +
                   CASE WHEN LOWER(c.id) LIKE v_query_lower || '%' THEN 80 ELSE 0 END +
                   CASE WHEN LOWER(c.name) LIKE '%' || v_query_lower || '%' THEN 50 ELSE 0 END +
-                  CASE WHEN v_digits <> '' AND regexp_replace(COALESCE(c.phone,''), '[^0-9]', '', 'g') LIKE '%' || v_digits || '%' THEN 50 ELSE 0 END +
+                  CASE WHEN v_digits <> '' AND regexp_replace(COALESCE(c.phone,'') || COALESCE(c.secondary_phone,''), '[^0-9]', '', 'g') LIKE '%' || v_digits || '%' THEN 50 ELSE 0 END +
                   CASE WHEN LOWER(COALESCE(c.email,'')) LIKE '%' || v_query_lower || '%' THEN 50 ELSE 0 END +
                   CASE WHEN LOWER(c.id) LIKE '%' || v_query_lower || '%' THEN 50 ELSE 0 END +
                   CASE WHEN LENGTH(v_query) >= 3 AND similarity(LOWER(c.name), v_query_lower) > 0.3 THEN (similarity(LOWER(c.name), v_query_lower) * 40)::NUMERIC ELSE 0 END
@@ -135,7 +138,8 @@ router.get('/apply-indexes', async (req, res) => {
                 AND (
                   LOWER(c.name) LIKE '%' || v_query_lower || '%'
                   OR COALESCE(c.phone, '') LIKE '%' || v_query || '%'
-                  OR (v_digits <> '' AND regexp_replace(COALESCE(c.phone,''), '[^0-9]', '', 'g') LIKE '%' || v_digits || '%')
+                  OR COALESCE(c.secondary_phone, '') LIKE '%' || v_query || '%'
+                  OR (v_digits <> '' AND regexp_replace(COALESCE(c.phone,'') || COALESCE(c.secondary_phone,''), '[^0-9]', '', 'g') LIKE '%' || v_digits || '%')
                   OR LOWER(COALESCE(c.email, '')) LIKE '%' || v_query_lower || '%'
                   OR LOWER(c.id) LIKE '%' || v_query_lower || '%'
                   OR (LENGTH(v_query) >= 3 AND similarity(LOWER(c.name), v_query_lower) > 0.3)

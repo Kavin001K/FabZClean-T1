@@ -534,7 +534,10 @@ export const customersApi = {
         method: "PUT",
         body: JSON.stringify(customer),
       });
-      if (!response.ok) throw new Error("Failed to update customer");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to update customer");
+      }
       const payload = await response.json();
       return payload?.data || payload;
     } catch (error) {

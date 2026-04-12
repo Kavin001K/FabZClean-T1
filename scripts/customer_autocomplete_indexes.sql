@@ -30,6 +30,7 @@ RETURNS TABLE (
   id TEXT,
   name TEXT,
   phone TEXT,
+  secondary_phone TEXT,
   email TEXT,
   address JSONB,
   status TEXT,
@@ -68,6 +69,7 @@ BEGIN
     c.id,
     c.name,
     c.phone,
+    c.secondary_phone,
     c.email,
     c.address,
     c.status,
@@ -85,7 +87,7 @@ BEGIN
       CASE WHEN LOWER(c.name) = v_query_lower THEN 100 ELSE 0 END
       -- Exact phone match (normalized)
       + CASE
-          WHEN v_digits <> '' AND regexp_replace(regexp_replace(COALESCE(c.phone,''), '[^0-9]', '', 'g'), '^(91|0+)', '') = v_digits
+          WHEN v_digits <> '' AND regexp_replace(regexp_replace(COALESCE(c.phone,'') || COALESCE(c.secondary_phone,''), '[^0-9]', '', 'g'), '^(91|0+)', '') = v_digits
           THEN 100 ELSE 0
         END
       -- Exact ID match
@@ -94,7 +96,7 @@ BEGIN
       + CASE WHEN LOWER(c.name) LIKE v_query_lower || '%' THEN 80 ELSE 0 END
       -- Prefix phone match
       + CASE
-          WHEN v_digits <> '' AND regexp_replace(regexp_replace(COALESCE(c.phone,''), '[^0-9]', '', 'g'), '^(91|0+)', '') LIKE v_digits || '%'
+          WHEN v_digits <> '' AND regexp_replace(regexp_replace(COALESCE(c.phone,'') || COALESCE(c.secondary_phone,''), '[^0-9]', '', 'g'), '^(91|0+)', '') LIKE v_digits || '%'
           THEN 80 ELSE 0
         END
       -- Prefix ID match
@@ -103,7 +105,7 @@ BEGIN
       + CASE WHEN LOWER(c.name) LIKE '%' || v_query_lower || '%' THEN 50 ELSE 0 END
       -- Contains phone match
       + CASE
-          WHEN v_digits <> '' AND regexp_replace(COALESCE(c.phone,''), '[^0-9]', '', 'g') LIKE '%' || v_digits || '%'
+          WHEN v_digits <> '' AND regexp_replace(COALESCE(c.phone,'') || COALESCE(c.secondary_phone,''), '[^0-9]', '', 'g') LIKE '%' || v_digits || '%'
           THEN 50 ELSE 0
         END
       -- Contains email match
@@ -124,8 +126,9 @@ BEGIN
       LOWER(c.name) LIKE '%' || v_query_lower || '%'
       -- Phone matching (raw)
       OR COALESCE(c.phone, '') LIKE '%' || v_query || '%'
+      OR COALESCE(c.secondary_phone, '') LIKE '%' || v_query || '%'
       -- Phone matching (digits only)
-      OR (v_digits <> '' AND regexp_replace(COALESCE(c.phone,''), '[^0-9]', '', 'g') LIKE '%' || v_digits || '%')
+      OR (v_digits <> '' AND regexp_replace(COALESCE(c.phone,'') || COALESCE(c.secondary_phone,''), '[^0-9]', '', 'g') LIKE '%' || v_digits || '%')
       -- Email matching
       OR LOWER(COALESCE(c.email, '')) LIKE '%' || v_query_lower || '%'
       -- ID matching

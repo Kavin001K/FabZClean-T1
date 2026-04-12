@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/table';
 import { formatDate, formatCurrency } from '@/lib/data-service';
 import { customersApi } from '@/lib/data-service';
+import { navigateOnEnter } from '@/lib/enter-navigation';
 import { cn } from '@/lib/utils';
 import type { Customer, Order } from '@shared/schema';
 import type { CustomerFeedbackRecord, CustomerOrderHistoryRecord, CustomerProfileDetails } from '@/lib/data-service';
@@ -55,7 +56,10 @@ const customerFormSchema = z.object({
   email: z.string().refine((val) => !val || z.string().email().safeParse(val).success, {
     message: 'Please enter a valid email address',
   }).optional(),
-  phone: z.string().min(10, 'Phone number must be at least 10 digits').max(15, 'Phone number must be less than 15 digits'),
+  phone: z.string().refine((val) => /^\d{10}$/.test(val.replace(/[^\d]/g, '').replace(/^(91|0+)/, '')), { message: 'Phone number must be exactly 10 digits' }),
+  secondaryPhone: z.string().refine((val) => !val || /^\d{10}$/.test(val.replace(/[^\d]/g, '').replace(/^(91|0+)/, '')), {
+    message: 'Secondary phone must be exactly 10 digits',
+  }).optional(),
   // Separate address fields for clean data collection
   addressStreet: z.string().min(1, 'Street address is required'),
   addressCity: z.string().optional(),
@@ -139,6 +143,9 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   onDeleteCustomer,
   orders = [],
 }) => {
+  const createSubmitButtonRef = React.useRef<HTMLButtonElement | null>(null);
+  const editSubmitButtonRef = React.useRef<HTMLButtonElement | null>(null);
+
   // Parse existing address for edit form
   const existingAddress = React.useMemo(() => {
     if (!selectedCustomer?.address) return { street: '', city: '', pincode: '' };
@@ -158,6 +165,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
       name: selectedCustomer?.name || '',
       email: selectedCustomer?.email || '',
       phone: selectedCustomer?.phone || '',
+      secondaryPhone: (selectedCustomer as any)?.secondaryPhone || '',
       addressStreet: existingAddress.street,
       addressCity: existingAddress.city,
       addressPincode: existingAddress.pincode,
@@ -173,6 +181,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
       name: '',
       email: '',
       phone: '',
+      secondaryPhone: '',
       addressStreet: '',
       addressCity: '',
       addressPincode: '',
@@ -188,6 +197,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
         name: selectedCustomer.name,
         email: selectedCustomer.email || '',
         phone: selectedCustomer.phone || '',
+        secondaryPhone: (selectedCustomer as any)?.secondaryPhone || '',
         addressStreet: existingAddress.street,
         addressCity: existingAddress.city,
         addressPincode: existingAddress.pincode,
@@ -238,6 +248,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
     return orders.filter(order => {
       if (selectedCustomer.id && order.customerId === selectedCustomer.id) return true;
       if (selectedCustomer.phone && order.customerPhone === selectedCustomer.phone) return true;
+      if ((selectedCustomer as any).secondaryPhone && order.customerPhone === (selectedCustomer as any).secondaryPhone) return true;
       return false;
     }).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
       .slice(0, 10);
@@ -310,7 +321,10 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
-                      <p className="text-sm">{selectedCustomer.phone || 'Not provided'}</p>
+                      <p className="text-sm">
+                        {selectedCustomer.phone || 'Not provided'}
+                        {(selectedCustomer as any).secondaryPhone ? `, ${(selectedCustomer as any).secondaryPhone}` : ''}
+                      </p>
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Address</Label>
@@ -662,6 +676,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   <Input
                     id="edit-name"
                     {...editForm.register('name')}
+                    onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('edit-phone') as HTMLElement | null })}
                     className={cn(
                       editForm.formState.errors.name && 'border-red-500'
                     )}
@@ -681,6 +696,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                     id="edit-phone"
                     type="tel"
                     {...editForm.register('phone')}
+                    onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('edit-secondary-phone') as HTMLElement | null })}
                     className={cn(
                       editForm.formState.errors.phone && 'border-red-500'
                     )}
@@ -688,6 +704,21 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   {editForm.formState.errors.phone && (
                     <p className="text-sm text-red-500">
                       {editForm.formState.errors.phone.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-secondary-phone">Secondary Phone</Label>
+                  <Input
+                    id="edit-secondary-phone"
+                    type="tel"
+                    {...editForm.register('secondaryPhone')}
+                    onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('edit-street') as HTMLElement | null })}
+                  />
+                  {editForm.formState.errors.secondaryPhone && (
+                    <p className="text-sm text-red-500">
+                      {editForm.formState.errors.secondaryPhone.message}
                     </p>
                   )}
                 </div>
@@ -702,6 +733,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                       id="edit-street"
                       {...editForm.register('addressStreet')}
                       placeholder="e.g., 1/85 Zamin Kottampatty"
+                      onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('edit-city') as HTMLElement | null })}
                       className={cn(
                         editForm.formState.errors.addressStreet && 'border-red-500'
                       )}
@@ -720,6 +752,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                         id="edit-city"
                         {...editForm.register('addressCity')}
                         placeholder="e.g., Pollachi"
+                        onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('edit-pincode') as HTMLElement | null })}
                       />
                     </div>
                     <div className="space-y-2">
@@ -729,6 +762,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                         {...editForm.register('addressPincode')}
                         placeholder="e.g., 642123"
                         maxLength={6}
+                        onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('edit-email') as HTMLElement | null })}
                         className={cn(
                           editForm.formState.errors.addressPincode && 'border-red-500'
                         )}
@@ -752,6 +786,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                     id="edit-email"
                     type="email"
                     {...editForm.register('email')}
+                    onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('edit-credit-limit') as HTMLElement | null })}
                     className={cn(
                       editForm.formState.errors.email && 'border-red-500'
                     )}
@@ -843,6 +878,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                         type="number"
                         {...editForm.register('creditLimit')}
                         placeholder="0"
+                        onKeyDown={(e) => navigateOnEnter(e, { next: editSubmitButtonRef.current, selectText: false })}
                       />
                       <p className="text-xs text-muted-foreground">Maximum credit allowed for this customer</p>
                     </div>
@@ -917,7 +953,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                     >
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={isUpdating}>
+                    <Button ref={editSubmitButtonRef} type="submit" disabled={isUpdating}>
                       {isUpdating ? 'Saving...' : 'Save Changes'}
                     </Button>
                   </div>
@@ -951,6 +987,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   id="create-name"
                   {...createForm.register('name')}
                   placeholder="Enter customer name"
+                  onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('create-phone') as HTMLElement | null })}
                   className={cn(
                     createForm.formState.errors.name && 'border-red-500'
                   )}
@@ -971,6 +1008,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   type="tel"
                   {...createForm.register('phone')}
                   placeholder="Enter phone number"
+                  onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('create-secondary-phone') as HTMLElement | null })}
                   className={cn(
                     createForm.formState.errors.phone && 'border-red-500'
                   )}
@@ -978,6 +1016,22 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                 {createForm.formState.errors.phone && (
                   <p className="text-sm text-red-500">
                     {createForm.formState.errors.phone.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-secondary-phone">Secondary Phone</Label>
+                <Input
+                  id="create-secondary-phone"
+                  type="tel"
+                  {...createForm.register('secondaryPhone')}
+                  placeholder="Optional secondary phone"
+                  onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('create-street') as HTMLElement | null })}
+                />
+                {createForm.formState.errors.secondaryPhone && (
+                  <p className="text-sm text-red-500">
+                    {createForm.formState.errors.secondaryPhone.message}
                   </p>
                 )}
               </div>
@@ -992,6 +1046,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                     id="create-street"
                     {...createForm.register('addressStreet')}
                     placeholder="e.g., 1/85 Zamin Kottampatty"
+                    onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('create-city') as HTMLElement | null })}
                     className={cn(
                       createForm.formState.errors.addressStreet && 'border-red-500'
                     )}
@@ -1010,6 +1065,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                       id="create-city"
                       {...createForm.register('addressCity')}
                       placeholder="e.g., Pollachi"
+                      onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('create-pincode') as HTMLElement | null })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -1019,6 +1075,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                       {...createForm.register('addressPincode')}
                       placeholder="e.g., 642123"
                       maxLength={6}
+                      onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('create-credit-limit') as HTMLElement | null })}
                       className={cn(
                         createForm.formState.errors.addressPincode && 'border-red-500'
                       )}
@@ -1043,6 +1100,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   type="number"
                   {...createForm.register('creditLimit')}
                   placeholder="1000"
+                  onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('create-email') as HTMLElement | null })}
                 />
                 <p className="text-xs text-muted-foreground">
                   Set the maximum unpaid amount allowed before staff are asked to collect payment.
@@ -1056,6 +1114,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   type="email"
                   {...createForm.register('email')}
                   placeholder="Enter email address"
+                  onKeyDown={(e) => navigateOnEnter(e, { next: createSubmitButtonRef.current, selectText: false })}
                   className={cn(
                     createForm.formState.errors.email && 'border-red-500'
                   )}
@@ -1100,7 +1159,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isCreating}>
+                <Button ref={createSubmitButtonRef} type="submit" disabled={isCreating}>
                   {isCreating ? 'Creating...' : 'Create Customer'}
                 </Button>
               </DialogFooter>

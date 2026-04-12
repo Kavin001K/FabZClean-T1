@@ -69,6 +69,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
+import { handleFormEnterNavigation } from '@/lib/enter-navigation';
 import { formatINR } from '@/lib/format';
 
 interface Expense {
@@ -579,7 +580,7 @@ function ExpenseDialog({ open, onOpenChange, expense, onSubmit }: ExpenseDialogP
             {expense ? 'Update expense details' : 'Add a new expense'}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDownCapture={handleFormEnterNavigation}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>

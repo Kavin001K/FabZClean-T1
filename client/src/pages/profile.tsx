@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { ImageCropperDialog } from '@/components/image-cropper-dialog';
+import { handleFormEnterNavigation } from '@/lib/enter-navigation';
 import { cn } from '@/lib/utils';
 
 export default function ProfilePage() {
@@ -372,7 +373,7 @@ export default function ProfilePage() {
                                         <CardDescription>Secure your account with a strong password.</CardDescription>
                                     </CardHeader>
                                     <CardContent className="p-6">
-                                        <form onSubmit={handlePasswordChange} className="space-y-6 max-w-md mx-auto py-4">
+                                        <form onSubmit={handlePasswordChange} onKeyDownCapture={handleFormEnterNavigation} className="space-y-6 max-w-md mx-auto py-4">
                                             <div className="space-y-2">
                                                 <Label className="text-muted-foreground">Current Password</Label>
                                                 <Input

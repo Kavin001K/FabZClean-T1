@@ -6,7 +6,7 @@ import { db } from '../db';
 import { LocalStorage } from './local-storage';
 import { R2Storage } from './r2-storage';
 import { businessConfigService } from './business-config-service';
-import { sendInvoiceWhatsApp } from './whatsapp.service';
+import { sendInvoiceWhatsAppBatch } from './whatsapp.service';
 import { smartItemSummary } from '../utils/item-summarizer';
 import {
   DEFAULT_INVOICE_TEMPLATE_CONFIG,
@@ -31,6 +31,7 @@ type OrderLike = {
   customerId?: string | null;
   customerName?: string | null;
   customerPhone?: string | null;
+  secondaryPhone?: string | null;
   customerEmail?: string | null;
   totalAmount?: string | number | null;
   paymentStatus?: string | null;
@@ -71,6 +72,7 @@ type EnrichedInvoiceOrder = {
   order: OrderLike & {
     customerName: string;
     customerPhone: string;
+    secondaryPhone?: string | null;
     customerEmail: string;
     customerAddress?: unknown;
     items: NonNullable<OrderLike['items']>;
@@ -342,6 +344,7 @@ async function hydrateOrderForInvoice(orderId: string, templateId?: string): Pro
     ...order,
     customerName: safeText((order as any).customerName),
     customerPhone: safeText((order as any).customerPhone),
+    secondaryPhone: safeText((order as any).secondaryPhone),
     customerEmail: safeText((order as any).customerEmail),
     items: Array.isArray((order as any).items) ? (order as any).items : [],
   };
@@ -354,6 +357,7 @@ async function hydrateOrderForInvoice(orderId: string, templateId?: string): Pro
 
     mutableOrder.customerName = safeText((customer as any).name, mutableOrder.customerName);
     mutableOrder.customerPhone = safeText((customer as any).phone, mutableOrder.customerPhone);
+    mutableOrder.secondaryPhone = safeText((customer as any).secondaryPhone, mutableOrder.secondaryPhone);
     mutableOrder.customerEmail = safeText((customer as any).email, mutableOrder.customerEmail);
 
     const hasOrderAddress = mutableOrder.deliveryAddress || mutableOrder.shippingAddress || mutableOrder.customerAddress || mutableOrder.address;
@@ -788,8 +792,10 @@ export async function processOrderBillingPipeline(orderId: string, retryCount = 
     const currentOrder = await db.getOrder(orderId);
     const currentCount = Number((currentOrder as any)?.whatsappMessageCount || 0);
 
-    const waResult = await sendInvoiceWhatsApp({
-      phoneNumber: generated.order.customerPhone,
+    const waResult = await sendInvoiceWhatsAppBatch([
+      generated.order.customerPhone,
+      generated.order.secondaryPhone,
+    ], {
       pdfUrl: generated.invoiceUrl,
       filename: `Invoice-${generated.order.orderNumber}.pdf`,
       customerName: generated.order.customerName,

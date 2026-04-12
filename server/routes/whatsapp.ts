@@ -3,6 +3,7 @@
 import { Router } from "express";
 import {
     sendInvoiceWhatsApp,
+    sendInvoiceWhatsAppBatch,
     sendTextWhatsApp,
     getTemplateForSendCount,
     MAX_RESENDS,
@@ -110,6 +111,7 @@ router.post("/send-bill", async (req, res) => {
         const {
             customerName,
             customerPhone,
+            secondaryPhone,
             orderId,
             amount,
             mainItem,
@@ -194,8 +196,7 @@ router.post("/send-bill", async (req, res) => {
         }
 
         // Send with PDF attachment using appropriate template
-        const result = await sendInvoiceWhatsApp({
-            phoneNumber: customerPhone,
+        const result = await sendInvoiceWhatsAppBatch([customerPhone, secondaryPhone], {
             pdfUrl: resolvedPdfUrl,
             filename: filename || `Invoice-${orderId}.pdf`,
             customerName,
@@ -229,6 +230,7 @@ router.post("/send-bill", async (req, res) => {
         res.json({
             success: result.success,
             error: result.error,
+            warning: result.warning,
             message: "WhatsApp order confirmation sent successfully",
             templateUsed: result.templateUsed,
             newSendCount,

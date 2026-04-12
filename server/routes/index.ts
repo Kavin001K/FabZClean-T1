@@ -19,6 +19,7 @@ import whatsappRouter from './whatsapp';
 import whatsappFlowRouter from './whatsapp-flow';
 import documentsRouter from './documents';
 import settingsRouter from './settings';
+import billingSettingsRouter from './billing-settings';
 import auditLogsRouter from './audit-logs';
 import analyticsRouter from './analytics';
 import creditsRouter from './credits';
@@ -196,6 +197,7 @@ export function registerAllRoutes(app: Express): void {
   // Dashboard and Accounting routes
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/accounting', accountingRouter);
+  app.use('/api/settings', billingSettingsRouter);
   app.use('/api/settings', settingsRouter);
   app.use('/api/business-settings', businessSettingsRouter);
 

@@ -193,44 +193,62 @@ export default React.memo(function OrderDetailsDialog({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Order Details: {order.id.substring(0, 8).toUpperCase()}
-            <Badge className={cn("border ml-2", getStatusColor(order.status))}>
-              <span className="flex items-center gap-1">
-                {getStatusIcon(order.status)}
-                <span>{formatStatusDisplay(order.status)}</span>
-              </span>
-            </Badge>
-          </DialogTitle>
-          <DialogDescription>
-            Created on {formatDate(order.createdAt?.toString() || new Date().toISOString())}
-          </DialogDescription>
+        <DialogHeader className="px-6 py-6 pb-4 border-b bg-slate-50/50 dark:bg-slate-900/50">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <DialogTitle className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+                Order <span className="text-primary">#{order.orderNumber || order.id.substring(0, 8).toUpperCase()}</span>
+              </DialogTitle>
+              <Badge className={cn("px-4 py-1.5 text-xs font-black uppercase tracking-widest border-2 shadow-sm rounded-full", getStatusColor(order.status))}>
+                <span className="flex items-center gap-2">
+                  {getStatusIcon(order.status)}
+                  <span>{formatStatusDisplay(order.status)}</span>
+                </span>
+              </Badge>
+            </div>
+            <DialogDescription className="text-sm font-bold text-slate-500 dark:text-slate-400 flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Booked on {formatDate(order.createdAt?.toString() || new Date().toISOString())}
+            </DialogDescription>
+          </div>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-6 py-4 pr-2">
           {/* Top Info Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Customer Column */}
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <User className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Customer</p>
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-lg">{order.customerName || anyOrder.customers?.name || "Guest Customer"}</p>
-                    {(order.customerId || anyOrder.customers?.id) && (
-                      <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0 h-4 bg-slate-100 text-slate-600 border-slate-200">
-                        {order.customerId || anyOrder.customers?.id}
-                      </Badge>
-                    )}
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-slate-900/60 p-5 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-sm">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                    <User className="h-6 w-6" />
                   </div>
-                  {(anyOrder.customers?.phone || anyOrder.phone) && (
-                    <div className="flex items-center text-sm text-muted-foreground mt-1">
-                      <Phone className="h-3 w-3 mr-1" />
-                      {anyOrder.customers?.phone || anyOrder.phone}
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Customer Profile</p>
+                    <p className="font-black text-2xl tracking-tight text-slate-900 dark:text-white leading-tight">
+                      {order.customerName || anyOrder.customers?.name || "Guest Customer"}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  {(anyOrder.customers?.phone || anyOrder.phone || anyOrder.customerPhone || order.customerPhone) && (
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
+                      <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                        <Phone className="h-4 w-4" />
+                      </div>
+                      <span className="text-sm sm:text-base font-black text-slate-700 dark:text-slate-300">
+                        {anyOrder.customers?.phone || anyOrder.phone || anyOrder.customerPhone || order.customerPhone}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {(order.customerId || anyOrder.customers?.id) && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 w-fit">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">ID:</span>
+                      <span className="font-mono text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                        {order.customerId || anyOrder.customers?.id}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -251,35 +269,48 @@ export default React.memo(function OrderDetailsDialog({
               </div>
             </div>
 
-            {/* Dates Column */}
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <Calendar className="h-4 w-4" />
-                </div>
+            {/* Dates & Quick Stats Column */}
+              <div className="bg-white dark:bg-slate-900/60 p-5 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Due Date</p>
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-lg">
-                      {anyOrder.pickupDate ? formatDate(anyOrder.pickupDate) : 'Not Scheduled'}
-                    </p>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="h-12 w-12 rounded-2xl bg-amber-100 dark:bg-amber-950/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-inner">
+                      <Calendar className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Expected Delivery</p>
+                      <p className="font-black text-2xl tracking-tight text-slate-900 dark:text-white leading-tight">
+                        {anyOrder.pickupDate ? formatDate(anyOrder.pickupDate) : 'Not Scheduled'}
+                      </p>
+                    </div>
                   </div>
-                  {anyOrder.pickupDate && (
-                    <Badge variant="outline" className={cn(
-                      "text-xs mt-1",
-                      new Date(anyOrder.pickupDate) < new Date() && !['completed', 'delivered', 'cancelled'].includes(order.status)
-                        ? "bg-red-100 text-red-800 border-red-200"
-                        : "bg-gray-100 text-gray-800 border-gray-200"
-                    )}>
-                      {new Date(anyOrder.pickupDate) < new Date() && !['completed', 'delivered', 'cancelled'].includes(order.status)
-                        ? "Overdue"
-                        : "Scheduled"}
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {anyOrder.pickupDate && (
+                      <Badge className={cn(
+                        "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border-2",
+                        new Date(anyOrder.pickupDate) < new Date() && !['completed', 'delivered', 'cancelled'].includes(order.status)
+                          ? "bg-rose-50 text-rose-700 border-rose-200 shadow-sm shadow-rose-100"
+                          : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      )}>
+                        {new Date(anyOrder.pickupDate) < new Date() && !['completed', 'delivered', 'cancelled'].includes(order.status)
+                          ? "Overdue Alert"
+                          : "On Schedule"}
+                      </Badge>
+                    )}
+                    <Badge variant="outline" className="font-black border-slate-900 bg-slate-900 text-white dark:bg-slate-800 dark:border-slate-700 text-[10px] uppercase tracking-widest px-3 py-1 rounded-lg">
+                      {storeLabel}
                     </Badge>
-                  )}
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Priority</span>
+                  <Badge className={cn("font-black tracking-widest uppercase text-[10px] px-3 py-1", getPriorityColor(anyOrder.priority || 'Normal'))}>
+                    {anyOrder.priority || 'Normal'}
+                  </Badge>
                 </div>
               </div>
             </div>
-          </div>
 
           {/* Items Section */}
           <div>
@@ -323,48 +354,48 @@ export default React.memo(function OrderDetailsDialog({
 
           {/* Payment & Charges */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-4 rounded-lg bg-muted/30 space-y-3 flex flex-col h-full">
+            <div className="p-5 rounded-xl bg-muted/40 border shadow-sm space-y-4 flex flex-col h-full">
               <div className="flex items-center gap-2 mb-2">
-                <IndianRupee className="h-4 w-4 text-muted-foreground" />
-                <p className="font-medium text-sm">Payment Details</p>
+                <IndianRupee className="h-5 w-5 text-emerald-600" />
+                <p className="font-bold text-base uppercase tracking-wider text-slate-800 dark:text-slate-200">Payment Details</p>
               </div>
 
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Status</span>
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-semibold text-slate-500 uppercase tracking-widest text-[10px]">Status</span>
                 <Badge variant={anyOrder.paymentStatus === 'paid' ? 'default' : anyOrder.paymentStatus === 'credit' ? 'secondary' : 'destructive'}
-                  className={anyOrder.paymentStatus === 'credit' ? 'bg-orange-100 text-orange-800 hover:bg-orange-200' : ''}>
+                  className={cn("px-2.5 py-0.5 text-xs font-black uppercase tracking-wider", anyOrder.paymentStatus === 'credit' ? 'bg-orange-100 text-orange-800 hover:bg-orange-200' : '')}>
                   {anyOrder.paymentStatus ? anyOrder.paymentStatus.toUpperCase() : 'PENDING'}
                 </Badge>
               </div>
 
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Method</span>
-                <span className="font-medium">{anyOrder.paymentMethod || 'Cash'}</span>
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-semibold text-slate-500 uppercase tracking-widest text-[10px]">Method</span>
+                <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider">{anyOrder.paymentMethod || 'Cash'}</span>
               </div>
 
               {anyOrder.walletUsed && parseFloat(anyOrder.walletUsed) > 0 && (
-                <div className="flex justify-between text-sm pt-2 border-t">
-                  <span className="text-muted-foreground">Wallet Used</span>
-                  <span className="text-emerald-600 font-medium">-{formatCurrency(anyOrder.walletUsed)}</span>
+                <div className="flex justify-between text-sm pt-3 border-t border-slate-200 dark:border-slate-800">
+                  <span className="font-semibold text-slate-500 uppercase tracking-widest text-[10px]">Wallet Used</span>
+                  <span className="text-emerald-600 font-bold">-{formatCurrency(anyOrder.walletUsed)}</span>
                 </div>
               )}
 
               {anyOrder.advancePaid && parseFloat(anyOrder.advancePaid) > 0 && (
-                <div className="flex justify-between text-sm pt-2 border-t">
-                  <span className="text-muted-foreground">Advance/Cash Paid</span>
-                  <span className="text-amber-600 font-medium">{formatCurrency(anyOrder.advancePaid)}</span>
+                <div className="flex justify-between text-sm pt-3 border-t border-slate-200 dark:border-slate-800">
+                  <span className="font-semibold text-slate-500 uppercase tracking-widest text-[10px]">Advance/Cash Paid</span>
+                  <span className="text-emerald-700 font-bold">{formatCurrency(anyOrder.advancePaid)}</span>
                 </div>
               )}
 
               {anyOrder.creditUsed && parseFloat(anyOrder.creditUsed) > 0 && (
-                <div className="flex justify-between text-sm pt-2 border-t">
-                  <span className="text-muted-foreground">Credit Assigned</span>
-                  <span className="text-red-600 font-medium">{formatCurrency(anyOrder.creditUsed)}</span>
+                <div className="flex justify-between text-sm pt-3 border-t border-slate-200 dark:border-slate-800">
+                  <span className="font-semibold text-slate-500 uppercase tracking-widest text-[10px]">Credit Assigned</span>
+                  <span className="text-red-600 font-bold">{formatCurrency(anyOrder.creditUsed)}</span>
                 </div>
               )}
 
-              <div className="flex justify-between text-base font-bold pt-2 border-t mt-auto">
-                <span>Total Amount</span>
+              <div className="flex justify-between items-center text-xl font-black pt-4 border-t-2 border-slate-200 dark:border-slate-800 mt-auto">
+                <span className="uppercase tracking-widest text-[12px] text-slate-500">Total Amount</span>
                 <span className="text-primary">{formatCurrency(parseFloat(order.totalAmount || "0"))}</span>
               </div>
             </div>
@@ -393,106 +424,119 @@ export default React.memo(function OrderDetailsDialog({
 
           {/* Notes */}
           {anyOrder.notes && (
-            <div className="bg-yellow-50 dark:bg-yellow-900/10 p-3 rounded-lg border border-yellow-100 dark:border-yellow-900/20">
-              <p className="text-xs font-bold text-yellow-800 dark:text-yellow-500 mb-1">ORDER NOTES</p>
-              <p className="text-sm text-yellow-900 dark:text-yellow-200">{anyOrder.notes}</p>
+            <div className="relative overflow-hidden bg-amber-50 dark:bg-amber-950/20 p-5 rounded-2xl border-2 border-amber-100 dark:border-amber-900/30">
+              <div className="absolute top-0 right-0 p-2 opacity-10">
+                <AlertCircle className="h-12 w-12" />
+              </div>
+              <p className="text-[10px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-widest mb-2">Special Instructions</p>
+              <p className="text-base font-bold text-amber-900 dark:text-amber-200 leading-relaxed italic">"{anyOrder.notes}"</p>
             </div>
           )}
         </div>
 
         {/* Footer Actions */}
-        <div className="flex flex-col gap-4 pt-4 border-t mt-2">
-          <div className="flex justify-end gap-2 flex-wrap">
-            {order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'delivered' && (
-              <Button variant="ghost" onClick={() => onCancel(order)} className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                <XCircle className="h-4 w-4 mr-2" /> Cancel
-              </Button>
-            )}
-
-            {canMarkPaid && onUpdatePaymentStatus && (
-              <Button
-                variant="outline"
-                onClick={() => onUpdatePaymentStatus(order, 'paid')}
-                className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
-              >
-                <CreditCard className="h-4 w-4 mr-2" />
-                Mark Paid (₹{outstandingAmount.toFixed(2)})
-              </Button>
-            )}
-
-            <Button variant="outline" onClick={() => onEdit(order)}>
-              <Edit className="h-4 w-4 mr-2" /> Edit
-            </Button>
-
-            <Button variant="outline" onClick={handlePrintInvoice} data-print-button>
-              <Printer className="h-4 w-4 mr-2" /> Invoice
-            </Button>
-
-            <Button
-              variant="outline"
-              onClick={() => window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank')}
-              className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
-            >
-              <Navigation className="h-4 w-4 mr-2" /> Track
-            </Button>
-
-            {/* Resend Bill Button */}
-            {onResendBill && (() => {
-              const sendCount = Number((order as any).whatsappMessageCount || 0);
-              const hasPhone = Boolean(resolvedCustomerPhone);
-              const limitReached = sendCount >= MAX_WHATSAPP_SENDS;
-              const canResend = hasPhone && !limitReached;
-              return (
+        <div className="px-6 py-6 border-t bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-sm sticky bottom-0">
+          <div className="flex flex-col gap-3">
+            {/* Primary Action Row */}
+            <div className="flex gap-2 w-full">
+              {nextStatus && (
                 <Button
-                  variant="outline"
-                  onClick={() => onResendBill(order)}
-                  disabled={!canResend || isResendingBill}
-                  className={cn(
-                    "relative",
-                    canResend
-                      ? "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800"
-                      : "opacity-50"
-                  )}
-                  title={
-                    !hasPhone
-                      ? 'No phone number available'
-                      : limitReached
-                        ? `Maximum ${MAX_WHATSAPP_SENDS} sends reached`
-                        : `Send bill via WhatsApp (${sendCount}/${MAX_WHATSAPP_SENDS})`
+                  className="flex-1 h-12 text-sm font-black uppercase tracking-widest shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 text-white"
+                  onClick={() => onNextStep(order)}
+                  disabled={
+                    (nextStatus === 'completed' || nextStatus === 'delivered') &&
+                    anyOrder.paymentStatus !== 'paid' && anyOrder.paymentStatus !== 'credit'
                   }
                 >
-                  {isResendingBill ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4 mr-2" />
-                  )}
-                  Resend Bill
-                  <span className="ml-1.5 text-[10px] font-bold opacity-70">
-                    {sendCount}/{MAX_WHATSAPP_SENDS}
-                  </span>
+                  <PlusCircle className="h-5 w-5 mr-2" />
+                  {order.status === 'ready_for_pickup' && anyOrder.fulfillmentType === 'delivery'
+                    ? 'Start Delivery'
+                    : order.status === 'ready_for_pickup'
+                      ? 'Hand Over'
+                      : order.status === 'out_for_delivery'
+                        ? 'Mark Delivered'
+                        : `Move to ${formatStatusDisplay(nextStatus)}`
+                  }
                 </Button>
-              );
-            })()}
-
-            {nextStatus && (
-              <Button
-                onClick={() => onNextStep(order)}
-                disabled={
-                  (nextStatus === 'completed' || nextStatus === 'delivered') &&
-                  anyOrder.paymentStatus !== 'paid' && anyOrder.paymentStatus !== 'credit'
-                }
+              )}
+              
+              <Button 
+                variant="outline" 
+                size="icon"
+                className="h-12 w-12 rounded-xl border-2 border-slate-200 dark:border-slate-800 shadow-sm"
+                onClick={handlePrintInvoice}
+                title="Print Invoice"
               >
-                <PlusCircle className="h-4 w-4 mr-2" />
-                {order.status === 'ready_for_pickup' && anyOrder.fulfillmentType === 'delivery'
-                  ? 'Start Delivery'
-                  : order.status === 'ready_for_pickup'
-                    ? 'Hand Over'
-                    : order.status === 'out_for_delivery'
-                      ? 'Mark Delivered'
-                      : `Move to ${formatStatusDisplay(nextStatus)}`
-                }
+                <Printer className="h-5 w-5" />
               </Button>
-            )}
+            </div>
+
+            {/* Secondary Action Row */}
+            <div className="flex flex-wrap gap-2">
+              <Button 
+                variant="secondary" 
+                className="flex-1 h-10 font-black uppercase tracking-widest text-[10px] rounded-xl border-2 border-slate-200 dark:border-slate-700"
+                onClick={() => onEdit(order)}
+              >
+                <Edit className="h-3.5 w-3.5 mr-2" /> Edit Order
+              </Button>
+
+              {onResendBill && (() => {
+                const sendCount = Number((order as any).whatsappMessageCount || 0);
+                const hasPhone = Boolean(resolvedCustomerPhone);
+                const limitReached = sendCount >= MAX_WHATSAPP_SENDS;
+                const canResend = hasPhone && !limitReached;
+                return (
+                  <Button
+                    variant="outline"
+                    onClick={() => onResendBill(order)}
+                    disabled={!canResend || isResendingBill}
+                    className={cn(
+                      "flex-1 h-10 font-black uppercase tracking-widest text-[10px] rounded-xl border-2 shadow-sm",
+                      canResend
+                        ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800"
+                        : "opacity-50"
+                    )}
+                  >
+                    {isResendingBill ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="h-3.5 w-3.5 mr-2" />
+                    )}
+                    WhatsApp Bill ({sendCount}/{MAX_WHATSAPP_SENDS})
+                  </Button>
+                );
+              })()}
+
+              <Button
+                variant="outline"
+                className="flex-1 h-10 font-black uppercase tracking-widest text-[10px] rounded-xl border-2 border-slate-200 dark:border-slate-800"
+                onClick={() => window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank')}
+              >
+                <Navigation className="h-3.5 w-3.5 mr-2" /> Track
+              </Button>
+
+              {canMarkPaid && onUpdatePaymentStatus && (
+                <Button
+                  variant="outline"
+                  onClick={() => onUpdatePaymentStatus(order, 'paid')}
+                  className="w-full sm:w-auto h-10 font-black uppercase tracking-widest text-[10px] rounded-xl bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                >
+                  <CreditCard className="h-3.5 w-3.5 mr-2" />
+                  Mark Paid (₹{outstandingAmount.toFixed(2)})
+                </Button>
+              )}
+
+              {order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'delivered' && (
+                <Button 
+                  variant="ghost" 
+                  onClick={() => onCancel(order)} 
+                  className="flex-1 h-10 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-bold text-[10px] uppercase tracking-widest rounded-xl"
+                >
+                  <XCircle className="h-3.5 w-3.5 mr-2" /> Cancel
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </DialogContent>

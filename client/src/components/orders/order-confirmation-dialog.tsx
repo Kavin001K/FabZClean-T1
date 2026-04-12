@@ -65,6 +65,7 @@ export function OrderConfirmationDialog({
 
     // Get effective customer details — order-level fields take priority, then DB customer fields
     const customerPhone = order?.customerPhone || customerData?.phone;
+    const secondaryPhone = (customerData as any)?.secondaryPhone || (order as any)?.secondaryPhone || '';
     const customerName = order?.customerName || customerData?.name || 'Valued Customer';
     const customerEmail = order?.customerEmail || customerData?.email || '';
     const customerAddress = (order as any)?.deliveryAddress || (order as any)?.shippingAddress || customerData?.address || '';
@@ -348,6 +349,7 @@ export function OrderConfirmationDialog({
                 billUrl,
                 pdfUrl,
                 mainItemName,
+                secondaryPhone,
                 whatsappSendCount // Pass current send count
             );
 
@@ -362,8 +364,8 @@ export function OrderConfirmationDialog({
                 toast({
                     title: "Sent!",
                     description: result.canResendAgain
-                        ? `WhatsApp ${templateName} sent. ${MAX_WHATSAPP_SENDS - newCount} resend(s) remaining.`
-                        : `WhatsApp ${templateName} sent. No more resends available.`,
+                        ? `${result.warning || `WhatsApp ${templateName} sent.`} ${MAX_WHATSAPP_SENDS - newCount} resend(s) remaining.`
+                        : `${result.warning || `WhatsApp ${templateName} sent.`} No more resends available.`,
                 });
                 setWhatsappStatus('sent');
             } else {

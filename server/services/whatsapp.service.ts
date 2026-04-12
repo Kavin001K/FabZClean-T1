@@ -83,6 +83,15 @@ interface SendResult {
     templateUsed?: string;
 }
 
+interface BatchSendResult {
+    success: boolean;
+    templateUsed?: string;
+    error?: string;
+    warning?: string;
+    sentTo: string[];
+    failedRecipients: Array<{ phoneNumber: string; error: string }>;
+}
+
 /**
  * Clean and format phone number for India
  */
@@ -95,6 +104,22 @@ function cleanPhoneNumber(phone: string): string {
         cleanPhone = '91' + cleanPhone;
     }
     return cleanPhone;
+}
+
+function buildUniqueRecipientList(...phoneNumbers: Array<string | null | undefined>): string[] {
+    const unique = new Map<string, string>();
+
+    for (const rawPhone of phoneNumbers) {
+        const trimmed = String(rawPhone || '').trim();
+        if (!trimmed) continue;
+        const cleaned = cleanPhoneNumber(trimmed);
+        if (!cleaned) continue;
+        if (!unique.has(cleaned)) {
+            unique.set(cleaned, trimmed);
+        }
+    }
+
+    return [...unique.values()];
 }
 
 /**
@@ -715,6 +740,66 @@ export async function sendInvoiceWhatsApp({
             templateUsed: template.name,
         };
     }
+}
+
+export async function sendInvoiceWhatsAppBatch(
+    phoneNumbers: Array<string | null | undefined>,
+    params: Omit<InvoiceMessageParams, 'phoneNumber'>
+): Promise<BatchSendResult> {
+    const recipients = buildUniqueRecipientList(...phoneNumbers);
+
+    if (!recipients.length) {
+        return {
+            success: false,
+            error: 'No valid WhatsApp recipient numbers available',
+            sentTo: [],
+            failedRecipients: [],
+        };
+    }
+
+    const sentTo: string[] = [];
+    const failedRecipients: Array<{ phoneNumber: string; error: string }> = [];
+    let templateUsed: string | undefined;
+
+    for (const phoneNumber of recipients) {
+        const result = await sendInvoiceWhatsApp({
+            ...params,
+            phoneNumber,
+        });
+
+        if (result.success) {
+            sentTo.push(phoneNumber);
+            templateUsed = result.templateUsed || templateUsed;
+            continue;
+        }
+
+        failedRecipients.push({
+            phoneNumber,
+            error: result.error || 'WhatsApp delivery failed',
+        });
+    }
+
+    if (!sentTo.length) {
+        return {
+            success: false,
+            templateUsed,
+            error: failedRecipients.map((entry) => `${entry.phoneNumber}: ${entry.error}`).join('; '),
+            sentTo,
+            failedRecipients,
+        };
+    }
+
+    const warning = failedRecipients.length
+        ? `Sent to ${sentTo.join(', ')}. Failed for ${failedRecipients.map((entry) => entry.phoneNumber).join(', ')}.`
+        : undefined;
+
+    return {
+        success: true,
+        templateUsed,
+        warning,
+        sentTo,
+        failedRecipients,
+    };
 }
 
 /**
