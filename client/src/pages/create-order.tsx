@@ -1121,7 +1121,7 @@ export default function CreateOrder() {
   }
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 lg:p-8 animate-fade-in pb-24 lg:pb-8 dark:bg-slate-950 min-h-screen">
+    <div className="p-3 sm:p-4 md:p-6 lg:p-8 animate-fade-in pb-24 lg:pb-8 bg-background dark:bg-slate-950 min-h-screen">
       <header className="mb-4 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Create New Order</h1>
         <Button
@@ -2312,7 +2312,7 @@ export default function CreateOrder() {
             className="sticky top-24 z-10"
           >
             <Card className="border-none shadow-2xl bg-gradient-to-br from-white via-white to-slate-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 overflow-hidden ring-1 ring-slate-200/60 dark:ring-slate-800 rounded-2xl md:rounded-xl">
-              <div className="h-1.5 w-full bg-primary" />
+              <div className="h-1.5 w-full bg-primary"></div>
               <CardHeader className="pb-4 border-b dark:border-slate-700/50">
                 <CardTitle className="flex items-center justify-between text-slate-900 dark:text-white">
                   <span className="flex items-center gap-2">
@@ -2498,7 +2498,7 @@ export default function CreateOrder() {
       </div>
 
       {/* Customer Creation Dialog */}
-      < Dialog open={showCustomerDialog} onOpenChange={setShowCustomerDialog} >
+      <Dialog open={showCustomerDialog} onOpenChange={setShowCustomerDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Customer</DialogTitle>
@@ -2615,7 +2615,7 @@ export default function CreateOrder() {
       {/* Credit Override Dialog */}
       <Dialog open={!!creditOverridePrompt} onOpenChange={(open) => !open && setCreditOverridePrompt(null)}>
         <DialogContent className="max-w-2xl border-none shadow-2xl p-0 overflow-hidden bg-slate-50 dark:bg-slate-950 max-h-[90vh] flex flex-col">
-          <div className="h-1.5 w-full bg-amber-500" />
+          <div className="h-1.5 w-full bg-amber-500"></div>
           
           <div className="p-6 space-y-6 overflow-y-auto">
             <DialogHeader>
@@ -2677,7 +2677,7 @@ export default function CreateOrder() {
                         </div>
                       </div>
                     ))}
-                    {customerOrders.length === 0 && (
+                    {customerOrders && customerOrders.length === 0 && (
                       <div className="text-center py-4">
                         <p className="text-xs text-muted-foreground opacity-50 italic">No recent order history</p>
                       </div>
@@ -2725,7 +2725,7 @@ export default function CreateOrder() {
       </Dialog>
 
       {/* Success Modal */}
-      < OrderConfirmationDialog
+      <OrderConfirmationDialog
         open={isModalOpen}
         onOpenChange={setIsModalOpen}
         order={createdOrder}
