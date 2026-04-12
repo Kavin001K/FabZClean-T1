@@ -2161,13 +2161,157 @@ export default function CreateOrder() {
 
         {/* Right Column: Order Summary & Activity Tracker */}
         <div className="lg:col-span-1 space-y-6">
+          {/* Customer History Section - Now at the Top */}
+          <AnimatePresence>
+            {foundCustomer && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3, delay: 0.2 }}
+                className="mb-4"
+              >
+                <Card className="border-2 border-primary/20 bg-gradient-to-br from-background to-primary/5 shadow-sm">
+                  <CardHeader className="pb-3 border-b border-primary/10">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <div className="p-1.5 rounded-lg bg-primary/10">
+                        <History className="h-4 w-4 text-primary" />
+                      </div>
+                      Customer History
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {customerOrdersLoading ? (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        <span className="ml-2 text-sm text-muted-foreground">Loading history...</span>
+                      </div>
+                    ) : customerStats ? (
+                      <>
+                        {/* Customer Stats Grid */}
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                          <div className="bg-emerald-50 dark:bg-emerald-950/30 p-3 rounded-lg border border-emerald-200/50 dark:border-emerald-800/50 shadow-sm">
+                            <div className="flex items-center gap-2 mb-1">
+                              <ShoppingBag className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                              <span className="text-[10px] uppercase tracking-wider font-extrabold text-emerald-600 dark:text-emerald-400 leading-none">Total Orders</span>
+                            </div>
+                            <p className="text-2xl font-black text-emerald-700 dark:text-emerald-300 tabular-nums">{customerStats.totalOrders}</p>
+                          </div>
+
+                          <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
+                            <div className="flex items-center gap-2 mb-1">
+                              <TrendingUp className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                              <span className="text-[10px] uppercase tracking-wider font-extrabold text-blue-600 dark:text-blue-400 leading-none">Total Spent</span>
+                            </div>
+                            <p className="text-2xl font-black text-blue-700 dark:text-blue-300 tabular-nums">₹{customerStats.totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                          </div>
+
+                          <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-lg border border-green-200/50 dark:border-green-800/50 shadow-sm">
+                            <div className="flex items-center gap-2 mb-1">
+                              <CreditCard className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                              <span className="text-[10px] uppercase tracking-wider font-extrabold text-green-600 dark:text-green-400 leading-none">Wallet</span>
+                            </div>
+                            <p className="text-2xl font-black text-green-700 dark:text-green-300 tabular-nums">
+                              ₹{parseFloat(String(foundCustomer?.walletBalanceCache || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                            </p>
+                          </div>
+
+                          <div className="bg-red-50 dark:bg-red-950/30 p-3 rounded-lg border border-red-200/50 dark:border-red-800/50 shadow-sm">
+                            <div className="flex items-center gap-2 mb-1">
+                              <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                              <span className="text-[10px] uppercase tracking-wider font-extrabold text-red-600 dark:text-red-400 leading-none">Credit Due</span>
+                            </div>
+                            {(() => {
+                              const due = foundCustomer?.creditBalance ? Number(foundCustomer.creditBalance) : 0;
+                              const limit = Math.max(0, Number((foundCustomer as any)?.creditLimit ?? 1000));
+                              const dueClass = due > limit ? "text-red-700 dark:text-red-300" : due === 0 ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300";
+                              return (
+                                <p className={`text-2xl font-black ${dueClass} tabular-nums`}>
+                                  ₹{due.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                </p>
+                              );
+                            })()}
+                          </div>
+
+                          <div className="bg-amber-50 dark:bg-amber-950/30 p-3 rounded-lg border border-amber-200/50 dark:border-amber-800/50 shadow-sm">
+                            <div className="flex items-center gap-2 mb-1">
+                              <CheckCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                              <span className="text-[10px] uppercase tracking-wider font-extrabold text-amber-600 dark:text-amber-400 leading-none">Limit</span>
+                            </div>
+                            <p className="text-2xl font-black text-amber-700 dark:text-amber-300 tabular-nums">
+                              ₹{Math.max(0, Number((foundCustomer as any)?.creditLimit ?? 1000)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Recent Transactions List */}
+                        {customerOrders.length > 0 && (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Recent Activity</p>
+                            </div>
+                            <div className="max-h-[220px] overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                              {customerOrders.slice(0, 5).map((order, idx) => (
+                                <div
+                                  key={order.id || idx}
+                                  onClick={() => {
+                                    setSelectedHistoryOrder(order);
+                                    setIsHistoryDetailsOpen(true);
+                                  }}
+                                  className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-primary/30 rounded-xl transition-all cursor-pointer hover:shadow-sm"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                      <span className="text-sm font-black text-primary font-mono tracking-tighter">
+                                        {order.orderNumber || `#${order.id?.slice(0, 8)}`}
+                                      </span>
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          "text-[9px] font-bold px-1.5 py-0 leading-tight",
+                                          order.status === 'completed' || order.status === 'delivered'
+                                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                            : order.status === 'processing'
+                                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                                              : "bg-amber-50 text-amber-700 border-amber-200"
+                                        )}
+                                      >
+                                        {order.status?.toUpperCase()}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase">
+                                      {order.createdAt ? format(new Date(order.createdAt), 'dd MMM yyyy') : 'N/A'}
+                                    </p>
+                                  </div>
+                                  <span className="text-lg font-black text-slate-900 dark:text-white tabular-nums">
+                                    ₹{parseFloat(order.totalAmount || '0').toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center py-8 bg-slate-50 dark:bg-slate-900/50 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-800">
+                        <Package className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                        <p className="text-sm font-bold text-slate-400">First-time Customer</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Bill Summary - Sticky Section */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
+            transition={{ duration: 0.3, delay: 0.3 }}
             className="sticky top-24 z-10"
           >
-            <Card className="border-none shadow-xl bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 overflow-hidden ring-1 ring-slate-200 dark:ring-slate-800 rounded-2xl md:rounded-xl">
+            <Card className="border-none shadow-2xl bg-gradient-to-br from-white via-white to-slate-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 overflow-hidden ring-1 ring-slate-200/60 dark:ring-slate-800 rounded-2xl md:rounded-xl">
               <div className="h-1.5 w-full bg-primary" />
               <CardHeader className="pb-4 border-b dark:border-slate-700/50">
                 <CardTitle className="flex items-center justify-between text-slate-900 dark:text-white">
@@ -2180,21 +2324,21 @@ export default function CreateOrder() {
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   {selectedServices.length === 0 ? (
-                    <div className="text-center py-6 border-2 border-dashed rounded-lg bg-slate-50/50 dark:bg-slate-900/50">
+                    <div className="text-center py-8 border-2 border-dashed rounded-xl bg-slate-50/50 dark:bg-slate-900/50">
                       <ShoppingCart className="h-8 w-8 mx-auto mb-2 text-slate-300" />
-                      <p className="text-sm text-slate-400">Add services to see summary</p>
+                      <p className="text-sm font-medium text-slate-400">Add services to see summary</p>
                     </div>
                   ) : (
-                    <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 scrollbar-thin">
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin">
                       {selectedServices.map(item => (
-                        <div key={item.instanceKey} className="flex justify-between items-start text-sm group gap-3">
+                        <div key={item.instanceKey} className="flex justify-between items-start text-sm group gap-3 py-1">
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium group-hover:text-primary transition-colors truncate">{item.service.name}</p>
-                            <p className="text-[11px] text-muted-foreground truncate">
+                            <p className="font-bold group-hover:text-primary transition-colors truncate">{item.service.name}</p>
+                            <p className="text-[11px] font-black text-muted-foreground/80 truncate">
                               ₹{safeParseFloat(item.priceOverride).toFixed(2)} × {item.quantity}
                             </p>
                           </div>
-                          <span className="font-bold text-slate-700 dark:text-slate-300 flex-shrink-0">₹{item.subtotal.toFixed(2)}</span>
+                          <span className="font-black text-slate-800 dark:text-slate-200 flex-shrink-0">₹{item.subtotal.toFixed(2)}</span>
                         </div>
                       ))}
                     </div>
@@ -2202,16 +2346,13 @@ export default function CreateOrder() {
                 </div>
 
                 <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-                    <div className="flex justify-between items-center gap-4 text-sm text-slate-900 dark:text-slate-100 font-medium">
+                    <div className="flex justify-between items-center gap-4 text-sm text-slate-900 dark:text-slate-100 font-bold">
                       <div className="flex items-center gap-2">
                         <span className="opacity-70 dark:opacity-80 min-w-0 truncate">Services Subtotal</span>
                         {selectedServiceCount > 0 && (
                           <div className="flex items-center gap-1.5 ml-1">
-                            <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[10px] py-0 px-1.5 h-4 leading-none">
-                              {selectedServiceCount} {selectedServiceCount === 1 ? 'service' : 'services'}
-                            </Badge>
-                            <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-none text-[10px] py-0 px-1.5 h-4 leading-none">
-                              {totalSelectedItemCount} items
+                            <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[10px] py-0 px-2 h-4 leading-none font-black">
+                              {selectedServiceCount} Svc
                             </Badge>
                           </div>
                         )}
@@ -2224,10 +2365,10 @@ export default function CreateOrder() {
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
-                          className="flex justify-between gap-4 text-sm text-amber-600 dark:text-amber-400 font-bold"
+                          className="flex justify-between gap-4 text-sm text-amber-600 dark:text-amber-400 font-black"
                         >
                           <span className="flex items-center gap-1 min-w-0">
-                            <Zap className="h-3.5 w-3.5 flex-shrink-0" /> <span className="truncate">Express Charge (50%)</span>
+                            <Zap className="h-3.5 w-3.5 flex-shrink-0" /> <span className="truncate">Express (50%)</span>
                           </span>
                           <span className="flex-shrink-0">+₹{expressSurcharge.toFixed(2)}</span>
                         </motion.div>
@@ -2237,11 +2378,11 @@ export default function CreateOrder() {
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
-                          className="flex justify-between gap-4 text-sm text-emerald-600 dark:text-emerald-400 font-bold"
+                          className="flex justify-between gap-4 text-sm text-emerald-600 dark:text-emerald-400 font-black"
                         >
                           <span className="flex items-center gap-1 min-w-0">
                             <TrendingDown className="h-3.5 w-3.5 flex-shrink-0" /> 
-                            <span className="truncate">Discount {discountType === 'percentage' ? `(${discountValue}%)` : '(Fixed)'}</span>
+                            <span className="truncate">Discount ({discountType === 'percentage' ? `${discountValue}%` : 'Fixed'})</span>
                           </span>
                           <span className="flex-shrink-0">-₹{discountAmount.toFixed(2)}</span>
                         </motion.div>
@@ -2251,7 +2392,7 @@ export default function CreateOrder() {
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
-                          className="flex justify-between gap-4 text-sm text-foreground/80 dark:text-slate-300"
+                          className="flex justify-between gap-4 text-sm text-foreground/80 dark:text-slate-300 font-medium"
                         >
                           <span className="flex items-center gap-1 italic min-w-0">
                             <PlusCircle className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
@@ -2265,15 +2406,15 @@ export default function CreateOrder() {
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
-                          className="flex justify-between gap-4 text-sm text-slate-900 dark:text-slate-100 font-medium"
+                          className="flex justify-between gap-4 text-sm text-slate-900 dark:text-slate-100 font-black"
                         >
                           <span className="opacity-70 dark:opacity-80 min-w-0 truncate">GST (18%)</span>
-                          <span className="font-black flex-shrink-0">+₹{gstAmount.toFixed(2)}</span>
+                          <span className="flex-shrink-0">+₹{gstAmount.toFixed(2)}</span>
                         </motion.div>
                       )}
                   </AnimatePresence>
 
-                  <div className="mt-4 p-5 rounded-2xl bg-primary text-white shadow-2xl transition-all duration-300 hover:scale-[1.03] ring-4 ring-primary/10">
+                  <div className="mt-4 p-5 rounded-2xl bg-primary text-white shadow-xl shadow-primary/20 ring-4 ring-primary/10 transition-transform active:scale-95">
                     <div className="flex justify-between items-center gap-4">
                       <div className="min-w-0">
                          <span className="text-[10px] uppercase tracking-[0.2em] font-black opacity-80 block truncate">
@@ -2294,258 +2435,46 @@ export default function CreateOrder() {
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
-                        className="mt-2 flex justify-between text-sm text-emerald-600 dark:text-emerald-400 font-bold px-1"
+                        className="mt-2 flex justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-black px-1 uppercase tracking-wider"
                       >
                         <span className="flex items-center gap-1">
-                          <CreditCard className="h-3.5 w-3.5" /> Wallet Applied
+                          <CreditCard className="h-3 w-3" /> Wallet Used
                         </span>
                         <span>-₹{walletApplied.toFixed(2)}</span>
                       </motion.div>
                     )}
                   </AnimatePresence>
-
-                  <AnimatePresence>
-                    {advancePayment && parseFloat(advancePayment) > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/30 space-y-2"
-                      >
-                        <div className="flex justify-between items-center">
-                          <p className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400">Advance Paid</p>
-                          <span className="text-lg font-bold text-emerald-600">₹{parseFloat(advancePayment).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between items-center border-t border-emerald-100 dark:border-emerald-800 pt-1">
-                          <p className="text-xs font-bold text-red-600">Balance Due</p>
-                          <span className="text-sm font-bold text-red-600">₹{(totalAmount - parseFloat(advancePayment)).toFixed(2)}</span>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </div>
 
-                <div className={cn(
-                  "mt-6 pb-6",
-                  // Removed fixed positioning on mobile to move it "below payable amount" as requested
-                  // and avoid overlapping with bottom navigation bar
-                )}>
+                <div className="mt-6">
                   <Button
                     onClick={handleCreateOrder}
                     data-save-button
-          disabled={createOrderMutation.isPending || selectedServiceCount === 0 || !customerName || !customerPhone}
-                    className="w-full h-12 text-lg font-black shadow-lg shadow-primary/25 hover:scale-[1.01] active:scale-[0.98] transition-all bg-primary hover:bg-primary/90"
+                    disabled={createOrderMutation.isPending || selectedServiceCount === 0 || !customerName || !customerPhone}
+                    className="w-full h-14 text-xl font-black shadow-lg shadow-primary/25 hover:shadow-primary/40 active:scale-[0.98] transition-all bg-primary hover:bg-primary/90 rounded-2xl"
                   >
                     {createOrderMutation.isPending ? (
                       <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Creating Order...
+                        <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                        Creating...
                       </>
                     ) : (
                       <>
-                        <CheckCircle className="mr-2 h-5 w-5" />
+                        <CheckCircle className="mr-2 h-6 w-6" />
                         Place Order • ₹{Math.max(0, finalPayable - (parseFloat(advancePayment) || 0)).toFixed(0)}
                       </>
                     )}
                   </Button>
                   
-                  {isMobile && (
-                    <p className="text-[9px] text-center text-muted-foreground mt-2 italic leading-tight">
-                      Automatic WhatsApp bill will be sent.
-                    </p>
-                  )}
-                </div>
-                
-                {!isMobile && (
-                  <p className="text-[10px] text-center text-muted-foreground px-4 italic leading-relaxed">
+                  <p className="text-[10px] text-center text-muted-foreground mt-3 italic leading-relaxed px-4">
                     By placing this order, you agree to the service terms. A WhatsApp bill will be sent automatically.
                   </p>
-                )}
+                </div>
               </CardContent>
             </Card>
-
-
-
-            {/* Customer History Section */}
-            <AnimatePresence>
-            {foundCustomer && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3, delay: 0.3 }}
-                className="mt-4"
-              >
-                <Card className="border-2 border-primary/20 bg-gradient-to-br from-background to-primary/5">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <div className="p-1.5 rounded-lg bg-primary/10">
-                        <History className="h-4 w-4 text-primary" />
-                      </div>
-                      Customer History
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {customerOrdersLoading ? (
-                      <div className="flex items-center justify-center py-6">
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                        <span className="ml-2 text-sm text-muted-foreground">Loading history...</span>
-                      </div>
-                    ) : customerStats ? (
-                      <>
-                        {/* Customer Stats Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 p-3 rounded-lg border border-emerald-200/50 dark:border-emerald-800/50">
-                            <div className="flex items-center gap-2 mb-1">
-                              <ShoppingBag className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                              <span className="text-[10px] uppercase tracking-wider font-medium text-emerald-600 dark:text-emerald-400">Total Orders</span>
-                            </div>
-                            <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">{customerStats.totalOrders}</p>
-                          </div>
-
-                          <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 p-3 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
-                            <div className="flex items-center gap-2 mb-1">
-                              <TrendingUp className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                              <span className="text-[10px] uppercase tracking-wider font-medium text-blue-600 dark:text-blue-400">Total Spent</span>
-                            </div>
-                            <p className="text-xl font-bold text-blue-700 dark:text-blue-300">₹{customerStats.totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
-                          </div>
-
-                          <div className="bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20 p-3 rounded-lg border border-green-200/50 dark:border-green-800/50">
-                            <div className="flex items-center gap-2 mb-1">
-                              <CreditCard className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                              <span className="text-[10px] uppercase tracking-wider font-medium text-green-600 dark:text-green-400">Wallet Balance</span>
-                            </div>
-                            <p className="text-xl font-bold text-green-700 dark:text-green-300">
-                              ₹{parseFloat(String(foundCustomer?.walletBalanceCache || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                            </p>
-                          </div>
-
-                          <div className="bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 p-3 rounded-lg border border-red-200/50 dark:border-red-800/50">
-                            <div className="flex items-center gap-2 mb-1">
-                              <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
-                              <span className="text-[10px] uppercase tracking-wider font-medium text-red-600 dark:text-red-400">Credit Due</span>
-                            </div>
-                            {(() => {
-                              const due = foundCustomer?.creditBalance ? Number(foundCustomer.creditBalance) : 0;
-                              const limit = Math.max(0, Number((foundCustomer as any)?.creditLimit ?? 1000));
-                              const dueClass = due > limit ? "text-red-700 dark:text-red-300" : due === 0 ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300";
-                              return (
-                                <p className={`text-xl font-bold ${dueClass}`}>
-                                  ₹{due.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                                </p>
-                              );
-                            })()}
-                          </div>
-
-                          <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/30 dark:to-amber-900/20 p-3 rounded-lg border border-amber-200/50 dark:border-amber-800/50">
-                            <div className="flex items-center gap-2 mb-1">
-                              <CheckCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                              <span className="text-[10px] uppercase tracking-wider font-medium text-amber-600 dark:text-amber-400">Credit Limit</span>
-                            </div>
-                            <p className="text-xl font-bold text-amber-700 dark:text-amber-300">
-                              ₹{Math.max(0, Number((foundCustomer as any)?.creditLimit ?? 1000)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                            </p>
-                          </div>
-                        </div>
-
-
-                        {/* Favorite Services */}
-                        {customerStats.topServices.length > 0 && (
-                          <div className="space-y-2">
-                            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                              <Package className="h-3 w-3" />
-                              Favorite Services
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {customerStats.topServices.map((service, idx) => (
-                                <Badge
-                                  key={idx}
-                                  variant="secondary"
-                                  className="text-[10px] bg-primary/10 text-primary hover:bg-primary/20"
-                                >
-                                  {service}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Last Order Date */}
-                        {customerStats.lastOrderDate && (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg">
-                            <Clock className="h-3 w-3" />
-                            <span>Last order: {format(new Date(customerStats.lastOrderDate), 'dd MMM yyyy')}</span>
-                          </div>
-                        )}
-
-                        {/* Recent Orders List */}
-                        {customerOrders.length > 0 && (
-                          <div className="space-y-2">
-                            <p className="text-xs font-medium text-muted-foreground">Recent Orders</p>
-                            <div className="max-h-[180px] overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-                              {customerOrders.slice(0, 5).map((order, idx) => (
-                                <div
-                                  key={order.id || idx}
-                                  onClick={() => {
-                                    setSelectedHistoryOrder(order);
-                                    setIsHistoryDetailsOpen(true);
-                                  }}
-                                  className="flex items-center justify-between p-2.5 bg-muted/30 hover:bg-muted/50 rounded-lg transition-colors border border-transparent hover:border-primary/10 cursor-pointer"
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs font-mono font-medium text-primary truncate">
-                                        {order.orderNumber || `#${order.id?.slice(0, 8)}`}
-                                      </span>
-                                      <Badge
-                                        variant="outline"
-                                        className={cn(
-                                          "text-[9px] px-1.5 py-0",
-                                          order.status === 'completed' || order.status === 'delivered'
-                                            ? "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400"
-                                            : order.status === 'processing'
-                                              ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400"
-                                              : order.status === 'cancelled'
-                                                ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400"
-                                                : "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400"
-                                        )}
-                                      >
-                                        {order.status?.replace(/_/g, ' ')}
-                                      </Badge>
-                                    </div>
-                                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                                      {order.createdAt ? format(new Date(order.createdAt), 'dd MMM yy') : 'N/A'}
-                                    </p>
-                                  </div>
-                                  <span className="text-sm font-semibold text-foreground">
-                                    ₹{parseFloat(order.totalAmount || '0').toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-center py-6">
-                        <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
-                          <Package className="h-6 w-6 text-muted-foreground/50" />
-                        </div>
-                        <p className="text-sm text-muted-foreground">No previous orders</p>
-                        <p className="text-xs text-muted-foreground/70 mt-1">This is a new customer!</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
-          </AnimatePresence>
           </motion.div>
-
-
         </div>
-      </div >
-
+      </div>
 
       {/* Bottom Page Area */}
       <div className="mt-8">
