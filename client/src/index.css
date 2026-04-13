@@ -520,14 +520,15 @@ html {
   scrollbar-color: rgb(var(--muted-foreground) / 0.3) transparent;
 }
 
-/* Hide scrollbar but keep functionality */
-.scrollbar-hidden::-webkit-scrollbar {
-  display: none;
-}
-
-.scrollbar-hidden {
+.scrollbar-hidden,
+.scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
 
 /* ========================

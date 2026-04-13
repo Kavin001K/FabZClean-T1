@@ -2272,57 +2272,59 @@ export default function CreateOrder() {
                       </div>
                     ) : customerStats ? (
                       <>
-                        {/* Customer Stats Grid */}
-                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                          <div className="bg-emerald-50 dark:bg-emerald-950/30 p-3 rounded-lg border border-emerald-200/50 dark:border-emerald-800/50 shadow-sm">
-                            <div className="flex items-center gap-2 mb-1">
-                              <ShoppingBag className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                              <span className="text-[10px] uppercase tracking-wider font-extrabold text-emerald-600 dark:text-emerald-400 leading-none">Total Orders</span>
+                        {/* Customer Stats - Two Row Layout for Instant Insight */}
+                        <div className="flex flex-wrap gap-2 pb-1">
+                          {/* Row 1: Primary Transaction Stats */}
+                          <div className="flex-1 min-w-[100px] bg-emerald-50 dark:bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-200/50 dark:border-emerald-800/50 shadow-sm transition-all hover:bg-emerald-100/50">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <ShoppingBag className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                              <span className="text-[9px] uppercase tracking-wider font-extrabold text-emerald-600 dark:text-emerald-400 leading-none truncate">Orders</span>
                             </div>
-                            <p className="text-2xl font-black text-emerald-700 dark:text-emerald-300 tabular-nums">{customerStats.totalOrders}</p>
+                            <p className="text-xl font-black text-emerald-700 dark:text-emerald-300 tabular-nums">{customerStats.totalOrders}</p>
                           </div>
 
-                          <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
-                            <div className="flex items-center gap-2 mb-1">
-                              <TrendingUp className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                              <span className="text-[10px] uppercase tracking-wider font-extrabold text-blue-600 dark:text-blue-400 leading-none">Total Spent</span>
+                          <div className="flex-1 min-w-[110px] bg-blue-50 dark:bg-blue-950/30 p-2.5 rounded-xl border border-blue-200/50 dark:border-blue-800/50 shadow-sm transition-all hover:bg-blue-100/50">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <TrendingUp className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                              <span className="text-[9px] uppercase tracking-wider font-extrabold text-blue-600 dark:text-blue-400 leading-none truncate">Spent</span>
                             </div>
-                            <p className="text-2xl font-black text-blue-700 dark:text-blue-300 tabular-nums">₹{customerStats.totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                            <p className="text-xl font-black text-blue-700 dark:text-blue-300 tabular-nums">₹{customerStats.totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
                           </div>
 
-                          <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-lg border border-green-200/50 dark:border-green-800/50 shadow-sm">
-                            <div className="flex items-center gap-2 mb-1">
-                              <CreditCard className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                              <span className="text-[10px] uppercase tracking-wider font-extrabold text-green-600 dark:text-green-400 leading-none">Wallet</span>
+                          <div className="flex-1 min-w-[100px] bg-green-50 dark:bg-green-950/30 p-2.5 rounded-xl border border-green-200/50 dark:border-green-800/50 shadow-sm transition-all hover:bg-green-100/50">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <CreditCard className="h-3 w-3 text-green-600 dark:text-green-400" />
+                              <span className="text-[9px] uppercase tracking-wider font-extrabold text-green-600 dark:text-green-400 leading-none truncate">Wallet</span>
                             </div>
-                            <p className="text-2xl font-black text-green-700 dark:text-green-300 tabular-nums">
+                            <p className="text-xl font-black text-green-700 dark:text-green-300 tabular-nums">
                               ₹{parseFloat(String(foundCustomer?.walletBalanceCache || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                             </p>
                           </div>
 
-                          <div className="bg-red-50 dark:bg-red-950/30 p-3 rounded-lg border border-red-200/50 dark:border-red-800/50 shadow-sm">
-                            <div className="flex items-center gap-2 mb-1">
-                              <AlertCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
-                              <span className="text-[10px] uppercase tracking-wider font-extrabold text-red-600 dark:text-red-400 leading-none">Credit Due</span>
+                          {/* Row 2: Credit & Limit Status */}
+                          <div className="flex-[1.5] min-w-[140px] bg-red-50 dark:bg-red-950/30 p-2.5 rounded-xl border border-red-200/50 dark:border-red-800/50 shadow-sm transition-all hover:bg-red-100/50">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <AlertCircle className="h-3 w-3 text-red-600 dark:text-red-400" />
+                              <span className="text-[9px] uppercase tracking-wider font-extrabold text-red-600 dark:text-red-400 leading-none truncate">Credit Due</span>
                             </div>
                             {(() => {
                               const due = foundCustomer?.creditBalance ? Number(foundCustomer.creditBalance) : 0;
                               const limit = Math.max(0, Number((foundCustomer as any)?.creditLimit ?? 1000));
                               const dueClass = due > limit ? "text-red-700 dark:text-red-300" : due === 0 ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300";
                               return (
-                                <p className={`text-2xl font-black ${dueClass} tabular-nums`}>
+                                <p className={`text-xl font-black ${dueClass} tabular-nums`}>
                                   ₹{due.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                                 </p>
                               );
                             })()}
                           </div>
 
-                          <div className="bg-amber-50 dark:bg-amber-950/30 p-3 rounded-lg border border-amber-200/50 dark:border-amber-800/50 shadow-sm">
-                            <div className="flex items-center gap-2 mb-1">
-                              <CheckCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                              <span className="text-[10px] uppercase tracking-wider font-extrabold text-amber-600 dark:text-amber-400 leading-none">Limit</span>
+                          <div className="flex-1 min-w-[100px] bg-amber-50 dark:bg-amber-950/30 p-2.5 rounded-xl border border-amber-200/50 dark:border-amber-800/50 shadow-sm transition-all hover:bg-amber-100/50">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <CheckCircle className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                              <span className="text-[9px] uppercase tracking-wider font-extrabold text-amber-600 dark:text-amber-400 leading-none truncate">Limit</span>
                             </div>
-                            <p className="text-2xl font-black text-amber-700 dark:text-amber-300 tabular-nums">
+                            <p className="text-xl font-black text-amber-700 dark:text-amber-300 tabular-nums">
                               ₹{Math.max(0, Number((foundCustomer as any)?.creditLimit ?? 1000)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                             </p>
                           </div>
