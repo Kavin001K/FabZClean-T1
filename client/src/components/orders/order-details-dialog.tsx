@@ -435,20 +435,20 @@ export default React.memo(function OrderDetailsDialog({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-6 border-t bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-sm sticky bottom-0">
-          <div className="flex flex-col gap-3">
-            {/* Primary Action Row */}
-            <div className="flex gap-2 w-full">
+        <div className="px-6 py-5 border-t bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-md sticky bottom-0">
+          <div className="flex flex-col gap-4">
+            {/* Row 1: Primary Action & Print */}
+            <div className="flex gap-3 w-full">
               {nextStatus && (
                 <Button
-                  className="flex-1 h-12 text-sm font-black uppercase tracking-widest shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 text-white"
+                  className="flex-1 h-14 text-sm font-black uppercase tracking-[0.1em] shadow-lg shadow-primary/25 bg-primary hover:bg-primary/90 text-white rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99] border-b-4 border-primary/70"
                   onClick={() => onNextStep(order)}
                   disabled={
                     (nextStatus === 'completed' || nextStatus === 'delivered') &&
                     anyOrder.paymentStatus !== 'paid' && anyOrder.paymentStatus !== 'credit'
                   }
                 >
-                  <PlusCircle className="h-5 w-5 mr-2" />
+                  <PlusCircle className="h-5 w-5 mr-3" />
                   {order.status === 'ready_for_pickup' && anyOrder.fulfillmentType === 'delivery'
                     ? 'Start Delivery'
                     : order.status === 'ready_for_pickup'
@@ -463,19 +463,19 @@ export default React.memo(function OrderDetailsDialog({
               <Button 
                 variant="outline" 
                 size="icon"
-                className="h-12 w-12 rounded-xl border-2 border-slate-200 dark:border-slate-800 shadow-sm"
+                className="h-14 w-14 rounded-2xl border-2 border-slate-200 dark:border-slate-800 shadow-md bg-white dark:bg-slate-950 flex-shrink-0 hover:bg-slate-50 transition-all hover:border-primary/30"
                 onClick={handlePrintInvoice}
                 title="Print Invoice"
               >
-                <Printer className="h-5 w-5" />
+                <Printer className="h-6 w-6 text-slate-700 dark:text-slate-300" />
               </Button>
             </div>
 
-            {/* Secondary Action Row */}
-            <div className="flex flex-wrap gap-2">
+            {/* Row 2: Secondary Support Actions - Grid Layout */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               <Button 
                 variant="secondary" 
-                className="flex-1 h-10 font-black uppercase tracking-widest text-[10px] rounded-xl border-2 border-slate-200 dark:border-slate-700"
+                className="h-11 font-bold uppercase tracking-widest text-[10px] rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:bg-slate-100 dark:hover:bg-slate-800"
                 onClick={() => onEdit(order)}
               >
                 <Edit className="h-3.5 w-3.5 mr-2" /> Edit Order
@@ -492,7 +492,7 @@ export default React.memo(function OrderDetailsDialog({
                     onClick={() => onResendBill(order)}
                     disabled={!canResend || isResendingBill}
                     className={cn(
-                      "flex-1 h-10 font-black uppercase tracking-widest text-[10px] rounded-xl border-2 shadow-sm",
+                      "h-11 font-bold uppercase tracking-widest text-[10px] rounded-xl border border-slate-200 shadow-sm transition-all",
                       canResend
                         ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800"
                         : "opacity-50"
@@ -510,30 +510,33 @@ export default React.memo(function OrderDetailsDialog({
 
               <Button
                 variant="outline"
-                className="flex-1 h-10 font-black uppercase tracking-widest text-[10px] rounded-xl border-2 border-slate-200 dark:border-slate-800"
+                className="h-11 font-bold uppercase tracking-widest text-[10px] rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm"
                 onClick={() => window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank')}
               >
-                <Navigation className="h-3.5 w-3.5 mr-2" /> Track
+                <Navigation className="h-3.5 w-3.5 mr-2" /> Track Order
               </Button>
 
               {canMarkPaid && onUpdatePaymentStatus && (
                 <Button
                   variant="outline"
                   onClick={() => onUpdatePaymentStatus(order, 'paid')}
-                  className="w-full sm:w-auto h-10 font-black uppercase tracking-widest text-[10px] rounded-xl bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                  className="col-span-1 sm:col-span-2 h-11 font-black uppercase tracking-widest text-[10px] rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 shadow-sm"
                 >
-                  <CreditCard className="h-3.5 w-3.5 mr-2" />
+                  <CreditCard className="h-3.5 w-3.5 mr-2 text-blue-800" />
                   Mark Paid (₹{outstandingAmount.toFixed(2)})
                 </Button>
               )}
 
               {order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'delivered' && (
                 <Button 
-                  variant="ghost" 
+                  variant="outline" 
                   onClick={() => onCancel(order)} 
-                  className="flex-1 h-10 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-bold text-[10px] uppercase tracking-widest rounded-xl"
+                  className={cn(
+                    "h-11 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-slate-200 dark:border-slate-800 font-bold text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-sm",
+                    !canMarkPaid && "col-span-2 sm:col-span-1"
+                  )}
                 >
-                  <XCircle className="h-3.5 w-3.5 mr-2" /> Cancel
+                  <XCircle className="h-3.5 w-3.5 mr-2 text-rose-500" /> Cancel Order
                 </Button>
               )}
             </div>

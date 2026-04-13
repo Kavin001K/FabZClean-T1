@@ -357,21 +357,19 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                         <div className="text-[10px] text-muted-foreground mt-1">Lifetime revenue</div>
                       </div>
 
-                      <div className="flex flex-col p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/20 hover:bg-emerald-500/10 transition-colors group">
+                      <div 
+                        className="flex flex-col p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/20 hover:bg-emerald-500/10 transition-all cursor-pointer group active:scale-[0.98]"
+                        onClick={() => setIsRechargeModalOpen(true)}
+                        title="Click to recharge wallet"
+                      >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <TrendingUp className="h-4 w-4 text-emerald-500" />
                             <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Wallet</span>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 rounded-full bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
-                            onClick={() => setIsRechargeModalOpen(true)}
-                            title="Recharge Wallet"
-                          >
+                          <div className="h-6 w-6 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
                             <UserPlus className="h-3 w-3" />
-                          </Button>
+                          </div>
                         </div>
                         <div className="text-2xl font-black text-emerald-600">
                           ₹{selectedWalletBalance.toLocaleString('en-IN')}

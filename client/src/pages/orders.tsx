@@ -1521,8 +1521,9 @@ function OrdersComponent() {
       <div
         key={order.id}
         className={cn(
-          `grid ${ordersGridColumns} gap-4 items-center px-4 h-full border-b hover:bg-muted/50 transition-colors text-sm w-full`,
-          selectedOrders.includes(order.id) && "bg-muted"
+          `grid ${ordersGridColumns} gap-4 items-center px-4 h-full border-b hover:bg-muted/50 transition-colors text-sm`,
+          ordersTableMinWidth,
+          selectedOrders.includes(order.id) && "bg-muted/80 shadow-inner"
         )}
         onClick={() => handleViewOrder(order)}
       >
@@ -1559,7 +1560,9 @@ function OrdersComponent() {
           {formatCurrency(parseFloat(order.totalAmount || "0"))}
         </div>
         <div className="text-muted-foreground truncate">{formatDate((order.createdAt || new Date()).toString())}</div>
-        <div className="truncate">{(order as any).pickupDate ? formatDate(new Date((order as any).pickupDate).toString()) : 'N/A'}</div>
+        <div className="flex items-center font-medium">
+          {(order as any).pickupDate ? formatDate(new Date((order as any).pickupDate).toString()) : 'N/A'}
+        </div>
         <div onClick={(e) => e.stopPropagation()} className="flex justify-center">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -1618,7 +1621,10 @@ function OrdersComponent() {
   }, [isMobile, selectedOrders, ordersGridColumns, getStatusColor, getStatusIcon, getPaymentStatusColor, handleSelectOrder, handleViewOrder, handleEditOrder, handlePrintInvoice, handleSendBill, handleUpdateStatus, handleDebitFromWallet, handleCancelOrder, sendingBillOrderId, setIsPaymentModalOpen, setSelectedPaymentOrder]);
 
   const OrderHeaders = (
-    <div className={`grid ${ordersGridColumns} gap-4 items-center px-4 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase select-none`}>
+    <div className={cn(
+      `grid ${ordersGridColumns} gap-4 items-center px-4 py-3 bg-muted/60 border-b text-[11px] font-bold text-muted-foreground uppercase select-none`,
+      ordersTableMinWidth
+    )}>
       <div><Checkbox checked={filteredOrders.length > 0 && selectedOrders.length === filteredOrders.length} onCheckedChange={handleSelectAll} /></div>
       <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('orderNumber')}>Order # <ArrowUpDown className="h-3 w-3" /></div>
       <div className="cursor-pointer hover:text-foreground flex items-center gap-1" onClick={() => handleSort('customerName')}>Customer <ArrowUpDown className="h-3 w-3" /></div>
@@ -2325,7 +2331,7 @@ function OrdersComponent() {
 
               {/* Orders Table or Timeline View */}
               {viewMode === 'table' ? (
-                <div className="rounded-lg border">
+                <div className="rounded-lg border overflow-x-auto overflow-y-hidden">
                   {isLoading ? (
                     <div className="p-8">
                       <LoadingSkeleton.TableSkeleton rows={10} />
