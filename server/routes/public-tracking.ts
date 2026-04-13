@@ -103,7 +103,7 @@ router.get('/track/:orderNumber', async (req, res) => {
             updatedAt: o.updatedAt || o.updated_at,
             pickupDate: o.pickupDate || o.pickup_date,
             // Invoice/Bill URL for download (from order or documents table)
-            invoiceUrl: invoiceUrl || null,
+            invoiceUrl: invoiceUrl ? (invoiceUrl.startsWith('http') ? invoiceUrl : `https://bill.myfabclean.com${invoiceUrl.startsWith('/') ? '' : '/'}${invoiceUrl}`) : null,
             // WhatsApp notification info
             lastWhatsappStatus: o.lastWhatsappStatus || o.last_whatsapp_status,
             lastWhatsappSentAt: o.lastWhatsappSentAt || o.last_whatsapp_sent_at,

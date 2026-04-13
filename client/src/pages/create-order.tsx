@@ -227,6 +227,7 @@ export default function CreateOrder() {
   // History order details
   const [selectedHistoryOrder, setSelectedHistoryOrder] = useState<Order | null>(null);
   const [isHistoryDetailsOpen, setIsHistoryDetailsOpen] = useState(false);
+  const [sessionOrders, setSessionOrders] = useState<Order[]>([]);
 
   // Credit Limit Error Dialog
   const [creditOverridePrompt, setCreditOverridePrompt] = useState<{
@@ -239,6 +240,15 @@ export default function CreateOrder() {
     projectedCreditRequired: number;
     pendingOrderData: any;
   } | null>(null);
+
+  // Session Activity stats
+  const sessionStats = useMemo(() => {
+    return sessionOrders.reduce((stats, order) => {
+      stats.count += 1;
+      stats.total += safeParseFloat(order.totalAmount || 0);
+      return stats;
+    }, { count: 0, total: 0 });
+  }, [sessionOrders]);
 
   // Calculation state - using useMemo for derived values
   const baseSubtotal = useMemo(() => {
@@ -820,6 +830,7 @@ export default function CreateOrder() {
         console.log('✅ Normalized Order for Dialog:', newOrder);
 
         setCreatedOrder(newOrder);
+        setSessionOrders(prev => [newOrder, ...prev]);
         setIsModalOpen(true);
         queryClient.invalidateQueries({ queryKey: ["orders"] });
         queryClient.invalidateQueries({ queryKey: ["print-queue"] });
@@ -2565,22 +2576,83 @@ export default function CreateOrder() {
       {/* Bottom Page Area */}
       <div className="mt-8">
                 {/* Session Activity Tracker */}
-        <Card className="mt-6 border-slate-200 dark:border-slate-800 bg-transparent shadow-none border-dashed text-center">
-          <CardHeader className="py-4">
-            <CardTitle className="text-sm flex items-center justify-center gap-2">
-              <Clock className="h-4 w-4 text-primary" />
-              Session Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <div className="space-y-3">
-              <div className="text-xs text-muted-foreground flex flex-col items-center justify-center py-6 opacity-60">
-                 <List className="h-5 w-5 mb-2 opacity-30" />
-                 <p>Completed orders will appear here</p>
-              </div>
+      {/* Session Activity Tracker */}
+      <div className="mt-8">
+        <Card className="mt-6 border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/10 shadow-none border-dashed overflow-hidden">
+          <CardHeader className="py-4 border-b border-dashed border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Clock className="h-4 w-4 text-primary" />
+                Session Activity
+              </CardTitle>
+              {sessionStats.count > 0 && (
+                <div className="flex items-center gap-4">
+                  <div className="hidden sm:flex items-center gap-2">
+                     <span className="text-[10px] uppercase tracking-tighter font-extrabold text-slate-400">Total Billing</span>
+                     <span className="text-sm font-black text-slate-700 dark:text-slate-300">₹{sessionStats.total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                  </div>
+                  <Badge variant="outline" className="bg-white dark:bg-slate-900 font-bold border-primary/20 text-primary px-3 py-0.5 h-6">
+                    {sessionStats.count} {sessionStats.count === 1 ? 'Order' : 'Orders'} Created
+                  </Badge>
+                </div>
+              )}
             </div>
+          </CardHeader>
+          <CardContent className="p-4">
+            {sessionOrders.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {sessionOrders.map((order) => (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    key={order.id}
+                    onClick={() => {
+                      setSelectedHistoryOrder(order);
+                      setIsHistoryDetailsOpen(true);
+                    }}
+                    className="flex items-center justify-between p-3.5 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl hover:border-primary/40 transition-all cursor-pointer group hover:shadow-lg active:scale-95"
+                  >
+                     <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-black text-primary font-mono tracking-tighter">{order.orderNumber}</span>
+                          <Badge className={cn(
+                            "text-[8px] h-3.5 px-1 leading-none uppercase font-black border-none",
+                            order.status === 'completed' ? "bg-emerald-50 text-emerald-600" : "bg-primary/10 text-primary"
+                          )}>
+                            {order.status}
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate">{order.customerName}</p>
+                        <p className="text-[9px] font-medium text-slate-400 flex items-center gap-1">
+                          <Clock className="h-2.5 w-2.5" />
+                          {order.createdAt ? format(new Date(order.createdAt), 'hh:mm a') : 'Just now'}
+                        </p>
+                     </div>
+                     <div className="text-right flex flex-col items-end gap-1 ml-3">
+                        <span className="text-base font-black text-slate-900 dark:text-white tabular-nums">₹{parseFloat(order.totalAmount || '0').toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                        <div className="flex items-center gap-1">
+                           <div className={cn(
+                             "w-1.5 h-1.5 rounded-full",
+                             order.paymentMethod === 'cash' ? "bg-emerald-400" : order.paymentMethod === 'upi' ? "bg-blue-400" : "bg-amber-400"
+                           )}></div>
+                           <span className="text-[9px] font-black uppercase tracking-tighter text-slate-400">{order.paymentMethod}</span>
+                        </div>
+                     </div>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground flex flex-col items-center justify-center py-12 opacity-60">
+                 <div className="p-4 rounded-full bg-slate-100 dark:bg-slate-800 mb-4">
+                    <List className="h-8 w-8 opacity-20" />
+                 </div>
+                 <p className="font-bold text-slate-500 text-sm">Session activity is empty</p>
+                 <p className="text-xs mt-1">Orders created in this window will appear here for fast tracking</p>
+              </div>
+            )}
           </CardContent>
-            </Card>
+        </Card>
+      </div>
       </div>
 
       {/* Customer Creation Dialog */}
