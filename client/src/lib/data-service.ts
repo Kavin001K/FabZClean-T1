@@ -600,6 +600,15 @@ export const customersApi = {
     }
   },
 
+  async getAnalytics(): Promise<any> {
+    try {
+      return await fetchData<any>('/customers/analytics/overview');
+    } catch (error) {
+      console.error('Failed to fetch customer analytics:', error);
+      return null;
+    }
+  },
+
   async importMany(customers: Partial<Customer>[]): Promise<{ inserted_count: number; error_count: number; skipped_phones: string[] }> {
     try {
       const response = await authorizedFetch(`/customers/import`, {

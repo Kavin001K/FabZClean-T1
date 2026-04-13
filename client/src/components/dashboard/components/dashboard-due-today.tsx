@@ -28,8 +28,8 @@ import { TEST_IDS, getTestId } from '@/lib/test-ids';
 import { formatCurrency } from '@/lib/data-service';
 import Skeleton from '@/components/ui/loading-skeleton';
 import { useLocation } from 'wouter';
-import { format, isSameDay, addDays, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { format, isSameDay, addDays, subDays } from 'date-fns';
 
 interface DashboardDueTodayProps {
   /** Optional initial orders data (legacy) */
@@ -200,18 +200,18 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
               return (
                 <div
                   key={order.id || index}
-                  className="group flex cursor-pointer flex-col rounded-2xl border border-border bg-muted/25 p-3 transition-colors hover:bg-muted/45"
+                  className="group flex cursor-pointer flex-col rounded-2xl border border-border bg-muted/20 p-4 transition-all hover:bg-muted/40 hover:shadow-md"
                   onClick={() => setLocation(`/orders/${order.id}`)}
                   data-testid={getTestId(TEST_IDS.DATA.ITEM, `due-order-${order.id || index}`)}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="max-w-[150px] truncate text-sm font-medium text-foreground">
+                      <span className="truncate text-sm font-bold text-foreground">
                         {order.customerName || order.customer?.name || 'Unknown'}
                       </span>
                       <Badge
                         variant="secondary"
-                        className={cn("text-[10px] px-1.5 py-0 h-5", urgencyColor)}
+                        className={cn("text-[10px] px-2 py-0.5 h-5 font-bold uppercase tracking-tight", urgencyColor)}
                       >
                         <span className="flex items-center gap-1">
                           {urgencyIcon}
@@ -219,26 +219,26 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
                         </span>
                       </Badge>
                     </div>
-                    <span className="text-sm font-semibold text-foreground">
+                    <span className="text-base font-black text-foreground tabular-nums">
                       {formatCurrency(order.totalAmount || order.total || 0)}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="font-mono">#{order.orderNumber || order.id?.slice(0, 8)}</span>
+                  <div className="flex items-center justify-between gap-3 pt-2 border-t border-border/30">
+                    <div className="flex min-w-0 items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                      <span className="font-mono text-primary/70">#{order.orderNumber || order.id?.slice(0, 8)}</span>
                       <span>•</span>
                       <span className="truncate">{order.service || 'Service'}</span>
                     </div>
 
-                    {hoursLeft <= 6 && (
+                    {hoursLeft <= 24 && (
                       <span className={cn(
-                        "font-medium",
-                        hoursLeft <= 0 ? "text-red-500" : "text-orange-500"
+                        "text-[10px] font-black uppercase tracking-wider",
+                        hoursLeft <= 0 ? "text-red-500" : "text-amber-500"
                       )}>
                         {hoursLeft <= 0
                           ? `Overdue ${Math.abs(hoursLeft)}h`
-                          : `Due in ${hoursLeft}h`
+                          : `In ${hoursLeft}h`
                         }
                       </span>
                     )}

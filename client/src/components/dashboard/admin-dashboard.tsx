@@ -22,7 +22,10 @@ import DashboardDueToday from "./components/dashboard-due-today";
 import DashboardRecentOrders from "./components/dashboard-recent-orders";
 import DashboardQuickActions from "./components/dashboard-quick-actions";
 import WeatherWidget from "./components/weather-widget";
+import DashboardOrdersByDate from "./components/orders-by-date";
+import DashboardNewCustomers from "./components/new-customers";
 import { format, startOfDay, endOfDay, isWithinInterval, isSameDay } from "date-fns";
+import { cn } from "@/lib/utils";
 
 import { useQuery } from "@tanstack/react-query";
 
@@ -389,55 +392,59 @@ export default function AdminDashboard() {
                 {statCards.map((card) => {
                     const Icon = card.icon;
                     return (
-                        <Card key={card.title} className="border-border bg-card shadow-sm">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                                    <Icon className="h-4 w-4" />
+                        <Card key={card.title} className="group border-border bg-card shadow-sm rounded-2xl transition-all hover:shadow-md hover:border-border/80">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                                <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{card.title}</CardTitle>
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/50 text-muted-foreground group-hover:text-primary transition-colors">
+                                    <Icon className="h-5 w-5" />
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="truncate text-2xl font-bold text-foreground">{card.value}</div>
-                                <p className="mt-2 flex min-h-5 items-center text-xs text-muted-foreground">
+                                <div className="truncate text-3xl font-black text-foreground tracking-tight">{card.value}</div>
+                                <div className="mt-3 flex min-h-5 items-center">
                                     {card.growth !== null ? (
-                                        <>
+                                        <div className={cn(
+                                            "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all",
+                                            card.growth > 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"
+                                        )}>
                                             {card.growth > 0 ? (
-                                                <ArrowUpRight className="mr-1 h-4 w-4 text-green-600" />
+                                                <ArrowUpRight className="h-3 w-3" />
                                             ) : (
-                                                <ArrowDownRight className="mr-1 h-4 w-4 text-red-500" />
+                                                <ArrowDownRight className="h-3 w-3" />
                                             )}
-                                            <span className={card.growth > 0 ? "text-green-600" : "text-red-500"}>
-                                                {Math.abs(card.growth)}%
-                                            </span>
-                                            <span className="ml-1">vs last {card.label}</span>
-                                        </>
+                                            {Math.abs(card.growth)}%
+                                            <span className="text-muted-foreground/60 font-medium">vs last {card.label}</span>
+                                        </div>
                                     ) : filterMode !== 'all' ? (
-                                        <span className="text-muted-foreground/60 italic">Filtered view</span>
+                                        <Badge variant="outline" className="text-[9px] h-5 border-border/50 font-bold uppercase tracking-tight text-muted-foreground/60">Filtered view</Badge>
                                     ) : (
-                                        <span>No comparison data</span>
+                                        <span className="text-[10px] text-muted-foreground/40 font-medium">No comparison data</span>
                                     )}
-                                </p>
+                                </div>
                             </CardContent>
                         </Card>
                     );
                 })}
 
                 {/* Today's Revenue Widget — always visible */}
-                <Card className="border-emerald-200 dark:border-emerald-800/50 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/20 dark:to-card shadow-sm overflow-hidden">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-bold text-emerald-700 dark:text-emerald-400">Today's Revenue</CardTitle>
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
-                            <TrendingUp className="h-4 w-4" />
+                <Card className="group border-emerald-200 dark:border-emerald-800/30 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/10 dark:to-card shadow-sm overflow-hidden rounded-2xl transition-all hover:shadow-md">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                        <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Today's Revenue</CardTitle>
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+                            <TrendingUp className="h-5 w-5" />
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="truncate text-2xl font-black text-emerald-800 dark:text-emerald-300 tabular-nums">
+                        <div className="truncate text-3xl font-black text-emerald-800 dark:text-emerald-300 tabular-nums tracking-tight">
                             {formatCurrency(stats.todayRevenue)}
                         </div>
-                        <p className="mt-2 flex items-center text-xs text-emerald-600/80 dark:text-emerald-400/80 font-medium">
-                            <Clock className="mr-1 h-3.5 w-3.5" />
-                            {stats.todayOrderCount} order{stats.todayOrderCount !== 1 ? 's' : ''} today
-                        </p>
+                        <div className="mt-3 flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[10px] font-bold">
+                                <Clock className="h-3 w-3" />
+                                {stats.todayOrderCount} order{stats.todayOrderCount !== 1 ? 's' : ''}
+                            </div>
+                            <span className="text-[10px] text-emerald-600/60 font-medium">Live sync</span>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
@@ -445,8 +452,9 @@ export default function AdminDashboard() {
             {/* Quick Actions */}
             <DashboardQuickActions />
 
-            {/* Due Today & Recent Orders */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Orders created today, Due Today & Recent Orders */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                <DashboardOrdersByDate />
                 <DashboardDueToday
                     orders={dueTodayOrders}
                     isLoading={isLoadingOrders}
@@ -455,6 +463,16 @@ export default function AdminDashboard() {
                     recentOrders={recentOrders}
                     isLoading={isLoadingOrders}
                 />
+            </div>
+
+            {/* Customer growth insight */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-1">
+                    <DashboardNewCustomers />
+                </div>
+                <div className="xl:col-span-2">
+                    <WeatherWidget />
+                </div>
             </div>
         </div>
     );

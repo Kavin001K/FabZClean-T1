@@ -717,6 +717,13 @@ router.get('/analytics/overview', async (req, res) => {
         const customerDate = customer.createdAt ? new Date(customer.createdAt).toISOString().split('T')[0] : '';
         return customerDate === today;
       }).length,
+      newCustomersPastMonth: customers.filter((customer: Customer) => {
+        if (!customer.createdAt) return false;
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        thirtyDaysAgo.setHours(0, 0, 0, 0); // Precision algorithm: start of day
+        return new Date(customer.createdAt) >= thirtyDaysAgo;
+      }).length,
       segments,
       loyaltyStats,
       topCustomers: customerLTV

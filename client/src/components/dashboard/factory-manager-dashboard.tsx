@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/auth-context";
+import DashboardOrdersByDate from "./components/orders-by-date";
+import DashboardNewCustomers from "./components/new-customers";
 
 /** Processing pipeline status config */
 const PIPELINE_STAGES = [
@@ -196,6 +198,11 @@ export default function FactoryManagerDashboard() {
                         )}
                     </CardContent>
                 </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <DashboardOrdersByDate />
+                <DashboardNewCustomers />
             </div>
         </div>
     );

@@ -512,6 +512,7 @@ router.get('/', async (req, res) => {
     const search = req.query.search as string;
     const status = req.query.status as string;
     const customerEmail = req.query.customerEmail as string;
+    const createdDate = req.query.createdDate as string;
 
     console.log(`[GET /api/orders] Query: ${JSON.stringify(req.query)}`);
 
@@ -520,6 +521,7 @@ router.get('/', async (req, res) => {
       search,
       status: status === 'all' ? undefined : status,
       customerEmail,
+      createdDate,
     };
 
     const orders = await orderService.findAllOrders(filters);

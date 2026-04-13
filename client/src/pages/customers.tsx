@@ -80,7 +80,11 @@ const getInitials = (name: string) => {
 const getCustomerSegment = (customer: Customer) => {
   const totalSpent = parseFloat(customer.totalSpent || '0');
   const totalOrders = customer.totalOrders || 0;
+  const createdAt = new Date(customer.createdAt || 0);
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
+  if (createdAt >= oneMonthAgo) return { label: 'New', color: 'bg-blue-500', variant: 'default' as const };
   if (totalSpent >= 50000) return { label: 'VIP', color: 'bg-primary', variant: 'default' as const };
   if (totalSpent >= 20000 || totalOrders >= 10) return { label: 'Premium', color: 'bg-accent', variant: 'secondary' as const };
   return { label: 'Regular', color: 'bg-secondary', variant: 'outline' as const };
@@ -108,9 +112,9 @@ export default function Customers() {
   const [segmentFilter, setSegmentFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('name');
   
-  // Pagination state
+  // Pagination state: Default to 'All' (using a large number)
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(100000); // Default to 'All'
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -242,6 +246,14 @@ export default function Customers() {
       if (segmentFilter === 'all') return true;
 
       const segment = getCustomerSegment(customer);
+      if (segmentFilter === 'new') {
+        const createdAt = new Date(customer.createdAt || 0);
+        const now = new Date();
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(now.getDate() - 30);
+        thirtyDaysAgo.setHours(0, 0, 0, 0); // Precision algorithm: start of day
+        return createdAt >= thirtyDaysAgo;
+      }
       return segment.label.toLowerCase() === segmentFilter.toLowerCase();
     });
 
@@ -673,6 +685,7 @@ export default function Customers() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Segments</SelectItem>
+                      <SelectItem value="new">New Customers</SelectItem>
                       <SelectItem value="vip">VIP</SelectItem>
                       <SelectItem value="premium">Premium</SelectItem>
                       <SelectItem value="regular">Regular</SelectItem>
@@ -698,6 +711,7 @@ export default function Customers() {
                       <SelectValue placeholder="Page size" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="100000">Show All</SelectItem>
                       <SelectItem value="50">50 / page</SelectItem>
                       <SelectItem value="100">100 / page</SelectItem>
                       <SelectItem value="500">500 / page</SelectItem>

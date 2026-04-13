@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/auth-context";
+import DashboardOrdersByDate from "./components/orders-by-date";
+import DashboardNewCustomers from "./components/new-customers";
 
 export default function StoreManagerDashboard() {
     const { employee } = useAuth();
@@ -204,6 +206,11 @@ export default function StoreManagerDashboard() {
                         )}
                     </CardContent>
                 </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <DashboardOrdersByDate />
+                <DashboardNewCustomers />
             </div>
 
             {/* Quick Actions */}

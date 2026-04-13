@@ -18,6 +18,7 @@ export interface OrderFilters {
   status?: string;
   search?: string;
   customerEmail?: string;
+  createdDate?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   limit?: number;
@@ -55,6 +56,25 @@ export class OrderService {
       // Apply status filter if provided
       if (filters.status && filters.status !== 'all') {
         orders = orders.filter((order: Order) => order.status === filters.status);
+      }
+      
+      // Apply createdDate filter if provided (YYYY-MM-DD)
+      if (filters.createdDate) {
+        const targetDate = filters.createdDate;
+        orders = orders.filter((order: Order) => {
+          if (!order.createdAt) return false;
+          try {
+            const d = new Date(order.createdAt);
+            // Convert to IST (UTC+5.5) for comparison if needed, 
+            // but for now simple YYYY-MM-DD from ISO string is usually fine if client sends UTC or local.
+            // Let's match the server's toISTDateString logic from routes/index.ts for consistency
+            const istTime = d.getTime() + (5.5 * 60 * 60 * 1000);
+            const dateStr = new Date(istTime).toISOString().split('T')[0];
+            return dateStr === targetDate;
+          } catch (e) {
+            return false;
+          }
+        });
       }
 
       // Apply search filter if provided

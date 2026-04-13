@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TEST_IDS, getTestId } from '@/lib/test-ids';
 import { formatCurrency } from '@/lib/data-service';
 import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
+import { cn } from '@/lib/utils';
 
 interface DashboardKPIsProps {
   /** Dashboard metrics */
@@ -106,27 +107,30 @@ export const DashboardKPIs: React.FC<DashboardKPIsProps> = React.memo(({
         return (
           <Card 
             key={card.id}
-            className="relative overflow-hidden"
+            className="group relative overflow-hidden rounded-2xl border-border bg-card shadow-sm hover:shadow-md transition-all hover:border-border/80"
             data-testid={getTestId(TEST_IDS.DASHBOARD.KPI, card.id)}
           >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 {card.title}
               </CardTitle>
-              <div className={`p-2 rounded-full ${card.bgColor}`}>
-                <Icon className={`h-4 w-4 ${card.color}`} />
+              <div className={cn("p-2.5 rounded-xl transition-transform group-hover:scale-110", card.bgColor)}>
+                <Icon className={cn("h-5 w-5", card.color)} />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-3xl font-black text-foreground tracking-tight">
                 {card.id === 'revenue' ? formatCurrency(value) : value.toLocaleString()}
               </div>
-              <div className="flex items-center space-x-1 text-xs">
-                {getTrendIcon(change)}
-                <span className={getTrendColor(change)}>
+              <div className="flex items-center gap-1.5 mt-3">
+                <div className={cn(
+                  "flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all",
+                  change > 0 ? "bg-emerald-500/10 text-emerald-600" : change < 0 ? "bg-red-500/10 text-red-600" : "bg-muted text-muted-foreground"
+                )}>
+                  {getTrendIcon(change)}
                   {changeText}
-                </span>
-                <span className="text-muted-foreground">from last month</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground/60 font-medium">vs last month</span>
               </div>
             </CardContent>
           </Card>

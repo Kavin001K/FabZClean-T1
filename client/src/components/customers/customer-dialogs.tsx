@@ -21,7 +21,8 @@ import {
   ShoppingBag,
   Star,
   Clock,
-  Trash2
+  Trash2,
+  UserPlus
 } from 'lucide-react';
 import {
   Dialog,
@@ -335,63 +336,81 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   </div>
 
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-muted/50 rounded-lg">
-                        <div className="text-2xl font-bold text-primary">{totalOrders}</div>
-                        <div className="text-sm text-muted-foreground">Total Orders</div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <div className="flex flex-col p-4 bg-muted/30 rounded-2xl border border-border/50 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-2 mb-2">
+                          <ShoppingBag className="h-4 w-4 text-blue-500" />
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Orders</span>
+                        </div>
+                        <div className="text-2xl font-black text-foreground">{totalOrders}</div>
+                        <div className="text-[10px] text-muted-foreground mt-1">Total placed</div>
                       </div>
-                      <div className="p-4 bg-muted/50 rounded-lg">
-                        <div className="text-2xl font-bold text-primary">
+
+                      <div className="flex flex-col p-4 bg-muted/30 rounded-2xl border border-border/50 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-2 mb-2">
+                          <IndianRupee className="h-4 w-4 text-emerald-500" />
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Spent</span>
+                        </div>
+                        <div className="text-2xl font-black text-foreground text-emerald-600">
                           ₹{totalSpent.toLocaleString('en-IN')}
                         </div>
-                        <div className="text-sm text-muted-foreground">Total Spent</div>
+                        <div className="text-[10px] text-muted-foreground mt-1">Lifetime revenue</div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                      <div className="p-4 bg-muted/50 rounded-lg">
-                        <div className="text-lg font-bold text-emerald-500">
-                          ₹{selectedWalletBalance.toLocaleString('en-IN')}
-                        </div>
-                        <div className="text-sm text-muted-foreground flex justify-between items-center mt-1">
-                          <span>Wallet Balance</span>
+                      <div className="flex flex-col p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/20 hover:bg-emerald-500/10 transition-colors group">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-emerald-500" />
+                            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Wallet</span>
+                          </div>
                           <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 rounded-full bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
                             onClick={() => setIsRechargeModalOpen(true)}
+                            title="Recharge Wallet"
                           >
-                            Recharge
+                            <UserPlus className="h-3 w-3" />
                           </Button>
                         </div>
+                        <div className="text-2xl font-black text-emerald-600">
+                          ₹{selectedWalletBalance.toLocaleString('en-IN')}
+                        </div>
+                        <div className="text-[10px] text-emerald-500/70 mt-1">Available balance</div>
                       </div>
-                      <div className="p-4 bg-muted/50 rounded-lg">
-                        <div className={cn("text-lg font-bold", selectedOutstandingClass)}>
+
+                      <div className="flex flex-col p-4 bg-muted/30 rounded-2xl border border-border/50 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-2 mb-2">
+                          <TrendingDown className="h-4 w-4 text-amber-500" />
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Credit</span>
+                        </div>
+                        <div className={cn("text-2xl font-black", selectedOutstandingClass)}>
                           ₹{selectedOutstanding.toLocaleString('en-IN')}
                         </div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          Outstanding Credit
+                        <div className="text-[10px] text-muted-foreground mt-1 flex items-center justify-between">
+                          <span>Outstanding</span>
+                          {selectedLimitExceeded && <Badge variant="destructive" className="h-4 text-[8px] px-1 font-bold">OVER</Badge>}
                         </div>
-                        {selectedLimitExceeded && (
-                          <div className="text-xs font-medium text-red-500 mt-1">
-                            Exceeded by ₹{(selectedOutstanding - selectedCreditLimitAbs).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                          </div>
-                        )}
                       </div>
-                      <div className="p-4 bg-muted/50 rounded-lg">
-                        <div className={cn("text-lg font-bold", selectedLimitExceeded ? "text-red-500" : "text-emerald-500")}>
+
+                      <div className="flex flex-col p-4 bg-muted/30 rounded-2xl border border-border/50 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Star className="h-4 w-4 text-amber-500" />
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Limit</span>
+                        </div>
+                        <div className="text-2xl font-black text-foreground">
                           ₹{selectedCreditLimitAbs.toLocaleString('en-IN')}
                         </div>
-                        <div className="text-sm text-muted-foreground">Credit Limit</div>
+                        <div className="text-[10px] text-muted-foreground mt-1">Max credit allowance</div>
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
-                      <Badge variant={totalOrders > 5 ? 'default' : 'secondary'}>
-                        {totalOrders > 5 ? 'Loyal Customer' : 'Regular Customer'}
+                    <div className="flex gap-1.5 pt-1">
+                      <Badge variant={totalOrders > 5 ? 'default' : 'secondary'} className="rounded-lg px-2 py-0.5 text-[10px] font-bold">
+                        {totalOrders > 5 ? 'LOYAL CUSTOMER' : 'REGULAR CUSTOMER'}
                       </Badge>
-                      <Badge variant={totalSpent > 10000 ? 'default' : 'outline'}>
-                        {totalSpent > 10000 ? 'High Value' : 'Standard'}
+                      <Badge variant={totalSpent > 10000 ? 'default' : 'outline'} className="rounded-lg px-2 py-0.5 text-[10px] font-bold border-border/50">
+                        {totalSpent > 10000 ? 'HIGH VALUE' : 'STANDARD'}
                       </Badge>
                     </div>
                   </div>

@@ -25,6 +25,8 @@ import { formatCurrency } from '@/lib/data-service';
 import { Package, ChevronRight } from 'lucide-react';
 import * as LoadingSkeleton from '@/components/ui/loading-skeleton';
 import { useLocation } from 'wouter';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 interface DashboardRecentOrdersProps {
   /** Recent orders data */
@@ -110,43 +112,44 @@ export const DashboardRecentOrders: React.FC<DashboardRecentOrdersProps> = React
             {displayOrders.map((order, index) => (
               <div
                 key={order.id || index}
-                className="group flex items-center justify-between rounded-2xl border border-border bg-muted/25 p-3 transition-colors hover:bg-muted/45"
+                className="group flex items-center justify-between rounded-2xl border border-border bg-muted/20 p-4 transition-all hover:bg-muted/40 hover:shadow-md cursor-pointer"
                 onClick={() => setLocation(`/orders/${order.id}`)}
                 data-testid={getTestId(TEST_IDS.DATA.ITEM, `order-${order.id || index}`)}
               >
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="truncate text-sm font-medium text-foreground">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="truncate text-sm font-bold text-foreground">
                       {order.customerName || order.customer?.name || 'Unknown Customer'}
                     </span>
                     <Badge
                       variant="secondary"
-                      className={`text-xs ${getStatusColor(order.status)}`}
+                      className={cn("text-[10px] px-2 py-0.5 h-5 font-bold uppercase tracking-tight", getStatusColor(order.status))}
                     >
                       {getStatusText(order.status)}
                     </Badge>
                   </div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    Order #{order.id || 'N/A'} • {order.service || 'Service'}
+                  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                    <span className="font-mono text-primary/70">#{order.orderNumber || order.id?.slice(0, 8)}</span>
+                    <span>•</span>
+                    <span className="truncate">{order.service || 'Service'}</span>
                   </div>
                 </div>
-                <div className="text-right flex flex-col items-end justify-between">
-                  <div className="text-sm font-medium text-foreground">
+                <div className="text-right flex flex-col items-end gap-1">
+                  <div className="text-base font-black text-foreground tabular-nums">
                     {formatCurrency(order.totalAmount || order.total || 0)}
                   </div>
-                  <div className="flex items-center justify-end gap-2 mt-2">
-                    <span className="text-xs text-muted-foreground">
-                      {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-muted-foreground/50">
+                      {order.createdAt ? format(new Date(order.createdAt), 'dd MMM') : 'N/A'}
                     </span>
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="h-6 px-2 text-[10px] text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                      className="h-6 px-2 text-[9px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
                       onClick={(e) => {
                         e.stopPropagation();
                         window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank');
                       }}
-                      title="Track Order"
                     >
                       Track
                     </Button>

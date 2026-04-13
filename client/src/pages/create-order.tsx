@@ -2284,7 +2284,8 @@ export default function CreateOrder() {
                     ) : customerStats ? (
                       <>
                         {/* Customer Stats - Two Row Layout for Instant Insight */}
-                        <div className="flex flex-wrap gap-2 pb-1">
+                        {/* Customer Stats - Professional Grid Layout */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 pb-2">
                           {/* Row 1: Primary Transaction Stats */}
                           <div className="flex-1 min-w-[100px] bg-emerald-50 dark:bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-200/50 dark:border-emerald-800/50 shadow-sm transition-all hover:bg-emerald-100/50">
                             <div className="flex items-center gap-1.5 mb-1">
