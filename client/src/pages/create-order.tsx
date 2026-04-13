@@ -93,8 +93,9 @@ export default function CreateOrder() {
   const [showCustomerInfo, setShowCustomerInfo] = useState(false);
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
   const [customerName, setCustomerName] = useState('');
-  const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerSecondaryPhone, setCustomerSecondaryPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const [customerStreet, setCustomerStreet] = useState('');
   const [customerCity, setCustomerCity] = useState('');
   const [customerPincode, setCustomerPincode] = useState('');
@@ -127,6 +128,7 @@ export default function CreateOrder() {
         if (draft.phoneNumber) setPhoneNumber(draft.phoneNumber);
         if (draft.customerName) setCustomerName(draft.customerName);
         if (draft.customerPhone) setCustomerPhone(draft.customerPhone);
+        if (draft.customerSecondaryPhone) setCustomerSecondaryPhone(draft.customerSecondaryPhone);
         if (draft.foundCustomer) setFoundCustomer(draft.foundCustomer);
         if (draft.selectedServices) {
           // Add missing instanceKeys to support older carts
@@ -150,15 +152,16 @@ export default function CreateOrder() {
   // Save draft on change
   useEffect(() => {
     const draft = {
-      phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate
+      phoneNumber, customerName, customerPhone, customerSecondaryPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate
     };
     localStorage.setItem(ABANDONED_CART_KEY, JSON.stringify(draft));
-  }, [phoneNumber, customerName, customerPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate]);
+  }, [phoneNumber, customerName, customerPhone, customerSecondaryPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate]);
 
   // Customer creation popup
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
+  const [newCustomerSecondaryPhone, setNewCustomerSecondaryPhone] = useState('');
   const [newCustomerEmail, setNewCustomerEmail] = useState('');
   // Separate address fields for clean data collection
   const [newCustomerStreet, setNewCustomerStreet] = useState('');
@@ -419,6 +422,7 @@ export default function CreateOrder() {
         setCustomerName(customer.name || "");
         setCustomerEmail(customer.email || "");
         setCustomerPhone(customer.phone || phoneNumber);
+        setCustomerSecondaryPhone(customer.secondaryPhone || "");
 
         // Use raw address object fields for our split state
         const addrObj = customer.address as { street?: string, city?: string, pincode?: string };
@@ -453,6 +457,7 @@ export default function CreateOrder() {
     setCustomerName(customer.name || "");
     setCustomerEmail(customer.email || "");
     setCustomerPhone(customer.phone || "");
+    setCustomerSecondaryPhone(customer.secondaryPhone || "");
 
     // Use raw address object fields for our split state
     const addrObj = customer.address as { street?: string, city?: string, pincode?: string };
@@ -484,6 +489,7 @@ export default function CreateOrder() {
         setCustomerName(newCustomer.name || "");
         setCustomerEmail(newCustomer.email || "");
         setCustomerPhone(newCustomer.phone || "");
+        setCustomerSecondaryPhone(newCustomer.secondaryPhone || "");
 
         // Use raw address object fields for our split state
         const addrObj = newCustomer.address as { street?: string, city?: string, pincode?: string };
@@ -502,6 +508,7 @@ export default function CreateOrder() {
         // Reset new customer form
         setNewCustomerName('');
         setNewCustomerPhone('');
+        setNewCustomerSecondaryPhone('');
         setNewCustomerEmail('');
         setNewCustomerStreet('');
         setNewCustomerCity('');
@@ -560,6 +567,7 @@ export default function CreateOrder() {
     createCustomerMutation.mutate({
       name: newCustomerName,
       phone: newCustomerPhone,
+      secondaryPhone: newCustomerSecondaryPhone || undefined,
       email: newCustomerEmail || undefined,
       address: addressObj,
     });
@@ -886,6 +894,7 @@ export default function CreateOrder() {
     setCustomerName('');
     setCustomerEmail('');
     setCustomerPhone('');
+    setCustomerSecondaryPhone('');
     setCustomerStreet('');
     setCustomerCity('');
     setCustomerPincode('');
@@ -978,6 +987,7 @@ export default function CreateOrder() {
         const newCustomer = await customersApi.create({
           name: customerName,
           phone: customerPhone,
+          secondaryPhone: customerSecondaryPhone || undefined,
           email: customerEmail || undefined,
           // Send address as an object to satisfy jsonb requirement
           address: { street: customerStreet, city: customerCity, pincode: customerPincode },
@@ -1001,6 +1011,7 @@ export default function CreateOrder() {
       // PERF: Fire-and-forget profile update — don't block order creation
       const hasNameChanged = foundCustomer.name !== customerName;
       const hasPhoneChanged = foundCustomer.phone !== customerPhone;
+      const hasSecondaryPhoneChanged = foundCustomer.secondaryPhone !== customerSecondaryPhone;
       const hasEmailChanged = foundCustomer.email !== (customerEmail || null);
       
       const addrObj = foundCustomer.address as { street?: string, city?: string, pincode?: string };
@@ -1008,10 +1019,11 @@ export default function CreateOrder() {
                                 customerCity !== (addrObj?.city || "") || 
                                 customerPincode !== (addrObj?.pincode || "");
 
-      if (hasNameChanged || hasPhoneChanged || hasEmailChanged || hasAddressChanged) {
+      if (hasNameChanged || hasPhoneChanged || hasSecondaryPhoneChanged || hasEmailChanged || hasAddressChanged) {
         const updates: any = {};
         if (hasNameChanged) updates.name = customerName;
         if (hasPhoneChanged) updates.phone = customerPhone;
+        if (hasSecondaryPhoneChanged) updates.secondaryPhone = customerSecondaryPhone || null;
         if (hasEmailChanged) updates.email = customerEmail || null;
         if (hasAddressChanged) updates.address = { street: customerStreet, city: customerCity, pincode: customerPincode };
 
@@ -1044,6 +1056,7 @@ export default function CreateOrder() {
       customerName,
       customerEmail: customerEmail || undefined,
       customerPhone,
+      secondaryPhone: customerSecondaryPhone || undefined,
       status: "pending",
       paymentStatus: paymentStatus,
       totalAmount: totalAmount.toFixed(2),
@@ -1311,17 +1324,30 @@ export default function CreateOrder() {
                       className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="customerPhone" className="text-slate-700 dark:text-slate-300">Phone Number *</Label>
-                    <Input
-                      id="customerPhone"
-                      placeholder="Phone number"
-                      type="tel"
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      required
-                      className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                    />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="customerPhone" className="text-slate-700 dark:text-slate-300">Primary Phone *</Label>
+                      <Input
+                        id="customerPhone"
+                        placeholder="Primary phone"
+                        type="tel"
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(e.target.value)}
+                        required
+                        className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="customerSecondaryPhone" className="text-slate-700 dark:text-slate-300">Secondary Phone</Label>
+                      <Input
+                        id="customerSecondaryPhone"
+                        placeholder="Alt phone"
+                        type="tel"
+                        value={customerSecondaryPhone}
+                        onChange={(e) => setCustomerSecondaryPhone(e.target.value)}
+                        className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -2575,16 +2601,28 @@ export default function CreateOrder() {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="newCustomerPhone">Phone Number *</Label>
-              <Input
-                id="newCustomerPhone"
-                placeholder="Phone number"
-                type="tel"
-                value={newCustomerPhone}
-                onChange={(e) => setNewCustomerPhone(e.target.value)}
-                required
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="newCustomerPhone">Primary Phone *</Label>
+                <Input
+                  id="newCustomerPhone"
+                  placeholder="Phone number"
+                  type="tel"
+                  value={newCustomerPhone}
+                  onChange={(e) => setNewCustomerPhone(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newCustomerSecondaryPhone">Secondary Phone</Label>
+                <Input
+                  id="newCustomerSecondaryPhone"
+                  placeholder="Alt phone (optional)"
+                  type="tel"
+                  value={newCustomerSecondaryPhone}
+                  onChange={(e) => setNewCustomerSecondaryPhone(e.target.value)}
+                />
+              </div>
             </div>
 
             {/* Address Fields - Collected Separately */}

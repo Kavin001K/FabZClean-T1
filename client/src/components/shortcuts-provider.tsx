@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { ShortcutsDialog } from './shortcuts-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { dispatchShortcutEvent, OPEN_GLOBAL_SEARCH_EVENT, REFRESH_DATA_EVENT } from '@/lib/shortcut-events';
+import { handleFormEnterNavigation } from '@/lib/enter-navigation';
 
 interface ShortcutsContextType {
     showShortcuts: () => void;
@@ -42,7 +43,13 @@ export function ShortcutsProvider({ children }: ShortcutsProviderProps) {
             modKey ||
             isAltNavigation;
 
-        if (isInput && !isShortcutKey) {
+        if (isInput && !isShortcutKey && e.key !== 'Enter') {
+            return;
+        }
+
+        // Handle Enter key for form navigation globally
+        if (e.key === 'Enter' && isInput && !e.shiftKey) {
+            handleFormEnterNavigation(e);
             return;
         }
 
@@ -138,9 +145,17 @@ export function ShortcutsProvider({ children }: ShortcutsProviderProps) {
                 return;
             }
 
-            const hasOpenDialog = Boolean(document.querySelector('[role="dialog"][data-state="open"]'));
-            const hasOpenPopover = Boolean(document.querySelector('[data-radix-popper-content-wrapper]'));
+            const hasOpenDialog = Boolean(document.querySelector('[role="dialog"][data-state="open"], [role="dialog"], .radix-dialog-content'));
+            const hasOpenPopover = Boolean(document.querySelector('[data-radix-popper-content-wrapper], [role="menu"], [role="listbox"]'));
+            
             if (hasOpenDialog || hasOpenPopover) {
+                // If native Radix/Shadcn logic doesn't close it, try forced close
+                const closeBtn = document.querySelector('[data-dialog-close], button[aria-label="Close"]') as HTMLButtonElement;
+                if (closeBtn) {
+                   closeBtn.click();
+                   e.preventDefault();
+                   return;
+                }
                 return;
             }
 
