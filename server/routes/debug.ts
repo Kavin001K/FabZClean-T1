@@ -3,13 +3,25 @@ import bcrypt from 'bcryptjs';
 import { db } from '../db';
 
 const router = Router();
+const debugRouteSecret = process.env.DEBUG_ROUTE_SECRET;
+
+function ensureDebugAccess(req: Request, res: Response): boolean {
+    if (process.env.ENABLE_DEBUG_ROUTES !== 'true') {
+        res.status(404).json({ error: 'Not found' });
+        return false;
+    }
+
+    if (!debugRouteSecret || req.query.secret !== debugRouteSecret) {
+        res.status(403).json({ error: 'Forbidden' });
+        return false;
+    }
+
+    return true;
+}
 
 router.get('/check-user', async (req: Request, res: Response) => {
-    const { username, secret } = req.query;
-
-    if (secret !== 'debug123') {
-        return res.status(403).json({ error: 'Forbidden' });
-    }
+    const { username } = req.query;
+    if (!ensureDebugAccess(req, res)) return;
 
     try {
         const term = String(username).toLowerCase();
@@ -48,11 +60,8 @@ router.get('/check-user', async (req: Request, res: Response) => {
 });
 
 router.get('/reset-password', async (req: Request, res: Response) => {
-    const { username, secret } = req.query;
-
-    if (secret !== 'debug123') {
-        return res.status(403).json({ error: 'Forbidden' });
-    }
+    const { username } = req.query;
+    if (!ensureDebugAccess(req, res)) return;
 
     try {
         const term = String(username).toLowerCase();
@@ -91,14 +100,11 @@ router.get('/reset-password', async (req: Request, res: Response) => {
 
 // Test WhatsApp notification endpoint
 router.get('/test-whatsapp', async (req: Request, res: Response) => {
-    const { phone, secret } = req.query;
-
-    if (secret !== 'debug123') {
-        return res.status(403).json({ error: 'Forbidden' });
-    }
+    const { phone } = req.query;
+    if (!ensureDebugAccess(req, res)) return;
 
     if (!phone) {
-        return res.status(400).json({ error: 'Phone number required (use ?phone=919XXXXXXXXX&secret=debug123)' });
+        return res.status(400).json({ error: 'Phone number required' });
     }
 
     const authKey = process.env.MSG91_AUTH_KEY;

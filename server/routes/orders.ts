@@ -1044,15 +1044,17 @@ router.put('/:id', async (req, res) => {
       }
 
       const cancellationReason = updateData.cancellationReason || 'Operational Issue';
-      const cancelUpdateData: Record<string, any> = {
-        status: 'cancelled',
-        cancellationReason,
-        cancelledAt: new Date(),
-        cancelledBy: req.employee?.username || req.employee?.employeeId || 'system',
-      };
+      const cancelledBy = req.employee?.username || req.employee?.employeeId || 'system';
 
       try {
-        const updatedOrder = await storage.updateOrder(orderId, cancelUpdateData);
+        const updatedOrder = typeof (storage as any).cancelOrder === 'function'
+          ? await (storage as any).cancelOrder(orderId, cancellationReason, cancelledBy)
+          : await storage.updateOrder(orderId, {
+              status: 'cancelled',
+              cancellationReason,
+              cancelledAt: new Date(),
+              cancelledBy,
+            });
         if (!updatedOrder) {
           return res.status(500).json(createErrorResponse('Failed to cancel order', 500));
         }

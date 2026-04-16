@@ -116,6 +116,30 @@ export class SupabaseStorage {
         throw new Error('Failed to write order record after removing unsupported columns');
     }
 
+    private shouldFallbackCancelOrderRpc(error: any): boolean {
+        const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`.trim();
+
+        return (
+            /cancel_order_with_reason/i.test(message) &&
+            /(does not exist|not found|Could not find the function)/i.test(message)
+        ) || /(operator does not exist:\s*uuid\s*=\s*text|operator does not exist:\s*text\s*=\s*uuid|invalid input syntax for type uuid)/i.test(message);
+    }
+
+    private async fallbackCancelOrder(
+        id: string,
+        cancellationReason?: string | null,
+        cancelledBy?: string | null
+    ): Promise<Order | undefined> {
+        console.warn('[SupabaseStorage] cancel_order_with_reason RPC unavailable or incompatible; falling back to direct orders update');
+
+        return this.updateOrder(id, {
+            status: 'cancelled',
+            cancellationReason: cancellationReason || 'Operational Issue',
+            cancelledAt: new Date(),
+            cancelledBy: cancelledBy || 'system',
+        } as Partial<InsertOrder>);
+    }
+
     // Map DB snake_case to App camelCase
     private mapDates(record: any): any {
         if (!record) return record;
@@ -1104,6 +1128,34 @@ export class SupabaseStorage {
             throw new Error(`Failed to update order: ${error?.message || 'Unknown error'}`);
         }
         return this.mapDates(order);
+    }
+
+    async cancelOrder(id: string, cancellationReason?: string | null, cancelledBy?: string | null): Promise<Order | undefined> {
+        try {
+            const { data, error } = await this.supabase.rpc('cancel_order_with_reason', {
+                p_order_id: id,
+                p_cancellation_reason: cancellationReason || 'Operational Issue',
+                p_cancelled_by: cancelledBy || 'system',
+            });
+
+            if (error) {
+                if (this.shouldFallbackCancelOrderRpc(error)) {
+                    return this.fallbackCancelOrder(id, cancellationReason, cancelledBy);
+                }
+
+                throw error;
+            }
+
+            if (!data) return undefined;
+            return this.mapDates(data);
+        } catch (error: any) {
+            if (this.shouldFallbackCancelOrderRpc(error)) {
+                return this.fallbackCancelOrder(id, cancellationReason, cancelledBy);
+            }
+
+            console.error('[SupabaseStorage] cancelOrder ERROR:', error?.message, error?.details);
+            throw new Error(`Failed to cancel order: ${error?.message || 'Unknown error'}`);
+        }
     }
 
     async deleteOrder(id: string): Promise<boolean> {

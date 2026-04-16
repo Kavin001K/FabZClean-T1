@@ -157,7 +157,9 @@ export function registerAllRoutes(app: Express): void {
 
   // Authentication routes
   app.use('/api/auth', authRouter);
-  app.use('/api/debug', debugRouter);
+  if (process.env.ENABLE_DEBUG_ROUTES === 'true') {
+    app.use('/api/debug', debugRouter);
+  }
   app.use('/api/whatsapp', whatsappRouter);
   app.use('/api/documents', documentsRouter);
 

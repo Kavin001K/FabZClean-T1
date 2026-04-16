@@ -114,6 +114,9 @@ const getPriorityColor = (priority: string) => {
   }
 };
 
+const isTerminalOrderStatus = (status: Order['status']) =>
+  status === 'cancelled' || status === 'completed' || status === 'delivered';
+
 export default React.memo(function OrderDetailsDialog({
   order,
   isOpen,
@@ -164,7 +167,12 @@ export default React.memo(function OrderDetailsDialog({
   const creditUsed = parseMoney(anyOrder.creditUsed);
   const calculatedDue = Math.max(0, totalAmount - advancePaid - walletUsed);
   const outstandingAmount = Math.max(creditUsed, calculatedDue);
-  const canMarkPaid = anyOrder.paymentStatus !== 'paid' && outstandingAmount > 0;
+  const workflowLocked = isTerminalOrderStatus(order.status);
+  const canEdit = !workflowLocked;
+  const canCancel = !workflowLocked;
+  const canTrack = order.status !== 'cancelled';
+  const canResendBill = order.status !== 'cancelled';
+  const canMarkPaid = order.status !== 'cancelled' && anyOrder.paymentStatus !== 'paid' && outstandingAmount > 0;
   const storeLabel = getOrderStoreLabel(resolveOrderStoreCodeFromOrder(anyOrder));
   const resolvedCustomerPhone = order.customerPhone || anyOrder.customerPhone || anyOrder.customers?.phone || "";
 
@@ -437,6 +445,14 @@ export default React.memo(function OrderDetailsDialog({
         {/* Footer Actions */}
         <div className="px-6 py-5 border-t bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-md sticky bottom-0">
           <div className="flex flex-col gap-4">
+            {workflowLocked && (
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-300">
+                {order.status === 'cancelled'
+                  ? 'This order is cancelled. Workflow and payment actions are locked.'
+                  : 'This order is closed. Only non-destructive actions remain available.'}
+              </div>
+            )}
+
             {/* Row 1: Primary Action & Print */}
             <div className="flex gap-3 w-full">
               {nextStatus && (
@@ -459,29 +475,42 @@ export default React.memo(function OrderDetailsDialog({
                   }
                 </Button>
               )}
-              
-              <Button 
-                variant="outline" 
-                size="icon"
-                className="h-14 w-14 rounded-2xl border-2 border-slate-200 dark:border-slate-800 shadow-md bg-white dark:bg-slate-950 flex-shrink-0 hover:bg-slate-50 transition-all hover:border-primary/30"
-                onClick={handlePrintInvoice}
-                title="Print Invoice"
-              >
-                <Printer className="h-6 w-6 text-slate-700 dark:text-slate-300" />
-              </Button>
+
+              {nextStatus ? (
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  className="h-14 w-14 rounded-2xl border-2 border-slate-200 dark:border-slate-800 shadow-md bg-white dark:bg-slate-950 flex-shrink-0 hover:bg-slate-50 transition-all hover:border-primary/30"
+                  onClick={handlePrintInvoice}
+                  title="Print Invoice"
+                >
+                  <Printer className="h-6 w-6 text-slate-700 dark:text-slate-300" />
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full h-12 rounded-2xl border-2 border-slate-200 dark:border-slate-800 shadow-md bg-white dark:bg-slate-950 hover:bg-slate-50 transition-all hover:border-primary/30 font-bold uppercase tracking-widest text-[10px]"
+                  onClick={handlePrintInvoice}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Invoice
+                </Button>
+              )}
             </div>
 
             {/* Row 2: Secondary Support Actions - Grid Layout */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              <Button 
-                variant="secondary" 
-                className="h-11 font-bold uppercase tracking-widest text-[10px] rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:bg-slate-100 dark:hover:bg-slate-800"
-                onClick={() => onEdit(order)}
-              >
-                <Edit className="h-3.5 w-3.5 mr-2" /> Edit Order
-              </Button>
+              {canEdit && (
+                <Button 
+                  variant="secondary" 
+                  className="h-11 font-bold uppercase tracking-widest text-[10px] rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:bg-slate-100 dark:hover:bg-slate-800"
+                  onClick={() => onEdit(order)}
+                >
+                  <Edit className="h-3.5 w-3.5 mr-2" /> Edit Order
+                </Button>
+              )}
 
-              {onResendBill && (() => {
+              {onResendBill && canResendBill && (() => {
                 const sendCount = Number((order as any).whatsappMessageCount || 0);
                 const hasPhone = Boolean(resolvedCustomerPhone);
                 const limitReached = sendCount >= MAX_WHATSAPP_SENDS;
@@ -508,13 +537,15 @@ export default React.memo(function OrderDetailsDialog({
                 );
               })()}
 
-              <Button
-                variant="outline"
-                className="h-11 font-bold uppercase tracking-widest text-[10px] rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm"
-                onClick={() => window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank')}
-              >
-                <Navigation className="h-3.5 w-3.5 mr-2" /> Track Order
-              </Button>
+              {canTrack && (
+                <Button
+                  variant="outline"
+                  className="h-11 font-bold uppercase tracking-widest text-[10px] rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm"
+                  onClick={() => window.open(`https://erp.myfabclean.com/trackorder/${order.orderNumber || order.id}`, '_blank')}
+                >
+                  <Navigation className="h-3.5 w-3.5 mr-2" /> Track Order
+                </Button>
+              )}
 
               {canMarkPaid && onUpdatePaymentStatus && (
                 <Button
@@ -527,7 +558,7 @@ export default React.memo(function OrderDetailsDialog({
                 </Button>
               )}
 
-              {order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'delivered' && (
+              {canCancel && (
                 <Button 
                   variant="outline" 
                   onClick={() => onCancel(order)} 

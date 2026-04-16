@@ -122,6 +122,21 @@ interface PaginationState {
 
 type ViewMode = 'table' | 'timeline';
 
+const TERMINAL_ORDER_STATUSES = new Set<Order['status']>(['cancelled', 'completed', 'delivered']);
+
+const isWorkflowLocked = (order: Order): boolean => TERMINAL_ORDER_STATUSES.has(order.status);
+
+const canEditOrder = (order: Order): boolean => !isWorkflowLocked(order);
+
+const canCancelOrder = (order: Order): boolean => !isWorkflowLocked(order);
+
+const canProcessPayment = (order: Order): boolean => {
+  const paymentStatus = String((order as any).paymentStatus || '').toLowerCase();
+  return order.status !== 'cancelled' && paymentStatus !== 'paid' && paymentStatus !== 'credit';
+};
+
+const canDebitWallet = (order: Order): boolean => canProcessPayment(order);
+
 const getBillWhatsappStatus = (order: Order): string => {
   return String((order as any).lastWhatsappStatus || '').trim();
 };
@@ -143,7 +158,7 @@ const resolveOrderPhone = (order: Order): string => {
 const canShowSendBillAction = (order: Order): boolean => {
   const phone = resolveOrderPhone(order);
   const sendCount = Number((order as any).whatsappMessageCount || 0);
-  return Boolean(phone) && hasBillSendFailed(order) && sendCount < MAX_WHATSAPP_SENDS;
+  return order.status !== 'cancelled' && Boolean(phone) && hasBillSendFailed(order) && sendCount < MAX_WHATSAPP_SENDS;
 };
 
 const resolveOrderDueDate = (order: Order): Date | null => {
@@ -238,6 +253,15 @@ function OrdersComponent() {
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
+
+  useEffect(() => {
+    if (!selectedOrder) return;
+
+    const freshOrder = orders.find((order) => order.id === selectedOrder.id);
+    if (freshOrder && freshOrder !== selectedOrder) {
+      setSelectedOrder(freshOrder);
+    }
+  }, [orders, selectedOrder]);
 
   // Deep Link Handling for Order Edit
   useEffect(() => {
@@ -473,21 +497,33 @@ function OrdersComponent() {
   const updateOrderStatusMutation = useMutation({
     mutationFn: ({ orderId, newStatus, cancellationReason }: { orderId: string; newStatus: string; cancellationReason?: string }) =>
       ordersApi.update(orderId, { status: newStatus as any, cancellationReason } as any),
-    onMutate: async ({ orderId, newStatus }) => {
+    onMutate: async ({ orderId, newStatus, cancellationReason }) => {
       await queryClient.cancelQueries({ queryKey: ['orders'] });
       const previousOrders = queryClient.getQueryData<Order[]>(['orders']);
 
       queryClient.setQueryData<Order[]>(['orders'], (old) => {
         if (!old) return [];
         return old.map((order) =>
-          order.id === orderId ? { ...order, status: newStatus as any } : order
+          order.id === orderId
+            ? { ...order, status: newStatus as any, ...(cancellationReason ? { cancellationReason } : {}) }
+            : order
         );
       });
+      setSelectedOrder((prev) =>
+        prev && prev.id === orderId
+          ? { ...prev, status: newStatus as any, ...(cancellationReason ? { cancellationReason } : {}) }
+          : prev
+      );
 
       return { previousOrders };
     },
     onSuccess: (updatedOrder, { orderId, newStatus }) => {
       if (updatedOrder) {
+        queryClient.setQueryData<Order[]>(['orders'], (old) =>
+          Array.isArray(old) ? old.map((order) => (order.id === orderId ? { ...order, ...updatedOrder } : order)) : old
+        );
+        setSelectedOrder((prev) => (prev && prev.id === orderId ? { ...prev, ...updatedOrder } : prev));
+
         addNotification({
           type: 'info',
           title: 'Order Status Updated',
@@ -608,6 +644,7 @@ function OrdersComponent() {
         `${window.location.origin}/bill/${encodeURIComponent(orderNumber)}`,
         customInvoiceUrl || (order as any).invoiceUrl || undefined,
         itemSummary,
+        undefined,
         sendCount
       );
 
@@ -685,14 +722,32 @@ function OrdersComponent() {
   }, [deleteOrderMutation]);
 
   const handleEditOrder = useCallback((order: Order) => {
+    if (!canEditOrder(order)) {
+      toast({
+        title: "Order Locked",
+        description: "Cancelled, completed, or delivered orders can't be edited.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setEditingOrder(order);
     setIsEditDialogOpen(true);
-  }, []);
+  }, [toast]);
 
   const handleCancelOrder = useCallback((order: Order) => {
+    if (!canCancelOrder(order)) {
+      toast({
+        title: "Cancellation Unavailable",
+        description: "This order can no longer be cancelled.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setCancellingOrder(order);
     setIsCancelDialogOpen(true);
-  }, []);
+  }, [toast]);
 
   const handleConfirmCancel = useCallback((orderId: string, reason: string) => {
     updateOrderStatusMutation.mutate({
@@ -718,6 +773,10 @@ function OrdersComponent() {
   }, [resendBillMutation]);
 
   const handleNextStep = useCallback((order: Order) => {
+    if (isWorkflowLocked(order)) {
+      return;
+    }
+
     let nextStatus: string | null = null;
     if (order.status === 'pending') {
       nextStatus = 'processing';
@@ -749,6 +808,15 @@ function OrdersComponent() {
   }, [updateOrderStatusMutation, orders, toast]);
 
   const handleDebitFromWallet = useCallback(async (order: Order) => {
+    if (!canDebitWallet(order)) {
+      toast({
+        title: "Wallet Debit Unavailable",
+        description: "Wallet debit is disabled for cancelled or fully settled orders.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const customerId = (order as any).customerId;
     if (!customerId) {
       toast({
@@ -808,6 +876,15 @@ function OrdersComponent() {
   }, [queryClient, toast]);
 
   const handleMarkOrderPaid = useCallback((order: Order, status: 'paid' | 'credit') => {
+    if (!canProcessPayment(order)) {
+      toast({
+        title: "Payment Update Unavailable",
+        description: "Cancelled orders cannot be marked as paid.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (status !== 'paid') {
       updateOrderMutation.mutate({
         orderId: order.id,
@@ -1489,6 +1566,7 @@ function OrdersComponent() {
                 size="sm" 
                 className="flex-1 h-10 font-bold"
                 onClick={(e) => { e.stopPropagation(); handleEditOrder(order); }}
+                disabled={!canEditOrder(order)}
               >
                 <Edit className="h-4 w-4 mr-2" /> Edit
               </Button>
@@ -1517,14 +1595,16 @@ function OrdersComponent() {
                     </DropdownMenuItem>
                   )}
                   {canShowSendBillAction(order) && <DropdownMenuSeparator />}
-                  {order.paymentStatus !== 'paid' && (
+                  {canProcessPayment(order) && (
                     <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedPaymentOrder(order); setIsPaymentModalOpen(true); }}>
                       <IndianRupee className="mr-2 h-4 w-4" /> Process Payment
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={() => handleCancelOrder(order)} className="text-destructive focus:text-destructive">
-                    <XCircle className="mr-2 h-4 w-4" /> Cancel Order
-                  </DropdownMenuItem>
+                  {canCancelOrder(order) && (
+                    <DropdownMenuItem onClick={() => handleCancelOrder(order)} className="text-destructive focus:text-destructive">
+                      <XCircle className="mr-2 h-4 w-4" /> Cancel Order
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -1592,9 +1672,11 @@ function OrdersComponent() {
               <DropdownMenuItem onClick={() => handleViewOrder(order)}>
                 <Eye className="mr-2 h-4 w-4" /> View Details
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleEditOrder(order)}>
-                <Edit className="mr-2 h-4 w-4" /> Edit Order
-              </DropdownMenuItem>
+              {canEditOrder(order) && (
+                <DropdownMenuItem onClick={() => handleEditOrder(order)}>
+                  <Edit className="mr-2 h-4 w-4" /> Edit Order
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => handlePrintInvoice(order)}>
                 <Printer className="mr-2 h-4 w-4" /> Print Invoice
               </DropdownMenuItem>
@@ -1613,7 +1695,7 @@ function OrdersComponent() {
               )}
               <DropdownMenuSeparator />
               {order.status === 'processing' && <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>Mark as Completed</DropdownMenuItem>}
-              {order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit' && (
+              {canProcessPayment(order) && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedPaymentOrder(order); setIsPaymentModalOpen(true); }}>
@@ -1624,7 +1706,7 @@ function OrdersComponent() {
                   </DropdownMenuItem>
                 </>
               )}
-              {order.status !== 'completed' && order.status !== 'cancelled' && (
+              {canCancelOrder(order) && (
                 <DropdownMenuItem onClick={() => handleCancelOrder(order)} className="text-red-600 focus:text-red-600">
                   <X className="mr-2 h-4 w-4" /> Cancel Order
                 </DropdownMenuItem>
@@ -2543,9 +2625,11 @@ function OrdersComponent() {
                                           <DropdownMenuItem onClick={() => handleViewOrder(order)}>
                                             <Eye className="mr-2 h-4 w-4" /> View Details
                                           </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={() => handleEditOrder(order)}>
-                                            <Edit className="mr-2 h-4 w-4" /> Edit Order
-                                          </DropdownMenuItem>
+                                          {canEditOrder(order) && (
+                                            <DropdownMenuItem onClick={() => handleEditOrder(order)}>
+                                              <Edit className="mr-2 h-4 w-4" /> Edit Order
+                                            </DropdownMenuItem>
+                                          )}
                                           <DropdownMenuItem onClick={() => handlePrintInvoice(order)}>
                                             <Printer className="mr-2 h-4 w-4" /> Print Invoice
                                           </DropdownMenuItem>
@@ -2564,7 +2648,7 @@ function OrdersComponent() {
                                           )}
                                           <DropdownMenuSeparator />
                                           {order.status === 'processing' && <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'completed')}>Mark as Completed</DropdownMenuItem>}
-                                          {order.paymentStatus !== 'paid' && order.paymentStatus !== 'credit' && (
+                                          {canProcessPayment(order) && (
                                             <>
                                               <DropdownMenuSeparator />
                                               <DropdownMenuItem onClick={() => { setSelectedPaymentOrder(order); setIsPaymentModalOpen(true); }}>
@@ -2575,7 +2659,7 @@ function OrdersComponent() {
                                               </DropdownMenuItem>
                                             </>
                                           )}
-                                          {order.status !== 'completed' && order.status !== 'cancelled' && (
+                                          {canCancelOrder(order) && (
                                             <DropdownMenuItem onClick={() => handleCancelOrder(order)} className="text-red-600 focus:text-red-600">
                                               <X className="mr-2 h-4 w-4" /> Cancel Order
                                             </DropdownMenuItem>
