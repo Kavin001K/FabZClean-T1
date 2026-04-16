@@ -22,7 +22,8 @@ import {
   Star,
   Clock,
   Trash2,
-  UserPlus
+  UserPlus,
+  Phone
 } from 'lucide-react';
 import {
   Dialog,
@@ -172,7 +173,12 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
       addressPincode: existingAddress.pincode,
       creditLimit: String((selectedCustomer as any)?.creditLimit ?? '1000'),
       creditBalance: selectedCustomer?.creditBalance || '0',
-      notes: '',
+      notes: (selectedCustomer as any)?.notes || '',
+      companyName: (selectedCustomer as any)?.companyName || '',
+      taxId: (selectedCustomer as any)?.taxId || '',
+      dateOfBirth: (selectedCustomer as any)?.dateOfBirth || '',
+      paymentTerms: (selectedCustomer as any)?.paymentTerms || '',
+      status: ((selectedCustomer as any)?.status as 'active' | 'inactive' | undefined) || 'active',
     },
   });
 
@@ -204,6 +210,12 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
         addressPincode: existingAddress.pincode,
         creditLimit: String((selectedCustomer as any)?.creditLimit ?? '1000'),
         creditBalance: selectedCustomer.creditBalance || '0',
+        notes: (selectedCustomer as any)?.notes || '',
+        companyName: (selectedCustomer as any)?.companyName || '',
+        taxId: (selectedCustomer as any)?.taxId || '',
+        dateOfBirth: (selectedCustomer as any)?.dateOfBirth || '',
+        paymentTerms: (selectedCustomer as any)?.paymentTerms || '',
+        status: ((selectedCustomer as any)?.status as 'active' | 'inactive' | undefined) || 'active',
       });
     }
   }, [isEditDialogOpen, selectedCustomer, editForm, existingAddress.street, existingAddress.city, existingAddress.pincode]);
@@ -243,6 +255,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
   });
 
   const profileData = customerProfileQuery.data as CustomerProfileDetails | null;
+  const resolvedCustomer = profileData?.customer ?? selectedCustomer;
 
   const fallbackOrders = React.useMemo(() => {
     if (!selectedCustomer || !orders) return [];
@@ -329,19 +342,19 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   <div className="space-y-4">
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Email</Label>
-                      <p className="text-sm">{selectedCustomer.email || 'Not provided'}</p>
+                      <p className="text-sm">{resolvedCustomer?.email || 'Not provided'}</p>
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
                       <p className="text-sm">
-                        {selectedCustomer.phone || 'Not provided'}
-                        {(selectedCustomer as any).secondaryPhone ? `, ${(selectedCustomer as any).secondaryPhone}` : ''}
+                        {resolvedCustomer?.phone || 'Not provided'}
+                        {(resolvedCustomer as any)?.secondaryPhone ? `, ${(resolvedCustomer as any).secondaryPhone}` : ''}
                       </p>
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Address</Label>
                       <p className="text-sm">
-                        {formatAddress(parseAddress(selectedCustomer.address))}
+                        {formatAddress(parseAddress(resolvedCustomer?.address))}
                       </p>
                     </div>
                   </div>
@@ -1030,19 +1043,23 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
 
 
               <div className="space-y-2">
-                <Label htmlFor="create-phone">Phone *</Label>
+                <Label htmlFor="create-phone" className="text-sm font-bold flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5 text-primary" />
+                  Phone Number <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="create-phone"
                   type="tel"
                   {...createForm.register('phone')}
-                  placeholder="Enter phone number"
+                  placeholder="Enter 10-digit mobile number"
                   onKeyDown={(e) => navigateOnEnter(e, { next: document.getElementById('create-secondary-phone') as HTMLElement | null })}
                   className={cn(
-                    createForm.formState.errors.phone && 'border-red-500'
+                    "h-11 rounded-xl focus-visible:ring-primary/20",
+                    createForm.formState.errors.phone && 'border-destructive'
                   )}
                 />
                 {createForm.formState.errors.phone && (
-                  <p className="text-sm text-red-500">
+                  <p className="text-[11px] text-destructive font-semibold">
                     {createForm.formState.errors.phone.message}
                   </p>
                 )}

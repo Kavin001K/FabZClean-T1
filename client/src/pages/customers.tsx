@@ -337,7 +337,7 @@ export default function Customers() {
       console.error('Failed to create customer:', error);
       toast({
         title: "Error",
-        description: "Failed to create customer. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create customer. Please try again.",
         variant: "destructive",
       });
     },
@@ -350,19 +350,20 @@ export default function Customers() {
     onSuccess: (updatedCustomer) => {
       if (updatedCustomer) {
         queryClient.invalidateQueries({ queryKey: ["customers"] });
+        queryClient.invalidateQueries({ queryKey: ["customers", updatedCustomer.id, "profile"] });
         toast({
           title: "Customer Updated Successfully",
           description: `Customer ${updatedCustomer.name} has been updated.`,
         });
+        setSelectedCustomer(updatedCustomer);
         setIsEditDialogOpen(false);
-        setSelectedCustomer(null);
       }
     },
     onError: (error) => {
       console.error('Failed to update customer:', error);
       toast({
         title: "Error",
-        description: "Failed to update customer. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update customer. Please try again.",
         variant: "destructive",
       });
     },
@@ -724,8 +725,8 @@ export default function Customers() {
 
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   <Select value={segmentFilter} onValueChange={setSegmentFilter}>
-                    <SelectTrigger className="w-[140px] sm:w-[160px] h-11 border-muted bg-transparent focus:ring-primary/20">
-                      <Filter className="h-3.5 w-3.5 mr-2 opacity-60" />
+                    <SelectTrigger className="w-[140px] sm:w-[160px] h-10 border-border bg-card shadow-sm hover:bg-muted/50 transition-all font-medium">
+                      <Filter className="h-4 w-4 mr-2 text-primary" />
                       <SelectValue placeholder="Segment" />
                     </SelectTrigger>
                     <SelectContent>
@@ -738,7 +739,7 @@ export default function Customers() {
                   </Select>
 
                   <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger className="w-[140px] sm:w-[160px] h-11 border-muted bg-transparent focus:ring-primary/20">
+                    <SelectTrigger className="w-[140px] sm:w-[160px] h-10 border-border bg-card shadow-sm hover:bg-muted/50 transition-all font-medium">
                       <SelectValue placeholder="Sort by" />
                     </SelectTrigger>
                     <SelectContent>

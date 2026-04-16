@@ -154,6 +154,9 @@ export const orders = pgTable("orders", {
   dispatchedAt: timestamp("dispatched_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  cancellationReason: text("cancellation_reason"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelledBy: text("cancelled_by"),
 });
 
 export const deliveries = pgTable("deliveries", {
@@ -185,7 +188,7 @@ export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   email: text("email"),
-  phone: text("phone"),
+  phone: text("phone").notNull(),
   secondaryPhone: text("secondary_phone"),
   franchiseId: text("franchise_id"),
   address: jsonb("address"),
@@ -358,7 +361,7 @@ export const insertOrderSchema = z.object({
   storeCode: z.enum(ORDER_STORE_CODES).optional().default(DEFAULT_ORDER_STORE_CODE),
   customerName: z.string(),
   customerEmail: z.string().optional().nullable(),
-  customerPhone: z.string().optional().nullable(),
+  customerPhone: z.string().min(10, "Phone number is required"),
   secondaryPhone: z.string().optional().nullable(),
   status: z.enum(["pending", "processing", "completed", "cancelled", "assigned", "in_transit", "shipped", "out_for_delivery", "delivered", "in_store", "ready_for_transit", "ready_for_pickup"]),
   paymentStatus: z.enum(["pending", "paid", "failed", "credit"]).default("pending"),

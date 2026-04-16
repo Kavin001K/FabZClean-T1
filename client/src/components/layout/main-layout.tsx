@@ -20,7 +20,12 @@ interface MainLayoutProps {
  * - Mobile (<sm): Header + Content + BottomNav (no sidebar)
  */
 export function MainLayout({ children }: MainLayoutProps) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    // Initial state from localStorage or default
+    const saved = localStorage.getItem('fabzclean-sidebar-open');
+    if (saved !== null) return saved === 'true';
+    return false; // Default to closed as requested
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [location] = useLocation();
@@ -28,18 +33,21 @@ export function MainLayout({ children }: MainLayoutProps) {
   // Detect mobile viewport
   useEffect(() => {
     const checkMobile = () => {
-      const mobile = window.innerWidth < 1024; // Use lg as mobile breakpoint for sidebar
+      const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
       if (mobile) {
-        setIsSidebarOpen(false);
-      } else {
-        setIsSidebarOpen(true);
+        setIsMobileMenuOpen(false);
       }
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Sync sidebar state to localStorage
+  useEffect(() => {
+    localStorage.setItem('fabzclean-sidebar-open', isSidebarOpen.toString());
+  }, [isSidebarOpen]);
 
   // Ensure drawer closes after route transitions on mobile/tablet.
   useEffect(() => {

@@ -20,17 +20,15 @@ const getFranchiseId = (req: any) => {
 
 router.get("/overview", authMiddleware, async (req, res) => {
     try {
+        const supabase = (storage as any).supabase;
+        if (!supabase) {
+            return res.status(500).json({ message: "Database not available" });
+        }
+
         const franchiseId = getFranchiseId(req);
         const dateRange = req.query.dateRange as string || 'last-30-days';
 
-        // 1. Fetch Orders
-        // 1. Fetch Orders (Filter manually as storage.listOrders returns all)
-        const allOrdersRaw = await storage.listOrders();
-        const allOrders = franchiseId
-            ? allOrdersRaw.filter(o => o.franchiseId === franchiseId)
-            : allOrdersRaw;
-
-        // 2. Filter by Date
+        // 1. Calculate Date Range
         const now = new Date();
         let startDate = new Date();
         switch (dateRange) {
@@ -41,68 +39,82 @@ router.get("/overview", authMiddleware, async (req, res) => {
             default: startDate = new Date(0); // All time
         }
 
-        const filteredOrders = allOrders.filter(o => new Date(o.createdAt || 0) >= startDate);
+        // 2. Efficient Counts & Revenue using Supabase
+        
+        // Count Total Customers (No date filter for total count)
+        let customerQuery = supabase.from('customers').select('id', { count: 'exact', head: true });
+        if (franchiseId) customerQuery = customerQuery.eq('franchise_id', franchiseId);
+        const { count: totalCustomersCount } = await customerQuery;
 
-        // Fetch customers for the franchise to get total count
-        const allCustomersRaw = extractListData(await storage.listCustomers());
-        const allCustomers = franchiseId
-            ? allCustomersRaw.filter(c => c.franchiseId === franchiseId)
-            : allCustomersRaw;
-        const totalCustomers = allCustomers.length;
+        // Fetch Orders for the period (Lightweight selection)
+        let orderQuery = supabase.from('orders')
+            .select('id, total_amount, status, created_at, items')
+            .gte('created_at', startDate.toISOString())
+            .order('created_at', { ascending: true });
+        
+        if (franchiseId) orderQuery = orderQuery.eq('franchise_id', franchiseId);
+        
+        const { data: filteredOrders, error: orderError } = await orderQuery;
+        if (orderError) throw orderError;
 
-        // 3. Calculate Metrics
-        const totalRevenue = filteredOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || '0'), 0);
-        const totalOrders = filteredOrders.length;
-        const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-
-        // Calculate basic retention (customers with > 1 order)
-        const repeatCustomers = allCustomers.filter(c => (c.totalOrders || 0) > 1).length;
-        const customerRetention = totalCustomers > 0 ? (repeatCustomers / totalCustomers) * 100 : 0;
-
-        // Revenue by Date (Chart)
+        // 3. Process Metrics (Now only on indexed/filtered data)
+        const orders = filteredOrders || [];
+        const totalOrders = orders.length;
+        let totalRevenue = 0;
+        
         const revenueMap = new Map<string, number>();
-        filteredOrders.forEach(o => {
-            const date = new Date(o.createdAt || 0).toLocaleDateString('en-CA'); // YYYY-MM-DD
-            revenueMap.set(date, (revenueMap.get(date) || 0) + parseFloat(o.totalAmount || '0'));
-        });
-        const revenueChart = Array.from(revenueMap.entries())
-            .map(([date, value]) => ({ date, value }))
-            .sort((a, b) => a.date.localeCompare(b.date));
-
-        // Service Performance
+        const statusMap = new Map<string, number>();
         const serviceMap = new Map<string, { name: string, revenue: number, count: number }>();
-        filteredOrders.forEach(o => {
+
+        orders.forEach(o => {
+            const rev = parseFloat(o.total_amount || '0');
+            totalRevenue += rev;
+
+            // Revenue Chart
+            const date = new Date(o.created_at).toLocaleDateString('en-CA');
+            revenueMap.set(date, (revenueMap.get(date) || 0) + rev);
+
+            // Status Map
+            const status = o.status || 'unknown';
+            statusMap.set(status, (statusMap.get(status) || 0) + 1);
+
+            // Service Map
             if (Array.isArray(o.items)) {
                 o.items.forEach((item: any) => {
-                    const name = item.serviceName || 'Unknown';
+                    const name = item.serviceName || item.name || 'Laundry Services';
                     const price = parseFloat(item.price || 0) * (item.quantity || 1);
                     const prev = serviceMap.get(name) || { name, revenue: 0, count: 0 };
                     serviceMap.set(name, { name, revenue: prev.revenue + price, count: prev.count + 1 });
                 });
             }
         });
-        const servicePerformance = Array.from(serviceMap.values()).sort((a, b) => b.revenue - a.revenue);
 
-        // Order Status Distribution
-        const statusMap = new Map<string, number>();
-        filteredOrders.forEach(o => {
-            const status = o.status || 'unknown';
-            statusMap.set(status, (statusMap.get(status) || 0) + 1);
-        });
-        const orderStatusDistribution = Array.from(statusMap.entries()).map(([status, count]) => ({ status, count }));
+        const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+        // Simplified retention for performance (could be improved with a more complex SQL)
+        // For now, let's at least get a better count using SQL
+        let repeatQuery = supabase.from('customers').select('id', { count: 'exact', head: true }).gt('total_orders', 1);
+        if (franchiseId) repeatQuery = repeatQuery.eq('franchise_id', franchiseId);
+        const { count: repeatCustomersCount } = await repeatQuery;
+        
+        const totalCust = totalCustomersCount || 0;
+        const repeatCust = repeatCustomersCount || 0;
+        const customerRetention = totalCust > 0 ? (repeatCust / totalCust) * 100 : 0;
 
         res.json({
             metrics: {
                 totalRevenue,
                 totalOrders,
                 avgOrderValue,
-                totalCustomers,
+                totalCustomers: totalCust,
                 customerRetention
             },
             charts: {
-                revenueOverTime: revenueChart,
-                servicePerformance,
-                orderStatusDistribution
+                revenueOverTime: Array.from(revenueMap.entries())
+                    .map(([date, value]) => ({ date, value }))
+                    .sort((a, b) => a.date.localeCompare(b.date)),
+                servicePerformance: Array.from(serviceMap.values()).sort((a, b) => b.revenue - a.revenue),
+                orderStatusDistribution: Array.from(statusMap.entries()).map(([status, count]) => ({ status, count }))
             }
         });
 

@@ -163,7 +163,7 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
             variant="ghost"
             size="icon"
             onClick={showShortcuts}
-            className="h-8 w-8 rounded-xl border border-transparent hover:border-border hover:bg-muted"
+            className="h-9 w-9 rounded-xl border border-transparent hover:border-border hover:bg-muted"
             title="Keyboard Shortcuts (F1)"
           >
             <Keyboard className="h-4 w-4" />
@@ -175,7 +175,7 @@ export function Header({ onToggleSidebar, isSidebarVisible, isMobile = false }: 
             size="icon"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="h-8 w-8 rounded-xl border border-transparent hover:border-border hover:bg-muted"
+            className="h-9 w-9 rounded-xl border border-transparent hover:border-border hover:bg-muted"
             title="Refresh app (F5)"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />

@@ -23,6 +23,8 @@ import { Driver, InsertDriver } from "./storage";
 
 export class SupabaseStorage {
     private supabase: SupabaseClient;
+    private static readonly MAX_CUSTOMER_WRITE_RETRIES = 8;
+    private static readonly MAX_ORDER_WRITE_RETRIES = 8;
 
     constructor() {
         const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -41,6 +43,77 @@ export class SupabaseStorage {
         if (!trimmed) return null;
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         return uuidRegex.test(trimmed) ? trimmed : null;
+    }
+
+    private async writeCustomerRecord(
+        operation: 'insert' | 'update',
+        payload: Record<string, any>,
+        id?: string
+    ): Promise<any> {
+        let workingPayload = { ...payload };
+
+        for (let attempt = 0; attempt < SupabaseStorage.MAX_CUSTOMER_WRITE_RETRIES; attempt += 1) {
+            const result = operation === 'insert'
+                ? await this.supabase.from('customers').insert(workingPayload).select().single()
+                : await this.supabase.from('customers').update(workingPayload).eq('id', id).select().single();
+            const { data, error } = result;
+            if (!error) {
+                return data;
+            }
+
+            const errorMessage = `${error.message || ''} ${error.details || ''}`.trim();
+            const missingColumnMatch =
+                errorMessage.match(/Could not find the '([^']+)' column of 'customers'/i) ||
+                errorMessage.match(/column\s+customers\.([a-zA-Z0-9_]+)\s+does not exist/i) ||
+                errorMessage.match(/column\s+"?([a-zA-Z0-9_]+)"?\s+does not exist/i);
+            const missingColumn = missingColumnMatch?.[1];
+
+            if (missingColumn && Object.prototype.hasOwnProperty.call(workingPayload, missingColumn)) {
+                console.warn(`[SupabaseStorage] customers.${missingColumn} is missing in the live schema; retrying without it`);
+                delete workingPayload[missingColumn];
+                continue;
+            }
+
+            throw error;
+        }
+
+        throw new Error('Failed to write customer record after removing unsupported columns');
+    }
+
+    private async writeOrderRecord(
+        operation: 'insert' | 'update',
+        payload: Record<string, any>,
+        id?: string
+    ): Promise<any> {
+        let workingPayload = { ...payload };
+
+        for (let attempt = 0; attempt < SupabaseStorage.MAX_ORDER_WRITE_RETRIES; attempt += 1) {
+            const result = operation === 'insert'
+                ? await this.supabase.from('orders').insert(workingPayload).select('*').single()
+                : await this.supabase.from('orders').update(workingPayload).eq('id', id).select('*').single();
+            const { data, error } = result;
+
+            if (!error) {
+                return data;
+            }
+
+            const errorMessage = `${error.message || ''} ${error.details || ''}`.trim();
+            const missingColumnMatch =
+                errorMessage.match(/Could not find the '([^']+)' column of 'orders'/i) ||
+                errorMessage.match(/column\s+orders\.([a-zA-Z0-9_]+)\s+does not exist/i) ||
+                errorMessage.match(/column\s+"?([a-zA-Z0-9_]+)"?\s+does not exist/i);
+            const missingColumn = missingColumnMatch?.[1];
+
+            if (missingColumn && Object.prototype.hasOwnProperty.call(workingPayload, missingColumn)) {
+                console.warn(`[SupabaseStorage] orders.${missingColumn} is missing in the live schema; retrying without it`);
+                delete workingPayload[missingColumn];
+                continue;
+            }
+
+            throw error;
+        }
+
+        throw new Error('Failed to write order record after removing unsupported columns');
     }
 
     // Map DB snake_case to App camelCase
@@ -456,7 +529,10 @@ export class SupabaseStorage {
             'presetKey': 'preset_key',
             'layoutKey': 'layout_key',
             'isAiOptimized': 'is_ai_optimized',
-            'shortName': 'short_name'
+            'shortName': 'short_name',
+            // Order cancellation fields
+            'cancellationReason': 'cancellation_reason',
+            'cancelledAt': 'cancelled_at',
         };
 
         // If key exists in mappings, use snake_case. If not, preserve original (e.g. 'status', 'email', 'name')
@@ -573,13 +649,7 @@ export class SupabaseStorage {
         };
 
         const snakeCaseData = this.toSnakeCase(dataWithId);
-
-        const { data: customer, error } = await this.supabase
-            .from('customers')
-            .insert(snakeCaseData)
-            .select()
-            .single();
-        if (error) throw error;
+        const customer = await this.writeCustomerRecord('insert', snakeCaseData);
         return this.mapDates(customer);
     }
 
@@ -688,15 +758,12 @@ export class SupabaseStorage {
     async updateCustomer(id: string, data: Partial<InsertCustomer>): Promise<Customer | undefined> {
         const snakeData = this.toSnakeCase(data);
         console.log('[SupabaseStorage] updateCustomer:', id, snakeData);
-        const { data: customer, error } = await this.supabase
-            .from('customers')
-            .update(snakeData)
-            .eq('id', id)
-            .select()
-            .single();
-        if (error) {
-            console.error('[SupabaseStorage] updateCustomer ERROR:', error.message, error.details);
-            throw new Error(`Failed to update customer: ${error.message}`);
+        let customer;
+        try {
+            customer = await this.writeCustomerRecord('update', snakeData, id);
+        } catch (error: any) {
+            console.error('[SupabaseStorage] updateCustomer ERROR:', error?.message, error?.details);
+            throw new Error(`Failed to update customer: ${error?.message || 'Unknown error'}`);
         }
         return this.mapDates(customer);
     }
@@ -959,7 +1026,7 @@ export class SupabaseStorage {
             // Remove fields that may not exist in the orders table to prevent schema errors
             const safeOrderFields = [
                 'id', 'order_number', 'customer_id', 'customer_name', 'customer_email',
-                'customer_phone', 'status', 'total_amount', 'payment_status', 'payment_method',
+                'customer_phone', 'secondary_phone', 'status', 'total_amount', 'payment_status', 'payment_method',
                 'items', 'notes', 'special_instructions', 'shipping_address', 'pickup_date',
                 'advance_paid', 'discount_type', 'discount_value', 'coupon_code',
                 'extra_charges', 'gst_enabled', 'gst_rate', 'gst_amount', 'pan_number',
@@ -983,38 +1050,8 @@ export class SupabaseStorage {
             }
 
             console.log('[SupabaseStorage] Creating order with data:', JSON.stringify(safeData, null, 2));
-            // Retry once per unknown-column error by stripping the offending key.
-            // This protects order creation when app payload and Supabase schema are temporarily out of sync.
-            const insertPayload: Record<string, any> = { ...safeData };
-            for (let attempt = 0; attempt < 8; attempt++) {
-                const { data: order, error } = await this.supabase
-                    .from('orders')
-                    .insert(insertPayload)
-                    .select('*')
-                    .single();
-
-                if (!error) {
-                    return this.mapDates(order);
-                }
-
-                const missingColumnMatch = /Could not find the '([^']+)' column of 'orders' in the schema cache/i.exec(error.message || '');
-                const missingColumn = missingColumnMatch?.[1];
-                if (missingColumn && Object.prototype.hasOwnProperty.call(insertPayload, missingColumn)) {
-                    console.warn(`[SupabaseStorage] Removing unknown orders column "${missingColumn}" and retrying insert`);
-                    delete insertPayload[missingColumn];
-                    continue;
-                }
-
-                console.error('[SupabaseStorage] Supabase create order error:', {
-                    message: error.message,
-                    details: error.details,
-                    hint: error.hint,
-                    code: error.code,
-                });
-                throw new Error(`Database error: ${error.message}${error.hint ? ` (Hint: ${error.hint})` : ''}${error.details ? ` - ${error.details}` : ''}`);
-            }
-
-            throw new Error('Database error: Failed to create order after removing unknown columns');
+            const order = await this.writeOrderRecord('insert', safeData);
+            return this.mapDates(order);
         } catch (err) {
             console.error('[SupabaseStorage] Create order exception:', err);
             if (err instanceof Error) {
@@ -1059,15 +1096,12 @@ export class SupabaseStorage {
     async updateOrder(id: string, data: Partial<InsertOrder>): Promise<Order | undefined> {
         const snakeData = this.toSnakeCase(data);
         console.log('[SupabaseStorage] updateOrder:', id, Object.keys(snakeData));
-        const { data: order, error } = await this.supabase
-            .from('orders')
-            .update(snakeData)
-            .eq('id', id)
-            .select('*')
-            .single();
-        if (error) {
-            console.error('[SupabaseStorage] updateOrder ERROR:', error.message, error.details);
-            throw new Error(`Failed to update order: ${error.message}`);
+        let order;
+        try {
+            order = await this.writeOrderRecord('update', snakeData, id);
+        } catch (error: any) {
+            console.error('[SupabaseStorage] updateOrder ERROR:', error?.message, error?.details);
+            throw new Error(`Failed to update order: ${error?.message || 'Unknown error'}`);
         }
         return this.mapDates(order);
     }

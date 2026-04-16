@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type KeyboardEvent } from 'react';
-import { Search, X, Loader2 } from 'lucide-react';
+import { Search, X, Loader2, Phone, Mail, User, MapPin, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import type { Customer } from '@shared/schema';
@@ -363,19 +363,19 @@ export function CustomerAutocomplete({
                                             )}
                                         </div>
                                         <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                                                <div className="flex items-center gap-1.5 text-primary/80 font-medium">
-                                                    <span className="text-muted-foreground w-3.5 text-center">🆔</span>
+                                                <div className="flex items-center gap-1.5 text-primary/80 font-semibold">
+                                                    <span className="text-muted-foreground w-3.5"><User className="h-3.5 w-3.5" /></span>
                                                     <span>{highlightMatch(customer.id, searchQuery)}</span>
                                                 </div>
                                             {customer.phone && (
                                                 <div className="flex items-center gap-1.5">
-                                                    <span className="text-muted-foreground w-3.5 text-center">📞</span>
+                                                    <span className="text-muted-foreground w-3.5"><Phone className="h-3.5 w-3.5" /></span>
                                                     <span>{highlightMatch(customer.phone, searchQuery, true)}</span>
                                                 </div>
                                             )}
                                             {customer.email && (
                                                 <div className="flex items-center gap-1.5">
-                                                    <span className="text-muted-foreground w-3.5 text-center">✉️</span>
+                                                    <span className="text-muted-foreground w-3.5"><Mail className="h-3.5 w-3.5" /></span>
                                                     <span className="truncate">
                                                         {highlightMatch(customer.email, searchQuery)}
                                                     </span>

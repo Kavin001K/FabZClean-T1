@@ -544,7 +544,7 @@ export const customersApi = {
       return payload?.data || payload;
     } catch (error) {
       console.error(`Failed to update customer ${id}:`, error);
-      return null;
+      throw error;
     }
   },
 
@@ -562,8 +562,18 @@ export const customersApi = {
 
   async searchByPhone(phone: string): Promise<Customer | null> {
     try {
-      const result = await this.getAll({ phone, limit: 25 });
-      return result.data.length > 0 ? result.data[0] : null;
+      const normalizedQuery = String(phone || '').replace(/\D/g, '').slice(-10);
+      if (!normalizedQuery) return null;
+
+      const result = await this.getAll({ search: normalizedQuery, limit: 25 });
+      const exactMatch = result.data.find((customer) => {
+        const customerPhones = [customer.phone, (customer as any).secondaryPhone]
+          .map((value) => String(value || '').replace(/\D/g, '').slice(-10))
+          .filter(Boolean);
+        return customerPhones.includes(normalizedQuery);
+      });
+
+      return exactMatch || result.data[0] || null;
     } catch (error) {
       console.error(`Failed to search customer by phone ${phone}:`, error);
       return null;

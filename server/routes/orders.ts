@@ -55,6 +55,9 @@ const ORDER_UPDATE_FIELDS = new Set([
   'gstNumber',
   'items',
   'totalAmount',
+  'cancellationReason',
+  'cancelledAt',
+  'cancelledBy',
 ]);
 // Apply rate limiting to all order routes
 router.use(jwtRequired);
@@ -131,6 +134,57 @@ const parseOrderItems = (items: unknown): OrderItem[] => {
 
 const sumItemsTotal = (items: OrderItem[]): number =>
   items.reduce((sum, item) => sum + coerceNonNegativeNumber(item.subtotal, 0), 0);
+
+const scheduleOrderStatusNotification = (
+  orderId: string,
+  updatedOrder: any,
+  previousOrder: any,
+  nextStatus: OrderStatus,
+  extraPayload?: {
+    cancellationReason?: string | null;
+  }
+) => {
+  handleOrderStatusChange(
+    {
+      customerPhone: updatedOrder?.customerPhone || previousOrder?.customerPhone,
+      customerName: updatedOrder?.customerName || previousOrder?.customerName,
+      orderNumber: updatedOrder?.orderNumber || previousOrder?.orderNumber,
+      totalAmount: updatedOrder?.totalAmount || previousOrder?.totalAmount,
+      status: nextStatus,
+      fulfillmentType: (updatedOrder?.fulfillmentType || previousOrder?.fulfillmentType || 'pickup') as FulfillmentType,
+      items: updatedOrder?.items || previousOrder?.items || [],
+      invoiceUrl: (updatedOrder as any)?.invoiceUrl || (previousOrder as any)?.invoiceUrl || null,
+      invoiceNumber: (updatedOrder as any)?.invoiceNumber || previousOrder?.orderNumber,
+      cancellationReason: extraPayload?.cancellationReason || updatedOrder?.cancellationReason || previousOrder?.cancellationReason || null,
+    },
+    previousOrder?.status as OrderStatus
+  ).then(async (result) => {
+    if (result?.success) {
+      console.log(`✅ [WhatsApp] Status update notification sent for ${previousOrder?.orderNumber}`);
+      try {
+        const currentCount = (updatedOrder as any)?.whatsappMessageCount || 0;
+        await storage.updateOrder(orderId, {
+          lastWhatsappStatus: `${nextStatus} - Sent`,
+          lastWhatsappSentAt: new Date(),
+          whatsappMessageCount: currentCount + 1,
+        });
+      } catch (updateErr) {
+        console.warn('Failed to update WhatsApp status:', updateErr);
+      }
+    } else if (result) {
+      console.warn(`⚠️ [WhatsApp] Failed to send status notification: ${result.error}`);
+      try {
+        await storage.updateOrder(orderId, {
+          lastWhatsappStatus: `${nextStatus} - Failed: ${result.error}`,
+        });
+      } catch (updateErr) {
+        console.warn('Failed to update WhatsApp status:', updateErr);
+      }
+    }
+  }).catch(err => {
+    console.error(`❌ [WhatsApp] Error sending status notification:`, err);
+  });
+};
 
 const schedulePostCreateTasks = (
   order: any,
@@ -724,10 +778,36 @@ router.post(
         const customer = await storage.getCustomer(orderData.customerId);
         if (customer) {
           prefetchedCustomer = customer;
-          orderData.customerName = customer.name || orderData.customerName;
-          orderData.customerEmail = customer.email || orderData.customerEmail || null;
-          orderData.customerPhone = customer.phone || orderData.customerPhone || null;
-          orderData.secondaryPhone = (customer as any).secondaryPhone || orderData.secondaryPhone || null;
+          orderData.customerName = orderData.customerName || customer.name;
+          orderData.customerEmail = orderData.customerEmail || customer.email || null;
+          orderData.customerPhone = orderData.customerPhone || customer.phone || null;
+          orderData.secondaryPhone = orderData.secondaryPhone || (customer as any).secondaryPhone || null;
+
+          const customerUpdates: Record<string, unknown> = {};
+          if (orderData.customerName && orderData.customerName !== customer.name) {
+            customerUpdates.name = orderData.customerName;
+          }
+          if (orderData.customerEmail && orderData.customerEmail !== customer.email) {
+            customerUpdates.email = orderData.customerEmail;
+          }
+          if (orderData.customerPhone && orderData.customerPhone !== customer.phone) {
+            customerUpdates.phone = orderData.customerPhone;
+          }
+          if (orderData.secondaryPhone && orderData.secondaryPhone !== (customer as any).secondaryPhone) {
+            customerUpdates.secondaryPhone = orderData.secondaryPhone;
+          }
+
+          if (Object.keys(customerUpdates).length > 0) {
+            try {
+              prefetchedCustomer = await storage.updateCustomer(orderData.customerId, customerUpdates) || {
+                ...customer,
+                ...customerUpdates,
+              };
+            } catch (syncError) {
+              console.warn('Customer contact sync during order creation failed:', syncError);
+            }
+          }
+
           const totalAmount = parseAmount(orderData.totalAmount);
           const walletBalance = parseAmount((customer as any).walletBalanceCache || '0');
           const projectedWalletCover = useWalletAtCreate
@@ -948,6 +1028,69 @@ router.put('/:id', async (req, res) => {
     });
 
     const hasItemPayload = Object.prototype.hasOwnProperty.call(updateData, 'items');
+
+    // ── CANCELLATION SHORT-PATH ──────────────────────────────────────
+    // When the only intent is to cancel the order, skip the heavy
+    // financial-recalculation path and go straight to the DB update +
+    // WhatsApp notification.
+    if (updateData.status === 'cancelled') {
+      // Validate: only certain statuses can be cancelled
+      const cancelAllowed = ['pending', 'processing', 'ready_for_pickup', 'ready_for_delivery', 'ready', 'in_store'];
+      if (!cancelAllowed.includes(order.status)) {
+        return res.status(400).json(createErrorResponse(
+          `Cannot cancel an order with status '${order.status}'. Orders can only be cancelled when pending, processing, or ready.`,
+          400
+        ));
+      }
+
+      const cancellationReason = updateData.cancellationReason || 'Operational Issue';
+      const cancelUpdateData: Record<string, any> = {
+        status: 'cancelled',
+        cancellationReason,
+        cancelledAt: new Date(),
+        cancelledBy: req.employee?.username || req.employee?.employeeId || 'system',
+      };
+
+      try {
+        const updatedOrder = await storage.updateOrder(orderId, cancelUpdateData);
+        if (!updatedOrder) {
+          return res.status(500).json(createErrorResponse('Failed to cancel order', 500));
+        }
+
+        // Log cancellation
+        if (req.employee) {
+          await AuthService.logAction(
+            req.employee.employeeId,
+            req.employee.username,
+            'cancel_order',
+            'order',
+            orderId,
+            { reason: cancellationReason, previousStatus: order.status },
+            req.ip || req.connection.remoteAddress,
+            req.get('user-agent')
+          );
+        }
+
+        // Real-time notification
+        realtimeServer.triggerUpdate('order', 'status_changed' as any, {
+          orderId,
+          status: 'cancelled',
+          previousStatus: order.status,
+        });
+
+        scheduleOrderStatusNotification(orderId, updatedOrder, order, 'cancelled', {
+          cancellationReason,
+        });
+
+        const serializedOrder = serializeOrder(updatedOrder);
+        return res.json(createSuccessResponse(serializedOrder, 'Order cancelled successfully'));
+      } catch (cancelError: any) {
+        console.error('Cancel order error:', cancelError);
+        return res.status(500).json(createErrorResponse('Failed to cancel order: ' + (cancelError.message || ''), 500));
+      }
+    }
+
+    // ── REGULAR UPDATE PATH (non-cancellation) ────────────────────────
     const brandingChanged =
       Object.prototype.hasOwnProperty.call(updateData, 'storeId') ||
       Object.prototype.hasOwnProperty.call(updateData, 'storeCode') ||
@@ -1066,45 +1209,7 @@ router.put('/:id', async (req, res) => {
 
     // If status was changed, send WhatsApp notification
     if (updateData.status && updateData.status !== order.status) {
-      handleOrderStatusChange(
-        {
-          customerPhone: updatedOrder?.customerPhone,
-          customerName: updatedOrder?.customerName || order.customerName,
-          orderNumber: updatedOrder?.orderNumber || order.orderNumber,
-          totalAmount: updatedOrder?.totalAmount || order.totalAmount,
-          status: updateData.status as OrderStatus,
-          fulfillmentType: (updatedOrder?.fulfillmentType || order.fulfillmentType || 'pickup') as FulfillmentType,
-          items: updatedOrder?.items || order.items || [],
-          invoiceUrl: (updatedOrder as any)?.invoiceUrl || (order as any)?.invoiceUrl || null,
-          invoiceNumber: (updatedOrder as any)?.invoiceNumber || order.orderNumber,
-        },
-        order.status as OrderStatus
-      ).then(async (result) => {
-        if (result?.success) {
-          console.log(`✅ [WhatsApp] Status update notification sent for ${order.orderNumber}`);
-          try {
-            const currentCount = (updatedOrder as any)?.whatsappMessageCount || 0;
-            await storage.updateOrder(orderId, {
-              lastWhatsappStatus: `${updateData.status} - Sent`,
-              lastWhatsappSentAt: new Date(),
-              whatsappMessageCount: currentCount + 1,
-            });
-          } catch (updateErr) {
-            console.warn('Failed to update WhatsApp status:', updateErr);
-          }
-        } else if (result) {
-          console.warn(`⚠️ [WhatsApp] Failed to send status notification: ${result.error}`);
-          try {
-            await storage.updateOrder(orderId, {
-              lastWhatsappStatus: `${updateData.status} - Failed: ${result.error}`,
-            });
-          } catch (updateErr) {
-            console.warn('Failed to update WhatsApp status:', updateErr);
-          }
-        }
-      }).catch(err => {
-        console.error(`❌ [WhatsApp] Error sending status notification:`, err);
-      });
+      scheduleOrderStatusNotification(orderId, updatedOrder, order, updateData.status as OrderStatus);
     }
 
     // If order bill was revised (items/total), send updated WhatsApp bill automatically.
@@ -1125,9 +1230,9 @@ router.put('/:id', async (req, res) => {
 
     const serializedOrder = serializeOrder(updatedOrder);
     res.json(createSuccessResponse(serializedOrder, 'Order updated successfully'));
-  } catch (error) {
+  } catch (error: any) {
     console.error('Update order error:', error);
-    res.status(500).json(createErrorResponse('Failed to update order', 500));
+    res.status(500).json(createErrorResponse('Failed to update order: ' + (error.message || ''), 500));
   }
 });
 
@@ -1137,7 +1242,7 @@ router.patch(
   async (req, res) => {
     try {
       const orderId = req.params.id;
-      const { status } = req.body;
+      const { status, cancellationReason } = req.body;
 
       if (!status) {
         return res.status(400).json(createErrorResponse('Status is required', 400));
@@ -1211,7 +1316,18 @@ router.patch(
         ));
       }
 
-      const updatedOrder = await storage.updateOrder(orderId, { status });
+      const updateData: any = { status };
+      
+      if (status === 'cancelled') {
+        updateData.cancellationReason = cancellationReason || 'Operational Issue';
+        updateData.cancelledAt = new Date();
+        updateData.cancelledBy = req.employee?.username || req.employee?.employeeId || 'system';
+      }
+
+      const updatedOrder = await storage.updateOrder(orderId, updateData);
+      if (!updatedOrder) {
+        return res.status(500).json(createErrorResponse('Failed to update order status', 500));
+      }
 
       // Log status change
       if (req.employee) {
@@ -1223,7 +1339,8 @@ router.patch(
           orderId,
           {
             from: order.status,
-            to: status
+            to: status,
+            ...(status === 'cancelled' ? { reason: cancellationReason || 'Operational Issue' } : {})
           },
           req.ip || req.connection.remoteAddress,
           req.get('user-agent')
@@ -1237,52 +1354,15 @@ router.patch(
         previousStatus: order.status
       });
 
-      // Send WhatsApp notification for status change
-      handleOrderStatusChange(
-        {
-          customerPhone: updatedOrder?.customerPhone,
-          customerName: updatedOrder?.customerName || order.customerName,
-          orderNumber: updatedOrder?.orderNumber || order.orderNumber,
-          totalAmount: updatedOrder?.totalAmount || order.totalAmount,
-          status: status as OrderStatus,
-          fulfillmentType: (updatedOrder?.fulfillmentType || order.fulfillmentType || 'pickup') as FulfillmentType,
-          items: updatedOrder?.items || order.items || [],
-          invoiceUrl: (updatedOrder as any)?.invoiceUrl || (order as any)?.invoiceUrl || null,
-          invoiceNumber: (updatedOrder as any)?.invoiceNumber || order.orderNumber,
-        },
-        order.status as OrderStatus
-      ).then(async (result) => {
-        if (result?.success) {
-          console.log(`✅ [WhatsApp] Status update notification sent for ${order.orderNumber}`);
-          try {
-            const currentCount = (updatedOrder as any)?.whatsappMessageCount || 0;
-            await storage.updateOrder(orderId, {
-              lastWhatsappStatus: `${status} - Sent`,
-              lastWhatsappSentAt: new Date(),
-              whatsappMessageCount: currentCount + 1,
-            });
-          } catch (updateErr) {
-            console.warn('Failed to update WhatsApp status:', updateErr);
-          }
-        } else if (result) {
-          console.warn(`⚠️ [WhatsApp] Failed to send status notification: ${result.error}`);
-          try {
-            await storage.updateOrder(orderId, {
-              lastWhatsappStatus: `${status} - Failed: ${result.error}`,
-            });
-          } catch (updateErr) {
-            console.warn('Failed to update WhatsApp status:', updateErr);
-          }
-        }
-      }).catch(err => {
-        console.error(`❌ [WhatsApp] Error sending status notification:`, err);
+      scheduleOrderStatusNotification(orderId, updatedOrder, order, status as OrderStatus, {
+        cancellationReason: status === 'cancelled' ? (updatedOrder?.cancellationReason || cancellationReason || null) : null,
       });
 
       const serializedOrder = serializeOrder(updatedOrder);
       res.json(createSuccessResponse(serializedOrder, 'Order status updated successfully'));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Update order status error:', error);
-      res.status(500).json(createErrorResponse('Failed to update order status', 500));
+      res.status(500).json(createErrorResponse(`Failed to update order status: ${error.message || 'Unknown error'}`, 500));
     }
   },
 );

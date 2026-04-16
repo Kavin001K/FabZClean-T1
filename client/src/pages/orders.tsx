@@ -48,6 +48,7 @@ import { Calendar } from "@/components/ui/calendar";
 import OrderDetailsDialog from "@/components/orders/order-details-dialog";
 import EditOrderDialog from "@/components/orders/edit-order-dialog";
 import OrderPaymentModal from "@/components/order-payment-modal";
+import OrderCancelDialog from "@/components/orders/order-cancel-dialog";
 import * as LoadingSkeleton from "@/components/ui/loading-skeleton";
 
 // Icons
@@ -215,7 +216,9 @@ function OrdersComponent() {
   // Dialog States
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isUpdatingBill, setIsUpdatingBill] = useState(false); // Added state for background bill update
+  const [isUpdatingBill, setIsUpdatingBill] = useState(false);
+  const [cancellingOrder, setCancellingOrder] = useState<Order | null>(null);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedPaymentOrder, setSelectedPaymentOrder] = useState<Order | null>(null);
@@ -468,8 +471,8 @@ function OrdersComponent() {
   });
 
   const updateOrderStatusMutation = useMutation({
-    mutationFn: ({ orderId, newStatus }: { orderId: string; newStatus: string }) =>
-      ordersApi.update(orderId, { status: newStatus as any }),
+    mutationFn: ({ orderId, newStatus, cancellationReason }: { orderId: string; newStatus: string; cancellationReason?: string }) =>
+      ordersApi.update(orderId, { status: newStatus as any, cancellationReason } as any),
     onMutate: async ({ orderId, newStatus }) => {
       await queryClient.cancelQueries({ queryKey: ['orders'] });
       const previousOrders = queryClient.getQueryData<Order[]>(['orders']);
@@ -494,8 +497,10 @@ function OrdersComponent() {
         });
 
         toast({
-          title: "Order Status Updated",
-          description: `Order ${orderId} moved to ${newStatus}`,
+          title: newStatus === 'cancelled' ? "Order Cancelled" : "Order Status Updated",
+          description: newStatus === 'cancelled'
+            ? `Order ${updatedOrder.orderNumber || orderId} was cancelled successfully.`
+            : `Order ${updatedOrder.orderNumber || orderId} moved to ${newStatus}`,
         });
       }
     },
@@ -506,7 +511,7 @@ function OrdersComponent() {
       console.error('Failed to update order status:', error);
       toast({
         title: "Error",
-        description: "Failed to update order status. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update order status. Please try again.",
         variant: "destructive",
       });
     },
@@ -685,9 +690,20 @@ function OrdersComponent() {
   }, []);
 
   const handleCancelOrder = useCallback((order: Order) => {
+    setCancellingOrder(order);
+    setIsCancelDialogOpen(true);
+  }, []);
+
+  const handleConfirmCancel = useCallback((orderId: string, reason: string) => {
     updateOrderStatusMutation.mutate({
-      orderId: order.id,
-      newStatus: 'cancelled'
+      orderId,
+      newStatus: 'cancelled',
+      cancellationReason: reason
+    }, {
+      onSuccess: () => {
+        setIsCancelDialogOpen(false);
+        setCancellingOrder(null);
+      }
     });
   }, [updateOrderStatusMutation]);
 
@@ -2659,6 +2675,17 @@ function OrdersComponent() {
           }}
         />
       )}
+
+      <OrderCancelDialog
+        order={cancellingOrder}
+        isOpen={isCancelDialogOpen}
+        onClose={() => {
+          setIsCancelDialogOpen(false);
+          setCancellingOrder(null);
+        }}
+        onConfirm={handleConfirmCancel}
+        isLoading={updateOrderStatusMutation.isPending}
+      />
     </PageTransition>
   );
 }

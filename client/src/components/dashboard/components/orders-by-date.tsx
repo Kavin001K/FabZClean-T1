@@ -60,20 +60,26 @@ export const DashboardOrdersByDate: React.FC = React.memo(() => {
       data-testid={getTestId(TEST_IDS.DASHBOARD.WIDGET, 'orders-by-date')}
       className="h-full overflow-hidden border-border bg-card shadow-sm"
     >
-      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0 border-b border-border pb-3">
-        <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
-          <ShoppingBag className="h-5 w-5 text-primary" />
-          {isToday ? 'Orders Created Today' : `Created: ${format(selectedDate, 'MMM d, yyyy')}`}
-          <Badge variant="secondary" className="ml-2 bg-primary/20 text-primary border-primary/20">
-            {orders.length}
-          </Badge>
-        </CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 pb-3 px-4 sm:px-6">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="h-9 w-9 rounded-xl bg-lime-500/10 flex items-center justify-center shrink-0">
+            <ShoppingBag className="h-5 w-5 text-lime-600" />
+          </div>
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-bold text-foreground">
+            <span className="whitespace-nowrap">
+              {isToday ? 'Orders Created Today' : `Created: ${format(selectedDate, 'MMM d')}`}
+            </span>
+            <Badge variant="secondary" className="bg-lime-500/20 text-lime-600 border-lime-500/20 px-1.5 h-5 font-bold text-[10px]">
+              {orders.length}
+            </Badge>
+          </CardTitle>
+        </div>
 
-        <div className="flex items-center gap-1 self-end sm:self-auto">
+        <div className="flex items-center gap-1 shrink-0 ml-2">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-xl"
+            className="h-8 w-8 rounded-full transition-all hover:bg-muted/80"
             onClick={handlePrevDay}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -85,12 +91,12 @@ export const DashboardOrdersByDate: React.FC = React.memo(() => {
                 variant="outline"
                 size="sm"
                 className={cn(
-                  "h-8 justify-start rounded-xl border-border px-3 text-left font-normal",
+                  "h-8 px-3 rounded-full border-border/50 text-[11px] font-bold transition-all hover:bg-muted/80 flex items-center gap-1.5",
                   !selectedDate && "text-muted-foreground"
                 )}
               >
-                <CalendarIcon className="h-4 w-4 mr-2" />
-                {selectedDate ? format(selectedDate, "MMM d") : <span>Pick a date</span>}
+                <CalendarIcon className="h-3.5 w-3.5 opacity-60" />
+                {selectedDate ? format(selectedDate, "MMM d") : <span>Date</span>}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
@@ -107,7 +113,7 @@ export const DashboardOrdersByDate: React.FC = React.memo(() => {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-xl"
+            className="h-8 w-8 rounded-full transition-all hover:bg-muted/80"
             onClick={handleNextDay}
             disabled={isToday}
           >

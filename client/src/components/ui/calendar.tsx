@@ -50,7 +50,7 @@ function Calendar({
           "h-10 w-10 p-0 font-medium aria-selected:opacity-100 rounded-full hover:bg-primary/10 hover:text-primary transition-all duration-200"
         ),
         day_range_end: "day-range-end",
-        day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground hover:scale-105 focus:bg-primary focus:text-primary-foreground rounded-full shadow-md font-bold text-base scale-110",
+        day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground hover:scale-110 focus:bg-primary focus:text-primary-foreground rounded-full shadow-lg font-bold text-base ring-offset-2 ring-2 ring-primary/20",
         day_today: "bg-accent/30 text-accent-foreground font-bold rounded-full ring-2 ring-primary/30 ring-offset-2",
         day_outside: "day-outside text-muted-foreground opacity-30 aria-selected:bg-accent/50 aria-selected:text-muted-foreground",
         day_disabled: "text-muted-foreground opacity-30",

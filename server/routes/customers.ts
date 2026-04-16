@@ -109,6 +109,142 @@ type CustomerOrderSummary = {
   feedbackTime: string | null;
 };
 
+type RecoveredCustomerContact = {
+  customer: Customer;
+  matchedOrders: Order[];
+};
+
+const getOrderTimestamp = (order: Order) => {
+  const dateValue = (order.updatedAt || order.createdAt) as string | Date | null | undefined;
+  return dateValue ? new Date(dateValue).getTime() : 0;
+};
+
+const getDistinctOrderPhones = (order: Order) => {
+  const rawPhones = [
+    sanitizePhoneForStorage(order.customerPhone as string | null | undefined),
+    sanitizePhoneForStorage((order as any).secondaryPhone as string | null | undefined),
+  ].filter(Boolean);
+
+  return rawPhones.filter((phone, index) => {
+    const normalized = normalizePhone(phone) || phone;
+    return rawPhones.findIndex((candidate) => (normalizePhone(candidate) || candidate) === normalized) === index;
+  });
+};
+
+const findOrdersRelatedToCustomer = (customer: Customer, orders: Order[]) => {
+  const primaryPhone = normalizePhone(customer.phone);
+  const secondaryPhone = normalizePhone((customer as any).secondaryPhone);
+
+  return orders
+    .filter((order) => {
+      if (order.customerId && order.customerId === customer.id) return true;
+
+      const orderPhones = getDistinctOrderPhones(order).map((phone) => normalizePhone(phone)).filter(Boolean);
+      return Boolean(
+        (primaryPhone && orderPhones.includes(primaryPhone)) ||
+        (secondaryPhone && orderPhones.includes(secondaryPhone))
+      );
+    })
+    .sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a));
+};
+
+async function ensureCustomerHasRecoveredPhone(customer: Customer, candidateOrders?: Order[]): Promise<RecoveredCustomerContact> {
+  const matchedOrders = findOrdersRelatedToCustomer(customer, candidateOrders || await storage.listOrders());
+
+  const currentPrimary = normalizePhone(customer.phone);
+  const currentSecondary = normalizePhone((customer as any).secondaryPhone);
+  const updates: Record<string, string | null> = {};
+
+  for (const order of matchedOrders) {
+    const [orderPrimary, orderSecondary] = getDistinctOrderPhones(order);
+    const normalizedPrimary = normalizePhone(orderPrimary);
+    const normalizedSecondary = normalizePhone(orderSecondary);
+
+    if (!currentPrimary && !updates.phone && orderPrimary && normalizedPrimary) {
+      updates.phone = orderPrimary;
+    }
+
+    const nextPrimaryNormalized = normalizePhone((updates.phone as string | undefined) || customer.phone);
+    const secondaryCandidate = orderSecondary && normalizedSecondary &&
+      normalizedSecondary !== nextPrimaryNormalized &&
+      normalizedSecondary !== currentSecondary
+      ? orderSecondary
+      : null;
+
+    if (!currentSecondary && !updates.secondaryPhone && secondaryCandidate) {
+      updates.secondaryPhone = secondaryCandidate;
+    }
+
+    if (updates.phone && (currentSecondary || updates.secondaryPhone)) {
+      break;
+    }
+  }
+
+  if (!updates.phone && !updates.secondaryPhone) {
+    return { customer, matchedOrders };
+  }
+
+  try {
+    const updatedCustomer = await storage.updateCustomer(customer.id, {
+      ...(updates.phone ? { phone: updates.phone } : {}),
+      ...(updates.secondaryPhone ? { secondaryPhone: updates.secondaryPhone } : {}),
+    });
+
+    return {
+      customer: (updatedCustomer || {
+        ...customer,
+        ...updates,
+      }) as Customer,
+      matchedOrders,
+    };
+  } catch (error) {
+    console.error(`Customer contact recovery failed for ${customer.id}:`, error);
+    return {
+      customer: {
+        ...customer,
+        ...updates,
+      } as Customer,
+      matchedOrders,
+    };
+  }
+}
+
+async function findCustomerByExactEmail(email?: string | null, excludeCustomerId?: string) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  const { data: candidates } = await storage.listCustomers(undefined, {
+    search: normalizedEmail,
+    limit: 100,
+  });
+
+  return candidates.find((customer: Customer) => {
+    if (excludeCustomerId && customer.id === excludeCustomerId) return false;
+    return String(customer.email || '').trim().toLowerCase() === normalizedEmail;
+  }) || null;
+}
+
+async function findCustomerByExactPhone(phone?: string | null, excludeCustomerId?: string) {
+  const normalizedTarget = normalizePhone(phone);
+  if (!normalizedTarget) return null;
+
+  const { data: candidates } = await storage.listCustomers(undefined, {
+    search: phone,
+    limit: 100,
+  });
+
+  return candidates.find((customer: Customer) => {
+    if (excludeCustomerId && customer.id === excludeCustomerId) return false;
+
+    const customerPhones = [
+      customer.phone,
+      (customer as any).secondaryPhone,
+    ].map((value) => normalizePhone(value)).filter(Boolean);
+
+    return customerPhones.includes(normalizedTarget);
+  }) || null;
+}
+
 function calculateWeightedCustomerRating(customerRatings: number[], globalAverage: number, priorWeight = 5): number | null {
   if (!customerRatings.length) return null;
 
@@ -139,7 +275,12 @@ router.get('/autocomplete', async (req, res) => {
         sortBy: 'createdAt',
         sortOrder: 'desc'
       });
-      const serializedCustomers = results.map((customer: Customer) => serializeCustomer(customer));
+      const hydratedResults = await Promise.all(results.map(async (customer: Customer) => {
+        if (customer.phone && (customer as any).secondaryPhone) return customer;
+        const recovered = await ensureCustomerHasRecoveredPhone(customer);
+        return recovered.customer;
+      }));
+      const serializedCustomers = hydratedResults.map((customer: Customer) => serializeCustomer(customer));
       return res.json(createSuccessResponse(serializedCustomers, 'Recent customers'));
     }
 
@@ -155,7 +296,21 @@ router.get('/autocomplete', async (req, res) => {
       results = searchResults;
     }
 
-    const serializedCustomers = results.map((customer: Customer) => serializeCustomer(customer));
+    let hydratedResults = results;
+    const customersNeedingRecovery = results.filter((customer: Customer) => !customer.phone || !(customer as any).secondaryPhone);
+    if (customersNeedingRecovery.length > 0) {
+      const allOrders = await storage.listOrders();
+      const recoveredById = new Map<string, Customer>();
+
+      await Promise.all(customersNeedingRecovery.map(async (customer: Customer) => {
+        const recovered = await ensureCustomerHasRecoveredPhone(customer, allOrders);
+        recoveredById.set(customer.id, recovered.customer);
+      }));
+
+      hydratedResults = results.map((customer: Customer) => recoveredById.get(customer.id) || customer);
+    }
+
+    const serializedCustomers = hydratedResults.map((customer: Customer) => serializeCustomer(customer));
     res.json(createSuccessResponse(serializedCustomers, 'Autocomplete results'));
   } catch (error) {
     console.error('Customer autocomplete error:', error);
@@ -194,10 +349,24 @@ router.get('/', async (req, res) => {
       limit: limitNum
     });
 
+    let hydratedCustomers = customers;
+    const customersNeedingRecovery = customers.filter((customer: Customer) => !customer.phone || !(customer as any).secondaryPhone);
+    if (customersNeedingRecovery.length > 0) {
+      const allOrders = await storage.listOrders();
+      const recoveredById = new Map<string, Customer>();
+
+      await Promise.all(customersNeedingRecovery.map(async (customer: Customer) => {
+        const recovered = await ensureCustomerHasRecoveredPhone(customer, allOrders);
+        recoveredById.set(customer.id, recovered.customer);
+      }));
+
+      hydratedCustomers = customers.map((customer: Customer) => recoveredById.get(customer.id) || customer);
+    }
+
     // Apply segment filter (if still needed on results, though ideally handled in DB)
-    let filteredCustomers = customers;
+    let filteredCustomers = hydratedCustomers;
     if (segment && segment !== 'all') {
-      filteredCustomers = customers.filter((customer: Customer) => {
+      filteredCustomers = hydratedCustomers.filter((customer: Customer) => {
         const segmentsData = (customer as any).segments;
         if (!segmentsData) return false;
         try {
@@ -238,24 +407,14 @@ router.get('/', async (req, res) => {
 // Get single customer
 router.get('/:id/profile', async (req, res) => {
   try {
-    const customer = await storage.getCustomer(req.params.id);
+    const customerRecord = await storage.getCustomer(req.params.id);
 
-    if (!customer) {
+    if (!customerRecord) {
       return res.status(404).json(createErrorResponse('Customer not found', 404));
     }
 
-    const customerPhone = normalizePhone(customer.phone);
     const allOrders = await storage.listOrders();
-    const matchedOrders = allOrders
-      .filter((order: Order) => {
-        if (order.customerId && order.customerId === customer.id) return true;
-        return customerPhone && normalizePhone(order.customerPhone) === customerPhone;
-      })
-      .sort((a: Order, b: Order) => {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return dateB - dateA;
-      });
+    const { customer, matchedOrders } = await ensureCustomerHasRecoveredPhone(customerRecord, allOrders);
 
     const orderLookup = new Map(
       matchedOrders.map((order: Order) => [order.id, order] as const)
@@ -407,12 +566,13 @@ router.get('/:id/profile', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const customer = await storage.getCustomer(req.params.id);
+    const customerRecord = await storage.getCustomer(req.params.id);
 
-    if (!customer) {
+    if (!customerRecord) {
       return res.status(404).json(createErrorResponse('Customer not found', 404));
     }
 
+    const { customer } = await ensureCustomerHasRecoveredPhone(customerRecord);
     const serializedCustomer = serializeCustomer(customer);
     res.json(createSuccessResponse(serializedCustomer));
   } catch (error) {
@@ -430,21 +590,23 @@ router.post(
     try {
       const customerData = normalizeCustomerPhonePayload(req.body);
 
-      // Check if customer already exists
-      const { data: existingCustomers } = await storage.listCustomers();
-      const emailExists = existingCustomers.some((c: Customer) => c.email === customerData.email);
+      if (!customerData.phone) {
+        return res.status(400).json(createErrorResponse('Primary phone number is required', 400));
+      }
 
-      if (emailExists) {
+      const conflictingEmailCustomer = await findCustomerByExactEmail(customerData.email as string | null | undefined);
+      if (conflictingEmailCustomer) {
         return res.status(400).json(createErrorResponse('Customer with this email already exists', 400));
       }
 
-      // Check if phone already exists
-      if (customerData.phone) {
-        const primaryKey = normalizePhone(customerData.phone as string);
-        const phoneExists = existingCustomers.some((c: Customer) => c.phone && normalizePhone(c.phone) === primaryKey);
-        if (phoneExists) {
-          return res.status(400).json(createErrorResponse('Customer with this phone number already exists', 400));
-        }
+      const conflictingPrimaryPhone = await findCustomerByExactPhone(customerData.phone as string | null | undefined);
+      if (conflictingPrimaryPhone) {
+        return res.status(400).json(createErrorResponse('Customer with this phone number already exists', 400));
+      }
+
+      const conflictingSecondaryPhone = await findCustomerByExactPhone(customerData.secondaryPhone as string | null | undefined);
+      if (conflictingSecondaryPhone) {
+        return res.status(400).json(createErrorResponse('Customer with this secondary phone number already exists', 400));
       }
 
       // Ensure address is properly formatted for storage
@@ -492,20 +654,40 @@ const updateCustomerHandler = async (req: any, res: any) => {
     const customerId = req.params.id;
     const updateData = normalizeCustomerPhonePayload(req.body);
 
-    const customer = await storage.getCustomer(customerId);
-    if (!customer) {
+    const existingCustomer = await storage.getCustomer(customerId);
+    if (!existingCustomer) {
       return res.status(404).json(createErrorResponse('Customer not found', 404));
     }
 
-    const { data: existingCustomers } = await storage.listCustomers();
-    const primaryKey = normalizePhone(updateData.phone as string | null | undefined);
-    const conflictingCustomer = existingCustomers.find((entry: Customer) => {
-      if (entry.id === customerId) return false;
-      return entry.phone && normalizePhone(entry.phone) === primaryKey;
-    });
+    const recoveryResult: RecoveredCustomerContact = !existingCustomer.phone
+      ? await ensureCustomerHasRecoveredPhone(existingCustomer)
+      : { customer: existingCustomer, matchedOrders: [] };
+    const { customer } = recoveryResult;
 
-    if (conflictingCustomer) {
+    if (Object.prototype.hasOwnProperty.call(updateData, 'phone') && !updateData.phone) {
+      return res.status(400).json(createErrorResponse('Primary phone number is required', 400));
+    }
+
+    const effectivePrimaryPhone = sanitizePhoneForStorage(
+      (updateData.phone as string | null | undefined) || customer.phone
+    );
+    if (!effectivePrimaryPhone) {
+      return res.status(400).json(createErrorResponse('Customer must have a primary phone number', 400));
+    }
+
+    const conflictingPrimaryPhone = await findCustomerByExactPhone(updateData.phone as string | null | undefined, customerId);
+    if (conflictingPrimaryPhone) {
       return res.status(400).json(createErrorResponse('Customer with this phone number already exists', 400));
+    }
+
+    const conflictingSecondaryPhone = await findCustomerByExactPhone(updateData.secondaryPhone as string | null | undefined, customerId);
+    if (conflictingSecondaryPhone) {
+      return res.status(400).json(createErrorResponse('Customer with this secondary phone number already exists', 400));
+    }
+
+    const conflictingEmailCustomer = await findCustomerByExactEmail(updateData.email as string | null | undefined, customerId);
+    if (conflictingEmailCustomer) {
+      return res.status(400).json(createErrorResponse('Customer with this email already exists', 400));
     }
 
     const updatedCustomer = await storage.updateCustomer(customerId, updateData);

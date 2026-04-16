@@ -20,12 +20,32 @@ window.visualViewport?.addEventListener('resize', syncViewportVariables, { passi
 
 // Global error handler for unhandled errors
 window.addEventListener('error', (event) => {
+  // Ignore noise from browser extensions (Grammarly, Chrome internal, etc.)
+  const filename = event.filename || '';
+  const isExtensionError = 
+    filename.startsWith('chrome-extension') || 
+    filename.includes('background.js') || 
+    filename.includes('content.js') ||
+    filename.includes('extension') ||
+    !event.error;
+
+  if (isExtensionError) return;
+
   console.error('Global error:', event.error);
   // Prevent the default error handling
   event.preventDefault();
 });
 
 window.addEventListener('unhandledrejection', (event) => {
+  // Filter extension noise from promise rejections
+  const reason = event.reason?.toString() || '';
+  const isExtensionNoise = 
+    reason.includes('FrameIsBrowserFrameError') || 
+    reason.includes('extension port is moved into back/forward cache') ||
+    reason.includes('message channel closed');
+
+  if (isExtensionNoise) return;
+
   console.error('Unhandled promise rejection:', event.reason);
   // Prevent the default error handling
   event.preventDefault();

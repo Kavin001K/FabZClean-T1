@@ -293,23 +293,23 @@ export default function AdminDashboard() {
             {/* Date Filter Bar */}
             <section className="flex flex-wrap items-center gap-3">
                 <Button
-                    variant={filterMode === 'all' ? 'default' : 'outline'}
+                    variant={filterMode === 'all' ? 'pills' : 'outline'}
                     size="sm"
-                    className="rounded-full font-bold text-xs"
+                    className="h-10 rounded-xl px-5 font-bold text-xs shadow-sm transition-all hover:scale-105"
                     onClick={clearFilter}
                 >
                     All Time
                 </Button>
                 <Button
-                    variant={filterMode === 'today' ? 'default' : 'outline'}
+                    variant={filterMode === 'today' ? 'pills' : 'outline'}
                     size="sm"
-                    className="rounded-full font-bold text-xs"
+                    className="h-10 rounded-xl px-5 font-bold text-xs shadow-sm transition-all hover:scale-105"
                     onClick={() => {
                         setFilterMode('today');
                         setSelectedDate(new Date());
                     }}
                 >
-                    <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+                    <CalendarIcon className="mr-2 h-4 w-4" />
                     Today
                 </Button>
 
@@ -317,15 +317,15 @@ export default function AdminDashboard() {
                 <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                     <PopoverTrigger asChild>
                         <Button
-                            variant={filterMode === 'date' ? 'default' : 'outline'}
+                            variant={filterMode === 'date' ? 'pills' : 'outline'}
                             size="sm"
-                            className="rounded-full font-bold text-xs"
+                            className="h-10 rounded-xl px-5 font-bold text-xs shadow-sm transition-all hover:scale-105"
                             onClick={() => {
                                 setFilterMode('date');
                                 setCalendarOpen(true);
                             }}
                         >
-                            <CalendarDays className="h-3.5 w-3.5 mr-1.5" />
+                            <CalendarDays className="mr-2 h-4 w-4" />
                             {filterMode === 'date' && selectedDate
                                 ? format(selectedDate, 'dd MMM yyyy')
                                 : 'Select Date'}
@@ -359,9 +359,9 @@ export default function AdminDashboard() {
 
                 {/* Date Range */}
                 <Button
-                    variant={filterMode === 'range' ? 'default' : 'outline'}
+                    variant={filterMode === 'range' ? 'pills' : 'outline'}
                     size="sm"
-                    className="rounded-full font-bold text-xs"
+                    className="h-10 rounded-xl px-5 font-bold text-xs shadow-sm transition-all hover:scale-105"
                     onClick={() => {
                         setFilterMode('range');
                         setRangeStart(undefined);
@@ -370,7 +370,7 @@ export default function AdminDashboard() {
                         setCalendarOpen(true);
                     }}
                 >
-                    <CalendarDays className="h-3.5 w-3.5 mr-1.5" />
+                    <CalendarDays className="mr-2 h-4 w-4" />
                     {filterMode === 'range' && rangeStart && rangeEnd
                         ? `${format(rangeStart, 'dd MMM')} — ${format(rangeEnd, 'dd MMM')}`
                         : 'Date Range'}

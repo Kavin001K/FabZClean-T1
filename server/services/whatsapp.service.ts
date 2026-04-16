@@ -17,6 +17,10 @@ const TEMPLATES = {
         namespace: TEMPLATE_NAMESPACE,
         name: process.env.MSG91_TEMPLATE_NAME_FEEDBACK || 'customer_feedback',
     },
+    cancellation: {
+        namespace: TEMPLATE_NAMESPACE,
+        name: process.env.MSG91_TEMPLATE_NAME_CANCEL || 'order_cancellation',
+    },
 };
 
 // App base URL for tracking links and terms pages
@@ -58,6 +62,13 @@ interface FeedbackMessageParams {
     phoneNumber: string;
     customerName: string;
     orderNumber: string;
+}
+
+interface OrderCancellationMessageParams {
+    phoneNumber: string;
+    customerName: string;
+    orderNumber: string;
+    cancellationReason: string;
 }
 
 interface InvoiceMessageParams {
@@ -532,6 +543,7 @@ export async function handleOrderStatusChange(
         items?: Array<{ serviceName?: string; name?: string; quantity?: number }>;
         invoiceUrl?: string | null; // PDF invoice URL for WhatsApp document header
         invoiceNumber?: string | null; // Invoice number for template placeholder
+        cancellationReason?: string | null; // Reason for cancellation (used when status = cancelled)
     },
     previousStatus?: OrderStatus
 ): Promise<SendResult | null> {
@@ -545,6 +557,17 @@ export async function handleOrderStatusChange(
     const prevStatusStr = (previousStatus as string) || '';
 
     console.log(`🔄 [WhatsApp] Order ${order.orderNumber} status changed: ${prevStatusStr || 'NONE'} -> ${currentStatusLine}`);
+
+    // STATUS: cancelled - Send cancellation notification
+    if (currentStatusLine === 'cancelled' && prevStatusStr !== 'cancelled') {
+        console.log(`📤 [WhatsApp] Triggering Cancellation notification for order ${order.orderNumber}`);
+        return await sendOrderCancellationNotification({
+            phoneNumber: order.customerPhone,
+            customerName: order.customerName,
+            orderNumber: order.orderNumber,
+            cancellationReason: order.cancellationReason || 'Operational Issue',
+        });
+    }
 
     // STATUS: pending or received - Send Order Created (Bill) notification
     if ((currentStatusLine === 'pending' || currentStatusLine === 'received') && !prevStatusStr) {
@@ -597,6 +620,131 @@ export async function handleOrderStatusChange(
     // No notification needed for other status changes
     console.log(`ℹ️ [WhatsApp] No notification configured for status: ${currentStatusLine}`);
     return null;
+}
+
+/**
+ * Send Order Cancellation notification via WhatsApp
+ * Template: "order_cancellation"
+ * AUTO-TRIGGERED: When order status changes to cancelled
+ *
+ * Template format (from MSG91):
+ * - header_1: text (Customer Name) → "HI, {{1}}"
+ * - body_1: text (Order Number) → "Your order {{1}} has been cancelled due to {{2}}"
+ * - body_2: text (Cancellation Reason)
+ * - button_2: url (Order Status tracking link suffix)
+ */
+export async function sendOrderCancellationNotification({
+    phoneNumber,
+    customerName,
+    orderNumber,
+    cancellationReason,
+}: OrderCancellationMessageParams): Promise<SendResult> {
+    const authKey = process.env.MSG91_AUTH_KEY;
+    const integratedNumber = process.env.MSG91_INTEGRATED_NUMBER || '15559458542';
+
+    if (!authKey) {
+        console.error('❌ MSG91_AUTH_KEY not configured');
+        return { success: false, error: 'MSG91_AUTH_KEY not configured' };
+    }
+
+    const template = TEMPLATES.cancellation;
+    const cleanPhone = cleanPhoneNumber(phoneNumber);
+    const cleanOrderNumber = orderNumber.replace(/[#]/g, '').trim();
+
+    const payload = {
+        integrated_number: integratedNumber,
+        content_type: "template",
+        payload: {
+            messaging_product: "whatsapp",
+            type: "template",
+            template: {
+                name: template.name,
+                language: {
+                    code: "en",
+                    policy: "deterministic",
+                },
+                namespace: template.namespace,
+                to_and_components: [
+                    {
+                        to: [cleanPhone],
+                        components: {
+                            // Header: "HI, {{1}}" → Customer Name
+                            header_1: {
+                                type: "text",
+                                value: customerName,
+                            },
+                            // Body: "Your order {{1}} has been cancelled due to {{2}}"
+                            body_1: {
+                                type: "text",
+                                value: orderNumber,
+                            },
+                            body_2: {
+                                type: "text",
+                                value: cancellationReason,
+                            },
+                            // Button 2: Order Status tracking URL suffix
+                            button_2: {
+                                subtype: "url",
+                                type: "text",
+                                value: cleanOrderNumber,
+                            }
+                        },
+                    },
+                ],
+            },
+        },
+    };
+
+    try {
+        console.log(`📱 [WhatsApp] Sending Cancellation to ${cleanPhone}`);
+        console.log(`📄 [WhatsApp] Template: ${template.name} (cancellation)`);
+        console.log(`📋 [WhatsApp] Customer: ${customerName}, Order: ${orderNumber}, Reason: ${cancellationReason}`);
+        console.log(`🔗 [WhatsApp] Track URL: ${APP_BASE_URL}/trackorder/${cleanOrderNumber}`);
+
+        const response = await fetch(
+            "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "authkey": authKey,
+                },
+                body: JSON.stringify(payload),
+            }
+        );
+
+        const resultText = await response.text();
+        console.log(`✅ [WhatsApp] MSG91 Response (${response.status}):`, resultText);
+
+        if (!response.ok) {
+            return {
+                success: false,
+                error: `MSG91 API Error: ${response.status} - ${resultText}`,
+                templateUsed: template.name,
+            };
+        }
+
+        let result;
+        try {
+            result = JSON.parse(resultText);
+        } catch {
+            result = { raw: resultText };
+        }
+
+        return {
+            success: true,
+            messageId: result?.message_id || result?.id || 'sent',
+            templateUsed: template.name,
+        };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`❌ [WhatsApp] Cancellation Error:`, errorMessage);
+        return {
+            success: false,
+            error: errorMessage,
+            templateUsed: template.name,
+        };
+    }
 }
 
 /**
