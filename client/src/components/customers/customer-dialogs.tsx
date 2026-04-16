@@ -299,11 +299,22 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                   </div>
                   <div>
                     <div className="text-xl font-semibold">{selectedCustomer.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Customer since {customerSince.toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long'
-                      })}
+                    <div className="flex flex-col gap-0.5">
+                      <div className="text-sm text-muted-foreground flex items-center gap-1.5 leading-none mb-1">
+                        <Calendar className="h-3 w-3" />
+                        Customer since {customerSince.toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long'
+                        })}
+                      </div>
+                      <div className="text-[12px] font-medium text-emerald-600 flex items-center gap-1.5 leading-none">
+                        <Clock className="h-3 w-3" />
+                        Last visited Neetly: {selectedCustomer.lastOrder ? new Date(selectedCustomer.lastOrder).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        }) : 'No orders yet'}
+                      </div>
                     </div>
                   </div>
                 </DialogTitle>

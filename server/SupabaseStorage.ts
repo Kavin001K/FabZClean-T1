@@ -726,18 +726,33 @@ export class SupabaseStorage {
         if (search) {
             const safeSearch = search.replace(/[%_]/g, '');
             const digitsOnly = search.replace(/\D/g, '');
+            const isPhoneSearch = digitsOnly.length >= 4 && digitsOnly.length === safeSearch.length;
             
             // Build a valid PostgREST OR query string
             const conditions: string[] = [];
             
-            if (safeSearch.length >= 2) {
+            // Always add name/email search for non-pure-digit queries of 2+ chars
+            if (safeSearch.length >= 2 && !isPhoneSearch) {
                 conditions.push(`name.ilike.%${safeSearch}%`);
                 conditions.push(`email.ilike.%${safeSearch}%`);
             }
             
+            // For phone search: match on any digit substring (even 1 char)
             if (digitsOnly.length >= 1) {
                 conditions.push(`phone.ilike.%${digitsOnly}%`);
                 conditions.push(`secondary_phone.ilike.%${digitsOnly}%`);
+            }
+
+            // Also try ID search (customer IDs like FZC26MY...)
+            if (safeSearch.length >= 3) {
+                conditions.push(`id.ilike.%${safeSearch}%`);
+            }
+
+
+            // Also try name search for mixed queries (e.g. "Suga" or longer)
+            if (isPhoneSearch && safeSearch.length >= 2) {
+                // Even for a pure-digit search, add name/email in case the name contains digits
+                conditions.push(`name.ilike.%${safeSearch}%`);
             }
             
             if (conditions.length > 0) {
@@ -759,15 +774,18 @@ export class SupabaseStorage {
         } else {
             // Default sort by relevance, then newest
             if (search) {
-                // Without complex backend scoring, fall back to simple descending id/created
                 query = query.order('id', { ascending: false });
             } else {
                 query = query.order('created_at', { ascending: false });
             }
         }
 
-        // Apply pagination
-        const limitToApply = options.limit && options.limit > 0 ? options.limit : 50;
+        // Apply pagination — cap limit to Supabase safe max (1000)
+        // Supabase PostgREST has a default max-rows setting; requesting
+        // ranges beyond it returns empty data silently.
+        const MAX_SUPABASE_ROWS = 1000;
+        const rawLimit = options.limit && options.limit > 0 ? options.limit : 50;
+        const limitToApply = Math.min(rawLimit, MAX_SUPABASE_ROWS);
         const offsetToApply = options.offset !== undefined ? options.offset : 
                              (options.page !== undefined ? (options.page - 1) * limitToApply : 0);
         
@@ -788,6 +806,45 @@ export class SupabaseStorage {
     async getCustomers(franchiseId?: string): Promise<Customer[]> { 
         const result = await this.listCustomers(franchiseId); 
         return result.data;
+    }
+
+    /**
+     * Efficient customer analytics using server-side COUNT queries.
+     * Uses head:true (no data returned) so it never fetches all rows — O(1) regardless of DB size.
+     */
+    async getCustomerAnalyticsStats(franchiseId?: string): Promise<{
+        totalCustomers: number;
+        newCustomersToday: number;
+        newCustomersPastMonth: number;
+        newCustomersPastWeek: number;
+        activeCustomers: number;
+    }> {
+        const baseQuery = () => {
+            let q = this.supabase.from('customers').select('*', { count: 'exact', head: true });
+            if (franchiseId) q = q.eq('franchise_id', franchiseId);
+            return q.neq('status', 'deleted');
+        };
+
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        const [total, today, month, week, active] = await Promise.all([
+            baseQuery(),
+            baseQuery().gte('created_at', startOfToday),
+            baseQuery().gte('created_at', thirtyDaysAgo),
+            baseQuery().gte('created_at', sevenDaysAgo),
+            baseQuery().eq('status', 'active'),
+        ]);
+
+        return {
+            totalCustomers: total.count ?? 0,
+            newCustomersToday: today.count ?? 0,
+            newCustomersPastMonth: month.count ?? 0,
+            newCustomersPastWeek: week.count ?? 0,
+            activeCustomers: active.count ?? 0,
+        };
     }
 
     /**

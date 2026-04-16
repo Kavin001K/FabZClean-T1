@@ -228,11 +228,10 @@ export const ordersApi = {
     try {
       const hasExplicitPagination = params.page !== undefined || params.cursor !== undefined || params.limit !== undefined;
       if (hasExplicitPagination) {
-        const queryParams = new URLSearchParams({
-          ...Object.fromEntries(
-            Object.entries(params).map(([key, value]) => [key, String(value)])
-          ),
-        });
+        const cleanEntries = Object.entries(params)
+          .filter(([, value]) => value !== undefined && value !== null && value !== '')
+          .map(([key, value]) => [key, String(value)]);
+        const queryParams = new URLSearchParams(Object.fromEntries(cleanEntries));
         const response = await fetchData<{ data: Order[]; pagination?: any } | Order[]>(`/orders?${queryParams.toString()}`);
         if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
           return response.data;
@@ -460,9 +459,12 @@ export const ordersApi = {
 export const customersApi = {
   async getAll(params: Record<string, any> = {}): Promise<{ data: Customer[]; totalCount: number }> {
     try {
-      const queryParams = new URLSearchParams(
-        Object.fromEntries(Object.entries(params).map(([key, value]) => [key, String(value)]))
-      );
+      // Filter out undefined, null, and empty string values to avoid sending
+      // literal "undefined" or blank params that confuse the backend search.
+      const cleanEntries = Object.entries(params)
+        .filter(([, value]) => value !== undefined && value !== null && value !== '')
+        .map(([key, value]) => [key, String(value)]);
+      const queryParams = new URLSearchParams(Object.fromEntries(cleanEntries));
       
       const response = await fetchData<{ data: Customer[]; totalCount?: number; meta?: { totalCount?: number } } | Customer[]>(`/customers?${queryParams.toString()}`);
       

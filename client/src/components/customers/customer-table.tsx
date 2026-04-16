@@ -92,6 +92,11 @@ const CustomerRow: React.FC<CustomerRowProps> = React.memo(({
       </TableCell>
       <TableCell className="text-center">
         <span className="group-hover:text-primary transition-colors">
+          {customer.lastOrder ? formatDate(customer.lastOrder) : 'Never'}
+        </span>
+      </TableCell>
+      <TableCell className="text-center">
+        <span className="group-hover:text-primary transition-colors">
           {customer.phone || 'N/A'}
         </span>
       </TableCell>
@@ -176,6 +181,7 @@ export const CustomerTable: React.FC<CustomerTableProps> = React.memo(({
             <TableHead>Customer</TableHead>
             <TableHead className="text-center">Orders</TableHead>
             <TableHead className="text-center">Join Date</TableHead>
+            <TableHead className="text-center">Last Visited</TableHead>
             <TableHead className="text-center">Phone</TableHead>
             <TableHead className="text-center">Actions</TableHead>
           </TableRow>
@@ -197,6 +203,7 @@ export const CustomerTable: React.FC<CustomerTableProps> = React.memo(({
             <TableHead>Customer</TableHead>
             <TableHead className="text-center">Orders</TableHead>
             <TableHead className="text-center">Join Date</TableHead>
+            <TableHead className="text-center">Last Visited</TableHead>
             <TableHead className="text-center">Phone</TableHead>
             <TableHead className="text-center">Actions</TableHead>
           </TableRow>
@@ -229,6 +236,7 @@ export const CustomerTable: React.FC<CustomerTableProps> = React.memo(({
           <TableHead>Customer</TableHead>
           <TableHead className="text-center">Orders</TableHead>
           <TableHead className="text-center">Join Date</TableHead>
+          <TableHead className="text-center">Last Visited</TableHead>
           <TableHead className="text-center">Phone</TableHead>
           <TableHead className="text-center">Actions</TableHead>
         </TableRow>

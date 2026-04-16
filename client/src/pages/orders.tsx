@@ -229,7 +229,7 @@ function OrdersComponent() {
     refetch,
   } = useQuery({
     queryKey: ['orders'],
-    queryFn: ordersApi.getAll,
+    queryFn: () => ordersApi.getAll({ limit: 10000 }),
     staleTime: 15000,
     refetchOnWindowFocus: false,
     retry: 3,

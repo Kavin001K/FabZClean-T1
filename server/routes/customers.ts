@@ -179,12 +179,15 @@ router.get('/', async (req, res) => {
     // Use database-level filtering for search-heavy paths to avoid loading the
     // entire customer base into the UI during order creation/autocomplete.
     const pageNum = parseInt(req.query.page as string) || 1;
-    const limitNum = parseInt(limit as string) || 50;
+    const rawLimit = parseInt(limit as string) || 50;
+    const limitNum = Math.min(rawLimit, 1000); // Cap to Supabase safe max
+
+    console.log(`[GET /api/customers] page=${pageNum} limit=${limitNum} search=${search || '(none)'} sortBy=${sortBy}`);
 
     // Use database-level filtering and pagination
     const { data: customers, totalCount } = await storage.listCustomers(undefined, {
-      search: typeof search === 'string' ? search : undefined,
-      phone: typeof phone === 'string' ? phone : undefined,
+      search: typeof search === 'string' && search.trim() ? search.trim() : undefined,
+      phone: typeof phone === 'string' && phone.trim() ? phone.trim() : undefined,
       sortBy: typeof sortBy === 'string' ? sortBy : undefined,
       sortOrder: sortOrder === 'asc' ? 'asc' : 'desc',
       page: pageNum,
@@ -483,8 +486,8 @@ router.post(
   },
 );
 
-// Update customer
-router.put('/:id', requireRole(CUSTOMER_EDITOR_ROLES), async (req, res) => {
+// Update customer (Support both PUT and PATCH for compatibility)
+const updateCustomerHandler = async (req: any, res: any) => {
   try {
     const customerId = req.params.id;
     const updateData = normalizeCustomerPhonePayload(req.body);
@@ -532,7 +535,10 @@ router.put('/:id', requireRole(CUSTOMER_EDITOR_ROLES), async (req, res) => {
     console.error('Update customer error:', error);
     res.status(500).json(createErrorResponse('Failed to update customer', 500));
   }
-});
+};
+
+router.put('/:id', requireRole(CUSTOMER_EDITOR_ROLES), updateCustomerHandler);
+router.patch('/:id', requireRole(CUSTOMER_EDITOR_ROLES), updateCustomerHandler);
 
 // Delete customer
 router.delete('/:id', requireRole(CUSTOMER_ADMIN_ROLES), async (req, res) => {
@@ -666,69 +672,32 @@ router.get('/:id/wallet-history', async (req, res) => {
 // Get customer analytics
 router.get('/analytics/overview', async (req, res) => {
   try {
-    const { data: customers } = await storage.listCustomers();
-    const orders = await storage.listOrders();
-
-    // Calculate customer segments
-    const segments: Record<string, number> = {};
-    customers.forEach((customer: Customer) => {
-      const segmentsData = (customer as any).segments;
-      if (segmentsData) {
-        try {
-          const customerSegments = typeof segmentsData === 'string'
-            ? JSON.parse(segmentsData)
-            : segmentsData;
-          if (Array.isArray(customerSegments)) {
-            customerSegments.forEach((segment: string) => {
-              segments[segment] = (segments[segment] || 0) + 1;
-            });
-          }
-        } catch {
-          // Ignore invalid segments
-        }
-      }
-    });
-
-    // Calculate loyalty points distribution
-    const loyaltyStats = {
-      totalPoints: customers.reduce((sum: number, customer: Customer) => sum + (parseInt((customer as any).loyaltyPoints || '0')), 0),
-      averagePoints: customers.length > 0
-        ? customers.reduce((sum: number, customer: Customer) => sum + (parseInt((customer as any).loyaltyPoints || '0')), 0) / customers.length
-        : 0,
-      customersWithPoints: customers.filter((c: Customer) => parseInt((c as any).loyaltyPoints || '0') > 0).length
-    };
-
-    // Calculate customer lifetime value
-    const customerLTV = customers.map((customer: Customer) => {
-      const customerOrders = orders.filter((order: Order) => order.customerId === customer.id);
-      const totalSpent = customerOrders.reduce((sum: number, order: Order) => sum + parseFloat(order.totalAmount || '0'), 0);
-      return {
-        customerId: customer.id,
-        customerName: customer.name,
-        totalSpent,
-        orderCount: customerOrders.length
-      };
-    });
+    // Use efficient server-side COUNT queries — never loads all rows into memory.
+    // Previously this called listCustomers() which defaulted to limit:50, causing
+    // totalCustomers and newCustomersPastMonth to both show 50 instead of the real counts.
+    const [counts, recentCustomersRes] = await Promise.all([
+      storage.getCustomerAnalyticsStats(),
+      storage.listCustomers(undefined, { limit: 10, sortBy: 'createdAt', sortOrder: 'desc' }),
+    ]);
 
     const analytics = {
-      totalCustomers: customers.length,
-      newCustomersToday: customers.filter((customer: Customer) => {
-        const today = new Date().toISOString().split('T')[0];
-        const customerDate = customer.createdAt ? new Date(customer.createdAt).toISOString().split('T')[0] : '';
-        return customerDate === today;
-      }).length,
-      newCustomersPastMonth: customers.filter((customer: Customer) => {
-        if (!customer.createdAt) return false;
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        thirtyDaysAgo.setHours(0, 0, 0, 0); // Precision algorithm: start of day
-        return new Date(customer.createdAt) >= thirtyDaysAgo;
-      }).length,
-      segments,
-      loyaltyStats,
-      topCustomers: customerLTV
-        .sort((a: any, b: any) => b.totalSpent - a.totalSpent)
-        .slice(0, 10)
+      totalCustomers: counts.totalCustomers,
+      newCustomersToday: counts.newCustomersToday,
+      newCustomersPastWeek: counts.newCustomersPastWeek,
+      newCustomersPastMonth: counts.newCustomersPastMonth,
+      activeCustomers: counts.activeCustomers,
+      // Growth velocity: what % of total base joined in the last 30 days
+      growthVelocityPct: counts.totalCustomers > 0
+        ? parseFloat(((counts.newCustomersPastMonth / counts.totalCustomers) * 100).toFixed(2))
+        : 0,
+      // Recently joined customers for the widget list (real data, newest first)
+      recentCustomers: recentCustomersRes.data.slice(0, 5).map((c: Customer) => ({
+        id: c.id,
+        name: c.name,
+        phone: (c as any).phone || '',
+        createdAt: c.createdAt,
+        status: (c as any).status || 'active',
+      })),
     };
 
     res.json(createSuccessResponse(analytics));

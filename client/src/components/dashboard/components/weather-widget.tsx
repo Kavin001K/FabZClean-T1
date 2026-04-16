@@ -1,131 +1,226 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Cloud, Sun, CloudRain, Snowflake, ThermometerSun, Loader2 } from "lucide-react";
+import { Cloud, CloudRain, Loader2, Snowflake, Sun, ThermometerSun } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+type WeatherResponse = {
+  name: string;
+  main: {
+    temp: number;
+  };
+  weather: Array<{
+    description: string;
+  }>;
+};
+
+type Coordinates = {
+  lat: number;
+  lon: number;
+};
+
+const DEFAULT_LOCATION: Coordinates = { lat: 10.66, lon: 77.01 };
+const DEFAULT_WEATHER: WeatherResponse = {
+  name: "Pollachi",
+  main: { temp: 28 },
+  weather: [{ description: "clear sky" }],
+};
+const WEATHER_CACHE_PREFIX = "fabzclean_weather";
+const CACHE_TTL_MS = 60 * 60 * 1000;
+
+function readWeatherCache(location: Coordinates): WeatherResponse | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const cached = window.localStorage.getItem(
+      `${WEATHER_CACHE_PREFIX}_${location.lat}_${location.lon}`,
+    );
+    if (!cached) return null;
+
+    const parsed = JSON.parse(cached) as { timestamp?: number; data?: WeatherResponse };
+    if (!parsed.timestamp || !parsed.data) return null;
+    if (Date.now() - parsed.timestamp >= CACHE_TTL_MS) return null;
+    return parsed.data;
+  } catch (error) {
+    console.warn("Failed to read cached weather data:", error);
+    return null;
+  }
+}
+
+function writeWeatherCache(location: Coordinates, data: WeatherResponse) {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      `${WEATHER_CACHE_PREFIX}_${location.lat}_${location.lon}`,
+      JSON.stringify({ timestamp: Date.now(), data }),
+    );
+  } catch (error) {
+    console.warn("Failed to cache weather data:", error);
+  }
+}
+
+function normalizeWeatherResponse(data: unknown): WeatherResponse | null {
+  if (!data || typeof data !== "object") return null;
+
+  const candidate = data as Partial<WeatherResponse>;
+  const name = typeof candidate.name === "string" ? candidate.name : DEFAULT_WEATHER.name;
+  const temp = typeof candidate.main?.temp === "number" ? candidate.main.temp : DEFAULT_WEATHER.main.temp;
+  const description =
+    typeof candidate.weather?.[0]?.description === "string"
+      ? candidate.weather[0].description
+      : DEFAULT_WEATHER.weather[0].description;
+
+  return {
+    name,
+    main: { temp },
+    weather: [{ description }],
+  };
+}
 
 export default function WeatherWidget() {
-    const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null);
-    const [geoError, setGeoError] = useState<string | null>(null);
+  const [location, setLocation] = useState<Coordinates>(DEFAULT_LOCATION);
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [geoResolved, setGeoResolved] = useState(false);
 
-    useEffect(() => {
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    // Round coordinates to 2 decimal places (approx 1km resolution) to highly optimize cache hits
-                    // and prevent excessive API calls when moving slightly
-                    const lat = parseFloat(position.coords.latitude.toFixed(2));
-                    const lon = parseFloat(position.coords.longitude.toFixed(2));
-                    setLocation({ lat, lon });
-                },
-                (error) => {
-                    console.error("Error getting geolocation:", error);
-                    setGeoError("Location access denied. Showing default.");
-                    // Fallback to Pollachi, Tamil Nadu
-                    setLocation({ lat: 10.66, lon: 77.01 });
-                }
-            );
-        } else {
-            setGeoError("Geolocation not supported. Showing default.");
-            setLocation({ lat: 10.66, lon: 77.01 });
-        }
-    }, []);
+  useEffect(() => {
+    let isActive = true;
 
-    const fetchWeather = async () => {
-        if (!location) throw new Error("Location not available");
+    const finishWithFallback = (message: string) => {
+      if (!isActive) return;
+      setGeoError(message);
+      setLocation(DEFAULT_LOCATION);
+      setGeoResolved(true);
+    };
 
-        const cacheKey = `fabzclean_weather_${location.lat}_${location.lon}`;
-        const cached = localStorage.getItem(cacheKey);
+    if (typeof window === "undefined" || !("geolocation" in navigator)) {
+      finishWithFallback("Location unavailable. Showing default weather.");
+      return () => {
+        isActive = false;
+      };
+    }
 
-        if (cached) {
-            try {
-                const { timestamp, data } = JSON.parse(cached);
-                // Use a 1-hour cache expiry to stay extremely conservative on API usage
-                if (Date.now() - timestamp < 60 * 60 * 1000) {
-                    return data;
-                }
-            } catch (e) {
-                console.error("Failed to parse cached weather:", e);
-            }
-        }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        if (!isActive) return;
+        const lat = Number(position.coords.latitude.toFixed(2));
+        const lon = Number(position.coords.longitude.toFixed(2));
+        setLocation({ lat, lon });
+        setGeoError(null);
+        setGeoResolved(true);
+      },
+      (error) => {
+        console.warn("Geolocation unavailable, using fallback weather:", {
+          code: error.code,
+          message: error.message,
+        });
+        finishWithFallback("Live location unavailable. Showing default weather.");
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 5000,
+        maximumAge: 10 * 60 * 1000,
+      },
+    );
 
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  const cachedWeather = useMemo(() => readWeatherCache(location), [location]);
+
+  const { data: weather, isLoading } = useQuery<WeatherResponse>({
+    queryKey: ["weather", location.lat, location.lon],
+    enabled: geoResolved,
+    initialData: cachedWeather ?? DEFAULT_WEATHER,
+    staleTime: CACHE_TTL_MS,
+    gcTime: CACHE_TTL_MS,
+    retry: 0,
+    queryFn: async ({ signal }) => {
+      const cached = readWeatherCache(location);
+      if (cached) {
+        return cached;
+      }
+
+      try {
         const apiKey = "8068425b839e87ae5d645b2c572f6c64";
         const url = `https://api.openweathermap.org/data/2.5/weather?lat=${location.lat}&lon=${location.lon}&appid=${apiKey}&units=metric`;
-        const res = await fetch(url);
+        const response = await fetch(url, { signal });
 
-        if (!res.ok) {
-            throw new Error("Failed to fetch weather data");
+        if (!response.ok) {
+          throw new Error(`Weather request failed with status ${response.status}`);
         }
 
-        const data = await res.json();
-
-        // Save successfully fetched data to cache
-        localStorage.setItem(cacheKey, JSON.stringify({
-            timestamp: Date.now(),
-            data
-        }));
-
-        return data;
-    };
-
-    const { data: weather, isLoading, isError } = useQuery({
-        queryKey: ['weather', location?.lat, location?.lon],
-        queryFn: fetchWeather,
-        enabled: !!location,
-        staleTime: 60 * 60 * 1000, // 1 hour caching to stay within 500 calls/day
-        gcTime: 60 * 60 * 1000,
-    });
-
-    const getLaundryAdvice = (description: string) => {
-        const desc = description.toLowerCase();
-        if (desc.includes('rain') || desc.includes('drizzle') || desc.includes('thunder')) {
-            return { emoji: "🌧️", text: "Rainy. Indoor drying only!", icon: <CloudRain className="h-4 w-4 text-blue-500" /> };
+        const rawData = (await response.json()) as unknown;
+        const normalizedData = normalizeWeatherResponse(rawData);
+        if (!normalizedData) {
+          throw new Error("Weather response format was invalid");
         }
-        if (desc.includes('snow')) {
-            return { emoji: "❄️", text: "Snowy. Indoor drying only!", icon: <Snowflake className="h-4 w-4 text-blue-300" /> };
-        }
-        if (desc.includes('cloud')) {
-            return { emoji: "☁️", text: "Cloudy. Slower drying time.", icon: <Cloud className="h-4 w-4 text-gray-500" /> };
-        }
-        if (desc.includes('clear') || desc.includes('sun')) {
-            return { emoji: "☀️", text: "Sunny. Perfect for drying!", icon: <Sun className="h-4 w-4 text-yellow-500" /> };
-        }
-        return { emoji: "🌤️", text: "Good conditions for drying.", icon: <ThermometerSun className="h-4 w-4 text-orange-500" /> };
-    };
 
-    return (
-        <Card className="border-border bg-card shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Weather</CardTitle>
-                {weather?.weather?.[0]?.description ? (
-                    getLaundryAdvice(weather.weather[0].description).icon
-                ) : (
-                    <Cloud className="h-4 w-4 text-muted-foreground" />
-                )}
-            </CardHeader>
-            <CardContent>
-                {isLoading || !location ? (
-                    <div className="flex items-center text-muted-foreground py-1">
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        <span className="text-xs">Loading...</span>
-                    </div>
-                ) : isError ? (
-                    <div className="text-xs text-red-500 mt-1">Unable to fetch weather</div>
-                ) : (
-                    <>
-                        <div className="text-2xl font-bold text-foreground">
-                            {Math.round(weather.main.temp)}°C
-                        </div>
-                        <div className="flex flex-col gap-0.5 mt-1">
-                            <p className="text-xs font-semibold text-foreground truncate capitalize">
-                                {weather.name} • {weather.weather[0].description} {getLaundryAdvice(weather.weather[0].description).emoji}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground truncate">
-                                💡 {getLaundryAdvice(weather.weather[0].description).text}
-                            </p>
-                        </div>
-                    </>
-                )}
-            </CardContent>
-        </Card>
-    );
+        writeWeatherCache(location, normalizedData);
+        return normalizedData;
+      } catch (error) {
+        if ((error as Error)?.name === "AbortError") {
+          throw error;
+        }
+
+        console.warn("Unable to fetch live weather, using fallback:", error);
+        return cachedWeather ?? DEFAULT_WEATHER;
+      }
+    },
+  });
+
+  const safeWeather = weather ?? cachedWeather ?? DEFAULT_WEATHER;
+
+  const getLaundryAdvice = (description: string) => {
+    const desc = description.toLowerCase();
+    if (desc.includes("rain") || desc.includes("drizzle") || desc.includes("thunder")) {
+      return { emoji: "🌧️", text: "Rainy. Indoor drying only!", icon: <CloudRain className="h-4 w-4 text-blue-500" /> };
+    }
+    if (desc.includes("snow")) {
+      return { emoji: "❄️", text: "Snowy. Indoor drying only!", icon: <Snowflake className="h-4 w-4 text-blue-300" /> };
+    }
+    if (desc.includes("cloud")) {
+      return { emoji: "☁️", text: "Cloudy. Slower drying time.", icon: <Cloud className="h-4 w-4 text-gray-500" /> };
+    }
+    if (desc.includes("clear") || desc.includes("sun")) {
+      return { emoji: "☀️", text: "Sunny. Perfect for drying!", icon: <Sun className="h-4 w-4 text-yellow-500" /> };
+    }
+    return { emoji: "🌤️", text: "Good conditions for drying.", icon: <ThermometerSun className="h-4 w-4 text-orange-500" /> };
+  };
+
+  const description = safeWeather.weather[0]?.description ?? DEFAULT_WEATHER.weather[0].description;
+  const advice = getLaundryAdvice(description);
+
+  return (
+    <Card className="border-border bg-card shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Weather</CardTitle>
+        {advice.icon}
+      </CardHeader>
+      <CardContent>
+        {!geoResolved && isLoading ? (
+          <div className="flex items-center py-1 text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <span className="text-xs">Loading...</span>
+          </div>
+        ) : (
+          <>
+            <div className="text-2xl font-bold text-foreground">
+              {Math.round(safeWeather.main.temp)}°C
+            </div>
+            <div className="mt-1 flex flex-col gap-0.5">
+              <p className="truncate text-xs font-semibold capitalize text-foreground">
+                {safeWeather.name} • {description} {advice.emoji}
+              </p>
+              <p className="truncate text-[10px] text-muted-foreground">
+                💡 {advice.text}
+              </p>
+              {geoError ? (
+                <p className="truncate text-[10px] text-muted-foreground">{geoError}</p>
+              ) : null}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
 }

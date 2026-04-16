@@ -31,6 +31,29 @@ window.addEventListener('unhandledrejection', (event) => {
   event.preventDefault();
 });
 
+const renderStaticFallback = (message: string) => {
+  const root = document.getElementById("root") ?? document.body;
+
+  root.innerHTML = `
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f9fafb;padding:16px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+      <div style="max-width:480px;width:100%;background:#ffffff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.08);padding:24px;text-align:center;">
+        <h1 style="margin:0 0 8px;font-size:24px;color:#111827;">Application Error</h1>
+        <p style="margin:0 0 16px;color:#4b5563;">${message}</p>
+        <button
+          id="fabzclean-reload-app"
+          style="padding:10px 16px;background:#059669;color:#ffffff;border:none;border-radius:8px;cursor:pointer;font-size:14px;"
+        >
+          Reload Application
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("fabzclean-reload-app")?.addEventListener("click", () => {
+    window.location.reload();
+  });
+};
+
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
   constructor(props: any) {
     super(props);
@@ -67,8 +90,20 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 }
 
-createRoot(document.getElementById("root")!).render(
-  <ErrorBoundary>
-    <App />
-  </ErrorBoundary>
-);
+const rootElement = document.getElementById("root");
+
+if (!rootElement) {
+  console.error('Root element "#root" was not found');
+  renderStaticFallback("The application shell is missing. Please reload and try again.");
+} else {
+  try {
+    createRoot(rootElement).render(
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    );
+  } catch (error) {
+    console.error("Failed to initialize application:", error);
+    renderStaticFallback("The application could not finish loading. Please reload and try again.");
+  }
+}

@@ -247,6 +247,18 @@ export class SerializationService {
         : serialized.totalOrders;
     }
 
+    // IMPORTANT FALLBACK: Ensure the `phone` property is fully guaranteed.
+    // Sometimes the database column maps to `customerPhone` or another alias natively.
+    if (!serialized.phone && serialized.customerPhone) {
+      serialized.phone = serialized.customerPhone;
+    }
+    if (!serialized.phone && serialized.customer_phone) {
+      serialized.phone = serialized.customer_phone;
+    }
+    if (!serialized.secondaryPhone && serialized.secondary_phone) {
+      serialized.secondaryPhone = serialized.secondary_phone;
+    } 
+
     // Convert creditBalance to number if it's a string
     if (serialized.creditBalance !== undefined) {
       serialized.creditBalance = typeof serialized.creditBalance === 'string'

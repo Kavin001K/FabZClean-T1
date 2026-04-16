@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { safeParseFloat } from '@/lib/safe-utils';
@@ -21,7 +21,8 @@ import {
   UserPlus,
   ChevronLeft,
   ChevronRight,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Calendar
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -109,12 +110,24 @@ export default function Customers() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [segmentFilter, setSegmentFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('name');
   
-  // Pagination state: Default to 'All' (using a large number)
+  // Pagination state: cap 'All' to 1000 (Supabase max-rows safe limit)
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(100000); // Default to 'All'
+  const [pageSize, setPageSize] = useState(1000); // Default to 'All' (capped at 1000)
+
+  // Debounce search input → server query (300ms)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1); // Reset to page 1 on new search
+    }, 300);
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+  }, [searchQuery]);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -134,24 +147,65 @@ export default function Customers() {
     return () => window.removeEventListener(REFRESH_DATA_EVENT, handleRefreshData);
   }, [queryClient, toast]);
 
-  // Fetch customers data
+  // Fetch customers data...
   const {
     data: customersResponse,
     isLoading: customersLoading,
     isError: customersError,
     error: customersErrorDetails,
   } = useQuery({
-    queryKey: ['customers', page, pageSize, searchQuery, sortBy],
+    queryKey: ['customers', page, pageSize, debouncedSearch, sortBy],
     queryFn: () => customersApi.getAll({ 
       page, 
       limit: pageSize, 
-      search: searchQuery,
+      search: debouncedSearch || undefined,
       sortBy 
     }),
     staleTime: 30000, 
     refetchOnWindowFocus: true,
     retry: 2,
   });
+
+  // Handle URL parameters (e.g. ?id=...) to open customer details directly
+  // Must be placed AFTER useQuery so customersResponse is declared
+  useEffect(() => {
+    if (!customersResponse) return;
+    
+    // Extract ID from URL if present
+    const params = new URLSearchParams(window.location.search);
+    const customerId = params.get('id');
+    
+    if (customerId) {
+      // Find customer in loaded data, or use API if it's the right way
+      // But since we might paginate, ideally we'd fetch directly if not in current page
+      // Here we just search the current page, which is 'All' by default
+      let dataList: Customer[] = [];
+      if (typeof customersResponse === 'object' && 'data' in customersResponse && Array.isArray(customersResponse.data)) {
+        dataList = customersResponse.data as Customer[];
+      } else if (Array.isArray(customersResponse)) {
+        dataList = customersResponse;
+      }
+      
+      const found = dataList.find(c => c.id === customerId);
+      if (found) {
+        setSelectedCustomer(found);
+        setIsViewDialogOpen(true);
+        // Clear the URL to avoid reopening on every re-render or layout shift
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      } else {
+        // If not found in current page, try fetching it directly
+        customersApi.getById(customerId).then((cust) => {
+          if (cust) {
+            setSelectedCustomer(cust);
+            setIsViewDialogOpen(true);
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, '', newUrl);
+          }
+        }).catch(console.error);
+      }
+    }
+  }, [customersResponse]);
 
   // Ensure customers is always an array and get total count
   const { customers, totalCount } = useMemo(() => {
@@ -221,60 +275,45 @@ export default function Customers() {
   }, [customers, totalCount]);
 
   // Filtered and sorted customers
+  // Client-side post-filtering: ONLY segment filter is applied here.
+  // Search is already handled server-side by the API, so we don't re-filter by searchQuery.
   const filteredCustomers = useMemo(() => {
-    let filtered = customers.filter(customer => {
-      // Normalize phone number for search Helper
-      const normalizePhone = (phone: string | null | undefined) => {
-        if (!phone) return '';
-        return phone.replace(/[\s\-\(\)]/g, '').replace(/^0+/, '').replace(/^\+91/, '');
-      };
-      
-      const normalizedQuery = normalizePhone(searchQuery);
-      const normalizedCustomerPhone = normalizePhone(customer.phone);
-      const normalizedSecondaryPhone = normalizePhone((customer as any).secondaryPhone);
+    let filtered = customers;
 
-      const matchesSearch = customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        customer.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        customer.phone?.includes(searchQuery) ||
-        (customer as any).secondaryPhone?.includes(searchQuery) ||
-        (normalizedQuery.length > 3 && normalizedCustomerPhone.includes(normalizedQuery)) ||
-        (normalizedQuery.length > 3 && normalizedSecondaryPhone.includes(normalizedQuery)) ||
-        (normalizedCustomerPhone && normalizedQuery && normalizedCustomerPhone === normalizedQuery);
+    // Segment filter (client-side only)
+    if (segmentFilter !== 'all') {
+      filtered = customers.filter(customer => {
+        if (segmentFilter === 'new') {
+          const createdAt = new Date(customer.createdAt || 0);
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          thirtyDaysAgo.setHours(0, 0, 0, 0);
+          return createdAt >= thirtyDaysAgo;
+        }
+        const segment = getCustomerSegment(customer);
+        return segment.label.toLowerCase() === segmentFilter.toLowerCase();
+      });
+    }
 
-      if (!matchesSearch) return false;
-
-      if (segmentFilter === 'all') return true;
-
-      const segment = getCustomerSegment(customer);
-      if (segmentFilter === 'new') {
-        const createdAt = new Date(customer.createdAt || 0);
-        const now = new Date();
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(now.getDate() - 30);
-        thirtyDaysAgo.setHours(0, 0, 0, 0); // Precision algorithm: start of day
-        return createdAt >= thirtyDaysAgo;
-      }
-      return segment.label.toLowerCase() === segmentFilter.toLowerCase();
-    });
-
-    // Sort customers
-    filtered.sort((a, b) => {
+    // Sort customers (client-side refinement on server-sorted data)
+    const sorted = [...filtered];
+    sorted.sort((a, b) => {
       switch (sortBy) {
         case 'name':
           return a.name.localeCompare(b.name);
-        case 'spending':
+        case 'totalSpent':
           return parseFloat(b.totalSpent || '0') - parseFloat(a.totalSpent || '0');
-        case 'orders':
+        case 'totalOrders':
           return (b.totalOrders || 0) - (a.totalOrders || 0);
-        case 'recent':
-          return new Date(b.lastOrder || 0).getTime() - new Date(a.lastOrder || 0).getTime();
+        case 'updatedAt':
+          return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
         default:
           return 0;
       }
     });
 
-    return filtered;
-  }, [customers, searchQuery, segmentFilter, sortBy]);
+    return sorted;
+  }, [customers, segmentFilter, sortBy]);
 
   const hasNextPage = (page * pageSize) < totalCount;
   const hasPrevPage = page > 1;
@@ -393,6 +432,9 @@ export default function Customers() {
       email: customerData.email || undefined,
       address: addressObj.street ? addressObj : undefined,
       creditLimit: normalizedCreditLimit,
+      creditBalance: customerData.creditBalance !== undefined && customerData.creditBalance !== '' 
+        ? customerData.creditBalance.toString() 
+        : undefined,
       notes: customerData.notes || undefined,
       companyName: customerData.companyName || undefined,
       taxId: customerData.taxId || undefined,
@@ -427,6 +469,9 @@ export default function Customers() {
       email: customerData.email || undefined,
       address: addressObj.street ? addressObj : undefined,
       creditLimit: normalizedCreditLimit,
+      creditBalance: customerData.creditBalance !== undefined && customerData.creditBalance !== '' 
+        ? customerData.creditBalance.toString() 
+        : undefined,
       status: customerData.status || 'active',
       notes: customerData.notes || undefined,
       companyName: customerData.companyName || undefined,
@@ -698,9 +743,9 @@ export default function Customers() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="name">Name (A-Z)</SelectItem>
-                      <SelectItem value="spending">Highest Spending</SelectItem>
-                      <SelectItem value="orders">Most Orders</SelectItem>
-                      <SelectItem value="recent">Recent Activity</SelectItem>
+                      <SelectItem value="totalSpent">Highest Spending</SelectItem>
+                      <SelectItem value="totalOrders">Most Orders</SelectItem>
+                      <SelectItem value="updatedAt">Recent Activity</SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -711,7 +756,7 @@ export default function Customers() {
                       <SelectValue placeholder="Page size" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="100000">Show All</SelectItem>
+                      <SelectItem value="1000">Show All</SelectItem>
                       <SelectItem value="50">50 / page</SelectItem>
                       <SelectItem value="100">100 / page</SelectItem>
                       <SelectItem value="500">500 / page</SelectItem>
@@ -853,9 +898,15 @@ export default function Customers() {
                                     {segment.label}
                                   </Badge>
                                 </div>
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                  <TierIcon className={`h-4 w-4 ${tier.color}`} />
-                                  <span className={tier.color}>{tier.label}</span>
+                                <div className="flex flex-col gap-1 mt-1">
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                                    <TierIcon className={`h-3.5 w-3.5 ${tier.color}`} />
+                                    <span className={tier.color}>{tier.label} Tier</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>Joined {new Date(customer.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -927,7 +978,7 @@ export default function Customers() {
                           <div className="flex items-center justify-between text-sm pt-3 border-t border-white/5">
                             <div className="flex items-center gap-2 text-muted-foreground">
                               <Clock className="h-4 w-4" />
-                              <span>Last active:</span>
+                              <span className="whitespace-nowrap">Last visited Neetly:</span>
                             </div>
                             <span className="font-medium text-foreground">{lastOrderDate}</span>
                           </div>
