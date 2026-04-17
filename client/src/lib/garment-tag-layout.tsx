@@ -4,6 +4,7 @@ import { normalizeOrderStoreCode } from './order-store';
 
 export const THERMAL_TAG_WIDTH_MM = 36;
 export const THERMAL_TAG_HEIGHT_MM = 28;
+const THERMAL_TAG_CUT_GAP_MM = 0.8;
 const THERMAL_TAG_STACK_PADDING_MM = 0.2;
 
 export interface ThermalTagItem {
@@ -83,6 +84,44 @@ const SECONDARY_SERVICE_RULES: Array<[RegExp, string]> = [
   [/\bCOLOUR\b/g, 'C'],
 ];
 
+const SERVICE_DESCRIPTOR_RULES: Array<[RegExp, string]> = [
+  [/\bWITHOUT\b/g, 'W/O'],
+  [/\bWITH\b/g, 'W/'],
+  [/\bHEAVY\b/g, 'HVY'],
+  [/\bLIGHT\b/g, 'LT'],
+  [/\bPLAIN\b/g, 'PLN'],
+  [/\bSIMPLE\b/g, 'SPL'],
+  [/\bDESIGNER\b/g, 'DSN'],
+  [/\bEMBROIDERY\b/g, 'EMB'],
+  [/\bEMBROIDERED\b/g, 'EMB'],
+  [/\bBORDER\b/g, 'BDR'],
+  [/\bPRINTED\b/g, 'PRNT'],
+  [/\bPRINT\b/g, 'PRNT'],
+  [/\bCHECKED\b/g, 'CHK'],
+  [/\bSTRIPED\b/g, 'STRP'],
+  [/\bSTARCHED\b/g, 'STRCH'],
+  [/\bSTARCH\b/g, 'STRCH'],
+  [/\bCOTTON\b/g, 'CTN'],
+  [/\bLINEN\b/g, 'LIN'],
+  [/\bSYNTHETIC\b/g, 'SYN'],
+  [/\bPOLYESTER\b/g, 'PLY'],
+  [/\bGEORGETTE\b/g, 'GEO'],
+  [/\bCHIFFON\b/g, 'CHF'],
+  [/\bBANARASI\b/g, 'BNR'],
+  [/\bLEHENGA\b/g, 'LHN'],
+  [/\bDUPATTA\b/g, 'DPT'],
+  [/\bCHUDIDAR\b/g, 'CHUD'],
+  [/\bSALWAR\b/g, 'SLWR'],
+  [/\bKAMEEZ\b/g, 'KMZ'],
+  [/\bBLOUSE\b/g, 'BLS'],
+  [/\bTROUSER\b/g, 'TRSR'],
+  [/\bPANT\b/g, 'PNT'],
+  [/\bSHERWANI\b/g, 'SHRW'],
+  [/\bNIGHTY\b/g, 'NGTY'],
+];
+
+const SERVICE_FILLER_WORDS = new Set(['AND', 'ONLY', 'ITEM', 'PCS', 'PC']);
+
 const compactSecondaryText = (value: string | undefined | null) => {
   let text = normalizeText(value, '');
 
@@ -97,10 +136,74 @@ const compactSecondaryText = (value: string | undefined | null) => {
     .trim();
 };
 
-const formatCompactServiceDisplay = (serviceName?: string) => {
-  const normalized = normalizeText(serviceName, 'SERVICE')
+const normalizeServiceName = (serviceName?: string) =>
+  normalizeText(serviceName, 'SERVICE')
     .replace(/\s+/g, ' ')
     .trim();
+
+const applyServiceRules = (value: string) => {
+  let text = value;
+
+  SECONDARY_SERVICE_RULES.forEach(([pattern, replacement]) => {
+    text = text.replace(pattern, replacement);
+  });
+
+  SERVICE_DESCRIPTOR_RULES.forEach(([pattern, replacement]) => {
+    text = text.replace(pattern, replacement);
+  });
+
+  return text
+    .replace(/[()]/g, ' ')
+    .replace(/\s*\/\s*/g, '/')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const abbreviateServiceToken = (token: string) => {
+  if (token.length <= 5) return token;
+  if (token.length <= 7) return token.slice(0, 5);
+  return token.slice(0, 4);
+};
+
+const buildServiceCandidates = (serviceName?: string) => {
+  const normalized = normalizeServiceName(serviceName);
+  const compact = applyServiceRules(normalized);
+  const compactTokens = compact
+    .split(/[\/\s]+/)
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .filter((token) => !SERVICE_FILLER_WORDS.has(token));
+
+  const shortenedTokens = compactTokens.map((token, index) => {
+    if (index === 0) return token;
+    return abbreviateServiceToken(token);
+  });
+
+  const headTailCompact = compactTokens.length <= 3
+    ? compactTokens.join(' ')
+    : [compactTokens[0], compactTokens[1], compactTokens[compactTokens.length - 1]].join(' ');
+
+  const headTailAbbreviated = shortenedTokens.length <= 3
+    ? shortenedTokens.join(' ')
+    : [shortenedTokens[0], shortenedTokens[1], shortenedTokens[shortenedTokens.length - 1]].join(' ');
+
+  const initialCompact = compactTokens.length <= 1
+    ? compactTokens[0] || normalized
+    : [compactTokens[0], ...compactTokens.slice(1).map((token) => token[0])].join(' ');
+
+  return Array.from(new Set([
+    normalized,
+    compact,
+    compactTokens.join(' '),
+    headTailCompact,
+    shortenedTokens.join(' '),
+    headTailAbbreviated,
+    initialCompact,
+  ].map((value) => normalizeWhitespace(value, '')).filter(Boolean)));
+};
+
+const formatCompactServiceDisplay = (serviceName?: string) => {
+  const normalized = normalizeServiceName(serviceName);
 
   const parenthesizedMatch = normalized.match(/^(.*?)\s*\((.*?)\)\s*$/);
   const beforeParen = (parenthesizedMatch?.[1] || normalized).trim();
@@ -153,7 +256,7 @@ const fitText = (
     ? `${normalized.slice(0, Math.max(1, config.maxCharsAtMin - 1)).trim()}…`
     : normalized;
 
-  return { text, fontSizeMm };
+  return { text, fontSizeMm, isTruncated: text !== normalized };
 };
 
 const fitUppercaseText = (
@@ -168,6 +271,36 @@ const fitUppercaseText = (
     maxCharsAtMin: number;
   }
 ) => fitText(normalizeText(value, fallback), fallback.toUpperCase(), config);
+
+const selectBestServiceFit = (
+  serviceName: string | undefined,
+  config: {
+    baseFontMm: number;
+    minFontMm: number;
+    shrinkStart: number;
+    shrinkStepChars: number;
+    shrinkFactor: number;
+    maxCharsAtMin: number;
+  }
+) => {
+  const candidates = Array.from(new Set([
+    formatCompactServiceDisplay(serviceName),
+    ...buildServiceCandidates(serviceName),
+  ]));
+
+  let fallbackFit = fitText(candidates[0] || serviceName || 'SERVICE', 'SERVICE', config);
+
+  for (const candidate of candidates) {
+    const fit = fitText(candidate, 'SERVICE', config);
+    fallbackFit = fit;
+
+    if (!fit.isTruncated) {
+      return fit;
+    }
+  }
+
+  return fallbackFit;
+};
 
 const formatShortOrderId = (orderNumber: string) => normalizeText(orderNumber.slice(-5), orderNumber);
 
@@ -202,26 +335,26 @@ export const prepareThermalTags = ({
 }: ThermalTagSource): PreparedThermalTag[] => {
   const shortOrderId = formatShortOrderId(orderNumber);
   const shortOrderFit = fitUppercaseText(shortOrderId, shortOrderId, {
-    baseFontMm: 6,
-    minFontMm: 4.3,
-    shrinkStart: 5,
+    baseFontMm: 2.8,
+    minFontMm: 2.3,
+    shrinkStart: 8,
     shrinkStepChars: 1,
-    shrinkFactor: 0.34,
-    maxCharsAtMin: 10,
+    shrinkFactor: 0.1,
+    maxCharsAtMin: 12,
   });
   const branchText = resolveBranchText(franchiseId, storeCode);
   const customerFit = fitText(formatCustomerDisplay(customerName), 'CUSTOMER', {
-    baseFontMm: 3.1,
-    minFontMm: 2.1,
-    shrinkStart: 12,
+    baseFontMm: 3.75,
+    minFontMm: 2.45,
+    shrinkStart: 10,
     shrinkStepChars: 2,
-    shrinkFactor: 0.1,
-    maxCharsAtMin: 30,
+    shrinkFactor: 0.12,
+    maxCharsAtMin: 24,
   });
   const branchFit = fitUppercaseText(branchText, branchText, {
-    baseFontMm: 2.3,
-    minFontMm: 1.9,
-    shrinkStart: 12,
+    baseFontMm: 2.15,
+    minFontMm: 1.75,
+    shrinkStart: 11,
     shrinkStepChars: 3,
     shrinkFactor: 0.12,
     maxCharsAtMin: 18,
@@ -229,43 +362,42 @@ export const prepareThermalTags = ({
   const billText = formatTagDate(billDate);
   const dueText = formatTagDate(dueDate);
   const billFit = fitUppercaseText(`ORD ${billText}`, `ORD ${billText}`, {
-    baseFontMm: 2.75,
-    minFontMm: 2.15,
-    shrinkStart: 7,
+    baseFontMm: 5,
+    minFontMm: 3.9,
+    shrinkStart: 4,
     shrinkStepChars: 1,
-    shrinkFactor: 0.12,
-    maxCharsAtMin: 12,
+    shrinkFactor: 0.24,
+    maxCharsAtMin: 8,
   });
 
   return items.flatMap((item, itemIndex) => {
     const quantity = Math.max(1, Number(item.quantity) || 1);
-    const compactServiceText = formatCompactServiceDisplay(item.serviceName);
     const compactNoteText = formatCompactNoteDisplay(item.tagNote || commonNote || '');
     const noteFit = fitText(compactNoteText, '', {
-      baseFontMm: 2.6,
-      minFontMm: 2.05,
-      shrinkStart: 80,
+      baseFontMm: 2.45,
+      minFontMm: 1.95,
+      shrinkStart: 72,
       shrinkStepChars: 4,
-      shrinkFactor: 0.14,
-      maxCharsAtMin: 160,
+      shrinkFactor: 0.12,
+      maxCharsAtMin: 140,
     });
     const hasNote = noteFit.text.length > 0;
-    const serviceFit = fitText(compactServiceText, 'Service', hasNote
+    const serviceFit = selectBestServiceFit(item.serviceName, hasNote
       ? {
-        baseFontMm: 4.85,
-        minFontMm: 2.85,
+        baseFontMm: 3.95,
+        minFontMm: 2.35,
         shrinkStart: 12,
-        shrinkStepChars: 3,
-        shrinkFactor: 0.2,
-        maxCharsAtMin: 32,
+        shrinkStepChars: 2,
+        shrinkFactor: 0.18,
+        maxCharsAtMin: 42,
       }
       : {
-        baseFontMm: 5.55,
-        minFontMm: 3.2,
-        shrinkStart: 14,
-        shrinkStepChars: 3,
+        baseFontMm: 4.45,
+        minFontMm: 2.45,
+        shrinkStart: 10,
+        shrinkStepChars: 2,
         shrinkFactor: 0.2,
-        maxCharsAtMin: 40,
+        maxCharsAtMin: 52,
       });
 
     return Array.from({ length: quantity }, (_, tagIndex) => ({
@@ -326,7 +458,7 @@ export const getThermalTagPrintStyles = (pageHeightMm: number) => `
     min-height: var(--thermal-page-height-mm);
     display: flex;
     flex-direction: column;
-    gap: 0;
+    gap: ${THERMAL_TAG_CUT_GAP_MM}mm;
   }
 
   .thermal-tag {
@@ -338,23 +470,23 @@ export const getThermalTagPrintStyles = (pageHeightMm: number) => `
     border-bottom: 0.4mm dashed #000000;
     display: flex;
     flex-direction: column;
-    gap: 0.45mm;
+    gap: 0.35mm;
     break-inside: avoid;
     page-break-inside: avoid;
     overflow: hidden;
     background: #ffffff;
-    padding: 0.75mm 0.85mm 0.65mm;
+    padding: 0.7mm 0.85mm 0.6mm;
   }
 
   .branch-bar {
-    line-height: 0.92;
+    line-height: 0.9;
     font-weight: 700;
     letter-spacing: 0.025mm;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     text-align: left;
-    padding-bottom: 0.25mm;
+    padding-bottom: 0.2mm;
     border-bottom: 0.2mm solid #000000;
   }
 
@@ -362,34 +494,37 @@ export const getThermalTagPrintStyles = (pageHeightMm: number) => `
     display: grid;
     grid-template-columns: max-content minmax(0, 1fr);
     align-items: end;
-    gap: 0.7mm;
-    min-height: 5.1mm;
+    gap: 0.55mm;
+    min-height: 4.35mm;
+    padding-bottom: 0.2mm;
+    border-bottom: 0.2mm solid #000000;
   }
 
   .short-id {
-    line-height: 0.86;
+    line-height: 0.8;
     font-weight: 900;
-    letter-spacing: 0.03mm;
+    letter-spacing: 0.015mm;
     white-space: nowrap;
     overflow: visible;
     text-overflow: clip;
   }
 
   .bill-date {
-    line-height: 0.95;
+    line-height: 0.9;
     font-weight: 800;
     letter-spacing: 0.03mm;
     white-space: nowrap;
-    padding: 0.25mm 0.55mm 0.15mm;
+    padding: 0.22mm 0.5mm 0.12mm;
     border: 0.22mm solid #000000;
     border-radius: 99mm;
     justify-self: end;
   }
 
   .customer-line {
-    font-weight: 800;
-    line-height: 0.94;
-    letter-spacing: 0.03mm;
+    font-weight: 900;
+    line-height: 0.88;
+    letter-spacing: 0.02mm;
+    padding-top: 0.12mm;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -402,76 +537,81 @@ export const getThermalTagPrintStyles = (pageHeightMm: number) => `
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    gap: 0.45mm;
-    padding: 0.6mm 0.7mm 0.45mm;
+    gap: 0.35mm;
+    padding: 0.5mm 0.68mm 0.4mm;
     border: 0.22mm solid #000000;
     border-radius: 0.95mm;
   }
 
   .tag-body--with-note {
     justify-content: flex-start;
-    gap: 0.45mm;
+    gap: 0.35mm;
   }
 
   .tag-body--no-note {
     justify-content: center;
-    gap: 0.15mm;
-    padding-top: 0.35mm;
-    padding-bottom: 0.35mm;
+    gap: 0.1mm;
+    padding-top: 0.2mm;
+    padding-bottom: 0.2mm;
   }
 
   .service-line {
     font-weight: 900;
-    line-height: 0.92;
-    letter-spacing: 0.03mm;
+    line-height: 0.84;
+    letter-spacing: 0.015mm;
     white-space: normal;
     overflow: hidden;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+    text-transform: uppercase;
   }
 
   .tag-body--no-note .service-line {
     -webkit-line-clamp: 3;
-    line-height: 0.9;
+    line-height: 0.8;
   }
 
   .note-line {
     font-weight: 700;
-    line-height: 0.94;
+    line-height: 0.88;
     letter-spacing: 0.02mm;
     white-space: normal;
     overflow: hidden;
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 2;
+    border-top: 0.2mm dashed #000000;
+    padding-top: 0.28mm;
   }
 
   .tag-footer {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: end;
-    gap: 0.65mm;
-    min-height: 3.6mm;
-    padding-top: 0.15mm;
+    gap: 0.55mm;
+    min-height: 3.3mm;
+    padding-top: 0.1mm;
   }
 
   .due-text {
-    font-size: 2.85mm;
-    line-height: 0.95;
+    font-size: 2.7mm;
+    line-height: 0.9;
     font-weight: 800;
     letter-spacing: 0.03mm;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    padding: 0.35mm 0.85mm 0.25mm;
+    padding: 0.28mm 0.75mm 0.18mm;
     border: 0.22mm solid #000000;
     border-radius: 99mm;
   }
 
   .count-text {
-    font-size: 3.5mm;
-    line-height: 0.95;
+    font-size: 3.25mm;
+    line-height: 0.9;
     font-weight: 900;
     letter-spacing: 0.02mm;
     white-space: nowrap;
@@ -504,7 +644,12 @@ export const getThermalTagPrintStyles = (pageHeightMm: number) => `
 `;
 
 export const getThermalTagStripHeightMm = (tagCount: number) =>
-  Math.max(THERMAL_TAG_HEIGHT_MM, (Math.max(1, tagCount) * THERMAL_TAG_HEIGHT_MM) + THERMAL_TAG_STACK_PADDING_MM);
+  Math.max(
+    THERMAL_TAG_HEIGHT_MM,
+    (Math.max(1, tagCount) * THERMAL_TAG_HEIGHT_MM) +
+      (Math.max(0, tagCount - 1) * THERMAL_TAG_CUT_GAP_MM) +
+      THERMAL_TAG_STACK_PADDING_MM
+  );
 
 export const buildThermalTagPrintHtml = (tags: PreparedThermalTag[], title: string) => {
   const pageHeightMm = getThermalTagStripHeightMm(tags.length);
@@ -568,22 +713,22 @@ export function ThermalTagLabel({ tag }: { tag: PreparedThermalTag }) {
         borderBottom: '0.4mm dashed #000000',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.45mm',
-        padding: '0.75mm 0.85mm 0.65mm',
+        gap: '0.35mm',
+        padding: '0.7mm 0.85mm 0.6mm',
         fontFamily: 'Arial, Helvetica, sans-serif',
       }}
     >
       <div
         style={{
           fontSize: `${tag.branchFontMm}mm`,
-          lineHeight: 0.92,
+          lineHeight: 0.9,
           fontWeight: 700,
           letterSpacing: '0.025mm',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           textAlign: 'left',
-          paddingBottom: '0.25mm',
+          paddingBottom: '0.2mm',
           borderBottom: '0.2mm solid #000000',
         }}
       >
@@ -594,16 +739,18 @@ export function ThermalTagLabel({ tag }: { tag: PreparedThermalTag }) {
           display: 'grid',
           gridTemplateColumns: 'max-content minmax(0, 1fr)',
           alignItems: 'end',
-          gap: '0.7mm',
-          minHeight: '5.1mm',
+          gap: '0.55mm',
+          minHeight: '4.35mm',
+          paddingBottom: '0.2mm',
+          borderBottom: '0.2mm solid #000000',
         }}
       >
         <div
           style={{
             fontSize: `${tag.shortOrderFontMm}mm`,
-            lineHeight: 0.86,
+            lineHeight: 0.8,
             fontWeight: 900,
-            letterSpacing: '0.03mm',
+            letterSpacing: '0.015mm',
             whiteSpace: 'nowrap',
             overflow: 'visible',
             textOverflow: 'clip',
@@ -614,11 +761,11 @@ export function ThermalTagLabel({ tag }: { tag: PreparedThermalTag }) {
         <div
           style={{
             fontSize: `${tag.billFontMm}mm`,
-            lineHeight: 0.95,
+            lineHeight: 0.9,
             fontWeight: 800,
             letterSpacing: '0.03mm',
             whiteSpace: 'nowrap',
-            padding: '0.25mm 0.55mm 0.15mm',
+            padding: '0.22mm 0.5mm 0.12mm',
             border: '0.22mm solid #000000',
             borderRadius: '99mm',
             justifySelf: 'end',
@@ -630,9 +777,10 @@ export function ThermalTagLabel({ tag }: { tag: PreparedThermalTag }) {
       <div
         style={{
           fontSize: `${tag.customerFontMm}mm`,
-          fontWeight: 800,
-          lineHeight: 0.94,
-          letterSpacing: '0.03mm',
+          fontWeight: 900,
+          lineHeight: 0.88,
+          letterSpacing: '0.02mm',
+          paddingTop: '0.12mm',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -648,8 +796,8 @@ export function ThermalTagLabel({ tag }: { tag: PreparedThermalTag }) {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: tag.hasNote ? 'flex-start' : 'center',
-          gap: tag.hasNote ? '0.45mm' : '0.15mm',
-          padding: tag.hasNote ? '0.6mm 0.7mm 0.45mm' : '0.35mm 0.7mm',
+          gap: tag.hasNote ? '0.35mm' : '0.1mm',
+          padding: tag.hasNote ? '0.5mm 0.68mm 0.4mm' : '0.2mm 0.68mm',
           border: '0.22mm solid #000000',
           borderRadius: '0.95mm',
         }}
@@ -658,13 +806,16 @@ export function ThermalTagLabel({ tag }: { tag: PreparedThermalTag }) {
           style={{
             fontSize: `${tag.serviceFontMm}mm`,
             fontWeight: 900,
-            lineHeight: 0.92,
-            letterSpacing: '0.03mm',
+            lineHeight: tag.hasNote ? 0.84 : 0.82,
+            letterSpacing: '0.015mm',
             whiteSpace: 'normal',
             overflow: 'hidden',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
             display: '-webkit-box',
             WebkitBoxOrient: 'vertical',
             WebkitLineClamp: tag.hasNote ? 2 : 3,
+            textTransform: 'uppercase',
           }}
         >
           {tag.serviceText}
@@ -674,13 +825,15 @@ export function ThermalTagLabel({ tag }: { tag: PreparedThermalTag }) {
             style={{
               fontSize: `${tag.noteFontMm}mm`,
               fontWeight: 700,
-              lineHeight: 0.94,
+              lineHeight: 0.88,
               letterSpacing: '0.02mm',
               whiteSpace: 'normal',
               overflow: 'hidden',
               display: '-webkit-box',
               WebkitBoxOrient: 'vertical',
-              WebkitLineClamp: 3,
+              WebkitLineClamp: 2,
+              borderTop: '0.2mm dashed #000000',
+              paddingTop: '0.28mm',
             }}
           >
             {tag.noteText}
@@ -692,21 +845,21 @@ export function ThermalTagLabel({ tag }: { tag: PreparedThermalTag }) {
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1fr) auto',
           alignItems: 'end',
-          gap: '0.65mm',
-          minHeight: '3.6mm',
-          paddingTop: '0.15mm',
+          gap: '0.55mm',
+          minHeight: '3.3mm',
+          paddingTop: '0.1mm',
         }}
       >
         <div
           style={{
-            fontSize: '2.85mm',
-            lineHeight: 0.95,
+            fontSize: '2.7mm',
+            lineHeight: 0.9,
             fontWeight: 800,
             letterSpacing: '0.03mm',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            padding: '0.35mm 0.85mm 0.25mm',
+            padding: '0.28mm 0.75mm 0.18mm',
             border: '0.22mm solid #000000',
             borderRadius: '99mm',
           }}
@@ -715,8 +868,8 @@ export function ThermalTagLabel({ tag }: { tag: PreparedThermalTag }) {
         </div>
         <div
           style={{
-            fontSize: '3.5mm',
-            lineHeight: 0.95,
+            fontSize: '3.25mm',
+            lineHeight: 0.9,
             fontWeight: 900,
             letterSpacing: '0.02mm',
             whiteSpace: 'nowrap',

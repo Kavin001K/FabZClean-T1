@@ -191,32 +191,52 @@ export default function WeatherWidget() {
   const advice = getLaundryAdvice(description);
 
   return (
-    <Card className="border-border bg-card shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <Card className="flex h-full min-h-[20rem] flex-col overflow-hidden border-border bg-card shadow-sm">
+      <CardHeader className="flex flex-col gap-3 space-y-0 border-b border-border/60 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-sm font-medium text-muted-foreground">Weather</CardTitle>
         {advice.icon}
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-1 flex-col justify-between gap-6">
         {!geoResolved && isLoading ? (
-          <div className="flex items-center py-1 text-muted-foreground">
+          <div className="flex flex-1 items-center py-1 text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             <span className="text-xs">Loading...</span>
           </div>
         ) : (
           <>
-            <div className="text-2xl font-bold text-foreground">
-              {Math.round(safeWeather.main.temp)}°C
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div className="space-y-2">
+                <div className="text-4xl font-black tracking-tight text-foreground sm:text-5xl">
+                  {Math.round(safeWeather.main.temp)}°C
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold capitalize text-foreground">
+                    {safeWeather.name} • {description} {advice.emoji}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {advice.text}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid w-full gap-3 sm:grid-cols-3 lg:max-w-xl">
+                <div className="rounded-2xl border border-border/60 bg-muted/25 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">Condition</p>
+                  <p className="mt-2 text-sm font-semibold capitalize text-foreground">{description}</p>
+                </div>
+                <div className="rounded-2xl border border-border/60 bg-muted/25 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">Drying</p>
+                  <p className="mt-2 text-sm font-semibold text-foreground">{advice.emoji} {advice.text}</p>
+                </div>
+                <div className="rounded-2xl border border-border/60 bg-muted/25 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">Source</p>
+                  <p className="mt-2 text-sm font-semibold text-foreground">{geoError ? 'Default location' : 'Live location'}</p>
+                </div>
+              </div>
             </div>
-            <div className="mt-1 flex flex-col gap-0.5">
-              <p className="truncate text-xs font-semibold capitalize text-foreground">
-                {safeWeather.name} • {description} {advice.emoji}
-              </p>
-              <p className="truncate text-[10px] text-muted-foreground">
-                💡 {advice.text}
-              </p>
-              {geoError ? (
-                <p className="truncate text-[10px] text-muted-foreground">{geoError}</p>
-              ) : null}
+
+            <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+              {geoError ?? `Using live weather for ${safeWeather.name}. Ideal for quick garment drying decisions.`}
             </div>
           </>
         )}

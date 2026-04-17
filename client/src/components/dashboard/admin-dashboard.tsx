@@ -178,7 +178,7 @@ export default function AdminDashboard() {
     const recentOrders: any[] = useMemo(() => {
         return filteredOrders
             .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-            .slice(0, 5)
+            .slice(0, 10)
             .map((order: any) => ({
                 id: order.id,
                 orderNumber: order.orderNumber,
@@ -453,7 +453,7 @@ export default function AdminDashboard() {
             <DashboardQuickActions />
 
             {/* Orders created today, Due Today & Recent Orders */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:auto-rows-fr xl:grid-cols-3">
                 <DashboardOrdersByDate />
                 <DashboardDueToday
                     orders={dueTodayOrders}
@@ -466,11 +466,11 @@ export default function AdminDashboard() {
             </div>
 
             {/* Customer growth insight */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <div className="xl:col-span-1">
+            <div className="grid grid-cols-1 gap-6 2xl:auto-rows-fr 2xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.35fr)]">
+                <div className="h-full">
                     <DashboardNewCustomers />
                 </div>
-                <div className="xl:col-span-2">
+                <div className="h-full">
                     <WeatherWidget />
                 </div>
             </div>

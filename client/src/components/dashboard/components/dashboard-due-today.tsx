@@ -111,15 +111,14 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
     return dateA - dateB;
   });
 
-  const displayOrders = sortedOrders.slice(0, 5);
   const isToday = isSameDay(selectedDate, new Date());
 
   return (
     <Card
       data-testid={getTestId(TEST_IDS.DASHBOARD.WIDGET, 'due-today')}
-      className="h-full overflow-hidden border-border bg-card shadow-sm"
+      className="flex h-full min-h-[24rem] flex-col overflow-hidden border-border bg-card shadow-sm sm:min-h-[28rem]"
     >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border pb-3">
+      <CardHeader className="flex flex-col gap-3 space-y-0 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
           <Clock className="h-5 w-5 text-primary" />
           {isToday ? 'Due Today' : `Due: ${format(selectedDate, 'MMM d')}`}
@@ -128,7 +127,7 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
           </Badge>
         </CardTitle>
 
-        <div className="flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1 self-end sm:ml-0 sm:self-auto">
           <Button
             variant="ghost"
             size="icon"
@@ -173,16 +172,16 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 overflow-auto pt-4">
+      <CardContent className="flex min-h-0 flex-1 flex-col pt-4">
         {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-16 w-full" />
             <Skeleton className="h-16 w-full" />
             <Skeleton className="h-16 w-full" />
           </div>
-        ) : displayOrders.length === 0 ? (
+        ) : sortedOrders.length === 0 ? (
           <div
-            className="flex flex-col items-center justify-center h-full py-8 text-muted-foreground"
+            className="flex h-full flex-1 flex-col items-center justify-center py-8 text-muted-foreground"
             data-testid={getTestId(TEST_IDS.DATA.EMPTY, 'due-today-orders')}
           >
             <CheckCircle className="h-12 w-12 mb-4 text-green-500/50" />
@@ -190,8 +189,8 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
             <p className="text-sm">Great job staying on top of things.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {displayOrders.map((order: any, index: number) => {
+          <div className="scrollbar-thin min-h-0 flex-1 space-y-3 overflow-y-auto pr-1 sm:pr-2">
+            {sortedOrders.map((order: any, index: number) => {
               const hoursLeft = calculateHoursLeft(order.dueDate || order.pickupDate);
               const urgencyColor = getUrgencyColor(hoursLeft);
               const urgencyIcon = getUrgencyIcon(hoursLeft);
@@ -200,35 +199,49 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
               return (
                 <div
                   key={order.id || index}
-                  className="group flex cursor-pointer flex-col rounded-2xl border border-border bg-muted/20 p-4 transition-all hover:bg-muted/40 hover:shadow-md"
+                  className="group flex cursor-pointer flex-col gap-3 rounded-2xl border border-border bg-muted/20 p-4 transition-all hover:bg-muted/40 hover:shadow-md"
                   onClick={() => setLocation(`/orders/${order.id}`)}
                   data-testid={getTestId(TEST_IDS.DATA.ITEM, `due-order-${order.id || index}`)}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="truncate text-sm font-bold text-foreground">
-                        {order.customerName || order.customer?.name || 'Unknown'}
-                      </span>
-                      <Badge
-                        variant="secondary"
-                        className={cn("text-[10px] px-2 py-0.5 h-5 font-bold uppercase tracking-tight", urgencyColor)}
-                      >
-                        <span className="flex items-center gap-1">
-                          {urgencyIcon}
-                          {urgencyText}
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="truncate text-sm font-bold text-foreground">
+                          {order.customerName || order.customer?.name || 'Unknown'}
                         </span>
-                      </Badge>
+                        <Badge
+                          variant="secondary"
+                          className={cn("h-5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-tight", urgencyColor)}
+                        >
+                          <span className="flex items-center gap-1">
+                            {urgencyIcon}
+                            {urgencyText}
+                          </span>
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+                        <span className="rounded-md bg-muted px-2 py-1 font-mono text-[10px] text-primary/80">
+                          #{order.orderNumber || order.id?.slice(0, 8)}
+                        </span>
+                        <span className="hidden text-muted-foreground/40 sm:inline">•</span>
+                        <span className="line-clamp-2 min-w-0">{order.service || 'Service'}</span>
+                      </div>
                     </div>
-                    <span className="text-base font-black text-foreground tabular-nums">
-                      {formatCurrency(order.totalAmount || order.total || 0)}
-                    </span>
+
+                    <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end sm:text-right">
+                      <span className="text-base font-black text-foreground tabular-nums">
+                        {formatCurrency(order.totalAmount || order.total || 0)}
+                      </span>
+                      <span className="rounded-full bg-background px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        {format(new Date(order.dueDate || order.pickupDate), 'dd MMM, hh:mm a')}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex items-center justify-between gap-3 pt-2 border-t border-border/30">
-                    <div className="flex min-w-0 items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                      <span className="font-mono text-primary/70">#{order.orderNumber || order.id?.slice(0, 8)}</span>
-                      <span>•</span>
-                      <span className="truncate">{order.service || 'Service'}</span>
+                  <div className="flex items-center justify-between gap-3 border-t border-border/30 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span>{hoursLeft <= 0 ? 'Needs action now' : 'Due window active'}</span>
                     </div>
 
                     {hoursLeft <= 24 && (
@@ -246,16 +259,6 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
                 </div>
               );
             })}
-
-            {dueOrders.length > 5 && (
-              <Button
-                variant="ghost"
-                className="w-full text-xs h-8 mt-2"
-                onClick={() => setLocation('/orders')}
-              >
-                View {dueOrders.length - 5} more orders
-              </Button>
-            )}
           </div>
         )}
       </CardContent>
