@@ -37,6 +37,8 @@ export interface PreparedThermalTag {
   billFontMm: number;
   customerText: string;
   branchText: string;
+  pieceText?: string;
+  pieceFontMm?: number;
   serviceText: string;
   noteText: string;
   hasNote: boolean;
@@ -231,6 +233,123 @@ const formatCompactServiceDisplay = (serviceName?: string) => {
 const formatCompactNoteDisplay = (value?: string) =>
   normalizeWhitespace(value, '');
 
+const TAG_BUNDLE_SIZE_PATTERNS: RegExp[] = [
+  /\b(?:set|combo|pack|bundle)\s*(?:of)?\s*(\d{1,2})\b/i,
+  /\b(\d{1,2})\s*(?:pc|pcs|piece|pieces|item|items)\b/i,
+];
+
+const TAG_BUNDLE_HINT_PATTERN = /\b(?:set|combo|pack|bundle|pair|pcs?|pieces?)\b/i;
+const TAG_COMPONENT_KEYWORDS = [
+  'top',
+  'bottom',
+  'dupatta',
+  'kurti',
+  'kurta',
+  'pant',
+  'pants',
+  'palazzo',
+  'legging',
+  'leggings',
+  'salwar',
+  'churidar',
+  'chudidar',
+  'kameez',
+  'blouse',
+  'skirt',
+  'lehenga',
+  'jacket',
+  'shawl',
+  'stole',
+  'inner',
+];
+
+const normalizeComponentToken = (value: string) => {
+  const normalized = normalizeWhitespace(value, '')
+    .replace(/^[-–—/+,.\s]+|[-–—/+,.\s]+$/g, '')
+    .replace(/\s+/g, ' ');
+
+  if (!normalized) return '';
+
+  const lower = normalized.toLowerCase();
+  if (lower === 'pants') return 'Pant';
+  if (lower === 'leggings') return 'Legging';
+
+  return normalized
+    .split(' ')
+    .map((part) => part ? part[0].toUpperCase() + part.slice(1).toLowerCase() : '')
+    .join(' ');
+};
+
+const extractBundleComponentInfo = (serviceName?: string) => {
+  const normalized = normalizeWhitespace(serviceName, '');
+  const match = normalized.match(/^(.*?)\s*\(([^()]+)\)\s*["']?\s*$/);
+  const baseServiceName = normalizeWhitespace(match?.[1] || normalized, 'SERVICE');
+  const componentText = normalizeWhitespace(match?.[2], '');
+
+  if (!componentText) {
+    return { baseServiceName, components: [] as string[] };
+  }
+
+  const rawComponents = componentText
+    .split(/[,/&+]/)
+    .map((part) => normalizeComponentToken(part))
+    .filter(Boolean);
+
+  if (rawComponents.length < 2) {
+    return { baseServiceName, components: [] as string[] };
+  }
+
+  const hasBundleHint = TAG_BUNDLE_HINT_PATTERN.test(normalized);
+  const keywordMatches = rawComponents.filter((part) => {
+    const lower = part.toLowerCase();
+    return TAG_COMPONENT_KEYWORDS.some((keyword) => lower.includes(keyword));
+  }).length;
+
+  if (!hasBundleHint && keywordMatches < Math.max(2, rawComponents.length - 1)) {
+    return { baseServiceName, components: [] as string[] };
+  }
+
+  return { baseServiceName, components: Array.from(new Set(rawComponents)) };
+};
+
+const inferTagBundleSize = (serviceName?: string) => {
+  const { components } = extractBundleComponentInfo(serviceName);
+  if (components.length > 1) {
+    return components.length;
+  }
+
+  const normalized = normalizeWhitespace(serviceName, '');
+
+  for (const pattern of TAG_BUNDLE_SIZE_PATTERNS) {
+    const match = normalized.match(pattern);
+    const parsed = Number(match?.[1]);
+    if (Number.isInteger(parsed) && parsed > 1) {
+      return parsed;
+    }
+  }
+
+  return 1;
+};
+
+const buildBundlePieceSequence = (serviceName: string | undefined, quantity: number) => {
+  const { baseServiceName, components } = extractBundleComponentInfo(serviceName);
+
+  if (components.length === 0) {
+    return {
+      baseServiceName,
+      pieceLabels: Array.from(
+        { length: inferTagBundleSize(serviceName) * quantity },
+        () => undefined as string | undefined
+      ),
+    };
+  }
+
+  return {
+    baseServiceName,
+    pieceLabels: Array.from({ length: quantity }, () => components).flat(),
+  };
+};
+
 const fitText = (
   value: string | undefined | null,
   fallback: string,
@@ -281,12 +400,28 @@ const selectBestServiceFit = (
     shrinkStepChars: number;
     shrinkFactor: number;
     maxCharsAtMin: number;
-  }
+  },
+  pieceLabel?: string
 ) => {
-  const candidates = Array.from(new Set([
-    formatCompactServiceDisplay(serviceName),
-    ...buildServiceCandidates(serviceName),
-  ]));
+  const { baseServiceName } = extractBundleComponentInfo(serviceName);
+  const normalizedPiece = pieceLabel ? normalizeText(pieceLabel, 'ITEM') : '';
+  const baseNormalized = normalizeServiceName(baseServiceName);
+  const basePrimary = baseNormalized.split(/[\/\s]+/).map((token) => token.trim()).filter(Boolean)[0] || 'SET';
+  const compactBase = formatCompactServiceDisplay(baseServiceName);
+
+  const candidates = normalizedPiece
+    ? Array.from(new Set([
+      normalizedPiece,
+      `${basePrimary}/${normalizedPiece}`,
+      `${basePrimary} ${normalizedPiece}`,
+      `${compactBase}/${normalizedPiece}`,
+      `${normalizedPiece} ${compactBase}`,
+      `${baseNormalized} ${normalizedPiece}`,
+    ].map((value) => normalizeWhitespace(value, '')).filter(Boolean)))
+    : Array.from(new Set([
+      formatCompactServiceDisplay(baseServiceName),
+      ...buildServiceCandidates(baseServiceName),
+    ]));
 
   let fallbackFit = fitText(candidates[0] || serviceName || 'SERVICE', 'SERVICE', config);
 
@@ -372,6 +507,8 @@ export const prepareThermalTags = ({
 
   return items.flatMap((item, itemIndex) => {
     const quantity = Math.max(1, Number(item.quantity) || 1);
+    const { baseServiceName, pieceLabels } = buildBundlePieceSequence(item.serviceName, quantity);
+    const totalTagCount = pieceLabels.length;
     const compactNoteText = formatCompactNoteDisplay(item.tagNote || commonNote || '');
     const noteFit = fitText(compactNoteText, '', {
       baseFontMm: 2.45,
@@ -382,7 +519,7 @@ export const prepareThermalTags = ({
       maxCharsAtMin: 140,
     });
     const hasNote = noteFit.text.length > 0;
-    const serviceFit = selectBestServiceFit(item.serviceName, hasNote
+    const serviceFitConfig = hasNote
       ? {
         baseFontMm: 3.95,
         minFontMm: 2.35,
@@ -398,26 +535,54 @@ export const prepareThermalTags = ({
         shrinkStepChars: 2,
         shrinkFactor: 0.2,
         maxCharsAtMin: 52,
-      });
+      };
 
-    return Array.from({ length: quantity }, (_, tagIndex) => ({
-      id: `${orderNumber}-${itemIndex}-${tagIndex}`,
-      shortOrderId,
-      shortOrderFontMm: shortOrderFit.fontSizeMm,
-      billText,
-      billFontMm: billFit.fontSizeMm,
-      customerText: customerFit.text,
-      branchText: branchFit.text,
-      serviceText: serviceFit.text,
-      noteText: noteFit.text,
-      hasNote,
-      dueText,
-      countText: `${tagIndex + 1}/${quantity}`,
-      customerFontMm: customerFit.fontSizeMm,
-      branchFontMm: branchFit.fontSizeMm,
-      serviceFontMm: serviceFit.fontSizeMm,
-      noteFontMm: noteFit.fontSizeMm,
-    }));
+    return pieceLabels.map((pieceLabel, tagIndex) => {
+      const pieceFit = pieceLabel
+        ? fitUppercaseText(pieceLabel, pieceLabel, {
+          baseFontMm: hasNote ? 2.55 : 2.9,
+          minFontMm: 1.95,
+          shrinkStart: 10,
+          shrinkStepChars: 2,
+          shrinkFactor: 0.12,
+          maxCharsAtMin: 22,
+        })
+        : null;
+      const serviceFit = selectBestServiceFit(
+        baseServiceName,
+        pieceLabel
+          ? {
+            baseFontMm: hasNote ? 4.15 : 4.55,
+            minFontMm: 2.45,
+            shrinkStart: 10,
+            shrinkStepChars: 2,
+            shrinkFactor: 0.18,
+            maxCharsAtMin: 34,
+          }
+          : serviceFitConfig
+      );
+
+      return {
+        id: `${orderNumber}-${itemIndex}-${tagIndex}`,
+        shortOrderId,
+        shortOrderFontMm: shortOrderFit.fontSizeMm,
+        billText,
+        billFontMm: billFit.fontSizeMm,
+        customerText: customerFit.text,
+        branchText: branchFit.text,
+        pieceText: pieceFit?.text,
+        pieceFontMm: pieceFit?.fontSizeMm,
+        serviceText: serviceFit.text,
+        noteText: noteFit.text,
+        hasNote,
+        dueText,
+        countText: `${tagIndex + 1}/${totalTagCount}`,
+        customerFontMm: customerFit.fontSizeMm,
+        branchFontMm: branchFit.fontSizeMm,
+        serviceFontMm: serviceFit.fontSizeMm,
+        noteFontMm: noteFit.fontSizeMm,
+      };
+    });
   });
 };
 
@@ -574,6 +739,45 @@ export const getThermalTagPrintStyles = (pageHeightMm: number) => `
     line-height: 0.8;
   }
 
+  .service-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.18mm;
+    min-height: 0;
+  }
+
+  .piece-line {
+    font-weight: 700;
+    line-height: 0.82;
+    letter-spacing: 0.012mm;
+    white-space: normal;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    text-transform: uppercase;
+  }
+
+  .service-subline {
+    font-weight: 900;
+    line-height: 0.84;
+    letter-spacing: 0.015mm;
+    white-space: normal;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    text-transform: uppercase;
+  }
+
+  .tag-body--no-note .service-subline {
+    -webkit-line-clamp: 2;
+  }
+
   .note-line {
     font-weight: 700;
     line-height: 0.88;
@@ -662,7 +866,13 @@ export const buildThermalTagPrintHtml = (tags: PreparedThermalTag[], title: stri
       </div>
       <div class="customer-line" style="font-size:${tag.customerFontMm}mm;">${escapeHtml(tag.customerText)}</div>
       <div class="tag-body ${tag.hasNote ? 'tag-body--with-note' : 'tag-body--no-note'}">
-        <div class="service-line" style="font-size:${tag.serviceFontMm}mm;">${escapeHtml(tag.serviceText)}</div>
+        ${tag.pieceText
+          ? `<div class="service-stack">
+              <div class="service-subline" style="font-size:${tag.serviceFontMm}mm;">${escapeHtml(tag.serviceText)}</div>
+              <div class="piece-line" style="font-size:${tag.pieceFontMm ?? tag.serviceFontMm}mm;">${escapeHtml(tag.pieceText)}</div>
+            </div>`
+          : `<div class="service-line" style="font-size:${tag.serviceFontMm}mm;">${escapeHtml(tag.serviceText)}</div>`
+        }
         ${tag.hasNote ? `<div class="note-line" style="font-size:${tag.noteFontMm}mm;">${escapeHtml(tag.noteText)}</div>` : ''}
       </div>
       <div class="tag-footer">
@@ -802,24 +1012,72 @@ export function ThermalTagLabel({ tag }: { tag: PreparedThermalTag }) {
           borderRadius: '0.95mm',
         }}
       >
-        <div
-          style={{
-            fontSize: `${tag.serviceFontMm}mm`,
-            fontWeight: 900,
-            lineHeight: tag.hasNote ? 0.84 : 0.82,
-            letterSpacing: '0.015mm',
-            whiteSpace: 'normal',
-            overflow: 'hidden',
-            overflowWrap: 'anywhere',
-            wordBreak: 'break-word',
-            display: '-webkit-box',
-            WebkitBoxOrient: 'vertical',
-            WebkitLineClamp: tag.hasNote ? 2 : 3,
-            textTransform: 'uppercase',
-          }}
-        >
-          {tag.serviceText}
-        </div>
+        {tag.pieceText ? (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.18mm',
+              minHeight: 0,
+            }}
+          >
+            <div
+              style={{
+                fontSize: `${tag.serviceFontMm}mm`,
+                fontWeight: 900,
+                lineHeight: 0.84,
+                letterSpacing: '0.015mm',
+                whiteSpace: 'normal',
+                overflow: 'hidden',
+                overflowWrap: 'anywhere',
+                wordBreak: 'break-word',
+                display: '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: 2,
+                textTransform: 'uppercase',
+              }}
+            >
+              {tag.serviceText}
+            </div>
+            <div
+              style={{
+                fontSize: `${tag.pieceFontMm ?? tag.serviceFontMm}mm`,
+                fontWeight: 700,
+                lineHeight: 0.82,
+                letterSpacing: '0.012mm',
+                whiteSpace: 'normal',
+                overflow: 'hidden',
+                overflowWrap: 'anywhere',
+                wordBreak: 'break-word',
+                display: '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: 2,
+                textTransform: 'uppercase',
+              }}
+            >
+              {tag.pieceText}
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              fontSize: `${tag.serviceFontMm}mm`,
+              fontWeight: 900,
+              lineHeight: tag.hasNote ? 0.84 : 0.82,
+              letterSpacing: '0.015mm',
+              whiteSpace: 'normal',
+              overflow: 'hidden',
+              overflowWrap: 'anywhere',
+              wordBreak: 'break-word',
+              display: '-webkit-box',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: tag.hasNote ? 2 : 3,
+              textTransform: 'uppercase',
+            }}
+          >
+            {tag.serviceText}
+          </div>
+        )}
         {tag.hasNote && (
           <div
             style={{
