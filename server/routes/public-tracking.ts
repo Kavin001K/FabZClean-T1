@@ -4,6 +4,29 @@ import { createErrorResponse, createSuccessResponse } from "../services/serializ
 
 const router = Router();
 
+const normalizeOrderLookupValue = (value: unknown) =>
+    String(value || '')
+        .trim()
+        .replace(/^#/, '')
+        .toLowerCase();
+
+const rankTrackedOrderMatch = (order: any, searchTerm: string) => {
+    const storedOrderNum = normalizeOrderLookupValue(order?.orderNumber || order?.order_number);
+    const storedId = normalizeOrderLookupValue(order?.id);
+
+    if (!storedOrderNum && !storedId) {
+        return Number.POSITIVE_INFINITY;
+    }
+
+    if (storedOrderNum === searchTerm || storedId === searchTerm) return 0;
+    if (storedOrderNum === `fzc-${searchTerm}` || searchTerm === `fzc-${storedOrderNum}`) return 1;
+    if (storedOrderNum.endsWith(searchTerm) || searchTerm.endsWith(storedOrderNum)) return 2;
+    if (storedOrderNum.includes(searchTerm)) return 3;
+    if (searchTerm.includes(storedOrderNum)) return 4;
+
+    return Number.POSITIVE_INFINITY;
+};
+
 /**
  * Public Order Tracking API
  * No authentication required - allows customers to track their orders
@@ -14,6 +37,10 @@ router.get('/track/:orderNumber', async (req, res) => {
     try {
         const { orderNumber } = req.params;
 
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+
         if (!orderNumber) {
             return res.status(400).json(createErrorResponse('Order number is required', 400));
         }
@@ -21,31 +48,24 @@ router.get('/track/:orderNumber', async (req, res) => {
         console.log(`[Track] Looking up order: ${orderNumber}`);
 
         // Normalize the search term - remove hash prefix, trim whitespace
-        const searchTerm = orderNumber.trim().replace(/^#/, '').toLowerCase();
+        const searchTerm = normalizeOrderLookupValue(orderNumber);
 
         // Find order by order number (flexible matching)
         const orders = await storage.listOrders();
         console.log(`[Track] Fetched ${orders?.length || 0} orders from database`);
 
-        const order = orders.find((o: any) => {
-            // Handle both camelCase and snake_case field names (for Supabase compatibility)
-            const storedOrderNum = (o.orderNumber || o.order_number || '').toString().trim().replace(/^#/, '').toLowerCase();
-            const storedId = (o.id || '').toLowerCase();
+        const rankedMatches = orders
+            .map((o: any) => ({ order: o, rank: rankTrackedOrderMatch(o, searchTerm) }))
+            .filter((entry) => Number.isFinite(entry.rank))
+            .sort((a, b) => {
+                if (a.rank !== b.rank) return a.rank - b.rank;
 
-            // Check various matching conditions
-            return (
-                // Exact match (case insensitive)
-                storedOrderNum === searchTerm ||
-                // Match by ID
-                storedId === searchTerm ||
-                // Match with FZC prefix variations
-                storedOrderNum === `fzc-${searchTerm}` ||
-                searchTerm === `fzc-${storedOrderNum}` ||
-                // Partial match (order number contains search term)
-                storedOrderNum.includes(searchTerm) ||
-                searchTerm.includes(storedOrderNum)
-            );
-        });
+                const aUpdated = new Date(a.order?.updatedAt || a.order?.updated_at || a.order?.createdAt || a.order?.created_at || 0).getTime();
+                const bUpdated = new Date(b.order?.updatedAt || b.order?.updated_at || b.order?.createdAt || b.order?.created_at || 0).getTime();
+                return bUpdated - aUpdated;
+            });
+
+        const order = rankedMatches[0]?.order;
 
         if (!order) {
             console.log(`[Track] Order not found for: ${orderNumber}`);

@@ -61,6 +61,7 @@ const safeParseFloat = (val: any) => {
 };
 
 const toDateOnly = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate());
+const DEFAULT_DUE_DATE_OFFSET_DAYS = 15;
 
 const toOrderCreatedAt = (value: Date) =>
   new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate(), 12, 0, 0)).toISOString();
@@ -693,12 +694,13 @@ export default function CreateOrder() {
     }
   }, [lastAddedInstanceKey, selectedServices]);
 
-  // Auto-set due date: 2 days for express, 7 days for regular
+  // Auto-set due date: 15 days from the selected order creation date
   useEffect(() => {
-    const daysToAdd = isExpressOrder ? 2 : 7;
-    const dueDate = new Date(toDateOnly(billDate).getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+    const dueDate = new Date(
+      toDateOnly(billDate).getTime() + DEFAULT_DUE_DATE_OFFSET_DAYS * 24 * 60 * 60 * 1000
+    );
     setPickupDate(dueDate);
-  }, [billDate, isExpressOrder]);
+  }, [billDate]);
 
   // Mutation for updating order status from history
   const updateOrderStatusMutation = useMutation({
@@ -1841,6 +1843,9 @@ export default function CreateOrder() {
                       />
                     </PopoverContent>
                   </Popover>
+                  <p className="text-xs text-muted-foreground">
+                    Default is 15 days from the order date.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="specialInstructions" className="text-slate-700 dark:text-slate-300">Special Instructions</Label>

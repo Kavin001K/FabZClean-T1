@@ -1,1180 +1,1285 @@
-import { useState, useEffect, useRef, TouchEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'wouter';
+import type { LucideIcon } from 'lucide-react';
 import {
-    Search,
-    Package,
-    Truck,
-    CheckCircle2,
-    Clock,
-    Phone,
-    MessageCircle,
-    Calendar,
-    CreditCard,
-    ArrowRight,
-    Sparkles,
-    Factory,
-    Home,
-    Star,
-    Shield,
-    Zap,
-    PartyPopper,
-    Timer,
-    MapPin,
-    Info,
-    ChevronDown,
-    ChevronUp,
-    Bell,
-    Shirt,
-    Droplets,
-    Wind,
-    RefreshCw,
-    ExternalLink,
-    X,
-    ChevronLeft,
-    ChevronRight,
-    Download,
-    FileText
+  ArrowRight,
+  Bell,
+  CalendarDays,
+  Check,
+  CheckCheck,
+  CheckCircle2,
+  CircleOff,
+  CreditCard,
+  ExternalLink,
+  Factory,
+  FileText,
+  Home,
+  MessageCircle,
+  Package,
+  Phone,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Shirt,
+  Store,
+  Timer,
+  Truck,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
-// Mobile detection hook
-const useIsMobile = () => {
-    const [isMobile, setIsMobile] = useState(false);
-
-    useEffect(() => {
-        const checkMobile = () => {
-            setIsMobile(window.innerWidth < 768 || 'ontouchstart' in window);
-        };
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, []);
-
-    return isMobile;
-};
-
-// SEO and Mobile Meta Tags Hook
-const useTrackingSEO = () => {
-    useEffect(() => {
-        document.title = "Track Your Order | Fab Clean - Premium Laundry Services";
-
-        // Ensure viewport meta is set for mobile
-        let viewport = document.querySelector('meta[name="viewport"]') as HTMLMetaElement;
-        if (!viewport) {
-            viewport = document.createElement('meta');
-            viewport.name = 'viewport';
-            document.head.appendChild(viewport);
-        }
-        viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
-
-        // Add theme color for mobile browsers
-        let themeColor = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement;
-        if (!themeColor) {
-            themeColor = document.createElement('meta');
-            themeColor.name = 'theme-color';
-            document.head.appendChild(themeColor);
-        }
-        themeColor.content = '#10b981';
-
-        // Add apple mobile web app capable
-        let appleMeta = document.querySelector('meta[name="apple-mobile-web-app-capable"]') as HTMLMetaElement;
-        if (!appleMeta) {
-            appleMeta = document.createElement('meta');
-            appleMeta.name = 'apple-mobile-web-app-capable';
-            appleMeta.content = 'yes';
-            document.head.appendChild(appleMeta);
-        }
-
-        const style = document.createElement('style');
-        style.id = 'tracking-styles';
-        style.textContent = `
-            @keyframes shimmer {
-                0% { background-position: -200% 0; }
-                100% { background-position: 200% 0; }
-            }
-            @keyframes float {
-                0%, 100% { transform: translateY(0); }
-                50% { transform: translateY(-5px); }
-            }
-            @keyframes slide-up {
-                0% { transform: translateY(20px); opacity: 0; }
-                100% { transform: translateY(0); opacity: 1; }
-            }
-            @keyframes slide-up-mobile {
-                0% { transform: translateY(10px); opacity: 0; }
-                100% { transform: translateY(0); opacity: 1; }
-            }
-            @keyframes bounce-in {
-                0% { transform: scale(0.5); opacity: 0; }
-                70% { transform: scale(1.05); }
-                100% { transform: scale(1); opacity: 1; }
-            }
-            @keyframes gradient-x {
-                0%, 100% { background-position: 0% 50%; }
-                50% { background-position: 100% 50%; }
-            }
-            @keyframes pulse-soft {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.7; }
-            }
-            @keyframes confetti {
-                0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-                100% { transform: translateY(80px) rotate(720deg); opacity: 0; }
-            }
-            .animate-shimmer {
-                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-                background-size: 200% 100%;
-                animation: shimmer 2s infinite;
-            }
-            .animate-float { animation: float 3s ease-in-out infinite; }
-            .animate-slide-up { animation: slide-up 0.4s ease-out forwards; }
-            .animate-bounce-in { animation: bounce-in 0.4s ease-out forwards; }
-            .animate-gradient { 
-                background-size: 200% 200%;
-                animation: gradient-x 4s ease infinite;
-            }
-            .animate-pulse-soft { animation: pulse-soft 2s ease-in-out infinite; }
-            
-            /* Mobile optimizations */
-            @media (max-width: 767px) {
-                .animate-slide-up { animation: slide-up-mobile 0.3s ease-out forwards; }
-                .animate-float { animation: float 4s ease-in-out infinite; }
-            }
-            
-            /* Touch-friendly tap targets */
-            .touch-target {
-                min-height: 44px;
-                min-width: 44px;
-            }
-            
-            /* Safe area padding for notched devices */
-            .safe-area-bottom {
-                padding-bottom: env(safe-area-inset-bottom, 16px);
-            }
-            .safe-area-top {
-                padding-top: env(safe-area-inset-top, 0px);
-            }
-            
-            /* Smooth scrolling */
-            html {
-                scroll-behavior: smooth;
-                -webkit-overflow-scrolling: touch;
-            }
-            
-            /* Hide scrollbar on mobile */
-            .hide-scrollbar::-webkit-scrollbar {
-                display: none;
-            }
-            .hide-scrollbar {
-                -ms-overflow-style: none;
-                scrollbar-width: none;
-            }
-            
-            /* Bottom sheet styles */
-            .bottom-sheet {
-                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            }
-            .bottom-sheet-backdrop {
-                transition: opacity 0.3s ease;
-            }
-        `;
-        document.head.appendChild(style);
-
-        return () => {
-            document.title = "Fab Clean - Premium Laundry & Dry Cleaning";
-            const existingStyle = document.getElementById('tracking-styles');
-            if (existingStyle) existingStyle.remove();
-        };
-    }, []);
-};
-
 interface OrderItem {
-    serviceName: string;
-    quantity: number;
-    price: string | number;
+  serviceName: string;
+  quantity: number;
+  price: string | number;
 }
 
 interface Order {
-    id: string;
-    orderNumber: string;
-    customerName: string;
-    status: string;
-    paymentStatus: string;
-    totalAmount: string;
-    items: OrderItem[];
-    fulfillmentType: string;
-    createdAt: string;
-    updatedAt: string;
-    pickupDate?: string;
-    invoiceUrl?: string;
-    lastWhatsappStatus?: string;
-    lastWhatsappSentAt?: string;
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  status: string;
+  paymentStatus: string;
+  totalAmount: string;
+  items: OrderItem[];
+  fulfillmentType: string;
+  createdAt: string;
+  updatedAt: string;
+  pickupDate?: string;
+  invoiceUrl?: string | null;
+  lastWhatsappStatus?: string;
+  lastWhatsappSentAt?: string;
 }
 
-// Status step configuration
-// Status step configuration template - base for mapping
-const STATUS_META = {
-    pending: {
-        id: 'pending',
-        label: 'Placed',
-        fullLabel: 'Order Placed',
-        icon: Package,
-        emoji: '📦',
-        color: 'from-amber-400 to-orange-500',
-        bgColor: 'bg-amber-50',
-        textColor: 'text-amber-700',
-        borderColor: 'border-amber-200',
-        description: 'Order received',
-        detailedInfo: 'We have received your order and are preparing to process it.',
-        estimatedTime: '~30 mins'
-    },
-    processing: {
-        id: 'processing',
-        label: 'Process',
-        fullLabel: 'In Process',
-        icon: Factory,
-        emoji: '🧺',
-        color: 'from-blue-400 to-indigo-500',
-        bgColor: 'bg-blue-50',
-        textColor: 'text-blue-700',
-        borderColor: 'border-blue-200',
-        description: 'Cleaning in progress',
-        detailedInfo: 'Our experts are carefully handling your garments with premium care.',
-        estimatedTime: '24-48 hrs'
-    },
-    ready_for_pickup: {
-        id: 'ready_for_pickup',
-        label: 'Ready',
-        fullLabel: 'Ready for Pickup',
-        icon: CheckCircle2,
-        emoji: '✨',
-        color: 'from-emerald-400 to-green-500',
-        bgColor: 'bg-emerald-50',
-        textColor: 'text-emerald-700',
-        borderColor: 'border-emerald-200',
-        description: 'Ready for pickup',
-        detailedInfo: 'Your freshly cleaned items are ready and waiting for you!',
-        estimatedTime: 'Ready now!'
-    },
-    out_for_delivery: {
-        id: 'out_for_delivery',
-        label: 'On Way',
-        fullLabel: 'Out for Delivery',
-        icon: Truck,
-        emoji: '🚚',
-        color: 'from-purple-400 to-violet-500',
-        bgColor: 'bg-purple-50',
-        textColor: 'text-purple-700',
-        borderColor: 'border-purple-200',
-        description: 'Out for delivery',
-        detailedInfo: 'Your order is on its way! Our delivery partner will reach you shortly.',
-        estimatedTime: '30-60 mins'
-    },
-    completed: {
-        id: 'completed',
-        label: 'Done',
-        fullLabel: 'Completed',
-        icon: PartyPopper,
-        emoji: '🎉',
-        color: 'from-green-400 to-emerald-500',
-        bgColor: 'bg-green-50',
-        textColor: 'text-green-700',
-        borderColor: 'border-green-200',
-        description: 'Order completed!',
-        detailedInfo: 'Your order has been finished successfully. Thank you for choosing Fab Clean!',
-        estimatedTime: 'Done'
-    },
+interface TrackingStep {
+  id: string;
+  shortLabel: string;
+  title: string;
+  detail: string;
+  eta: string;
+  icon: LucideIcon;
+  tone: string;
+  surface: string;
+  border: string;
+  text: string;
+}
+
+const SUPPORT_PHONE = '+919363059595';
+
+const TRACKING_META: Record<string, TrackingStep> = {
+  pending: {
+    id: 'pending',
+    shortLabel: 'Placed',
+    title: 'Order Placed',
+    detail: 'Your order has been received and queued for the care team.',
+    eta: 'Verification in progress',
+    icon: Package,
+    tone: 'from-amber-400 via-orange-400 to-amber-500',
+    surface: 'bg-amber-50/90',
+    border: 'border-amber-200/80',
+    text: 'text-amber-700',
+  },
+  processing: {
+    id: 'processing',
+    shortLabel: 'In Care',
+    title: 'In Process',
+    detail: 'Garments are being cleaned and quality checked.',
+    eta: 'Usually 24 to 48 hours',
+    icon: Factory,
+    tone: 'from-[#0f766e] via-[#14b8a6] to-[#84cc16]',
+    surface: 'bg-emerald-50/90',
+    border: 'border-emerald-200/80',
+    text: 'text-emerald-700',
+  },
+  ready_for_pickup: {
+    id: 'ready_for_pickup',
+    shortLabel: 'Ready',
+    title: 'Ready for Pickup',
+    detail: 'Your order is ready at the store and can be collected anytime during working hours.',
+    eta: 'Ready now',
+    icon: Store,
+    tone: 'from-emerald-500 via-green-500 to-teal-500',
+    surface: 'bg-emerald-50/90',
+    border: 'border-emerald-200/80',
+    text: 'text-emerald-700',
+  },
+  out_for_delivery: {
+    id: 'out_for_delivery',
+    shortLabel: 'On Route',
+    title: 'Out for Delivery',
+    detail: 'The delivery team is on the way with your order.',
+    eta: 'Approaching delivery',
+    icon: Truck,
+    tone: 'from-[#f59e0b] via-[#f97316] to-[#fb7185]',
+    surface: 'bg-orange-50/90',
+    border: 'border-orange-200/80',
+    text: 'text-orange-700',
+  },
+  completed: {
+    id: 'completed',
+    shortLabel: 'Done',
+    title: 'Completed',
+    detail: 'The order has been successfully handed over. Thank you for choosing Fab Clean.',
+    eta: 'Finished',
+    icon: CheckCircle2,
+    tone: 'from-emerald-500 via-lime-500 to-green-500',
+    surface: 'bg-green-50/90',
+    border: 'border-green-200/80',
+    text: 'text-green-700',
+  },
+  cancelled: {
+    id: 'cancelled',
+    shortLabel: 'Cancelled',
+    title: 'Order Cancelled',
+    detail: 'This order has been cancelled. Contact support if you need help.',
+    eta: 'No further processing',
+    icon: CircleOff,
+    tone: 'from-rose-500 via-orange-500 to-amber-500',
+    surface: 'bg-rose-50/90',
+    border: 'border-rose-200/80',
+    text: 'text-rose-700',
+  },
 };
 
-const getStatusStepsForFulfillment = (fulfillmentType?: string) => {
-    const isPickup = fulfillmentType === 'pickup' || fulfillmentType === 'store_pickup';
-    
-    // For pickup: Placed -> Process -> Ready -> Completed
-    if (isPickup) {
-        return [STATUS_META.pending, STATUS_META.processing, STATUS_META.ready_for_pickup, STATUS_META.completed];
+const STATUS_ALIAS: Record<string, keyof typeof TRACKING_META> = {
+  pending: 'pending',
+  received: 'pending',
+  orderplaced: 'pending',
+  new: 'pending',
+  processing: 'processing',
+  inprocess: 'processing',
+  inprogress: 'processing',
+  cleaning: 'processing',
+  ready: 'ready_for_pickup',
+  readyforpickup: 'ready_for_pickup',
+  readyforcollection: 'ready_for_pickup',
+  outfordelivery: 'out_for_delivery',
+  intransit: 'out_for_delivery',
+  dispatched: 'out_for_delivery',
+  shipping: 'out_for_delivery',
+  completed: 'completed',
+  delivered: 'completed',
+  done: 'completed',
+  finished: 'completed',
+  cancelled: 'cancelled',
+  canceled: 'cancelled',
+};
+
+const normalizeStatusKey = (status?: string) =>
+  STATUS_ALIAS[String(status || '').toLowerCase().replace(/[\s_-]/g, '')] || 'pending';
+
+const getStepsForFulfillment = (fulfillmentType?: string, status?: string) => {
+  if (normalizeStatusKey(status) === 'cancelled') {
+    return [TRACKING_META.pending, TRACKING_META.processing, TRACKING_META.cancelled];
+  }
+
+  const isPickup = fulfillmentType === 'pickup' || fulfillmentType === 'store_pickup';
+  return isPickup
+    ? [
+        TRACKING_META.pending,
+        TRACKING_META.processing,
+        TRACKING_META.ready_for_pickup,
+        TRACKING_META.completed,
+      ]
+    : [
+        TRACKING_META.pending,
+        TRACKING_META.processing,
+        TRACKING_META.out_for_delivery,
+        TRACKING_META.completed,
+      ];
+};
+
+const formatCurrency = (amount: string | number) => {
+  const value = typeof amount === 'number' ? amount : Number(amount);
+  return `₹${Number.isFinite(value) ? value.toLocaleString('en-IN') : '0'}`;
+};
+
+const formatDate = (value?: string) => {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+const formatDateTime = (value?: string) => {
+  if (!value) return 'Just now';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
+const toTitleCase = (value?: string) =>
+  String(value || 'Pending')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const getGreetingName = (value?: string) => {
+  const first = String(value || 'Guest').trim().split(/\s+/)[0];
+  return first || 'Guest';
+};
+
+const getPaymentBadgeClass = (status?: string) =>
+  status === 'paid'
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    : 'border-amber-200 bg-amber-50 text-amber-700';
+
+const getStatusBadgeClass = (step: TrackingStep) =>
+  cn(step.surface, step.border, step.text, 'border');
+
+function useTrackingMeta() {
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = 'Track Your Order | Fab Clean';
+
+    let themeMeta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+    const previousTheme = themeMeta?.content;
+    if (!themeMeta) {
+      themeMeta = document.createElement('meta');
+      themeMeta.name = 'theme-color';
+      document.head.appendChild(themeMeta);
     }
-    
-    // For delivery: Placed -> Process -> Out for Delivery -> Completed
-    return [STATUS_META.pending, STATUS_META.processing, STATUS_META.out_for_delivery, STATUS_META.completed];
-};
+    themeMeta.content = '#8ec63f';
 
-const getStatusIndexForSteps = (status: string, steps: any[]): number => {
-    const normalizedStatus = status?.toLowerCase().replace(/[\s-_]/g, '');
-    const statusMap: Record<string, string> = {
-        'pending': 'pending', 'received': 'pending', 'orderplaced': 'pending', 'new': 'pending',
-        'processing': 'processing', 'inprocess': 'processing', 'cleaning': 'processing', 'inprogress': 'processing',
-        'readyforpickup': 'ready_for_pickup', 'ready': 'ready_for_pickup', 'readyforcollection': 'ready_for_pickup',
-        'outfordelivery': 'out_for_delivery', 'intransit': 'out_for_delivery', 'shipping': 'out_for_delivery', 'dispatched': 'out_for_delivery',
-        'completed': 'completed', 'delivered': 'completed', 'done': 'completed', 'finished': 'completed',
+    return () => {
+      document.title = previousTitle;
+      if (themeMeta) {
+        if (previousTheme) {
+          themeMeta.content = previousTheme;
+        } else {
+          themeMeta.remove();
+        }
+      }
     };
-    
-    const baseId = statusMap[normalizedStatus] || 'pending';
-    const index = steps.findIndex(s => s.id === baseId);
-    
-    // If exact status not in steps (e.g., ready_for_pickup in a delivery flow), find nearest or return based on map
-    if (index === -1) {
-        if (baseId === 'ready_for_pickup' && steps.some(s => s.id === 'out_for_delivery')) return 1; // Show still in process or transition
-        if (baseId === 'out_for_delivery' && steps.some(s => s.id === 'ready_for_pickup')) return 2; // Show ready if somehow tracked here
-        return 0;
-    }
-    return index;
-};
+  }, []);
+}
 
-// Confetti component
-const Confetti = () => (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden z-50">
-        {[...Array(20)].map((_, i) => (
-            <div
-                key={i}
-                className="absolute w-2 h-2 md:w-3 md:h-3 rounded-sm"
-                style={{
-                    left: `${Math.random() * 100}%`,
-                    top: '-10px',
-                    backgroundColor: ['#10b981', '#f59e0b', '#6366f1', '#ec4899', '#06b6d4'][Math.floor(Math.random() * 5)],
-                    animation: `confetti ${1.5 + Math.random() * 1.5}s ease-out forwards`,
-                    animationDelay: `${Math.random() * 0.3}s`,
-                }}
-            />
-        ))}
-    </div>
-);
+function useTrackingMotion() {
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.id = 'public-tracking-motion';
+    style.textContent = `
+      @keyframes tracking-enter {
+        0% { opacity: 0; transform: translateY(16px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes tracking-sweep {
+        0% { transform: scaleX(0); opacity: 0.5; }
+        100% { transform: scaleX(1); opacity: 1; }
+      }
+      @keyframes tracking-pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(142, 198, 63, 0.14); }
+        60% { box-shadow: 0 0 0 14px rgba(142, 198, 63, 0); }
+      }
+      @keyframes tracking-float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-4px); }
+      }
+      @keyframes tracking-cancel {
+        0%, 100% { transform: translateY(0); }
+        25% { transform: translateY(-1px); }
+        50% { transform: translateY(1px); }
+        75% { transform: translateY(-1px); }
+      }
+      .tracking-enter {
+        animation: tracking-enter 420ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .tracking-sweep {
+        transform-origin: left center;
+        animation: tracking-sweep 720ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .tracking-pulse {
+        animation: tracking-pulse 1.8s ease-out infinite;
+      }
+      .tracking-float {
+        animation: tracking-float 4s ease-in-out infinite;
+      }
+      .tracking-cancel {
+        animation: tracking-cancel 1.2s ease-in-out infinite;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .tracking-enter,
+        .tracking-sweep,
+        .tracking-pulse,
+        .tracking-float,
+        .tracking-cancel {
+          animation: none !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
 
-// Mobile Bottom Sheet Component
-const BottomSheet = ({
-    isOpen,
-    onClose,
-    step,
-    isCurrent
+    return () => {
+      style.remove();
+    };
+  }, []);
+}
+
+function DesktopProgress({
+  steps,
+  currentStepIndex,
+  selectedStep,
+  onSelect,
+  statusKey,
 }: {
-    isOpen: boolean;
-    onClose: () => void;
-    step: any;
-    isCurrent: boolean;
-}) => {
-    if (!step) return null;
+  steps: TrackingStep[];
+  currentStepIndex: number;
+  selectedStep: number;
+  onSelect: (index: number) => void;
+  statusKey: string;
+}) {
+  const progressPercent = steps.length > 1 ? (currentStepIndex / (steps.length - 1)) * 100 : 0;
 
-    const StepIcon = step.icon;
+  return (
+    <div className="hidden md:block">
+      <div className="relative px-3 py-8">
+        <div
+          className="absolute top-[2.9rem] h-[3px] rounded-full bg-slate-200"
+          style={{ left: `${100 / (steps.length * 2)}%`, right: `${100 / (steps.length * 2)}%` }}
+        >
+          <div
+            className="tracking-sweep h-full rounded-full bg-gradient-to-r from-[#8ec63f] via-[#14b8a6] to-[#f59e0b] transition-all duration-700 ease-out"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
 
-    return (
-        <>
-            {/* Backdrop */}
-            <div
+        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
+          {steps.map((step, index) => {
+            const StepIcon = step.icon;
+            const isCurrent = index === currentStepIndex;
+            const isComplete = index < currentStepIndex;
+            const isSelected = index === selectedStep;
+
+            return (
+              <button
+                key={step.id}
+                type="button"
+                onClick={() => onSelect(index)}
                 className={cn(
-                    "fixed inset-0 bg-black/40 z-50 bottom-sheet-backdrop",
-                    isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+                  'group flex flex-col items-center gap-3 rounded-3xl px-3 py-2 text-center transition-all duration-300',
+                  isSelected && 'bg-white shadow-sm ring-1 ring-slate-200'
                 )}
-                onClick={onClose}
-            />
+              >
+                <div className="relative">
+                  {isCurrent && (
+                    <div className="absolute inset-0 rounded-full bg-emerald-400/20 blur-md transition-opacity duration-300" />
+                  )}
+                  <div
+                    className={cn(
+                      'relative flex h-14 w-14 items-center justify-center rounded-full border-4 transition-all duration-300',
+                      isComplete || isCurrent
+                        ? 'border-white bg-slate-900 text-white shadow-lg shadow-slate-900/10'
+                        : 'border-slate-200 bg-white text-slate-400',
+                      isCurrent && statusKey === 'cancelled' && 'tracking-cancel',
+                      isCurrent && statusKey !== 'cancelled' && 'tracking-pulse'
+                    )}
+                  >
+                    {isComplete ? <CheckCheck className="h-5 w-5" /> : <StepIcon className="h-5 w-5" />}
+                  </div>
+                </div>
 
-            {/* Sheet */}
-            <div
+                <div className="space-y-1">
+                  <p className={cn('text-sm font-semibold', isComplete || isCurrent ? 'text-slate-900' : 'text-slate-400')}>
+                    {step.title}
+                  </p>
+                  <p className="text-xs text-slate-500">{step.eta}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MobileProgress({
+  steps,
+  currentStepIndex,
+  selectedStep,
+  onSelect,
+  statusKey,
+}: {
+  steps: TrackingStep[];
+  currentStepIndex: number;
+  selectedStep: number;
+  onSelect: (index: number) => void;
+  statusKey: string;
+}) {
+  return (
+    <div className="space-y-3 md:hidden">
+      {steps.map((step, index) => {
+        const StepIcon = step.icon;
+        const isCurrent = index === currentStepIndex;
+        const isComplete = index < currentStepIndex;
+        const isSelected = index === selectedStep;
+
+        return (
+          <button
+            key={step.id}
+            type="button"
+            onClick={() => onSelect(index)}
+            className={cn(
+              'relative flex w-full items-start gap-3 rounded-3xl border p-4 text-left transition-all duration-300',
+              isSelected ? 'border-slate-300 bg-white shadow-sm' : 'border-slate-200/80 bg-white/80',
+              isCurrent && 'ring-2 ring-emerald-200'
+            )}
+          >
+            {index !== steps.length - 1 && (
+              <div
                 className={cn(
-                    "fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl z-50 bottom-sheet safe-area-bottom",
-                    isOpen ? "translate-y-0" : "translate-y-full"
+                  'absolute left-[1.72rem] top-14 h-[calc(100%-2.5rem)] w-px',
+                  index < currentStepIndex ? 'bg-emerald-400' : 'bg-slate-200'
                 )}
+              />
+            )}
+
+            <div
+              className={cn(
+                'relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border transition-all duration-300',
+                isComplete || isCurrent
+                  ? 'border-transparent bg-slate-900 text-white shadow-md shadow-slate-900/10'
+                  : 'border-slate-200 bg-slate-50 text-slate-400',
+                isCurrent && statusKey === 'cancelled' && 'tracking-cancel',
+                isCurrent && statusKey !== 'cancelled' && 'tracking-pulse'
+              )}
             >
-                {/* Handle */}
-                <div className="flex justify-center py-3">
-                    <div className="w-12 h-1.5 bg-slate-300 rounded-full" />
-                </div>
-
-                {/* Content */}
-                <div className="px-6 pb-8">
-                    <div className="flex items-start gap-4">
-                        <div className={cn(
-                            "w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0",
-                            `bg-gradient-to-br ${step.color}`
-                        )}>
-                            <StepIcon className="w-8 h-8 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className={cn("text-xl font-bold", step.textColor)}>
-                                    {step.emoji} {step.fullLabel}
-                                </h3>
-                                {isCurrent && (
-                                    <Badge className="bg-emerald-500 text-white text-xs">Current</Badge>
-                                )}
-                            </div>
-                            <p className="text-slate-600 mt-2 leading-relaxed">{step.detailedInfo}</p>
-                            <div className="flex items-center gap-2 mt-3 text-sm">
-                                <Timer className={cn("w-4 h-4", step.textColor)} />
-                                <span className={step.textColor}>Est. Time: {step.estimatedTime}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <Button
-                        className="w-full mt-6 h-12 bg-slate-100 hover:bg-slate-200 text-slate-700"
-                        onClick={onClose}
-                    >
-                        Close
-                    </Button>
-                </div>
+              {isComplete ? <Check className="h-4 w-4" /> : <StepIcon className="h-4 w-4" />}
             </div>
-        </>
-    );
-};
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h3 className={cn('text-sm font-semibold', isComplete || isCurrent ? 'text-slate-900' : 'text-slate-500')}>
+                  {step.shortLabel}
+                </h3>
+                {isCurrent && <Badge className="rounded-full bg-emerald-100 px-2 py-0 text-[10px] text-emerald-700">Now</Badge>}
+              </div>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{isSelected || isCurrent ? step.eta : 'Tap for details'}</p>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="tracking-enter space-y-4">
+      <Card className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/85 shadow-[0_18px_56px_-28px_rgba(15,23,42,0.18)] backdrop-blur">
+        <CardContent className="p-5 sm:p-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="tracking-float flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#8ec63f,#14b8a6,#f59e0b)] text-white shadow-lg shadow-lime-900/15">
+                <Package className="h-5 w-5" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 w-24 rounded-full bg-gradient-to-r from-[#8ec63f]/20 via-[#14b8a6]/20 to-[#f59e0b]/20" />
+                <div className="h-5 w-36 rounded-full bg-slate-200/80" />
+              </div>
+            </div>
+            <div className="h-8 w-56 rounded-2xl bg-slate-200/80" />
+            <div className="grid gap-3 sm:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="h-3 w-16 rounded-full bg-slate-200" />
+                  <div className="mt-3 h-5 w-24 rounded-full bg-slate-200" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/85 shadow-[0_18px_56px_-28px_rgba(15,23,42,0.18)] backdrop-blur">
+        <CardContent className="p-5 sm:p-6">
+          <div className="mb-5 flex items-center justify-between">
+            <div className="space-y-2">
+              <div className="h-3 w-24 rounded-full bg-slate-200" />
+              <div className="h-6 w-40 rounded-full bg-slate-200" />
+            </div>
+            <RefreshCw className="h-5 w-5 animate-spin text-[#14b8a6]" />
+          </div>
+
+          <div className="relative px-2 py-6">
+            <div className="absolute left-[12.5%] right-[12.5%] top-[2.4rem] h-[3px] rounded-full bg-slate-200">
+              <div className="tracking-sweep h-full w-1/2 rounded-full bg-gradient-to-r from-[#8ec63f] via-[#14b8a6] to-[#f59e0b]" />
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="flex flex-col items-center gap-3">
+                  <div
+                    className={cn(
+                      'flex h-14 w-14 items-center justify-center rounded-full border-4',
+                      index < 2 ? 'tracking-pulse border-white bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-300'
+                    )}
+                  >
+                    {index < 2 ? <CheckCheck className="h-5 w-5" /> : <Package className="h-5 w-5" />}
+                  </div>
+                  <div className="h-3 w-16 rounded-full bg-slate-200" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export default function PublicOrderTracking() {
-    useTrackingSEO();
-    const isMobile = useIsMobile();
-    const params = useParams<{ orderNumber?: string }>();
-    const [orderNumber, setOrderNumber] = useState(params.orderNumber || '');
-    const [order, setOrder] = useState<Order | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [hasSearched, setHasSearched] = useState(false);
-    const [showConfetti, setShowConfetti] = useState(false);
-    const [selectedStep, setSelectedStep] = useState<number | null>(null);
-    const [showTimeline, setShowTimeline] = useState(false);
-    const [refreshing, setRefreshing] = useState(false);
-    const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
-    const progressRef = useRef<HTMLDivElement>(null);
-    const currentYear = new Date().getFullYear();
+  useTrackingMeta();
+  useTrackingMotion();
 
-    useEffect(() => {
-        if (params.orderNumber) {
-            setOrderNumber(params.orderNumber);
-            handleSearch(params.orderNumber);
-        }
-    }, [params.orderNumber]);
+  const params = useParams<{ orderNumber?: string }>();
+  const orderSnapshotRef = useRef<{ orderNumber?: string; status?: string; updatedAt?: string } | null>(null);
+  const [orderNumber, setOrderNumber] = useState(params.orderNumber || '');
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [honeypot, setHoneypot] = useState('');
+  const [selectedStep, setSelectedStep] = useState(0);
+  const [viewEpoch, setViewEpoch] = useState(0);
+  const [statusPopupOpen, setStatusPopupOpen] = useState(false);
 
-    const currentSteps = getStatusStepsForFulfillment(order?.fulfillmentType);
-    const currentStepIndex = order ? getStatusIndexForSteps(order.status, currentSteps) : -1;
+  const steps = useMemo(() => getStepsForFulfillment(order?.fulfillmentType, order?.status), [order?.fulfillmentType, order?.status]);
+  const statusKey = useMemo(() => normalizeStatusKey(order?.status), [order?.status]);
+  const currentStepIndex = useMemo(() => {
+    if (!order) return 0;
+    const currentId = statusKey;
+    const exactIndex = steps.findIndex((step) => step.id === currentId);
+    if (exactIndex >= 0) return exactIndex;
+    if (currentId === 'ready_for_pickup' && steps.some((step) => step.id === 'out_for_delivery')) return 1;
+    if (currentId === 'out_for_delivery' && steps.some((step) => step.id === 'ready_for_pickup')) return 2;
+    return 0;
+  }, [order, statusKey, steps]);
+  const activeStepIndex = order ? Math.min(selectedStep, steps.length - 1) : 0;
+  const activeStep = steps[activeStepIndex] || steps[0];
 
-    useEffect(() => {
-        if (order && currentStepIndex === currentSteps.length - 1) {
-            setShowConfetti(true);
-            setTimeout(() => setShowConfetti(false), 3000);
-        }
-    }, [order, currentStepIndex, currentSteps.length]);
+  useEffect(() => {
+    if (!order) return;
+    setSelectedStep(currentStepIndex);
+  }, [order, currentStepIndex]);
 
-    const [honeypot, setHoneypot] = useState('');
+  const handleSearch = useCallback(
+    async (
+      searchNumber?: string,
+      options?: {
+        showQuickStatus?: boolean;
+        silent?: boolean;
+      }
+    ) => {
+      if (honeypot) {
+        setLoading(true);
+        window.setTimeout(() => {
+          setLoading(false);
+          setError('Order not found');
+        }, 1200);
+        return;
+      }
 
-    const handleSearch = async (searchNumber?: string) => {
-        // Honeypot check - Trap bots silently
-        if (honeypot) {
-            // Simulate network delay to keep them waiting
-            setLoading(true);
-            setTimeout(() => {
-                setLoading(false);
-                setError('Order not found');
-            }, 2000);
-            return;
-        }
+      const nextNumber = String(searchNumber || orderNumber).trim();
+      if (!nextNumber) return;
 
-        const numToSearch = searchNumber || orderNumber;
-        if (!numToSearch.trim()) return;
-
+      if (!options?.silent) {
         setLoading(true);
         setError(null);
         setHasSearched(true);
+      }
 
-        try {
-            const response = await fetch(`/api/public/track/${encodeURIComponent(numToSearch.trim())}`);
-            const data = await response.json();
-
-            if (!response.ok || data.error) {
-                throw new Error(data.message || 'Order not found');
-            }
-
-            setOrder(data.data);
-
-            if (data.data?.orderNumber) {
-                window.history.replaceState(null, '', `/trackorder/${data.data.orderNumber}`);
-            }
-        } catch (err: any) {
-            setError(err.message || 'Failed to fetch order');
-            setOrder(null);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleRefresh = async () => {
-        if (!order?.orderNumber) return;
-        setRefreshing(true);
-        await handleSearch(order.orderNumber);
-        setTimeout(() => setRefreshing(false), 500);
-    };
-
-    const handleStepClick = (index: number) => {
-        setSelectedStep(index);
-        if (isMobile) {
-            setBottomSheetOpen(true);
-        }
-    };
-
-    const formatDate = (dateString: string) => {
-        if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleDateString('en-IN', {
-            day: 'numeric', month: 'short', year: 'numeric'
+      try {
+        const response = await fetch(`/api/public/track/${encodeURIComponent(nextNumber)}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
         });
-    };
+        const result = await response.json();
 
-    const formatAmount = (amount: string | number) => {
-        const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-        return `₹${num?.toLocaleString('en-IN') || '0'}`;
-    };
+        if (!response.ok || result?.error) {
+          throw new Error(result?.message || 'Order not found');
+        }
 
-    // Replaced static helpers with local calculation
-
-    const getStatusBadgeStyle = (status: string) => {
-        const styles: Record<string, string> = {
-            pending: 'bg-gradient-to-r from-amber-500 to-orange-500 text-white',
-            processing: 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white',
-            ready_for_pickup: 'bg-gradient-to-r from-emerald-500 to-green-500 text-white',
-            out_for_delivery: 'bg-gradient-to-r from-purple-500 to-violet-500 text-white',
-            completed: 'bg-gradient-to-r from-green-500 to-emerald-600 text-white',
-            delivered: 'bg-gradient-to-r from-green-500 to-emerald-600 text-white',
+        const nextOrder = result.data as Order;
+        const previousSnapshot = orderSnapshotRef.current;
+        const nextSnapshot = {
+          orderNumber: nextOrder?.orderNumber,
+          status: nextOrder?.status,
+          updatedAt: nextOrder?.updatedAt,
         };
-        return styles[status?.toLowerCase()] || 'bg-gradient-to-r from-slate-500 to-slate-600 text-white';
+        const hasMeaningfulChange =
+          !previousSnapshot ||
+          previousSnapshot.orderNumber !== nextSnapshot.orderNumber ||
+          previousSnapshot.status !== nextSnapshot.status ||
+          previousSnapshot.updatedAt !== nextSnapshot.updatedAt;
+
+        orderSnapshotRef.current = nextSnapshot;
+
+        setOrder(nextOrder);
+        setOrderNumber(nextOrder.orderNumber || nextNumber);
+
+        if (hasMeaningfulChange || !options?.silent) {
+          setViewEpoch((value) => value + 1);
+        }
+
+        if (options?.showQuickStatus) {
+          setStatusPopupOpen(true);
+        }
+
+        if (result.data?.orderNumber) {
+          window.history.replaceState(null, '', `/trackorder/${encodeURIComponent(result.data.orderNumber)}`);
+        }
+      } catch (fetchError: any) {
+        if (!options?.silent) {
+          setOrder(null);
+          setError(fetchError?.message || 'Unable to fetch order details');
+        }
+      } finally {
+        if (!options?.silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [honeypot, orderNumber]
+  );
+
+  useEffect(() => {
+    if (!order?.orderNumber) return;
+
+    const refreshFromRealtimeTrigger = () => {
+      if (document.visibilityState === 'visible') {
+        void handleSearch(order.orderNumber, { silent: true });
+      }
     };
 
-    return (
-        <div className="min-h-screen overflow-x-hidden relative">
-            {/* Premium Background */}
-            <div className="fixed inset-0 -z-20" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1582735689146-2771d9d968dd?auto=format&fit=crop&q=80&w=2000')", backgroundSize: 'cover', backgroundPosition: 'center' }} />
-            <div className="fixed inset-0 bg-green-50/85 backdrop-blur-md -z-10" />
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void handleSearch(order.orderNumber, { silent: true });
+      }
+    }, 20000);
 
-            {showConfetti && <Confetti />}
+    window.addEventListener('focus', refreshFromRealtimeTrigger);
+    document.addEventListener('visibilitychange', refreshFromRealtimeTrigger);
 
-            {/* Mobile Bottom Sheet */}
-            {isMobile && (
-                <BottomSheet
-                    isOpen={bottomSheetOpen}
-                    onClose={() => setBottomSheetOpen(false)}
-                    step={selectedStep !== null ? currentSteps[selectedStep] : null}
-                    isCurrent={selectedStep === currentStepIndex}
-                />
-            )}
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshFromRealtimeTrigger);
+      document.removeEventListener('visibilitychange', refreshFromRealtimeTrigger);
+    };
+  }, [handleSearch, order?.orderNumber]);
 
-            {/* Decorative Background - Clean & Subtle */}
-            <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-32 -right-32 w-64 md:w-[500px] h-64 md:h-[500px] bg-gradient-to-br from-emerald-100/40 to-teal-100/30 rounded-full blur-[80px] md:blur-[120px]" />
-                <div className="absolute top-1/2 -left-32 w-56 md:w-[400px] h-56 md:h-[400px] bg-gradient-to-br from-blue-100/25 to-indigo-100/20 rounded-full blur-[80px] md:blur-[120px]" />
-                <div className="absolute -bottom-32 right-1/4 w-48 md:w-[350px] h-48 md:h-[350px] bg-gradient-to-br from-teal-100/20 to-cyan-100/15 rounded-full blur-[80px] md:blur-[120px]" />
-                {/* Subtle grid pattern */}
-                <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: 'radial-gradient(circle, #10b981 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
-            </div>
+  useEffect(() => {
+    if (!params.orderNumber) return;
+    setOrderNumber(params.orderNumber);
+    void handleSearch(params.orderNumber, { showQuickStatus: true });
+  }, [params.orderNumber]);
 
-            {/* Header */}
-            <header className="bg-white/80 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-40 safe-area-top shadow-sm">
-                <div className="max-w-5xl mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-center">
-                    <a href="/" className="flex items-center gap-2 active:opacity-70 transition-opacity">
-                        <img src="/assets/logo.webp" alt="Fab Clean" className="h-9 md:h-12" />
-                    </a>
-                </div>
-            </header>
+  const handleRefresh = useCallback(async () => {
+    if (!order?.orderNumber) return;
+    setRefreshing(true);
+    await handleSearch(order.orderNumber, { silent: true });
+    window.setTimeout(() => setRefreshing(false), 350);
+  }, [handleSearch, order?.orderNumber]);
 
-            {/* Hero Section - Compact on mobile */}
-            <div className="relative bg-gradient-to-br from-emerald-600 via-teal-500 to-emerald-700 text-white py-8 md:py-16 overflow-hidden">
-                {/* Subtle pattern overlay */}
-                <div className="absolute inset-0 opacity-[0.08]">
-                    <div className="absolute inset-0" style={{
-                        backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
-                        backgroundSize: '24px 24px'
-                    }} />
-                </div>
-                {/* Decorative glow */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] bg-white/10 rounded-full blur-[100px]" />
+  const invoiceUrl = order?.invoiceUrl
+    ? order.invoiceUrl
+    : order?.orderNumber
+      ? `/api/public/invoice/${encodeURIComponent(order.orderNumber)}`
+      : null;
 
-                <div className="relative max-w-5xl mx-auto px-4 md:px-6 text-center">
-                    <div className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-full px-3.5 py-1.5 mb-3 border border-white/10">
-                        <Sparkles className="w-3.5 h-3.5 animate-pulse-soft" />
-                        <span className="text-xs md:text-sm font-medium tracking-wide">Real-time Tracking</span>
-                    </div>
-                    <h1 className="text-2xl md:text-5xl font-bold mb-2 md:mb-4 tracking-tight">Track Your Order</h1>
-                    <p className="text-emerald-100/90 text-sm md:text-lg max-w-xl mx-auto">
-                        Enter your order number for live updates
-                    </p>
-                </div>
-            </div>
+  const statusBadge = order ? steps[currentStepIndex] || steps[0] : TRACKING_META.pending;
+  const fulfillmentLabel = order?.fulfillmentType === 'delivery' ? 'Home delivery' : 'Store pickup';
+  const paymentLabel = order?.paymentStatus === 'paid' ? 'Paid' : 'Pending payment';
 
-            {/* Search Section */}
-            <div className="max-w-2xl mx-auto px-4 md:px-6 -mt-6 md:-mt-10 relative z-20">
-                <Card className="shadow-xl md:shadow-2xl border border-slate-100 bg-white/98 backdrop-blur-xl overflow-hidden">
-                    <CardContent className="p-4 md:p-6">
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <div className="relative flex-1">
-                                <div className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-8 md:w-10 h-8 md:h-10 bg-emerald-100 rounded-lg md:rounded-xl flex items-center justify-center">
-                                    <Search className="w-4 md:w-5 h-4 md:h-5 text-emerald-600" />
-                                </div>
-                                {/* Honeypot Field - Traps bots */}
-                                <input
-                                    type="text"
-                                    name="website_url"
-                                    value={honeypot}
-                                    onChange={(e) => setHoneypot(e.target.value)}
-                                    style={{ display: 'none' }}
-                                    autoComplete="off"
-                                    tabIndex={-1}
-                                />
-                                <Input
-                                    value={orderNumber}
-                                    onChange={(e) => setOrderNumber(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                    placeholder="Order number (FZC-2025...)"
-                                    className="pl-12 md:pl-16 h-12 md:h-14 text-base md:text-lg border-2 border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20 rounded-xl bg-white"
-                                />
-                            </div>
-                            <Button
-                                onClick={() => handleSearch()}
-                                disabled={loading || !orderNumber.trim()}
-                                className="h-12 md:h-14 px-6 md:px-8 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition-all active:scale-95 touch-target"
-                            >
-                                {loading ? (
-                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                    <>
-                                        Track
-                                        <ArrowRight className="w-5 h-5 ml-2" />
-                                    </>
-                                )}
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+  return (
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(142,198,63,0.14),_transparent_28%),radial-gradient(circle_at_right,_rgba(245,158,11,0.10),_transparent_24%),linear-gradient(180deg,_#fbfdf8_0%,_#f4f8f4_38%,_#f9fbf8_100%)] text-slate-900">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute left-[-12rem] top-24 h-80 w-80 rounded-full bg-lime-200/25 blur-3xl" />
+        <div className="absolute right-[-10rem] top-20 h-96 w-96 rounded-full bg-amber-200/20 blur-3xl" />
+        <div className="absolute bottom-[-8rem] left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-emerald-200/20 blur-3xl" />
+      </div>
 
-            {/* Main Content */}
-            <main className="relative max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-10">
-                {/* Error State */}
-                {error && (
-                    <Card className="border-0 shadow-lg bg-gradient-to-br from-red-50 to-rose-50 mb-6 animate-slide-up overflow-hidden">
-                        <CardContent className="p-6 text-center">
-                            <div className="w-16 h-16 mx-auto bg-gradient-to-br from-red-100 to-rose-100 rounded-xl flex items-center justify-center mb-3">
-                                <Package className="w-8 h-8 text-red-500" />
-                            </div>
-                            <h3 className="text-xl font-bold text-red-700 mb-1">Order Not Found</h3>
-                            <p className="text-red-600/80 text-sm">Please check your order number</p>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Order Found */}
-                {order && (
-                    <div className="space-y-4 md:space-y-6">
-                        {/* Customer Greeting Card */}
-                        <Card className="border border-slate-100 shadow-md md:shadow-lg bg-white overflow-hidden animate-slide-up">
-                            <CardContent className="p-4 md:p-8">
-                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                                    <div>
-                                        <Badge className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0 shadow mb-2 text-xs md:text-sm px-3 py-0.5">
-                                            {order.orderNumber}
-                                        </Badge>
-                                        <h2 className="text-xl md:text-3xl font-bold text-slate-800">
-                                            Hello, {order.customerName?.split(' ')[0] || 'there'}!
-                                            <span className="inline-block ml-2 animate-float text-lg md:text-2xl">{currentSteps[currentStepIndex]?.emoji || '👋'}</span>
-                                        </h2>
-                                        <p className="text-slate-500 text-sm md:text-lg mt-1">Track your order in real-time</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Badge className={cn('text-sm md:text-base px-3 md:px-5 py-1.5 md:py-2 font-semibold shadow border-0', getStatusBadgeStyle(order.status))}>
-                                            {currentSteps[currentStepIndex]?.fullLabel || 'Processing'}
-                                        </Badge>
-                                        <Badge className={cn(
-                                            "text-sm md:text-base px-3 md:px-5 py-1.5 md:py-2 font-bold shadow border-0 ml-1 md:ml-3",
-                                            order.paymentStatus === 'paid' ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200"
-                                        )}>
-                                            {order.paymentStatus === 'paid' ? '💰 PAID' : '💳 PENDING PAYMENT'}
-                                        </Badge>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={handleRefresh}
-                                            className="text-slate-500 hover:text-emerald-600 h-10 w-10 p-0 touch-target"
-                                        >
-                                            <RefreshCw className={cn("w-4 h-4", refreshing && "animate-spin")} />
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Progress Tracker - Mobile Optimized */}
-                        <Card className="border border-slate-100 shadow-md md:shadow-lg bg-white overflow-hidden animate-slide-up">
-                            <CardContent className="p-4 md:p-8">
-                                <div className="flex items-center justify-between mb-4 md:mb-6">
-                                    <div className="flex items-center gap-2 md:gap-3">
-                                        <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-lg md:rounded-xl flex items-center justify-center shadow">
-                                            <Timer className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-base md:text-xl font-bold text-slate-800">Order Progress</h3>
-                                            <p className="text-xs md:text-sm text-slate-500 hidden md:block">Tap any step for details</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                                        <Bell className="w-3.5 h-3.5 text-emerald-500" />
-                                        <span className="hidden sm:inline">WhatsApp updates</span>
-                                    </div>
-                                </div>
-
-                                {/* Mobile-Optimized Progress Steps */}
-                                <div ref={progressRef} className="relative py-4 md:py-8">
-                                    {/* Progress Track */}
-                                    <div className="absolute top-6 md:top-10 left-4 right-4 md:left-0 md:right-0 h-2 md:h-3 bg-slate-100 rounded-full" />
-
-                                    {/* Progress Fill */}
-                                    <div
-                                        className="absolute top-6 md:top-10 left-4 md:left-0 h-2 md:h-3 rounded-full transition-all duration-700 ease-out overflow-hidden"
-                                        style={{ width: `calc(${(currentStepIndex / (currentSteps.length - 1)) * 100}% - 32px)`, marginLeft: '0' }}
-                                    >
-                                        <div className="h-full w-full bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 relative">
-                                            <div className="absolute inset-0 animate-shimmer" />
-                                        </div>
-                                    </div>
-
-                                    {/* Steps */}
-                                    <div className="relative flex justify-between items-start px-0">
-                                        {currentSteps.map((step, index) => {
-                                            const isCompleted = index <= currentStepIndex;
-                                            const isCurrent = index === currentStepIndex;
-                                            const isPast = index < currentStepIndex;
-                                            const StepIcon = step.icon;
-
-                                            return (
-                                                <button
-                                                    key={step.id}
-                                                    className="flex flex-col items-center text-center focus:outline-none touch-target group"
-                                                    style={{ width: `${100 / currentSteps.length}%` }}
-                                                    onClick={() => handleStepClick(index)}
-                                                >
-                                                    {/* Step Circle */}
-                                                    <div className="relative">
-                                                        {isCurrent && (
-                                                            <div className="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping" style={{ transform: 'scale(1.3)' }} />
-                                                        )}
-
-                                                        {isPast && (
-                                                            <div className="absolute -top-0.5 -right-0.5 w-4 h-4 md:w-5 md:h-5 bg-green-500 rounded-full flex items-center justify-center z-10 border-2 border-white">
-                                                                <CheckCircle2 className="w-2.5 h-2.5 md:w-3 md:h-3 text-white" />
-                                                            </div>
-                                                        )}
-
-                                                        <div className={cn(
-                                                            "relative w-10 h-10 md:w-16 md:h-16 rounded-full flex items-center justify-center transition-all duration-300 border-2 md:border-4",
-                                                            isCompleted
-                                                                ? `bg-gradient-to-br ${step.color} text-white border-white shadow-lg`
-                                                                : "bg-white text-slate-300 border-slate-200",
-                                                            isCurrent && "scale-110 ring-2 ring-emerald-200 ring-offset-1",
-                                                            "active:scale-95"
-                                                        )}>
-                                                            <StepIcon className={cn(
-                                                                "w-5 h-5 md:w-7 md:h-7",
-                                                                isCurrent && "animate-pulse-soft"
-                                                            )} />
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Label */}
-                                                    <span className={cn(
-                                                        "mt-2 text-[10px] md:text-sm font-semibold transition-colors",
-                                                        isCompleted ? "text-slate-800" : "text-slate-400"
-                                                    )}>
-                                                        {isMobile ? step.label : step.fullLabel}
-                                                    </span>
-
-                                                    {isCurrent && (
-                                                        <span className="mt-1 text-[9px] md:text-xs font-bold text-emerald-600 bg-emerald-100 px-1.5 md:px-2 py-0.5 rounded-full">
-                                                            Now
-                                                        </span>
-                                                    )}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {/* Step Details - Desktop Only */}
-                                {!isMobile && selectedStep !== null && (
-                                    <div className={cn(
-                                        "mt-4 p-4 md:p-5 rounded-xl border-2 transition-all duration-300 animate-slide-up",
-                                        currentSteps[selectedStep].bgColor,
-                                        currentSteps[selectedStep].borderColor
-                                    )}>
-                                        <div className="flex items-start gap-4">
-                                            <div className={cn(
-                                                "w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0",
-                                                `bg-gradient-to-br ${currentSteps[selectedStep].color}`
-                                            )}>
-                                                {(() => {
-                                                    const StepIcon = currentSteps[selectedStep].icon;
-                                                    return <StepIcon className="w-6 h-6 md:w-7 md:h-7 text-white" />;
-                                                })()}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <h4 className={cn("text-lg font-bold", currentSteps[selectedStep].textColor)}>
-                                                        {currentSteps[selectedStep].emoji} {currentSteps[selectedStep].fullLabel}
-                                                    </h4>
-                                                    {selectedStep === currentStepIndex && (
-                                                        <Badge className="bg-emerald-500 text-white text-xs">Current</Badge>
-                                                    )}
-                                                </div>
-                                                <p className="text-slate-600 mt-1 text-sm">{currentSteps[selectedStep].detailedInfo}</p>
-                                                <p className={cn("text-xs mt-2 flex items-center gap-1", currentSteps[selectedStep].textColor)}>
-                                                    <Timer className="w-3 h-3" />
-                                                    Est: {currentSteps[selectedStep].estimatedTime}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Progress Summary */}
-                                <div className="mt-4 md:mt-6 flex items-center justify-between p-3 md:p-4 bg-slate-50 rounded-xl">
-                                    <div className="flex items-center gap-3">
-                                        <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", currentSteps[currentStepIndex]?.bgColor)}>
-                                            {(() => {
-                                                const StepIcon = currentSteps[currentStepIndex]?.icon || Package;
-                                                return <StepIcon className={cn("w-5 h-5", currentSteps[currentStepIndex]?.textColor)} />;
-                                            })()}
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Status</p>
-                                            <p className={cn("font-bold", currentSteps[currentStepIndex]?.textColor)}>
-                                                {currentSteps[currentStepIndex]?.fullLabel}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => setShowTimeline(!showTimeline)}
-                                        className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-emerald-600 transition-colors uppercase tracking-widest bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm"
-                                    >
-                                        {showTimeline ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                        Timeline
-                                    </button>
-                                </div>
-
-                                {/* Timeline */}
-                                {showTimeline && (
-                                    <div className="mt-3 md:mt-4 space-y-4 animate-slide-up bg-slate-50/50 p-4 rounded-xl border border-slate-100">
-                                        {currentSteps.map((step, index) => {
-                                            const isCompleted = index <= currentStepIndex;
-                                            const isCurrent = index === currentStepIndex;
-                                            const StepIcon = step.icon;
-
-                                            return (
-                                                <div key={step.id} className="relative pl-10">
-                                                    {index !== currentSteps.length - 1 && (
-                                                        <div className={cn(
-                                                            "absolute left-[19px] top-10 bottom-0 w-0.5",
-                                                            index < currentStepIndex ? "bg-emerald-500" : "bg-slate-200"
-                                                        )} />
-                                                    )}
-                                                    <div className={cn(
-                                                        "absolute left-0 top-0 w-10 h-10 rounded-full flex items-center justify-center z-10 transition-all duration-300",
-                                                        isCompleted ? `bg-gradient-to-br ${step.color} text-white shadow-lg` : "bg-white border-2 border-slate-200 text-slate-300"
-                                                    )}>
-                                                        <StepIcon className={cn("w-5 h-5", isCurrent && "animate-pulse-soft")} />
-                                                    </div>
-                                                    <div className="py-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <h5 className={cn("font-bold text-sm md:text-base", isCompleted ? "text-slate-800" : "text-slate-400")}>
-                                                                {step.fullLabel}
-                                                            </h5>
-                                                            {isCurrent && (
-                                                                <Badge className="bg-emerald-500 text-[10px] h-4 animate-pulse-soft text-white">LIVE</Badge>
-                                                            )}
-                                                        </div>
-                                                        <p className="text-xs text-slate-500 mt-0.5">{step.description}</p>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        {/* Order Details - Stacked on Mobile */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                            {/* Order Info */}
-                            <Card className="border border-slate-100 shadow-md bg-white overflow-hidden animate-slide-up">
-                                <div className="h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
-                                <CardContent className="p-4 md:p-6">
-                                    <h3 className="text-base md:text-lg font-bold text-slate-800 mb-3 md:mb-5 flex items-center gap-2">
-                                        <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-lg md:rounded-xl flex items-center justify-center shadow">
-                                            <Calendar className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                                        </div>
-                                        Order Details
-                                    </h3>
-                                    <div className="space-y-2.5 md:space-y-4">
-                                        <div className="flex justify-between items-center p-2.5 md:p-3 bg-slate-50 rounded-lg md:rounded-xl">
-                                            <span className="text-slate-500 text-sm flex items-center gap-1.5">
-                                                <Calendar className="w-3.5 h-3.5" /> Order Date
-                                            </span>
-                                            <span className="font-semibold text-slate-800 text-sm">{formatDate(order.createdAt)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center p-3 md:p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg md:rounded-xl border border-emerald-100">
-                                            <span className="text-slate-500 text-sm flex items-center gap-1.5">
-                                                <CreditCard className="w-3.5 h-3.5" /> Total
-                                            </span>
-                                            <span className="font-bold text-xl md:text-2xl text-emerald-600">{formatAmount(order.totalAmount)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center p-2.5 md:p-3 bg-slate-50 rounded-lg md:rounded-xl">
-                                            <span className="text-slate-500 text-sm">Payment</span>
-                                            <Badge className={cn(
-                                                "text-xs",
-                                                order.paymentStatus === 'paid'
-                                                    ? 'bg-green-100 text-green-700'
-                                                    : 'bg-amber-100 text-amber-700'
-                                            )}>
-                                                {order.paymentStatus?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                            </Badge>
-                                        </div>
-                                        <div className="flex justify-between items-center p-2.5 md:p-3 bg-slate-50 rounded-lg md:rounded-xl">
-                                            <span className="text-slate-500 text-sm">Delivery</span>
-                                            <span className="font-medium text-slate-800 text-sm flex items-center gap-1.5">
-                                                {order.fulfillmentType === 'delivery' ? (
-                                                    <><Truck className="w-3.5 h-3.5 text-emerald-600" /> Home Delivery</>
-                                                ) : (
-                                                    <><Home className="w-3.5 h-3.5 text-emerald-600" /> Store Pickup</>
-                                                )}
-                                            </span>
-                                        </div>
-
-                                        {/* Download Invoice Button */}
-                                        {order.invoiceUrl ? (
-                                            // Ensure we always go to the bill domain for saved invoices
-                                            <Button
-                                                variant="outline"
-                                                className="w-full h-12 mt-2 border-2 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold rounded-xl transition-all active:scale-95 touch-target shadow-sm"
-                                                onClick={() => {
-                                                    const rawUrl = (order as any).invoiceUrl || '';
-                                                    // Ensure we go to bill.myfabclean.com if it's a relative path
-                                                    const finalUrl = rawUrl.startsWith('http') 
-                                                        ? rawUrl 
-                                                        : `https://bill.myfabclean.com${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
-                                                    window.open(finalUrl, '_blank');
-                                                }}
-                                            >
-                                                <Download className="w-4 h-4 mr-2" />
-                                                Download Invoice
-                                            </Button>
-                                        ) : (
-                                            // Fallback to generated invoice
-                                            <Button
-                                                variant="outline"
-                                                className="w-full h-12 mt-2 border-2 border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 font-semibold rounded-xl transition-all active:scale-95 touch-target"
-                                                onClick={() => {
-                                                    const invoiceUrl = `/api/public/invoice/${encodeURIComponent(order.orderNumber)}`;
-                                                    window.open(invoiceUrl, '_blank');
-                                                }}
-                                            >
-                                                <FileText className="w-4 h-4 mr-2" />
-                                                View Invoice
-                                            </Button>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Items */}
-                            <Card className="border border-slate-100 shadow-md bg-white overflow-hidden animate-slide-up">
-                                <div className="h-1 bg-gradient-to-r from-blue-400 to-indigo-500" />
-                                <CardContent className="p-4 md:p-6">
-                                    <h3 className="text-base md:text-lg font-bold text-slate-800 mb-3 md:mb-5 flex items-center gap-2">
-                                        <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-lg md:rounded-xl flex items-center justify-center shadow">
-                                            <Package className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                                        </div>
-                                        Items
-                                        <Badge variant="outline" className="ml-auto text-xs">{order.items?.length || 0}</Badge>
-                                    </h3>
-                                    <div className="space-y-2 max-h-[200px] md:max-h-[300px] overflow-y-auto hide-scrollbar">
-                                        {order.items?.length > 0 ? (
-                                            order.items.map((item, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="flex justify-between items-center p-3 bg-slate-50 rounded-lg"
-                                                >
-                                                    <div className="flex items-center gap-2.5 min-w-0">
-                                                        <div className="w-8 h-8 bg-white rounded flex items-center justify-center shadow-sm flex-shrink-0">
-                                                            <Shirt className="w-4 h-4 text-blue-500" />
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <p className="font-medium text-slate-800 text-sm truncate">{item.serviceName}</p>
-                                                            <p className="text-xs text-slate-500">Qty: {item.quantity}</p>
-                                                        </div>
-                                                    </div>
-                                                    <span className="font-semibold text-slate-700 text-sm flex-shrink-0">{formatAmount(item.price)}</span>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <div className="text-center py-6 text-slate-400">
-                                                <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                                                <p className="text-sm">No items</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        {/* Service Features - Horizontal scroll on mobile */}
-                        <div className="overflow-x-auto hide-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-                            <div className="flex md:grid md:grid-cols-4 gap-3 md:gap-4 min-w-max md:min-w-0 animate-slide-up">
-                                {[
-                                    { icon: Droplets, label: 'Premium Wash', color: 'from-blue-400 to-cyan-500' },
-                                    { icon: Wind, label: 'Fresh & Clean', color: 'from-emerald-400 to-green-500' },
-                                    { icon: Shield, label: 'Care Guarantee', color: 'from-purple-400 to-violet-500' },
-                                    { icon: Truck, label: 'Free Delivery', color: 'from-amber-400 to-orange-500' },
-                                ].map((feature) => (
-                                    <Card key={feature.label} className="border border-slate-100 shadow-sm bg-white/90 w-28 md:w-auto flex-shrink-0">
-                                        <CardContent className="p-3 md:p-4 text-center">
-                                            <div className={cn(
-                                                "w-10 h-10 md:w-12 md:h-12 mx-auto rounded-lg md:rounded-xl flex items-center justify-center shadow mb-2",
-                                                `bg-gradient-to-br ${feature.color}`
-                                            )}>
-                                                <feature.icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                                            </div>
-                                            <h4 className="font-semibold text-slate-800 text-xs md:text-sm">{feature.label}</h4>
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Initial State */}
-                {!order && !error && !hasSearched && (
-                    <div className="text-center py-10 md:py-16 animate-slide-up">
-                        <div className="max-w-lg mx-auto px-4">
-                            <div className="relative w-20 h-20 md:w-28 md:h-28 mx-auto mb-6 md:mb-8">
-                                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl md:rounded-3xl rotate-6 opacity-30" />
-                                <div className="relative w-full h-full bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl md:rounded-3xl flex items-center justify-center shadow-xl">
-                                    <Sparkles className="w-10 h-10 md:w-14 md:h-14 text-white animate-float" />
-                                </div>
-                            </div>
-                            <h3 className="text-xl md:text-2xl font-bold text-slate-800 mb-2">Track Your Order</h3>
-                            <p className="text-slate-500 text-sm md:text-lg mb-8">
-                                Enter your order number above to see real-time status
-                            </p>
-
-                            <div className="grid grid-cols-3 gap-3 md:gap-6">
-                                {[
-                                    { icon: Zap, label: 'Fast Pickup', color: 'from-amber-400 to-orange-500' },
-                                    { icon: Star, label: 'Expert Care', color: 'from-blue-400 to-indigo-500' },
-                                    { icon: Truck, label: 'Quick Delivery', color: 'from-emerald-400 to-teal-500' },
-                                ].map((feature) => (
-                                    <div key={feature.label} className="p-3 md:p-6 bg-white rounded-xl md:rounded-2xl shadow">
-                                        <div className={cn(
-                                            'w-10 h-10 md:w-14 md:h-14 mx-auto rounded-lg md:rounded-xl flex items-center justify-center shadow mb-2 md:mb-4',
-                                            `bg-gradient-to-br ${feature.color}`
-                                        )}>
-                                            <feature.icon className="w-5 h-5 md:w-7 md:h-7 text-white" />
-                                        </div>
-                                        <h4 className="font-semibold text-slate-800 text-xs md:text-base">{feature.label}</h4>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </main>
-
-            {/* Fixed Bottom CTA - Mobile Only */}
-            {order && isMobile && (
-                <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 p-4 z-40 safe-area-bottom">
-                    <div className="flex gap-3 max-w-lg mx-auto">
-                        <Button
-                            variant="outline"
-                            className="flex-1 h-12 border-slate-200 text-slate-700 touch-target"
-                            onClick={() => window.open('tel:+919363059595')}
-                        >
-                            <Phone className="w-4 h-4 mr-2" />
-                            Call
-                        </Button>
-                        <Button
-                            className="flex-1 h-12 bg-green-500 hover:bg-green-600 text-white touch-target"
-                            onClick={() => window.open('https://wa.me/919363059595')}
-                        >
-                            <MessageCircle className="w-4 h-4 mr-2" />
-                            WhatsApp
-                        </Button>
-                    </div>
-                </div>
-            )}
-
-            {/* Help Section - Desktop */}
-            {order && !isMobile && (
-                <div className="max-w-5xl mx-auto px-6 pb-10">
-                    <Card className="border-0 shadow-xl bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 animate-gradient text-white overflow-hidden">
-                        <CardContent className="p-8">
-                            <div className="flex items-center justify-between flex-wrap gap-6">
-                                <div>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Shield className="w-5 h-5" />
-                                        <span className="text-emerald-100">Premium Support</span>
-                                    </div>
-                                    <h3 className="text-2xl font-bold">Need Help?</h3>
-                                    <p className="text-emerald-100">We're here 24/7</p>
-                                </div>
-                                <div className="flex gap-4">
-                                    <Button
-                                        variant="secondary"
-                                        size="lg"
-                                        className="bg-white/20 hover:bg-white/30 text-white border-0"
-                                        onClick={() => window.open('tel:+919363059595')}
-                                    >
-                                        <Phone className="w-5 h-5 mr-2" />
-                                        Call Now
-                                    </Button>
-                                    <Button
-                                        size="lg"
-                                        className="bg-green-500 hover:bg-green-600 text-white shadow-lg"
-                                        onClick={() => window.open('https://wa.me/919363059595')}
-                                    >
-                                        <MessageCircle className="w-5 h-5 mr-2" />
-                                        WhatsApp
-                                    </Button>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
-            {/* Footer */}
-            <footer className={cn(
-                "bg-slate-900 text-white py-10 md:py-14",
-                order && isMobile && "pb-28" // Extra padding for fixed bottom bar
-            )}>
-                <div className="max-w-5xl mx-auto px-4 md:px-6">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6 md:gap-10 mb-8">
-                        <div className="col-span-2 md:col-span-1">
-                            <img src="/assets/logo.webp" alt="Fab Clean" className="h-8 md:h-10 mb-3 brightness-0 invert opacity-80" />
-                            <p className="text-slate-400 text-sm">Premium laundry services committed to quality.</p>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold mb-3 text-sm md:text-base">Legal</h4>
-                            <ul className="space-y-2 text-xs md:text-sm text-slate-400">
-                                <li><a href="/terms" className="hover:text-emerald-400 flex items-center gap-1"><ExternalLink className="w-3 h-3" />Terms</a></li>
-                                <li><a href="/privacy" className="hover:text-emerald-400 flex items-center gap-1"><ExternalLink className="w-3 h-3" />Privacy</a></li>
-                                <li><a href="/refund" className="hover:text-emerald-400 flex items-center gap-1"><ExternalLink className="w-3 h-3" />Refunds</a></li>
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold mb-3 text-sm md:text-base">Contact</h4>
-                            <ul className="space-y-2 text-xs md:text-sm text-slate-400">
-                                <li className="flex items-center gap-1.5"><Phone className="w-3 h-3 text-emerald-400" /> +91 93630 59595</li>
-                                <li className="flex items-center gap-1.5"><MapPin className="w-3 h-3 text-emerald-400" /> Pollachi, TN</li>
-                            </ul>
-                        </div>
-                    </div>
-                    <div className="border-t border-slate-800 pt-6 text-center">
-                        <p className="text-slate-500 text-xs md:text-sm">© {currentYear} Fab Clean. All rights reserved.</p>
-                    </div>
-                </div>
-            </footer>
+      <header className="sticky top-0 z-30 border-b border-white/60 bg-white/75 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
+          <a href="/trackorder" className="transition-opacity hover:opacity-80">
+            <img src="/assets/logo.webp" alt="Fab Clean" className="h-10 sm:h-12" />
+          </a>
+          <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-500 sm:flex">
+            <Bell className="h-3.5 w-3.5 text-emerald-500" />
+            Live order updates
+          </div>
         </div>
-    );
+      </header>
+
+      <main className="relative">
+        <Dialog open={statusPopupOpen && !!order} onOpenChange={setStatusPopupOpen}>
+          <DialogContent className="max-w-[30rem] border-0 bg-transparent p-0 shadow-none">
+            {order && (
+              <div className="overflow-hidden rounded-[2rem] border border-white/80 bg-[radial-gradient(circle_at_top,_rgba(142,198,63,0.24),_transparent_38%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(248,250,252,0.96))] shadow-[0_30px_90px_-28px_rgba(15,23,42,0.42)] backdrop-blur-xl">
+                <div className={cn('h-1.5 w-full bg-gradient-to-r', statusBadge.tone)} />
+                <div className="space-y-5 p-5 sm:p-6">
+                  <DialogHeader className="space-y-3 text-left">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-3">
+                        <Badge className="w-fit rounded-full bg-slate-900 px-3 py-1 text-[11px] font-semibold tracking-[0.2em] text-white">
+                          {order.orderNumber}
+                        </Badge>
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={cn(
+                              'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-lg',
+                              statusBadge.tone,
+                              statusKey === 'cancelled' ? 'tracking-cancel' : 'tracking-float'
+                            )}
+                          >
+                            <statusBadge.icon className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <DialogTitle className="text-2xl font-black tracking-tight text-slate-950">
+                              {statusBadge.title}
+                            </DialogTitle>
+                            <DialogDescription className="mt-1 text-sm leading-6 text-slate-600">
+                              {statusBadge.detail}
+                            </DialogDescription>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </DialogHeader>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className={cn('rounded-[1.5rem] border p-4 shadow-sm', statusBadge.surface, statusBadge.border)}>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Current stage</p>
+                      <p className="mt-2 text-lg font-bold text-slate-950">{statusBadge.title}</p>
+                      <p className="mt-1 text-sm text-slate-600">{statusBadge.eta}</p>
+                    </div>
+
+                    <div className="rounded-[1.5rem] border border-slate-200 bg-white/90 p-4 shadow-sm">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Customer</p>
+                      <p className="mt-2 text-lg font-bold text-slate-950">{getGreetingName(order.customerName)}</p>
+                      <p className="mt-1 text-sm text-slate-600">Updated {formatDateTime(order.updatedAt)}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Payment</p>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">{paymentLabel}</p>
+                    </div>
+                    <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Fulfillment</p>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">{fulfillmentLabel}</p>
+                    </div>
+                    <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Ready date</p>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">{formatDate(order.pickupDate)}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Button
+                      type="button"
+                      onClick={() => setStatusPopupOpen(false)}
+                      className="h-12 flex-1 rounded-2xl bg-[linear-gradient(135deg,#8ec63f,#14b8a6,#f59e0b)] text-base font-semibold text-white shadow-lg shadow-lime-900/15"
+                    >
+                      View full tracking
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void handleRefresh()}
+                      className="h-12 rounded-2xl border-slate-200 bg-white/90 px-4 text-slate-700 hover:bg-slate-50"
+                    >
+                      <RefreshCw className={cn('mr-2 h-4 w-4', refreshing && 'animate-spin')} />
+                      Refresh
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <section className="mx-auto max-w-6xl px-4 pb-8 pt-8 sm:px-6 sm:pb-12 sm:pt-12">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-end">
+            <div className="space-y-5">
+              <Badge className="inline-flex rounded-full border border-lime-200/80 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-lime-700 shadow-sm">
+                Fab clean tracking
+              </Badge>
+              <div className="space-y-3">
+                <h1 className="max-w-3xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+                  Clear order status, built for glanceable mobile use.
+                </h1>
+                <p className="max-w-2xl text-sm leading-7 text-slate-600 sm:text-lg">
+                  Open the link, enter the order number, and see the latest stage instantly.
+                </p>
+              </div>
+            </div>
+
+            <Card className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/80 shadow-[0_24px_80px_-28px_rgba(15,23,42,0.28)] backdrop-blur-xl">
+              <CardContent className="p-4 sm:p-5">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/90 p-2 shadow-inner">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-emerald-600 shadow-sm">
+                      <Search className="h-5 w-5" />
+                    </div>
+                    <Input
+                      value={orderNumber}
+                      onChange={(event) => setOrderNumber(event.target.value)}
+                      onKeyDown={(event) => event.key === 'Enter' && void handleSearch(undefined, { showQuickStatus: true })}
+                      placeholder="Order number (FZC-2026...)"
+                      className="h-12 border-0 bg-transparent px-0 text-base font-medium text-slate-800 shadow-none focus-visible:ring-0"
+                    />
+                    <input
+                      type="text"
+                      name="website_url"
+                      value={honeypot}
+                      onChange={(event) => setHoneypot(event.target.value)}
+                      autoComplete="off"
+                      tabIndex={-1}
+                      className="hidden"
+                    />
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={() => void handleSearch(undefined, { showQuickStatus: true })}
+                    disabled={loading || !orderNumber.trim()}
+                    className="h-12 w-full rounded-2xl bg-[linear-gradient(135deg,#8ec63f,#14b8a6,#f59e0b)] text-base font-semibold text-white shadow-lg shadow-lime-900/15 transition-transform duration-200 hover:translate-y-[-1px] active:translate-y-0"
+                  >
+                    {loading ? (
+                      <RefreshCw className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        Track order
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </>
+                    )}
+                  </Button>
+
+                  <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1">Live progress</span>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1">Easy mobile view</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
+          {loading && !order && <LoadingState />}
+
+          {error && (
+            <Card className="mb-6 rounded-[2rem] border border-rose-200 bg-rose-50/80 shadow-sm backdrop-blur">
+              <CardContent className="flex flex-col gap-3 p-6 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-lg font-semibold text-rose-700">Order not found</p>
+                  <p className="text-sm text-rose-600">Check the order number and try again.</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-2xl border-rose-200 bg-white text-rose-700 hover:bg-rose-100"
+                  onClick={() => {
+                    setError(null);
+                    setHasSearched(false);
+                  }}
+                >
+                  Clear
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {order ? (
+            <div key={`${order.orderNumber}-${viewEpoch}`} className="tracking-enter space-y-6">
+              <Card className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/85 shadow-[0_18px_56px_-28px_rgba(15,23,42,0.28)] backdrop-blur">
+                <CardContent className="p-5 sm:p-7">
+                  <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold tracking-[0.2em] text-white">
+                          {order.orderNumber}
+                        </Badge>
+                        <Badge className={cn('rounded-full px-3 py-1 text-xs font-semibold', getStatusBadgeClass(statusBadge))}>
+                          {statusBadge.title}
+                        </Badge>
+                        <Badge className={cn('rounded-full px-3 py-1 text-xs font-semibold border', getPaymentBadgeClass(order.paymentStatus))}>
+                          {order.paymentStatus === 'paid' ? 'Paid' : 'Pending payment'}
+                        </Badge>
+                      </div>
+
+                      <div className="space-y-2">
+                        <h2 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                          Hello, {getGreetingName(order.customerName)}.
+                        </h2>
+                        <p className="max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">Current stage: <span className="font-semibold text-slate-900">{statusBadge.title}</span></p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2 lg:w-[24rem]">
+                      <div className="rounded-3xl border border-slate-200 bg-slate-50/90 p-4">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Last update</p>
+                        <p className="mt-2 text-base font-semibold text-slate-900">{formatDateTime(order.updatedAt)}</p>
+                        <p className="mt-1 text-sm text-slate-500">{statusBadge.eta}</p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => void handleRefresh()}
+                        className="rounded-3xl border border-lime-200 bg-lime-50/80 p-4 text-left transition-transform duration-200 hover:translate-y-[-1px]"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-lime-700">Refresh</p>
+                            <p className="mt-2 text-base font-semibold text-slate-900">Check live status</p>
+                          </div>
+                          <RefreshCw className={cn('h-5 w-5 text-lime-700', refreshing && 'animate-spin')} />
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.8fr)]">
+                <Card className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/85 shadow-[0_18px_56px_-28px_rgba(15,23,42,0.24)] backdrop-blur">
+                  <CardContent className="p-5 sm:p-7">
+                    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Progress</p>
+                        <h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Order journey</h3>
+                      </div>
+                      <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500">
+                        <Bell className="h-3.5 w-3.5 text-emerald-500" />
+                        WhatsApp updates enabled
+                      </div>
+                    </div>
+
+                    <DesktopProgress
+                      steps={steps}
+                      currentStepIndex={currentStepIndex}
+                      selectedStep={activeStepIndex}
+                      onSelect={setSelectedStep}
+                      statusKey={statusKey}
+                    />
+
+                    <MobileProgress
+                      steps={steps}
+                      currentStepIndex={currentStepIndex}
+                      selectedStep={activeStepIndex}
+                      onSelect={setSelectedStep}
+                      statusKey={statusKey}
+                    />
+
+                    <div className={cn('mt-6 rounded-[1.75rem] border p-5', activeStep.surface, activeStep.border)}>
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex items-start gap-4">
+                          <div
+                            className={cn(
+                              'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-lg',
+                              activeStep.tone,
+                              statusKey === 'cancelled' && 'tracking-cancel'
+                            )}
+                          >
+                            <activeStep.icon className="h-5 w-5" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Selected step</p>
+                            <h4 className="text-xl font-bold text-slate-950">{activeStep.title}</h4>
+                            <p className="max-w-xl text-sm leading-6 text-slate-600">{activeStep.detail}</p>
+                          </div>
+                        </div>
+                        <div className="rounded-2xl bg-white/80 px-4 py-3 shadow-sm">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Expected</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900">{activeStep.eta}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {statusKey === 'cancelled' && (
+                      <div className="tracking-enter mt-4 overflow-hidden rounded-[1.75rem] border border-rose-200/80 bg-[linear-gradient(135deg,rgba(255,241,242,0.95),rgba(255,247,237,0.96))] p-5 shadow-[0_18px_42px_-28px_rgba(244,63,94,0.35)]">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex items-start gap-4">
+                            <div className="tracking-cancel flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#ef4444,#f97316,#f59e0b)] text-white shadow-lg shadow-rose-500/20">
+                              <CircleOff className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-rose-500">Cancellation notice</p>
+                              <h4 className="mt-2 text-xl font-bold text-slate-950">This order is closed</h4>
+                              <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600">
+                                No more processing steps will run for this order. Support options remain available below if the customer needs help.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border border-white/80 bg-white/70 px-4 py-3 shadow-sm">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Status</p>
+                            <p className="mt-1 text-sm font-semibold text-rose-600">Cancelled</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <div className="space-y-6">
+                  <Card className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/85 shadow-[0_18px_56px_-28px_rgba(15,23,42,0.24)] backdrop-blur">
+                    <CardContent className="space-y-4 p-5 sm:p-6">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Overview</p>
+                        <h3 className="mt-2 text-xl font-bold text-slate-950">Order details</h3>
+                      </div>
+
+                      <div className="grid gap-3">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm">
+                                <CalendarDays className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-slate-500">Order date</p>
+                                <p className="text-sm font-semibold text-slate-900">{formatDate(order.createdAt)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm">
+                                <CreditCard className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-emerald-700/70">Order total</p>
+                                <p className="text-lg font-bold text-emerald-800">{formatCurrency(order.totalAmount)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm">
+                                {order.fulfillmentType === 'delivery' ? <Truck className="h-4 w-4" /> : <Home className="h-4 w-4" />}
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-slate-500">Fulfillment</p>
+                                <p className="text-sm font-semibold text-slate-900">
+                                  {fulfillmentLabel}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {order.pickupDate && (
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm">
+                                <Timer className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-slate-500">Expected ready date</p>
+                                <p className="text-sm font-semibold text-slate-900">{formatDate(order.pickupDate)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {order.lastWhatsappStatus && (
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm">
+                                <MessageCircle className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-slate-500">Notification status</p>
+                                <p className="text-sm font-semibold text-slate-900">{order.lastWhatsappStatus}</p>
+                                {order.lastWhatsappSentAt && (
+                                  <p className="mt-1 text-xs text-slate-500">Updated {formatDateTime(order.lastWhatsappSentAt)}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/85 shadow-[0_18px_56px_-28px_rgba(15,23,42,0.24)] backdrop-blur">
+                    <CardContent className="space-y-4 p-5 sm:p-6">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Documents</p>
+                          <h3 className="mt-2 text-xl font-bold text-slate-950">Invoice & support</h3>
+                        </div>
+                        <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                      </div>
+
+                      <div className="grid gap-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-12 justify-between rounded-2xl border-slate-200 bg-slate-50 px-4 text-slate-700 hover:bg-slate-100"
+                          onClick={() => {
+                            if (invoiceUrl) window.open(invoiceUrl, '_blank');
+                          }}
+                        >
+                          <span className="flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            {order.invoiceUrl ? 'Download invoice' : 'Open invoice'}
+                          </span>
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-12 justify-between rounded-2xl border-slate-200 bg-slate-50 px-4 text-slate-700 hover:bg-slate-100"
+                          onClick={() => window.open(`tel:${SUPPORT_PHONE}`)}
+                        >
+                          <span className="flex items-center gap-2">
+                            <Phone className="h-4 w-4" />
+                            Call support
+                          </span>
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+
+                        <Button
+                          type="button"
+                          className="h-12 justify-between rounded-2xl bg-[#25D366] px-4 text-white hover:bg-[#1fad57]"
+                          onClick={() => window.open(`https://wa.me/${SUPPORT_PHONE.replace(/[^\d]/g, '')}`)}
+                        >
+                          <span className="flex items-center gap-2">
+                            <MessageCircle className="h-4 w-4" />
+                            WhatsApp support
+                          </span>
+                          <ArrowRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              <Card className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/85 shadow-[0_18px_56px_-28px_rgba(15,23,42,0.24)] backdrop-blur">
+                <CardContent className="p-5 sm:p-7">
+                  <div className="mb-5 flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Items</p>
+                      <h3 className="mt-2 text-xl font-bold text-slate-950">Garments in this order</h3>
+                    </div>
+                    <Badge className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {order.items?.length || 0} line items
+                    </Badge>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {order.items?.length ? (
+                      order.items.map((item, index) => (
+                        <div
+                          key={`${item.serviceName}-${index}`}
+                          className="flex flex-col gap-3 rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4 transition-colors duration-200 hover:border-slate-300 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm">
+                              <Shirt className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-900 sm:text-base">{item.serviceName}</p>
+                              <p className="mt-1 text-xs text-slate-500">Quantity {item.quantity}</p>
+                            </div>
+                          </div>
+                          <div className="rounded-2xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm">
+                            {formatCurrency(item.price)}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50/70 p-8 text-center text-sm text-slate-500">
+                        No item lines available for this order.
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+            </div>
+          ) : (
+            !error && !loading && (
+              <Card className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/80 shadow-[0_18px_56px_-28px_rgba(15,23,42,0.2)] backdrop-blur">
+                <CardContent className="p-6 sm:p-8">
+                  <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
+                    <div className="space-y-5">
+                      <div className="inline-flex h-14 w-14 items-center justify-center rounded-[1.4rem] bg-slate-900 text-white shadow-lg shadow-slate-900/15">
+                        <Package className="h-6 w-6" />
+                      </div>
+                      <div className="space-y-2">
+                        <h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                          Start with your order number.
+                        </h2>
+                        <p className="max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">Open the link, paste the order number, and view the latest status.</p>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        {[
+                          { label: 'Status', value: 'Live progress' },
+                          { label: 'Bill', value: 'Invoice link' },
+                          { label: 'Help', value: 'Call or WhatsApp' },
+                        ].map((item) => (
+                          <div key={item.label} className="rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{item.label}</p>
+                            <p className="mt-2 text-sm font-semibold text-slate-900">{item.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[2rem] border border-slate-200 bg-slate-50/90 p-5">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Example format</p>
+                      <div className="mt-4 space-y-3">
+                        {['FZC-2026FAB0097A', 'FZC-2026FAB0192A', 'FAB0097A'].map((example) => (
+                          <button
+                            key={example}
+                            type="button"
+                            className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-200 hover:text-emerald-700"
+                            onClick={() => setOrderNumber(example)}
+                          >
+                            {example}
+                            <ArrowRight className="h-4 w-4" />
+                          </button>
+                        ))}
+                      </div>
+
+                      {hasSearched && !loading && !order && (
+                        <p className="mt-4 text-sm text-slate-500">No active order is loaded right now. Try another order number.</p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          )}
+        </section>
+      </main>
+    </div>
+  );
 }
