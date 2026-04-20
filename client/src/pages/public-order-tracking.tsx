@@ -24,6 +24,7 @@ import {
   Store,
   Timer,
   Truck,
+  X,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -839,11 +840,31 @@ export default function PublicOrderTracking() {
                     </div>
                     <Input
                       value={orderNumber}
-                      onChange={(event) => setOrderNumber(event.target.value)}
-                      onKeyDown={(event) => event.key === 'Enter' && void handleSearch(undefined, { showQuickStatus: true })}
+                      onChange={(event) => !order && setOrderNumber(event.target.value)}
+                      onKeyDown={(event) => event.key === 'Enter' && !order && void handleSearch(undefined, { showQuickStatus: true })}
                       placeholder="Order number (FZC-2026...)"
-                      className="h-12 border-0 bg-transparent px-0 text-base font-medium text-slate-800 shadow-none focus-visible:ring-0"
+                      readOnly={!!order}
+                      className={cn(
+                        "h-12 border-0 bg-transparent px-0 text-base font-medium shadow-none focus-visible:ring-0",
+                        order ? "text-slate-500 cursor-default select-none" : "text-slate-800"
+                      )}
                     />
+                    {order && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOrder(null);
+                          setOrderNumber('');
+                          setHasSearched(false);
+                          setError(null);
+                          window.history.replaceState(null, '', '/trackorder');
+                        }}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-200/80 text-slate-500 transition-colors hover:bg-slate-300 hover:text-slate-700"
+                        title="Search a different order"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
                     <input
                       type="text"
                       name="website_url"
