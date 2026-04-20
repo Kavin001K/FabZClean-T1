@@ -843,28 +843,12 @@ export default function PublicOrderTracking() {
                       onChange={(event) => !order && setOrderNumber(event.target.value)}
                       onKeyDown={(event) => event.key === 'Enter' && !order && void handleSearch(undefined, { showQuickStatus: true })}
                       placeholder="Order number (FZC-2026...)"
-                      readOnly={!!order}
+                      disabled={!!order}
                       className={cn(
                         "h-12 border-0 bg-transparent px-0 text-base font-medium shadow-none focus-visible:ring-0",
-                        order ? "text-slate-500 cursor-default select-none" : "text-slate-800"
+                        order ? "text-slate-400 cursor-not-allowed select-none opacity-100" : "text-slate-800"
                       )}
                     />
-                    {order && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOrder(null);
-                          setOrderNumber('');
-                          setHasSearched(false);
-                          setError(null);
-                          window.history.replaceState(null, '', '/trackorder');
-                        }}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-200/80 text-slate-500 transition-colors hover:bg-slate-300 hover:text-slate-700"
-                        title="Search a different order"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
                     <input
                       type="text"
                       name="website_url"
@@ -1248,51 +1232,30 @@ export default function PublicOrderTracking() {
             !error && !loading && (
               <Card className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/80 shadow-[0_18px_56px_-28px_rgba(15,23,42,0.2)] backdrop-blur">
                 <CardContent className="p-6 sm:p-8">
-                  <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
-                    <div className="space-y-5">
-                      <div className="inline-flex h-14 w-14 items-center justify-center rounded-[1.4rem] bg-slate-900 text-white shadow-lg shadow-slate-900/15">
-                        <Package className="h-6 w-6" />
-                      </div>
-                      <div className="space-y-2">
-                        <h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                          Start with your order number.
-                        </h2>
-                        <p className="max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">Open the link, paste the order number, and view the latest status.</p>
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        {[
-                          { label: 'Status', value: 'Live progress' },
-                          { label: 'Bill', value: 'Invoice link' },
-                          { label: 'Help', value: 'Call or WhatsApp' },
-                        ].map((item) => (
-                          <div key={item.label} className="rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{item.label}</p>
-                            <p className="mt-2 text-sm font-semibold text-slate-900">{item.value}</p>
-                          </div>
-                        ))}
-                      </div>
+                  <div className="flex flex-col items-center justify-center space-y-6 text-center">
+                    <div className="inline-flex h-16 w-16 items-center justify-center rounded-[1.6rem] bg-slate-900 text-white shadow-xl shadow-slate-900/15">
+                      <Package className="h-8 w-8" />
+                    </div>
+                    <div className="space-y-3">
+                      <h2 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                        Start with your order number.
+                      </h2>
+                      <p className="mx-auto max-w-xl text-base leading-7 text-slate-600">
+                        Open the link, paste the order number, and view your latest laundry progress instantly.
+                      </p>
                     </div>
 
-                    <div className="rounded-[2rem] border border-slate-200 bg-slate-50/90 p-5">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Example format</p>
-                      <div className="mt-4 space-y-3">
-                        {['FZC-2026FAB0097A', 'FZC-2026FAB0192A', 'FAB0097A'].map((example) => (
-                          <button
-                            key={example}
-                            type="button"
-                            className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition-colors hover:border-emerald-200 hover:text-emerald-700"
-                            onClick={() => setOrderNumber(example)}
-                          >
-                            {example}
-                            <ArrowRight className="h-4 w-4" />
-                          </button>
-                        ))}
-                      </div>
-
-                      {hasSearched && !loading && !order && (
-                        <p className="mt-4 text-sm text-slate-500">No active order is loaded right now. Try another order number.</p>
-                      )}
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {[
+                        { label: 'Status', value: 'Live progress' },
+                        { label: 'Bill', value: 'Invoice link' },
+                        { label: 'Help', value: 'Call or WhatsApp' },
+                      ].map((item) => (
+                        <div key={item.label} className="w-40 rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{item.label}</p>
+                          <p className="mt-2 text-sm font-semibold text-slate-900">{item.value}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </CardContent>
