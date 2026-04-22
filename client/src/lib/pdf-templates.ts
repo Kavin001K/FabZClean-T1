@@ -8,10 +8,10 @@ interface jsPDFWithAutoTable extends jsPDF {
 }
 
 const COMPANY_INFO = {
-    name: "FabZClean Services",
+    name: "Fab Clean",
     address: "Premium Laundry & Dry Cleaning",
-    website: "www.fabzclean.com",
-    contact: "support@fabzclean.com"
+    website: "www.myfabclean.com",
+    contact: "support@myfabclean.com"
 };
 
 const THEME_COLORS = {

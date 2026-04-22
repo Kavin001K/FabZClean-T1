@@ -306,7 +306,7 @@ export function generatePrintHTML(config: PrintConfig): string {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${title} - FabzClean</title>
+      <title>${title} - Fab Clean</title>
       ${generatePrintStyles()}
     </head>
     <body>
@@ -320,7 +320,7 @@ export function generatePrintHTML(config: PrintConfig): string {
         <div class="print-header">
           <div class="brand-logo">
             <div class="logo-circle">FC</div>
-            <div class="company-name">FabzClean</div>
+            <div class="company-name">Fab Clean</div>
           </div>
           <h1 class="report-title">${title}</h1>
           ${subtitle ? `<p class="report-subtitle">${subtitle}</p>` : ''}
@@ -589,7 +589,7 @@ export function generateTagHTML(order: any, items: any[]): string {
     const shortName = tag.name.length > 10 ? tag.name.substring(0, 9) + '.' : tag.name;
     contentHtml += `
       <div class="tag">
-        <div class="brand">FabZClean</div>
+        <div class="brand">Fab Clean</div>
         <div class="customer">${(order.customerName || 'Guest').substring(0, 12).toUpperCase()}</div>
         <div class="item">${shortName}</div>
         <div class="counter">${tag.index}/${tag.total}</div>

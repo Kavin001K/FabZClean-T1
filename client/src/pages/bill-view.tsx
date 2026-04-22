@@ -312,7 +312,7 @@ export default function BillView() {
                 enableGST: true,
                 company: {
                     name: "Fab Clean",
-                    address: "#16, Venkatramana Round Road,\nOpp to HDFC Bank,\nMahalingapuram, Pollachi - 642002",
+                    address: "Yadvik Traaders, #16, Venketaramana Round Road, Mahalingapuram, Opp. to HDFC Bank, Pollachi – 642 002.",
                     phone: "+91 93630 59595",
                     email: "support@myfabclean.com",
                     taxId: "33AITPD3522F1ZK",
@@ -358,7 +358,7 @@ export default function BillView() {
                 dueDate: order.pickupDate ? new Date(order.pickupDate).toISOString() : (order.createdAt ? new Date(order.createdAt).toISOString() : new Date().toISOString()),
                 company: {
                     name: "Fab Clean",
-                    address: "#16, Venkatramana Round Road,\nOpp to HDFC Bank,\nMahalingapuram, Pollachi - 642002",
+                    address: "Yadvik Traaders, #16, Venketaramana Round Road, Mahalingapuram, Opp. to HDFC Bank, Pollachi – 642 002.",
                     phone: "+91 93630 59595",
                     email: "support@myfabclean.com",
                     logo: "/assets/logo.webp"

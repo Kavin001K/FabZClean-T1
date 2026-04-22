@@ -28,11 +28,11 @@ export const InvoiceGenerator: React.FC = () => {
     invoiceDate: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     company: {
-      name: 'FabZClean Services',
-      address: '123 Business Street\nCity, State 12345',
-      phone: '+91 9876543210',
-      email: 'billing@fabzclean.com',
-      taxId: '27ABCDE1234F1Z5',
+      name: 'Fab Clean',
+      address: 'Yadvik Traaders, #16, Venketaramana Round Road, Mahalingapuram, Opp. to HDFC Bank, Pollachi – 642 002.',
+      phone: '+91 93630 59595',
+      email: 'support@myfabclean.com',
+      taxId: '33AITPD3522F1ZK',
       logo: '/assets/logo.webp'
     },
     customer: {

@@ -89,12 +89,12 @@ export interface FranchiseBranchInfo {
 // Default company info (used when no franchise is specified)
 export const DEFAULT_COMPANY_INFO: FranchiseBranchInfo = {
     id: 'default',
-    name: 'FabZClean',
+    name: 'Fab Clean',
     branchCode: 'FAB',
-    address: '#16, Venkatramana Round Road, Opp: Naturals/HDFC Bank, Mahalingapuram',
+    address: 'Yadvik Traaders, #16, Venketaramana Round Road, Mahalingapuram, Opp. to HDFC Bank',
     city: 'Pollachi',
     state: 'Tamil Nadu',
-    pincode: '642002',
+    pincode: '642 002',
     phone: '+91 93630 59595',
     email: 'support@myfabclean.com',
     gstNumber: '33AITPD3522F1ZK',
@@ -106,12 +106,12 @@ export const FRANCHISE_BRANCHES: Record<string, FranchiseBranchInfo> = {
     // Pollachi Branch (Main)
     'pollachi': {
         id: 'pollachi',
-        name: 'FabZClean - Pollachi',
+        name: 'Fab Clean - Pollachi',
         branchCode: 'POL',
-        address: '#16, Venkatramana Round Road, Opp: Naturals/HDFC Bank, Mahalingapuram',
+        address: 'Yadvik Traaders, #16, Venketaramana Round Road, Mahalingapuram, Opp. to HDFC Bank',
         city: 'Pollachi',
         state: 'Tamil Nadu',
-        pincode: '642002',
+        pincode: '642 002',
         phone: '+91 93630 59595',
         email: 'pollachi@myfabclean.com',
         gstNumber: '33AITPD3522F1ZK',
@@ -121,7 +121,7 @@ export const FRANCHISE_BRANCHES: Record<string, FranchiseBranchInfo> = {
     // Kinathukadavu Branch
     'kinathukadavu': {
         id: 'kinathukadavu',
-        name: 'FabZClean - Kinathukadavu',
+        name: 'Fab Clean - Kinathukadavu',
         branchCode: 'KIN',
         address: '#442/11, Opp MLA Office, Krishnasamypuram',
         city: 'Kinathukadavu',

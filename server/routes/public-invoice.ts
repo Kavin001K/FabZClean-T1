@@ -306,7 +306,7 @@ router.get('/invoice/:orderNumber', async (req: Request, res: Response) => {
         <div class="header">
             <div class="company-info">
                 <h1>🧺 Fab Clean</h1>
-                <p>#16, Venkatramana Round Road,<br>Opp to HDFC Bank, Mahalingapuram,<br>Pollachi - 642002</p>
+                <p>Yadvik Traaders, #16, Venketaramana Round Road, Mahalingapuram, Opp. to HDFC Bank, Pollachi – 642 002.</p>
                 <p>📞 +91 93630 59595</p>
                 <p>✉️ support@myfabclean.com</p>
             </div>
