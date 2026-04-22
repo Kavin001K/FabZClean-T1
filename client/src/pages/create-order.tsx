@@ -61,7 +61,8 @@ const safeParseFloat = (val: any) => {
 };
 
 const toDateOnly = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate());
-const DEFAULT_DUE_DATE_OFFSET_DAYS = 15;
+const DEFAULT_DUE_DATE_OFFSET_DAYS = 12;
+const EXPRESS_DUE_DATE_OFFSET_DAYS = 3;
 
 const toOrderCreatedAt = (value: Date) =>
   new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate(), 12, 0, 0)).toISOString();
@@ -109,6 +110,8 @@ export default function CreateOrder() {
 
   // Order details (must be before useEffect that references it)
   const [specialInstructions, setSpecialInstructions] = useState('');
+  const [isExpressOrder, setIsExpressOrder] = useState(false);
+  const [bagCount, setBagCount] = useState(1);
 
   // Abandoned Cart Recovery
   const ABANDONED_CART_KEY = "fabzclean_cart_draft_v1";
@@ -142,6 +145,7 @@ export default function CreateOrder() {
         if (draft.specialInstructions) setSpecialInstructions(draft.specialInstructions);
         if (draft.storeCode) setStoreCode(draft.storeCode);
         if (draft.billDate) setBillDate(toDateOnly(new Date(draft.billDate)));
+        if (draft.bagCount) setBagCount(draft.bagCount);
 
         toast({ title: "Draft Restored", description: "Taking you back to where you left off." });
       } catch (e) {
@@ -153,10 +157,10 @@ export default function CreateOrder() {
   // Save draft on change
   useEffect(() => {
     const draft = {
-      phoneNumber, customerName, customerPhone, customerSecondaryPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate
+      phoneNumber, customerName, customerPhone, customerSecondaryPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate, bagCount
     };
     localStorage.setItem(ABANDONED_CART_KEY, JSON.stringify(draft));
-  }, [phoneNumber, customerName, customerPhone, customerSecondaryPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate]);
+  }, [phoneNumber, customerName, customerPhone, customerSecondaryPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate, bagCount]);
 
   // Customer creation popup
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
@@ -218,8 +222,8 @@ export default function CreateOrder() {
     }
   }, [paymentMethod]); // ONLY depend on paymentMethod to avoid loops
 
-  // Express Order - Priority with 50% extra charge and 2-day turnaround
-  const [isExpressOrder, setIsExpressOrder] = useState(false);
+  // Express Order - Priority with 50% extra charge and 3-day turnaround
+  // (State declarations moved to top of file)
 
   // Success modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -694,13 +698,14 @@ export default function CreateOrder() {
     }
   }, [lastAddedInstanceKey, selectedServices]);
 
-  // Auto-set due date: 15 days from the selected order creation date
+  // Auto-set due date: 12 days (regular) or 3 days (express) from the selected order creation date
   useEffect(() => {
+    const offsetDays = isExpressOrder ? EXPRESS_DUE_DATE_OFFSET_DAYS : DEFAULT_DUE_DATE_OFFSET_DAYS;
     const dueDate = new Date(
-      toDateOnly(billDate).getTime() + DEFAULT_DUE_DATE_OFFSET_DAYS * 24 * 60 * 60 * 1000
+      toDateOnly(billDate).getTime() + offsetDays * 24 * 60 * 60 * 1000
     );
     setPickupDate(dueDate);
-  }, [billDate]);
+  }, [billDate, isExpressOrder]);
 
   // Mutation for updating order status from history
   const updateOrderStatusMutation = useMutation({
@@ -845,7 +850,7 @@ export default function CreateOrder() {
           type: isExpress ? 'warning' : 'success',
           title: isExpress ? '⚡ EXPRESS Order Created!' : 'Order Created Successfully!',
           message: isExpress
-            ? `PRIORITY: Order ${newOrder.orderNumber} for ${newOrder.customerName} - 2 day turnaround`
+            ? `PRIORITY: Order ${newOrder.orderNumber} for ${newOrder.customerName} - 3 day turnaround`
             : `Order ${newOrder.orderNumber} has been created for ${newOrder.customerName}`,
           actionUrl: '/orders',
           actionText: 'View Orders'
@@ -865,7 +870,7 @@ export default function CreateOrder() {
         toast({
           title: isExpress ? "⚡ Express Order Created!" : "Order Created Successfully!",
           description: isExpress
-            ? `Priority order ${newOrder.orderNumber} - 50% surcharge applied, 2-day turnaround`
+            ? `Priority order ${newOrder.orderNumber} - 50% surcharge applied, 3-day turnaround`
             : `Order ${newOrder.orderNumber} has been created and saved.`,
         });
 
@@ -934,6 +939,7 @@ export default function CreateOrder() {
     setDeliveryCharges(0);
     setUseWallet(false);
     setCreditOverridePrompt(null);
+    setBagCount(1);
   };
 
   // Validate phone number - flexible to accept various international formats
@@ -1113,6 +1119,8 @@ export default function CreateOrder() {
       priority: isExpressOrder ? 'high' : 'normal',
       // Wallet usage
       useWallet: useWallet,
+      // Bag count
+      bagCount: bagCount,
     };
 
     createOrderMutation.mutate(orderData);
@@ -1495,6 +1503,8 @@ export default function CreateOrder() {
                                   />
                                 </div>
                                 <Button
+                                  type="button"
+                                  tabIndex={-1}
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleRemoveService(item.instanceKey)}
@@ -1698,6 +1708,8 @@ export default function CreateOrder() {
                                     <TableCell className="font-semibold text-slate-900 dark:text-white py-2">₹{item.subtotal.toFixed(2)}</TableCell>
                                     <TableCell>
                                       <Button
+                                        type="button"
+                                        tabIndex={-1}
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => handleRemoveService(item.instanceKey)}
@@ -2029,8 +2041,8 @@ export default function CreateOrder() {
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {isExpressOrder
-                        ? "🔥 50% surcharge applied • 2-day turnaround • Fast tracked transit"
-                        : "Enable for priority processing (+50% charge, 2-day turnaround)"
+                        ? "🔥 50% surcharge applied • 3-day turnaround • Fast tracked transit"
+                        : "Enable for priority processing (+50% charge, 3-day turnaround)"
                       }
                     </p>
                   </div>
@@ -2422,6 +2434,22 @@ export default function CreateOrder() {
                     <ShoppingBag className="h-5 w-5 text-primary" />
                     Bill Summary
                   </span>
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="bag-count" className="text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">Bags</label>
+                    <Input
+                      id="bag-count"
+                      type="text"
+                      inputMode="numeric"
+                      value={bagCount}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || /^\d+$/.test(val)) {
+                          setBagCount(val === '' ? 1 : Math.max(1, parseInt(val)));
+                        }
+                      }}
+                      className="h-8 w-14 text-center font-bold text-sm bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-lg"
+                    />
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -2455,7 +2483,7 @@ export default function CreateOrder() {
                         {selectedServiceCount > 0 && (
                           <div className="flex items-center gap-1.5 ml-1">
                             <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[10px] py-0 px-2 h-4 leading-none font-black">
-                              {selectedServiceCount} Svc
+                              {totalSelectedItemCount} Items
                             </Badge>
                           </div>
                         )}
@@ -2921,7 +2949,16 @@ export default function CreateOrder() {
           setIsExpressOrder(false);
           setDiscountValue(0);
           setExtraCharges(0);
+          setBagCount(1);
           localStorage.removeItem(ABANDONED_CART_KEY);
+          // Scroll to top and focus customer search for fast next-order entry
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          setTimeout(() => {
+            const searchInput = document.getElementById('customer-search-input');
+            if (searchInput) {
+              searchInput.focus();
+            }
+          }, 400);
           // Show refreshing state briefly
           toast({ title: "Form Cleared", description: "Ready for next order." });
         }}

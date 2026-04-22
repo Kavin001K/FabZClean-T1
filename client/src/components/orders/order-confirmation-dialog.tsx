@@ -51,6 +51,20 @@ export function OrderConfirmationDialog({
     const lastFailureStageRef = useRef<'pdf' | 'send' | null>(null);
     const { toast } = useToast();
 
+    // Enter key closes dialog and starts new order
+    useEffect(() => {
+        if (!open) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Only trigger on Enter when not focused on buttons or interactive elements
+            if (e.key === 'Enter' && !showTagPrint) {
+                e.preventDefault();
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [open, onClose, showTagPrint]);
+
     // ALWAYS fetch full customer data from DB when customerId exists.
     // This ensures name, phone, email, and address are ALL available for:
     // 1. Invoice PDF generation
@@ -606,6 +620,9 @@ export function OrderConfirmationDialog({
                     quantity: typeof item.quantity === 'number' ? item.quantity : parseInt(item.quantity) || 1,
                     customerName: order?.customerName,
                 }))}
+                bagCount={(order as any)?.bagCount || (order as any)?.bag_count || 1}
+                totalItems={(order?.items || []).reduce((sum: number, item: any) => sum + (typeof item.quantity === 'number' ? item.quantity : parseInt(item.quantity) || 1), 0)}
+                totalServices={(order?.items || []).length}
             />
         </Dialog>
     );

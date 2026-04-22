@@ -110,10 +110,16 @@ function cleanPhoneNumber(phone: string): string {
     let cleanPhone = phone.replace(/[+\s\-()]/g, '');
     // Remove leading zeros
     cleanPhone = cleanPhone.replace(/^0+/, '');
+    
     // Add India country code if not present
-    if (!cleanPhone.startsWith('91')) {
+    // If it's exactly 10 digits, it's definitely missing the country code
+    if (cleanPhone.length === 10) {
+        cleanPhone = '91' + cleanPhone;
+    } else if (!cleanPhone.startsWith('91')) {
+        // Fallback for other lengths
         cleanPhone = '91' + cleanPhone;
     }
+    
     return cleanPhone;
 }
 

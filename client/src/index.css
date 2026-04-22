@@ -211,11 +211,12 @@
   }
 
   .interactive:hover {
-    @apply transform translateY(-1px);
+    @apply transition-all duration-200 ease-in-out;
+    transform: translateY(-1px);
   }
 
   .interactive:active {
-    @apply transform translateY(0);
+    transform: translateY(0);
   }
 }
 

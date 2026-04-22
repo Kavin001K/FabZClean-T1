@@ -197,13 +197,15 @@ async function ensureCustomerHasRecoveredPhone(customer: Customer, candidateOrde
       }) as Customer,
       matchedOrders,
     };
-  } catch (error) {
-    console.error(`Customer contact recovery failed for ${customer.id}:`, error);
+  } catch (error: any) {
+    if (error?.message?.includes('duplicate key value violates unique constraint')) {
+      // Gracefully ignore conflicts without a loud error trace
+      console.log(`ℹ️ [Recovery] Skipped phone recovery for ${customer.id} due to phone number conflict.`);
+      return { customer, matchedOrders };
+    }
+    console.error(`Customer contact recovery failed for ${customer.id}:`, error.message || error);
     return {
-      customer: {
-        ...customer,
-        ...updates,
-      } as Customer,
+      customer,
       matchedOrders,
     };
   }
@@ -297,7 +299,7 @@ router.get('/autocomplete', async (req, res) => {
     }
 
     let hydratedResults = results;
-    const customersNeedingRecovery = results.filter((customer: Customer) => !customer.phone || !(customer as any).secondaryPhone);
+    const customersNeedingRecovery = results.filter((customer: Customer) => !customer.phone);
     if (customersNeedingRecovery.length > 0) {
       const allOrders = await storage.listOrders();
       const recoveredById = new Map<string, Customer>();
@@ -350,7 +352,7 @@ router.get('/', async (req, res) => {
     });
 
     let hydratedCustomers = customers;
-    const customersNeedingRecovery = customers.filter((customer: Customer) => !customer.phone || !(customer as any).secondaryPhone);
+    const customersNeedingRecovery = customers.filter((customer: Customer) => !customer.phone);
     if (customersNeedingRecovery.length > 0) {
       const allOrders = await storage.listOrders();
       const recoveredById = new Map<string, Customer>();

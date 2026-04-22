@@ -1139,3 +1139,373 @@ export function ThermalTagLabel({ tag }: { tag: PreparedThermalTag }) {
     </div>
   );
 }
+
+// ============================================================
+// BAG TAGS — Separate tags for physical garment bags
+// ============================================================
+
+export const BAG_TAG_HEIGHT_MM = 32;
+
+export interface BagTagSource {
+  orderNumber: string;
+  customerName?: string;
+  franchiseId?: string | null;
+  storeCode?: string;
+  billDate?: string;
+  dueDate?: string;
+  totalItems: number;
+  totalServices: number;
+  bagCount: number;
+}
+
+export interface PreparedBagTag {
+  id: string;
+  shortOrderId: string;
+  shortOrderFontMm: number;
+  branchText: string;
+  branchFontMm: number;
+  customerText: string;
+  customerFontMm: number;
+  billText: string;
+  dueText: string;
+  totalItemsText: string;
+  totalServicesText: string;
+  bagLabel: string;
+  bagLabelFontMm: number;
+}
+
+export const prepareBagTags = ({
+  orderNumber,
+  customerName,
+  franchiseId,
+  storeCode,
+  billDate,
+  dueDate,
+  totalItems,
+  totalServices,
+  bagCount,
+}: BagTagSource): PreparedBagTag[] => {
+  const shortOrderId = formatShortOrderId(orderNumber);
+  const shortOrderFit = fitUppercaseText(shortOrderId, shortOrderId, {
+    baseFontMm: 2.8,
+    minFontMm: 2.3,
+    shrinkStart: 8,
+    shrinkStepChars: 1,
+    shrinkFactor: 0.1,
+    maxCharsAtMin: 12,
+  });
+  const branchText = resolveBranchText(franchiseId, storeCode);
+  const branchFit = fitUppercaseText(branchText, branchText, {
+    baseFontMm: 2.15,
+    minFontMm: 1.75,
+    shrinkStart: 11,
+    shrinkStepChars: 3,
+    shrinkFactor: 0.12,
+    maxCharsAtMin: 18,
+  });
+  const customerFit = fitText(formatCustomerDisplay(customerName), 'CUSTOMER', {
+    baseFontMm: 3.75,
+    minFontMm: 2.45,
+    shrinkStart: 10,
+    shrinkStepChars: 2,
+    shrinkFactor: 0.12,
+    maxCharsAtMin: 24,
+  });
+  const billText = formatTagDate(billDate);
+  const dueText = formatTagDate(dueDate);
+  const count = Math.max(1, bagCount);
+
+  return Array.from({ length: count }, (_, i) => {
+    const bagLabel = `BAG ${i + 1}/${count}`;
+    const bagLabelFit = fitUppercaseText(bagLabel, bagLabel, {
+      baseFontMm: 6.5,
+      minFontMm: 4.5,
+      shrinkStart: 10,
+      shrinkStepChars: 2,
+      shrinkFactor: 0.3,
+      maxCharsAtMin: 16,
+    });
+
+    return {
+      id: `${orderNumber}-bag-${i}`,
+      shortOrderId,
+      shortOrderFontMm: shortOrderFit.fontSizeMm,
+      branchText: branchFit.text,
+      branchFontMm: branchFit.fontSizeMm,
+      customerText: customerFit.text,
+      customerFontMm: customerFit.fontSizeMm,
+      billText,
+      dueText,
+      totalItemsText: `${totalItems} ITEMS`,
+      totalServicesText: `${totalServices} SVC`,
+      bagLabel: bagLabelFit.text,
+      bagLabelFontMm: bagLabelFit.fontSizeMm,
+    };
+  });
+};
+
+export const getBagTagStripHeightMm = (tagCount: number) =>
+  Math.max(
+    BAG_TAG_HEIGHT_MM,
+    (Math.max(1, tagCount) * BAG_TAG_HEIGHT_MM) +
+      (Math.max(0, tagCount - 1) * 0.8) + 0.2
+  );
+
+const getBagTagPrintStyles = (pageHeightMm: number) => `
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: #fff; color: #000;
+    width: ${THERMAL_TAG_WIDTH_MM}mm; min-width: ${THERMAL_TAG_WIDTH_MM}mm;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  body { font-family: Arial, Helvetica, sans-serif; }
+  .no-print { display: block; }
+  .bag-page {
+    width: ${THERMAL_TAG_WIDTH_MM}mm;
+    min-height: ${pageHeightMm}mm;
+    display: flex; flex-direction: column; gap: 0.8mm;
+  }
+  .bag-tag {
+    width: ${THERMAL_TAG_WIDTH_MM}mm;
+    height: ${BAG_TAG_HEIGHT_MM}mm;
+    min-height: ${BAG_TAG_HEIGHT_MM}mm;
+    max-height: ${BAG_TAG_HEIGHT_MM}mm;
+    border-top: 0.4mm dashed #000; border-bottom: 0.4mm dashed #000;
+    display: flex; flex-direction: column; gap: 0.3mm;
+    break-inside: avoid; page-break-inside: avoid;
+    overflow: hidden; background: #fff;
+    padding: 0.7mm 0.85mm 0.6mm;
+  }
+  .bag-branch { line-height: 0.9; font-weight: 700; letter-spacing: 0.025mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; padding-bottom: 0.2mm; border-bottom: 0.2mm solid #000; }
+  .bag-head { display: grid; grid-template-columns: max-content minmax(0,1fr); align-items: end; gap: 0.55mm; min-height: 4mm; padding-bottom: 0.2mm; border-bottom: 0.2mm solid #000; }
+  .bag-id { line-height: 0.8; font-weight: 900; letter-spacing: 0.015mm; white-space: nowrap; }
+  .bag-date-pill { line-height: 0.9; font-weight: 800; letter-spacing: 0.03mm; white-space: nowrap; padding: 0.2mm 0.5mm 0.1mm; border: 0.22mm solid #000; border-radius: 99mm; justify-self: end; font-size: 2.2mm; }
+  .bag-customer { font-weight: 900; line-height: 0.88; letter-spacing: 0.02mm; padding-top: 0.12mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
+  .bag-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 0.5mm; border: 0.3mm solid #000; border-radius: 1mm; padding: 0.5mm; }
+  .bag-label { font-weight: 900; line-height: 0.85; letter-spacing: 0.04mm; text-transform: uppercase; text-align: center; }
+  .bag-info { display: flex; justify-content: center; gap: 2mm; font-size: 2.4mm; font-weight: 700; line-height: 1; }
+  .bag-footer { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 0.55mm; min-height: 3mm; padding-top: 0.1mm; }
+  .bag-due { font-size: 2.7mm; line-height: 0.9; font-weight: 800; letter-spacing: 0.03mm; white-space: nowrap; padding: 0.28mm 0.75mm 0.18mm; border: 0.22mm solid #000; border-radius: 99mm; }
+  @media print {
+    @page { size: ${THERMAL_TAG_WIDTH_MM}mm ${pageHeightMm}mm; margin: 0; }
+    .no-print { display: none !important; }
+    html, body { margin: 0 !important; padding: 0 !important; width: ${THERMAL_TAG_WIDTH_MM}mm !important; }
+  }
+`;
+
+export const buildBagTagPrintHtml = (tags: PreparedBagTag[], title: string) => {
+  const pageHeightMm = getBagTagStripHeightMm(tags.length);
+  const tagsHtml = tags.map((tag) => `
+    <div class="bag-tag">
+      <div class="bag-branch" style="font-size:${tag.branchFontMm}mm;">${escapeHtml(tag.branchText)}</div>
+      <div class="bag-head">
+        <div class="bag-id" style="font-size:${tag.shortOrderFontMm}mm;">${escapeHtml(tag.shortOrderId)}</div>
+        <div class="bag-date-pill">ORD ${escapeHtml(tag.billText)}</div>
+      </div>
+      <div class="bag-customer" style="font-size:${tag.customerFontMm}mm;">${escapeHtml(tag.customerText)}</div>
+      <div class="bag-body">
+        <div class="bag-label" style="font-size:${tag.bagLabelFontMm}mm;">${escapeHtml(tag.bagLabel)}</div>
+        <div class="bag-info">
+          <span>${escapeHtml(tag.totalItemsText)}</span>
+          <span>•</span>
+          <span>${escapeHtml(tag.totalServicesText)}</span>
+        </div>
+      </div>
+      <div class="bag-footer">
+        <div class="bag-due">DUE ${escapeHtml(tag.dueText)}</div>
+      </div>
+    </div>
+  `).join('');
+
+  return `<!DOCTYPE html>
+  <html>
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>${escapeHtml(title)}</title>
+      <style>${getBagTagPrintStyles(pageHeightMm)}</style>
+    </head>
+    <body>
+      <div class="no-print" style="padding:4mm 0;text-align:center;width:${THERMAL_TAG_WIDTH_MM}mm;">
+        <button onclick="window.print()" style="font:900 12px Arial,sans-serif;padding:8px 12px;border:1px solid #000;background:#fff;color:#000;cursor:pointer;">
+          PRINT BAG TAGS
+        </button>
+      </div>
+      <div class="bag-page">
+        ${tagsHtml}
+      </div>
+      <script>
+        window.onload = function () {
+          setTimeout(function () {
+            window.print();
+          }, 400);
+        };
+      </script>
+    </body>
+  </html>`;
+};
+
+export function BagTagLabel({ tag }: { tag: PreparedBagTag }) {
+  return (
+    <div
+      className="bg-white text-black overflow-hidden"
+      style={{
+        width: `${THERMAL_TAG_WIDTH_MM}mm`,
+        height: `${BAG_TAG_HEIGHT_MM}mm`,
+        minHeight: `${BAG_TAG_HEIGHT_MM}mm`,
+        maxHeight: `${BAG_TAG_HEIGHT_MM}mm`,
+        borderTop: '0.4mm dashed #000000',
+        borderBottom: '0.4mm dashed #000000',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.3mm',
+        padding: '0.7mm 0.85mm 0.6mm',
+        fontFamily: 'Arial, Helvetica, sans-serif',
+      }}
+    >
+      {/* Branch bar */}
+      <div
+        style={{
+          fontSize: `${tag.branchFontMm}mm`,
+          lineHeight: 0.9,
+          fontWeight: 700,
+          letterSpacing: '0.025mm',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          textAlign: 'left',
+          paddingBottom: '0.2mm',
+          borderBottom: '0.2mm solid #000000',
+        }}
+      >
+        {tag.branchText}
+      </div>
+      {/* Header: Order ID + date pill */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'max-content minmax(0, 1fr)',
+          alignItems: 'end',
+          gap: '0.55mm',
+          minHeight: '4mm',
+          paddingBottom: '0.2mm',
+          borderBottom: '0.2mm solid #000000',
+        }}
+      >
+        <div
+          style={{
+            fontSize: `${tag.shortOrderFontMm}mm`,
+            lineHeight: 0.8,
+            fontWeight: 900,
+            letterSpacing: '0.015mm',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {tag.shortOrderId}
+        </div>
+        <div
+          style={{
+            fontSize: '2.2mm',
+            lineHeight: 0.9,
+            fontWeight: 800,
+            letterSpacing: '0.03mm',
+            whiteSpace: 'nowrap',
+            padding: '0.2mm 0.5mm 0.1mm',
+            border: '0.22mm solid #000000',
+            borderRadius: '99mm',
+            justifySelf: 'end',
+          }}
+        >
+          {`ORD ${tag.billText}`}
+        </div>
+      </div>
+      {/* Customer name */}
+      <div
+        style={{
+          fontSize: `${tag.customerFontMm}mm`,
+          fontWeight: 900,
+          lineHeight: 0.88,
+          letterSpacing: '0.02mm',
+          paddingTop: '0.12mm',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          textTransform: 'uppercase',
+        }}
+      >
+        {tag.customerText}
+      </div>
+      {/* Bag body — big bag label + item/service info */}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '0.5mm',
+          border: '0.3mm solid #000000',
+          borderRadius: '1mm',
+          padding: '0.5mm',
+        }}
+      >
+        <div
+          style={{
+            fontSize: `${tag.bagLabelFontMm}mm`,
+            fontWeight: 900,
+            lineHeight: 0.85,
+            letterSpacing: '0.04mm',
+            textTransform: 'uppercase',
+            textAlign: 'center',
+          }}
+        >
+          {tag.bagLabel}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '2mm',
+            fontSize: '2.4mm',
+            fontWeight: 700,
+            lineHeight: 1,
+          }}
+        >
+          <span>{tag.totalItemsText}</span>
+          <span>•</span>
+          <span>{tag.totalServicesText}</span>
+        </div>
+      </div>
+      {/* Footer — due date */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) auto',
+          alignItems: 'end',
+          gap: '0.55mm',
+          minHeight: '3mm',
+          paddingTop: '0.1mm',
+        }}
+      >
+        <div
+          style={{
+            fontSize: '2.7mm',
+            lineHeight: 0.9,
+            fontWeight: 800,
+            letterSpacing: '0.03mm',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            padding: '0.28mm 0.75mm 0.18mm',
+            border: '0.22mm solid #000000',
+            borderRadius: '99mm',
+          }}
+        >
+          {`DUE ${tag.dueText}`}
+        </div>
+      </div>
+    </div>
+  );
+}
+

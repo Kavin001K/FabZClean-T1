@@ -398,6 +398,7 @@ export const insertOrderSchema = z.object({
   isCreditOrder: z.coerce.boolean().optional().default(false),
   walletUsed: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
   creditUsed: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+  bagCount: z.number().optional().default(1),
   deliveredAt: z.coerce.date().optional().nullable(),
   dispatchedAt: z.coerce.date().optional().nullable(),
   createdAt: z.coerce.date().optional(),
