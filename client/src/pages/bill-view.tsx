@@ -194,7 +194,7 @@ export default function BillView() {
             }
 
             if (balanceDue > 0) {
-                const qrData = `upi://pay?pa=8825702072@okbizaxis&pn=FabZClean&am=${balanceDue.toFixed(2)}&tr=${order.orderNumber}&tn=Order-${order.orderNumber}`;
+                const qrData = `upi://pay?pa=9886788858@pz&pn=FabZClean&am=${balanceDue.toFixed(2)}&tr=${order.orderNumber}&tn=Order-${order.orderNumber}`;
 
                 // Generate Data URL for Invoice Template
                 QRCode.toDataURL(qrData, {
