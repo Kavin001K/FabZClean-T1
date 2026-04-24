@@ -75,7 +75,17 @@ const shouldUseDirectSupabase = (): boolean => {
   const apiUrl = import.meta.env.VITE_API_URL;
   if (apiUrl) return false;
 
-  // Only use Supabase in production mode when it's configured
+  // If the app is served from a backend (same-origin), the backend handles auth.
+  // Direct Supabase auth is ONLY for standalone static hosting (e.g. Amplify/CloudFront)
+  // where there is no backend at all. In self-hosted mode (Render, VPS, etc.),
+  // the backend is at the same origin and provides /api/auth/login.
+  const host = window.location.hostname;
+  const isStaticHosting = host.includes('amplifyapp.com') || host.includes('cloudfront.net');
+  if (!isStaticHosting) {
+    return false;
+  }
+
+  // Only use Supabase in production mode when it's configured AND on static hosting
   if (import.meta.env.PROD && isSupabaseConfigured) {
     return true;
   }
