@@ -102,10 +102,13 @@ const walletApi = {
     if (!res.ok) throw new Error(data?.message || "Failed to recharge wallet");
     return data;
   },
-  refund: async (customerId: string, payload: { amount: number; reason: string; notes?: string }) => {
-    const res = await authorizedFetch(`/credits/${customerId}/adjust`, {
+  refund: async (customerId: string, payload: { amount: number; refundMethod: string; reason: string; notes?: string }) => {
+    const res = await authorizedFetch(`/wallet/refund`, {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        customerId,
+        ...payload
+      }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.message || "Failed to issue refund");
@@ -193,20 +196,35 @@ export default function WalletManagementPage() {
     enabled: !!selectedCustomer && refundOpen,
   });
 
+  const { data: refundedAmountData } = useQuery({
+    queryKey: ["refunded-amount", selectedOrderId],
+    queryFn: async () => {
+      if (!selectedOrderId) return 0;
+      const res = await authorizedFetch(`/wallet/refunds/${selectedOrderId}`);
+      if (!res.ok) return 0;
+      const payload = await res.json();
+      return payload.data?.totalRefunded || 0;
+    },
+    enabled: !!selectedOrderId && refundOpen,
+  });
+
+  const refundedAmount = refundedAmountData || 0;
   const selectedOrder = customerOrders.find((o: any) => o.id === selectedOrderId);
+  const maxRefund = selectedOrder ? Math.max(0, parseFloat(selectedOrder.totalAmount || "0") - refundedAmount) : 0;
   const selectedOutstandingAmount = Math.max(0, toNumber(selectedCustomer?.creditBalance, 0));
   const selectedCreditLimitAmount = Math.max(0, toNumber(selectedCustomer?.creditLimit, 1000));
   const adjustmentAmount = toNumber(amount, 0);
+  const selectedWalletAmount = Math.max(0, toNumber((selectedCustomer as any)?.walletBalanceCache, 0));
   const currentAdjustmentBase = adjustTarget === "credit_limit"
     ? selectedCreditLimitAmount
-    : selectedOutstandingAmount;
+    : (adjustTarget === "wallet_balance" ? selectedWalletAmount : selectedOutstandingAmount);
   const projectedAdjustmentValue = currentAdjustmentBase + adjustmentAmount;
   const adjustmentPreviewIsInvalid = projectedAdjustmentValue < 0;
-  const targetLabel = adjustTarget === "credit_limit" ? "Credit Limit" : "Outstanding Balance";
+  const targetLabel = adjustTarget === "credit_limit" ? "Credit Limit" : (adjustTarget === "wallet_balance" ? "Wallet Balance" : "Outstanding Balance");
   const targetHint = adjustTarget === "credit_limit"
     ? "Allowance before the customer exceeds their approved limit."
-    : "Debt currently owed by the customer.";
-  const targetValueLabel = adjustTarget === "credit_limit" ? "Current limit" : "Current outstanding";
+    : (adjustTarget === "wallet_balance" ? "Prepaid amount available for purchases." : "Debt currently owed by the customer.");
+  const targetValueLabel = adjustTarget === "credit_limit" ? "Current limit" : (adjustTarget === "wallet_balance" ? "Current wallet balance" : "Current outstanding");
 
   const getLedgerDirection = useCallback((tx: any) => {
     const rawAmount = toNumber(tx?.amount, 0);
@@ -401,7 +419,8 @@ export default function WalletManagementPage() {
 
   const refundMutation = useMutation({
     mutationFn: () => walletApi.refund(selectedCustomer!.id, {
-      amount: -Math.abs(toNumber(amount, 0)), // Ensure debit for refund
+      amount: Math.abs(toNumber(amount, 0)), // Send positive amount, backend will handle direction
+      refundMethod: paymentMethod,
       reason: `Refund for Order ${selectedOrder?.orderNumber || "manual"}: ${reason}`,
       notes: `Refund issued by ${employee?.fullName || employee?.username} (${employee?.employeeId}). Link: ${selectedOrderId || "N/A"}. ${notes || ""}`.trim(),
     }),
@@ -920,7 +939,7 @@ export default function WalletManagementPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Internal Note</Label>
+              <Label>Internal Note (Required)</Label>
               <Input placeholder="Additional context..." value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
           </div>
@@ -928,7 +947,7 @@ export default function WalletManagementPage() {
             <Button variant="outline" onClick={() => setRechargeOpen(false)}>Cancel</Button>
             <Button
               onClick={() => rechargeMutation.mutate()}
-              disabled={rechargeMutation.isPending || toNumber(amount, 0) <= 0}
+              disabled={rechargeMutation.isPending || toNumber(amount, 0) <= 0 || !notes.trim()}
             >
               Recharge
             </Button>
@@ -975,7 +994,7 @@ export default function WalletManagementPage() {
               </Select>
               {selectedOrder && (
                 <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                  Max Refund: ₹{parseFloat(selectedOrder.totalAmount || "0").toFixed(2)}
+                  Max Refund: ₹{maxRefund.toFixed(2)} {refundedAmount > 0 && `(Already refunded: ₹${refundedAmount.toFixed(2)})`}
                 </p>
               )}
             </div>
@@ -990,9 +1009,35 @@ export default function WalletManagementPage() {
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
               />
-              {selectedOrder && toNumber(amount) > parseFloat(selectedOrder.totalAmount || "0") && (
-                <p className="text-xs text-red-500 font-medium">Amount exceeds order value!</p>
+              {selectedOrder && toNumber(amount) > maxRefund && (
+                <p className="text-xs text-red-500 font-medium">Amount exceeds maximum allowable refund!</p>
               )}
+            </div>
+
+            <div className="space-y-4">
+              <Label className="text-sm font-semibold">Refund Method</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'wallet', name: 'Wallet', icon: <Wallet className="w-4 h-4" /> },
+                  { id: 'cash', name: 'Cash', icon: <Banknote className="w-4 h-4" /> },
+                  { id: 'upi', name: 'UPI', icon: <Smartphone className="w-4 h-4" /> },
+                  { id: 'bank_transfer', name: 'Bank Transfer', icon: <Building className="w-4 h-4" /> }
+                ].map((method) => (
+                  <Button
+                    key={method.id}
+                    type="button"
+                    variant={paymentMethod === method.id ? "default" : "outline"}
+                    className={cn(
+                      "justify-start gap-2 h-10 transition-all duration-200",
+                      paymentMethod === method.id ? "ring-2 ring-primary ring-offset-1" : "hover:bg-accent/50"
+                    )}
+                    onClick={() => setPaymentMethod(method.id)}
+                  >
+                    {method.icon}
+                    <span className="text-sm">{method.name}</span>
+                  </Button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -1012,7 +1057,7 @@ export default function WalletManagementPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Additional Notes</Label>
+              <Label>Additional Notes (Required)</Label>
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -1029,7 +1074,8 @@ export default function WalletManagementPage() {
                 toNumber(amount, 0) <= 0 ||
                 !reason ||
                 !selectedOrderId ||
-                (selectedOrder && toNumber(amount) > parseFloat(selectedOrder.totalAmount || "0"))
+                !notes.trim() ||
+                (selectedOrder && toNumber(amount) > maxRefund)
               }
             >
               Post Refund
@@ -1092,7 +1138,7 @@ export default function WalletManagementPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Internal Note</Label>
+              <Label>Internal Note (Required)</Label>
               <Input placeholder="Additional context..." value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
           </div>
@@ -1100,7 +1146,7 @@ export default function WalletManagementPage() {
             <Button variant="outline" onClick={() => setCreditPaymentOpen(false)}>Cancel</Button>
             <Button
               onClick={() => creditPaymentMutation.mutate()}
-              disabled={creditPaymentMutation.isPending || toNumber(amount, 0) <= 0}
+              disabled={creditPaymentMutation.isPending || toNumber(amount, 0) <= 0 || !notes.trim()}
             >
               Record Payment
             </Button>
@@ -1130,6 +1176,7 @@ export default function WalletManagementPage() {
                 <SelectContent>
                   <SelectItem value="outstanding">Outstanding Balance</SelectItem>
                   <SelectItem value="credit_limit">Credit Limit</SelectItem>
+                  <SelectItem value="wallet_balance">Wallet Balance</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
@@ -1140,7 +1187,7 @@ export default function WalletManagementPage() {
               <div className="flex items-center justify-between gap-3 text-sm">
                 <span className="font-medium text-foreground">{targetLabel}</span>
                 <Badge variant="outline" className="font-semibold">
-                  {adjustTarget === "credit_limit" ? "Allowance" : "Debt"}
+                  {adjustTarget === "credit_limit" ? "Allowance" : (adjustTarget === "wallet_balance" ? "Prepaid" : "Debt")}
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">{targetHint}</p>
@@ -1158,7 +1205,7 @@ export default function WalletManagementPage() {
               </div>
               {adjustmentPreviewIsInvalid && (
                 <p className="text-xs text-red-600">
-                  This adjustment would make the {adjustTarget === "credit_limit" ? "credit limit" : "outstanding balance"} negative.
+                  This adjustment would make the {adjustTarget === "credit_limit" ? "credit limit" : (adjustTarget === "wallet_balance" ? "wallet balance" : "outstanding balance")} negative.
                 </p>
               )}
             </div>
@@ -1174,7 +1221,7 @@ export default function WalletManagementPage() {
               <Input value={reason} onChange={(e) => setReason(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>Notes</Label>
+              <Label>Notes (Required)</Label>
               <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
           </div>
@@ -1182,7 +1229,7 @@ export default function WalletManagementPage() {
             <Button variant="outline" onClick={() => setAdjustOpen(false)}>Cancel</Button>
             <Button
               onClick={() => adjustMutation.mutate()}
-              disabled={adjustMutation.isPending || adjustmentAmount === 0 || !reason.trim() || adjustmentPreviewIsInvalid}
+              disabled={adjustMutation.isPending || adjustmentAmount === 0 || !reason.trim() || !notes.trim() || adjustmentPreviewIsInvalid}
             >
               Apply Adjustment
             </Button>

@@ -141,14 +141,27 @@ export default function BillView() {
         });
     };
 
-    // Parse query params for GST toggle
+    // Parse query params for GST toggle and preset selection
     const searchParams = new URLSearchParams(window.location.search);
     const hasGSTParam = searchParams.has('enableGST');
     const paramGST = searchParams.get('enableGST') === 'true';
+    // Preset: classic | express | edited | (auto-detected from order flags)
+    const presetParam = searchParams.get('preset') as 'classic' | 'express' | 'edited' | null;
 
     // Determine if we should show GST view
     // Priority: 1. Query Param, 2. Order's gstEnabled flag, 3. Default false
     const enableGST = order ? (hasGSTParam ? paramGST : (order.gstEnabled || false)) : false;
+
+    // Determine the invoice preset
+    // Priority: 1. Query Param, 2. Auto-detect from order flags, 3. Default 'classic'
+    const isExpressFromOrder = !!(order as any)?.isExpressOrder || !!(order as any)?.is_express_order;
+    const resolvedPreset: 'classic' | 'express' | 'edited' = presetParam
+      ? presetParam
+      : isExpressFromOrder
+        ? 'express'
+        : 'classic';
+    // Detect if this is an edited bill (preset param explicitly set, or both express + edited)
+    const isEditedBill = presetParam === 'edited';
 
     const subtotal = order ? (Array.isArray(order.items)
         ? order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
@@ -194,7 +207,7 @@ export default function BillView() {
             }
 
             if (balanceDue > 0) {
-                const qrData = `upi://pay?pa=9886788858@pz&pn=FabZClean&am=${balanceDue.toFixed(2)}&tr=${order.orderNumber}&tn=Order-${order.orderNumber}`;
+                const qrData = generateUPIUrl(balanceDue, order.orderNumber, `Order-${order.orderNumber}`);
 
                 // Generate Data URL for Invoice Template
                 QRCode.toDataURL(qrData, {
@@ -295,10 +308,38 @@ export default function BillView() {
             ""
         );
         // MANDATORY: name and phone must always be present
-        const customerName = firstNonEmpty(order.customerName, linkedCustomer?.name, "") || "Customer";
-        const customerPhone = firstNonEmpty(order.customerPhone, linkedCustomer?.phone, (order as any).phone, "") || "N/A";
+        const customerName = firstNonEmpty(order.customerName, linkedCustomer?.name, "");
+        const customerPhone = firstNonEmpty(order.customerPhone, linkedCustomer?.phone, (order as any).phone, "");
         // OPTIONAL: email — show if available, otherwise empty string (template handles hiding)
         const customerEmail = firstNonEmpty(order.customerEmail, linkedCustomer?.email, (order as any).email, "");
+
+        // VALIDATION GATE: Block bill rendering if critical customer data is missing.
+        // A bill must NEVER be generated without a valid customer name and phone.
+        if (!customerName || !customerPhone) {
+            return (
+                <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-amber-50 to-orange-50">
+                    <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md">
+                        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span className="text-3xl">⚠️</span>
+                        </div>
+                        <h1 className="text-2xl font-bold text-gray-800 mb-2">Incomplete Customer Data</h1>
+                        <p className="text-gray-600 mb-4">
+                            This bill cannot be generated because the customer record is missing required information.
+                        </p>
+                        <div className="text-left bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 text-sm">
+                            {!customerName && <p className="text-amber-800 font-medium">❌ Customer Name is missing</p>}
+                            {!customerPhone && <p className="text-amber-800 font-medium">❌ Phone Number is missing</p>}
+                        </div>
+                        <p className="text-gray-500 text-sm mb-6">
+                            Please update the customer details in the order or customer record and try again.
+                        </p>
+                        <Button onClick={() => window.history.back()} className="mt-2">
+                            Go Back
+                        </Button>
+                    </div>
+                </div>
+            );
+        }
 
         // GST Invoice
         if (enableGST) {
@@ -334,7 +375,9 @@ export default function BillView() {
                 total: calculatedTotal,
                 paymentTerms: "Due on receipt",
                 qrCode: qrCodeUrl || undefined,
-                isExpressOrder: (order as any).isExpressOrder || (order as any).is_express_order || false,
+                isExpressOrder: isExpressFromOrder,
+                isUpdate: isEditedBill,
+                preset: isEditedBill ? 'edited' as const : (isExpressFromOrder ? 'express' as const : 'classic' as const),
                 fulfillmentType: order.fulfillmentType || 'pickup',
                 deliveryAddress: order.deliveryAddress || formattedAddress,
                 paymentBreakdown: {
@@ -381,7 +424,9 @@ export default function BillView() {
                 expressSurcharge: (order as any).expressSurcharge ? Number((order as any).expressSurcharge) : 0,
                 paymentTerms: "Due on receipt",
                 qrCode: qrCodeUrl || undefined,
-                isExpressOrder: (order as any).isExpressOrder || (order as any).is_express_order || false,
+                isExpressOrder: isExpressFromOrder,
+                isUpdate: isEditedBill,
+                preset: isEditedBill ? 'edited' as const : (isExpressFromOrder ? 'express' as const : 'classic' as const),
                 fulfillmentType: order.fulfillmentType || 'pickup',
                 deliveryAddress: order.deliveryAddress || formattedAddress,
                 paymentBreakdown: {

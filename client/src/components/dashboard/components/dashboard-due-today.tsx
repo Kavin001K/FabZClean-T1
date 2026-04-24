@@ -116,7 +116,7 @@ export const DashboardDueToday: React.FC<DashboardDueTodayProps> = React.memo(({
   return (
     <Card
       data-testid={getTestId(TEST_IDS.DASHBOARD.WIDGET, 'due-today')}
-      className="flex h-full min-h-[24rem] flex-col overflow-hidden border-border bg-card shadow-sm sm:min-h-[28rem]"
+      className="flex h-full flex-col overflow-hidden border-border bg-card shadow-sm"
     >
       <CardHeader className="flex flex-col gap-3 space-y-0 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">

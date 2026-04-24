@@ -93,6 +93,9 @@ export default React.memo(function BulkActionsDialog({
           {/* Status Updates */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">Update Status</Label>
+            <p className="text-xs text-muted-foreground">
+              Only orders that can move <strong>forward</strong> to the selected status will be updated. Orders already at or past the target status will be skipped.
+            </p>
             <div className="grid grid-cols-2 gap-2">
               <Button
                 size="sm"
@@ -103,6 +106,26 @@ export default React.memo(function BulkActionsDialog({
               >
                 <Clock className="h-4 w-4" />
                 Processing
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleStatusUpdate('ready_for_pickup')}
+                disabled={isLoading}
+                className="justify-start gap-2"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Ready for Pickup
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleStatusUpdate('out_for_delivery')}
+                disabled={isLoading}
+                className="justify-start gap-2"
+              >
+                <Clock className="h-4 w-4" />
+                Out for Delivery
               </Button>
               <Button
                 size="sm"

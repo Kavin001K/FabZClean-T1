@@ -277,6 +277,27 @@ router.post('/:customerId/adjust', requireRole(ADMIN_ONLY), async (req, res) => 
                 description: `Limit Updated: ₹${currentLimit} ➔ ₹${newLimit}. ${reason}${notes ? ` - ${notes}` : ''}`,
             };
             finalMessage = 'Credit limit updated successfully';
+        } else if (target === 'wallet_balance') {
+            const currentWallet = parseFloat((customer as any).walletBalanceCache || '0');
+            newBalance = currentWallet + changeAmount;
+            if (newBalance < 0) {
+                return res.status(400).json(createErrorResponse('Wallet balance cannot be negative', 400));
+            }
+            
+            const rechargeResult = await (storage as any).processWalletRecharge(
+                customerId,
+                changeAmount,
+                'WALLET_ADJUSTMENT',
+                req.employee?.id || null,
+                req.employee?.username || 'system'
+            );
+
+            if (!rechargeResult.success) {
+                return res.status(400).json(createErrorResponse(rechargeResult.error || 'Failed to adjust wallet balance', 400));
+            }
+
+            result = { type: 'wallet_adjustment', newBalance: rechargeResult.newBalance };
+            finalMessage = 'Wallet balance adjusted successfully';
         } else {
             // Standard outstanding balance adjustment
             newBalance = currentBalance + changeAmount;

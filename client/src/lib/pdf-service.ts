@@ -295,7 +295,7 @@ export class PDFService {
     ): Promise<string> {
         try {
             // Generate PDF from bill URL
-            const billUrl = `${window.location.origin}/bill/${orderNumber}?enableGST=${enableGST}`;
+            const billUrl = `${window.location.origin}/bill/${orderNumber}?enableGST=${enableGST}${(order as any).isEdited ? '&preset=edited' : ''}`;
             console.log('📄 Generating PDF from:', billUrl);
 
             const pdfBlob = await this.generatePDFFromURL(billUrl);

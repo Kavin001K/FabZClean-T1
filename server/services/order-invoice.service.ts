@@ -456,10 +456,13 @@ async function buildInvoiceBuffer(context: EnrichedInvoiceOrder): Promise<Buffer
 
   doc.setFillColor(255, 255, 255);
   doc.setTextColor(...accentDark);
-  (doc as any).roundedRect(pageWidth - 31, 7, 22, 9, 4, 4, 'F');
+  const isEdited = (order as any).isEdited;
+  const invoiceLabel = isEdited ? 'REVISED' : 'INVOICE';
+  const labelWidth = isEdited ? 24 : 22;
+  (doc as any).roundedRect(pageWidth - 9 - labelWidth, 7, labelWidth, 9, 4, 4, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
-  doc.text('INVOICE', pageWidth - 20, 13, { align: 'center' });
+  doc.text(invoiceLabel, pageWidth - 9 - (labelWidth / 2), 13, { align: 'center' });
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);

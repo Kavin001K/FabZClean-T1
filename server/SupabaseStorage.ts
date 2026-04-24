@@ -1408,6 +1408,32 @@ export class SupabaseStorage {
         }
     }
 
+    async processRefundOut(
+        customerId: string,
+        amount: number,
+        paymentMethod: string,
+        reason: string,
+        orderId?: string
+    ): Promise<{ success: boolean; error?: string }> {
+        try {
+            const { error } = await this.supabase.from('transactions').insert({
+                customer_id: customerId,
+                order_id: orderId || null,
+                type: 'ORDER_REFUND',
+                payment_method: paymentMethod,
+                amount: amount,
+                status: 'SUCCESS'
+            });
+
+            if (error) throw error;
+            return { success: true };
+        } catch (err: any) {
+            console.error('[SupabaseStorage] Refund out failed:', err);
+            return { success: false, error: err.message || 'Refund processing failed.' };
+        }
+    }
+
+
     // ======= AUDIT LOGS =======
     async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
         const { data: auditLog, error } = await this.supabase
@@ -2534,8 +2560,10 @@ export class SupabaseStorage {
             .eq('customer_id', customerId)
             .order('entry_no', { ascending: false });
 
+        let allHistory: any[] = [];
+
         if (!walletError && walletData) {
-            return walletData.map((row: any) => {
+            allHistory = walletData.map((row: any) => {
                 const mapped = this.mapDates(row);
                 const walletAmount = parseFloat(row.amount || mapped.amount || '0');
                 const walletBalanceAfter = parseFloat(row.balance_after || mapped.balanceAfter || '0');
@@ -2571,25 +2599,55 @@ export class SupabaseStorage {
                     staffId: row.staff?.employee_id || null
                 };
             });
-        }
-
-        if (walletError && !this.isWalletInfraMissing(walletError)) {
+        } else if (walletError && !this.isWalletInfraMissing(walletError)) {
             console.error('Get Credit History from wallet ledger failed', walletError);
-            return [];
+        } else {
+            // Legacy fallback path
+            const { data, error } = await this.supabase
+                .from('credit_transactions')
+                .select('*')
+                .eq('customer_id', customerId)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Get Credit History failed', error);
+            } else if (data) {
+                allHistory = data.map(item => this.mapDates(item));
+            }
         }
 
-        // Legacy fallback path
-        const { data, error } = await this.supabase
-            .from('credit_transactions')
+        // Fetch external refunds
+        const { data: refundData, error: refundError } = await this.supabase
+            .from('transactions')
             .select('*')
             .eq('customer_id', customerId)
-            .order('created_at', { ascending: false });
+            .eq('type', 'ORDER_REFUND');
 
-        if (error) {
-            console.error('Get Credit History failed', error);
-            return [];
+        if (!refundError && refundData) {
+            const mappedRefunds = refundData.map((row: any) => {
+                const mapped = this.mapDates(row);
+                return {
+                    ...mapped,
+                    type: 'refund',
+                    // Positive amount so UI treats it as Debit Out (money leaving)
+                    amount: Math.abs(parseFloat(row.amount || mapped.amount || '0')).toFixed(2),
+                    balanceAfter: null, // Doesn't affect balance natively
+                    description: `Refund via ${row.payment_method || mapped.paymentMethod}`,
+                    transactionId: `REF-${row.id || mapped.id}`,
+                    recordedByName: 'System'
+                };
+            });
+            allHistory = [...allHistory, ...mappedRefunds];
         }
-        return data.map(item => this.mapDates(item));
+
+        // Sort combined history descending
+        allHistory.sort((a, b) => {
+            const dateA = new Date(a.createdAt || a.transactionDate || 0).getTime();
+            const dateB = new Date(b.createdAt || b.transactionDate || 0).getTime();
+            return dateB - dateA;
+        });
+
+        return allHistory;
     }
 
     async getCustomersWithOutstandingCredit(

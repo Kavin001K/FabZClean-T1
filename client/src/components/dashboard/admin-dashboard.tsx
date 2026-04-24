@@ -453,16 +453,22 @@ export default function AdminDashboard() {
             <DashboardQuickActions />
 
             {/* Orders created today, Due Today & Recent Orders */}
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:auto-rows-fr xl:grid-cols-3">
-                <DashboardOrdersByDate />
-                <DashboardDueToday
-                    orders={dueTodayOrders}
-                    isLoading={isLoadingOrders}
-                />
-                <DashboardRecentOrders
-                    recentOrders={recentOrders}
-                    isLoading={isLoadingOrders}
-                />
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                <div className="overflow-hidden" style={{ height: '28rem' }}>
+                    <DashboardOrdersByDate />
+                </div>
+                <div className="overflow-hidden" style={{ height: '28rem' }}>
+                    <DashboardDueToday
+                        orders={dueTodayOrders}
+                        isLoading={isLoadingOrders}
+                    />
+                </div>
+                <div className="overflow-hidden" style={{ height: '28rem' }}>
+                    <DashboardRecentOrders
+                        recentOrders={recentOrders}
+                        isLoading={isLoadingOrders}
+                    />
+                </div>
             </div>
 
             {/* Customer growth insight */}

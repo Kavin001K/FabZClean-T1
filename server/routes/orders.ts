@@ -44,6 +44,7 @@ const ORDER_UPDATE_FIELDS = new Set([
   'specialInstructions',
   'notes',
   'isExpressOrder',
+  'isEdited',
   'discountType',
   'discountValue',
   'couponCode',
@@ -1084,6 +1085,53 @@ router.put('/:id', async (req, res) => {
           cancellationReason,
         });
 
+        // Auto-refund logic
+        const advancePaid = parseAmount((order as any).advancePaid);
+        const walletUsed = parseAmount((order as any).walletUsed);
+        const totalPaid = advancePaid + walletUsed;
+
+        if (totalPaid > 0 && order.customerId) {
+            try {
+                const refundResult = await (storage as any).processWalletRecharge(
+                    order.customerId,
+                    totalPaid,
+                    'WALLET_REFUND',
+                    req.employee?.id || null,
+                    req.employee?.username || 'system'
+                );
+
+                if (refundResult.success) {
+                    await (storage as any).processRefundOut(
+                        order.customerId,
+                        totalPaid,
+                        'WALLET',
+                        `Auto-refund for cancelled order ${order.orderNumber}`,
+                        orderId
+                    );
+                    
+                    if (req.employee) {
+                        await AuthService.logAction(
+                            req.employee.employeeId,
+                            req.employee.username,
+                            'wallet_refund',
+                            'customer',
+                            order.customerId,
+                            {
+                                amount: totalPaid,
+                                paymentMethod: 'WALLET',
+                                reason: `Auto-refund for cancelled order ${order.orderNumber}`,
+                                orderId
+                            },
+                            req.ip || req.connection.remoteAddress,
+                            req.get('user-agent')
+                        );
+                    }
+                }
+            } catch (err) {
+                console.error('[Auto-Refund] Error auto-refunding to wallet on cancel:', err);
+            }
+        }
+
         const serializedOrder = serializeOrder(updatedOrder);
         return res.json(createSuccessResponse(serializedOrder, 'Order cancelled successfully'));
       } catch (cancelError: any) {
@@ -1134,6 +1182,9 @@ router.put('/:id', async (req, res) => {
 
     const requiresInvoiceRegeneration = revisedOrderFinancials || brandingChanged;
     if (requiresInvoiceRegeneration) {
+      if (revisedOrderFinancials) {
+        updateData.isEdited = true;
+      }
       updateData.invoiceUrl = null;
       updateData.appliedTemplateId = null;
       updateData.whatsappBillStatus = 'pending';
@@ -1359,6 +1410,55 @@ router.patch(
       scheduleOrderStatusNotification(orderId, updatedOrder, order, status as OrderStatus, {
         cancellationReason: status === 'cancelled' ? (updatedOrder?.cancellationReason || cancellationReason || null) : null,
       });
+
+      // Auto-refund logic for cancellation via status change
+      if (status === 'cancelled') {
+          const advancePaid = parseAmount((order as any).advancePaid);
+          const walletUsed = parseAmount((order as any).walletUsed);
+          const totalPaid = advancePaid + walletUsed;
+
+          if (totalPaid > 0 && order.customerId) {
+              try {
+                  const refundResult = await (storage as any).processWalletRecharge(
+                      order.customerId,
+                      totalPaid,
+                      'WALLET_REFUND',
+                      req.employee?.id || null,
+                      req.employee?.username || 'system'
+                  );
+
+                  if (refundResult.success) {
+                      await (storage as any).processRefundOut(
+                          order.customerId,
+                          totalPaid,
+                          'WALLET',
+                          `Auto-refund for cancelled order ${order.orderNumber}`,
+                          orderId
+                      );
+                      
+                      if (req.employee) {
+                          await AuthService.logAction(
+                              req.employee.employeeId,
+                              req.employee.username,
+                              'wallet_refund',
+                              'customer',
+                              order.customerId,
+                              {
+                                  amount: totalPaid,
+                                  paymentMethod: 'WALLET',
+                                  reason: `Auto-refund for cancelled order ${order.orderNumber}`,
+                                  orderId
+                              },
+                              req.ip || req.connection.remoteAddress,
+                              req.get('user-agent')
+                          );
+                      }
+                  }
+              } catch (err) {
+                  console.error('[Auto-Refund] Error auto-refunding to wallet on cancel via status:', err);
+              }
+          }
+      }
 
       const serializedOrder = serializeOrder(updatedOrder);
       res.json(createSuccessResponse(serializedOrder, 'Order status updated successfully'));

@@ -191,9 +191,13 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
   const franchise = getFranchiseById(franchiseId);
   const usesEditedVisual = preset === 'edited';
   const isEditedInvoice = usesEditedVisual || isUpdate;
-  const visualPreset: InvoiceTemplatePresetKey = usesEditedVisual
-    ? 'edited'
-    : (preset === 'express' || isExpressOrder ? 'express' : preset);
+  // When both express AND edited, use express visuals (orange) but still show edited seal
+  const isExpressEdited = isExpressOrder && isEditedInvoice;
+  const visualPreset: InvoiceTemplatePresetKey = isExpressEdited
+    ? 'express' // Express takes visual priority for the header gradient
+    : usesEditedVisual
+      ? 'edited'
+      : (preset === 'express' || isExpressOrder ? 'express' : preset);
   const presetVisuals: Record<InvoiceTemplatePresetKey, {
     accent: string;
     accentSoft: string;
@@ -296,21 +300,29 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
     { label: 'Fulfillment', value: fulfillmentType === 'delivery' ? 'Home Delivery' : 'Store Pickup', Icon: fulfillmentType === 'delivery' ? Truck : Store },
     { label: 'Payment Status', value: paymentStatus, Icon: CircleDollarSign },
   ];
-  const documentTitle = visualPreset === 'express'
-    ? 'Express Bill'
-    : usesEditedVisual
-      ? 'Edited Order Bill'
-      : 'Invoice';
-  const heroTitle = visualPreset === 'express'
-    ? 'Priority processing enabled'
-    : usesEditedVisual
-      ? 'Latest approved revision'
-      : 'Ready for billing and collection';
-  const heroCopy = visualPreset === 'express'
-    ? 'Fast-turnaround handling is reflected on this bill. Pickup timing and totals already include express service uplift.'
-    : usesEditedVisual
-      ? 'This document supersedes the previous bill for the same order and reflects the latest confirmed order changes.'
-      : 'This preset keeps billing clean, branded, and easy to scan at the counter.';
+  // Document title logic — supports 4 bill types:
+  // 1. Normal Bill (classic), 2. Express Bill, 3. Edited Bill, 4. Express Edited Bill
+  const documentTitle = isExpressEdited
+    ? 'Express Edited Bill'
+    : visualPreset === 'express'
+      ? 'Express Bill'
+      : isEditedInvoice
+        ? 'Edited Order Bill'
+        : 'Invoice';
+  const heroTitle = isExpressEdited
+    ? 'Revised express order'
+    : visualPreset === 'express'
+      ? 'Priority processing enabled'
+      : isEditedInvoice
+        ? 'Latest approved revision'
+        : 'Ready for billing and collection';
+  const heroCopy = isExpressEdited
+    ? 'This document supersedes the previous express bill and reflects updated order items, quantities, or pricing.'
+    : visualPreset === 'express'
+      ? 'Fast-turnaround handling is reflected on this bill. Pickup timing and totals already include express service uplift.'
+      : isEditedInvoice
+        ? 'This document supersedes the previous bill for the same order and reflects the latest confirmed order changes.'
+        : 'This preset keeps billing clean, branded, and easy to scan at the counter.';
 
   return (
     <div
@@ -506,7 +518,7 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
             </div>
           </header>
 
-          {(visualPreset === 'express' || usesEditedVisual) && (
+          {(visualPreset === 'express' || isEditedInvoice) && (
             <section className="invoice-section" style={{ padding: '14px 18px 0' }}>
               <div
                 className="invoice-card"
@@ -537,10 +549,10 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                   }}
                 >
                   <p style={{ margin: 0, fontSize: '10px', color: mutedInk, textTransform: 'uppercase', letterSpacing: '0.12em' }}>
-                    {visualPreset === 'express' ? 'Priority By' : 'Revision Date'}
+                    {isExpressEdited ? 'Revision Date' : visualPreset === 'express' ? 'Priority By' : 'Revision Date'}
                   </p>
                   <p style={{ margin: '6px 0 0', fontSize: '18px', fontWeight: 900, color: accent }}>
-                    {formatDisplayDate(visualPreset === 'express' ? dueDate : invoiceDate)}
+                    {formatDisplayDate(isExpressEdited ? invoiceDate : (visualPreset === 'express' ? dueDate : invoiceDate))}
                   </p>
                 </div>
               </div>
@@ -835,12 +847,12 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                     </div>
                   </div>
                 )}
-                {usesEditedVisual && (
+                {isEditedInvoice && (
                   <div
                     style={{
                       position: 'absolute',
-                      right: '12px',
-                      top: '12px',
+                      right: isExpressOrder ? '12px' : '12px',
+                      top: isExpressOrder ? '110px' : '12px',
                       padding: '10px 12px',
                       borderRadius: '12px',
                       background: '#f5f3ff',
@@ -850,8 +862,8 @@ const InvoiceTemplateIN: React.FC<{ data: InvoiceData }> = ({ data }) => {
                       opacity: 0.9,
                     }}
                   >
-                    <div style={{ fontSize: '8px', fontWeight: 800, letterSpacing: '0.16em' }}>REVISED</div>
-                    <div style={{ fontSize: '14px', fontWeight: 900, lineHeight: 1.1 }}>LATEST BILL</div>
+                    <div style={{ fontSize: '8px', fontWeight: 800, letterSpacing: '0.16em' }}>EDITED</div>
+                    <div style={{ fontSize: '14px', fontWeight: 900, lineHeight: 1.1 }}>REVISED BILL</div>
                   </div>
                 )}
 

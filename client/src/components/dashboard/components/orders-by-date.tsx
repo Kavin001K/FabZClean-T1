@@ -58,7 +58,7 @@ export const DashboardOrdersByDate: React.FC = React.memo(() => {
   return (
     <Card
       data-testid={getTestId(TEST_IDS.DASHBOARD.WIDGET, 'orders-by-date')}
-      className="flex h-full min-h-[24rem] flex-col overflow-hidden border-border bg-card shadow-sm sm:min-h-[28rem]"
+      className="flex h-full flex-col overflow-hidden border-border bg-card shadow-sm"
     >
       <CardHeader className="flex flex-col gap-3 border-b border-border/50 pb-3 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex items-center gap-3 min-w-0 flex-1">

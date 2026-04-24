@@ -131,6 +131,7 @@ export const orders = pgTable("orders", {
   deliveryAddress: jsonb("delivery_address").$type<ShippingAddress>(),
   // Express Order / Priority
   isExpressOrder: boolean("is_express_order").default(false),
+  isEdited: boolean("is_edited").default(false),
   priority: text("priority", { enum: ["normal", "high", "urgent"] }).default("normal"),
   // WhatsApp notification tracking
   lastWhatsappStatus: text("last_whatsapp_status"),

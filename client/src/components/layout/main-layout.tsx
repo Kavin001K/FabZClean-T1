@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { BottomNav } from './bottom-nav';
@@ -15,20 +15,19 @@ interface MainLayoutProps {
 
 /**
  * Responsive layout:
- * - Desktop (md+): Sidebar + Header + Content
- * - Tablet (sm–md): Header + Content + BottomNav (no sidebar)
- * - Mobile (<sm): Header + Content + BottomNav (no sidebar)
+ * - Desktop (lg+): Hover-to-reveal sidebar + Header + Content (full width)
+ * - Tablet/Mobile (<lg): Header + Content + BottomNav (sheet drawer)
  */
 export function MainLayout({ children }: MainLayoutProps) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
-    // Initial state from localStorage or default
-    const saved = localStorage.getItem('fabzclean-sidebar-open');
-    if (saved !== null) return saved === 'true';
-    return false; // Default to closed as requested
-  });
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [location] = useLocation();
+
+  // Hover-to-reveal refs
+  const sidebarOverlayRef = useRef<HTMLDivElement>(null);
+  const hoverIntentTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Detect mobile viewport
   useEffect(() => {
@@ -37,6 +36,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       setIsMobile(mobile);
       if (mobile) {
         setIsMobileMenuOpen(false);
+        setIsSidebarOpen(false);
       }
     };
     checkMobile();
@@ -44,16 +44,13 @@ export function MainLayout({ children }: MainLayoutProps) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Sync sidebar state to localStorage
-  useEffect(() => {
-    localStorage.setItem('fabzclean-sidebar-open', isSidebarOpen.toString());
-  }, [isSidebarOpen]);
-
-  // Ensure drawer closes after route transitions on mobile/tablet.
+  // Close drawer after route transitions on mobile/tablet
   useEffect(() => {
     if (isMobile) {
       setIsMobileMenuOpen(false);
     }
+    // Also auto-hide desktop sidebar on route change
+    setIsSidebarOpen(false);
   }, [location, isMobile]);
 
   const toggleSidebar = () => {
@@ -64,16 +61,101 @@ export function MainLayout({ children }: MainLayoutProps) {
     }
   };
 
+  // Desktop hover-to-reveal: show sidebar
+  const showSidebar = useCallback(() => {
+    if (isMobile) return;
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+    setIsSidebarOpen(true);
+  }, [isMobile]);
+
+  // Desktop hover-to-reveal: hide sidebar with delay
+  const scheduleSidebarHide = useCallback(() => {
+    if (isMobile) return;
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => {
+      setIsSidebarOpen(false);
+    }, 300);
+  }, [isMobile]);
+
+  // Hover zone: mouse enters left edge
+  const handleHoverZoneEnter = useCallback(() => {
+    if (isMobile) return;
+    hoverIntentTimerRef.current = setTimeout(() => {
+      showSidebar();
+    }, 120); // slight delay to avoid accidental triggers
+  }, [isMobile, showSidebar]);
+
+  const handleHoverZoneLeave = useCallback(() => {
+    if (hoverIntentTimerRef.current) {
+      clearTimeout(hoverIntentTimerRef.current);
+      hoverIntentTimerRef.current = null;
+    }
+  }, []);
+
+  // Cleanup timers
+  useEffect(() => {
+    return () => {
+      if (hoverIntentTimerRef.current) clearTimeout(hoverIntentTimerRef.current);
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    };
+  }, []);
+
   return (
     <>
       <SessionTimeoutWarning />
 
       <div className="app-shell flex h-[calc(var(--app-dvh,1dvh)*100)] min-h-[100svh] w-full overflow-hidden bg-background">
-        {/* Desktop Sidebar */}
-        {!isMobile && isSidebarOpen && (
-          <div className="hidden shrink-0 p-4 pr-0 lg:flex">
-            <Sidebar className="w-72 shrink-0" />
-          </div>
+        {/* Desktop: Invisible hover zone on left edge (always present when sidebar hidden) */}
+        {!isMobile && !isSidebarOpen && (
+          <div
+            className="fixed left-0 top-0 z-50 h-full w-4 cursor-default"
+            onMouseEnter={handleHoverZoneEnter}
+            onMouseLeave={handleHoverZoneLeave}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Desktop: Sidebar overlay (slides in from left) */}
+        {!isMobile && (
+          <>
+            {/* Backdrop */}
+            <AnimatePresence>
+              {isSidebarOpen && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
+                  onClick={() => setIsSidebarOpen(false)}
+                />
+              )}
+            </AnimatePresence>
+
+            {/* Sidebar panel */}
+            <AnimatePresence>
+              {isSidebarOpen && (
+                <motion.div
+                  ref={sidebarOverlayRef}
+                  initial={{ x: -300, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  exit={{ x: -300, opacity: 0 }}
+                  transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+                  className="fixed left-0 top-0 z-50 h-full p-4 pr-0"
+                  onMouseEnter={showSidebar}
+                  onMouseLeave={scheduleSidebarHide}
+                >
+                  <Sidebar
+                    className="h-full w-72 shrink-0"
+                    onClose={() => setIsSidebarOpen(false)}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
         )}
 
         {/* Mobile/Tablet Sidebar Drawer */}
@@ -98,7 +180,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             isMobile ? "pb-[calc(5.75rem+env(safe-area-inset-bottom)+0.5rem)]" : "pb-[max(1.5rem,env(safe-area-inset-bottom))]"
           )}>
             <ErrorBoundary>
-              <div className="mx-auto w-full max-w-[1380px] min-w-0">
+              <div className="mx-auto w-full max-w-[1600px] min-w-0">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={location}

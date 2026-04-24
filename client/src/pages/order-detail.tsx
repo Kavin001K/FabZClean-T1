@@ -94,7 +94,7 @@ export default function OrderDetailPage() {
         orderNumber,
         mutationOrder.customerName || 'Customer',
         amount,
-        `${window.location.origin}/bill/${encodeURIComponent(orderNumber)}`,
+        `${window.location.origin}/bill/${encodeURIComponent(orderNumber)}${(mutationOrder as any).isEdited ? '?preset=edited' : ''}`,
         (mutationOrder as any).invoiceUrl || undefined,
         itemSummary,
         sendCount

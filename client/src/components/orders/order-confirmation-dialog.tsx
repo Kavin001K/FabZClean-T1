@@ -288,7 +288,7 @@ export function OrderConfirmationDialog({
         setWhatsappError(null);
 
         const orderNum = order.orderNumber || order.id || 'N/A';
-        const billUrl = `${window.location.origin}/bill/${orderNum}?enableGST=${enableGST}`;
+        const billUrl = `${window.location.origin}/bill/${orderNum}?enableGST=${enableGST}${(order as any).isEdited ? '&preset=edited' : ''}`;
 
         try {
             console.log(`[WhatsApp] Send #${whatsappSendCount + 1} starting...`);

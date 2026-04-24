@@ -85,6 +85,7 @@ import {
   Zap,
   Loader2,
   MessageCircle,
+  Truck,
 } from "lucide-react";
 
 // Data Service
@@ -123,6 +124,17 @@ interface PaginationState {
 type ViewMode = 'table' | 'timeline';
 
 const TERMINAL_ORDER_STATUSES = new Set<Order['status']>(['cancelled', 'completed', 'delivered']);
+
+/** Strict forward-only status hierarchy. Lower rank = earlier in workflow. */
+const STATUS_RANK: Record<string, number> = {
+  pending: 0,
+  processing: 1,
+  ready_for_pickup: 2,
+  out_for_delivery: 2,
+  completed: 3,
+  delivered: 4,
+  cancelled: 99, // terminal — never overwritten
+};
 
 const isWorkflowLocked = (order: Order): boolean => TERMINAL_ORDER_STATUSES.has(order.status);
 
@@ -641,7 +653,7 @@ function OrdersComponent() {
         orderNumber,
         order.customerName || 'Customer',
         amount,
-        `${window.location.origin}/bill/${encodeURIComponent(orderNumber)}`,
+        `${window.location.origin}/bill/${encodeURIComponent(orderNumber)}${(order as any).isEdited ? '?preset=edited' : ''}`,
         customInvoiceUrl || (order as any).invoiceUrl || undefined,
         itemSummary,
         undefined,
@@ -699,12 +711,12 @@ function OrdersComponent() {
   }, []);
 
   const handleSelectAll = useCallback(() => {
-    if (selectedOrders.length === paginatedOrders.length) {
+    if (selectedOrders.length === filteredOrders.length) {
       setSelectedOrders([]);
     } else {
-      setSelectedOrders(paginatedOrders.map(order => order.id));
+      setSelectedOrders(filteredOrders.map(order => order.id));
     }
-  }, [selectedOrders.length, paginatedOrders]);
+  }, [selectedOrders.length, filteredOrders]);
 
   const handleClearSelection = useCallback(() => {
     setSelectedOrders([]);
@@ -909,11 +921,44 @@ function OrdersComponent() {
       return;
     }
 
+    // Forward-only workflow: only update orders whose current status rank
+    // is strictly lower than the target status rank.
+    const targetRank = STATUS_RANK[newStatus] ?? 0;
+    const eligibleOrderIds = selectedOrders.filter(orderId => {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return false;
+      const currentRank = STATUS_RANK[order.status] ?? 0;
+      // Skip if already at or past the target, or if cancelled
+      return currentRank < targetRank && order.status !== 'cancelled';
+    });
+
+    const skippedCount = selectedOrders.length - eligibleOrderIds.length;
+
+    if (eligibleOrderIds.length === 0) {
+      toast({
+        title: "No Eligible Orders",
+        description: `All ${selectedOrders.length} selected orders are already at or past "${newStatus}" status and were skipped.`,
+      });
+      return;
+    }
+
     setIsBulkOperationLoading(true);
     try {
+      // For ready_for_pickup / out_for_delivery, remap based on each order's
+      // fulfillmentType so delivery orders never get "ready_for_pickup" and
+      // pickup orders never get "out_for_delivery".
+      const resolveStatusForOrder = (orderId: string): string => {
+        if (newStatus === 'ready_for_pickup' || newStatus === 'out_for_delivery') {
+          const order = orders.find(o => o.id === orderId);
+          const isDelivery = (order as any)?.fulfillmentType === 'delivery';
+          return isDelivery ? 'out_for_delivery' : 'ready_for_pickup';
+        }
+        return newStatus;
+      };
+
       const results = await Promise.allSettled(
-        selectedOrders.map(orderId =>
-          ordersApi.update(orderId, { status: newStatus as any })
+        eligibleOrderIds.map(orderId =>
+          ordersApi.update(orderId, { status: resolveStatusForOrder(orderId) as any })
         )
       );
 
@@ -924,7 +969,7 @@ function OrdersComponent() {
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         toast({
           title: "Bulk Update Complete",
-          description: `${successful} orders updated${failed > 0 ? `, ${failed} failed` : ''}`,
+          description: `${successful} updated, ${skippedCount > 0 ? `${skippedCount} skipped (already at or past target), ` : ''}${failed > 0 ? `${failed} failed` : ''}`.replace(/, $/, ''),
         });
       }
 
@@ -943,7 +988,7 @@ function OrdersComponent() {
     } finally {
       setIsBulkOperationLoading(false);
     }
-  }, [selectedOrders, queryClient, toast]);
+  }, [selectedOrders, orders, queryClient, toast]);
 
   const handleBulkDelete = useCallback(async () => {
     if (selectedOrders.length === 0) {
@@ -2233,8 +2278,24 @@ function OrdersComponent() {
                         exit={{ opacity: 0, scale: 0.9 }}
                         className="flex items-center gap-2"
                       >
-                        <Badge variant="secondary" className="h-11 px-4 text-base">
+                        <Badge variant="secondary" className="h-11 px-4 text-base gap-2">
                           {selectedOrders.length} selected
+                          {/* Smart status breakdown */}
+                          {(() => {
+                            const breakdown: Record<string, number> = {};
+                            selectedOrders.forEach(id => {
+                              const o = orders.find(x => x.id === id);
+                              if (o) breakdown[o.status] = (breakdown[o.status] || 0) + 1;
+                            });
+                            const parts = Object.entries(breakdown)
+                              .sort(([,a], [,b]) => b - a)
+                              .slice(0, 3)
+                              .map(([s, c]) => `${c} ${s.replace(/_/g, ' ')}`);
+                            if (parts.length > 0) {
+                              return <span className="text-xs text-muted-foreground font-normal hidden lg:inline">({parts.join(' · ')})</span>;
+                            }
+                            return null;
+                          })()}
                         </Badge>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -2253,7 +2314,9 @@ function OrdersComponent() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuLabel className="text-xs text-muted-foreground">
+                              Forward-only — skips orders at/past target
+                            </DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => handleBulkStatusUpdate('processing')}
@@ -2261,6 +2324,20 @@ function OrdersComponent() {
                             >
                               <Clock className="mr-2 h-4 w-4" />
                               Mark as Processing
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleBulkStatusUpdate('ready_for_pickup')}
+                              disabled={isBulkOperationLoading}
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Ready for Pickup
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleBulkStatusUpdate('out_for_delivery')}
+                              disabled={isBulkOperationLoading}
+                            >
+                              <Truck className="mr-2 h-4 w-4" />
+                              Out for Delivery
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleBulkStatusUpdate('completed')}
