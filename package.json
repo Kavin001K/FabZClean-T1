@@ -98,6 +98,7 @@
     "drizzle-orm": "^0.39.1",
     "drizzle-zod": "^0.7.0",
     "embla-carousel-react": "^8.6.0",
+    "esbuild": "^0.25.9",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
     "framer-motion": "^11.13.1",
@@ -181,7 +182,6 @@
     "@types/ws": "^8.5.13",
     "@vitest/browser-playwright": "^4.0.16",
     "@vitest/coverage-v8": "^4.0.16",
-    "esbuild": "^0.25.9",
     "husky": "^9.1.7",
     "playwright": "^1.57.0",
     "storybook": "^10.1.11",
@@ -201,5 +201,10 @@
     "picomatch": "^2.3.2",
     "rimraf": "^6.0.1",
     "inflight": "^1.0.6"
-  }
+  },
+  "browserslist": [
+    ">0.2%",
+    "not dead",
+    "not op_mini all"
+  ]
 }
