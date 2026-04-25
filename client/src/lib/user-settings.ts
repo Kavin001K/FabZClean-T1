@@ -1,7 +1,7 @@
 import { ROLE_NAV_ACCESS, type SystemRole } from "@shared/schema";
 
 export type Theme = "light" | "dark" | "system";
-export type LandingPage = "/dashboard" | "/orders" | "/create-order" | "/customers" | "/services";
+export type LandingPage = "/dashboard" | "/booking" | "/orders" | "/create-order" | "/customers" | "/services";
 
 export const AVAILABLE_QUICK_ACTIONS = [
   { id: "new-order", label: "New Order", icon: "Plus" },
@@ -9,6 +9,10 @@ export const AVAILABLE_QUICK_ACTIONS = [
   { id: "customer-search", label: "Customers", icon: "Users" },
   { id: "services", label: "Services", icon: "Settings" },
   { id: "print-queue", label: "Print Tags", icon: "FileText" },
+  { id: "reports", label: "Reports", icon: "BarChart3" },
+  { id: "updates", label: "Updates", icon: "RefreshCw" },
+  { id: "user-management", label: "Users", icon: "ShieldCheck" },
+  { id: "wallet-management", label: "Wallet", icon: "Wallet" },
 ] as const;
 
 export type QuickActionId = typeof AVAILABLE_QUICK_ACTIONS[number]["id"];
@@ -24,11 +28,11 @@ export const DEFAULT_SETTINGS: UserSettings = {
   theme: "system",
   landingPage: "/dashboard",
   compactMode: false,
-  quickActions: ["new-order", "active-orders", "customer-search", "print-queue"],
+  quickActions: ["new-order", "active-orders", "customer-search", "services", "print-queue"],
 };
 
 const VALID_THEMES = new Set<Theme>(["light", "dark", "system"]);
-const VALID_LANDING_PAGES = new Set<LandingPage>(["/dashboard", "/orders", "/create-order", "/customers", "/services"]);
+const VALID_LANDING_PAGES = new Set<LandingPage>(["/dashboard", "/booking", "/orders", "/create-order", "/customers", "/services"]);
 const VALID_QUICK_ACTIONS = new Set<QuickActionId>(AVAILABLE_QUICK_ACTIONS.map((action) => action.id));
 const STORAGE_KEY_PREFIX = "fabzclean_user_settings_v1";
 
@@ -55,7 +59,7 @@ export function normalizeQuickActions(value: unknown): QuickActionId[] {
 
   const uniqueActions = Array.from(new Set(value))
     .filter((action): action is QuickActionId => typeof action === "string" && VALID_QUICK_ACTIONS.has(action as QuickActionId))
-    .slice(0, 4);
+    .slice(0, 5);
 
   return uniqueActions.length > 0 ? uniqueActions : DEFAULT_SETTINGS.quickActions;
 }

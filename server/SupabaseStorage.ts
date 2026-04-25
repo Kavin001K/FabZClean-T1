@@ -1057,7 +1057,10 @@ export class SupabaseStorage {
                 'gst_number', 'franchise_id', 'store_code', 'created_at', 'priority',
                 'is_express_order', 'fulfillment_type', 'delivery_charges', 'delivery_address',
                 'tag_note', 'barcode_id', 'assigned_to', 'wallet_used', 'credit_used',
-                'is_credit_order', 'delivery_earnings_calculated', 'delivery_cash_collected'
+                'is_credit_order', 'delivery_earnings_calculated', 'delivery_cash_collected',
+                'bag_count', 'cover_type',
+                // Booking intake tracking fields
+                'booking_source', 'booking_channel', 'booking_slot', 'booking_context'
             ];
             const safeData: any = {};
             for (const key of Object.keys(snakeCaseData)) {

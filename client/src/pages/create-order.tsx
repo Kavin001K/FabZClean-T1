@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Service, Order, Customer, OrderStoreCode } from "@shared/schema";
+import type { Service, Order, Customer, OrderStoreCode, OrderCoverType } from "@shared/schema";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -54,6 +54,11 @@ interface ServiceItem {
 
 let instanceCounter = 0;
 const nextInstanceKey = (serviceId: string) => `${serviceId}_${++instanceCounter}_${Date.now()}`;
+const ORDER_COVER_OPTIONS: Array<{ value: OrderCoverType; label: string }> = [
+  { value: 'bag', label: 'Bag' },
+  { value: 'cover', label: 'Cover' },
+  { value: 'coat_cover', label: 'Coat Cover' },
+];
 
 const safeParseFloat = (val: any) => {
   const parsed = parseFloat(val);
@@ -112,6 +117,7 @@ export default function CreateOrder() {
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [isExpressOrder, setIsExpressOrder] = useState(false);
   const [bagCount, setBagCount] = useState(1);
+  const [coverType, setCoverType] = useState<OrderCoverType>('bag');
 
   // Abandoned Cart Recovery
   const ABANDONED_CART_KEY = "fabzclean_cart_draft_v1";
@@ -146,6 +152,7 @@ export default function CreateOrder() {
         if (draft.storeCode) setStoreCode(draft.storeCode);
         if (draft.billDate) setBillDate(toDateOnly(new Date(draft.billDate)));
         if (draft.bagCount) setBagCount(draft.bagCount);
+        if (draft.coverType) setCoverType(draft.coverType);
 
         toast({ title: "Draft Restored", description: "Taking you back to where you left off." });
       } catch (e) {
@@ -157,10 +164,10 @@ export default function CreateOrder() {
   // Save draft on change
   useEffect(() => {
     const draft = {
-      phoneNumber, customerName, customerPhone, customerSecondaryPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate, bagCount
+      phoneNumber, customerName, customerPhone, customerSecondaryPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate, bagCount, coverType
     };
     localStorage.setItem(ABANDONED_CART_KEY, JSON.stringify(draft));
-  }, [phoneNumber, customerName, customerPhone, customerSecondaryPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate, bagCount]);
+  }, [phoneNumber, customerName, customerPhone, customerSecondaryPhone, selectedServices, specialInstructions, foundCustomer, storeCode, billDate, bagCount, coverType]);
 
   // Customer creation popup
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
@@ -940,6 +947,7 @@ export default function CreateOrder() {
     setUseWallet(false);
     setCreditOverridePrompt(null);
     setBagCount(1);
+    setCoverType('bag');
   };
 
   // Validate phone number - flexible to accept various international formats
@@ -1121,6 +1129,7 @@ export default function CreateOrder() {
       useWallet: useWallet,
       // Bag count
       bagCount: bagCount,
+      coverType,
     };
 
     createOrderMutation.mutate(orderData);
@@ -2434,7 +2443,7 @@ export default function CreateOrder() {
                     <ShoppingBag className="h-5 w-5 text-primary" />
                     Bill Summary
                   </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <label htmlFor="bag-count" className="text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">Bags</label>
                     <Input
                       id="bag-count"
@@ -2449,6 +2458,18 @@ export default function CreateOrder() {
                       }}
                       className="h-8 w-14 text-center font-bold text-sm bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-lg"
                     />
+                    <Select value={coverType} onValueChange={(value: OrderCoverType) => setCoverType(value)}>
+                      <SelectTrigger className="h-8 w-[132px] text-xs font-bold bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-lg">
+                        <SelectValue placeholder="Print type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ORDER_COVER_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardTitle>
               </CardHeader>
@@ -2950,6 +2971,7 @@ export default function CreateOrder() {
           setDiscountValue(0);
           setExtraCharges(0);
           setBagCount(1);
+          setCoverType('bag');
           localStorage.removeItem(ABANDONED_CART_KEY);
           // Scroll to top and focus customer search for fast next-order entry
           window.scrollTo({ top: 0, behavior: 'smooth' });

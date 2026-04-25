@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { cacheService } from '../../services/cache.service';
 import { routeOptimizationService } from '../../services/route-optimization.service';
 import { paginationService } from '../../services/pagination.service';
+import { db as storage } from '../../db';
+import { ExternalApiClient, ExternalApiError } from '../../services/externalApiClient';
 import { 
   adminLoginRequired, 
   jwtRequired,
@@ -121,6 +123,54 @@ const tagLayoutLabel = (layoutKey: unknown): string => {
     default:
       return 'Thermal Tag';
   }
+};
+
+const toNumber = (value: unknown): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const parseDate = (value: unknown): Date | null => {
+  if (!value) return null;
+  const date = new Date(String(value));
+  return Number.isFinite(date.getTime()) ? date : null;
+};
+
+const buildBookingRecommendation = (metrics: any, weather?: any) => {
+  const recommendations: string[] = [];
+
+  if (metrics.overdueOrders > 0) {
+    recommendations.push(`There are ${metrics.overdueOrders} overdue bookings. Prioritize calls and schedule extra pickup windows to reduce backlog.`);
+  }
+
+  if (metrics.pendingOrders > 10) {
+    recommendations.push(`Pending workload is high with ${metrics.pendingOrders} active orders. Consider shifting staff to pickup and delivery support.`);
+  }
+
+  if (metrics.completionRate >= 90) {
+    recommendations.push(`Completion rate remains strong at ${metrics.completionRate.toFixed(1)}%. Keep the current workflow and monitor daily schedule adherence.`);
+  } else if (metrics.completionRate > 0) {
+    recommendations.push(`Completion rate is ${metrics.completionRate.toFixed(1)}%. Review operational bottlenecks and speed up order handoffs.`);
+  }
+
+  if (weather) {
+    const weatherCondition = String(weather.condition || '').toLowerCase();
+    if (weatherCondition.includes('rain')) {
+      recommendations.push('Today has rain risk. Keep waterproof packing ready and prioritize nearby pickups first.');
+    } else if (weatherCondition.includes('clear') || weatherCondition.includes('sun')) {
+      recommendations.push('Today looks sunny. This is a good window to clear pending pickups and run clustered delivery routes.');
+    } else if (weather.temperature <= 18) {
+      recommendations.push('Cool weather is forecasted. Prioritize same-day deliveries and keep customers updated on pickup times.');
+    } else if (weather.temperature >= 30) {
+      recommendations.push('Warm temperatures are coming. Plan for fast pickup and encourage customers to choose morning or evening slots.');
+    }
+  }
+
+  if (recommendations.length === 0) {
+    recommendations.push('Review the latest booking cadence and verify that the next available pickup slots match current staffing levels.');
+  }
+
+  return recommendations.slice(0, 3);
 };
 
 // Route optimization endpoint
@@ -350,6 +400,158 @@ router.post('/tag-template-optimize', adminLoginRequired, async (req, res) => {
       ? error.issues.map((issue: any) => issue?.message).filter(Boolean).join(', ')
       : error.message || 'Failed to optimize tag template';
     res.status(500).json(createErrorResponse(message, 500));
+  }
+});
+
+router.get('/operational-suggestion', async (req, res) => {
+  try {
+    const { dateRange = 'last-30-days', weatherLocation = '' } = req.query as Record<string, string>;
+    const rawOrders = await storage.listOrders();
+    const now = new Date();
+    const startDate = new Date(now);
+
+    switch (dateRange) {
+      case 'last-7-days':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'last-90-days':
+        startDate.setDate(now.getDate() - 90);
+        break;
+      case 'last-year':
+        startDate.setFullYear(now.getFullYear() - 1);
+        break;
+      case 'all':
+        startDate.setTime(0);
+        break;
+      default:
+        startDate.setDate(now.getDate() - 30);
+        break;
+    }
+
+    const orders = rawOrders.filter((order: any) => {
+      if (!order || !order.createdAt) return false;
+      const createdAt = parseDate(order.createdAt);
+      return createdAt ? createdAt >= startDate : false;
+    });
+
+    const activeOrders = orders.filter((order: any) => order.status !== 'cancelled');
+    const completedOrders = activeOrders.filter((order: any) => ['completed', 'delivered'].includes(order.status));
+    const pendingOrders = activeOrders.filter((order: any) => ['pending', 'processing', 'assigned', 'ready_for_pickup', 'ready_for_transit', 'in_progress'].includes(order.status));
+    const overdueOrders = activeOrders.filter((order: any) => {
+      const dueDate = parseDate(order.pickupDate || order.dueDate || order.createdAt);
+      if (!dueDate) return false;
+      return dueDate < now && !['completed', 'delivered', 'cancelled'].includes(order.status);
+    });
+
+    const revenueLast30Days = activeOrders.reduce((sum: number, order: any) => sum + toNumber(order.totalAmount), 0);
+    const completionRate = activeOrders.length > 0 ? (completedOrders.length / activeOrders.length) * 100 : 0;
+
+    const serviceCounts = new Map<string, number>();
+    activeOrders.forEach((order: any) => {
+      const items = Array.isArray(order.items) ? order.items : [];
+      const primaryService = items.length > 0 ? String(items[0]?.productName || items[0]?.name || items[0]?.service || items[0]?.productId || 'General service') : 'General service';
+      serviceCounts.set(primaryService, (serviceCounts.get(primaryService) || 0) + 1);
+    });
+
+    const topService = Array.from(serviceCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name]) => name)[0];
+
+    let weather: any | undefined;
+    if (weatherLocation && weatherLocation.trim().length > 0) {
+      try {
+        const client = new ExternalApiClient();
+        const weatherResponse = await client.get<any>('/weather', {
+          q: weatherLocation,
+          units: 'metric',
+        });
+
+        const condition = weatherResponse?.weather?.[0]?.description || weatherResponse?.current?.weather?.[0]?.description || 'Unknown';
+        const temperature = toNumber(weatherResponse?.main?.temp ?? weatherResponse?.current?.temp ?? 0);
+        const humidity = toNumber(weatherResponse?.main?.humidity ?? weatherResponse?.current?.humidity ?? 0);
+
+        weather = {
+          location: weatherResponse?.name || weatherLocation,
+          condition: String(condition),
+          temperature,
+          humidity,
+          recommendation: '',
+        };
+
+        if (weather.condition.toLowerCase().includes('rain')) {
+          weather.recommendation = 'Rain is expected. Protect deliveries and inform customers about possible delays.';
+        } else if (weather.temperature <= 18) {
+          weather.recommendation = 'Cool weather is expected. Prioritize same-day pickups and keep customers informed.';
+        } else if (weather.temperature >= 30) {
+          weather.recommendation = 'Warm weather is forecasted. Encourage morning or evening bookings to avoid heat-related issues.';
+        }
+      } catch (error) {
+        if (error instanceof ExternalApiError) {
+          console.warn('Weather lookup failed:', error.message);
+        } else {
+          console.warn('Unexpected error during weather lookup:', error);
+        }
+      }
+    }
+
+    const metrics = {
+      totalOrders: activeOrders.length,
+      pendingOrders: pendingOrders.length,
+      overdueOrders: overdueOrders.length,
+      revenueLast30Days,
+      completionRate,
+      topService,
+    };
+
+    const recommendations = buildBookingRecommendation(metrics, weather);
+    let recommendation = recommendations[0] || 'Review booking workload and weather before finalizing the schedule.';
+
+    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    if (geminiApiKey) {
+      try {
+        const prompt = [
+          'You are an intelligent operations assistant for a service business.',
+          'Use the ERP metrics below and optional weather signal to provide 2 concise recommendations for booking, staffing, and delivery planning.',
+          'Return plain text only.',
+          `Metrics: ${JSON.stringify(metrics)}`,
+          `Weather: ${JSON.stringify(weather || { unavailable: true })}`,
+        ].join('\n');
+
+        const llmResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.3 },
+            }),
+          }
+        );
+
+        if (llmResponse.ok) {
+          const raw = await llmResponse.text();
+          const envelope = JSON.parse(raw);
+          const aiText = envelope?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || '').join('') || '';
+          if (aiText) {
+            recommendation = aiText.trim();
+          }
+        }
+      } catch (error) {
+        console.warn('Gemini suggestion failed, falling back to heuristic guidance.', error);
+      }
+    }
+
+    res.json(createSuccessResponse({
+      analytics: metrics,
+      weather,
+      recommendation,
+      recommendations,
+    }, 'Operational booking suggestion generated'));
+  } catch (error) {
+    console.error('Operational suggestion error:', error);
+    res.status(500).json(createErrorResponse('Failed to generate operational suggestion', 500));
   }
 });
 

@@ -36,11 +36,13 @@ const CreateOrder = lazy(() => retryDynamicImport(() => import("@/pages/create-o
 const Customers = lazy(() => retryDynamicImport(() => import("@/pages/customers")));
 const Services = lazy(() => retryDynamicImport(() => import("@/pages/services")));
 const Reports = lazy(() => retryDynamicImport(() => import("@/pages/reports")));
+const Updates = lazy(() => retryDynamicImport(() => import("@/pages/updates")));
 const PrintQueue = lazy(() => retryDynamicImport(() => import("@/pages/print-queue")));
 const UserManagement = lazy(() => retryDynamicImport(() => import("@/pages/user-management")));
 const WalletManagement = lazy(() => retryDynamicImport(() => import("@/pages/wallet-management")));
 
 const Settings = lazy(() => retryDynamicImport(() => import("@/pages/settings")));
+const BookingPage = lazy(() => retryDynamicImport(() => import("@/pages/booking")));
 const PerformanceAnalytics = lazy(() => retryDynamicImport(() => import("@/components/analytics")));
 const BillView = lazy(() => retryDynamicImport(() => import("@/pages/bill-view")));
 
@@ -128,6 +130,14 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/booking">
+        <ProtectedRoute>
+          <MainLayout>
+            <BookingPage />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
       <Route path="/customers">
         <ProtectedRoute>
           <MainLayout>
@@ -164,6 +174,14 @@ function Router() {
         <ProtectedRoute>
           <MainLayout>
             <Reports />
+          </MainLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/updates">
+        <ProtectedRoute>
+          <MainLayout>
+            <Updates />
           </MainLayout>
         </ProtectedRoute>
       </Route>

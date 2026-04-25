@@ -9,6 +9,9 @@ import {
   Scissors,
   Wallet,
   ShieldCheck,
+  BarChart3,
+  RefreshCw,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -28,12 +31,15 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: Home },
+  { to: "/booking", label: "Booking", icon: CalendarDays, allowedRoles: ["admin", "store_manager", "store_staff"] },
   { to: "/create-order", label: "New Order", icon: PlusCircle, allowedRoles: ["admin", "store_manager", "store_staff"] },
   { to: "/orders", label: "Active Orders", icon: ListOrdered },
   { to: "/customers", label: "Customers", icon: Users2, allowedRoles: ["admin", "store_manager", "store_staff"] },
   { to: "/wallet-management", label: "Wallet", icon: Wallet, allowedRoles: ["admin", "store_manager", "store_staff"] },
   { to: "/user-management", label: "Users", icon: ShieldCheck, allowedRoles: ["admin"] },
   { to: "/services", label: "Services", icon: Scissors, allowedRoles: ["admin", "store_manager"] },
+  { to: "/reports", label: "Reports", icon: BarChart3, allowedRoles: ["admin", "store_manager", "factory_manager"] },
+  { to: "/updates", label: "Updates", icon: RefreshCw, allowedRoles: ["admin", "store_manager", "store_staff", "factory_manager"] },
   { to: "/print-queue", label: "Print Tags", icon: Printer },
 ];
 

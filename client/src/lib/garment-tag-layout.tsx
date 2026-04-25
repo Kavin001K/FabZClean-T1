@@ -1,6 +1,7 @@
 import React from 'react';
 import { DEFAULT_COMPANY_INFO, getFranchiseById } from './franchise-config';
 import { normalizeOrderStoreCode } from './order-store';
+import type { OrderCoverType } from '@shared/schema';
 
 export const THERMAL_TAG_WIDTH_MM = 36;
 export const THERMAL_TAG_HEIGHT_MM = 28;
@@ -1156,6 +1157,7 @@ export interface BagTagSource {
   totalItems: number;
   totalServices: number;
   bagCount: number;
+  coverType?: OrderCoverType | string;
 }
 
 export interface PreparedBagTag {
@@ -1170,9 +1172,26 @@ export interface PreparedBagTag {
   dueText: string;
   totalItemsText: string;
   totalServicesText: string;
+  bagTypeText: string;
   bagLabel: string;
   bagLabelFontMm: number;
 }
+
+const normalizeCoverType = (value?: OrderCoverType | string): OrderCoverType => {
+  if (value === 'cover' || value === 'coat_cover') return value;
+  return 'bag';
+};
+
+const getBagTypeLabel = (value?: OrderCoverType | string) => {
+  switch (normalizeCoverType(value)) {
+    case 'cover':
+      return 'COVER';
+    case 'coat_cover':
+      return 'COAT COVER';
+    default:
+      return 'BAG';
+  }
+};
 
 export const prepareBagTags = ({
   orderNumber,
@@ -1184,6 +1203,7 @@ export const prepareBagTags = ({
   totalItems,
   totalServices,
   bagCount,
+  coverType,
 }: BagTagSource): PreparedBagTag[] => {
   const shortOrderId = formatShortOrderId(orderNumber);
   const shortOrderFit = fitUppercaseText(shortOrderId, shortOrderId, {
@@ -1214,9 +1234,10 @@ export const prepareBagTags = ({
   const billText = formatTagDate(billDate);
   const dueText = formatTagDate(dueDate);
   const count = Math.max(1, bagCount);
+  const bagTypeText = getBagTypeLabel(coverType);
 
   return Array.from({ length: count }, (_, i) => {
-    const bagLabel = `BAG ${i + 1}/${count}`;
+    const bagLabel = `${bagTypeText} ${i + 1}/${count}`;
     const bagLabelFit = fitUppercaseText(bagLabel, bagLabel, {
       baseFontMm: 6.5,
       minFontMm: 4.5,
@@ -1238,6 +1259,7 @@ export const prepareBagTags = ({
       dueText,
       totalItemsText: `${totalItems} ITEMS`,
       totalServicesText: `${totalServices} SVC`,
+      bagTypeText,
       bagLabel: bagLabelFit.text,
       bagLabelFontMm: bagLabelFit.fontSizeMm,
     };
@@ -1282,6 +1304,7 @@ const getBagTagPrintStyles = (pageHeightMm: number) => `
   .bag-date-pill { line-height: 0.9; font-weight: 800; letter-spacing: 0.03mm; white-space: nowrap; padding: 0.2mm 0.5mm 0.1mm; border: 0.22mm solid #000; border-radius: 99mm; justify-self: end; font-size: 2.2mm; }
   .bag-customer { font-weight: 900; line-height: 0.88; letter-spacing: 0.02mm; padding-top: 0.12mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
   .bag-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 0.5mm; border: 0.3mm solid #000; border-radius: 1mm; padding: 0.5mm; }
+  .bag-type { font-size: 2.2mm; line-height: 0.9; font-weight: 800; letter-spacing: 0.08mm; text-transform: uppercase; text-align: center; }
   .bag-label { font-weight: 900; line-height: 0.85; letter-spacing: 0.04mm; text-transform: uppercase; text-align: center; }
   .bag-info { display: flex; justify-content: center; gap: 2mm; font-size: 2.4mm; font-weight: 700; line-height: 1; }
   .bag-footer { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 0.55mm; min-height: 3mm; padding-top: 0.1mm; }
@@ -1304,6 +1327,7 @@ export const buildBagTagPrintHtml = (tags: PreparedBagTag[], title: string) => {
       </div>
       <div class="bag-customer" style="font-size:${tag.customerFontMm}mm;">${escapeHtml(tag.customerText)}</div>
       <div class="bag-body">
+        <div class="bag-type">${escapeHtml(tag.bagTypeText)}</div>
         <div class="bag-label" style="font-size:${tag.bagLabelFontMm}mm;">${escapeHtml(tag.bagLabel)}</div>
         <div class="bag-info">
           <span>${escapeHtml(tag.totalItemsText)}</span>
@@ -1508,4 +1532,3 @@ export function BagTagLabel({ tag }: { tag: PreparedBagTag }) {
     </div>
   );
 }
-

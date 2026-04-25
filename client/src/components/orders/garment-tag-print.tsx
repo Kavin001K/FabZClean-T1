@@ -18,6 +18,7 @@ import {
   buildBagTagPrintHtml,
   BagTagLabel,
 } from '@/lib/garment-tag-layout';
+import type { OrderCoverType } from '@shared/schema';
 
 interface GarmentTagPrintProps {
   open: boolean;
@@ -33,6 +34,7 @@ interface GarmentTagPrintProps {
   billDate?: string;
   dueDate?: string;
   bagCount?: number;
+  coverType?: OrderCoverType | string;
   totalItems?: number;
   totalServices?: number;
 }
@@ -50,6 +52,7 @@ export function GarmentTagPrint({
   billDate,
   dueDate,
   bagCount = 1,
+  coverType = 'bag',
   totalItems,
   totalServices,
 }: GarmentTagPrintProps) {
@@ -79,8 +82,9 @@ export function GarmentTagPrint({
       totalItems: itemCount,
       totalServices: svcCount,
       bagCount: count,
+      coverType,
     });
-  }, [orderNumber, customerName, franchiseId, storeCode, billDate, dueDate, bagCount, totalItems, totalServices, items]);
+  }, [orderNumber, customerName, franchiseId, storeCode, billDate, dueDate, bagCount, coverType, totalItems, totalServices, items]);
 
   const handlePrint = () => {
     if (preparedTags.length === 0) {

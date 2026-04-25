@@ -129,11 +129,31 @@ function normalizeHeaders(headers?: HeadersInit): HeadersMap {
   return { ...(headers as HeadersMap) };
 }
 
+function hasHeader(headers: HeadersMap, key: string): boolean {
+  const target = key.toLowerCase();
+  return Object.keys(headers).some((headerKey) => headerKey.toLowerCase() === target);
+}
+
+function deleteHeader(headers: HeadersMap, key: string): void {
+  const target = key.toLowerCase();
+  for (const headerKey of Object.keys(headers)) {
+    if (headerKey.toLowerCase() === target) {
+      delete headers[headerKey];
+    }
+  }
+}
+
 function withAuth(init: RequestInit = {}): RequestInit {
   const headers = normalizeHeaders(init.headers);
-  if (!headers["Content-Type"]) {
+  const isFormDataBody = typeof FormData !== "undefined" && init.body instanceof FormData;
+
+  // Let browser set multipart boundaries automatically for FormData.
+  if (isFormDataBody) {
+    deleteHeader(headers, "Content-Type");
+  } else if (!hasHeader(headers, "Content-Type")) {
     headers["Content-Type"] = "application/json";
   }
+
   const token = getAccessToken();
   if (token) {
     headers.Authorization = `Bearer ${token}`;
@@ -190,18 +210,30 @@ async function fetchAllPaginated<T>(
 ): Promise<T[]> {
   const allRows: T[] = [];
   let cursor: string | undefined;
+  let page = 1;
 
-  for (let page = 0; page < maxPages; page++) {
+  for (let i = 0; i < maxPages; i++) {
     const queryParams = new URLSearchParams({
       limit: String(pageSize),
       ...params,
+      page: String(page),
     });
 
     if (cursor) {
       queryParams.set("cursor", cursor);
     }
 
-    const response = await fetchData<{ data?: T[]; pagination?: { hasMore?: boolean; cursor?: string } } | T[]>(
+    const response = await fetchData<{
+      data?: T[];
+      pagination?: {
+        hasMore?: boolean;
+        cursor?: string;
+        total?: number;
+        limit?: number;
+        page?: number;
+        totalPages?: number;
+      };
+    } | T[]>(
       `${endpoint}?${queryParams.toString()}`
     );
 
@@ -212,11 +244,40 @@ async function fetchAllPaginated<T>(
     const rows = Array.isArray(response?.data) ? response.data : [];
     allRows.push(...rows);
 
-    if (!response?.pagination?.hasMore || !response?.pagination?.cursor) {
-      break;
+    const pagination = response?.pagination ?? {};
+
+    // Prefer cursor strategy when backend provides it.
+    if (pagination.cursor) {
+      if (!pagination.hasMore) break;
+      cursor = pagination.cursor;
+      page += 1;
+      continue;
     }
 
-    cursor = response.pagination.cursor;
+    // Fallback: standard page-based pagination.
+    const total = Number(pagination.total ?? 0);
+    const effectiveLimit = Number(pagination.limit ?? pageSize) || pageSize;
+    const totalPages =
+      Number.isFinite(Number(pagination.totalPages))
+        ? Number(pagination.totalPages)
+        : total > 0
+          ? Math.ceil(total / effectiveLimit)
+          : 0;
+
+    if (pagination.hasMore === true) {
+      page += 1;
+      continue;
+    }
+    if (totalPages > 0 && page < totalPages) {
+      page += 1;
+      continue;
+    }
+    if (rows.length >= effectiveLimit && (total === 0 || allRows.length < total)) {
+      page += 1;
+      continue;
+    }
+
+    break;
   }
 
   return allRows;

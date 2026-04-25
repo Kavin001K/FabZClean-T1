@@ -351,7 +351,7 @@ function DesktopProgress({
           style={{ left: `${100 / (steps.length * 2)}%`, right: `${100 / (steps.length * 2)}%` }}
         >
           <div
-            className="tracking-sweep h-full rounded-full bg-gradient-to-r from-[#8ec63f] via-[#14b8a6] to-[#f59e0b] transition-all duration-700 ease-out"
+            className="tracking-sweep h-full rounded-full bg-gradient-to-r from-[#8ec63f] via-[#14b8a6] to-[#f59e0b] animate-sweep transition-all duration-700 ease-out shadow-[0_0_12px_rgba(20,184,166,0.6)]"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -823,10 +823,10 @@ export default function PublicOrderTracking() {
               </Badge>
               <div className="space-y-3">
                 <h1 className="max-w-3xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-                  Clear order status, built for glanceable mobile use.
+                  Track Your Order
                 </h1>
                 <p className="max-w-2xl text-sm leading-7 text-slate-600 sm:text-lg">
-                  Open the link, enter the order number, and see the latest stage instantly.
+                  Enter your order number to see the latest progress instantly.
                 </p>
               </div>
             </div>

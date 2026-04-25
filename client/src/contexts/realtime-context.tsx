@@ -3,7 +3,7 @@ import { useWebSocket } from '@/hooks/use-websocket';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { getWebSocketUrl } from '@/lib/data-service';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, isSupabaseRealtimeEnabled } from '@/lib/supabase';
 import { useRealtime as useSupabaseRealtime } from '@/hooks/use-realtime';
 import { useAuth } from './auth-context';
 
@@ -57,6 +57,127 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     }));
   }, [supabaseDrivers]);
 
+  const processSocketEvent = (type: string, data: any) => {
+    if (type === 'analytics_update') {
+      setAnalyticsData(data);
+      return;
+    }
+
+    if (type === 'driver_assigned' || type === 'driver_status_update') {
+      queryClient.invalidateQueries({ queryKey: ['live-tracking-drivers'] });
+      toast({ title: 'Driver Update', description: 'Driver information has been updated.' });
+    }
+
+    // Invalidate queries to refetch data
+    if (type.startsWith('order_')) {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['print-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['order', data?.id] });
+      queryClient.invalidateQueries({ queryKey: ['live-tracking-orders'] });
+      toast({ title: 'Orders updated', description: 'The list of orders has been updated in real-time.' });
+    }
+
+    if (type.startsWith('customer_')) {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customer', data?.id] });
+      toast({ title: 'Customers updated', description: 'The list of customers has been updated in real-time.' });
+    }
+
+    if (type.startsWith('employee_')) {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      queryClient.invalidateQueries({ queryKey: ['employee', data?.id] });
+      toast({ title: 'Employees updated', description: 'The list of employees has been updated in real-time.' });
+    }
+
+    if (type.startsWith('product_')) {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product', data?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-items'] }); // For inventory page
+      queryClient.invalidateQueries({ queryKey: ['inventory-kpis'] }); // For inventory KPIs
+      toast({ title: 'Products updated', description: 'The list of products has been updated in real-time.' });
+    }
+
+    if (type.startsWith('service_')) {
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['service', data?.id] });
+      toast({ title: 'Services updated', description: 'The list of services has been updated in real-time.' });
+    }
+
+    if (type.startsWith('credit_') || type.startsWith('wallet_')) {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['credits'] });
+      queryClient.invalidateQueries({ queryKey: ['wallet-management'] });
+    }
+
+    if (type.startsWith('invoice_')) {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice', data?.id] });
+      queryClient.invalidateQueries({ queryKey: ['accounts-receivable'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts-payable'] });
+      toast({ title: 'Invoices updated', description: 'Invoice data has been updated in real-time.' });
+    }
+
+    if (type.startsWith('expense_')) {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['expense', data?.id] });
+      toast({ title: 'Expenses updated', description: 'Expense data has been updated in real-time.' });
+    }
+
+    if (type.startsWith('budget_')) {
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['budget', data?.id] });
+      queryClient.invalidateQueries({ queryKey: ['budget-vs-actual'] });
+      toast({ title: 'Budgets updated', description: 'Budget data has been updated in real-time.' });
+    }
+
+    if (type.startsWith('taxRate_')) {
+      queryClient.invalidateQueries({ queryKey: ['tax-rates'] });
+      queryClient.invalidateQueries({ queryKey: ['taxRate', data?.id] });
+      toast({ title: 'Tax Rates updated', description: 'Tax rate data has been updated in real-time.' });
+    }
+
+    if (type.startsWith('account_')) {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['account', data?.id] });
+      queryClient.invalidateQueries({ queryKey: ['chart-of-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['general-ledger'] });
+      queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
+      queryClient.invalidateQueries({ queryKey: ['income-statement'] });
+      toast({ title: 'Accounts updated', description: 'Account data has been updated in real-time.' });
+    }
+
+    if (type.startsWith('journalEntry_')) {
+      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['journalEntry', data?.id] });
+      queryClient.invalidateQueries({ queryKey: ['general-ledger'] });
+      queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
+      queryClient.invalidateQueries({ queryKey: ['income-statement'] });
+      toast({ title: 'Journal Entry updated', description: 'Journal entry has been updated in real-time.' });
+    }
+
+    if (type.startsWith('payment_')) {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['payment', data?.id] });
+      queryClient.invalidateQueries({ queryKey: ['accounts-receivable'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts-payable'] });
+      toast({ title: 'Payment updated', description: 'Payment data has been updated in real-time.' });
+    }
+
+    if (type.startsWith('posTransaction_')) {
+      queryClient.invalidateQueries({ queryKey: ['pos/transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['posTransaction', data?.id] });
+      toast({ title: 'POS Transaction updated', description: 'Transaction has been updated in real-time.' });
+    }
+
+    if (type.startsWith('setting_')) {
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+      queryClient.invalidateQueries({ queryKey: ['setting', data?.key] });
+      toast({ title: 'Settings updated', description: 'Settings have been updated in real-time.' });
+    }
+  };
+
   const { subscribe } = useWebSocket({
     url: skipBackendWS ? null : wsUrl,
     maxReconnectAttempts: skipBackendWS ? 0 : 5, // Disable reconnection in development
@@ -66,135 +187,30 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       if (skipBackendWS) return;
 
       console.debug('WS update:', message?.type);
+      const maybeBatch = message as any;
+      if (Array.isArray(maybeBatch?.messages)) {
+        for (const batched of maybeBatch.messages) {
+          const batchType = typeof batched?.type === 'string' ? batched.type : '';
+          if (!batchType) continue;
+          processSocketEvent(batchType, batched?.data);
+        }
+        return;
+      }
+
       const { type, data } = message || {};
 
       // Guard against undefined or null type
       if (!type) {
-        console.warn('Received WebSocket message without type:', message);
+        // Ignore known metadata/control payloads from websocket server
+        const controlKeys = ['batchId', 'messages', 'topics', 'portalType', 'timestamp'];
+        const hasControlShape = message && typeof message === 'object' &&
+          controlKeys.some((key) => Object.prototype.hasOwnProperty.call(message as unknown as Record<string, unknown>, key));
+        if (!hasControlShape) {
+          console.warn('Received WebSocket message without type:', message);
+        }
         return;
       }
-
-      if (type === 'analytics_update') {
-        setAnalyticsData(data);
-        return;
-      }
-
-      // Note: driver_locations are now handled by Supabase Realtime above
-      // We keep this for backward compatibility if WS sends other data
-
-      if (type === 'driver_assigned' || type === 'driver_status_update') {
-        queryClient.invalidateQueries({ queryKey: ['live-tracking-drivers'] });
-        toast({ title: 'Driver Update', description: 'Driver information has been updated.' });
-      }
-
-      // Invalidate queries to refetch data
-      if (type.startsWith('order_')) {
-        queryClient.invalidateQueries({ queryKey: ['orders'] });
-        queryClient.invalidateQueries({ queryKey: ['print-queue'] });
-        queryClient.invalidateQueries({ queryKey: ['order', data?.id] });
-        queryClient.invalidateQueries({ queryKey: ['live-tracking-orders'] });
-        toast({ title: 'Orders updated', description: 'The list of orders has been updated in real-time.' });
-      }
-
-      if (type.startsWith('customer_')) {
-        queryClient.invalidateQueries({ queryKey: ['customers'] });
-        queryClient.invalidateQueries({ queryKey: ['customer', data?.id] });
-        toast({ title: 'Customers updated', description: 'The list of customers has been updated in real-time.' });
-      }
-
-      if (type.startsWith('employee_')) {
-        queryClient.invalidateQueries({ queryKey: ['employees'] });
-        queryClient.invalidateQueries({ queryKey: ['employee', data?.id] });
-        toast({ title: 'Employees updated', description: 'The list of employees has been updated in real-time.' });
-      }
-
-      if (type.startsWith('product_')) {
-        queryClient.invalidateQueries({ queryKey: ['products'] });
-        queryClient.invalidateQueries({ queryKey: ['product', data?.id] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-items'] }); // For inventory page
-        queryClient.invalidateQueries({ queryKey: ['inventory-kpis'] }); // For inventory KPIs
-        toast({ title: 'Products updated', description: 'The list of products has been updated in real-time.' });
-      }
-
-      if (type.startsWith('service_')) {
-        queryClient.invalidateQueries({ queryKey: ['services'] });
-        queryClient.invalidateQueries({ queryKey: ['service', data?.id] });
-        toast({ title: 'Services updated', description: 'The list of services has been updated in real-time.' });
-      }
-
-      if (type.startsWith('credit_') || type.startsWith('wallet_')) {
-        queryClient.invalidateQueries({ queryKey: ['customers'] });
-        queryClient.invalidateQueries({ queryKey: ['credits'] });
-        queryClient.invalidateQueries({ queryKey: ['wallet-management'] });
-      }
-
-      if (type.startsWith('invoice_')) {
-        queryClient.invalidateQueries({ queryKey: ['invoices'] });
-        queryClient.invalidateQueries({ queryKey: ['invoice', data?.id] });
-        queryClient.invalidateQueries({ queryKey: ['accounts-receivable'] });
-        queryClient.invalidateQueries({ queryKey: ['accounts-payable'] });
-        toast({ title: 'Invoices updated', description: 'Invoice data has been updated in real-time.' });
-      }
-
-      if (type.startsWith('expense_')) {
-        queryClient.invalidateQueries({ queryKey: ['expenses'] });
-        queryClient.invalidateQueries({ queryKey: ['expense', data?.id] });
-        toast({ title: 'Expenses updated', description: 'Expense data has been updated in real-time.' });
-      }
-
-      if (type.startsWith('budget_')) {
-        queryClient.invalidateQueries({ queryKey: ['budgets'] });
-        queryClient.invalidateQueries({ queryKey: ['budget', data?.id] });
-        queryClient.invalidateQueries({ queryKey: ['budget-vs-actual'] });
-        toast({ title: 'Budgets updated', description: 'Budget data has been updated in real-time.' });
-      }
-
-      if (type.startsWith('taxRate_')) {
-        queryClient.invalidateQueries({ queryKey: ['tax-rates'] });
-        queryClient.invalidateQueries({ queryKey: ['taxRate', data?.id] });
-        toast({ title: 'Tax Rates updated', description: 'Tax rate data has been updated in real-time.' });
-      }
-
-      if (type.startsWith('account_')) {
-        queryClient.invalidateQueries({ queryKey: ['accounts'] });
-        queryClient.invalidateQueries({ queryKey: ['account', data?.id] });
-        queryClient.invalidateQueries({ queryKey: ['chart-of-accounts'] });
-        queryClient.invalidateQueries({ queryKey: ['general-ledger'] });
-        queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
-        queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
-        queryClient.invalidateQueries({ queryKey: ['income-statement'] });
-        toast({ title: 'Accounts updated', description: 'Account data has been updated in real-time.' });
-      }
-
-      if (type.startsWith('journalEntry_')) {
-        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
-        queryClient.invalidateQueries({ queryKey: ['journalEntry', data?.id] });
-        queryClient.invalidateQueries({ queryKey: ['general-ledger'] });
-        queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
-        queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
-        queryClient.invalidateQueries({ queryKey: ['income-statement'] });
-        toast({ title: 'Journal Entry updated', description: 'Journal entry has been updated in real-time.' });
-      }
-
-      if (type.startsWith('payment_')) {
-        queryClient.invalidateQueries({ queryKey: ['payments'] });
-        queryClient.invalidateQueries({ queryKey: ['payment', data?.id] });
-        queryClient.invalidateQueries({ queryKey: ['accounts-receivable'] });
-        queryClient.invalidateQueries({ queryKey: ['accounts-payable'] });
-        toast({ title: 'Payment updated', description: 'Payment data has been updated in real-time.' });
-      }
-
-      if (type.startsWith('posTransaction_')) {
-        queryClient.invalidateQueries({ queryKey: ['pos/transactions'] });
-        queryClient.invalidateQueries({ queryKey: ['posTransaction', data?.id] });
-        toast({ title: 'POS Transaction updated', description: 'Transaction has been updated in real-time.' });
-      }
-
-      if (type.startsWith('setting_')) {
-        queryClient.invalidateQueries({ queryKey: ['settings'] });
-        queryClient.invalidateQueries({ queryKey: ['setting', data?.key] });
-        toast({ title: 'Settings updated', description: 'Settings have been updated in real-time.' });
-      }
+      processSocketEvent(type, data);
     },
   });
 
@@ -222,7 +238,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   }, [subscribe]);
 
   useEffect(() => {
-    if (!employee || !isSupabaseConfigured) return;
+    if (!employee || !isSupabaseConfigured || !isSupabaseRealtimeEnabled) return;
 
     const invalidateByTable = (table: string) => {
       if (table === 'orders') {

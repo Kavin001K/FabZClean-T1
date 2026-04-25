@@ -42,10 +42,10 @@ export const MAX_ADMIN_COUNT = 5;
 
 /** Navigation access matrix: role → allowed route prefixes */
 export const ROLE_NAV_ACCESS: Record<SystemRole, string[]> = {
-  admin: ['/', '/dashboard', '/create-order', '/orders', '/customers', '/wallet-management', '/credits', '/user-management', '/services', '/print-queue', '/settings', '/profile'],
-  store_manager: ['/', '/dashboard', '/create-order', '/orders', '/customers', '/wallet-management', '/credits', '/services', '/print-queue', '/settings', '/profile'],
-  factory_manager: ['/', '/dashboard', '/orders', '/print-queue', '/settings', '/profile'],
-  store_staff: ['/', '/dashboard', '/create-order', '/orders', '/customers', '/wallet-management', '/credits', '/print-queue', '/profile'],
+  admin: ['/', '/dashboard', '/booking', '/create-order', '/orders', '/customers', '/wallet-management', '/credits', '/user-management', '/services', '/reports', '/updates', '/print-queue', '/settings', '/profile'],
+  store_manager: ['/', '/dashboard', '/booking', '/create-order', '/orders', '/customers', '/wallet-management', '/credits', '/services', '/reports', '/updates', '/print-queue', '/settings', '/profile'],
+  factory_manager: ['/', '/dashboard', '/orders', '/reports', '/updates', '/print-queue', '/settings', '/profile'],
+  store_staff: ['/', '/dashboard', '/booking', '/create-order', '/orders', '/customers', '/wallet-management', '/credits', '/updates', '/print-queue', '/profile'],
   factory_staff: [], // No login
   driver: ['/profile'],
 };
@@ -95,6 +95,9 @@ export interface OrderItem {
 export const ORDER_STORE_CODES = ["POL", "KIN", "MCET", "UDM"] as const;
 export type OrderStoreCode = (typeof ORDER_STORE_CODES)[number];
 export const DEFAULT_ORDER_STORE_CODE: OrderStoreCode = "POL";
+export const ORDER_COVER_TYPES = ["bag", "cover", "coat_cover"] as const;
+export type OrderCoverType = (typeof ORDER_COVER_TYPES)[number];
+export const DEFAULT_ORDER_COVER_TYPE: OrderCoverType = "bag";
 
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -145,6 +148,8 @@ export const orders = pgTable("orders", {
   tagTemplateId: text("tag_template_id"),
   // Tag printing tracking
   tagsPrinted: boolean("tags_printed").default(false),
+  bagCount: integer("bag_count").default(1),
+  coverType: text("cover_type", { enum: ORDER_COVER_TYPES }).default(DEFAULT_ORDER_COVER_TYPE),
   // Delivery earnings & credit tracking
   deliveryEarningsCalculated: integer("delivery_earnings_calculated").default(0),
   deliveryCashCollected: decimal("delivery_cash_collected", { precision: 10, scale: 2 }).default("0"),
@@ -399,7 +404,8 @@ export const insertOrderSchema = z.object({
   isCreditOrder: z.coerce.boolean().optional().default(false),
   walletUsed: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
   creditUsed: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
-  bagCount: z.number().optional().default(1),
+  bagCount: z.coerce.number().int().min(1).optional().default(1),
+  coverType: z.enum(ORDER_COVER_TYPES).optional().default(DEFAULT_ORDER_COVER_TYPE),
   deliveredAt: z.coerce.date().optional().nullable(),
   dispatchedAt: z.coerce.date().optional().nullable(),
   createdAt: z.coerce.date().optional(),

@@ -412,6 +412,20 @@ router.post('/:id/mark-paid', async (req, res) => {
         const isNoAccount = noCreditAccountPhrases.some(phrase => errorLower.includes(phrase));
         if (isNoAccount) {
           console.warn('[OrdersRoute] processCreditRepayment skipped (no credit account/balance):', repayment.error);
+          // Still record the payment transaction in the ledger for cash/upi
+          try {
+            await (storage as any).supabase.from('transactions').insert({
+              customer_id: order.customerId,
+              order_id: orderId,
+              type: 'ORDER_PAYMENT',
+              payment_method: String(paymentMethod).toUpperCase(),
+              amount: settlementAmount,
+              status: 'SUCCESS',
+              recorded_by: req.employee?.id || null
+            });
+          } catch (txErr) {
+            console.error('[OrdersRoute] Failed to record fallback transaction:', txErr);
+          }
         } else {
           return res.status(400).json(createErrorResponse(repayment.error || 'Failed to settle outstanding balance', 400));
         }
@@ -591,7 +605,9 @@ router.get('/', async (req, res) => {
 
     const response = createPaginatedResponse(serializedOrders, {
       total: orders.length,
-      limit: limit
+      limit: limit,
+      page,
+      hasMore: endIndex < total,
     });
 
     res.json(response);

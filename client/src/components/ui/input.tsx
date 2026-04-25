@@ -7,6 +7,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const nameAttr = (props.name || '').toLowerCase();
       const idAttr = (props.id || '').toLowerCase();
+      const placeholderAttr = (props.placeholder || '').toLowerCase();
       
       const isLoginOrEmailField = 
         type === 'email' || 
@@ -17,8 +18,17 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         nameAttr.includes('username') ||
         idAttr.includes('username');
 
+      const isCaseSensitiveTextField =
+        isLoginOrEmailField ||
+        ['url', 'website', 'link', 'domain', 'slug', 'upi', 'id'].some(
+          (keyword) =>
+            nameAttr.includes(keyword) ||
+            idAttr.includes(keyword) ||
+            placeholderAttr.includes(keyword),
+        );
+
       if (
-        !isLoginOrEmailField &&
+        !isCaseSensitiveTextField &&
         type !== 'number' &&
         type !== 'tel' &&
         type !== 'date' &&
@@ -26,7 +36,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
       ) {
         const name = nameAttr;
         const id = idAttr;
-        const placeholder = (props.placeholder || '').toLowerCase();
+        const placeholder = placeholderAttr;
         
         // Exact match exclusions or keyword inclusions
         const isNameOrAddress = ['name', 'address', 'street', 'city', 'location', 'company'].some(

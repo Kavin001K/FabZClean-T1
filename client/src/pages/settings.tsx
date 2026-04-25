@@ -29,7 +29,8 @@ import {
   Moon, Sun, Laptop, Zap,
   LayoutDashboard, Plus, Search, Receipt,
   FileText, Users, Settings, Loader2,
-  Save, Upload, Trash2, Sparkles
+  Save, Upload, Trash2, Sparkles, Globe, Smartphone,
+  Wallet, ShieldCheck, BarChart3, RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { businessConfigApi, getBillingCache } from '@/lib/business-config-service';
@@ -81,6 +82,10 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'customer-search': Search,
   'services': Settings,
   'print-queue': FileText,
+  'reports': BarChart3,
+  'updates': RefreshCw,
+  'user-management': ShieldCheck,
+  'wallet-management': Wallet,
 };
 
 export default function SettingsPage() {
@@ -166,12 +171,88 @@ export default function SettingsPage() {
     config: { ...DEFAULT_TAG_TEMPLATE_CONFIG },
   });
   const [aiOptimizedTagTemplateDraft, setAiOptimizedTagTemplateDraft] = useState<Partial<TagTemplateProfile> | null>(null);
+  const [platformControls, setPlatformControls] = useState({
+    websiteEnabled: true,
+    appEnabled: true,
+    bookingEnabled: true,
+    orderUpdatesEnabled: true,
+  });
+  const [platformSavingKey, setPlatformSavingKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (businessProfile) {
-      setProfileDraft(businessProfile);
+      setProfileDraft({
+        ...businessProfile,
+        contactDetails: {
+          ...businessProfile.contactDetails,
+          website: normalizeWebsiteUrl(businessProfile.contactDetails.website || ''),
+        },
+      });
     }
   }, [businessProfile]);
+
+  useEffect(() => {
+    let mounted = true;
+    const token = localStorage.getItem('employee_token');
+    if (!token || !isAdmin) return;
+
+    const loadPlatformControls = async () => {
+      try {
+        const res = await fetch('/api/settings/category/platform', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!res.ok) return;
+        const rows = await res.json();
+        const byKey = new Map((Array.isArray(rows) ? rows : []).map((entry: any) => [entry.key, entry.value]));
+        if (!mounted) return;
+        setPlatformControls((prev) => ({
+          websiteEnabled: byKey.has('platform.website.enabled') ? Boolean(byKey.get('platform.website.enabled')) : prev.websiteEnabled,
+          appEnabled: byKey.has('platform.app.enabled') ? Boolean(byKey.get('platform.app.enabled')) : prev.appEnabled,
+          bookingEnabled: byKey.has('platform.booking.enabled') ? Boolean(byKey.get('platform.booking.enabled')) : prev.bookingEnabled,
+          orderUpdatesEnabled: byKey.has('platform.orderUpdates.enabled') ? Boolean(byKey.get('platform.orderUpdates.enabled')) : prev.orderUpdatesEnabled,
+        }));
+      } catch {
+        // noop
+      }
+    };
+
+    void loadPlatformControls();
+    return () => {
+      mounted = false;
+    };
+  }, [isAdmin]);
+
+  const savePlatformControl = async (key: string, value: boolean) => {
+    const token = localStorage.getItem('employee_token');
+    if (!token) return;
+    setPlatformSavingKey(key);
+    try {
+      const res = await fetch(`/api/settings/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ value, category: 'platform' }),
+      });
+      if (!res.ok) throw new Error('Could not save setting');
+      toast({
+        title: 'Platform setting updated',
+        description: `${key} is now ${value ? 'enabled' : 'disabled'}.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Failed to save setting',
+        description: error?.message || 'Try again in a moment.',
+        variant: 'destructive',
+      });
+    } finally {
+      setPlatformSavingKey(null);
+    }
+  };
 
   useEffect(() => {
     if (selectedStoreId === 'new') {
@@ -461,6 +542,7 @@ export default function SettingsPage() {
     return store ? `${store.code} · ${store.name}` : 'Store';
   };
 
+  const normalizeWebsiteUrl = (value: string): string => value.trim().toLowerCase();
 
   const applyAiTemplateVersion = () => {
     if (!aiOptimizedTemplateDraft) return;
@@ -510,7 +592,7 @@ export default function SettingsPage() {
 
   return (
     <div className="container-desktop min-h-screen py-8 pb-20 sm:pb-8 gradient-mesh">
-      <div className="mx-auto max-w-4xl space-y-8">
+      <div className="mx-auto w-full max-w-[1850px] space-y-8">
         {/* Header */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
@@ -527,15 +609,46 @@ export default function SettingsPage() {
         </div>
 
         <Tabs defaultValue="appearance" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
-            <TabsTrigger value="appearance" className="gap-2">
+          <TabsList
+            className={cn(
+              "w-full gap-2",
+              isAdmin
+                ? "flex overflow-x-auto whitespace-nowrap justify-start lg:grid lg:grid-cols-7"
+                : "grid grid-cols-2 lg:w-[440px]"
+            )}
+          >
+            <TabsTrigger value="appearance" className="gap-2 min-w-[140px] lg:min-w-0">
               <Laptop className="h-4 w-4" />
               Appearance
             </TabsTrigger>
-            <TabsTrigger value="workflow" className="gap-2">
+            <TabsTrigger value="workflow" className="gap-2 min-w-[140px] lg:min-w-0">
               <Zap className="h-4 w-4" />
               Workflow
             </TabsTrigger>
+            {isAdmin && (
+              <>
+                <TabsTrigger value="platform" className="gap-2 min-w-[140px] lg:min-w-0">
+                  <Globe className="h-4 w-4" />
+                  Platform
+                </TabsTrigger>
+                <TabsTrigger value="business" className="gap-2 min-w-[140px] lg:min-w-0">
+                  <Settings className="h-4 w-4" />
+                  Business
+                </TabsTrigger>
+                <TabsTrigger value="stores" className="gap-2 min-w-[140px] lg:min-w-0">
+                  <Users className="h-4 w-4" />
+                  Stores
+                </TabsTrigger>
+                <TabsTrigger value="invoice" className="gap-2 min-w-[140px] lg:min-w-0">
+                  <FileText className="h-4 w-4" />
+                  Invoice
+                </TabsTrigger>
+                <TabsTrigger value="tags" className="gap-2 min-w-[140px] lg:min-w-0">
+                  <Smartphone className="h-4 w-4" />
+                  Tags
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
 
           {/* === APPEARANCE TAB === */}
@@ -620,6 +733,7 @@ export default function SettingsPage() {
                     </SelectTrigger>
                     <SelectContent className="rounded-xl border-white/10 glass shadow-2xl">
                       <SelectItem value="/dashboard">Dashboard Overview</SelectItem>
+                      <SelectItem value="/booking">Booking Guidance</SelectItem>
                       <SelectItem value="/orders">Orders Management</SelectItem>
                       <SelectItem value="/create-order">New Order Creation</SelectItem>
                       <SelectItem value="/customers">Customer Database</SelectItem>
@@ -636,11 +750,11 @@ export default function SettingsPage() {
                     <div className="space-y-1">
                       <Label className="text-base">Dashboard Quick Actions</Label>
                       <p className="text-sm text-muted-foreground">
-                        Select up to 4 shortcuts for your main dashboard.
+                        Select up to 5 shortcuts for your main dashboard.
                       </p>
                     </div>
                     <Badge variant="outline" className="w-fit py-1 px-3 border-primary/20 bg-primary/5 text-primary">
-                      {settings.quickActions.length} / 4 Selected
+                      {settings.quickActions.length} / 5 Selected
                     </Badge>
                   </div>
 
@@ -648,7 +762,7 @@ export default function SettingsPage() {
                     {AVAILABLE_QUICK_ACTIONS.map((action) => {
                       const isSelected = settings.quickActions.includes(action.id);
                       const IconComponent = ICON_MAP[action.id] || Plus;
-                      const isMaxed = settings.quickActions.length >= 4 && !isSelected;
+                      const isMaxed = settings.quickActions.length >= 5 && !isSelected;
 
                       return (
                         <button
@@ -696,6 +810,84 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </TabsContent>
+          {isAdmin && (
+            <TabsContent value="platform" className="space-y-6 mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Website & App Controls</CardTitle>
+                  <CardDescription>
+                    Control platform-level switches for website, mobile app, and booking visibility.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-6 md:grid-cols-2">
+                  <div className="rounded-xl border p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-base">Website</Label>
+                        <p className="text-xs text-muted-foreground">Enable customer website pages and APIs.</p>
+                      </div>
+                      <Switch
+                        checked={platformControls.websiteEnabled}
+                        disabled={platformSavingKey === 'platform.website.enabled'}
+                        onCheckedChange={(checked) => {
+                          setPlatformControls((prev) => ({ ...prev, websiteEnabled: checked }));
+                          void savePlatformControl('platform.website.enabled', checked);
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-base">Mobile App</Label>
+                        <p className="text-xs text-muted-foreground">Enable mobile app logins and core flows.</p>
+                      </div>
+                      <Switch
+                        checked={platformControls.appEnabled}
+                        disabled={platformSavingKey === 'platform.app.enabled'}
+                        onCheckedChange={(checked) => {
+                          setPlatformControls((prev) => ({ ...prev, appEnabled: checked }));
+                          void savePlatformControl('platform.app.enabled', checked);
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-base">Booking</Label>
+                        <p className="text-xs text-muted-foreground">Enable pickup booking on website and app.</p>
+                      </div>
+                      <Switch
+                        checked={platformControls.bookingEnabled}
+                        disabled={platformSavingKey === 'platform.booking.enabled'}
+                        onCheckedChange={(checked) => {
+                          setPlatformControls((prev) => ({ ...prev, bookingEnabled: checked }));
+                          void savePlatformControl('platform.booking.enabled', checked);
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-base">Order Updates</Label>
+                        <p className="text-xs text-muted-foreground">Show live order updates to customers.</p>
+                      </div>
+                      <Switch
+                        checked={platformControls.orderUpdatesEnabled}
+                        disabled={platformSavingKey === 'platform.orderUpdates.enabled'}
+                        onCheckedChange={(checked) => {
+                          setPlatformControls((prev) => ({ ...prev, orderUpdatesEnabled: checked }));
+                          void savePlatformControl('platform.orderUpdates.enabled', checked);
+                        }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
           {isAdmin && profileDraft && (
             <TabsContent value="business" className="space-y-6 mt-6">
               <Card>
@@ -768,7 +960,16 @@ export default function SettingsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Website</Label>
-                    <Input value={profileDraft.contactDetails.website || ''} onChange={(e) => setProfileDraft({ ...profileDraft, contactDetails: { ...profileDraft.contactDetails, website: e.target.value } })} />
+                    <Input
+                      value={profileDraft.contactDetails.website || ''}
+                      onChange={(e) => setProfileDraft({
+                        ...profileDraft,
+                        contactDetails: {
+                          ...profileDraft.contactDetails,
+                          website: normalizeWebsiteUrl(e.target.value),
+                        },
+                      })}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>WhatsApp Bill Message</Label>
@@ -920,7 +1121,19 @@ export default function SettingsPage() {
                     <Textarea rows={3} value={profileDraft.invoiceDefaults.footerNote || ''} onChange={(e) => setProfileDraft({ ...profileDraft, invoiceDefaults: { ...profileDraft.invoiceDefaults, footerNote: e.target.value } })} />
                   </div>
                   <div className="flex justify-end md:col-span-2">
-                    <Button onClick={() => profileDraft && saveBusinessProfile.mutate(profileDraft)} disabled={saveBusinessProfile.isPending}>
+                    <Button
+                      onClick={() =>
+                        profileDraft &&
+                        saveBusinessProfile.mutate({
+                          ...profileDraft,
+                          contactDetails: {
+                            ...profileDraft.contactDetails,
+                            website: normalizeWebsiteUrl(profileDraft.contactDetails.website || ''),
+                          },
+                        })
+                      }
+                      disabled={saveBusinessProfile.isPending}
+                    >
                       {saveBusinessProfile.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                       Save Business Profile
                     </Button>
@@ -1136,7 +1349,7 @@ export default function SettingsPage() {
 
           {isAdmin && (
             <TabsContent value="invoice" className="mt-6">
-              <div className="grid gap-6 xl:grid-cols-[340px_1fr_1fr]">
+              <div className="grid gap-6 xl:grid-cols-[minmax(320px,380px)_minmax(480px,1fr)_minmax(420px,1fr)]">
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between gap-3">
@@ -1365,7 +1578,7 @@ export default function SettingsPage() {
 
           {isAdmin && (
             <TabsContent value="tags" className="mt-6">
-              <div className="grid gap-6 xl:grid-cols-[340px_1fr_320px]">
+              <div className="grid gap-6 xl:grid-cols-[minmax(320px,380px)_minmax(480px,1fr)_minmax(320px,420px)]">
                 <Card>
                   <CardHeader>
                     <CardTitle>Tag Templates</CardTitle>

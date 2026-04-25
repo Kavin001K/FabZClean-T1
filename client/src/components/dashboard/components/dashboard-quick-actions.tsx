@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   PlusCircle, QrCode, Search, Truck, Calculator, Users,
-  FileText, Receipt, Settings, Package
+  FileText, Receipt, Settings, Package, BarChart3, RefreshCw, ShieldCheck, Wallet
 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 
@@ -49,6 +49,34 @@ const ACTIONS_CONFIG: Record<string, {
     route: '/print-queue',
     color: 'text-indigo-500',
     description: 'Print garment tags'
+  },
+  'reports': {
+    label: 'Reports',
+    icon: BarChart3,
+    route: '/reports',
+    color: 'text-pink-500',
+    description: 'View business reports'
+  },
+  'updates': {
+    label: 'Updates',
+    icon: RefreshCw,
+    route: '/updates',
+    color: 'text-teal-500',
+    description: 'View system updates'
+  },
+  'user-management': {
+    label: 'Users',
+    icon: ShieldCheck,
+    route: '/user-management',
+    color: 'text-red-500',
+    description: 'Manage staff accounts'
+  },
+  'wallet-management': {
+    label: 'Wallet',
+    icon: Wallet,
+    route: '/wallet-management',
+    color: 'text-emerald-500',
+    description: 'Manage customer wallets'
   },
 };
 

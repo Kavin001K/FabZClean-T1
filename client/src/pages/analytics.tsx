@@ -126,6 +126,32 @@ export default function Analytics() {
 
   const { toast } = useToast();
 
+  const {
+    data: bookingSuggestions,
+    isLoading: bookingSuggestionsLoading,
+    error: bookingSuggestionsError,
+    refetch: refetchBookingSuggestions,
+  } = useQuery({
+    queryKey: ['operational-suggestion', dateRange],
+    queryFn: async () => {
+      const params = new URLSearchParams({ dateRange });
+      const response = await fetch(`/api/v1/algorithms/operational-suggestion?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('employee_token')}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch booking guidance');
+      }
+      return response.json();
+    },
+    staleTime: 1000 * 60 * 2,
+    retry: 1,
+  });
+
+  const bookingInsightText = bookingSuggestions?.recommendation || 'AI booking guidance will appear here once data is loaded.';
+  const bookingInsightList = bookingSuggestions?.recommendations || [];
+
   // Adapt Server Data to Component Structure
   const analyticsData = useMemo(() => {
     if (!serverAnalytics) {
@@ -483,6 +509,74 @@ export default function Analytics() {
           </Button>
         </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            AI booking & weather guidance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-border bg-muted p-4">
+              <p className="text-sm text-muted-foreground">
+                This section combines recent ERP throughput with weather-aware suggestions to help you prioritize daily bookings and staffing.
+              </p>
+              <div className="mt-4 text-sm text-foreground">
+                {bookingSuggestionsLoading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Fetching guidance...
+                  </div>
+                ) : bookingSuggestionsError ? (
+                  <div className="text-destructive">Could not load recommendation. Try refreshing.</div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="font-medium">{bookingInsightText}</p>
+                    {bookingInsightList.length > 0 && (
+                      <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+                        {bookingInsightList.map((item, index) => (
+                          <li key={index}>{item}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="rounded-lg border border-border p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium">Top suggestion</p>
+                  <p className="text-xs text-muted-foreground">Powered by ERP metrics and optional weather signal.</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => refetchBookingSuggestions()} disabled={bookingSuggestionsLoading}>
+                  Refresh
+                </Button>
+              </div>
+              <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+                {bookingSuggestions?.weather ? (
+                  <div>
+                    <p className="font-medium">Weather: {bookingSuggestions.weather.condition}</p>
+                    <p>{bookingSuggestions.weather.location} · {Math.round(bookingSuggestions.weather.temperature)}°C</p>
+                    {bookingSuggestions.weather.recommendation && (
+                      <p className="mt-2 text-xs text-foreground">{bookingSuggestions.weather.recommendation}</p>
+                    )}
+                  </div>
+                ) : (
+                  <div>No weather data available. Configure EXTERNAL_API_KEY + EXTERNAL_API_BASE_URL to enable live weather signal.</div>
+                )}
+                <div className="rounded-lg border border-dashed border-border p-3 bg-background">
+                  <p className="text-sm">Pending orders: {bookingSuggestions?.analytics.pendingOrders ?? '—'}</p>
+                  <p className="text-sm">Overdue orders: {bookingSuggestions?.analytics.overdueOrders ?? '—'}</p>
+                  <p className="text-sm">30d revenue: ₹{bookingSuggestions?.analytics.revenueLast30Days?.toLocaleString() ?? '—'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <Card>

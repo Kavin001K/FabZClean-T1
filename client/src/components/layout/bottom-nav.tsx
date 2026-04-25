@@ -2,9 +2,9 @@ import { Link, useLocation } from "wouter";
 import {
     Home,
     ShoppingCart,
-    PlusCircle,
+    CalendarDays,
     Users2,
-    Wallet,
+    Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -13,9 +13,9 @@ import { useAuth } from "@/contexts/auth-context";
 const BOTTOM_NAV_ITEMS = [
     { to: "/", label: "Home", icon: Home, allowedRoles: ["admin", "store_manager", "factory_manager", "store_staff"] },
     { to: "/orders", label: "Orders", icon: ShoppingCart },
-    { to: "/create-order", label: "New", icon: PlusCircle, allowedRoles: ["admin", "store_manager", "store_staff"] },
+    { to: "/booking", label: "Booking", icon: CalendarDays, allowedRoles: ["admin", "store_manager", "store_staff"] },
     { to: "/customers", label: "Customers", icon: Users2, allowedRoles: ["admin", "store_manager", "store_staff"] },
-    { to: "/wallet-management", label: "Wallet", icon: Wallet, allowedRoles: ["admin", "store_manager", "store_staff"] },
+    { to: "/updates", label: "Updates", icon: Bell, allowedRoles: ["admin", "store_manager", "store_staff", "factory_manager"] },
 ];
 
 export function BottomNav() {
@@ -34,7 +34,7 @@ export function BottomNav() {
                 {filteredItems.map((item) => {
                     const isActive = location === item.to;
                     const Icon = item.icon;
-                    const isNewOrder = item.to === "/create-order";
+                    const isBooking = item.to === "/booking";
 
                     return (
                         <Link
@@ -50,13 +50,13 @@ export function BottomNav() {
                             <div
                                 className={cn(
                                     "flex h-9 w-9 items-center justify-center rounded-full transition-all",
-                                    isNewOrder
+                                    isBooking
                                         ? "bg-primary text-white"
                                         : "bg-transparent",
-                                    isActive && !isNewOrder && "bg-primary/10 text-primary"
+                                    isActive && !isBooking && "bg-primary/10 text-primary"
                                 )}
                             >
-                                <Icon className={cn(isNewOrder ? "h-5 w-5" : "h-5 w-5")} />
+                                <Icon className="h-5 w-5" />
                             </div>
                             <span className="max-w-full truncate px-0.5 text-[10px] font-medium">
                                 {item.label}

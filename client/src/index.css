@@ -307,6 +307,16 @@
     }
   }
 
+  @keyframes shimmer-sweep {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+
+  .animate-sweep {
+    animation: shimmer-sweep 3s infinite linear;
+    background-size: 200% auto;
+  }
+
   /* Stagger Animation Delays */
   .animate-delay-100 {
     animation-delay: 100ms;

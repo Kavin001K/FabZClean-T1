@@ -621,6 +621,7 @@ export function OrderConfirmationDialog({
                     customerName: order?.customerName,
                 }))}
                 bagCount={(order as any)?.bagCount || (order as any)?.bag_count || 1}
+                coverType={(order as any)?.coverType || (order as any)?.cover_type || 'bag'}
                 totalItems={(order?.items || []).reduce((sum: number, item: any) => sum + (typeof item.quantity === 'number' ? item.quantity : parseInt(item.quantity) || 1), 0)}
                 totalServices={(order?.items || []).length}
             />

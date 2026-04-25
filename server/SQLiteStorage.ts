@@ -301,6 +301,8 @@ export class SQLiteStorage implements IStorage {
         lastWhatsappStatus TEXT,
         lastWhatsappSentAt TEXT,
         whatsappMessageCount INTEGER DEFAULT 0,
+        bagCount INTEGER DEFAULT 1,
+        coverType TEXT DEFAULT 'bag',
         
         createdBy TEXT,
         employeeId TEXT,
@@ -711,6 +713,8 @@ export class SQLiteStorage implements IStorage {
           { name: 'lastWhatsappStatus', type: 'TEXT' },
           { name: 'lastWhatsappSentAt', type: 'TEXT' },
           { name: 'whatsappMessageCount', type: 'INTEGER DEFAULT 0' },
+          { name: 'bagCount', type: 'INTEGER DEFAULT 1' },
+          { name: 'coverType', type: 'TEXT DEFAULT "bag"' },
           // Service fields
           { name: 'service', type: 'TEXT' },
           { name: 'serviceId', type: 'TEXT' },

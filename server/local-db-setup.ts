@@ -142,6 +142,8 @@ db.exec(`
     lastWhatsappSentAt TEXT,
     whatsappMessageCount INTEGER DEFAULT 0,
     tagsPrinted INTEGER DEFAULT 0,
+    bagCount INTEGER DEFAULT 1,
+    coverType TEXT DEFAULT 'bag',
     createdAt TEXT,
     updatedAt TEXT,
     FOREIGN KEY (customerId) REFERENCES customers(id)

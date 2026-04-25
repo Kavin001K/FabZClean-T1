@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import { jwtRequired, requireRole } from "../middleware/auth";
 import { storage } from "../storage";
 import { businessConfigService } from "../services/business-config-service";
@@ -11,12 +12,69 @@ import {
 
 const router = Router();
 
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype?.startsWith("image/")) {
+      cb(new Error("Only image uploads are allowed"));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+function extensionForMime(mime: string): string {
+  switch (mime) {
+    case "image/png":
+      return "png";
+    case "image/jpeg":
+      return "jpg";
+    case "image/webp":
+      return "webp";
+    case "image/svg+xml":
+      return "svg";
+    default:
+      return "bin";
+  }
+}
+
+async function uploadBrandingAsset(file: Express.Multer.File): Promise<string> {
+  const supabase = (storage as any)?.supabase;
+  if (!supabase) {
+    throw new Error("Storage backend is not available");
+  }
+
+  const ext = extensionForMime(file.mimetype);
+  const key = `logos/bill-logo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("branding")
+    .upload(key, file.buffer, {
+      contentType: file.mimetype,
+      upsert: true,
+    });
+
+  if (uploadError) {
+    throw new Error(uploadError.message || "Failed to upload logo to storage");
+  }
+
+  const { data } = supabase.storage.from("branding").getPublicUrl(key);
+  if (!data?.publicUrl) {
+    throw new Error("Failed to resolve uploaded logo URL");
+  }
+
+  return data.publicUrl;
+}
+
 // All routes require authentication
 router.use(jwtRequired);
 
 // --- Business Profile ---
 
-router.get("/business-profile", async (req, res) => {
+router.get("/business-profile", async (_req, res) => {
   try {
     const profile = await businessConfigService.getBusinessProfile();
     res.json({ success: true, profile });
@@ -34,6 +92,34 @@ router.put("/business-profile", requireRole(["admin"]), async (req, res) => {
     res.status(400).json({ success: false, error: error.message });
   }
 });
+
+router.post(
+  "/business-profile/logo",
+  requireRole(["admin"]),
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: "No image uploaded" });
+      }
+
+      const logoUrl = await uploadBrandingAsset(req.file);
+      const current = await businessConfigService.getBusinessProfile();
+      const merged = businessProfileSchema.parse({
+        ...current,
+        invoiceDefaults: {
+          ...(current?.invoiceDefaults || {}),
+          logoUrl,
+        },
+      });
+
+      const profile = await (storage as any).upsertBusinessProfile(merged);
+      res.json({ success: true, profile });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message || "Logo upload failed" });
+    }
+  }
+);
 
 // --- Stores ---
 
@@ -142,7 +228,7 @@ router.get("/tag-templates/resolve", async (req, res) => {
 
     const store = storeId ? await (storage as any).getStore(storeId) : null;
     const templates = await (storage as any).listTagTemplates({ storeId, isActive: true });
-    
+
     let template = null;
     if (templateId) {
       template = await (storage as any).getTagTemplate(templateId);
@@ -152,10 +238,10 @@ router.get("/tag-templates/resolve", async (req, res) => {
       template = templates.find((t: any) => t.isDefault) || templates[0];
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       store: store ? storeConfigSchema.parse(store) : null,
-      template: template ? tagTemplateProfileSchema.parse(template) : null
+      template: template ? tagTemplateProfileSchema.parse(template) : null,
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });

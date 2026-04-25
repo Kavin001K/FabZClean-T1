@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, isSupabaseRealtimeEnabled } from '@/lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface UseRealtimeOptions {
@@ -134,7 +134,7 @@ export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeRe
   // Set up realtime subscription
   useEffect(() => {
     // Skip if disabled or Supabase is not configured
-    if (!enabled || !isSupabaseConfigured) return;
+    if (!enabled || !isSupabaseConfigured || !isSupabaseRealtimeEnabled) return;
 
     // Clean up previous subscription if it exists
     if (channelRef.current) {
@@ -228,4 +228,3 @@ export function useRealtime<T = any>(options: UseRealtimeOptions): UseRealtimeRe
     error,
   };
 }
-

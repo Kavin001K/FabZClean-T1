@@ -143,8 +143,9 @@ const canEditOrder = (order: Order): boolean => !isWorkflowLocked(order);
 const canCancelOrder = (order: Order): boolean => !isWorkflowLocked(order);
 
 const canProcessPayment = (order: Order): boolean => {
+  // Allow payment updates for orders that are not cancelled and not already fully paid
   const paymentStatus = String((order as any).paymentStatus || '').toLowerCase();
-  return order.status !== 'cancelled' && paymentStatus !== 'paid' && paymentStatus !== 'credit';
+  return order.status !== 'cancelled' && paymentStatus !== 'paid';
 };
 
 const canDebitWallet = (order: Order): boolean => canProcessPayment(order);
@@ -891,7 +892,9 @@ function OrdersComponent() {
     if (!canProcessPayment(order)) {
       toast({
         title: "Payment Update Unavailable",
-        description: "Cancelled orders cannot be marked as paid.",
+        description: order.status === 'cancelled' 
+          ? "Cannot update payment for cancelled orders."
+          : "This order is already marked as paid.",
         variant: "destructive",
       });
       return;

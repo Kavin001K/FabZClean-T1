@@ -39,7 +39,7 @@ import { ordersApi, formatCurrency } from "@/lib/data-service";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { Order, OrderItem } from "@shared/schema";
-import { buildThermalTagPrintHtml, prepareThermalTags } from "@/lib/garment-tag-layout";
+import { buildBagTagPrintHtml, buildThermalTagPrintHtml, prepareBagTags, prepareThermalTags } from "@/lib/garment-tag-layout";
 import {
     ORDER_STORE_OPTIONS,
     getOrderStoreLabel,
@@ -62,6 +62,25 @@ const PAYMENT_OPTIONS = [
     { value: "paid", label: "Paid" },
     { value: "credit", label: "Credit" },
 ];
+
+const getOrderBagCount = (order: Order | any) => {
+    const value = Number((order as any)?.bagCount ?? (order as any)?.bag_count ?? 1);
+    if (!Number.isFinite(value)) return 1;
+    return Math.max(1, Math.trunc(value));
+};
+
+const getOrderCoverType = (order: Order | any) => {
+    const value = String((order as any)?.coverType ?? (order as any)?.cover_type ?? "bag");
+    if (value === "cover" || value === "coat_cover") return value;
+    return "bag";
+};
+
+const getOrderCoverLabel = (order: Order | any) => {
+    const coverType = getOrderCoverType(order);
+    if (coverType === "cover") return "Cover";
+    if (coverType === "coat_cover") return "Coat Cover";
+    return "Bag";
+};
 
 const statusColor = (s: string) => {
     switch (s) {
@@ -279,11 +298,58 @@ export default function PrintTags() {
         [printInvoice]
     );
 
+    /** Print bag or cover tags for one or many orders in a single popup */
+    const handlePrintBags = useCallback((targetOrders: Order[]) => {
+        if (targetOrders.length === 0) {
+            toast({ title: "No orders selected", variant: "destructive" });
+            return;
+        }
+
+        const preparedBagTags = targetOrders.flatMap((order) => {
+            const items = Array.isArray(order.items) ? order.items : [];
+            return prepareBagTags({
+                orderNumber: order.orderNumber,
+                customerName: order.customerName,
+                franchiseId: (order as any).franchiseId || (order as any).franchise_id || null,
+                storeCode: resolveOrderStoreCodeFromOrder(order),
+                billDate: order.createdAt ? String(order.createdAt) : undefined,
+                dueDate: (order as any).pickupDate
+                    ? String((order as any).pickupDate)
+                    : (order as any).dueDate
+                        ? String((order as any).dueDate)
+                        : undefined,
+                totalItems: items.reduce((sum: number, item: OrderItem) => sum + (item.quantity || 1), 0),
+                totalServices: items.length,
+                bagCount: getOrderBagCount(order),
+                coverType: getOrderCoverType(order),
+            });
+        });
+
+        if (preparedBagTags.length === 0) {
+            toast({ title: "No printable bags", description: "The selected orders do not contain printable bag tags.", variant: "destructive" });
+            return;
+        }
+
+        const tagWindow = window.open("", "_blank", "width=600,height=800");
+        if (!tagWindow) {
+            toast({ title: "Popup blocked", description: "Please allow popups", variant: "destructive" });
+            return;
+        }
+
+        tagWindow.document.write(buildBagTagPrintHtml(preparedBagTags, `Bag Tags - ${targetOrders.length} Orders`));
+        tagWindow.document.close();
+    }, [toast]);
+
     /** Print selected orders' tags */
     const handlePrintSelectedTags = useCallback(() => {
         const selected = filteredOrders.filter((o: Order) => selectedIds.includes(o.id));
         handlePrintTags(selected);
     }, [filteredOrders, selectedIds, handlePrintTags]);
+
+    const handlePrintSelectedBags = useCallback(() => {
+        const selected = filteredOrders.filter((o: Order) => selectedIds.includes(o.id));
+        handlePrintBags(selected);
+    }, [filteredOrders, selectedIds, handlePrintBags]);
 
     /** Mark selected as printed */
     const handleMarkSelectedPrinted = useCallback(() => {
@@ -505,6 +571,9 @@ export default function PrintTags() {
                             <Button size="sm" onClick={handlePrintSelectedTags} className="font-bold">
                                 <Printer className="h-4 w-4 mr-2" /> {activeTab === 'pending' ? 'Print All Tags' : 'Reprint All Tags'}
                             </Button>
+                            <Button size="sm" variant="outline" onClick={handlePrintSelectedBags} className="font-bold gap-2 border-primary/20">
+                                <Package className="h-4 w-4" /> {activeTab === 'pending' ? 'Print All Bags' : 'Reprint All Bags'}
+                            </Button>
                             {activeTab === 'pending' && (
                                 <Button
                                     size="sm"
@@ -646,6 +715,8 @@ export default function PrintTags() {
                                                     <span className="opacity-20">•</span>
                                                     <span>{items.length} item{items.length !== 1 ? "s" : ""}</span>
                                                     <span className="opacity-20">•</span>
+                                                    <span>{getOrderBagCount(order)} {getOrderCoverLabel(order).toLowerCase()}{getOrderBagCount(order) !== 1 ? "s" : ""}</span>
+                                                    <span className="opacity-20">•</span>
                                                     <span className="text-primary font-bold">{formatCurrency(parseFloat(order.totalAmount || "0"))}</span>
                                                     <span className="opacity-20">•</span>
                                                     <span className="text-xs opacity-70">
@@ -671,6 +742,16 @@ export default function PrintTags() {
                                                 >
                                                     <Tag className="h-4 w-4" />
                                                     <span>{activeTab === 'pending' ? 'Tags' : 'Reprint'}</span>
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-9 px-3 gap-2 text-xs font-bold hover:bg-violet-500/10 hover:text-violet-500 transition-all"
+                                                    onClick={() => handlePrintBags([order])}
+                                                    title={activeTab === 'pending' ? "Print bags or covers" : "Reprint bags or covers"}
+                                                >
+                                                    <Package className="h-4 w-4" />
+                                                    <span>Bags</span>
                                                 </Button>
                                                 <Button
                                                     size="sm"
@@ -721,6 +802,11 @@ export default function PrintTags() {
                                             <p className="text-[10px] font-bold text-primary uppercase tracking-widest pl-1">
                                                 Items in Order
                                             </p>
+                                            <div className="flex flex-wrap gap-2 pl-1">
+                                                <Badge variant="outline" className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider bg-violet-500/10 text-violet-600 border-violet-500/20">
+                                                    {getOrderBagCount(order)} {getOrderCoverLabel(order)}
+                                                </Badge>
+                                            </div>
                                             <div className="grid grid-cols-1 gap-2">
                                                 {items.map((item: any, idx: number) => (
                                                     <div

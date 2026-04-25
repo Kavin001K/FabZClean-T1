@@ -18,11 +18,20 @@ const rankTrackedOrderMatch = (order: any, searchTerm: string) => {
         return Number.POSITIVE_INFINITY;
     }
 
-    if (storedOrderNum === searchTerm || storedId === searchTerm) return 0;
-    if (storedOrderNum === `fzc-${searchTerm}` || searchTerm === `fzc-${storedOrderNum}`) return 1;
-    if (storedOrderNum.endsWith(searchTerm) || searchTerm.endsWith(storedOrderNum)) return 2;
-    if (storedOrderNum.includes(searchTerm)) return 3;
-    if (searchTerm.includes(storedOrderNum)) return 4;
+    const isCancelled = order?.status === 'cancelled';
+    const penalty = isCancelled ? 10 : 0; // Penalize cancelled orders
+
+    if (storedOrderNum === searchTerm || storedId === searchTerm) return 0 + penalty;
+    if (storedOrderNum === `fzc-${searchTerm}` || searchTerm === `fzc-${storedOrderNum}`) return 1 + penalty;
+    
+    // Exact suffix match (ignoring the 'a' at the end of modern orders if searchTerm is just numbers)
+    const normalizedTermForSuffix = searchTerm.replace(/\D/g, '');
+    const suffixBase = storedOrderNum.replace(/a$/, '');
+    if (suffixBase.endsWith(normalizedTermForSuffix) && normalizedTermForSuffix.length > 0) return 2 + penalty;
+    
+    if (storedOrderNum.endsWith(searchTerm) || searchTerm.endsWith(storedOrderNum)) return 3 + penalty;
+    if (storedOrderNum.includes(searchTerm)) return 4 + penalty;
+    if (searchTerm.includes(storedOrderNum)) return 5 + penalty;
 
     return Number.POSITIVE_INFINITY;
 };
