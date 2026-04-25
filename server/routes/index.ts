@@ -32,6 +32,7 @@ import franchiseRouter from './franchise';
 import driversRouter from './drivers';
 import tasksRouter from './tasks';
 import transitRouter from './transit';
+import bookingsRouter, { publicBookingsRouter } from './bookings';
 import { jwtRequired } from '../middleware/auth';
 import { debugRouter } from './debug';
 import { db as storage } from '../db';
@@ -154,6 +155,7 @@ export function registerAllRoutes(app: Express): void {
   // Public routes (no authentication required)
   app.use('/api/public', publicTrackingRouter);
   app.use('/api/public', publicInvoiceRouter);
+  app.use('/api/public', publicBookingsRouter);
 
   // Authentication routes
   app.use('/api/auth', authRouter);
@@ -171,6 +173,7 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/employees', employeesRouter);
   app.use('/api/v1/orders', ordersRouter);
   app.use('/api/v1/customers', customersRouter);
+  app.use('/api/v1/bookings', bookingsRouter);
   app.use('/api/franchises', franchiseRouter);
   app.use('/api/drivers', driversRouter);
   app.use('/api/tasks', tasksRouter);

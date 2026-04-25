@@ -65,6 +65,19 @@ export type CustomerFeedbackRecord = {
   feedbackStatus: string | null;
 };
 
+export type CustomerBookingRecord = {
+  id: string;
+  bookingId: string;
+  status: string;
+  source: string | null;
+  channel: string | null;
+  storeCode: string | null;
+  preferredDate: string | null;
+  preferredSlot: string | null;
+  createdAt: string | null;
+  convertedOrderId: string | null;
+};
+
 export type CustomerProfileDetails = {
   customer: Customer;
   customerRating: number | null;
@@ -74,6 +87,7 @@ export type CustomerProfileDetails = {
   neutralReviews: number;
   negativeReviews: number;
   recentOrders: CustomerOrderHistoryRecord[];
+  recentBookings: CustomerBookingRecord[];
   feedbackHistory: CustomerFeedbackRecord[];
 };
 

@@ -137,10 +137,12 @@ type DetailTarget =
   | { type: 'franchise'; key: string; title: string };
 
 const RANGE_OPTIONS = [
-  { value: '7', label: 'Last 7 days' },
-  { value: '30', label: 'Last 30 days' },
-  { value: '90', label: 'Last 90 days' },
-  { value: '180', label: 'Last 180 days' },
+  { value: '1', label: 'Day-wise Sales' },
+  { value: '7', label: 'Weekly Sales' },
+  { value: '14', label: 'Fortnightly Sales' },
+  { value: '30', label: 'Monthly Sales' },
+  { value: '90', label: 'Quarterly Sales' },
+  { value: '365', label: 'Yearly Sales' },
 ];
 
 const formatCurrency = (amount: number) =>
@@ -481,6 +483,11 @@ export default function ReportsPage() {
     staleTime: 20_000,
   });
 
+  const selectedRangeOption = useMemo(
+    () => RANGE_OPTIONS.find((option) => option.value === rangeDays),
+    [rangeDays],
+  );
+
   const detailQuery = useQuery({
     queryKey: ['report-detail', detailTarget?.type, detailTarget?.key],
     enabled: Boolean(detailTarget && detailTarget.type !== 'metric'),
@@ -529,7 +536,7 @@ export default function ReportsPage() {
       filename: `FabClean_Report_${overview.meta.startDate}_${overview.meta.endDate}`,
       companyName: 'Fab Clean',
       title: `Fab Clean Report ${overview.meta.startDate} to ${overview.meta.endDate}`,
-      filterInfo: `Last ${rangeDays} days${overview.meta.scopedStore ? ` • ${overview.meta.scopedStore}` : ''}`,
+      filterInfo: `${selectedRangeOption?.label || `Last ${rangeDays} days`}${overview.meta.scopedStore ? ` • ${overview.meta.scopedStore}` : ''}`,
       sheets: [
         {
           name: 'Summary',
@@ -566,7 +573,7 @@ export default function ReportsPage() {
       title: 'Excel export ready',
       description: 'Report workbook generated successfully.',
     });
-  }, [overview, rangeDays, toast]);
+  }, [overview, rangeDays, selectedRangeOption, toast]);
 
   const pieData = useMemo(() => {
     if (!overview?.serviceMix?.length) return [];

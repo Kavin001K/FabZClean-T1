@@ -417,6 +417,10 @@ router.get('/:id/profile', async (req, res) => {
 
     const allOrders = await storage.listOrders();
     const { customer, matchedOrders } = await ensureCustomerHasRecoveredPhone(customerRecord, allOrders);
+    const customerPhonesForBookingLookup = [
+      normalizePhone(customer.phone),
+      normalizePhone((customer as any).secondaryPhone),
+    ].filter(Boolean) as string[];
 
     const orderLookup = new Map(
       matchedOrders.map((order: Order) => [order.id, order] as const)
@@ -548,6 +552,43 @@ router.get('/:id/profile', async (req, res) => {
     const positiveReviews = combinedFeedbackHistory.filter((entry) => entry.aiSentiment === 'positive').length;
     const neutralReviews = combinedFeedbackHistory.filter((entry) => entry.aiSentiment === 'neutral').length;
     const negativeReviews = combinedFeedbackHistory.filter((entry) => entry.aiSentiment === 'negative').length;
+    let recentBookings: any[] = [];
+
+    if (supabase) {
+      try {
+        let bookingQuery = supabase
+          .from('booking_requests')
+          .select('id, booking_id, request_number, status, source, channel, store_code, preferred_date, preferred_slot, created_at, converted_order_id, customer_id, customer_phone')
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (customer.id) {
+          bookingQuery = bookingQuery.eq('customer_id', customer.id);
+        } else if (customerPhonesForBookingLookup.length > 0) {
+          const normalizedCsv = customerPhonesForBookingLookup.join(',');
+          bookingQuery = bookingQuery.in('customer_phone', normalizedCsv.split(','));
+        }
+
+        const bookingResult = await bookingQuery;
+
+        const mappedBookings = (bookingResult.data || []).map((entry: any) => ({
+          id: entry.id,
+          bookingId: entry.booking_id || entry.request_number || entry.id,
+          status: entry.status || 'new',
+          source: entry.source || null,
+          channel: entry.channel || null,
+          storeCode: entry.store_code || null,
+          preferredDate: entry.preferred_date || null,
+          preferredSlot: entry.preferred_slot || null,
+          createdAt: entry.created_at || null,
+          convertedOrderId: entry.converted_order_id || null,
+        }));
+
+        recentBookings = mappedBookings.slice(0, 10);
+      } catch (bookingError) {
+        console.error('Customer profile booking aggregation failed:', bookingError);
+      }
+    }
 
     res.json(createSuccessResponse({
       customer: serializeCustomer(customer),
@@ -558,6 +599,7 @@ router.get('/:id/profile', async (req, res) => {
       neutralReviews,
       negativeReviews,
       recentOrders,
+      recentBookings,
       feedbackHistory: combinedFeedbackHistory,
     }));
   } catch (error) {

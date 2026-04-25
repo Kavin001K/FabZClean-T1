@@ -24,16 +24,27 @@ import DashboardQuickActions from "./components/dashboard-quick-actions";
 import WeatherWidget from "./components/weather-widget";
 import DashboardOrdersByDate from "./components/orders-by-date";
 import DashboardNewCustomers from "./components/new-customers";
-import { format, startOfDay, endOfDay, isWithinInterval, isSameDay } from "date-fns";
+import { format, startOfDay, endOfDay, isWithinInterval, isSameDay, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 
 import { useQuery } from "@tanstack/react-query";
 
-type FilterMode = 'all' | 'today' | 'date' | 'range';
+type FilterMode = 'all' | 'preset' | 'date' | 'range';
+type PresetPeriod = 'day' | 'week' | 'fortnight' | 'month' | 'quarter' | 'year';
+
+const PERIOD_FILTERS: Array<{ value: PresetPeriod; label: string }> = [
+    { value: 'day', label: 'Day' },
+    { value: 'week', label: 'Weekly' },
+    { value: 'fortnight', label: 'Fortnightly' },
+    { value: 'month', label: 'Monthly' },
+    { value: 'quarter', label: 'Quarterly' },
+    { value: 'year', label: 'Yearly' },
+];
 
 export default function AdminDashboard() {
     // Date filter state
     const [filterMode, setFilterMode] = useState<FilterMode>('all');
+    const [presetPeriod, setPresetPeriod] = useState<PresetPeriod>('day');
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
     const [rangeStart, setRangeStart] = useState<Date | undefined>(undefined);
     const [rangeEnd, setRangeEnd] = useState<Date | undefined>(undefined);
@@ -55,10 +66,22 @@ export default function AdminDashboard() {
         const now = new Date();
         const todayStart = startOfDay(now);
 
-        if (filterMode === 'today') {
+        if (filterMode === 'preset') {
+            let start = todayStart;
+            if (presetPeriod === 'week') {
+                start = startOfDay(subDays(now, 6));
+            } else if (presetPeriod === 'fortnight') {
+                start = startOfDay(subDays(now, 13));
+            } else if (presetPeriod === 'month') {
+                start = startOfDay(subDays(now, 29));
+            } else if (presetPeriod === 'quarter') {
+                start = startOfDay(subDays(now, 89));
+            } else if (presetPeriod === 'year') {
+                start = startOfDay(subDays(now, 364));
+            }
             return orders.filter((o: any) => {
                 const d = new Date(o.createdAt || now);
-                return isSameDay(d, todayStart);
+                return isWithinInterval(d, { start, end: endOfDay(now) });
             });
         }
 
@@ -79,7 +102,7 @@ export default function AdminDashboard() {
         }
 
         return orders;
-    }, [orders, filterMode, selectedDate, rangeStart, rangeEnd]);
+    }, [orders, filterMode, presetPeriod, selectedDate, rangeStart, rangeEnd]);
 
     // Calculate stats from filtered orders
     const stats = useMemo(() => {
@@ -195,11 +218,14 @@ export default function AdminDashboard() {
 
     // Filter label for display
     const filterLabel = useMemo(() => {
-        if (filterMode === 'today') return `Today — ${format(new Date(), 'dd MMM yyyy')}`;
+        if (filterMode === 'preset') {
+            const selected = PERIOD_FILTERS.find((option) => option.value === presetPeriod);
+            return `${selected?.label || 'Day'} Sales`;
+        }
         if (filterMode === 'date' && selectedDate) return format(selectedDate, 'dd MMM yyyy');
         if (filterMode === 'range' && rangeStart && rangeEnd) return `${format(rangeStart, 'dd MMM')} — ${format(rangeEnd, 'dd MMM yyyy')}`;
         return 'All Time';
-    }, [filterMode, selectedDate, rangeStart, rangeEnd]);
+    }, [filterMode, presetPeriod, selectedDate, rangeStart, rangeEnd]);
 
     const handleDateSelect = (date: Date | undefined) => {
         if (!date) return;
@@ -228,6 +254,7 @@ export default function AdminDashboard() {
 
     const clearFilter = () => {
         setFilterMode('all');
+        setPresetPeriod('day');
         setSelectedDate(undefined);
         setRangeStart(undefined);
         setRangeEnd(undefined);
@@ -300,18 +327,21 @@ export default function AdminDashboard() {
                 >
                     All Time
                 </Button>
-                <Button
-                    variant={filterMode === 'today' ? 'pills' : 'outline'}
-                    size="sm"
-                    className="h-10 rounded-xl px-5 font-bold text-xs shadow-sm transition-all hover:scale-105"
-                    onClick={() => {
-                        setFilterMode('today');
-                        setSelectedDate(new Date());
-                    }}
-                >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    Today
-                </Button>
+                {PERIOD_FILTERS.map((period) => (
+                    <Button
+                        key={period.value}
+                        variant={filterMode === 'preset' && presetPeriod === period.value ? 'pills' : 'outline'}
+                        size="sm"
+                        className="h-10 rounded-xl px-5 font-bold text-xs shadow-sm transition-all hover:scale-105"
+                        onClick={() => {
+                            setFilterMode('preset');
+                            setPresetPeriod(period.value);
+                        }}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {period.label}
+                    </Button>
+                ))}
 
                 {/* Date Picker */}
                 <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
