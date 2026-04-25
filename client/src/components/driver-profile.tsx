@@ -257,7 +257,7 @@ export const DriverProfile: React.FC<DriverProfileProps> = ({
                   <div className="text-center p-4 bg-purple-50 rounded-lg">
                     <div className="flex items-center justify-center gap-1 mb-2">
                       <Fuel className="h-4 w-4 text-purple-500" />
-                      <span className="text-2xl font-bold">₹{driver.totalEarnings.toLocaleString()}</span>
+                      <span className="text-2xl font-bold">Rs. {driver.totalEarnings.toLocaleString()}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">Total Earnings</p>
                   </div>

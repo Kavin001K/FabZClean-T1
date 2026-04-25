@@ -24,7 +24,8 @@ import {
   Sparkles,
   RefreshCw,
   Bell,
-  ArrowRight
+  ArrowRight,
+  CreditCard
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,7 @@ type OrderLite = {
   customerName?: string;
   customerPhone?: string;
   status: string;
+  paymentStatus?: string;
   totalAmount?: string | number;
   createdAt?: string;
   priority?: "normal" | "high" | "urgent";
@@ -92,6 +94,9 @@ export default function UpdatesPage() {
     if (order.status === 'pending') score += 60;
     if (order.status === 'processing') score += 40;
     
+    // Payment boost (unpaid orders)
+    if (order.paymentStatus === 'pending') score += 30;
+
     // Staleness logic
     const createdDate = order.createdAt ? new Date(order.createdAt) : new Date();
     const hoursSinceCreation = (new Date().getTime() - createdDate.getTime()) / (1000 * 60 * 60);
@@ -202,6 +207,44 @@ export default function UpdatesPage() {
     }
   };
 
+  const updatePaymentStatus = async () => {
+    if (!selectedOrder) return;
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/orders/${selectedOrder.id}/mark-paid`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ paymentMethod: "CASH" }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || payload?.message || "Payment update failed");
+      }
+
+      const updatedOrder: OrderLite = {
+        ...selectedOrder,
+        paymentStatus: 'paid',
+      };
+      
+      setRecentOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+      setResults(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+      setSelectedOrder(updatedOrder);
+      
+      toast({
+        title: "Payment Received",
+        description: `Order ${selectedOrder.orderNumber} marked as PAID.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Payment update failed",
+        description: error?.message || "Could not update payment status.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const renderOrderCard = (order: OrderLite, isSelected: boolean) => {
     const score = calculateScore(order);
     const isUrgent = order.priority === 'urgent' || order.isExpressOrder;
@@ -218,12 +261,16 @@ export default function UpdatesPage() {
           setSelectedOrder(order);
           setNextStatus("");
           setCancellationReason("");
+          // Auto scroll to top on mobile when order is selected
+          if (window.innerWidth < 1024) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
         }}
         className={cn(
           "relative w-full rounded-3xl border p-5 text-left transition-all duration-500 overflow-hidden",
           isSelected 
-            ? "border-primary bg-primary/[0.03] ring-1 ring-primary/20 shadow-xl shadow-primary/5" 
-            : "border-border bg-card hover:border-primary/40 hover:shadow-lg hover:shadow-black/5"
+            ? "border-primary bg-primary/10 ring-1 ring-primary/20 shadow-xl shadow-primary/10" 
+            : "border-border bg-card hover:border-primary/40 hover:shadow-lg"
         )}
       >
         {/* Progress Glow for High Score */}
@@ -247,15 +294,22 @@ export default function UpdatesPage() {
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">
-                <Badge variant="outline" className={cn(
-                  "rounded-lg px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest border-2",
-                  order.status === 'pending' && "text-orange-500 border-orange-500/20 bg-orange-500/5",
-                  order.status === 'processing' && "text-blue-500 border-blue-500/20 bg-blue-500/5",
-                  order.status === 'ready_for_pickup' && "text-emerald-500 border-emerald-500/20 bg-emerald-500/5"
-                )}>
-                  {order.status.replace(/_/g, " ")}
-                </Badge>
-                <p className="text-[10px] font-medium text-muted-foreground">₹{Number(order.totalAmount || 0).toFixed(0)}</p>
+                <div className="flex gap-1">
+                  <Badge variant="outline" className={cn(
+                    "rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest border-2",
+                    order.status === 'pending' && "text-orange-500 border-orange-500/20 bg-orange-500/5",
+                    order.status === 'processing' && "text-blue-500 border-blue-500/20 bg-blue-500/5",
+                    order.status === 'ready_for_pickup' && "text-emerald-500 border-emerald-500/20 bg-emerald-500/5"
+                  )}>
+                    {order.status.replace(/_/g, " ")}
+                  </Badge>
+                  {order.paymentStatus === 'paid' ? (
+                    <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[9px] px-2 py-0.5">PAID</Badge>
+                  ) : (
+                    <Badge variant="destructive" className="bg-red-500/10 text-red-500 border-red-500/20 text-[9px] px-2 py-0.5">UNPAID</Badge>
+                  )}
+                </div>
+                <p className="text-[10px] font-medium text-muted-foreground">Rs. {Number(order.totalAmount || 0).toFixed(0)}</p>
             </div>
           </div>
 
@@ -312,7 +366,7 @@ export default function UpdatesPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search Order ID, Name or Phone..."
-                className="h-14 border-2 bg-card/50 pl-12 rounded-3xl ring-offset-background focus-visible:ring-primary/20 text-base font-medium"
+                className="h-14 border-border border-2 bg-card/80 pl-12 rounded-3xl ring-offset-background focus-visible:ring-primary/20 text-base font-medium"
                 onKeyDown={(e) => e.key === "Enter" && runSearch()}
               />
             </div>
@@ -323,9 +377,9 @@ export default function UpdatesPage() {
         </div>
       </div>
 
-      <div className="grid gap-8 px-5 lg:grid-cols-[1fr_420px] lg:px-0">
-        {/* Smart Lists */}
-        <div className="space-y-8">
+      <div className="flex flex-col lg:grid lg:grid-cols-[1fr_420px] gap-8 px-5 lg:px-0">
+        {/* Smart Lists - Swapped to bottom on mobile when order selected */}
+        <div className={cn("space-y-8", selectedOrder && "hidden lg:block")}>
           <div className="flex items-center gap-2 p-1.5 bg-muted/50 rounded-2xl w-fit border border-border/50">
             <button 
               onClick={() => setActiveTab('smart')}
@@ -392,38 +446,69 @@ export default function UpdatesPage() {
           </div>
         </div>
 
-        {/* Interactive Update Interface */}
-        <div className="lg:sticky lg:top-10">
+        {/* Interactive Update Interface - Swapped to top on mobile when order selected */}
+        <div className={cn("lg:sticky lg:top-10", selectedOrder ? "mb-8 lg:mb-0" : "hidden lg:block")}>
           <AnimatePresence>
             {selectedOrder ? (
               <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
                 className="relative"
               >
                 {/* Background Decoration */}
                 <div className="absolute -inset-4 bg-primary/5 blur-3xl rounded-[3rem] -z-10" />
                 
-                <Card className="border-2 border-primary/20 shadow-[0_32px_64px_-12px_rgba(var(--primary),0.1)] overflow-hidden rounded-[2.5rem]">
-                  <div className="bg-primary/5 p-8 border-b border-primary/10 relative overflow-hidden">
+                <Card className="border-2 border-primary/20 shadow-[0_32px_64px_-12px_rgba(var(--primary),0.1)] overflow-hidden rounded-[2.5rem] bg-card">
+                  <div className="bg-primary/10 p-8 border-b border-primary/10 relative overflow-hidden">
                     {/* Decorative Element */}
-                    <div className="absolute -right-10 -top-10 h-40 w-40 bg-primary/5 rounded-full blur-2xl" />
+                    <div className="absolute -right-10 -top-10 h-40 w-40 bg-primary/10 rounded-full blur-2xl" />
                     
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
                          <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Live Controller</span>
+                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Active Selection</span>
                       </div>
-                      <Button variant="ghost" size="icon" onClick={() => setSelectedOrder(null)} className="h-10 w-10 rounded-full hover:bg-primary/10">
+                      <Button variant="ghost" size="icon" onClick={() => setSelectedOrder(null)} className="h-10 w-10 rounded-full hover:bg-primary/20">
                         <ArrowRight className="h-5 w-5" />
                       </Button>
                     </div>
-                    <h3 className="text-4xl font-black tracking-tighter mb-1">{selectedOrder.orderNumber}</h3>
-                    <p className="text-sm font-bold text-muted-foreground uppercase tracking-tight">{selectedOrder.customerName}</p>
+                    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                      <div>
+                        <h3 className="text-5xl font-black tracking-tighter mb-2 text-foreground">{selectedOrder.orderNumber}</h3>
+                        <p className="text-lg font-bold text-muted-foreground uppercase tracking-tight">{selectedOrder.customerName}</p>
+                      </div>
+                      <div className="sm:text-right">
+                        <p className="text-3xl font-black text-primary">Rs. {Number(selectedOrder.totalAmount || 0).toFixed(0)}</p>
+                        <div className="mt-2">
+                          {selectedOrder.paymentStatus === 'paid' ? (
+                            <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/20 text-[12px] font-bold py-1 px-3">PAID</Badge>
+                          ) : (
+                            <Badge variant="destructive" className="bg-red-500/20 text-red-500 border-red-500/20 text-[12px] font-bold py-1 px-3">UNPAID</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <CardContent className="p-8 space-y-8">
+                    {/* Quick Payment Action */}
+                    {selectedOrder.paymentStatus !== 'paid' && (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-emerald-500">
+                            <CreditCard className="h-4 w-4" />
+                            <Label className="text-[10px] font-black uppercase tracking-widest">Financial Settlement</Label>
+                        </div>
+                        <Button 
+                          onClick={updatePaymentStatus}
+                          disabled={saving}
+                          className="w-full h-14 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20"
+                        >
+                          Mark as Paid (Cash)
+                        </Button>
+                      </div>
+                    )}
+
                     {/* Progress Recommendations */}
                     {STATUS_SUGGESTIONS[selectedOrder.status]?.length > 0 && (
                       <div className="space-y-4">

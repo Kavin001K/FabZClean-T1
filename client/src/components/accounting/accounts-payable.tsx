@@ -214,7 +214,7 @@ export function AccountsPayable() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              ₹{agingReport?.total ? formatINR(agingReport.total) : '0.00'}
+              Rs. {agingReport?.total ? formatINR(agingReport.total) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -225,7 +225,7 @@ export function AccountsPayable() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">
-              ₹{agingReport?.current ? formatINR(agingReport.current) : '0.00'}
+              Rs. {agingReport?.current ? formatINR(agingReport.current) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -236,7 +236,7 @@ export function AccountsPayable() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              ₹{agingReport?.days30 ? formatINR(agingReport.days30) : '0.00'}
+              Rs. {agingReport?.days30 ? formatINR(agingReport.days30) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -247,7 +247,7 @@ export function AccountsPayable() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              ₹{agingReport?.days90Plus ? formatINR(agingReport.days90Plus) : '0.00'}
+              Rs. {agingReport?.days90Plus ? formatINR(agingReport.days90Plus) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -345,13 +345,13 @@ export function AccountsPayable() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          ₹{formatINR(item.amount)}
+                          Rs. {formatINR(item.amount)}
                         </TableCell>
                         <TableCell className="text-right text-green-600">
-                          ₹{formatINR(item.amountPaid)}
+                          Rs. {formatINR(item.amountPaid)}
                         </TableCell>
                         <TableCell className="text-right font-medium text-red-600">
-                          ₹{formatINR(item.amountDue)}
+                          Rs. {formatINR(item.amountDue)}
                         </TableCell>
                         <TableCell>{getStatusBadge(item.status)}</TableCell>
                         <TableCell>
@@ -392,32 +392,32 @@ export function AccountsPayable() {
               <div className="p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-950">
                 <p className="text-sm text-muted-foreground">Current</p>
                 <p className="text-2xl font-bold text-yellow-600">
-                  ₹{formatINR(agingReport.current)}
+                  Rs. {formatINR(agingReport.current)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">0-30 days</p>
               </div>
               <div className="p-4 border rounded-lg bg-orange-50 dark:bg-orange-950">
                 <p className="text-sm text-muted-foreground">31-60 Days</p>
                 <p className="text-2xl font-bold text-orange-600">
-                  ₹{formatINR(agingReport.days30)}
+                  Rs. {formatINR(agingReport.days30)}
                 </p>
               </div>
               <div className="p-4 border rounded-lg bg-red-50 dark:bg-red-950">
                 <p className="text-sm text-muted-foreground">61-90 Days</p>
                 <p className="text-2xl font-bold text-red-600">
-                  ₹{formatINR(agingReport.days60)}
+                  Rs. {formatINR(agingReport.days60)}
                 </p>
               </div>
               <div className="p-4 border rounded-lg bg-red-100 dark:bg-red-900">
                 <p className="text-sm text-muted-foreground">91-120 Days</p>
                 <p className="text-2xl font-bold text-red-700">
-                  ₹{formatINR(agingReport.days90)}
+                  Rs. {formatINR(agingReport.days90)}
                 </p>
               </div>
               <div className="p-4 border rounded-lg bg-red-200 dark:bg-red-800">
                 <p className="text-sm text-muted-foreground">120+ Days</p>
                 <p className="text-2xl font-bold text-red-800 dark:text-red-200">
-                  ₹{formatINR(agingReport.days90Plus)}
+                  Rs. {formatINR(agingReport.days90Plus)}
                 </p>
               </div>
             </div>
@@ -493,13 +493,13 @@ function PaymentDialog({ open, onOpenChange, bill, onSubmit }: PaymentDialogProp
               <div>
                 <p className="text-sm text-muted-foreground">Bill Amount</p>
                 <p className="font-medium">
-                  ₹{formatINR(bill.amount)}
+                  Rs. {formatINR(bill.amount)}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Amount Due</p>
                 <p className="font-medium text-red-600">
-                  ₹{formatINR(bill.amountDue)}
+                  Rs. {formatINR(bill.amountDue)}
                 </p>
               </div>
             </div>

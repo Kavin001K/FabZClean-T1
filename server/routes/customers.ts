@@ -27,6 +27,7 @@ const CUSTOMER_EDITOR_ROLES: string[] = [
   "franchise_manager",
 ];
 const CUSTOMER_ADMIN_ROLES: string[] = ["admin", "franchise_manager"];
+let bookingRequestSchemaCache: { hasBookingId: boolean; hasCustomerId: boolean; checkedAt: number } | null = null;
 
 const normalizePhone = (value?: string | null) => normalizePhoneForComparison(value);
 const toNumeric = (value: unknown) => {
@@ -39,6 +40,34 @@ const splitRawPhoneInput = (value?: string | null) =>
     .split(/[,\n;]+/)
     .map((part) => sanitizePhoneForStorage(part))
     .filter(Boolean);
+
+async function getBookingRequestSchemaCapabilities(supabase: any) {
+  const now = Date.now();
+  if (bookingRequestSchemaCache && now - bookingRequestSchemaCache.checkedAt < 60_000) {
+    return bookingRequestSchemaCache;
+  }
+
+  const fallback = { hasBookingId: false, hasCustomerId: false, checkedAt: now };
+
+  try {
+    const [bookingIdProbe, customerIdProbe] = await Promise.all([
+      supabase.from('booking_requests').select('booking_id').limit(1),
+      supabase.from('booking_requests').select('customer_id').limit(1),
+    ]);
+
+    const bookingIdError = String(bookingIdProbe?.error?.message || '').toLowerCase();
+    const customerIdError = String(customerIdProbe?.error?.message || '').toLowerCase();
+    bookingRequestSchemaCache = {
+      hasBookingId: !bookingIdError.includes('does not exist'),
+      hasCustomerId: !customerIdError.includes('does not exist'),
+      checkedAt: now,
+    };
+    return bookingRequestSchemaCache;
+  } catch {
+    bookingRequestSchemaCache = fallback;
+    return fallback;
+  }
+}
 
 function normalizeCustomerPhonePayload(payload: Record<string, unknown>) {
   const hasPhoneField = Object.prototype.hasOwnProperty.call(payload, 'phone');
@@ -113,6 +142,24 @@ type RecoveredCustomerContact = {
   customer: Customer;
   matchedOrders: Order[];
 };
+
+const customerAddressSchema = z.object({
+  label: z.string().min(1).default('Home'),
+  recipientName: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  line1: z.string().min(2),
+  line2: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
+  state: z.string().optional().nullable(),
+  pincode: z.string().optional().nullable(),
+  country: z.string().optional().nullable(),
+  landmark: z.string().optional().nullable(),
+  latitude: z.coerce.number().optional().nullable(),
+  longitude: z.coerce.number().optional().nullable(),
+  isDefault: z.boolean().optional().default(false),
+});
+
+const customerAddressPatchSchema = customerAddressSchema.partial();
 
 const getOrderTimestamp = (order: Order) => {
   const dateValue = (order.updatedAt || order.createdAt) as string | Date | null | undefined;
@@ -421,6 +468,11 @@ router.get('/:id/profile', async (req, res) => {
       normalizePhone(customer.phone),
       normalizePhone((customer as any).secondaryPhone),
     ].filter(Boolean) as string[];
+    const customerPhoneSearchTokens = customerPhonesForBookingLookup
+      .map((value) => String(value || '').replace(/\D/g, ''))
+      .filter(Boolean)
+      .map((digits) => digits.slice(-10))
+      .filter(Boolean);
 
     const orderLookup = new Map(
       matchedOrders.map((order: Order) => [order.id, order] as const)
@@ -556,22 +608,51 @@ router.get('/:id/profile', async (req, res) => {
 
     if (supabase) {
       try {
-        let bookingQuery = supabase
-          .from('booking_requests')
-          .select('id, booking_id, request_number, status, source, channel, store_code, preferred_date, preferred_slot, created_at, converted_order_id, customer_id, customer_phone')
-          .order('created_at', { ascending: false })
-          .limit(20);
+        let bookingRows: any[] = [];
+        const bookingSchema = await getBookingRequestSchemaCapabilities(supabase);
+        const bookingSelectColumns = bookingSchema.hasBookingId
+          ? 'id, booking_id, request_number, status, source, channel, store_code, preferred_date, preferred_slot, created_at, converted_order_id, customer_id, customer_phone'
+          : 'id, request_number, status, source, channel, store_code, preferred_date, preferred_slot, created_at, converted_order_id, customer_phone';
 
-        if (customer.id) {
-          bookingQuery = bookingQuery.eq('customer_id', customer.id);
-        } else if (customerPhonesForBookingLookup.length > 0) {
-          const normalizedCsv = customerPhonesForBookingLookup.join(',');
-          bookingQuery = bookingQuery.in('customer_phone', normalizedCsv.split(','));
+        if (bookingSchema.hasCustomerId && customer.id) {
+          const byCustomerResult = await supabase
+            .from('booking_requests')
+            .select(bookingSelectColumns)
+            .eq('customer_id', customer.id)
+            .order('created_at', { ascending: false })
+            .limit(20);
+          bookingRows = Array.isArray(byCustomerResult.data) ? byCustomerResult.data : [];
         }
 
-        const bookingResult = await bookingQuery;
+        if (customerPhonesForBookingLookup.length > 0) {
+          let byPhoneResult: any = { data: [], error: null };
+          if (customerPhoneSearchTokens.length > 0) {
+            byPhoneResult = await supabase
+              .from('booking_requests')
+              .select(bookingSelectColumns)
+              .or(customerPhoneSearchTokens.map((digits) => `customer_phone.ilike.%${digits}%`).join(','))
+              .order('created_at', { ascending: false })
+              .limit(50);
+          } else {
+            byPhoneResult = await supabase
+              .from('booking_requests')
+              .select(bookingSelectColumns)
+              .order('created_at', { ascending: false })
+              .limit(50);
+          }
+          const phoneRows = Array.isArray(byPhoneResult.data) ? byPhoneResult.data : [];
+          const dedup = new Map<string, any>();
+          for (const entry of [...bookingRows, ...phoneRows]) {
+            dedup.set(String(entry.id), entry);
+          }
+          bookingRows = Array.from(dedup.values()).sort((a, b) => {
+            const aTime = new Date(a.created_at || 0).getTime();
+            const bTime = new Date(b.created_at || 0).getTime();
+            return bTime - aTime;
+          });
+        }
 
-        const mappedBookings = (bookingResult.data || []).map((entry: any) => ({
+        const mappedBookings = bookingRows.map((entry: any) => ({
           id: entry.id,
           bookingId: entry.booking_id || entry.request_number || entry.id,
           status: entry.status || 'new',
@@ -605,6 +686,209 @@ router.get('/:id/profile', async (req, res) => {
   } catch (error) {
     console.error('Get customer profile error:', error);
     res.status(500).json(createErrorResponse('Failed to fetch customer profile details', 500));
+  }
+});
+
+router.get('/:id/addresses', async (req, res) => {
+  try {
+    const customerId = req.params.id;
+    const supabase = (storage as any).supabase;
+
+    if (!supabase) {
+      return res.status(500).json(createErrorResponse('Database unavailable', 500));
+    }
+
+    const { data, error } = await supabase
+      .from('customer_addresses')
+      .select('*')
+      .eq('customer_id', customerId)
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return res.status(500).json(createErrorResponse(error.message || 'Failed to fetch customer addresses', 500));
+    }
+
+    return res.json(createSuccessResponse((data || []).map((row: any) => ({
+      id: row.id,
+      customerId: row.customer_id,
+      label: row.label,
+      recipientName: row.recipient_name || null,
+      phone: row.phone || null,
+      line1: row.line1,
+      line2: row.line2 || null,
+      city: row.city || null,
+      state: row.state || null,
+      pincode: row.pincode || null,
+      country: row.country || null,
+      landmark: row.landmark || null,
+      latitude: row.latitude ?? null,
+      longitude: row.longitude ?? null,
+      isDefault: Boolean(row.is_default),
+      createdAt: row.created_at || null,
+      updatedAt: row.updated_at || null,
+    }))));
+  } catch (error) {
+    console.error('List customer addresses error:', error);
+    return res.status(500).json(createErrorResponse('Failed to fetch customer addresses', 500));
+  }
+});
+
+router.post('/:id/addresses', async (req, res) => {
+  try {
+    const customerId = req.params.id;
+    const parsed = customerAddressSchema.parse(req.body || {});
+    const supabase = (storage as any).supabase;
+
+    if (!supabase) {
+      return res.status(500).json(createErrorResponse('Database unavailable', 500));
+    }
+
+    if (parsed.isDefault) {
+      await supabase.from('customer_addresses').update({ is_default: false }).eq('customer_id', customerId);
+    }
+
+    const payload = {
+      customer_id: customerId,
+      label: parsed.label,
+      recipient_name: parsed.recipientName || null,
+      phone: parsed.phone || null,
+      line1: parsed.line1,
+      line2: parsed.line2 || null,
+      city: parsed.city || null,
+      state: parsed.state || null,
+      pincode: parsed.pincode || null,
+      country: parsed.country || 'India',
+      landmark: parsed.landmark || null,
+      latitude: parsed.latitude ?? null,
+      longitude: parsed.longitude ?? null,
+      is_default: parsed.isDefault || false,
+    };
+
+    const { data, error } = await supabase.from('customer_addresses').insert(payload).select('*').single();
+    if (error || !data) {
+      return res.status(500).json(createErrorResponse(error?.message || 'Failed to save customer address', 500));
+    }
+
+    return res.json(createSuccessResponse({
+      id: data.id,
+      customerId: data.customer_id,
+      label: data.label,
+      recipientName: data.recipient_name || null,
+      phone: data.phone || null,
+      line1: data.line1,
+      line2: data.line2 || null,
+      city: data.city || null,
+      state: data.state || null,
+      pincode: data.pincode || null,
+      country: data.country || null,
+      landmark: data.landmark || null,
+      latitude: data.latitude ?? null,
+      longitude: data.longitude ?? null,
+      isDefault: Boolean(data.is_default),
+      createdAt: data.created_at || null,
+      updatedAt: data.updated_at || null,
+    }));
+  } catch (error: any) {
+    console.error('Create customer address error:', error);
+    return res.status(400).json(createErrorResponse(error?.message || 'Failed to save customer address', 400));
+  }
+});
+
+router.patch('/:id/addresses/:addressId', async (req, res) => {
+  try {
+    const customerId = req.params.id;
+    const addressId = req.params.addressId;
+    const parsed = customerAddressPatchSchema.parse(req.body || {});
+    const supabase = (storage as any).supabase;
+
+    if (!supabase) {
+      return res.status(500).json(createErrorResponse('Database unavailable', 500));
+    }
+
+    if (parsed.isDefault) {
+      await supabase.from('customer_addresses').update({ is_default: false }).eq('customer_id', customerId);
+    }
+
+    const updatePayload: any = {};
+    if (parsed.label !== undefined) updatePayload.label = parsed.label;
+    if (parsed.recipientName !== undefined) updatePayload.recipient_name = parsed.recipientName || null;
+    if (parsed.phone !== undefined) updatePayload.phone = parsed.phone || null;
+    if (parsed.line1 !== undefined) updatePayload.line1 = parsed.line1;
+    if (parsed.line2 !== undefined) updatePayload.line2 = parsed.line2 || null;
+    if (parsed.city !== undefined) updatePayload.city = parsed.city || null;
+    if (parsed.state !== undefined) updatePayload.state = parsed.state || null;
+    if (parsed.pincode !== undefined) updatePayload.pincode = parsed.pincode || null;
+    if (parsed.country !== undefined) updatePayload.country = parsed.country || null;
+    if (parsed.landmark !== undefined) updatePayload.landmark = parsed.landmark || null;
+    if (parsed.latitude !== undefined) updatePayload.latitude = parsed.latitude ?? null;
+    if (parsed.longitude !== undefined) updatePayload.longitude = parsed.longitude ?? null;
+    if (parsed.isDefault !== undefined) updatePayload.is_default = parsed.isDefault;
+
+    const { data, error } = await supabase
+      .from('customer_addresses')
+      .update(updatePayload)
+      .eq('customer_id', customerId)
+      .eq('id', addressId)
+      .select('*')
+      .single();
+
+    if (error || !data) {
+      return res.status(500).json(createErrorResponse(error?.message || 'Failed to update customer address', 500));
+    }
+
+    return res.json(createSuccessResponse({
+      id: data.id,
+      customerId: data.customer_id,
+      label: data.label,
+      recipientName: data.recipient_name || null,
+      phone: data.phone || null,
+      line1: data.line1,
+      line2: data.line2 || null,
+      city: data.city || null,
+      state: data.state || null,
+      pincode: data.pincode || null,
+      country: data.country || null,
+      landmark: data.landmark || null,
+      latitude: data.latitude ?? null,
+      longitude: data.longitude ?? null,
+      isDefault: Boolean(data.is_default),
+      createdAt: data.created_at || null,
+      updatedAt: data.updated_at || null,
+    }));
+  } catch (error: any) {
+    console.error('Update customer address error:', error);
+    return res.status(400).json(createErrorResponse(error?.message || 'Failed to update customer address', 400));
+  }
+});
+
+router.post('/:id/addresses/:addressId/default', async (req, res) => {
+  try {
+    const customerId = req.params.id;
+    const addressId = req.params.addressId;
+    const supabase = (storage as any).supabase;
+
+    if (!supabase) {
+      return res.status(500).json(createErrorResponse('Database unavailable', 500));
+    }
+
+    await supabase.from('customer_addresses').update({ is_default: false }).eq('customer_id', customerId);
+    const { data, error } = await supabase
+      .from('customer_addresses')
+      .update({ is_default: true })
+      .eq('customer_id', customerId)
+      .eq('id', addressId)
+      .select('*')
+      .single();
+
+    if (error || !data) {
+      return res.status(500).json(createErrorResponse(error?.message || 'Failed to set default address', 500));
+    }
+
+    return res.json(createSuccessResponse({ id: data.id, isDefault: true }));
+  } catch (error: any) {
+    console.error('Set default customer address error:', error);
+    return res.status(400).json(createErrorResponse(error?.message || 'Failed to set default address', 400));
   }
 });
 
@@ -1029,7 +1313,7 @@ router.patch(
         data: updatedCustomer
       });
 
-      const description = `Credit limit updated from ₹${Number(oldLimit).toFixed(2)} to ₹${normalizedCreditLimit.toFixed(2)}`;
+      const description = `Credit limit updated from Rs. ${Number(oldLimit).toFixed(2)} to Rs. ${normalizedCreditLimit.toFixed(2)}`;
 
       // Log in wallet/credit transactions as a 0 amount adjustment just for history
       try {

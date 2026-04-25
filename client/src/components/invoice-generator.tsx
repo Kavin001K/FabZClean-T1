@@ -258,7 +258,7 @@ export const InvoiceGenerator: React.FC = () => {
           customerName: invoiceData.customer.name,
           customerPhone: invoiceData.customer.phone,
           orderId: invoiceData.invoiceNumber,
-          amount: `₹${invoiceData.total.toFixed(2)}`,
+          amount: `Rs. ${invoiceData.total.toFixed(2)}`,
           pdfUrl: pdfUrl
         })
       });
@@ -503,7 +503,7 @@ export const InvoiceGenerator: React.FC = () => {
                       <div className="text-right">
                         <Label>Total</Label>
                         <div className="text-lg font-semibold">
-                          ₹{item.total.toFixed(2)}
+                          Rs. {item.total.toFixed(2)}
                         </div>
                       </div>
                       <Button
@@ -579,16 +579,16 @@ export const InvoiceGenerator: React.FC = () => {
             <div className="w-72 bg-muted/30 p-6 rounded-xl border border-border/50 space-y-3">
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Subtotal</span>
-                <span className="font-medium text-foreground">₹{invoiceData.subtotal.toFixed(2)}</span>
+                <span className="font-medium text-foreground">Rs. {invoiceData.subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Tax (18% GST)</span>
-                <span className="font-medium text-foreground">₹{invoiceData.taxAmount.toFixed(2)}</span>
+                <span className="font-medium text-foreground">Rs. {invoiceData.taxAmount.toFixed(2)}</span>
               </div>
               <Separator className="my-2" />
               <div className="flex justify-between items-center">
                 <span className="text-base font-semibold">Total Amount</span>
-                <span className="text-xl font-bold text-primary">₹{invoiceData.total.toFixed(2)}</span>
+                <span className="text-xl font-bold text-primary">Rs. {invoiceData.total.toFixed(2)}</span>
               </div>
               <div className="text-xs text-muted-foreground text-right pt-1">
                 Inclusive of all taxes

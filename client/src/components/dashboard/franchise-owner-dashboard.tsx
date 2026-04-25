@@ -775,7 +775,7 @@ export default React.memo(function FranchiseOwnerDashboard() {
                               />
                             </div>
                             <div>
-                              <Label htmlFor="employeeSalary">Salary (₹)</Label>
+                              <Label htmlFor="employeeSalary">Salary (Rs. )</Label>
                               <Input
                                 id="employeeSalary"
                                 name="salary"

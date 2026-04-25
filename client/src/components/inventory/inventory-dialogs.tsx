@@ -212,7 +212,7 @@ export const InventoryDialogs: React.FC<InventoryDialogsProps> = React.memo(({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-price">Price (₹) *</Label>
+                <Label htmlFor="edit-price">Price (Rs. ) *</Label>
                 <Input
                   id="edit-price"
                   type="number"
@@ -371,7 +371,7 @@ export const InventoryDialogs: React.FC<InventoryDialogsProps> = React.memo(({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="create-price">Price (₹) *</Label>
+                <Label htmlFor="create-price">Price (Rs. ) *</Label>
                 <Input
                   id="create-price"
                   type="number"

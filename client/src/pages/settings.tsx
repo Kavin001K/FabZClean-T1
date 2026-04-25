@@ -473,7 +473,6 @@ export default function SettingsPage() {
         storeCode: 'POL',
         billDate: new Date().toISOString(),
         dueDate: new Date().toISOString(),
-        templateConfig: tagTemplateDraft.config,
         items: [
           {
             orderNumber: 'FZC-2026POL0001A',
@@ -1535,9 +1534,11 @@ export default function SettingsPage() {
                           <div className="overflow-auto">
                             <div className="origin-top-left scale-[0.42] w-[235%]">
                               <InvoiceTemplateIN
-                                data={invoicePreviewData as any}
-                                preset={(invoiceTemplateDraft.presetKey || 'classic') as any}
-                                config={invoiceTemplateDraft.config}
+                                data={{
+                                  ...invoicePreviewData,
+                                  preset: (invoiceTemplateDraft.presetKey || 'classic'),
+                                  config: invoiceTemplateDraft.config
+                                } as any}
                               />
                             </div>
                           </div>
@@ -1553,9 +1554,11 @@ export default function SettingsPage() {
                           <div className="overflow-auto">
                             <div className="origin-top-left scale-[0.42] w-[235%]">
                               <InvoiceTemplateIN
-                                data={invoicePreviewData as any}
-                                preset={(aiOptimizedTemplateDraft.presetKey || 'classic') as any}
-                                config={aiOptimizedTemplateDraft.config}
+                                data={{
+                                  ...invoicePreviewData,
+                                  preset: (aiOptimizedTemplateDraft.presetKey || 'classic'),
+                                  config: aiOptimizedTemplateDraft.config
+                                } as any}
                               />
                             </div>
                           </div>
@@ -1564,9 +1567,11 @@ export default function SettingsPage() {
                     ) : (
                       <div className="origin-top-left scale-[0.52] w-[190%]">
                         <InvoiceTemplateIN
-                          data={invoicePreviewData as any}
-                          preset={(invoiceTemplateDraft.presetKey || 'classic') as any}
-                          config={invoiceTemplateDraft.config}
+                          data={{
+                            ...invoicePreviewData,
+                            preset: (invoiceTemplateDraft.presetKey || 'classic'),
+                            config: invoiceTemplateDraft.config
+                          } as any}
                         />
                       </div>
                     )}
@@ -1742,7 +1747,6 @@ export default function SettingsPage() {
                               storeCode: 'POL',
                               billDate: new Date().toISOString(),
                               dueDate: new Date().toISOString(),
-                              templateConfig: aiOptimizedTagTemplateDraft.config,
                               items: [
                                 {
                                   orderNumber: 'FZC-2026POL0001A',

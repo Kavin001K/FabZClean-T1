@@ -41,22 +41,21 @@ export function getStoredSettings(): StoredSettings | null {
 }
 
 /**
- * Format currency using stored settings or defaults
+ * Format currency values - returns "Rs. 0" for missing amounts
  * @param amount - Number or string to format
- * @returns Formatted currency string (e.g., "₹1,234.00")
+ * @returns Formatted currency string (e.g., "Rs. 1,234.00")
  */
 export function formatCurrency(amount: number | string): string {
   const settings = getStoredSettings();
   const currency = settings?.currency || 'INR';
 
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(num)) return '₹0.00';
+  if (isNaN(num)) return 'Rs. 0.00';
 
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: currency,
+  const formatted = new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: 2
   }).format(num);
+  return `Rs. ${formatted}`;
 }
 
 /**
@@ -64,13 +63,12 @@ export function formatCurrency(amount: number | string): string {
  */
 export function formatCurrencyWithSettings(amount: number | string, currency: string = 'INR'): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(num)) return '₹0.00';
+  if (isNaN(num)) return 'Rs. 0.00';
 
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: currency,
+  const formatted = new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: 2
   }).format(num);
+  return `Rs. ${formatted}`;
 }
 
 /**

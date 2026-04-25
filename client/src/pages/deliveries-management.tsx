@@ -218,7 +218,7 @@ export default function DeliveriesManagement() {
                                                     </td>
                                                     <td className="p-4">
                                                         <div className="flex flex-col">
-                                                            <span className="font-semibold text-foreground">₹{order.totalAmount}</span>
+                                                            <span className="font-semibold text-foreground">Rs. {order.totalAmount}</span>
                                                             <span className="text-[10px] text-muted-foreground uppercase">{order.paymentStatus}</span>
                                                         </div>
                                                     </td>

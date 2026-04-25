@@ -118,7 +118,7 @@ This policy applies to all services offered by Fab Clean, including regular laun
             shortTitle: "Cancellation",
             content: `BEFORE PICKUP: Orders can be cancelled free of charge any time before our pickup agent arrives at your location.
 
-AFTER PICKUP, BEFORE PROCESSING: If you need to cancel after pickup but before processing begins, a nominal handling fee of ₹50 will apply.
+AFTER PICKUP, BEFORE PROCESSING: If you need to cancel after pickup but before processing begins, a nominal handling fee of Rs. 50 will apply.
 
 AFTER PROCESSING BEGINS: Once cleaning or processing has started, cancellation is not possible. The full order amount will be charged.
 
@@ -177,7 +177,7 @@ COMPENSATION CALCULATION:
 - Garments 1-3 years old: Up to 50% of original purchase price
 - Garments over 3 years old: Up to 25% of original purchase price
 
-MAXIMUM LIABILITY: Our maximum liability per garment is capped at ₹5,000 for regular items and ₹15,000 for premium/designer items.
+MAXIMUM LIABILITY: Our maximum liability per garment is capped at Rs. 5,000 for regular items and Rs. 15,000 for premium/designer items.
 
 REPAIR OPTION: Where possible, we may offer professional repair or restoration.`
         },

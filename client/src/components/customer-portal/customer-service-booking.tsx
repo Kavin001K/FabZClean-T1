@@ -250,7 +250,7 @@ export default function CustomerServiceBooking({ customer }: CustomerServiceBook
 
   // Calculate discount from loyalty points
   const loyaltyDiscount = useMemo(() => {
-    return Math.min(bookingForm.loyaltyPointsUsed * 0.1, totalPrice * 0.2); // 10 points = ₹1, max 20% discount
+    return Math.min(bookingForm.loyaltyPointsUsed * 0.1, totalPrice * 0.2); // 10 points = Rs. 1, max 20% discount
   }, [bookingForm.loyaltyPointsUsed, totalPrice]);
 
   // Final price after discount
@@ -332,7 +332,7 @@ export default function CustomerServiceBooking({ customer }: CustomerServiceBook
     // Simulate booking submission
     toast({
       title: "Booking Confirmed!",
-      description: `Your order has been placed successfully. Total: ₹${finalPrice.toFixed(2)}`,
+      description: `Your order has been placed successfully. Total: Rs. ${finalPrice.toFixed(2)}`,
     });
 
     // Reset form
@@ -457,7 +457,7 @@ export default function CustomerServiceBooking({ customer }: CustomerServiceBook
                           <div className="flex items-center gap-4 text-sm">
                             <div className="flex items-center gap-1">
                               <IndianRupee className="h-4 w-4 text-green-600" />
-                              <span className="font-semibold">₹{service.price}</span>
+                              <span className="font-semibold">Rs. {service.price}</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <Timer className="h-4 w-4 text-blue-600" />
@@ -550,7 +550,7 @@ export default function CustomerServiceBooking({ customer }: CustomerServiceBook
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-semibold">₹{service.price * ((service as any).quantity || 1)}</div>
+                        <div className="font-semibold">Rs. {service.price * ((service as any).quantity || 1)}</div>
                         {service.loyaltyPoints && (
                           <div className="text-xs text-purple-600">
                             +{(service.loyaltyPoints * ((service as any).quantity || 1))} pts
@@ -563,17 +563,17 @@ export default function CustomerServiceBooking({ customer }: CustomerServiceBook
                   <div className="space-y-2 pt-4 border-t">
                     <div className="flex items-center justify-between">
                       <span>Subtotal:</span>
-                      <span>₹{totalPrice.toFixed(2)}</span>
+                      <span>Rs. {totalPrice.toFixed(2)}</span>
                     </div>
                     {loyaltyDiscount > 0 && (
                       <div className="flex items-center justify-between text-green-600">
                         <span>Loyalty Discount:</span>
-                        <span>-₹{loyaltyDiscount.toFixed(2)}</span>
+                        <span>-Rs. {loyaltyDiscount.toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex items-center justify-between font-semibold text-lg">
                       <span>Total:</span>
-                      <span>₹{finalPrice.toFixed(2)}</span>
+                      <span>Rs. {finalPrice.toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -608,7 +608,7 @@ export default function CustomerServiceBooking({ customer }: CustomerServiceBook
                 <span className="font-semibold text-green-600">+{loyaltyPointsEarned}</span>
               </div>
               <div className="text-sm text-muted-foreground">
-                Use 100 points to get ₹10 discount (max 20% of order value)
+                Use 100 points to get Rs. 10 discount (max 20% of order value)
               </div>
             </CardContent>
           </Card>
@@ -670,12 +670,12 @@ export default function CustomerServiceBooking({ customer }: CustomerServiceBook
                           ({(service as any).quantity || 1}x)
                         </span>
                       </div>
-                      <span>₹{service.price * ((service as any).quantity || 1)}</span>
+                      <span>Rs. {service.price * ((service as any).quantity || 1)}</span>
                     </div>
                   ))}
                   <div className="flex items-center justify-between font-semibold pt-2 border-t">
                     <span>Total:</span>
-                    <span>₹{finalPrice.toFixed(2)}</span>
+                    <span>Rs. {finalPrice.toFixed(2)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -803,7 +803,7 @@ export default function CustomerServiceBooking({ customer }: CustomerServiceBook
               </div>
               {loyaltyDiscount > 0 && (
                 <p className="text-sm text-green-600">
-                  You'll save ₹{loyaltyDiscount.toFixed(2)} with these points
+                  You'll save Rs. {loyaltyDiscount.toFixed(2)} with these points
                 </p>
               )}
             </div>
@@ -814,17 +814,17 @@ export default function CustomerServiceBooking({ customer }: CustomerServiceBook
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span>Subtotal:</span>
-                    <span>₹{totalPrice.toFixed(2)}</span>
+                    <span>Rs. {totalPrice.toFixed(2)}</span>
                   </div>
                   {loyaltyDiscount > 0 && (
                     <div className="flex items-center justify-between text-green-600">
                       <span>Loyalty Discount:</span>
-                      <span>-₹{loyaltyDiscount.toFixed(2)}</span>
+                      <span>-Rs. {loyaltyDiscount.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between font-semibold text-lg pt-2 border-t">
                     <span>Total Amount:</span>
-                    <span>₹{finalPrice.toFixed(2)}</span>
+                    <span>Rs. {finalPrice.toFixed(2)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -837,7 +837,7 @@ export default function CustomerServiceBooking({ customer }: CustomerServiceBook
               disabled={selectedServices.length === 0 || !bookingForm.pickupDate || !bookingForm.deliveryDate}
             >
               <CreditCard className="h-4 w-4 mr-2" />
-              Confirm Booking - ₹{finalPrice.toFixed(2)}
+              Confirm Booking - Rs. {finalPrice.toFixed(2)}
             </Button>
           </div>
         </DialogContent>

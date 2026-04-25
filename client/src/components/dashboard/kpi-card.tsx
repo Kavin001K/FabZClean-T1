@@ -33,13 +33,13 @@ export default React.memo(function KpiCard({
   const formatValue = (val: string | number | undefined | null) => {
     if (typeof val === 'number') {
       const safeVal = val ?? 0;
-      if (isNaN(safeVal) || !isFinite(safeVal)) return '₹0';
+      if (isNaN(safeVal) || !isFinite(safeVal)) return 'Rs. 0';
       if (safeVal >= 1000000) {
-        return `₹${(safeVal / 1000000).toFixed(1)}M`;
+        return `Rs. ${(safeVal / 1000000).toFixed(1)}M`;
       } else if (safeVal >= 1000) {
-        return `₹${(safeVal / 1000).toFixed(1)}K`;
+        return `Rs. ${(safeVal / 1000).toFixed(1)}K`;
       }
-      return `₹${safeVal.toLocaleString()}`;
+      return `Rs. ${safeVal.toLocaleString()}`;
     }
     return val ?? '0';
   };

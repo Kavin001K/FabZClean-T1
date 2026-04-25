@@ -119,12 +119,12 @@ const formatActionDescription = (log: AuditLog): string => {
 
         // Payments
         case 'payment_received':
-            const amount = d.amount ? `₹${d.amount}` : '';
+            const amount = d.amount ? `Rs. ${d.amount}` : '';
             return `Received payment ${amount} for order ${d.orderNumber || entityId}`;
         case 'mark_paid':
             return `Marked order ${d.orderNumber || entityId} as paid`;
         case 'refund_issued':
-            return `Issued refund of ₹${d.amount || 0} for order ${d.orderNumber || entityId}`;
+            return `Issued refund of Rs. ${d.amount || 0} for order ${d.orderNumber || entityId}`;
 
         // Printing
         case 'print_invoice':

@@ -167,7 +167,7 @@ function calculateServicePerformance(
       amount = order.totalAmount;
     } else if (typeof order.totalAmount === 'string') {
       // Remove currency symbols, commas, and convert
-      const cleaned = order.totalAmount.replace(/[₹,\s]/g, '');
+      const cleaned = order.totalAmount.replace(/[Rs. ,\s]/g, '');
       amount = parseFloat(cleaned) || 0;
     }
 
@@ -236,7 +236,7 @@ function calculateKPIMetrics(orders: Order[]): KPIMetrics {
       if (typeof order.totalAmount === 'number') {
         amount = order.totalAmount;
       } else if (typeof order.totalAmount === 'string') {
-        const cleaned = order.totalAmount.replace(/[₹,\s]/g, '');
+        const cleaned = order.totalAmount.replace(/[Rs. ,\s]/g, '');
         amount = parseFloat(cleaned) || 0;
       }
       totalRevenue += amount;

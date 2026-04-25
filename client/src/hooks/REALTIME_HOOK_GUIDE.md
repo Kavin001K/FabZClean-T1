@@ -102,10 +102,10 @@ orderBy: 'createdAt.desc'
 import { formatData, formatCurrency, formatText, formatNumber } from '@/lib/format-data';
 
 // Smart formatter (auto-detects type)
-formatData(value, 'currency') // Returns "₹0" if null
+formatData(value, 'currency') // Returns "Rs. 0" if null
 
 // Specific formatters
-formatCurrency(1000)        // "₹1,000"
+formatCurrency(1000)        // "Rs. 1,000"
 formatText(null)            // "Nill"
 formatNumber(1234.56)        // "1,234.56"
 formatStatus(undefined)     // "NI"
@@ -119,7 +119,7 @@ formatPercentage(85.5)      // "85.5%"
 |----------|-------|----------------------------|---------|
 | `formatText()` | `string \| null \| undefined` | `"Nill"` | `formatText("John")` → `"John"` |
 | `formatNumber()` | `number \| string \| null` | `"0"` | `formatNumber(1234)` → `"1,234"` |
-| `formatCurrency()` | `number \| string \| null` | `"₹0"` | `formatCurrency(1000)` → `"₹1,000"` |
+| `formatCurrency()` | `number \| string \| null` | `"Rs. 0"` | `formatCurrency(1000)` → `"Rs. 1,000"` |
 | `formatStatus()` | `string \| null \| undefined` | `"NI"` | `formatStatus("active")` → `"active"` |
 | `formatDate()` | `Date \| string \| null` | `"Nill"` | `formatDate(new Date())` → `"25 Oct 2024"` |
 | `formatDateTime()` | `Date \| string \| null` | `"Nill"` | `formatDateTime(date)` → `"25 Oct 2024, 10:30 AM"` |

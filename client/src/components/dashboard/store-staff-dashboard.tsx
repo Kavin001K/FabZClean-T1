@@ -104,7 +104,7 @@ export default function StoreStaffDashboard() {
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground font-medium">Total Billed</p>
-                                <p className="text-xl font-bold">₹{todaysRevenue.toLocaleString("en-IN")}</p>
+                                <p className="text-xl font-bold">Rs. {todaysRevenue.toLocaleString("en-IN")}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -118,7 +118,7 @@ export default function StoreStaffDashboard() {
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground font-medium">Cash in Hand</p>
-                                <p className="text-xl font-bold">₹{cashCollected.toLocaleString("en-IN")}</p>
+                                <p className="text-xl font-bold">Rs. {cashCollected.toLocaleString("en-IN")}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -149,7 +149,7 @@ export default function StoreStaffDashboard() {
                                     <p className="text-xs text-muted-foreground">{o.customerName || o.customer_name}</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-sm font-bold">₹{parseFloat(o.totalAmount || o.total_amount || "0").toLocaleString("en-IN")}</p>
+                                    <p className="text-sm font-bold">Rs. {parseFloat(o.totalAmount || o.total_amount || "0").toLocaleString("en-IN")}</p>
                                     <Badge variant="outline" className="text-xs capitalize">
                                         {o.status?.replace(/_/g, " ")}
                                     </Badge>

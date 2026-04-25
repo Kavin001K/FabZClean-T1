@@ -28,6 +28,7 @@ export interface ThermalTagSource {
   billDate?: string;
   dueDate?: string;
   items: ThermalTagItem[];
+  templateConfig?: any;
 }
 
 export interface PreparedThermalTag {
@@ -498,11 +499,11 @@ export const prepareThermalTags = ({
   const billText = formatTagDate(billDate);
   const dueText = formatTagDate(dueDate);
   const billFit = fitUppercaseText(`ORD ${billText}`, `ORD ${billText}`, {
-    baseFontMm: 5,
-    minFontMm: 3.9,
+    baseFontMm: 3.8,
+    minFontMm: 3.2,
     shrinkStart: 4,
     shrinkStepChars: 1,
-    shrinkFactor: 0.24,
+    shrinkFactor: 0.2,
     maxCharsAtMin: 8,
   });
 

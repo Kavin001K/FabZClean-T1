@@ -877,7 +877,7 @@ function OrdersComponent() {
       const split = payload?.data?.split || {};
       toast({
         title: "Wallet debit processed",
-        description: `Wallet: ₹${Number(split.walletDebited || 0).toFixed(2)} • Credit: ₹${Number(split.creditAssigned || 0).toFixed(2)}`,
+        description: `Wallet: Rs. ${Number(split.walletDebited || 0).toFixed(2)} • Credit: Rs. ${Number(split.creditAssigned || 0).toFixed(2)}`,
       });
     } catch (error: any) {
       toast({
@@ -1394,7 +1394,7 @@ function OrdersComponent() {
           </div>
           <div class="stat-box">
             <div class="stat-label">Total Revenue</div>
-            <div class="stat-value">₹${stats.totalRevenue.toFixed(2)}</div>
+            <div class="stat-value">Rs. ${stats.totalRevenue.toFixed(2)}</div>
           </div>
           <div class="stat-box">
             <div class="stat-label">Completed</div>
@@ -1402,7 +1402,7 @@ function OrdersComponent() {
           </div>
           <div class="stat-box">
             <div class="stat-label">Avg Order Value</div>
-            <div class="stat-value">₹${stats.avgOrderValue.toFixed(2)}</div>
+            <div class="stat-value">Rs. ${stats.avgOrderValue.toFixed(2)}</div>
           </div>
         </div>
 
@@ -1428,7 +1428,7 @@ function OrdersComponent() {
                 <td>${order.service || 'N/A'}</td>
                 <td><span class="status-badge status-${order.status}">${order.status}</span></td>
                 <td>${order.paymentStatus || 'N/A'}</td>
-                <td><strong>₹${safeParseFloat(order.totalAmount).toFixed(2)}</strong></td>
+                <td><strong>Rs. ${safeParseFloat(order.totalAmount).toFixed(2)}</strong></td>
                 <td>${safeFormatDate(order.createdAt, 'en-US', { dateStyle: 'medium' })}</td>
               </tr>
             `).join('')}

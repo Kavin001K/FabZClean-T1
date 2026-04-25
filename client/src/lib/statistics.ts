@@ -645,7 +645,7 @@ export function monthOverMonthGrowth(data: { date: Date; value: number }[]): num
  * @returns Customer lifetime value
  *
  * @example
- * customerLifetimeValue(100, 4, 3) // Returns 1200 (₹1200 CLV)
+ * customerLifetimeValue(100, 4, 3) // Returns 1200 (Rs. 1200 CLV)
  */
 export function customerLifetimeValue(
   avgOrderValue: number,

@@ -46,7 +46,7 @@ import { customersApi } from '@/lib/data-service';
 import { navigateOnEnter } from '@/lib/enter-navigation';
 import { cn } from '@/lib/utils';
 import type { Customer, Order } from '@shared/schema';
-import type { CustomerFeedbackRecord, CustomerOrderHistoryRecord, CustomerProfileDetails } from '@/lib/data-service';
+import type { CustomerBookingRecord, CustomerFeedbackRecord, CustomerOrderHistoryRecord, CustomerProfileDetails } from '@/lib/data-service';
 
 // Import New Wallet Components
 import { WalletRechargeModal } from '../wallet-recharge-modal';
@@ -282,6 +282,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
         feedbackDate: order.feedbackDate ?? null,
         feedbackTime: order.feedbackTime ?? null,
       }));
+  const recentBookings = (profileData?.recentBookings || []) as CustomerBookingRecord[];
 
   const feedbackHistory = (profileData?.feedbackHistory || []) as CustomerFeedbackRecord[];
   const computedCustomerRating = profileData?.customerRating ?? ((selectedCustomer as any)?.customerRating ?? null);
@@ -376,7 +377,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Spent</span>
                         </div>
                         <div className="text-2xl font-black text-foreground text-emerald-600">
-                          ₹{totalSpent.toLocaleString('en-IN')}
+                          Rs. {totalSpent.toLocaleString('en-IN')}
                         </div>
                         <div className="text-[10px] text-muted-foreground mt-1">Lifetime revenue</div>
                       </div>
@@ -396,7 +397,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                           </div>
                         </div>
                         <div className="text-2xl font-black text-emerald-600">
-                          ₹{selectedWalletBalance.toLocaleString('en-IN')}
+                          Rs. {selectedWalletBalance.toLocaleString('en-IN')}
                         </div>
                         <div className="text-[10px] text-emerald-500/70 mt-1">Available balance</div>
                       </div>
@@ -407,7 +408,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Credit</span>
                         </div>
                         <div className={cn("text-2xl font-black", selectedOutstandingClass)}>
-                          ₹{selectedOutstanding.toLocaleString('en-IN')}
+                          Rs. {selectedOutstanding.toLocaleString('en-IN')}
                         </div>
                         <div className="text-[10px] text-muted-foreground mt-1 flex items-center justify-between">
                           <span>Outstanding</span>
@@ -421,7 +422,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Limit</span>
                         </div>
                         <div className="text-2xl font-black text-foreground">
-                          ₹{selectedCreditLimitAbs.toLocaleString('en-IN')}
+                          Rs. {selectedCreditLimitAbs.toLocaleString('en-IN')}
                         </div>
                         <div className="text-[10px] text-muted-foreground mt-1">Max credit allowance</div>
                       </div>
@@ -466,7 +467,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-green-600">
-                        ₹{totalOrders > 0 ? Math.round(totalSpent / totalOrders).toLocaleString('en-IN') : '0'}
+                        Rs. {totalOrders > 0 ? Math.round(totalSpent / totalOrders).toLocaleString('en-IN') : '0'}
                       </div>
                       <p className="text-xs text-muted-foreground">per order</p>
                     </CardContent>
@@ -610,6 +611,59 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                           <TableRow>
                             <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
                               No orders found for this customer.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Recent Bookings</h3>
+                  <div className="overflow-x-auto">
+                    <Table className="min-w-[860px]">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Booking ID</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Source</TableHead>
+                          <TableHead>Store</TableHead>
+                          <TableHead>Preferred Slot</TableHead>
+                          <TableHead>Converted Order</TableHead>
+                          <TableHead>Created</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {recentBookings.length > 0 ? (
+                          recentBookings.map((booking) => (
+                            <TableRow key={booking.id}>
+                              <TableCell className="font-medium">{booking.bookingId}</TableCell>
+                              <TableCell>
+                                <Badge variant={booking.status === 'converted' ? 'default' : booking.status === 'cancelled' ? 'destructive' : 'secondary'}>
+                                  {booking.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {[booking.source, booking.channel].filter(Boolean).join(' / ') || 'website / web'}
+                              </TableCell>
+                              <TableCell>{booking.storeCode || 'Unassigned'}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {booking.preferredDate ? formatDate(booking.preferredDate) : 'No date'}
+                                {booking.preferredSlot ? ` • ${booking.preferredSlot}` : ''}
+                              </TableCell>
+                              <TableCell>{booking.convertedOrderId || 'Not converted'}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {booking.createdAt ? formatDate(booking.createdAt) : 'Not available'}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
+                              No bookings found for this customer.
                             </TableCell>
                           </TableRow>
                         )}
@@ -913,7 +967,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="edit-credit-limit">Credit Limit (₹)</Label>
+                      <Label htmlFor="edit-credit-limit">Credit Limit (Rs. )</Label>
                       <Input
                         id="edit-credit-limit"
                         type="number"
@@ -925,7 +979,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="edit-credit-balance">Current Credit Balance (₹)</Label>
+                      <Label htmlFor="edit-credit-balance">Current Credit Balance (Rs. )</Label>
                       <Input
                         id="edit-credit-balance"
                         type="number"
@@ -939,7 +993,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
                       />
                       <p className={cn("text-xs", selectedLimitExceeded ? "text-red-500" : "text-muted-foreground")}>
                         {selectedLimitExceeded
-                          ? `Current outstanding credit exceeds limit by ₹${(selectedOutstanding - selectedCreditLimitAbs).toFixed(2)}`
+                          ? `Current outstanding credit exceeds limit by Rs. ${(selectedOutstanding - selectedCreditLimitAbs).toFixed(2)}`
                           : "Current outstanding credit amount"}
                       </p>
                     </div>
@@ -1139,7 +1193,7 @@ const CustomerDialogs: React.FC<CustomerDialogsProps> = React.memo(({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="create-credit-limit">Credit Limit (₹)</Label>
+                <Label htmlFor="create-credit-limit">Credit Limit (Rs. )</Label>
                 <Input
                   id="create-credit-limit"
                   type="number"

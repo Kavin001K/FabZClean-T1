@@ -783,7 +783,7 @@ export default function EmployeeManagement() {
 
                   {employeeForm.salaryType === 'monthly' ? (
                     <div className="space-y-2">
-                      <Label htmlFor="baseSalary">Monthly Salary (₹) *</Label>
+                      <Label htmlFor="baseSalary">Monthly Salary (Rs. ) *</Label>
                       <Input
                         id="baseSalary"
                         type="number"
@@ -794,7 +794,7 @@ export default function EmployeeManagement() {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <Label htmlFor="hourlyRate">Hourly Rate (₹) *</Label>
+                      <Label htmlFor="hourlyRate">Hourly Rate (Rs. ) *</Label>
                       <Input
                         id="hourlyRate"
                         type="number"
@@ -1206,7 +1206,7 @@ export default function EmployeeManagement() {
 
               {employeeForm.salaryType === 'monthly' ? (
                 <div className="space-y-2">
-                  <Label htmlFor="edit-baseSalary">Monthly Salary (₹) *</Label>
+                  <Label htmlFor="edit-baseSalary">Monthly Salary (Rs. ) *</Label>
                   <Input
                     id="edit-baseSalary"
                     type="number"
@@ -1217,7 +1217,7 @@ export default function EmployeeManagement() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Label htmlFor="edit-hourlyRate">Hourly Rate (₹) *</Label>
+                  <Label htmlFor="edit-hourlyRate">Hourly Rate (Rs. ) *</Label>
                   <Input
                     id="edit-hourlyRate"
                     type="number"
@@ -1343,8 +1343,8 @@ export default function EmployeeManagement() {
                     </span>
                     <p className="font-medium text-primary">
                       {selectedEmployee.salaryType === 'hourly'
-                        ? `₹${selectedEmployee.hourlyRate || 0}/hr`
-                        : `₹${(selectedEmployee as any).salary || selectedEmployee.baseSalary || 0}/month`
+                        ? `Rs. ${selectedEmployee.hourlyRate || 0}/hr`
+                        : `Rs. ${(selectedEmployee as any).salary || selectedEmployee.baseSalary || 0}/month`
                       }
                     </p>
                   </div>

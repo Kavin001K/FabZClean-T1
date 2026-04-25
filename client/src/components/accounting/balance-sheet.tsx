@@ -209,7 +209,7 @@ export function BalanceSheet() {
               {account.accountName}
             </TableCell>
             <TableCell className="text-right font-medium">
-              ₹{formatINR(account.balance)}
+              Rs. {formatINR(account.balance)}
             </TableCell>
           </TableRow>
         ))}
@@ -219,7 +219,7 @@ export function BalanceSheet() {
               Total {section.title}
             </TableCell>
             <TableCell className="text-right">
-              ₹{formatINR(section.subtotal)}
+              Rs. {formatINR(section.subtotal)}
             </TableCell>
           </TableRow>
         )}
@@ -296,7 +296,7 @@ export function BalanceSheet() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">
-                    ₹{formatINR(data.assets?.totalAssets || 0)}
+                    Rs. {formatINR(data.assets?.totalAssets || 0)}
                   </div>
                 </CardContent>
               </Card>
@@ -307,7 +307,7 @@ export function BalanceSheet() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-600">
-                    ₹{formatINR(data.liabilities?.totalLiabilities || 0)}
+                    Rs. {formatINR(data.liabilities?.totalLiabilities || 0)}
                   </div>
                 </CardContent>
               </Card>
@@ -318,7 +318,7 @@ export function BalanceSheet() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-blue-600">
-                    ₹{formatINR(data.equity?.totalEquity || 0)}
+                    Rs. {formatINR(data.equity?.totalEquity || 0)}
                   </div>
                 </CardContent>
               </Card>
@@ -346,7 +346,7 @@ export function BalanceSheet() {
                   <TableRow className="bg-primary/20 font-bold border-t-2">
                     <TableCell>TOTAL ASSETS</TableCell>
                     <TableCell className="text-right text-green-600">
-                      ₹{formatINR(data.assets?.totalAssets || 0)}
+                      Rs. {formatINR(data.assets?.totalAssets || 0)}
                     </TableCell>
                   </TableRow>
 
@@ -366,7 +366,7 @@ export function BalanceSheet() {
                   <TableRow className="bg-muted/50 font-bold border-t">
                     <TableCell>TOTAL LIABILITIES</TableCell>
                     <TableCell className="text-right text-red-600">
-                      ₹{formatINR(data.liabilities?.totalLiabilities || 0)}
+                      Rs. {formatINR(data.liabilities?.totalLiabilities || 0)}
                     </TableCell>
                   </TableRow>
 
@@ -382,7 +382,7 @@ export function BalanceSheet() {
                   <TableRow className="bg-muted/50 font-bold border-t">
                     <TableCell>TOTAL EQUITY</TableCell>
                     <TableCell className="text-right text-blue-600">
-                      ₹{formatINR(data.equity?.totalEquity || 0)}
+                      Rs. {formatINR(data.equity?.totalEquity || 0)}
                     </TableCell>
                   </TableRow>
 
@@ -390,7 +390,7 @@ export function BalanceSheet() {
                   <TableRow className="bg-primary/20 font-bold border-t-2">
                     <TableCell>TOTAL LIABILITIES AND EQUITY</TableCell>
                     <TableCell className="text-right">
-                      ₹{formatINR(data.totalLiabilitiesAndEquity ?? 0)}
+                      Rs. {formatINR(data.totalLiabilitiesAndEquity ?? 0)}
                     </TableCell>
                   </TableRow>
                 </TableBody>

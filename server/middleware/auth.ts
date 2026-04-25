@@ -188,7 +188,7 @@ export const rateLimit = (windowMs: number = 60000, maxRequests: number = 100) =
 };
 
 // Type exports for compatibility
-export interface AuthenticatedRequest extends Request {
+export type AuthenticatedRequest = Request & {
   employee?: {
     id: string;
     employeeId: string;
@@ -203,4 +203,4 @@ export interface AuthenticatedRequest extends Request {
     role: UserRole;
   };
   session?: any;
-}
+};

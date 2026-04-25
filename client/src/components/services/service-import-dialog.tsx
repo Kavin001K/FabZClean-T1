@@ -269,7 +269,7 @@ export function ServiceImportDialog({ open, onOpenChange }: ServiceImportDialogP
                                                     <>
                                                         <TableCell>{service.category}</TableCell>
                                                         <TableCell>{service.name}</TableCell>
-                                                        <TableCell>₹{service.price}</TableCell>
+                                                        <TableCell>Rs. {service.price}</TableCell>
                                                         <TableCell>
                                                             <span className={`px-2 py-1 rounded-full text-xs ${service.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                                                                 {service.status}

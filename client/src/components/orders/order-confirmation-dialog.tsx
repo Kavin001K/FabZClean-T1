@@ -490,7 +490,7 @@ export function OrderConfirmationDialog({
                             <div className="text-right">
                                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Total Amount</p>
                                 <div className="flex items-center justify-end gap-1 text-gray-900">
-                                    <span className="text-lg font-medium">₹</span>
+                                    <span className="text-lg font-medium">Rs. </span>
                                     <span className="text-4xl font-extrabold tracking-tight">
                                         {totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                     </span>

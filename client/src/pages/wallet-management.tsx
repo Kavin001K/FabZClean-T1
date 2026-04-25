@@ -358,13 +358,13 @@ export default function WalletManagementPage() {
     <div class="amount-box">
       <span class="amount-label">TOTAL AMOUNT</span>
       <span class="amount-value ${direction.isCredit ? 'credit' : 'debit'}">
-        ${direction.isCredit ? '₹' : '-₹'}${direction.absoluteAmount.toFixed(2)}
+        ${direction.isCredit ? 'Rs. ' : '-Rs. '}${direction.absoluteAmount.toFixed(2)}
       </span>
     </div>
 
     <div class="row" style="background: #f3f4f6; padding: 6px; border-radius: 4px;">
       <span class="label">Balance After</span>
-      <span class="value">₹${balanceAfter.toFixed(2)}</span>
+      <span class="value">Rs. ${balanceAfter.toFixed(2)}</span>
     </div>
 
     <div class="footer">
@@ -582,7 +582,7 @@ export default function WalletManagementPage() {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Outstanding</p>
-                  <h3 className="text-2xl font-black tracking-tight text-amber-600">₹{totals.totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</h3>
+                  <h3 className="text-2xl font-black tracking-tight text-amber-600">Rs. {totals.totalOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</h3>
                   <div className="mt-1 text-[10px] text-amber-500/60 font-medium italic">Total receivables</div>
                 </div>
               </div>
@@ -597,7 +597,7 @@ export default function WalletManagementPage() {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Prepaid</p>
-                  <h3 className="text-2xl font-black tracking-tight text-emerald-600">₹{totals.totalPrepaid.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</h3>
+                  <h3 className="text-2xl font-black tracking-tight text-emerald-600">Rs. {totals.totalPrepaid.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</h3>
                   <div className="mt-1 text-[10px] text-emerald-500/60 font-medium italic">Available balances</div>
                 </div>
               </div>
@@ -694,11 +694,11 @@ export default function WalletManagementPage() {
                           "text-right font-semibold",
                           row.isExceeded ? "text-red-500" : row.isClear ? "text-emerald-500" : "text-amber-500",
                         )}>
-                          ₹{row.outstanding.toFixed(2)}
+                          Rs. {row.outstanding.toFixed(2)}
                         </TableCell>
-                        <TableCell className="text-right">₹{row.creditLimit.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">Rs. {row.creditLimit.toFixed(2)}</TableCell>
                         <TableCell className={cn("text-right font-medium", row.walletBalance >= 0 ? "text-emerald-500" : "text-amber-500")}>
-                          ₹{row.walletBalance.toFixed(2)}
+                          Rs. {row.walletBalance.toFixed(2)}
                         </TableCell>
                         <TableCell>
                           {row.isExceeded ? (
@@ -814,11 +814,11 @@ export default function WalletManagementPage() {
                           <p className={cn(
                             "text-sm font-black",
                             row.isExceeded ? "text-red-600" : row.isClear ? "text-emerald-600" : "text-amber-600",
-                          )}>₹{row.outstanding.toFixed(2)}</p>
+                          )}>Rs. {row.outstanding.toFixed(2)}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-[10px] uppercase font-bold text-muted-foreground">Wallet</p>
-                          <p className={cn("text-sm font-black text-emerald-600")}>₹{row.walletBalance.toFixed(2)}</p>
+                          <p className={cn("text-sm font-black text-emerald-600")}>Rs. {row.walletBalance.toFixed(2)}</p>
                         </div>
                       </div>
                       
@@ -986,7 +986,7 @@ export default function WalletManagementPage() {
                   ) : (
                     customerOrders.map((order: any) => (
                       <SelectItem key={order.id} value={order.id}>
-                        {order.orderNumber} - ₹{parseFloat(order.totalAmount || "0").toFixed(2)} ({new Date(order.createdAt).toLocaleDateString()})
+                        {order.orderNumber} - Rs. {parseFloat(order.totalAmount || "0").toFixed(2)} ({new Date(order.createdAt).toLocaleDateString()})
                       </SelectItem>
                     ))
                   )}
@@ -994,7 +994,7 @@ export default function WalletManagementPage() {
               </Select>
               {selectedOrder && (
                 <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                  Max Refund: ₹{maxRefund.toFixed(2)} {refundedAmount > 0 && `(Already refunded: ₹${refundedAmount.toFixed(2)})`}
+                  Max Refund: Rs. {maxRefund.toFixed(2)} {refundedAmount > 0 && `(Already refunded: Rs. ${refundedAmount.toFixed(2)})`}
                 </p>
               )}
             </div>
@@ -1194,12 +1194,12 @@ export default function WalletManagementPage() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{targetValueLabel}</p>
-                  <p className="font-bold">₹{currentAdjustmentBase.toFixed(2)}</p>
+                  <p className="font-bold">Rs. {currentAdjustmentBase.toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">After adjustment</p>
                   <p className={cn("font-bold", adjustmentPreviewIsInvalid ? "text-red-600" : "text-emerald-600")}>
-                    ₹{projectedAdjustmentValue.toFixed(2)}
+                    Rs. {projectedAdjustmentValue.toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -1255,11 +1255,11 @@ export default function WalletManagementPage() {
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Credit In</p>
-              <p className="text-sm font-bold text-emerald-600">₹{ledgerSummary.creditIn.toFixed(2)}</p>
+              <p className="text-sm font-bold text-emerald-600">Rs. {ledgerSummary.creditIn.toFixed(2)}</p>
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Debit Out</p>
-              <p className="text-sm font-bold text-amber-600">₹{ledgerSummary.debitOut.toFixed(2)}</p>
+              <p className="text-sm font-bold text-amber-600">Rs. {ledgerSummary.debitOut.toFixed(2)}</p>
             </div>
           </div>
 
@@ -1324,9 +1324,9 @@ export default function WalletManagementPage() {
                         </div>
                         <div className="text-right shrink-0">
                           <p className={cn("font-bold text-base", isCredit ? "text-emerald-600" : "text-amber-600")}>
-                            {isCredit ? "+" : "-"}₹{direction.absoluteAmount.toFixed(2)}
+                            {isCredit ? "+" : "-"}Rs. {direction.absoluteAmount.toFixed(2)}
                           </p>
-                          <p className="text-[10px] font-medium text-slate-500 mt-0.5">Bal: ₹{toNumber(tx.balanceAfter).toFixed(2)}</p>
+                          <p className="text-[10px] font-medium text-slate-500 mt-0.5">Bal: Rs. {toNumber(tx.balanceAfter).toFixed(2)}</p>
                           <Button
                             variant="ghost"
                             size="sm"

@@ -167,6 +167,7 @@ export interface InvoicePrintData {
   dueDate?: string;
   orderNumber?: string;
   franchiseId?: string; // For franchise-specific details
+  storeId?: string; // Added storeId
   enableGST?: boolean; // Whether to show GST on invoice
   customerInfo: {
     name: string;
@@ -181,6 +182,7 @@ export interface InvoicePrintData {
     email: string;
     website?: string;
     taxId?: string;
+    logo?: string;
   };
   items: Array<{
     name: string;
@@ -196,6 +198,9 @@ export interface InvoicePrintData {
   total: number;
   paymentMethod?: string;
   paymentStatus?: string;
+  storeCode?: string | null;
+  store?: any;
+  businessProfile?: any;
   notes?: string;
   terms?: string;
   status?: string;
@@ -981,7 +986,7 @@ export class PrintDriver {
         storeCode: (data as any).storeCode || resolvedStore?.code || null,
         store: resolvedStore || (data as any).store || null,
         businessProfile: resolvedBusinessProfile || (data as any).businessProfile,
-      };
+      } as any;
 
       const invoiceData = {
         invoiceNumber: data.invoiceNumber,
@@ -1040,10 +1045,9 @@ export class PrintDriver {
         root = createRoot(container);
 
         await new Promise<void>((resolve) => {
+          const finalData = { ...invoiceData, preset: presetKey, config: effectiveConfig };
           root.render(React.createElement(InvoiceTemplateIN, {
-            data: invoiceData as any,
-            preset: presetKey as any,
-            config: effectiveConfig as any,
+            data: finalData as any,
           }));
           setTimeout(resolve, 2000);
         });
@@ -1585,10 +1589,10 @@ export class PrintDriver {
       doc.text((item.quantity || 0).toString(), margin.left + itemWidth + 2, currentY);
 
       // Unit price
-      doc.text(`₹${(parseFloat(String(item.unitPrice)) || 0).toFixed(2)}`, margin.left + itemWidth + qtyWidth + 2, currentY);
+      doc.text(`Rs. ${(parseFloat(String(item.unitPrice)) || 0).toFixed(2)}`, margin.left + itemWidth + qtyWidth + 2, currentY);
 
       // Total
-      doc.text(`₹${(parseFloat(String(item.total)) || 0).toFixed(2)}`, rightMargin - totalWidth + 2, currentY);
+      doc.text(`Rs. ${(parseFloat(String(item.total)) || 0).toFixed(2)}`, rightMargin - totalWidth + 2, currentY);
 
       currentY += 12;
 
@@ -1622,24 +1626,24 @@ export class PrintDriver {
     doc.setFontSize(template.settings.fontSize);
     doc.setFont(template.settings.fontFamily, 'normal');
     doc.text('Subtotal:', totalsX, startY + 10);
-    doc.text(`₹${(parseFloat(String(data.subtotal)) || 0).toFixed(2)}`, totalsX + 50, startY + 10);
+    doc.text(`Rs. ${(parseFloat(String(data.subtotal)) || 0).toFixed(2)}`, totalsX + 50, startY + 10);
 
     // Discount (if applicable)
     if (data.discount && data.discount > 0) {
       doc.text('Discount:', totalsX, startY + 20);
-      doc.text(`-₹${(parseFloat(String(data.discount)) || 0).toFixed(2)}`, totalsX + 50, startY + 20);
+      doc.text(`-Rs. ${(parseFloat(String(data.discount)) || 0).toFixed(2)}`, totalsX + 50, startY + 20);
     }
 
     // Tax
     doc.text('Tax:', totalsX, startY + (data.discount ? 30 : 20));
-    doc.text(`₹${(parseFloat(String(data.tax)) || 0).toFixed(2)}`, totalsX + 50, startY + (data.discount ? 30 : 20));
+    doc.text(`Rs. ${(parseFloat(String(data.tax)) || 0).toFixed(2)}`, totalsX + 50, startY + (data.discount ? 30 : 20));
 
     // Total
     doc.setFont(template.settings.fontFamily, 'bold');
     doc.setFontSize(template.settings.fontSize + 1);
     const totalY = startY + (data.discount ? 45 : 35);
     doc.text('Total:', totalsX, totalY);
-    doc.text(`₹${(parseFloat(String(data.total)) || 0).toFixed(2)}`, totalsX + 50, totalY);
+    doc.text(`Rs. ${(parseFloat(String(data.total)) || 0).toFixed(2)}`, totalsX + 50, totalY);
 
     // Payment information
     if (data.paymentMethod || data.paymentStatus) {
@@ -1682,7 +1686,7 @@ export class PrintDriver {
     data.items.forEach((item, index) => {
       const y = margin.top + 90 + (index * 15);
       doc.text(`${item.name}`, margin.left, y);
-      doc.text(`Qty: ${item.quantity} x ₹${(item.unitPrice || 0).toFixed(2)} = ₹${(item.total || 0).toFixed(2)}`, margin.left, y + 8);
+      doc.text(`Qty: ${item.quantity} x Rs. ${(item.unitPrice || 0).toFixed(2)} = Rs. ${(item.total || 0).toFixed(2)}`, margin.left, y + 8);
     });
   }
 
@@ -1693,10 +1697,10 @@ export class PrintDriver {
 
     doc.setFontSize(template.settings.fontSize);
     doc.setFont(template.settings.fontFamily, 'normal');
-    doc.text(`Subtotal: ₹${(parseFloat(String(data.subtotal)) || 0).toFixed(2)}`, margin.left, startY);
-    doc.text(`Tax: ₹${(parseFloat(String(data.tax)) || 0).toFixed(2)}`, margin.left, startY + 10);
+    doc.text(`Subtotal: Rs. ${(parseFloat(String(data.subtotal)) || 0).toFixed(2)}`, margin.left, startY);
+    doc.text(`Tax: Rs. ${(parseFloat(String(data.tax)) || 0).toFixed(2)}`, margin.left, startY + 10);
     doc.setFont(template.settings.fontFamily, 'bold');
-    doc.text(`Total: ₹${(parseFloat(String(data.total)) || 0).toFixed(2)}`, margin.left, startY + 20);
+    doc.text(`Total: Rs. ${(parseFloat(String(data.total)) || 0).toFixed(2)}`, margin.left, startY + 20);
 
     if (data.paymentMethod) {
       doc.setFont(template.settings.fontFamily, 'normal');
@@ -1890,11 +1894,11 @@ export class PrintDriver {
         xPosition += colWidths[0];
         pdf.text((item.quantity || 0).toString(), xPosition + 2, yPosition + 5);
         xPosition += colWidths[1];
-        pdf.text(`₹${(parseFloat(String(item.unitPrice)) || 0).toFixed(2)}`, xPosition + 2, yPosition + 5);
+        pdf.text(`Rs. ${(parseFloat(String(item.unitPrice)) || 0).toFixed(2)}`, xPosition + 2, yPosition + 5);
         xPosition += colWidths[2];
         pdf.text(`${(parseFloat(String(item.taxRate)) || 0)}%`, xPosition + 2, yPosition + 5);
         xPosition += colWidths[3];
-        pdf.text(`₹${(parseFloat(String(item.total)) || 0).toFixed(2)}`, xPosition + 2, yPosition + 5);
+        pdf.text(`Rs. ${(parseFloat(String(item.total)) || 0).toFixed(2)}`, xPosition + 2, yPosition + 5);
 
         yPosition += 8;
       });
@@ -1908,17 +1912,17 @@ export class PrintDriver {
     pdf.setFont(template.settings.fontFamily, 'normal');
 
     pdf.text('Subtotal:', totalsX, yPosition);
-    pdf.text(`₹${(parseFloat(String(data.subtotal)) || 0).toFixed(2)}`, totalsX + 40, yPosition);
+    pdf.text(`Rs. ${(parseFloat(String(data.subtotal)) || 0).toFixed(2)}`, totalsX + 40, yPosition);
     yPosition += 6;
 
     pdf.text('Tax:', totalsX, yPosition);
-    pdf.text(`₹${(parseFloat(String(data.taxAmount)) || 0).toFixed(2)}`, totalsX + 40, yPosition);
+    pdf.text(`Rs. ${(parseFloat(String(data.taxAmount)) || 0).toFixed(2)}`, totalsX + 40, yPosition);
     yPosition += 6;
 
     pdf.setFont(template.settings.fontFamily, 'bold');
     pdf.setFontSize(12);
     pdf.text('Total:', totalsX, yPosition);
-    pdf.text(`₹${(parseFloat(String(data.total)) || 0).toFixed(2)}`, totalsX + 40, yPosition);
+    pdf.text(`Rs. ${(parseFloat(String(data.total)) || 0).toFixed(2)}`, totalsX + 40, yPosition);
     yPosition += 15;
 
     // Payment Terms
@@ -2068,9 +2072,9 @@ export class PrintDriver {
 
     const summaryData = [
       { label: 'Total Orders', value: data.summary.totalOrders.toString() },
-      { label: 'Total Revenue', value: `₹${data.summary.totalRevenue.toLocaleString()}` },
+      { label: 'Total Revenue', value: `Rs. ${data.summary.totalRevenue.toLocaleString()}` },
       { label: 'Total Customers', value: data.summary.totalCustomers.toString() },
-      { label: 'Avg Order Value', value: `₹${data.summary.averageOrderValue.toFixed(2)}` }
+      { label: 'Avg Order Value', value: `Rs. ${data.summary.averageOrderValue.toFixed(2)}` }
     ];
 
     summaryData.forEach((item, index) => {
@@ -2108,7 +2112,7 @@ export class PrintDriver {
 
         pdf.text(`${index + 1}. ${service.name}`, margin.left, yPosition);
         pdf.text(`Orders: ${service.count}`, margin.left + 80, yPosition);
-        pdf.text(`Revenue: ₹${service.revenue.toLocaleString()}`, margin.left + 120, yPosition);
+        pdf.text(`Revenue: Rs. ${service.revenue.toLocaleString()}`, margin.left + 120, yPosition);
         yPosition += 6;
       });
 

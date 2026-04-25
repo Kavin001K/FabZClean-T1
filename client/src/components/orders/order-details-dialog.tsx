@@ -554,7 +554,7 @@ export default React.memo(function OrderDetailsDialog({
                   className="col-span-1 sm:col-span-2 h-11 font-black uppercase tracking-widest text-[10px] rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 shadow-sm"
                 >
                   <CreditCard className="h-3.5 w-3.5 mr-2 text-blue-800" />
-                  Mark Paid (₹{outstandingAmount.toFixed(2)})
+                  Mark Paid (Rs. {outstandingAmount.toFixed(2)})
                 </Button>
               )}
 

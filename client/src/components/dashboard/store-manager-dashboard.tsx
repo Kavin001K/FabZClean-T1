@@ -86,7 +86,7 @@ export default function StoreManagerDashboard() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-xs text-muted-foreground font-medium">Today's Revenue</p>
-                                <p className="text-2xl font-bold mt-1">₹{todaysRevenue.toLocaleString("en-IN")}</p>
+                                <p className="text-2xl font-bold mt-1">Rs. {todaysRevenue.toLocaleString("en-IN")}</p>
                             </div>
                             <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
                                 <IndianRupee className="h-5 w-5 text-emerald-600" />
@@ -163,7 +163,7 @@ export default function StoreManagerDashboard() {
                                         <Badge variant="outline" className="text-xs capitalize">
                                             {o.status?.replace(/_/g, " ")}
                                         </Badge>
-                                        <p className="text-xs font-medium mt-1">₹{parseFloat(o.totalAmount || o.total_amount || "0").toLocaleString("en-IN")}</p>
+                                        <p className="text-xs font-medium mt-1">Rs. {parseFloat(o.totalAmount || o.total_amount || "0").toLocaleString("en-IN")}</p>
                                     </div>
                                 </div>
                             ))

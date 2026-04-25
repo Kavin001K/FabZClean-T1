@@ -113,7 +113,7 @@ export function downloadServiceTemplate(): void {
         { Instruction: '' },
         { Instruction: 'NOTES:' },
         { Instruction: '• Delete sample rows before adding your data' },
-        { Instruction: '• Prices should be numbers only (no ₹ symbol)' },
+        { Instruction: '• Prices should be numbers only (no Rs.  symbol)' },
         { Instruction: '• Duplicate names will update existing services' },
         { Instruction: '• Leave empty rows will be skipped' },
         { Instruction: '' },

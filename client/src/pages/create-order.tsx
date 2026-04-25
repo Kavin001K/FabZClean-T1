@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/hooks/use-notifications";
-import { ordersApi, customersApi, servicesApi } from '@/lib/data-service';
+import { authorizedFetch, ordersApi, customersApi, servicesApi } from '@/lib/data-service';
 import { useInvoicePrint } from '@/hooks/use-invoice-print';
 import { motion, AnimatePresence } from "framer-motion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -50,6 +50,18 @@ interface ServiceItem {
   tagNote: string;
   // Unique barcode for tracking lifecycle
   garmentBarcode?: string;
+}
+
+interface CustomerAddressOption {
+  id: string;
+  label: string;
+  line1: string;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
+  country?: string | null;
+  isDefault?: boolean;
 }
 
 let instanceCounter = 0;
@@ -99,6 +111,8 @@ export default function CreateOrder() {
   const [showCouponExtras, setShowCouponExtras] = useState(false);
   const [showCustomerInfo, setShowCustomerInfo] = useState(false);
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
+  const [customerAddresses, setCustomerAddresses] = useState<CustomerAddressOption[]>([]);
+  const [selectedCustomerAddressId, setSelectedCustomerAddressId] = useState<string>('manual');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerSecondaryPhone, setCustomerSecondaryPhone] = useState('');
@@ -210,12 +224,62 @@ export default function CreateOrder() {
     if (foundCustomer?.creditBalance && Number(foundCustomer.creditBalance) > 0) {
       toast({
         title: "Credit Balance Due",
-        description: `This customer has a pending credit balance of ₹${Number(foundCustomer.creditBalance).toLocaleString('en-IN')}`,
+        description: `This customer has a pending credit balance of Rs. ${Number(foundCustomer.creditBalance).toLocaleString('en-IN')}`,
         variant: "destructive",
         duration: 5000,
       });
     }
   }, [foundCustomer, toast]);
+
+  useEffect(() => {
+    const loadCustomerAddresses = async () => {
+      if (!foundCustomer?.id) {
+        setCustomerAddresses([]);
+        setSelectedCustomerAddressId('manual');
+        return;
+      }
+
+      try {
+        const response = await authorizedFetch(`/v1/customers/${encodeURIComponent(foundCustomer.id)}/addresses`);
+        if (!response.ok) {
+          setCustomerAddresses([]);
+          setSelectedCustomerAddressId('manual');
+          return;
+        }
+
+        const payload = await response.json();
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        const mapped: CustomerAddressOption[] = rows.map((row: any) => ({
+          id: String(row.id),
+          label: String(row.label || 'Address'),
+          line1: String(row.line1 || ''),
+          line2: row.line2 || null,
+          city: row.city || null,
+          state: row.state || null,
+          pincode: row.pincode || null,
+          country: row.country || null,
+          isDefault: Boolean(row.isDefault),
+        })).filter((row: CustomerAddressOption) => row.line1);
+
+        setCustomerAddresses(mapped);
+        if (mapped.length > 0) {
+          const preferred = mapped.find((entry) => entry.isDefault) || mapped[0];
+          setSelectedCustomerAddressId(preferred.id);
+          const formatted = [preferred.line1, preferred.line2, preferred.city, preferred.state, preferred.pincode, preferred.country]
+            .filter(Boolean)
+            .join(', ');
+          setDeliveryAddress(formatted);
+        } else {
+          setSelectedCustomerAddressId('manual');
+        }
+      } catch {
+        setCustomerAddresses([]);
+        setSelectedCustomerAddressId('manual');
+      }
+    };
+
+    void loadCustomerAddresses();
+  }, [foundCustomer?.id]);
 
   // Sync payment status with payment method
   useEffect(() => {
@@ -657,7 +721,7 @@ export default function CreateOrder() {
   /**
    * Handle price input with arithmetic notation (+N/-N).
    * If value starts with + or -, treat as relative adjustment.
-   * Arrow keys: Up/Down adjusts by ₹5 (handled in onKeyDown).
+   * Arrow keys: Up/Down adjusts by Rs. 5 (handled in onKeyDown).
    */
   const handlePriceInputChange = (instanceKey: string, rawValue: string) => {
     const trimmed = rawValue.trim();
@@ -1552,7 +1616,7 @@ export default function CreateOrder() {
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/80">
                                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 mb-2">Price</p>
                                   <div className="flex items-center bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 h-11 pr-3">
-                                    <span className="pl-3 text-slate-400 font-bold text-sm">₹</span>
+                                    <span className="pl-3 text-slate-400 font-bold text-sm">Rs. </span>
                                     <Input
                                       ref={(el) => { priceRefs.current[item.instanceKey] = el; }}
                                       type="text"
@@ -1576,7 +1640,7 @@ export default function CreateOrder() {
                               <div className="mt-4 rounded-2xl bg-primary px-4 py-3 text-white shadow-lg shadow-primary/10">
                                 <div className="flex items-center justify-between gap-3">
                                   <span className="text-xs font-black uppercase tracking-[0.18em] text-white/80">Subtotal</span>
-                                  <span className="text-2xl font-black tabular-nums">₹{item.subtotal.toFixed(2)}</span>
+                                  <span className="text-2xl font-black tabular-nums">Rs. {item.subtotal.toFixed(2)}</span>
                                 </div>
                               </div>
 
@@ -1714,7 +1778,7 @@ export default function CreateOrder() {
                                         className="w-24 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                                       />
                                     </TableCell>
-                                    <TableCell className="font-semibold text-slate-900 dark:text-white py-2">₹{item.subtotal.toFixed(2)}</TableCell>
+                                    <TableCell className="font-semibold text-slate-900 dark:text-white py-2">Rs. {item.subtotal.toFixed(2)}</TableCell>
                                     <TableCell>
                                       <Button
                                         type="button"
@@ -1969,17 +2033,52 @@ export default function CreateOrder() {
                             </Button>
                           )}
                         </div>
+                        {customerAddresses.length > 0 && (
+                          <div className="space-y-2">
+                            <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Saved Addresses</Label>
+                            <Select
+                              value={selectedCustomerAddressId}
+                              onValueChange={(value) => {
+                                setSelectedCustomerAddressId(value);
+                                if (value === 'manual') return;
+                                const selected = customerAddresses.find((entry) => entry.id === value);
+                                if (!selected) return;
+                                const formatted = [selected.line1, selected.line2, selected.city, selected.state, selected.pincode, selected.country]
+                                  .filter(Boolean)
+                                  .join(', ');
+                                setDeliveryAddress(formatted);
+                              }}
+                            >
+                              <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                                <SelectValue placeholder="Select saved address" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="manual">Manual address</SelectItem>
+                                {customerAddresses.map((entry) => (
+                                  <SelectItem key={entry.id} value={entry.id}>
+                                    {entry.label}: {entry.line1}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                         <div className="relative group">
                           <Textarea 
                             placeholder="Enter detailed delivery address..." 
                             value={deliveryAddress}
-                            onChange={(e) => setDeliveryAddress(e.target.value)}
+                            onChange={(e) => {
+                              if (selectedCustomerAddressId !== 'manual') {
+                                setSelectedCustomerAddressId('manual');
+                              }
+                              setDeliveryAddress(e.target.value);
+                            }}
                             className="min-h-[100px] sm:min-h-[120px] bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-primary/20 focus:border-primary dark:focus:border-primary transition-all text-sm leading-relaxed shadow-sm"
                           />
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Delivery Charges (₹)</Label>
+                        <Label className="text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Delivery Charges (Rs. )</Label>
                         <div className="relative group">
                           <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 group-focus-within:text-primary transition-colors" />
                           <Input 
@@ -2004,7 +2103,7 @@ export default function CreateOrder() {
                               )}
                               onClick={() => setDeliveryCharges(amt)}
                             >
-                              ₹{amt}
+                              Rs. {amt}
                             </Button>
                           ))}
                         </div>
@@ -2108,7 +2207,7 @@ export default function CreateOrder() {
                       <SelectContent>
                         <SelectItem value="none">No Discount</SelectItem>
                         <SelectItem value="percentage">Percentage (%)</SelectItem>
-                        <SelectItem value="fixed">Fixed Amount (₹)</SelectItem>
+                        <SelectItem value="fixed">Fixed Amount (Rs. )</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -2215,7 +2314,7 @@ export default function CreateOrder() {
                       <div>
                         <p className="text-sm font-bold">Use Wallet Balance</p>
                         <p className="text-xs text-muted-foreground">
-                          Available: <span className="font-bold text-emerald-600 dark:text-emerald-400">₹{parseFloat(String(foundCustomer.walletBalanceCache || 0)).toFixed(2)}</span>
+                          Available: <span className="font-bold text-emerald-600 dark:text-emerald-400">Rs. {parseFloat(String(foundCustomer.walletBalanceCache || 0)).toFixed(2)}</span>
                         </p>
                       </div>
                     </div>
@@ -2248,7 +2347,7 @@ export default function CreateOrder() {
                   <div className="space-y-2">
                     <Label htmlFor="advancePayment">Advance Amount</Label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">Rs. </span>
                       <Input
                         id="advancePayment"
                         type="number"
@@ -2326,7 +2425,7 @@ export default function CreateOrder() {
                               <TrendingUp className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                               <span className="text-[9px] uppercase tracking-wider font-extrabold text-blue-600 dark:text-blue-400 leading-none truncate">Spent</span>
                             </div>
-                            <p className="text-xl font-black text-blue-700 dark:text-blue-300 tabular-nums">₹{customerStats.totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                            <p className="text-xl font-black text-blue-700 dark:text-blue-300 tabular-nums">Rs. {customerStats.totalSpent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
                           </div>
 
                           <div className="flex-1 min-w-[100px] bg-green-50 dark:bg-green-950/30 p-2.5 rounded-xl border border-green-200/50 dark:border-green-800/50 shadow-sm transition-all hover:bg-green-100/50">
@@ -2335,7 +2434,7 @@ export default function CreateOrder() {
                               <span className="text-[9px] uppercase tracking-wider font-extrabold text-green-600 dark:text-green-400 leading-none truncate">Wallet</span>
                             </div>
                             <p className="text-xl font-black text-green-700 dark:text-green-300 tabular-nums">
-                              ₹{parseFloat(String(foundCustomer?.walletBalanceCache || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                              Rs. {parseFloat(String(foundCustomer?.walletBalanceCache || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                             </p>
                           </div>
 
@@ -2351,7 +2450,7 @@ export default function CreateOrder() {
                               const dueClass = due > limit ? "text-red-700 dark:text-red-300" : due === 0 ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300";
                               return (
                                 <p className={`text-xl font-black ${dueClass} tabular-nums`}>
-                                  ₹{due.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                  Rs. {due.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                                 </p>
                               );
                             })()}
@@ -2363,7 +2462,7 @@ export default function CreateOrder() {
                               <span className="text-[9px] uppercase tracking-wider font-extrabold text-amber-600 dark:text-amber-400 leading-none truncate">Limit</span>
                             </div>
                             <p className="text-xl font-black text-amber-700 dark:text-amber-300 tabular-nums">
-                              ₹{Math.max(0, Number((foundCustomer as any)?.creditLimit ?? 1000)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                              Rs. {Math.max(0, Number((foundCustomer as any)?.creditLimit ?? 1000)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                             </p>
                           </div>
                         </div>
@@ -2408,7 +2507,7 @@ export default function CreateOrder() {
                                     </p>
                                   </div>
                                   <span className="text-lg font-black text-slate-900 dark:text-white tabular-nums">
-                                    ₹{parseFloat(order.totalAmount || '0').toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                    Rs. {parseFloat(order.totalAmount || '0').toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                                   </span>
                                 </div>
                               ))}
@@ -2487,10 +2586,10 @@ export default function CreateOrder() {
                           <div className="flex-1 min-w-0">
                             <p className="font-bold group-hover:text-primary transition-colors truncate">{item.service.name}</p>
                             <p className="text-[11px] font-black text-muted-foreground/80 truncate">
-                              ₹{safeParseFloat(item.priceOverride).toFixed(2)} × {item.quantity}
+                              Rs. {safeParseFloat(item.priceOverride).toFixed(2)} × {item.quantity}
                             </p>
                           </div>
-                          <span className="font-black text-slate-800 dark:text-slate-200 flex-shrink-0">₹{item.subtotal.toFixed(2)}</span>
+                          <span className="font-black text-slate-800 dark:text-slate-200 flex-shrink-0">Rs. {item.subtotal.toFixed(2)}</span>
                         </div>
                       ))}
                     </div>
@@ -2509,7 +2608,7 @@ export default function CreateOrder() {
                           </div>
                         )}
                       </div>
-                      <span className="font-black flex-shrink-0 text-base">₹{baseSubtotal.toFixed(2)}</span>
+                      <span className="font-black flex-shrink-0 text-base">Rs. {baseSubtotal.toFixed(2)}</span>
                     </div>
   
                     <AnimatePresence>
@@ -2522,7 +2621,7 @@ export default function CreateOrder() {
                           <span className="flex items-center gap-1 min-w-0">
                             <Zap className="h-3.5 w-3.5 flex-shrink-0" /> <span className="truncate">Express (50%)</span>
                           </span>
-                          <span className="flex-shrink-0">+₹{expressSurcharge.toFixed(2)}</span>
+                          <span className="flex-shrink-0">+Rs. {expressSurcharge.toFixed(2)}</span>
                         </motion.div>
                       )}
   
@@ -2536,7 +2635,7 @@ export default function CreateOrder() {
                             <TrendingDown className="h-3.5 w-3.5 flex-shrink-0" /> 
                             <span className="truncate">Discount ({discountType === 'percentage' ? `${discountValue}%` : 'Fixed'})</span>
                           </span>
-                          <span className="flex-shrink-0">-₹{discountAmount.toFixed(2)}</span>
+                          <span className="flex-shrink-0">-Rs. {discountAmount.toFixed(2)}</span>
                         </motion.div>
                       )}
   
@@ -2550,7 +2649,7 @@ export default function CreateOrder() {
                             <PlusCircle className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
                             <span className="truncate">{extraChargesLabel || 'Extra Charges'}</span>
                           </span>
-                          <span className="flex-shrink-0">+₹{extraCharges.toFixed(2)}</span>
+                          <span className="flex-shrink-0">+Rs. {extraCharges.toFixed(2)}</span>
                         </motion.div>
                       )}
   
@@ -2561,7 +2660,7 @@ export default function CreateOrder() {
                           className="flex justify-between gap-4 text-sm text-slate-900 dark:text-slate-100 font-black"
                         >
                           <span className="opacity-70 dark:opacity-80 min-w-0 truncate">GST (18%)</span>
-                          <span className="flex-shrink-0">+₹{gstAmount.toFixed(2)}</span>
+                          <span className="flex-shrink-0">+Rs. {gstAmount.toFixed(2)}</span>
                         </motion.div>
                       )}
                   </AnimatePresence>
@@ -2578,7 +2677,7 @@ export default function CreateOrder() {
                            </p>
                          )}
                       </div>
-                      <span className="text-3xl font-black tabular-nums flex-shrink-0">₹{finalPayable.toFixed(2)}</span>
+                      <span className="text-3xl font-black tabular-nums flex-shrink-0">Rs. {finalPayable.toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -2592,7 +2691,7 @@ export default function CreateOrder() {
                         <span className="flex items-center gap-1">
                           <CreditCard className="h-3 w-3" /> Wallet Used
                         </span>
-                        <span>-₹{walletApplied.toFixed(2)}</span>
+                        <span>-Rs. {walletApplied.toFixed(2)}</span>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -2613,7 +2712,7 @@ export default function CreateOrder() {
                     ) : (
                       <>
                         <CheckCircle className="mr-2 h-6 w-6" />
-                        Place Order • ₹{Math.max(0, finalPayable - (parseFloat(advancePayment) || 0)).toFixed(0)}
+                        Place Order • Rs. {Math.max(0, finalPayable - (parseFloat(advancePayment) || 0)).toFixed(0)}
                       </>
                     )}
                   </Button>
@@ -2644,7 +2743,7 @@ export default function CreateOrder() {
                 <div className="flex items-center gap-4">
                   <div className="hidden sm:flex items-center gap-2">
                      <span className="text-[10px] uppercase tracking-tighter font-extrabold text-slate-400">Total Billing</span>
-                     <span className="text-sm font-black text-slate-700 dark:text-slate-300">₹{sessionStats.total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                     <span className="text-sm font-black text-slate-700 dark:text-slate-300">Rs. {sessionStats.total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
                   </div>
                   <Badge variant="outline" className="bg-white dark:bg-slate-900 font-bold border-primary/20 text-primary px-3 py-0.5 h-6">
                     {sessionStats.count} {sessionStats.count === 1 ? 'Order' : 'Orders'} Created
@@ -2684,7 +2783,7 @@ export default function CreateOrder() {
                         </p>
                      </div>
                      <div className="text-right flex flex-col items-end gap-1 ml-3">
-                        <span className="text-base font-black text-slate-900 dark:text-white tabular-nums">₹{parseFloat(order.totalAmount || '0').toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                        <span className="text-base font-black text-slate-900 dark:text-white tabular-nums">Rs. {parseFloat(order.totalAmount || '0').toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
                         <div className="flex items-center gap-1">
                            <div className={cn(
                              "w-1.5 h-1.5 rounded-full",
@@ -2862,15 +2961,15 @@ export default function CreateOrder() {
                     <div className="space-y-3">
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">Current Dues</span>
-                        <span className="font-bold text-red-600">₹{creditOverridePrompt.outstandingBefore.toFixed(2)}</span>
+                        <span className="font-bold text-red-600">Rs. {creditOverridePrompt.outstandingBefore.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">Credit Limit</span>
-                        <span className="font-bold text-slate-700 dark:text-slate-300">₹{creditOverridePrompt.creditLimit.toFixed(2)}</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-300">Rs. {creditOverridePrompt.creditLimit.toFixed(2)}</span>
                       </div>
                       <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-sm">
                         <span className="text-amber-600 font-bold uppercase text-[10px]">Over Limit By</span>
-                        <span className="font-black text-amber-600 font-mono">₹{Math.max(0, creditOverridePrompt.outstandingBefore + creditOverridePrompt.projectedCreditRequired - creditOverridePrompt.creditLimit).toFixed(2)}</span>
+                        <span className="font-black text-amber-600 font-mono">Rs. {Math.max(0, creditOverridePrompt.outstandingBefore + creditOverridePrompt.projectedCreditRequired - creditOverridePrompt.creditLimit).toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
@@ -2881,7 +2980,7 @@ export default function CreateOrder() {
                         <p className="text-[10px] uppercase font-black text-emerald-600 dark:text-emerald-400 tracking-wider">Wallet Balance</p>
                         <p className="text-xs text-emerald-700 dark:text-emerald-500 opacity-70 mt-0.5">Available for partial payment</p>
                       </div>
-                      <span className="text-xl font-black text-emerald-600">₹{creditOverridePrompt.walletBalance.toFixed(2)}</span>
+                      <span className="text-xl font-black text-emerald-600">Rs. {creditOverridePrompt.walletBalance.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -2897,7 +2996,7 @@ export default function CreateOrder() {
                           <p className="text-muted-foreground opacity-70">{format(new Date(order.createdAt), 'dd MMM')}</p>
                         </div>
                         <div className="text-right ml-2">
-                          <p className="font-black text-slate-600 dark:text-slate-400">₹{parseFloat(order.totalAmount).toFixed(0)}</p>
+                          <p className="font-black text-slate-600 dark:text-slate-400">Rs. {parseFloat(order.totalAmount).toFixed(0)}</p>
                           <Badge variant="outline" className="text-[8px] h-3 px-1 bg-muted/50">{order.status}</Badge>
                         </div>
                       </div>

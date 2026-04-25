@@ -3,10 +3,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 
 const franchiseData = [
-  { name: "Downtown Central", revenue: "₹450,231.89", change: "+15.2%", status: "active" },
-  { name: "Northside Hub", revenue: "₹320,112.45", change: "+8.9%", status: "active" },
-  { name: "Eastwood Branch", revenue: "₹280,543.21", change: "-1.2%", status: "warning" },
-  { name: "Southbridge Mall", revenue: "₹190,876.54", change: "+5.4%", status: "active" },
+  { name: "Downtown Central", revenue: "Rs. 450,231.89", change: "+15.2%", status: "active" },
+  { name: "Northside Hub", revenue: "Rs. 320,112.45", change: "+8.9%", status: "active" },
+  { name: "Eastwood Branch", revenue: "Rs. 280,543.21", change: "-1.2%", status: "warning" },
+  { name: "Southbridge Mall", revenue: "Rs. 190,876.54", change: "+5.4%", status: "active" },
 ];
 
 export default function FranchisePerformance() {

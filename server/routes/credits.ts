@@ -274,7 +274,7 @@ router.post('/:customerId/adjust', requireRole(ADMIN_ONLY), async (req, res) => 
                 type: 'limit_adjustment',
                 previousLimit: currentLimit,
                 newLimit: newLimit,
-                description: `Limit Updated: ₹${currentLimit} ➔ ₹${newLimit}. ${reason}${notes ? ` - ${notes}` : ''}`,
+                description: `Limit Updated: Rs. ${currentLimit} ➔ Rs. ${newLimit}. ${reason}${notes ? ` - ${notes}` : ''}`,
             };
             finalMessage = 'Credit limit updated successfully';
         } else if (target === 'wallet_balance') {

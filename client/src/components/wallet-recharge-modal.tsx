@@ -93,7 +93,7 @@ export function WalletRechargeModal({ customerId, customerName, isOpen, onClose,
                     <div className="space-y-3">
                         <Label>Recharge Amount</Label>
                         <div className="relative">
-                            <span className="absolute left-3 top-2.5 text-muted-foreground">₹</span>
+                            <span className="absolute left-3 top-2.5 text-muted-foreground">Rs. </span>
                             <Input
                                 type="number"
                                 placeholder="0.00"

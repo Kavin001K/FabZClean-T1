@@ -13,7 +13,7 @@ export interface BusinessSettings {
     id: string;
     // Financials
     taxRate: number;           // e.g., 18.00 for 18% GST
-    currencySymbol: string;    // e.g., "₹"
+    currencySymbol: string;    // e.g., "Rs. "
     minimumOrderValue: number; // Minimum order amount required
 
     // Operations
@@ -34,7 +34,7 @@ export interface BusinessSettings {
 // Default settings
 const DEFAULT_SETTINGS: Omit<BusinessSettings, 'id'> = {
     taxRate: 0,
-    currencySymbol: '₹',
+    currencySymbol: 'Rs. ',
     minimumOrderValue: 0,
     defaultTurnaroundHours: 48,
     expressSurchargePercent: 50,
@@ -57,7 +57,7 @@ class BusinessSettingsServiceClass {
         CREATE TABLE IF NOT EXISTS business_settings (
           id TEXT PRIMARY KEY DEFAULT 'global',
           taxRate REAL DEFAULT 0,
-          currencySymbol TEXT DEFAULT '₹',
+          currencySymbol TEXT DEFAULT 'Rs. ',
           minimumOrderValue REAL DEFAULT 0,
           defaultTurnaroundHours INTEGER DEFAULT 48,
           expressSurchargePercent REAL DEFAULT 50,
@@ -224,7 +224,7 @@ class BusinessSettingsServiceClass {
         return {
             id: row.id,
             taxRate: parseFloat(row.taxRate) || 0,
-            currencySymbol: row.currencySymbol || '₹',
+            currencySymbol: row.currencySymbol || 'Rs. ',
             minimumOrderValue: parseFloat(row.minimumOrderValue) || 0,
             defaultTurnaroundHours: parseInt(row.defaultTurnaroundHours) || 48,
             expressSurchargePercent: parseFloat(row.expressSurchargePercent) || 50,

@@ -46,13 +46,13 @@ function processRevenueData(orders: Order[]): SalesData[] {
       const year = date.getFullYear();
       const monthKey = `${month} ${year}`; // Include year to handle multi-year data
 
-      // 2. Clean the price string (remove "₹" and commas) and convert to float
+      // 2. Clean the price string (remove "Rs. " and commas) and convert to float
       let amount = 0;
       if (typeof order.totalAmount === 'number') {
         amount = order.totalAmount;
       } else if (typeof order.totalAmount === 'string') {
         // Remove currency symbols, commas, and convert to number
-        const cleaned = order.totalAmount.replace(/[₹,\s]/g, '');
+        const cleaned = order.totalAmount.replace(/[Rs. ,\s]/g, '');
         amount = parseFloat(cleaned) || 0;
       }
 

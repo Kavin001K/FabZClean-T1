@@ -409,7 +409,7 @@ const WorkerStatusUpdater: React.FC<WorkerStatusUpdaterProps> = ({ driver }) => 
                   <TrendingUp className="h-4 w-4 text-orange-500" />
                   <span className="text-sm font-medium">Earnings</span>
                 </div>
-                <p className="text-2xl font-bold">₹{dailyStats.earnings}</p>
+                <p className="text-2xl font-bold">Rs. {dailyStats.earnings}</p>
                 <p className="text-xs text-muted-foreground">Today's total</p>
               </Card>
             </div>

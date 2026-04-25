@@ -473,7 +473,7 @@ router.post('/:id/mark-paid', async (req, res) => {
       order: serializeOrder(updatedOrder),
       settledAmount: settlementAmount,
       message: settlementAmount > 0
-        ? `Outstanding amount of ₹${settlementAmount.toFixed(2)} has been settled and marked as paid`
+        ? `Outstanding amount of Rs. ${settlementAmount.toFixed(2)} has been settled and marked as paid`
         : 'Order marked as paid',
     }, 'Order payment updated successfully'));
   } catch (error: any) {
@@ -848,8 +848,8 @@ router.post(
 
             if (currentCredit > creditLimit && !creditOverrideApproved) {
               const message =
-                `This customer already has unpaid dues of ₹${currentCredit.toFixed(2)}, ` +
-                `which exceeds the allowed credit limit of ₹${creditLimit.toFixed(2)}. ` +
+                `This customer already has unpaid dues of Rs. ${currentCredit.toFixed(2)}, ` +
+                `which exceeds the allowed credit limit of Rs. ${creditLimit.toFixed(2)}. ` +
                 `Ask the customer for payment before proceeding.`;
 
               return res.status(409).json({
@@ -1215,7 +1215,7 @@ router.put('/:id', async (req, res) => {
         order.customerId,
         outstandingDelta,
         'adjustment',
-        `Order ${order.orderNumber} revised (outstanding delta ₹${outstandingDelta.toFixed(2)})`,
+        `Order ${order.orderNumber} revised (outstanding delta Rs. ${outstandingDelta.toFixed(2)})`,
         orderId,
         req.employee?.id || undefined,
         (order as any).paymentMethod || undefined

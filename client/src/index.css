@@ -37,8 +37,8 @@
   --popover-foreground: var(--card-foreground);
   --muted: 241 245 249;
   /* Slate-100 */
-  --muted-foreground: 100 116 139;
-  /* Slate-500 */
+  --muted-foreground: 71 85 105;
+  /* Slate-600 for better contrast */
   --border: 226 232 240;
   /* Slate-200 */
   --input: 203 213 225;

@@ -204,7 +204,7 @@ function buildSignals(params: {
       id: "store-focus",
       severity: leadStore.revenueShare >= 70 ? "high" : leadStore.revenueShare >= 45 ? "medium" : "low",
       title: `${leadStore.storeName} is carrying ${leadStore.revenueShare.toFixed(0)}% of revenue`,
-      summary: `${leadStore.totalOrders} orders and ₹${Math.round(leadStore.totalRevenue).toLocaleString("en-IN")} booked in the selected window.`,
+      summary: `${leadStore.totalOrders} orders and Rs. ${Math.round(leadStore.totalRevenue).toLocaleString("en-IN")} booked in the selected window.`,
       action: leadStore.revenueShare >= 70 ? "Reduce concentration risk by pushing repeat business into the smaller stores." : "Healthy lead store momentum with room to balance volume.",
     });
   }
@@ -224,7 +224,7 @@ function buildSignals(params: {
       id: "profitability",
       severity: pnl.profitMargin < 20 ? "high" : pnl.profitMargin < 35 ? "medium" : "low",
       title: `Profit margin is ${pnl.profitMargin.toFixed(1)}%`,
-      summary: `Net profit is ₹${Math.round(pnl.netProfit).toLocaleString("en-IN")} after ₹${Math.round(pnl.totalExpenses).toLocaleString("en-IN")} in expenses.`,
+      summary: `Net profit is Rs. ${Math.round(pnl.netProfit).toLocaleString("en-IN")} after Rs. ${Math.round(pnl.totalExpenses).toLocaleString("en-IN")} in expenses.`,
       action: pnl.profitMargin < 20 ? "Review low-yield services and non-productive spending immediately." : "Margin is workable; protect it by tracking expenses by store and category.",
     });
   }
@@ -234,7 +234,7 @@ function buildSignals(params: {
       id: "service-mix",
       severity: "low",
       title: `${leadService.name} is the main revenue driver`,
-      summary: `${leadService.itemCount} pieces from ${leadService.customersCount} customers generated ₹${Math.round(leadService.revenue).toLocaleString("en-IN")}.`,
+      summary: `${leadService.itemCount} pieces from ${leadService.customersCount} customers generated Rs. ${Math.round(leadService.revenue).toLocaleString("en-IN")}.`,
       action: "Promote adjacent upsells around this service to lift average ticket without changing the workflow.",
     });
   }
@@ -244,7 +244,7 @@ function buildSignals(params: {
       id: "customer-value",
       severity: leadCustomer.creditBalance > 0 ? "medium" : "low",
       title: `${leadCustomer.customerName} is the top-value customer`,
-      summary: `${leadCustomer.orders} orders, ₹${Math.round(leadCustomer.revenue).toLocaleString("en-IN")} revenue, credit due ₹${Math.round(leadCustomer.creditBalance).toLocaleString("en-IN")}.`,
+      summary: `${leadCustomer.orders} orders, Rs. ${Math.round(leadCustomer.revenue).toLocaleString("en-IN")} revenue, credit due Rs. ${Math.round(leadCustomer.creditBalance).toLocaleString("en-IN")}.`,
       action: leadCustomer.creditBalance > 0 ? "Follow up on dues while protecting this account with proactive service." : "This is a high-value repeat customer worth retaining carefully.",
     });
   }

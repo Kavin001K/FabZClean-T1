@@ -248,7 +248,7 @@ export default function OrderTracking() {
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Amount</p>
-                                    <p className="font-medium text-lg">₹{order.totalAmount || '0.00'}</p>
+                                    <p className="font-medium text-lg">Rs. {order.totalAmount || '0.00'}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Payment Status</p>
@@ -291,7 +291,7 @@ export default function OrderTracking() {
                                             <p className="font-medium">{item.serviceName || item.name || 'Service'}</p>
                                             <p className="text-sm text-muted-foreground">Qty: {item.quantity || 1}</p>
                                         </div>
-                                        <p className="font-medium">₹{item.price || '0.00'}</p>
+                                        <p className="font-medium">Rs. {item.price || '0.00'}</p>
                                     </div>
                                 ))}
                             </div>

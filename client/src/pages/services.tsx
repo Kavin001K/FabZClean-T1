@@ -84,7 +84,7 @@ const getServiceIcon = (category: string) => {
 const formatCurrency = (amount: string | number) => {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
   if (isNaN(num) || num === null || num === undefined) {
-    return '₹0.00';
+    return 'Rs. 0.00';
   }
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -1038,7 +1038,7 @@ function EditServiceDialog({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-service-price">Price (₹)</Label>
+                  <Label htmlFor="edit-service-price">Price (Rs. )</Label>
                   <Input
                     id="edit-service-price"
                     type="number"
@@ -1189,7 +1189,7 @@ function CreateServiceDialog({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="price">Price (₹)</Label>
+                  <Label htmlFor="price">Price (Rs. )</Label>
                   <Input
                     id="price"
                     type="number"

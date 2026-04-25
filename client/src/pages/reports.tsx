@@ -18,6 +18,41 @@ import { useToast } from '@/hooks/use-toast';
 
 const CHART_COLORS = ['#4f8cff', '#34c38f', '#f5b74f', '#fb8c4c', '#9b8cff', '#56cfe1'];
 
+const CustomAxisTick = ({ x, y, payload, vertical, ...props }: any) => {
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={0}
+        y={0}
+        dy={vertical ? 4 : 12}
+        textAnchor={vertical ? "end" : "middle"}
+        fill="currentColor"
+        className="text-[10px] font-bold text-muted-foreground/90"
+        {...props}
+      >
+        {payload.value}
+      </text>
+    </g>
+  );
+};
+
+const CustomYAxisTick = ({ x, y, payload, formatter, ...props }: any) => {
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={-10}
+        y={4}
+        textAnchor="end"
+        fill="currentColor"
+        className="text-[10px] font-bold text-muted-foreground/90"
+        {...props}
+      >
+        {formatter ? formatter(payload.value) : payload.value}
+      </text>
+    </g>
+  );
+};
+
 type OverviewResponse = {
   meta: {
     generatedAt: string;
@@ -142,7 +177,7 @@ const RANGE_OPTIONS = [
   { value: '14', label: 'Fortnightly Sales' },
   { value: '30', label: 'Monthly Sales' },
   { value: '90', label: 'Quarterly Sales' },
-  { value: '365', label: 'Yearly Sales' },
+  { value: '365', label: 'Year-on Sales' },
 ];
 
 const formatCurrency = (amount: number) =>
@@ -170,13 +205,13 @@ const formatDate = (value?: string | null) => {
 const getDeltaTone = (value: number) => {
   if (value > 0) return 'text-emerald-500';
   if (value < 0) return 'text-rose-500';
-  return 'text-slate-400';
+  return 'text-muted-foreground';
 };
 
 const getSignalTone = (severity: string) => {
-  if (severity === 'high') return 'border-rose-500/30 bg-rose-500/10 text-rose-100';
-  if (severity === 'medium') return 'border-amber-500/30 bg-amber-500/10 text-amber-100';
-  return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100';
+  if (severity === 'high') return 'border-destructive/20 bg-destructive/5 text-destructive dark:text-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10';
+  if (severity === 'medium') return 'border-warning/20 bg-warning/5 text-warning dark:text-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10';
+  return 'border-success/20 bg-success/5 text-success dark:text-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10';
 };
 
 const createExpense = async (payload: Record<string, any>) => {
@@ -204,8 +239,8 @@ async function fetchJson<T>(url: string): Promise<T> {
 
 function LoadingBlock({ label }: { label: string }) {
   return (
-    <div className="flex h-[260px] items-center justify-center rounded-3xl border border-white/8 bg-white/[0.03]">
-      <div className="flex items-center gap-3 text-sm text-slate-400">
+    <div className="flex h-[260px] items-center justify-center rounded-3xl border border-border bg-muted/20">
+      <div className="flex items-center gap-3 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
         {label}
       </div>
@@ -220,38 +255,38 @@ function DetailMetricContent({ metricKey, overview }: { metricKey: string; overv
     return (
       <div className="space-y-6">
         <div className="grid gap-4 md:grid-cols-3">
-          <Card className="border-white/10 bg-white/[0.03]">
+          <Card className="border-border bg-muted/20">
             <CardContent className="pt-6">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Range Revenue</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(summary.totalRevenue)}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Range Revenue</p>
+              <p className="mt-2 text-3xl font-semibold text-foreground">{formatCurrency(summary.totalRevenue)}</p>
             </CardContent>
           </Card>
-          <Card className="border-white/10 bg-white/[0.03]">
+          <Card className="border-border bg-muted/20">
             <CardContent className="pt-6">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Average Ticket</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(summary.averageOrderValue)}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Average Ticket</p>
+              <p className="mt-2 text-3xl font-semibold text-foreground">{formatCurrency(summary.averageOrderValue)}</p>
             </CardContent>
           </Card>
-          <Card className="border-white/10 bg-white/[0.03]">
+          <Card className="border-border bg-muted/20">
             <CardContent className="pt-6">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Best Store</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{franchisePerformance[0]?.storeName || 'Not available'}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Best Store</p>
+              <p className="mt-2 text-3xl font-semibold text-foreground">{franchisePerformance[0]?.storeName || 'Not available'}</p>
             </CardContent>
           </Card>
         </div>
         <div className="space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Top Stores By Revenue</h4>
+          <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">Top Stores By Revenue</h4>
           <div className="space-y-3">
             {franchisePerformance.slice(0, 5).map((store) => (
-              <div key={store.franchiseCode} className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+              <div key={store.franchiseCode} className="rounded-2xl border border-border bg-muted/20 p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="font-medium text-white">{store.storeName}</p>
-                    <p className="text-sm text-slate-400">{store.totalOrders} orders</p>
+                    <p className="font-medium text-foreground">{store.storeName}</p>
+                    <p className="text-sm text-muted-foreground">{store.totalOrders} orders</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-white">{formatCurrency(store.totalRevenue)}</p>
-                    <p className="text-xs text-slate-400">{store.revenueShare.toFixed(1)}% share</p>
+                    <p className="font-semibold text-foreground">{formatCurrency(store.totalRevenue)}</p>
+                    <p className="text-xs text-muted-foreground">{store.revenueShare.toFixed(1)}% share</p>
                   </div>
                 </div>
               </div>
@@ -266,37 +301,37 @@ function DetailMetricContent({ metricKey, overview }: { metricKey: string; overv
     return (
       <div className="space-y-6">
         <div className="grid gap-4 md:grid-cols-3">
-          <Card className="border-white/10 bg-white/[0.03]">
+          <Card className="border-border bg-card">
             <CardContent className="pt-6">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Orders In Range</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{summary.totalOrders}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Orders In Range</p>
+              <p className="mt-2 text-3xl font-semibold text-foreground">{summary.totalOrders}</p>
             </CardContent>
           </Card>
-          <Card className="border-white/10 bg-white/[0.03]">
+          <Card className="border-border bg-card">
             <CardContent className="pt-6">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Completed</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{summary.completedOrders}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Completed</p>
+              <p className="mt-2 text-3xl font-semibold text-foreground">{summary.completedOrders}</p>
             </CardContent>
           </Card>
-          <Card className="border-white/10 bg-white/[0.03]">
+          <Card className="border-border bg-card">
             <CardContent className="pt-6">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Still Open</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{summary.pendingOrders}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Still Open</p>
+              <p className="mt-2 text-3xl font-semibold text-foreground">{summary.pendingOrders}</p>
             </CardContent>
           </Card>
         </div>
         <div className="space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Daily Order Load</h4>
+          <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">Daily Order Load</h4>
           <div className="space-y-3">
             {[...dailySummary].reverse().slice(0, 8).map((day) => (
-              <div key={day.date} className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+              <div key={day.date} className="flex items-center justify-between rounded-2xl border border-border bg-muted/20 p-4">
                 <div>
-                  <p className="font-medium text-white">{formatDate(day.date)}</p>
-                  <p className="text-sm text-slate-400">{day.completedOrders} completed</p>
+                  <p className="font-medium text-foreground">{formatDate(day.date)}</p>
+                  <p className="text-sm text-muted-foreground">{day.completedOrders} completed</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-white">{day.totalOrders} orders</p>
-                  <p className="text-xs text-slate-400">{formatCurrency(day.averageOrderValue)} avg ticket</p>
+                  <p className="font-semibold text-foreground">{day.totalOrders} orders</p>
+                  <p className="text-xs text-muted-foreground">{formatCurrency(day.averageOrderValue)} avg ticket</p>
                 </div>
               </div>
             ))}
@@ -310,38 +345,38 @@ function DetailMetricContent({ metricKey, overview }: { metricKey: string; overv
     return (
       <div className="space-y-6">
         <div className="grid gap-4 md:grid-cols-3">
-          <Card className="border-white/10 bg-white/[0.03]">
+          <Card className="border-border bg-card">
             <CardContent className="pt-6">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Active Customers</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{summary.totalCustomers}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Active Customers</p>
+              <p className="mt-2 text-3xl font-semibold text-foreground">{summary.totalCustomers}</p>
             </CardContent>
           </Card>
-          <Card className="border-white/10 bg-white/[0.03]">
+          <Card className="border-border bg-card">
             <CardContent className="pt-6">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Outstanding Credit</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(summary.creditOutstanding)}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Outstanding Credit</p>
+              <p className="mt-2 text-3xl font-semibold text-foreground">{formatCurrency(summary.creditOutstanding)}</p>
             </CardContent>
           </Card>
-          <Card className="border-white/10 bg-white/[0.03]">
+          <Card className="border-border bg-card">
             <CardContent className="pt-6">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Wallet Balance Held</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(summary.walletBalance)}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Wallet Balance Held</p>
+              <p className="mt-2 text-3xl font-semibold text-foreground">{formatCurrency(summary.walletBalance)}</p>
             </CardContent>
           </Card>
         </div>
         <div className="space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Highest Value Customers</h4>
+          <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">Highest Value Customers</h4>
           <div className="space-y-3">
             {topCustomers.slice(0, 8).map((customer) => (
-              <div key={customer.customerKey} className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+              <div key={customer.customerKey} className="rounded-2xl border border-border bg-muted/20 p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="font-medium text-white">{customer.customerName}</p>
-                    <p className="text-sm text-slate-400">{customer.phone || 'No phone'} • {customer.orders} orders</p>
+                    <p className="font-medium text-foreground">{customer.customerName}</p>
+                    <p className="text-sm text-muted-foreground">{customer.phone || 'No phone'} • {customer.orders} orders</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-white">{formatCurrency(customer.revenue)}</p>
-                    <p className="text-xs text-slate-400">Credit {formatCurrency(customer.creditBalance)}</p>
+                    <p className="font-semibold text-foreground">{formatCurrency(customer.revenue)}</p>
+                    <p className="text-xs text-muted-foreground">Credit {formatCurrency(customer.creditBalance)}</p>
                   </div>
                 </div>
               </div>
@@ -355,32 +390,32 @@ function DetailMetricContent({ metricKey, overview }: { metricKey: string; overv
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-white/10 bg-white/[0.03]">
+        <Card className="border-border bg-card">
           <CardContent className="pt-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Net Profit</p>
-            <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(pnl.netProfit)}</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Net Profit</p>
+            <p className="mt-2 text-3xl font-semibold text-foreground">{formatCurrency(pnl.netProfit)}</p>
           </CardContent>
         </Card>
-        <Card className="border-white/10 bg-white/[0.03]">
+        <Card className="border-border bg-card">
           <CardContent className="pt-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Profit Margin</p>
-            <p className="mt-2 text-3xl font-semibold text-white">{pnl.profitMargin.toFixed(1)}%</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Profit Margin</p>
+            <p className="mt-2 text-3xl font-semibold text-foreground">{pnl.profitMargin.toFixed(1)}%</p>
           </CardContent>
         </Card>
-        <Card className="border-white/10 bg-white/[0.03]">
+        <Card className="border-border bg-card">
           <CardContent className="pt-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Top Revenue Service</p>
-            <p className="mt-2 text-2xl font-semibold text-white">{topServices[0]?.name || 'Not available'}</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Top Revenue Service</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{topServices[0]?.name || 'Not available'}</p>
           </CardContent>
         </Card>
       </div>
       <div className="space-y-3">
-        <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Expense Breakdown</h4>
+        <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">Expense Breakdown</h4>
         <div className="space-y-3">
           {Object.entries(pnl.expenseByCategory || {}).sort((a, b) => b[1] - a[1]).map(([category, amount]) => (
-            <div key={category} className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-              <p className="font-medium text-white capitalize">{category.replace(/_/g, ' ')}</p>
-              <p className="font-semibold text-white">{formatCurrency(amount)}</p>
+            <div key={category} className="flex items-center justify-between rounded-2xl border border-border bg-muted/20 p-4">
+              <p className="font-medium text-foreground capitalize">{category.replace(/_/g, ' ')}</p>
+              <p className="font-semibold text-foreground">{formatCurrency(amount)}</p>
             </div>
           ))}
         </div>
@@ -614,18 +649,18 @@ export default function ReportsPage() {
             Live Reporting Workspace
           </Badge>
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Operations dashboard for Fab Clean.</h1>
-            <p className="max-w-3xl text-sm leading-6 text-slate-400 sm:text-base">
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Operations dashboard for Fab Clean.</h1>
+            <p className="max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
               Clean numbers, usable signals, and direct drill-downs for stores, customers, services, staff, and finance.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <span>Window: {formatDate(meta.startDate)} to {formatDate(meta.endDate)}</span>
-            <span className="h-1 w-1 rounded-full bg-slate-600" />
+            <span className="h-1 w-1 rounded-full bg-border" />
             <span>Generated {new Date(meta.generatedAt).toLocaleString('en-IN')}</span>
             {meta.scopedStore && (
               <>
-                <span className="h-1 w-1 rounded-full bg-slate-600" />
+                <span className="h-1 w-1 rounded-full bg-border" />
                 <span>Scoped to {meta.scopedStore}</span>
               </>
             )}
@@ -634,7 +669,7 @@ export default function ReportsPage() {
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <Select value={rangeDays} onValueChange={setRangeDays}>
-            <SelectTrigger className="w-[170px] border-white/10 bg-white/[0.03] text-white">
+            <SelectTrigger className="w-[170px] border-border bg-card text-foreground">
               <SelectValue placeholder="Select window" />
             </SelectTrigger>
             <SelectContent>
@@ -648,7 +683,7 @@ export default function ReportsPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              className="border-white/10 bg-[#182334] text-white hover:bg-[#1b2945]"
+              className="border-border bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={handleProcessReport}
               disabled={isProcessing}
             >
@@ -658,13 +693,13 @@ export default function ReportsPage() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button className="border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08]" variant="outline">
+                <Button className="border-border bg-card text-foreground hover:bg-muted" variant="outline">
                   <Download className="mr-2 h-4 w-4" />
                   Export report
                   <ChevronDown className="ml-2 h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 bg-[#0d1522] border border-white/10">
+              <DropdownMenuContent align="end" className="w-56 bg-card border border-border">
                 <DropdownMenuLabel>Download outputs</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => generateExecutiveOverviewReport(overview)}>
                   Executive PDF
@@ -687,7 +722,7 @@ export default function ReportsPage() {
             </DropdownMenu>
 
             <Button
-              className="border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08]"
+              className="border-border bg-card text-foreground hover:bg-muted"
               onClick={() => setIsExpenseSheetOpen(true)}
             >
               <BadgeIndianRupee className="mr-2 h-4 w-4" />
@@ -741,23 +776,23 @@ export default function ReportsPage() {
               onClick={() => setDetailTarget({ type: 'metric', key: metric.key, title: metric.title })}
               className="group text-left"
             >
-              <Card className="h-full border-white/10 bg-gradient-to-br from-[#131c31] via-[#10192c] to-[#0d1424] transition duration-200 hover:border-[#c2d44e]/40 hover:shadow-[0_24px_80px_rgba(10,17,34,0.4)]">
+              <Card className="h-full border-border bg-card transition duration-200 hover:border-primary/40 hover:shadow-lg dark:hover:shadow-[0_24px_80px_rgba(10,17,34,0.4)]">
                 <CardContent className="pt-6">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{metric.title}</p>
-                      <p className="text-3xl font-semibold text-white">{metric.value}</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">{metric.title}</p>
+                      <p className="text-3xl font-semibold text-foreground">{metric.value}</p>
                       <div className={`flex items-center gap-1 text-sm ${getDeltaTone(metric.delta)}`}>
                         {deltaPositive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
                         <span>{Math.abs(metric.delta).toFixed(1)}%</span>
-                        <span className="text-slate-500">vs previous window</span>
+                        <span className="text-muted-foreground font-medium text-xs">vs last window</span>
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3 text-[#c2d44e]">
+                    <div className="rounded-2xl border border-border bg-primary/5 p-3 text-primary">
                       <Icon className="h-5 w-5" />
                     </div>
                   </div>
-                  <p className="mt-5 text-sm text-slate-400">{metric.note}</p>
+                  <p className="mt-5 text-sm text-muted-foreground">{metric.note}</p>
                 </CardContent>
               </Card>
             </button>
@@ -775,16 +810,16 @@ export default function ReportsPage() {
                 </Badge>
                 <BrainCircuit className="h-4 w-4 opacity-70" />
               </div>
-              <h3 className="text-base font-semibold">{signal.title}</h3>
-              <p className="mt-2 text-sm leading-6 opacity-90">{signal.summary}</p>
-              <p className="mt-4 text-xs font-medium uppercase tracking-[0.18em] opacity-75">{signal.action}</p>
+              <h3 className="text-base font-bold">{signal.title}</h3>
+              <p className="mt-2 text-sm leading-6 font-medium">{signal.summary}</p>
+              <p className="mt-4 text-xs font-black uppercase tracking-[0.18em]">{signal.action}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="flex w-full flex-wrap justify-start gap-2 rounded-2xl border border-white/8 bg-white/[0.03] p-2">
+        <TabsList className="flex w-full overflow-x-auto no-scrollbar justify-start gap-2 rounded-2xl border border-border bg-muted/50 p-2">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="stores">Stores</TabsTrigger>
           <TabsTrigger value="services">Services</TabsTrigger>
@@ -792,44 +827,62 @@ export default function ReportsPage() {
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="finance">Finance</TabsTrigger>
         </TabsList>
-
         <TabsContent value="overview" className="space-y-6">
           <div className="grid gap-6 xl:grid-cols-[1.8fr_1fr]">
-            <Card className="border-white/10 bg-[#121b30]">
+            <Card className="border-border bg-card">
               <CardHeader className="flex flex-row items-start justify-between gap-4">
                 <div>
-                  <CardTitle className="text-white">Revenue Flow</CardTitle>
-                  <CardDescription className="text-slate-400">Daily revenue and order movement for the selected window.</CardDescription>
+                  <CardTitle className="text-foreground">Revenue Flow</CardTitle>
+                  <CardDescription className="text-muted-foreground">Daily revenue and order movement for the selected window.</CardDescription>
                 </div>
-                {isFetching && <Loader2 className="h-4 w-4 animate-spin text-slate-500" />}
+                {isFetching && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={320}>
-                  <AreaChart data={dailySummary}>
+                <div className="rounded-2xl bg-muted/60 p-4">
+                  <ResponsiveContainer width="100%" height={320}>
+                    <AreaChart data={dailySummary}>
                     <defs>
                       <linearGradient id="revenueFill" x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="0%" stopColor="#4f8cff" stopOpacity={0.42} />
-                        <stop offset="100%" stopColor="#4f8cff" stopOpacity={0.03} />
+                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.05} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid stroke="rgba(148,163,184,0.14)" vertical={false} />
-                    <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 12 }} tickLine={false} axisLine={false} />
-                    <YAxis tickFormatter={(value) => `₹${Math.round(value / 1000)}k`} tick={{ fill: '#94a3b8', fontSize: 12 }} tickLine={false} axisLine={false} />
+                    <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" opacity={0.8} vertical={false} />
+                    <XAxis 
+                      dataKey="date" 
+                      tick={<CustomAxisTick />} 
+                      tickLine={false} 
+                      axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }} 
+                    />
+                    <YAxis 
+                      tick={<CustomYAxisTick formatter={(value: any) => `Rs. ${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`} />} 
+                      tickLine={false} 
+                      axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }} 
+                    />
                     <Tooltip
-                      contentStyle={{ background: '#0f172a', border: '1px solid rgba(148,163,184,0.16)', borderRadius: 16, color: '#fff' }}
+                      contentStyle={{ 
+                        background: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))', 
+                        borderRadius: 12,
+                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                        padding: '8px 12px'
+                      }}
+                      itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 700, fontSize: 12 }}
+                      labelStyle={{ color: 'hsl(var(--muted-foreground))', fontWeight: 600, fontSize: 11, marginBottom: 4 }}
                       formatter={(value: number, name: string) => [name === 'totalRevenue' ? formatCurrency(value) : value, name === 'totalRevenue' ? 'Revenue' : 'Orders']}
                     />
-                    <Area type="monotone" dataKey="totalRevenue" stroke="#4f8cff" strokeWidth={3} fill="url(#revenueFill)" />
-                    <Bar dataKey="totalOrders" fill="#c2d44e" radius={[8, 8, 0, 0]} />
+                    <Area type="monotone" dataKey="totalRevenue" stroke="hsl(var(--primary))" strokeWidth={3} fill="url(#revenueFill)" />
+                    <Bar dataKey="totalOrders" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} barSize={20} />
                   </AreaChart>
                 </ResponsiveContainer>
+              </div>
               </CardContent>
             </Card>
 
-            <Card className="border-white/10 bg-[#121b30]">
+            <Card className="border-border bg-card">
               <CardHeader>
-                <CardTitle className="text-white">Order Share By Store</CardTitle>
-                <CardDescription className="text-slate-400">Fixed labels, readable share, and drill-down on click.</CardDescription>
+                <CardTitle className="text-foreground">Order Share By Store</CardTitle>
+                <CardDescription className="text-muted-foreground">Fixed labels, readable share, and drill-down on click.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <ResponsiveContainer width="100%" height={250}>
@@ -841,7 +894,7 @@ export default function ReportsPage() {
                       innerRadius={72}
                       outerRadius={104}
                       paddingAngle={2}
-                      stroke="rgba(255,255,255,0.06)"
+                      stroke="hsl(var(--border) / 0.2)"
                       label={false}
                       labelLine={false}
                       onClick={(payload) => setDetailTarget({ type: 'franchise', key: payload?.name, title: payload?.label || payload?.name })}
@@ -852,7 +905,15 @@ export default function ReportsPage() {
                     </Pie>
                     <Tooltip
                       formatter={(value: number, _name: string, payload: any) => [`${value} orders`, payload?.payload?.label || payload?.payload?.name]}
-                      contentStyle={{ background: '#0f172a', border: '1px solid rgba(148,163,184,0.16)', borderRadius: 16, color: '#fff' }}
+                      contentStyle={{ 
+                        background: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))', 
+                        borderRadius: 12,
+                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                        padding: '8px 12px'
+                      }}
+                      itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600, fontSize: 12 }}
+                      labelStyle={{ color: 'hsl(var(--muted-foreground))', fontWeight: 500, fontSize: 11, marginBottom: 4 }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -862,16 +923,16 @@ export default function ReportsPage() {
                       key={entry.name}
                       type="button"
                       onClick={() => setDetailTarget({ type: 'franchise', key: entry.name, title: entry.label || entry.name })}
-                      className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-left transition hover:border-[#c2d44e]/35"
+                      className="flex items-center justify-between rounded-2xl border border-border bg-muted/50 px-4 py-3 text-left transition hover:border-primary/50"
                     >
                       <div className="flex items-center gap-3">
                         <span className="h-3 w-3 rounded-full" style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} />
                         <div>
-                          <p className="font-medium text-white">{entry.label}</p>
-                          <p className="text-xs text-slate-400">{entry.value} orders</p>
+                          <p className="font-medium text-foreground">{entry.label}</p>
+                          <p className="text-[10px] font-bold text-muted-foreground/80">{entry.value} orders</p>
                         </div>
                       </div>
-                      <p className="text-sm font-semibold text-white">{entry.share.toFixed(1)}%</p>
+                      <p className="text-sm font-semibold text-foreground">{entry.share.toFixed(1)}%</p>
                     </button>
                   ))}
                 </div>
@@ -881,22 +942,55 @@ export default function ReportsPage() {
         </TabsContent>
 
         <TabsContent value="stores" className="space-y-6">
-          <Card className="border-white/10 bg-[#121b30]">
+          <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-white">Store Performance</CardTitle>
-              <CardDescription className="text-slate-400">Revenue, volume, backlog, credit exposure, and top service per store.</CardDescription>
+              <CardTitle className="text-foreground">Store Performance</CardTitle>
+              <CardDescription className="text-muted-foreground">Revenue, volume, backlog, credit exposure, and top service per store.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={franchisePerformance}>
-                  <CartesianGrid stroke="rgba(148,163,184,0.14)" vertical={false} />
-                  <XAxis dataKey="franchiseCode" tick={{ fill: '#94a3b8', fontSize: 12 }} tickLine={false} axisLine={false} />
-                  <YAxis tickFormatter={(value) => `₹${Math.round(value / 1000)}k`} tick={{ fill: '#94a3b8', fontSize: 12 }} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(148,163,184,0.16)', borderRadius: 16, color: '#fff' }} formatter={(value: number) => formatCurrency(value)} />
-                  <Legend />
-                  <Bar dataKey="totalRevenue" radius={[10, 10, 0, 0]} fill="#4f8cff" onClick={(payload) => setDetailTarget({ type: 'franchise', key: payload.franchiseCode, title: payload.storeName })} />
+              <div className="rounded-2xl bg-muted/60 p-4">
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={franchisePerformance}>
+                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" opacity={0.8} vertical={false} />
+                  <XAxis 
+                    dataKey="franchiseCode" 
+                    tick={<CustomAxisTick />} 
+                    tickLine={false} 
+                    axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }} 
+                  />
+                  <YAxis 
+                    tick={<CustomYAxisTick formatter={(value: any) => `Rs. ${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`} />} 
+                    tickLine={false} 
+                    axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }} 
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      background: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))', 
+                      borderRadius: 12,
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                      padding: '8px 12px'
+                    }}
+                    itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 700, fontSize: 12 }}
+                    labelStyle={{ color: 'hsl(var(--muted-foreground))', fontWeight: 600, fontSize: 11, marginBottom: 4 }}
+                    formatter={(value: number) => [formatCurrency(value), 'Revenue']} 
+                  />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={36} 
+                    wrapperStyle={{ paddingTop: '20px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em' }}
+                  />
+                  <Bar 
+                    name="Total Revenue"
+                    dataKey="totalRevenue" 
+                    radius={[6, 6, 0, 0]} 
+                    fill="hsl(var(--primary))" 
+                    barSize={40}
+                    onClick={(payload) => setDetailTarget({ type: 'franchise', key: payload.franchiseCode, title: payload.storeName })} 
+                  />
                 </BarChart>
-              </ResponsiveContainer>
+                </ResponsiveContainer>
+              </div>
 
               <Table>
                 <TableHeader>
@@ -912,11 +1006,11 @@ export default function ReportsPage() {
                 </TableHeader>
                 <TableBody>
                   {franchisePerformance.map((store) => (
-                    <TableRow key={store.franchiseCode} className="cursor-pointer hover:bg-white/[0.03]" onClick={() => setDetailTarget({ type: 'franchise', key: store.franchiseCode, title: store.storeName })}>
+                    <TableRow key={store.franchiseCode} className="cursor-pointer hover:bg-muted/50" onClick={() => setDetailTarget({ type: 'franchise', key: store.franchiseCode, title: store.storeName })}>
                       <TableCell>
                         <div>
-                          <p className="font-medium text-white">{store.storeName}</p>
-                          <p className="text-xs text-slate-400">{store.franchiseCode}</p>
+                          <p className="font-medium text-foreground">{store.storeName}</p>
+                          <p className="text-xs text-muted-foreground">{store.franchiseCode}</p>
                         </div>
                       </TableCell>
                       <TableCell className="text-right">{store.totalOrders}</TableCell>
@@ -934,10 +1028,10 @@ export default function ReportsPage() {
         </TabsContent>
 
         <TabsContent value="services" className="space-y-6">
-          <Card className="border-white/10 bg-[#121b30]">
+          <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-white">Service Performance</CardTitle>
-              <CardDescription className="text-slate-400">Click a service to inspect customers, store mix, and recent order usage.</CardDescription>
+              <CardTitle className="text-foreground">Service Performance</CardTitle>
+              <CardDescription className="text-muted-foreground">Click a service to inspect customers, store mix, and recent order usage.</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -954,8 +1048,8 @@ export default function ReportsPage() {
                 </TableHeader>
                 <TableBody>
                   {topServices.map((service) => (
-                    <TableRow key={service.name} className="cursor-pointer hover:bg-white/[0.03]" onClick={() => setDetailTarget({ type: 'service', key: service.name, title: service.name })}>
-                      <TableCell className="font-medium text-white">{service.name}</TableCell>
+                    <TableRow key={service.name} className="cursor-pointer hover:bg-muted/50" onClick={() => setDetailTarget({ type: 'service', key: service.name, title: service.name })}>
+                      <TableCell className="font-medium text-foreground">{service.name}</TableCell>
                       <TableCell className="text-right">{service.itemCount}</TableCell>
                       <TableCell className="text-right">{service.orderCount}</TableCell>
                       <TableCell className="text-right">{service.customersCount}</TableCell>
@@ -971,10 +1065,10 @@ export default function ReportsPage() {
         </TabsContent>
 
         <TabsContent value="customers" className="space-y-6">
-          <Card className="border-white/10 bg-[#121b30]">
+          <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-white">Customer Value Table</CardTitle>
-              <CardDescription className="text-slate-400">Click a customer row for order history, credit, wallet, and service profile.</CardDescription>
+              <CardTitle className="text-foreground">Customer Value Table</CardTitle>
+              <CardDescription className="text-muted-foreground">Click a customer row for order history, credit, wallet, and service profile.</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -990,8 +1084,8 @@ export default function ReportsPage() {
                 </TableHeader>
                 <TableBody>
                   {topCustomers.map((customer) => (
-                    <TableRow key={customer.customerKey} className="cursor-pointer hover:bg-white/[0.03]" onClick={() => setDetailTarget({ type: 'customer', key: customer.customerId || customer.customerKey, title: customer.customerName })}>
-                      <TableCell className="font-medium text-white">{customer.customerName}</TableCell>
+                    <TableRow key={customer.customerKey} className="cursor-pointer hover:bg-muted/50" onClick={() => setDetailTarget({ type: 'customer', key: customer.customerId || customer.customerKey, title: customer.customerName })}>
+                      <TableCell className="font-medium text-foreground">{customer.customerName}</TableCell>
                       <TableCell>{customer.phone || '-'}</TableCell>
                       <TableCell className="text-right">{customer.orders}</TableCell>
                       <TableCell className="text-right">{formatCurrency(customer.revenue)}</TableCell>
@@ -1006,10 +1100,10 @@ export default function ReportsPage() {
         </TabsContent>
 
         <TabsContent value="team" className="space-y-6">
-          <Card className="border-white/10 bg-[#121b30]">
+          <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-white">Team Output</CardTitle>
-              <CardDescription className="text-slate-400">Orders handled, revenue touched, completion quality, and store alignment.</CardDescription>
+              <CardTitle className="text-foreground">Team Output</CardTitle>
+              <CardDescription className="text-muted-foreground">Orders handled, revenue touched, completion quality, and store alignment.</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -1028,8 +1122,8 @@ export default function ReportsPage() {
                     <TableRow key={employee.employeeId}>
                       <TableCell>
                         <div>
-                          <p className="font-medium text-white">{employee.name}</p>
-                          <p className="text-xs text-slate-400">{employee.employeeCode}</p>
+                          <p className="font-medium text-foreground">{employee.name}</p>
+                          <p className="text-xs text-muted-foreground">{employee.employeeCode}</p>
                         </div>
                       </TableCell>
                       <TableCell>{employee.role.replace(/_/g, ' ')}</TableCell>
@@ -1047,42 +1141,42 @@ export default function ReportsPage() {
 
         <TabsContent value="finance" className="space-y-6">
           <div className="grid gap-4 md:grid-cols-3">
-            <Card className="border-white/10 bg-[#121b30]">
+            <Card className="border-border bg-card">
               <CardContent className="pt-6">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Revenue</p>
-                <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(pnl.revenue)}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Revenue</p>
+                <p className="mt-2 text-3xl font-semibold text-foreground">{formatCurrency(pnl.revenue)}</p>
               </CardContent>
             </Card>
-            <Card className="border-white/10 bg-[#121b30]">
+            <Card className="border-border bg-card">
               <CardContent className="pt-6">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Expenses</p>
-                <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(pnl.totalExpenses)}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Expenses</p>
+                <p className="mt-2 text-3xl font-semibold text-foreground">{formatCurrency(pnl.totalExpenses)}</p>
               </CardContent>
             </Card>
-            <Card className="border-white/10 bg-[#121b30]">
+            <Card className="border-border bg-card">
               <CardContent className="pt-6">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Net Profit</p>
-                <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(pnl.netProfit)}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Net Profit</p>
+                <p className="mt-2 text-3xl font-semibold text-foreground">{formatCurrency(pnl.netProfit)}</p>
               </CardContent>
             </Card>
           </div>
 
-          <Card className="border-white/10 bg-[#121b30]">
+          <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-white">Expense Categories</CardTitle>
-              <CardDescription className="text-slate-400">Actual expense entries recorded in the shared expense table.</CardDescription>
+              <CardTitle className="text-foreground">Expense Categories</CardTitle>
+              <CardDescription className="text-muted-foreground">Actual expense entries recorded in the shared expense table.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-6 xl:grid-cols-[1fr_1.1fr]">
               <div className="space-y-3">
                 {Object.entries(pnl.expenseByCategory || {}).sort((a, b) => b[1] - a[1]).map(([category, amount]) => (
-                  <div key={category} className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-                    <p className="font-medium capitalize text-white">{category.replace(/_/g, ' ')}</p>
-                    <p className="font-semibold text-white">{formatCurrency(amount)}</p>
+                  <div key={category} className="flex items-center justify-between rounded-2xl border border-border bg-muted/50 px-4 py-3">
+                    <p className="font-medium capitalize text-foreground">{category.replace(/_/g, ' ')}</p>
+                    <p className="font-semibold text-foreground">{formatCurrency(amount)}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="overflow-hidden rounded-3xl border border-white/8">
+              <div className="overflow-hidden rounded-3xl border border-border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1108,75 +1202,75 @@ export default function ReportsPage() {
       </Tabs>
 
       <Sheet open={isExpenseSheetOpen} onOpenChange={setIsExpenseSheetOpen}>
-        <SheetContent side="right" className="w-full border-white/10 bg-[#0b1220] text-white sm:max-w-2xl">
+        <SheetContent side="right" className="w-full border-border bg-card text-foreground sm:max-w-2xl">
           <SheetHeader className="space-y-3">
-            <Badge className="w-fit rounded-full border border-[#c2d44e]/30 bg-[#c2d44e]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#d2e46b]">
+            <Badge className="w-fit rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">
               Add Expense
             </Badge>
-            <SheetTitle className="text-2xl font-semibold text-white">Record a new expense</SheetTitle>
-            <SheetDescription className="text-slate-400">
+            <SheetTitle className="text-2xl font-semibold text-foreground">Record a new expense</SheetTitle>
+            <SheetDescription className="text-muted-foreground">
               Capture expense details and immediately refresh the report totals.
             </SheetDescription>
           </SheetHeader>
 
           <div className="mt-8 space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="space-y-2 text-sm text-slate-400">
+              <label className="space-y-2 text-sm text-muted-foreground">
                 Amount
                 <input
                   type="number"
                   value={expenseForm.amount}
                   onChange={(event) => setExpenseForm((prev) => ({ ...prev, amount: event.target.value }))}
-                  className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 text-white outline-none placeholder:text-slate-500 focus:border-[#c2d44e]/50"
+                  className="h-12 w-full rounded-2xl border border-border bg-muted/20 px-4 text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-primary/50"
                   placeholder="Enter amount"
                 />
               </label>
-              <label className="space-y-2 text-sm text-slate-400">
+              <label className="space-y-2 text-sm text-muted-foreground">
                 Category
                 <input
                   type="text"
                   value={expenseForm.category}
                   onChange={(event) => setExpenseForm((prev) => ({ ...prev, category: event.target.value }))}
-                  className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 text-white outline-none placeholder:text-slate-500 focus:border-[#c2d44e]/50"
+                  className="h-12 w-full rounded-2xl border border-border bg-muted/20 px-4 text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-primary/50"
                   placeholder="E.g. materials, payroll, utilities"
                 />
               </label>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="space-y-2 text-sm text-slate-400">
+              <label className="space-y-2 text-sm text-muted-foreground">
                 Date incurred
                 <input
                   type="date"
                   value={expenseForm.incurredAt}
                   onChange={(event) => setExpenseForm((prev) => ({ ...prev, incurredAt: event.target.value }))}
-                  className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 text-white outline-none placeholder:text-slate-500 focus:border-[#c2d44e]/50"
+                  className="h-12 w-full rounded-2xl border border-border bg-muted/20 px-4 text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-primary/50"
                 />
               </label>
-              <label className="space-y-2 text-sm text-slate-400">
+              <label className="space-y-2 text-sm text-muted-foreground">
                 Store code
                 <input
                   type="text"
                   value={expenseForm.storeCode}
                   onChange={(event) => setExpenseForm((prev) => ({ ...prev, storeCode: event.target.value }))}
-                  className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 text-white outline-none placeholder:text-slate-500 focus:border-[#c2d44e]/50"
+                  className="h-12 w-full rounded-2xl border border-border bg-muted/20 px-4 text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-primary/50"
                   placeholder="Optional store" 
                 />
               </label>
             </div>
 
-            <label className="space-y-2 text-sm text-slate-400">
+            <label className="space-y-2 text-sm text-muted-foreground">
               Note
               <textarea
                 value={expenseForm.note}
                 onChange={(event) => setExpenseForm((prev) => ({ ...prev, note: event.target.value }))}
-                className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-[#c2d44e]/50"
+                className="min-h-[120px] w-full rounded-2xl border border-border bg-muted/20 px-4 py-3 text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-primary/50"
                 placeholder="Reason for expense"
               />
             </label>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button variant="outline" className="border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08]" onClick={() => setIsExpenseSheetOpen(false)}>
+              <Button variant="outline" className="border-border bg-card text-foreground hover:bg-muted" onClick={() => setIsExpenseSheetOpen(false)}>
                 Cancel
               </Button>
               <Button
@@ -1192,13 +1286,13 @@ export default function ReportsPage() {
       </Sheet>
 
       <Sheet open={Boolean(detailTarget)} onOpenChange={(open) => !open && setDetailTarget(null)}>
-        <SheetContent side="right" className="w-full border-white/10 bg-[#0b1220] text-white sm:max-w-2xl">
+        <SheetContent side="right" className="w-full border-border bg-card text-foreground sm:max-w-2xl">
           <SheetHeader className="space-y-3">
-            <Badge className="w-fit rounded-full border border-[#c2d44e]/30 bg-[#c2d44e]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#d2e46b]">
+            <Badge className="w-fit rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">
               {detailTarget?.type === 'metric' ? 'Report Metric' : 'Drill Down'}
             </Badge>
-            <SheetTitle className="text-2xl font-semibold text-white">{detailTarget?.title}</SheetTitle>
-            <SheetDescription className="text-slate-400">
+            <SheetTitle className="text-2xl font-semibold text-foreground">{detailTarget?.title}</SheetTitle>
+            <SheetDescription className="text-muted-foreground">
               {detailTarget?.type === 'metric'
                 ? 'Live breakdown for the selected KPI card.'
                 : 'Expanded reporting detail based on current live data.'}
@@ -1213,50 +1307,50 @@ export default function ReportsPage() {
             ) : detailQuery.data && detailTarget?.type === 'customer' ? (
               <div className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Card className="border-white/10 bg-white/[0.03]">
+                  <Card className="border-border bg-card">
                     <CardContent className="pt-6">
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Customer Snapshot</p>
-                      <p className="mt-2 text-2xl font-semibold text-white">{detailQuery.data.customer.name}</p>
-                      <p className="mt-1 text-sm text-slate-400">{detailQuery.data.customer.phone || 'No phone'} {detailQuery.data.customer.email ? `• ${detailQuery.data.customer.email}` : ''}</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Customer Snapshot</p>
+                      <p className="mt-2 text-2xl font-semibold text-foreground">{detailQuery.data.customer.name}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{detailQuery.data.customer.phone || 'No phone'} {detailQuery.data.customer.email ? `• ${detailQuery.data.customer.email}` : ''}</p>
                       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                        <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
-                          <p className="text-slate-400">Revenue</p>
-                          <p className="mt-1 font-semibold text-white">{formatCurrency(detailQuery.data.customer.totalRevenue)}</p>
+                        <div className="rounded-2xl border border-border bg-muted/50 p-3">
+                          <p className="text-muted-foreground">Revenue</p>
+                          <p className="mt-1 font-semibold text-foreground">{formatCurrency(detailQuery.data.customer.totalRevenue)}</p>
                         </div>
-                        <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
-                          <p className="text-slate-400">Orders</p>
-                          <p className="mt-1 font-semibold text-white">{detailQuery.data.customer.totalOrders}</p>
+                        <div className="rounded-2xl border border-border bg-muted/50 p-3">
+                          <p className="text-muted-foreground">Orders</p>
+                          <p className="mt-1 font-semibold text-foreground">{detailQuery.data.customer.totalOrders}</p>
                         </div>
-                        <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
-                          <p className="text-slate-400">Credit</p>
-                          <p className="mt-1 font-semibold text-white">{formatCurrency(detailQuery.data.customer.creditBalance)}</p>
+                        <div className="rounded-2xl border border-border bg-muted/50 p-3">
+                          <p className="text-muted-foreground">Credit</p>
+                          <p className="mt-1 font-semibold text-foreground">{formatCurrency(detailQuery.data.customer.creditBalance)}</p>
                         </div>
-                        <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
-                          <p className="text-slate-400">Wallet</p>
-                          <p className="mt-1 font-semibold text-white">{formatCurrency(detailQuery.data.customer.walletBalance)}</p>
+                        <div className="rounded-2xl border border-border bg-muted/50 p-3">
+                          <p className="text-muted-foreground">Wallet</p>
+                          <p className="mt-1 font-semibold text-foreground">{formatCurrency(detailQuery.data.customer.walletBalance)}</p>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
 
-                  <Card className="border-white/10 bg-white/[0.03]">
+                  <Card className="border-border bg-card">
                     <CardHeader>
-                      <CardTitle className="text-base text-white">Top Services</CardTitle>
+                      <CardTitle className="text-base text-foreground">Top Services</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {detailQuery.data.topServices.map((service: any) => (
-                        <div key={service.name} className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-                          <p className="font-medium text-white">{service.name}</p>
-                          <p className="font-semibold text-white">{formatCurrency(service.revenue)}</p>
+                        <div key={service.name} className="flex items-center justify-between rounded-2xl border border-border bg-muted/50 px-4 py-3">
+                          <p className="font-medium text-foreground">{service.name}</p>
+                          <p className="font-semibold text-foreground">{formatCurrency(service.revenue)}</p>
                         </div>
                       ))}
                     </CardContent>
                   </Card>
                 </div>
 
-                <Card className="border-white/10 bg-white/[0.03]">
+                <Card className="border-border bg-card">
                   <CardHeader>
-                    <CardTitle className="text-base text-white">Recent Orders</CardTitle>
+                    <CardTitle className="text-base text-foreground">Recent Orders</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <Table>
@@ -1274,8 +1368,8 @@ export default function ReportsPage() {
                           <TableRow key={order.id}>
                             <TableCell>
                               <div>
-                                <p className="font-medium text-white">{order.orderNumber}</p>
-                                <p className="text-xs text-slate-400">{formatDate(order.createdAt)}</p>
+                                <p className="font-medium text-foreground">{order.orderNumber}</p>
+                                <p className="text-xs text-muted-foreground">{formatDate(order.createdAt)}</p>
                               </div>
                             </TableCell>
                             <TableCell>{order.status}</TableCell>
@@ -1298,18 +1392,18 @@ export default function ReportsPage() {
                     ['Orders', detailQuery.data.service.orderCount.toString()],
                     ['Customers', detailQuery.data.service.customerCount.toString()],
                   ].map(([label, value]) => (
-                    <Card key={label} className="border-white/10 bg-white/[0.03]">
+                    <Card key={label} className="border-border bg-card">
                       <CardContent className="pt-6">
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{label}</p>
-                        <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">{label}</p>
+                        <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
 
-                <Card className="border-white/10 bg-white/[0.03]">
+                <Card className="border-border bg-card">
                   <CardHeader>
-                    <CardTitle className="text-base text-white">Customers Ordering This Service</CardTitle>
+                    <CardTitle className="text-base text-foreground">Customers Ordering This Service</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <Table>
@@ -1324,7 +1418,7 @@ export default function ReportsPage() {
                       <TableBody>
                         {detailQuery.data.topCustomers.map((customer: any) => (
                           <TableRow key={customer.customerKey}>
-                            <TableCell className="font-medium text-white">{customer.customerName}</TableCell>
+                            <TableCell className="font-medium text-foreground">{customer.customerName}</TableCell>
                             <TableCell>{customer.phone || '-'}</TableCell>
                             <TableCell className="text-right">{customer.orders}</TableCell>
                             <TableCell className="text-right">{formatCurrency(customer.revenue)}</TableCell>
@@ -1344,41 +1438,41 @@ export default function ReportsPage() {
                     ['Avg Ticket', formatCurrency(detailQuery.data.franchise.averageOrderValue)],
                     ['Team', detailQuery.data.franchise.activeEmployees.toString()],
                   ].map(([label, value]) => (
-                    <Card key={label} className="border-white/10 bg-white/[0.03]">
+                    <Card key={label} className="border-border bg-card">
                       <CardContent className="pt-6">
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{label}</p>
-                        <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">{label}</p>
+                        <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-2">
-                  <Card className="border-white/10 bg-white/[0.03]">
+                  <Card className="border-border bg-card">
                     <CardHeader>
-                      <CardTitle className="text-base text-white">Top Services</CardTitle>
+                      <CardTitle className="text-base text-foreground">Top Services</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {detailQuery.data.topServices.map((service: any) => (
-                        <div key={service.name} className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-                          <p className="font-medium text-white">{service.name}</p>
-                          <p className="font-semibold text-white">{formatCurrency(service.revenue)}</p>
+                        <div key={service.name} className="flex items-center justify-between rounded-2xl border border-border bg-muted/50 px-4 py-3">
+                          <p className="font-medium text-foreground">{service.name}</p>
+                          <p className="font-semibold text-foreground">{formatCurrency(service.revenue)}</p>
                         </div>
                       ))}
                     </CardContent>
                   </Card>
-                  <Card className="border-white/10 bg-white/[0.03]">
+                  <Card className="border-border bg-card">
                     <CardHeader>
-                      <CardTitle className="text-base text-white">Top Customers</CardTitle>
+                      <CardTitle className="text-base text-foreground">Top Customers</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {detailQuery.data.topCustomers.map((customer: any) => (
-                        <div key={customer.customerKey} className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+                        <div key={customer.customerKey} className="flex items-center justify-between rounded-2xl border border-border bg-muted/50 px-4 py-3">
                           <div>
-                            <p className="font-medium text-white">{customer.customerName}</p>
-                            <p className="text-xs text-slate-400">{customer.orders} orders</p>
+                            <p className="font-medium text-foreground">{customer.customerName}</p>
+                            <p className="text-xs text-muted-foreground">{customer.orders} orders</p>
                           </div>
-                          <p className="font-semibold text-white">{formatCurrency(customer.revenue)}</p>
+                          <p className="font-semibold text-foreground">{formatCurrency(customer.revenue)}</p>
                         </div>
                       ))}
                     </CardContent>
@@ -1386,8 +1480,8 @@ export default function ReportsPage() {
                 </div>
               </div>
             ) : (
-              <Card className="border-white/10 bg-white/[0.03]">
-                <CardContent className="pt-6 text-sm text-slate-400">
+              <Card className="border-border bg-card">
+                <CardContent className="pt-6 text-sm text-muted-foreground">
                   No detail data available for this selection.
                 </CardContent>
               </Card>

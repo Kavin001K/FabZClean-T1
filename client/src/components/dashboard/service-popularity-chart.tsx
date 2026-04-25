@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from "recharts";
@@ -11,6 +12,41 @@ import {
 
 // ✅ Removed hardcoded defaultData - always use provided data or empty array
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+
+const CustomAxisTick = ({ x, y, payload, vertical, ...props }: any) => {
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={0}
+        y={0}
+        dy={vertical ? 4 : 12}
+        textAnchor={vertical ? "end" : "middle"}
+        fill="currentColor"
+        className="text-[10px] font-bold text-muted-foreground/90"
+        {...props}
+      >
+        {payload.value}
+      </text>
+    </g>
+  );
+};
+
+const CustomYAxisTick = ({ x, y, payload, formatter, ...props }: any) => {
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={-10}
+        y={4}
+        textAnchor="end"
+        fill="currentColor"
+        className="text-[10px] font-bold text-muted-foreground/90"
+        {...props}
+      >
+        {formatter ? formatter(payload.value) : payload.value}
+      </text>
+    </g>
+  );
+};
 
 interface ServicePopularityChartProps {
   data?: Array<{ name: string; value?: number; orders?: number; revenue?: number; fill?: string }>;
@@ -114,17 +150,32 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="rounded-lg border bg-background p-3 shadow-md">
-          <p className="font-medium mb-2">{data.name}</p>
-          <div className="space-y-1 text-sm">
-            <p>Orders: <span className="font-semibold">{data.orders}</span></p>
-            <p>Revenue: <span className="font-semibold">₹{data.revenue?.toLocaleString()}</span></p>
-            <p>Market Share: <span className="font-semibold">{(data.marketShare ?? 0).toFixed(1)}%</span></p>
-            <p>Avg Order: <span className="font-semibold">₹{(data.avgOrderValue ?? 0).toFixed(0)}</span></p>
+        <div className="rounded-xl border border-border bg-card p-3 shadow-lg backdrop-blur-sm">
+          <p className="font-bold text-xs text-muted-foreground mb-2 uppercase tracking-wider">{data.name}</p>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-6">
+              <span className="text-[11px] font-semibold text-foreground">Orders:</span>
+              <span className="text-[11px] font-bold text-foreground">{data.orders}</span>
+            </div>
+            <div className="flex items-center justify-between gap-6">
+              <span className="text-[11px] font-semibold text-foreground">Revenue:</span>
+              <span className="text-[11px] font-bold text-foreground">Rs. {data.revenue?.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between gap-6">
+              <span className="text-[11px] font-semibold text-foreground">Market Share:</span>
+              <span className="text-[11px] font-bold text-foreground">{(data.marketShare ?? 0).toFixed(1)}%</span>
+            </div>
+            <div className="flex items-center justify-between gap-6">
+              <span className="text-[11px] font-semibold text-foreground">Avg Order:</span>
+              <span className="text-[11px] font-bold text-foreground">Rs. {(data.avgOrderValue ?? 0).toFixed(0)}</span>
+            </div>
             {data.growth !== 0 && (
-              <p className={data.growth > 0 ? 'text-green-600' : 'text-red-600'}>
-                Growth: <span className="font-semibold">{data.growth > 0 ? '+' : ''}{(data.growth ?? 0).toFixed(1)}%</span>
-              </p>
+              <div className="flex items-center justify-between gap-6 pt-1 border-t border-border/50 mt-1">
+                <span className="text-[11px] font-semibold text-foreground">Growth:</span>
+                <span className={cn("text-[11px] font-bold", data.growth > 0 ? 'text-green-600' : 'text-red-600')}>
+                  {data.growth > 0 ? '+' : ''}{(data.growth ?? 0).toFixed(1)}%
+                </span>
+              </div>
             )}
           </div>
         </div>
@@ -154,7 +205,7 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
             <div className="text-xs text-muted-foreground">Total Orders</div>
           </div>
           <div className="p-3 bg-muted rounded-lg text-center">
-            <div className="text-xl font-bold">₹{((statistics.totalRevenue ?? 0) / 1000).toFixed(0)}K</div>
+            <div className="text-xl font-bold">Rs. {((statistics.totalRevenue ?? 0) / 1000).toFixed(0)}K</div>
             <div className="text-xs text-muted-foreground">Total Revenue</div>
           </div>
           <div className="p-3 bg-muted rounded-lg text-center">
@@ -175,16 +226,15 @@ export default function ServicePopularityChart({ data, previousPeriodData }: Ser
             <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
             <XAxis
               dataKey="name"
-              fontSize={11}
-              angle={-20}
-              textAnchor="end"
+              tick={<CustomAxisTick vertical={true} />}
               height={80}
-              tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              tickLine={false}
+              axisLine={false}
             />
             <YAxis
-              fontSize={12}
-              tick={{ fill: 'hsl(var(--muted-foreground))' }}
-              tickFormatter={(value) => `${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`}
+              tick={<CustomYAxisTick />}
+              tickLine={false}
+              axisLine={false}
             />
             <Tooltip content={<CustomTooltip />} />
             <Bar dataKey="orders" radius={[8, 8, 0, 0]}>

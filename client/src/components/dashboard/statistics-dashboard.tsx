@@ -133,7 +133,7 @@ export default function StatisticsDashboard({
   };
 
   const formatCurrency = (num: number): string => {
-    return `₹${formatNumber(num, 0)}`;
+    return `Rs. ${formatNumber(num, 0)}`;
   };
 
   // Simple sparkline visualization

@@ -156,7 +156,7 @@ export function exportOrdersToPDF(orders: any[], title: string = 'Orders Report'
     'Customer': order.customerName,
     'Service': order.service || '',
     'Status': order.status,
-    'Amount': `₹${order.totalAmount}`,
+    'Amount': `Rs. ${order.totalAmount}`,
     'Date': new Date(order.createdAt).toLocaleDateString(),
   }));
 
@@ -170,7 +170,7 @@ export function exportCustomersToPDF(customers: any[], title: string = 'Customer
     'Email': customer.email || '',
     'Phone': customer.phone || '',
     'Orders': customer.totalOrders,
-    'Total Spent': `₹${customer.totalSpent}`,
+    'Total Spent': `Rs. ${customer.totalSpent}`,
   }));
 
   exportToPDF(exportData, `customers-${new Date().toISOString().split('T')[0]}`, title);

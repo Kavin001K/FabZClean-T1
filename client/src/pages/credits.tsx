@@ -203,7 +203,7 @@ export default function CreditsPage() {
         onSuccess: (data) => {
             toast({
                 title: "Payment Recorded",
-                description: `Payment of ₹${paymentAmount} recorded successfully`,
+                description: `Payment of Rs. ${paymentAmount} recorded successfully`,
             });
             setIsPaymentDialogOpen(false);
             setPaymentAmount("");
@@ -371,13 +371,13 @@ export default function CreditsPage() {
             c.name,
             c.phone,
             c.email || '',
-            `₹${c.creditBalance.toLocaleString('en-IN')}`,
+            `Rs. ${c.creditBalance.toLocaleString('en-IN')}`,
             c.totalOrders || 0,
         ]);
 
         const csvContent = [
             `Credit Outstanding Report - ${format(new Date(), 'dd MMM yyyy')}`,
-            `Total Outstanding: ₹${outstandingData?.totalOutstanding?.toLocaleString('en-IN') || 0}`,
+            `Total Outstanding: Rs. ${outstandingData?.totalOutstanding?.toLocaleString('en-IN') || 0}`,
             `Total Customers: ${outstandingData?.totalCustomers || 0}`,
             '',
             headers.join(','),
@@ -400,7 +400,7 @@ export default function CreditsPage() {
 
     // Format currency
     const formatCurrency = (amount: number) => {
-        return `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+        return `Rs. ${amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
     };
 
     return (
@@ -765,7 +765,7 @@ export default function CreditsPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Payment Amount (₹)</Label>
+                                <Label>Payment Amount (Rs. )</Label>
                                 <Input
                                     type="number"
                                     placeholder="Enter amount"
@@ -848,7 +848,7 @@ export default function CreditsPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Adjustment Amount (₹)</Label>
+                                <Label>Adjustment Amount (Rs. )</Label>
                                 <Input
                                     type="number"
                                     placeholder="Positive to add, negative to reduce"

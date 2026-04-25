@@ -39,7 +39,13 @@ router.get('/invoice/:orderNumber', async (req: Request, res: Response) => {
             return res.redirect((order as any).invoiceUrl);
         }
 
-        const latestDocument = await findLatestInvoiceDocument(orderNumber);
+        const documents = await storage.listDocuments({ type: 'invoice' });
+        const sortedDocs = [...documents].sort((a: any, b: any) => (b.id || 0) - (a.id || 0));
+        const latestDocument = sortedDocs.find((d: any) => 
+            String(d.orderNumber) === String(orderNumber) || 
+            (d.metadata && String(d.metadata.orderNumber) === String(orderNumber))
+        );
+        
         if (latestDocument?.fileUrl) {
             return res.redirect(latestDocument.fileUrl);
         }
@@ -70,7 +76,10 @@ router.get('/invoice/:orderNumber', async (req: Request, res: Response) => {
             totalAmount: o.total_amount || o.totalAmount,
             paymentStatus: o.payment_status || o.paymentStatus,
             fulfillmentType: o.fulfillment_type || o.fulfillmentType,
-            isExpressOrder: o.is_express_order || o.isExpressOrder
+            isExpressOrder: o.is_express_order || o.isExpressOrder,
+            bookingId: o.booking_id || o.bookingId || null,
+            bookingSource: o.booking_source || o.bookingSource || null,
+            bookingChannel: o.booking_channel || o.bookingChannel || null,
         };
 
         // Extract order data
@@ -91,7 +100,10 @@ router.get('/invoice/:orderNumber', async (req: Request, res: Response) => {
             total: parseFloat(mappedOrder.totalAmount || 0),
             paymentStatus: mappedOrder.paymentStatus || 'pending',
             fulfillmentType: mappedOrder.fulfillmentType || 'pickup',
-            isExpressOrder: mappedOrder.isExpressOrder || false
+            isExpressOrder: mappedOrder.isExpressOrder || false,
+            bookingId: mappedOrder.bookingId || null,
+            bookingSource: mappedOrder.bookingSource || null,
+            bookingChannel: mappedOrder.bookingChannel || null,
         };
 
         // Calculate totals if not available
@@ -110,7 +122,7 @@ router.get('/invoice/:orderNumber', async (req: Request, res: Response) => {
         });
 
         // Format currency
-        const formatCurrency = (amount: number) => `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const formatCurrency = (amount: number) => `Rs. ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
         // Generate HTML invoice
         const invoiceHtml = `
@@ -314,6 +326,7 @@ router.get('/invoice/:orderNumber', async (req: Request, res: Response) => {
                 <h2>INVOICE</h2>
                 <p class="invoice-number">#${orderData.orderNumber}</p>
                 <p class="invoice-date">Date: ${invoiceDate}</p>
+                ${orderData.bookingId ? `<p class="invoice-date">Booking ID: ${orderData.bookingId}${orderData.bookingSource || orderData.bookingChannel ? ` (${[orderData.bookingSource, orderData.bookingChannel].filter(Boolean).join(' / ')})` : ''}</p>` : ''}
                 <p style="margin-top: 10px;">
                     <span class="status-badge ${orderData.paymentStatus === 'paid' ? 'status-paid' : 'status-pending'}">
                         ${orderData.paymentStatus === 'paid' ? '✓ PAID' : 'PENDING'}

@@ -77,10 +77,10 @@ export interface InvoiceData {
 }
 
 const formatIndianCurrency = (amount: number): string =>
-  `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  `Rs. ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const formatCompactCurrency = (amount: number): string =>
-  `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  `Rs. ${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
 const convertToWords = (num: number): string => {
   if (num === 0) return 'Zero Rupees Only';

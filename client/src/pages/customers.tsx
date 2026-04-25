@@ -652,7 +652,7 @@ export default function Customers() {
                   </div>
                   <div>
                     <p className="text-[8px] lg:text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Revenue</p>
-                    <h3 className="text-lg lg:text-2xl font-black tracking-tight text-emerald-600">₹{metrics.totalRevenue.toFixed(0)}</h3>
+                    <h3 className="text-lg lg:text-2xl font-black tracking-tight text-emerald-600">Rs. {metrics.totalRevenue.toFixed(0)}</h3>
                   </div>
                 </div>
               </CardContent>
@@ -939,21 +939,21 @@ export default function Customers() {
                             <div className="flex items-center justify-between">
                               <span className="text-muted-foreground font-medium">Wallet Balance</span>
                               <span className="font-bold text-emerald-500">
-                                ₹{parseFloat((customer as any).walletBalanceCache || '0').toFixed(2)}
+                                Rs. {parseFloat((customer as any).walletBalanceCache || '0').toFixed(2)}
                               </span>
                             </div>
                             <div className="flex items-center justify-between border-t border-white/5 pt-1">
                               <span className="text-muted-foreground font-medium">Outstanding Credit</span>
                               <span className={`font-bold ${outstandingColorClass}`}>
-                                ₹{outstandingCredit.toFixed(2)}
+                                Rs. {outstandingCredit.toFixed(2)}
                               </span>
                             </div>
                             <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1">
-                              <span className={isCreditLimitExceeded ? "text-red-500 font-semibold" : ""}>Limit ₹{customerCreditLimit.toFixed(0)}</span>
+                              <span className={isCreditLimitExceeded ? "text-red-500 font-semibold" : ""}>Limit Rs. {customerCreditLimit.toFixed(0)}</span>
                               <span className={isCreditLimitExceeded ? "text-red-500 font-semibold" : ""}>
                                 {isCreditLimitExceeded
-                                  ? `Exceeded ₹${(outstandingCredit - customerCreditLimit).toFixed(0)}`
-                                  : `Available ₹${availableCredit.toFixed(0)}`}
+                                  ? `Exceeded Rs. ${(outstandingCredit - customerCreditLimit).toFixed(0)}`
+                                  : `Available Rs. ${availableCredit.toFixed(0)}`}
                               </span>
                             </div>
                           </div>
@@ -970,7 +970,7 @@ export default function Customers() {
                               <div>
                                 <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">LTV</div>
                                 <div className="text-2xl font-bold text-primary">
-                                  ₹{totalSpent.toFixed(0)}
+                                  Rs. {totalSpent.toFixed(0)}
                                 </div>
                               </div>
                             </div>

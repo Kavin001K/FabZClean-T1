@@ -196,7 +196,7 @@ const getStepsForFulfillment = (fulfillmentType?: string, status?: string) => {
 
 const formatCurrency = (amount: string | number) => {
   const value = typeof amount === 'number' ? amount : Number(amount);
-  return `₹${Number.isFinite(value) ? value.toLocaleString('en-IN') : '0'}`;
+  return `Rs. ${Number.isFinite(value) ? value.toLocaleString('en-IN') : '0'}`;
 };
 
 const formatDate = (value?: string) => {

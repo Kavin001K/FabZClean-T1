@@ -498,7 +498,7 @@ export default function CustomerAccountManagement({ customer }: CustomerAccountM
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span>Points Value:</span>
-                      <span className="font-medium">₹{totalLoyaltyPoints * 0.1}</span>
+                      <span className="font-medium">Rs. {totalLoyaltyPoints * 0.1}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span>Next Reward:</span>

@@ -294,7 +294,7 @@ export function exportOrdersEnhanced(orders: any[]) {
   // Add statistics summary
   pdf.addStatsSummary([
     { label: 'Total Orders', value: totalOrders },
-    { label: 'Total Revenue', value: `₹${totalRevenue.toFixed(2)}` },
+    { label: 'Total Revenue', value: `Rs. ${totalRevenue.toFixed(2)}` },
     { label: 'Completed', value: completedOrders },
     { label: 'Pending', value: pendingOrders },
   ]);
@@ -310,7 +310,7 @@ export function exportOrdersEnhanced(orders: any[]) {
     order.service || 'N/A',
     order.status,
     order.paymentStatus || 'N/A',
-    `₹${order.totalAmount}`,
+    `Rs. ${order.totalAmount}`,
     new Date(order.createdAt).toLocaleDateString(),
   ]);
 
@@ -319,7 +319,7 @@ export function exportOrdersEnhanced(orders: any[]) {
   // Add summary info
   pdf.addInfoBox(
     'Report Summary',
-    `This report contains ${totalOrders} orders with a total revenue of ₹${totalRevenue.toFixed(2)}. ` +
+    `This report contains ${totalOrders} orders with a total revenue of Rs. ${totalRevenue.toFixed(2)}. ` +
     `${completedOrders} orders have been completed, and ${pendingOrders} orders are pending or in progress.`
   );
 
@@ -342,7 +342,7 @@ export function exportCustomersEnhanced(customers: any[]) {
   // Add statistics summary
   pdf.addStatsSummary([
     { label: 'Total Customers', value: totalCustomers },
-    { label: 'Total Revenue', value: `₹${totalRevenue.toFixed(2)}` },
+    { label: 'Total Revenue', value: `Rs. ${totalRevenue.toFixed(2)}` },
     { label: 'Avg Orders/Customer', value: avgOrders.toFixed(1) },
     { label: 'Active Customers', value: activeCustomers },
   ]);
@@ -357,7 +357,7 @@ export function exportCustomersEnhanced(customers: any[]) {
     customer.email || 'N/A',
     customer.phone || 'N/A',
     customer.totalOrders || 0,
-    `₹${customer.totalSpent || 0}`,
+    `Rs. ${customer.totalSpent || 0}`,
     customer.lastOrder ? new Date(customer.lastOrder).toLocaleDateString() : 'Never',
     (customer.totalOrders || 0) > 0 ? 'Active' : 'Inactive',
   ]);
@@ -367,7 +367,7 @@ export function exportCustomersEnhanced(customers: any[]) {
   // Add summary info
   pdf.addInfoBox(
     'Report Summary',
-    `This report contains ${totalCustomers} customers with a total lifetime value of ₹${totalRevenue.toFixed(2)}. ` +
+    `This report contains ${totalCustomers} customers with a total lifetime value of Rs. ${totalRevenue.toFixed(2)}. ` +
     `On average, each customer has placed ${avgOrders.toFixed(1)} orders. ${activeCustomers} customers are currently active.`
   );
 
@@ -383,7 +383,7 @@ export function exportDashboardSummary(metrics: any) {
 
   // Add statistics summary
   pdf.addStatsSummary([
-    { label: 'Total Revenue', value: `₹${metrics.totalRevenue?.toFixed(2) || 0}` },
+    { label: 'Total Revenue', value: `Rs. ${metrics.totalRevenue?.toFixed(2) || 0}` },
     { label: 'Total Orders', value: metrics.totalOrders || 0 },
     { label: 'Active Customers', value: metrics.activeCustomers || 0 },
     { label: 'Completion Rate', value: `${metrics.completionRate || 0}%` },
@@ -398,7 +398,7 @@ export function exportDashboardSummary(metrics: any) {
     const data = Object.entries(metrics.revenueByStatus).map(([status, revenue]: [string, any]) => [
       status.charAt(0).toUpperCase() + status.slice(1),
       metrics.ordersByStatus?.[status] || 0,
-      `₹${revenue.toFixed(2)}`,
+      `Rs. ${revenue.toFixed(2)}`,
       `${((revenue / total) * 100).toFixed(1)}%`,
     ]);
     pdf.addTable(columns, data);
@@ -409,7 +409,7 @@ export function exportDashboardSummary(metrics: any) {
 
   pdf.addInfoBox(
     'Business Health',
-    `Your business is performing well with a total revenue of ₹${metrics.totalRevenue?.toFixed(2) || 0} ` +
+    `Your business is performing well with a total revenue of Rs. ${metrics.totalRevenue?.toFixed(2) || 0} ` +
     `across ${metrics.totalOrders || 0} orders. Customer satisfaction remains high with ` +
     `${metrics.activeCustomers || 0} active customers.`
   );
@@ -434,7 +434,7 @@ export function exportServicesEnhanced(services: any[]) {
   pdf.addStatsSummary([
     { label: 'Total Services', value: totalServices },
     { label: 'Active Services', value: activeServices },
-    { label: 'Avg Price', value: `₹${avgPrice.toFixed(2)}` },
+    { label: 'Avg Price', value: `Rs. ${avgPrice.toFixed(2)}` },
     { label: 'Categories', value: categories },
   ]);
 
@@ -446,7 +446,7 @@ export function exportServicesEnhanced(services: any[]) {
   const data = services.map(service => [
     service.name,
     service.category || 'General',
-    `₹${service.price}`,
+    `Rs. ${service.price}`,
     service.duration || 'N/A',
     service.status || 'Active',
   ]);
@@ -458,7 +458,7 @@ export function exportServicesEnhanced(services: any[]) {
     'Catalog Summary',
     `This catalog contains ${totalServices} services across ${categories} different categories. ` +
     `${activeServices} services are currently active and available for booking. ` +
-    `The average service price is ₹${avgPrice.toFixed(2)}.`
+    `The average service price is Rs. ${avgPrice.toFixed(2)}.`
   );
 
   // Save PDF
@@ -483,7 +483,7 @@ export function exportInventoryEnhanced(inventory: any[]) {
     { label: 'Total Items', value: totalItems },
     { label: 'In Stock', value: inStock },
     { label: 'Out of Stock', value: outOfStock, color: BRAND_COLORS.accent },
-    { label: 'Total Value', value: `₹${totalValue.toFixed(2)}` },
+    { label: 'Total Value', value: `Rs. ${totalValue.toFixed(2)}` },
   ]);
 
   // Add inventory section
@@ -496,7 +496,7 @@ export function exportInventoryEnhanced(inventory: any[]) {
     item.name,
     item.category || 'General',
     item.stock,
-    `₹${parseFloat(item.price || '0').toFixed(2)}`,
+    `Rs. ${parseFloat(item.price || '0').toFixed(2)}`,
     item.status,
   ]);
 
@@ -505,7 +505,7 @@ export function exportInventoryEnhanced(inventory: any[]) {
   // Add summary info
   pdf.addInfoBox(
     'Report Summary',
-    `This report contains ${totalItems} unique inventory items with a total estimated value of ₹${totalValue.toFixed(2)}. ` +
+    `This report contains ${totalItems} unique inventory items with a total estimated value of Rs. ${totalValue.toFixed(2)}. ` +
     `${inStock} items are currently in stock, while ${outOfStock} items are out of stock and ${lowStock} are low on stock.`
   );
 
@@ -527,9 +527,9 @@ export function exportIncomeStatement(data: any) {
 
   // Add statistics summary
   pdf.addStatsSummary([
-    { label: 'Total Revenue', value: `$${totalRevenue.toFixed(2)}`, color: BRAND_COLORS.light },
-    { label: 'Total Expenses', value: `$${totalExpenses.toFixed(2)}`, color: BRAND_COLORS.light },
-    { label: 'Net Income', value: `$${netIncome.toFixed(2)}`, color: netIncome >= 0 ? '#d1fae5' : '#fee2e2' },
+    { label: 'Total Revenue', value: `Rs. ${totalRevenue.toFixed(2)}`, color: BRAND_COLORS.light },
+    { label: 'Total Expenses', value: `Rs. ${totalExpenses.toFixed(2)}`, color: BRAND_COLORS.light },
+    { label: 'Net Income', value: `Rs. ${netIncome.toFixed(2)}`, color: netIncome >= 0 ? '#d1fae5' : '#fee2e2' },
     { label: 'Profit Margin', value: `${totalRevenue > 0 ? ((netIncome / totalRevenue) * 100).toFixed(1) : 0}%` },
   ]);
 
@@ -540,9 +540,9 @@ export function exportIncomeStatement(data: any) {
     const revenueData = data.revenue.map((item: any) => [
       item.account || 'N/A',
       item.description || '-',
-      `$${(item.amount || 0).toFixed(2)}`,
+      `Rs. ${(item.amount || 0).toFixed(2)}`,
     ]);
-    revenueData.push(['', 'Total Revenue', `$${totalRevenue.toFixed(2)}`]);
+    revenueData.push(['', 'Total Revenue', `Rs. ${totalRevenue.toFixed(2)}`]);
     pdf.addTable(revenueColumns, revenueData);
   }
 
@@ -553,17 +553,17 @@ export function exportIncomeStatement(data: any) {
     const expensesData = data.expenses.map((item: any) => [
       item.account || 'N/A',
       item.description || '-',
-      `$${(item.amount || 0).toFixed(2)}`,
+      `Rs. ${(item.amount || 0).toFixed(2)}`,
     ]);
-    expensesData.push(['', 'Total Expenses', `$${totalExpenses.toFixed(2)}`]);
+    expensesData.push(['', 'Total Expenses', `Rs. ${totalExpenses.toFixed(2)}`]);
     pdf.addTable(expensesColumns, expensesData);
   }
 
   // Net income summary
   pdf.addInfoBox(
     'Financial Summary',
-    `Total Revenue: $${totalRevenue.toFixed(2)} | Total Expenses: $${totalExpenses.toFixed(2)} | ` +
-    `Net Income: $${netIncome.toFixed(2)} | Profit Margin: ${totalRevenue > 0 ? ((netIncome / totalRevenue) * 100).toFixed(1) : 0}%`
+    `Total Revenue: Rs. ${totalRevenue.toFixed(2)} | Total Expenses: Rs. ${totalExpenses.toFixed(2)} | ` +
+    `Net Income: Rs. ${netIncome.toFixed(2)} | Profit Margin: ${totalRevenue > 0 ? ((netIncome / totalRevenue) * 100).toFixed(1) : 0}%`
   );
 
   // Save PDF
@@ -583,9 +583,9 @@ export function exportBalanceSheet(data: any) {
 
   // Add statistics summary
   pdf.addStatsSummary([
-    { label: 'Total Assets', value: `$${totalAssets.toFixed(2)}` },
-    { label: 'Total Liabilities', value: `$${totalLiabilities.toFixed(2)}` },
-    { label: 'Total Equity', value: `$${totalEquity.toFixed(2)}` },
+    { label: 'Total Assets', value: `Rs. ${totalAssets.toFixed(2)}` },
+    { label: 'Total Liabilities', value: `Rs. ${totalLiabilities.toFixed(2)}` },
+    { label: 'Total Equity', value: `Rs. ${totalEquity.toFixed(2)}` },
     { label: 'Balance Check', value: totalAssets === (totalLiabilities + totalEquity) ? 'Balanced' : 'Unbalanced', color: totalAssets === (totalLiabilities + totalEquity) ? '#d1fae5' : '#fee2e2' },
   ]);
 
@@ -596,9 +596,9 @@ export function exportBalanceSheet(data: any) {
     const assetsData = data.assets.map((item: any) => [
       item.account || 'N/A',
       item.description || '-',
-      `$${(item.amount || 0).toFixed(2)}`,
+      `Rs. ${(item.amount || 0).toFixed(2)}`,
     ]);
-    assetsData.push(['', 'Total Assets', `$${totalAssets.toFixed(2)}`]);
+    assetsData.push(['', 'Total Assets', `Rs. ${totalAssets.toFixed(2)}`]);
     pdf.addTable(assetsColumns, assetsData);
   }
 
@@ -609,9 +609,9 @@ export function exportBalanceSheet(data: any) {
     const liabilitiesData = data.liabilities.map((item: any) => [
       item.account || 'N/A',
       item.description || '-',
-      `$${(item.amount || 0).toFixed(2)}`,
+      `Rs. ${(item.amount || 0).toFixed(2)}`,
     ]);
-    liabilitiesData.push(['', 'Total Liabilities', `$${totalLiabilities.toFixed(2)}`]);
+    liabilitiesData.push(['', 'Total Liabilities', `Rs. ${totalLiabilities.toFixed(2)}`]);
     pdf.addTable(liabilitiesColumns, liabilitiesData);
   }
 
@@ -622,17 +622,17 @@ export function exportBalanceSheet(data: any) {
     const equityData = data.equity.map((item: any) => [
       item.account || 'N/A',
       item.description || '-',
-      `$${(item.amount || 0).toFixed(2)}`,
+      `Rs. ${(item.amount || 0).toFixed(2)}`,
     ]);
-    equityData.push(['', 'Total Equity', `$${totalEquity.toFixed(2)}`]);
+    equityData.push(['', 'Total Equity', `Rs. ${totalEquity.toFixed(2)}`]);
     pdf.addTable(equityColumns, equityData);
   }
 
   // Balance verification
   pdf.addInfoBox(
     'Balance Verification',
-    `Assets: $${totalAssets.toFixed(2)} | Liabilities + Equity: $${(totalLiabilities + totalEquity).toFixed(2)} | ` +
-    `Difference: $${(totalAssets - (totalLiabilities + totalEquity)).toFixed(2)}`
+    `Assets: Rs. ${totalAssets.toFixed(2)} | Liabilities + Equity: Rs. ${(totalLiabilities + totalEquity).toFixed(2)} | ` +
+    `Difference: Rs. ${(totalAssets - (totalLiabilities + totalEquity)).toFixed(2)}`
   );
 
   // Save PDF
@@ -652,8 +652,8 @@ export function exportTrialBalance(data: any) {
   // Add statistics summary
   pdf.addStatsSummary([
     { label: 'Total Accounts', value: data.accounts?.length || 0 },
-    { label: 'Total Debits', value: `$${totalDebits.toFixed(2)}` },
-    { label: 'Total Credits', value: `$${totalCredits.toFixed(2)}` },
+    { label: 'Total Debits', value: `Rs. ${totalDebits.toFixed(2)}` },
+    { label: 'Total Credits', value: `Rs. ${totalCredits.toFixed(2)}` },
     { label: 'Balance Status', value: totalDebits === totalCredits ? 'Balanced' : 'Unbalanced', color: totalDebits === totalCredits ? '#d1fae5' : '#fee2e2' },
   ]);
 
@@ -664,18 +664,18 @@ export function exportTrialBalance(data: any) {
     const accountsData = data.accounts.map((item: any) => [
       item.code || 'N/A',
       item.name || 'N/A',
-      item.debit ? `$${item.debit.toFixed(2)}` : '-',
-      item.credit ? `$${item.credit.toFixed(2)}` : '-',
+      item.debit ? `Rs. ${item.debit.toFixed(2)}` : '-',
+      item.credit ? `Rs. ${item.credit.toFixed(2)}` : '-',
     ]);
-    accountsData.push(['', 'TOTALS', `$${totalDebits.toFixed(2)}`, `$${totalCredits.toFixed(2)}`]);
+    accountsData.push(['', 'TOTALS', `Rs. ${totalDebits.toFixed(2)}`, `Rs. ${totalCredits.toFixed(2)}`]);
     pdf.addTable(columns, accountsData);
   }
 
   // Balance verification
   pdf.addInfoBox(
     'Trial Balance Verification',
-    `Total Debits: $${totalDebits.toFixed(2)} | Total Credits: $${totalCredits.toFixed(2)} | ` +
-    `Difference: $${(totalDebits - totalCredits).toFixed(2)} | ` +
+    `Total Debits: Rs. ${totalDebits.toFixed(2)} | Total Credits: Rs. ${totalCredits.toFixed(2)} | ` +
+    `Difference: Rs. ${(totalDebits - totalCredits).toFixed(2)} | ` +
     `Status: ${totalDebits === totalCredits ? 'Books are in balance' : 'Books are NOT in balance - investigation required'}`
   );
 
@@ -696,9 +696,9 @@ export function exportGeneralLedger(data: any) {
 
   pdf.addStatsSummary([
     { label: 'Total Transactions', value: totalTransactions },
-    { label: 'Total Debits', value: `$${totalDebits.toFixed(2)}` },
-    { label: 'Total Credits', value: `$${totalCredits.toFixed(2)}` },
-    { label: 'Net Change', value: `$${(totalDebits - totalCredits).toFixed(2)}` },
+    { label: 'Total Debits', value: `Rs. ${totalDebits.toFixed(2)}` },
+    { label: 'Total Credits', value: `Rs. ${totalCredits.toFixed(2)}` },
+    { label: 'Net Change', value: `Rs. ${(totalDebits - totalCredits).toFixed(2)}` },
   ]);
 
   // Transactions section
@@ -709,9 +709,9 @@ export function exportGeneralLedger(data: any) {
       item.date ? new Date(item.date).toLocaleDateString() : 'N/A',
       item.account || 'N/A',
       item.description || '-',
-      item.debit ? `$${item.debit.toFixed(2)}` : '-',
-      item.credit ? `$${item.credit.toFixed(2)}` : '-',
-      `$${(item.balance || 0).toFixed(2)}`,
+      item.debit ? `Rs. ${item.debit.toFixed(2)}` : '-',
+      item.credit ? `Rs. ${item.credit.toFixed(2)}` : '-',
+      `Rs. ${(item.balance || 0).toFixed(2)}`,
     ]);
     pdf.addTable(columns, transactionsData);
   }
@@ -728,7 +728,7 @@ export function exportDashboardReport(metrics: any, options?: { includeCharts?: 
 
   // Add statistics summary
   pdf.addStatsSummary([
-    { label: 'Total Revenue', value: `₹${(metrics.totalRevenue || 0).toFixed(2)}` },
+    { label: 'Total Revenue', value: `Rs. ${(metrics.totalRevenue || 0).toFixed(2)}` },
     { label: 'Total Orders', value: metrics.totalOrders || 0 },
     { label: 'Active Customers', value: metrics.activeCustomers || 0 },
     { label: 'Completion Rate', value: `${(metrics.completionRate || 0).toFixed(1)}%` },
@@ -742,7 +742,7 @@ export function exportDashboardReport(metrics: any, options?: { includeCharts?: 
     ['Pending Orders', metrics.pendingOrders || 0, 'Active'],
     ['Processing Orders', metrics.processingOrders || 0, 'Active'],
     ['Completed Orders', metrics.completedOrders || 0, 'Completed'],
-    ['Average Order Value', `₹${(metrics.averageOrderValue || 0).toFixed(2)}`, 'Metric'],
+    ['Average Order Value', `Rs. ${(metrics.averageOrderValue || 0).toFixed(2)}`, 'Metric'],
     ['Total Customers', metrics.totalCustomers || 0, 'Active'],
     ['New Customers (This Month)', metrics.newCustomers || 0, 'Growth'],
   ];
@@ -756,7 +756,7 @@ export function exportDashboardReport(metrics: any, options?: { includeCharts?: 
     const revenueData = Object.entries(metrics.revenueByStatus).map(([status, revenue]: [string, any]) => [
       status.charAt(0).toUpperCase() + status.slice(1),
       metrics.ordersByStatus?.[status] || 0,
-      `₹${revenue.toFixed(2)}`,
+      `Rs. ${revenue.toFixed(2)}`,
       `${((revenue / (totalRevenue || 1)) * 100).toFixed(1)}%`,
     ]);
     pdf.addTable(revenueColumns, revenueData);
@@ -776,9 +776,9 @@ export function exportDashboardReport(metrics: any, options?: { includeCharts?: 
   if (metrics.totalRevenue && metrics.totalOrders) {
     pdf.addInfoBox(
       'Financial Health',
-      `Average Order Value: ₹${(metrics.averageOrderValue || 0).toFixed(2)} | ` +
-      `Total Revenue: ₹${(metrics.totalRevenue || 0).toFixed(2)} | ` +
-      `Customer Lifetime Value: ₹${metrics.totalCustomers > 0 ? ((metrics.totalRevenue || 0) / metrics.totalCustomers).toFixed(2) : '0.00'}`
+      `Average Order Value: Rs. ${(metrics.averageOrderValue || 0).toFixed(2)} | ` +
+      `Total Revenue: Rs. ${(metrics.totalRevenue || 0).toFixed(2)} | ` +
+      `Customer Lifetime Value: Rs. ${metrics.totalCustomers > 0 ? ((metrics.totalRevenue || 0) / metrics.totalCustomers).toFixed(2) : '0.00'}`
     );
   }
 

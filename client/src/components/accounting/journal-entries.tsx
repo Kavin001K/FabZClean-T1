@@ -287,10 +287,10 @@ export function JournalEntries() {
                         </TableCell>
                         <TableCell>{entry.description}</TableCell>
                         <TableCell className="text-right font-medium">
-                          ₹{formatINR(totalDebit)}
+                          Rs. {formatINR(totalDebit)}
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          ₹{formatINR(totalCredit)}
+                          Rs. {formatINR(totalCredit)}
                         </TableCell>
                         <TableCell>
                           <Badge

@@ -130,7 +130,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
         const summary = `🧺 ${svc.name} • ${qty} pcs\n👕 ${getItemNames(items)}`;
 
         // Build estimate string
-        const estimateStr = `₹${est.min} - ₹${est.max}`;
+        const estimateStr = `Rs. ${est.min} - Rs. ${est.max}`;
 
         // Save to database
         try {

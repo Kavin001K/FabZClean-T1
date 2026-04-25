@@ -489,7 +489,7 @@ export default React.memo(function EditOrderDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="totalAmount" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Amount (₹)</Label>
+                <Label htmlFor="totalAmount" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Amount (Rs. )</Label>
                 <Input
                   id="totalAmount"
                   value={recalculatedTotal.toFixed(2)}
@@ -499,7 +499,7 @@ export default React.memo(function EditOrderDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="advancePaid" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Advance Paid (₹)</Label>
+                <Label htmlFor="advancePaid" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Advance Paid (Rs. )</Label>
                 <Input
                   id="advancePaid"
                   value={(formData as any).advancePaid || 0}

@@ -437,9 +437,9 @@ export default function CustomerPortal() {
                   <CreditCard className="h-5 w-5 text-orange-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold">₹{customerMetrics.totalSpent.toFixed(0)}</div>
+                  <div className="text-3xl font-bold">Rs. {customerMetrics.totalSpent.toFixed(0)}</div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Avg: ₹{customerMetrics.averageOrderValue.toFixed(0)}/order
+                    Avg: Rs. {customerMetrics.averageOrderValue.toFixed(0)}/order
                   </p>
                 </CardContent>
               </Card>
@@ -507,7 +507,7 @@ export default function CustomerPortal() {
                                 <div>
                                   <div className="font-semibold">{order.orderNumber}</div>
                                   <div className="text-sm text-muted-foreground">
-                                    ₹{order.totalAmount} • {order.items.length} items
+                                    Rs. {order.totalAmount} • {order.items.length} items
                                   </div>
                                 </div>
                               </div>

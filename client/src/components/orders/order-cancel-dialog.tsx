@@ -163,7 +163,7 @@ export default function OrderCancelDialog({
             <div className="flex justify-between items-center text-sm mt-2">
               <span className="text-slate-500 font-medium">Amount</span>
               <span className="font-black text-primary">
-                ₹{parseFloat(order.totalAmount || "0").toFixed(2)}
+                Rs. {parseFloat(order.totalAmount || "0").toFixed(2)}
               </span>
             </div>
           </div>

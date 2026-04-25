@@ -284,7 +284,7 @@ export function GeneralLedger() {
                         <TableCell className="text-right">
                           {entry.debit && entry.debit > 0 ? (
                             <span className="font-medium text-green-600">
-                              ₹{formatINR(entry.debit)}
+                              Rs. {formatINR(entry.debit)}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">-</span>
@@ -293,14 +293,14 @@ export function GeneralLedger() {
                         <TableCell className="text-right">
                           {entry.credit && entry.credit > 0 ? (
                             <span className="font-medium text-red-600">
-                              ₹{formatINR(entry.credit)}
+                              Rs. {formatINR(entry.credit)}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          ₹{formatINR(entry.balance)}
+                          Rs. {formatINR(entry.balance)}
                         </TableCell>
                       </TableRow>
                     ))
@@ -318,19 +318,19 @@ export function GeneralLedger() {
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Total Debit</p>
                       <p className="text-lg font-bold text-green-600">
-                        ₹{formatINR(totals.debit)}
+                        Rs. {formatINR(totals.debit)}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Total Credit</p>
                       <p className="text-lg font-bold text-red-600">
-                        ₹{formatINR(totals.credit)}
+                        Rs. {formatINR(totals.credit)}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Difference</p>
                       <p className="text-lg font-bold">
-                        ₹{formatINR(Math.abs(totals.debit - totals.credit))}
+                        Rs. {formatINR(Math.abs(totals.debit - totals.credit))}
                       </p>
                     </div>
                   </div>

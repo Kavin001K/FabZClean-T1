@@ -142,7 +142,7 @@ export const ServiceCombobox = React.forwardRef<HTMLButtonElement, ServiceCombob
                         </span>
                       </div>
                       <span className="text-sm font-bold text-primary">
-                        ₹{parseFloat(service.price).toFixed(2)}
+                        Rs. {parseFloat(service.price).toFixed(2)}
                       </span>
                     </CommandItem>
                   ))}
@@ -173,7 +173,7 @@ export const ServiceCombobox = React.forwardRef<HTMLButtonElement, ServiceCombob
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-primary">
-                          ₹{parseFloat(service.price).toFixed(2)}
+                          Rs. {parseFloat(service.price).toFixed(2)}
                         </span>
                         <Check
                           className={cn(

@@ -106,13 +106,13 @@ const escapeFilename = (value: string): string =>
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const formatCurrency = (value: number): string =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
+const formatCurrency = (value: number): string => {
+  const formatted = new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
+  return `Rs. ${formatted}`;
+};
 
 const formatDisplayDate = (value?: string | Date | null): string => {
   const date = value ? new Date(value) : new Date();
@@ -538,8 +538,15 @@ async function buildInvoiceBuffer(context: EnrichedInvoiceOrder): Promise<Buffer
   doc.text(formatHeroDate(order.createdAt), margin + 10, cursorY + 14);
   doc.text(formatHeroDate(dueDate), margin + cardWidth + columnGap + 10, cursorY + 14);
 
+  const bookingTag = safeText((order as any).bookingId || (order as any).booking_id, '');
+  const bookingSource = safeText((order as any).bookingSource || (order as any).booking_source, '');
+  const bookingChannel = safeText((order as any).bookingChannel || (order as any).booking_channel, '');
+  const bookingMetaLine = bookingTag
+    ? `Booking ID: ${bookingTag}${bookingSource || bookingChannel ? ` • ${[bookingSource, bookingChannel].filter(Boolean).join(' / ')}` : ''}`
+    : '';
+
   cursorY += smallCardHeight + 4;
-  drawCard(margin, cursorY, contentWidth, 18);
+  drawCard(margin, cursorY, contentWidth, bookingMetaLine ? 24 : 18);
   doc.setTextColor(...slate);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
@@ -552,7 +559,14 @@ async function buildInvoiceBuffer(context: EnrichedInvoiceOrder): Promise<Buffer
   doc.setFontSize(9);
   doc.text(`Status: ${safeText(order.status, 'pending')}`, pageWidth - 10, cursorY + 14, { align: 'right' });
 
-  cursorY += 24;
+  if (bookingMetaLine) {
+    doc.setTextColor(...slate);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.text(bookingMetaLine, margin + 10, cursorY + 20);
+  }
+
+  cursorY += bookingMetaLine ? 30 : 24;
   doc.setFillColor(...tableHeader);
   (doc as any).roundedRect(margin, cursorY, contentWidth, 12, 4, 4, 'F');
   doc.setTextColor(255, 255, 255);

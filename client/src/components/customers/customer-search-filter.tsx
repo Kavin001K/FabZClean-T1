@@ -72,7 +72,7 @@ const filterOptions = [
   { value: 'all' as const, label: 'All Customers', description: 'Show all customers' },
   { value: 'new' as const, label: 'New Customers', description: 'Customers joined in last 30 days' },
   { value: 'loyal' as const, label: 'Loyal Customers', description: 'Customers with 5+ orders' },
-  { value: 'high_value' as const, label: 'High Value', description: 'Customers with ₹5000+ total spend' },
+  { value: 'high_value' as const, label: 'High Value', description: 'Customers with Rs. 5000+ total spend' },
   { value: 'has_orders' as const, label: 'Has Orders', description: 'Customers with at least one order' },
 ] as const;
 

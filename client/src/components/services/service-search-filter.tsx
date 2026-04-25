@@ -31,8 +31,8 @@ const filterOptions = [
   { value: 'all' as const, label: 'All Services' },
   { value: 'active' as const, label: 'Active Services' },
   { value: 'inactive' as const, label: 'Inactive Services' },
-  { value: 'high_price' as const, label: 'High Price (>₹500)' },
-  { value: 'low_price' as const, label: 'Low Price (<₹200)' },
+  { value: 'high_price' as const, label: 'High Price (>Rs. 500)' },
+  { value: 'low_price' as const, label: 'Low Price (<Rs. 200)' },
 ];
 
 const categoryOptions = [

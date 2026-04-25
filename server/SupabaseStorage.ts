@@ -1060,7 +1060,8 @@ export class SupabaseStorage {
                 'is_credit_order', 'delivery_earnings_calculated', 'delivery_cash_collected',
                 'bag_count', 'cover_type',
                 // Booking intake tracking fields
-                'booking_source', 'booking_channel', 'booking_slot', 'booking_context'
+                'booking_source', 'booking_channel', 'booking_slot', 'booking_context',
+                'booking_request_id', 'booking_id'
             ];
             const safeData: any = {};
             for (const key of Object.keys(snakeCaseData)) {

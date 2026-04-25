@@ -13,6 +13,41 @@ import {
   standardDeviation,
 } from "@/lib/statistics";
 
+const CustomAxisTick = ({ x, y, payload, vertical, ...props }: any) => {
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={0}
+        y={0}
+        dy={vertical ? 4 : 12}
+        textAnchor={vertical ? "end" : "middle"}
+        fill="currentColor"
+        className="text-[10px] font-bold text-muted-foreground/90"
+        {...props}
+      >
+        {payload.value}
+      </text>
+    </g>
+  );
+};
+
+const CustomYAxisTick = ({ x, y, payload, formatter, ...props }: any) => {
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={-10}
+        y={4}
+        textAnchor="end"
+        fill="currentColor"
+        className="text-[10px] font-bold text-muted-foreground/90"
+        {...props}
+      >
+        {formatter ? formatter(payload.value) : payload.value}
+      </text>
+    </g>
+  );
+};
+
 const SAMPLE_SALES_DATA = [
   { month: "Jan", revenue: 12000, orders: 45 },
   { month: "Feb", revenue: 15000, orders: 52 },
@@ -41,22 +76,27 @@ interface SalesChartProps {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="rounded-lg border bg-background p-3 shadow-md">
-        <p className="font-medium mb-2">{`${label}`}</p>
-        {payload.map((entry: any, index: number) => (
-          <div key={index} className="flex items-center justify-between gap-4">
-            <span className="text-sm" style={{ color: entry.color }}>
-              {entry.name}:
-            </span>
-            <span className="text-sm font-semibold">
-              {entry.name.includes('Forecast') || entry.name.includes('MA') || entry.name.includes('Trend')
-                ? `₹${entry.value?.toLocaleString()}`
-                : entry.name === 'Orders'
-                ? entry.value
-                : `₹${entry.value?.toLocaleString()}`}
-            </span>
-          </div>
-        ))}
+      <div className="rounded-xl border border-border bg-card p-3 shadow-lg backdrop-blur-sm">
+        <p className="font-bold text-xs text-muted-foreground mb-2 uppercase tracking-wider">{label}</p>
+        <div className="space-y-1.5">
+          {payload.map((entry: any, index: number) => (
+            <div key={index} className="flex items-center justify-between gap-6">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                <span className="text-[11px] font-semibold text-foreground">
+                  {entry.name}:
+                </span>
+              </div>
+              <span className="text-[11px] font-bold text-foreground">
+                {entry.name.includes('Forecast') || entry.name.includes('MA') || entry.name.includes('Trend')
+                  ? `Rs. ${entry.value?.toLocaleString()}`
+                  : entry.name === 'Orders'
+                  ? entry.value
+                  : `Rs. ${entry.value?.toLocaleString()}`}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -217,7 +257,7 @@ export default React.memo(function SalesChart({
               </span>
             </div>
             <div className="text-right">
-              <div className="font-medium">₹{statistics.totalRevenue.toLocaleString()}</div>
+              <div className="font-medium">Rs. {statistics.totalRevenue.toLocaleString()}</div>
               <div className="text-xs text-muted-foreground">Total Revenue</div>
             </div>
           </div>
@@ -228,17 +268,17 @@ export default React.memo(function SalesChart({
         <div className="flex items-center gap-4 flex-wrap">
           <Badge variant="outline" className="flex items-center gap-1">
             <Activity className="h-3 w-3" />
-            Avg: ₹{statistics.avgRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            Avg: Rs. {statistics.avgRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
           </Badge>
           <Badge variant="outline">
-            Std Dev: ₹{statistics.stdDev.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            Std Dev: Rs. {statistics.stdDev.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
           </Badge>
           <Badge variant="outline">
             R²: {((statistics.regression?.r2 ?? 0) * 100).toFixed(1)}%
           </Badge>
           {statistics.hasEnoughData && statistics.forecast[0] && (
           <Badge variant="secondary">
-              Next Forecast: ₹{statistics.forecast[0].toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              Next Forecast: Rs. {statistics.forecast[0].toLocaleString('en-IN', { maximumFractionDigits: 0 })}
           </Badge>
           )}
         </div>
@@ -256,24 +296,19 @@ export default React.memo(function SalesChart({
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="hsl(var(--muted))"
-                opacity={0.3}
+                stroke="hsl(var(--border))"
+                opacity={0.4}
               />
               <XAxis
                 dataKey="month"
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
+                tick={<CustomAxisTick />}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
               />
               <YAxis
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
+                tick={<CustomYAxisTick formatter={(value: any) => `Rs. ${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`} />}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                tickFormatter={(value) => `₹${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`}
               />
               <Tooltip content={<CustomTooltip />} />
 

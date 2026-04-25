@@ -232,7 +232,7 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-price">Price (₹) *</Label>
+              <Label htmlFor="edit-price">Price (Rs. ) *</Label>
               <Input
                 id="edit-price"
                 type="number"
@@ -378,7 +378,7 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="create-price">Price (₹) *</Label>
+              <Label htmlFor="create-price">Price (Rs. ) *</Label>
               <Input
                 id="create-price"
                 type="number"
@@ -501,7 +501,7 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="product-price">Price (₹) *</Label>
+              <Label htmlFor="product-price">Price (Rs. ) *</Label>
               <Input
                 id="product-price"
                 type="number"

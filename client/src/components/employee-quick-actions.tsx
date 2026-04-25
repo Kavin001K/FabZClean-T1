@@ -618,35 +618,35 @@ export default function DashboardQuickActions({ employeeId, employeeName }: Empl
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span>Basic Salary</span>
-                <span>₹45,000</span>
+                <span>Rs. 45,000</span>
               </div>
               <div className="flex justify-between">
                 <span>Overtime (8 hours)</span>
-                <span>₹1,800</span>
+                <span>Rs. 1,800</span>
               </div>
               <div className="flex justify-between">
                 <span>Performance Bonus</span>
-                <span>₹2,500</span>
+                <span>Rs. 2,500</span>
               </div>
               <div className="flex justify-between">
                 <span>Transport Allowance</span>
-                <span>₹1,000</span>
+                <span>Rs. 1,000</span>
               </div>
               <div className="border-t pt-2 flex justify-between font-semibold">
                 <span>Gross Salary</span>
-                <span>₹50,300</span>
+                <span>Rs. 50,300</span>
               </div>
               <div className="flex justify-between text-red-600">
                 <span>Tax Deduction</span>
-                <span>-₹5,030</span>
+                <span>-Rs. 5,030</span>
               </div>
               <div className="flex justify-between text-red-600">
                 <span>Provident Fund</span>
-                <span>-₹2,250</span>
+                <span>-Rs. 2,250</span>
               </div>
               <div className="border-t pt-2 flex justify-between font-bold text-lg">
                 <span>Net Salary</span>
-                <span>₹43,020</span>
+                <span>Rs. 43,020</span>
               </div>
             </div>
 

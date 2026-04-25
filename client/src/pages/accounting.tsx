@@ -53,7 +53,7 @@ interface DashboardMetrics {
 
 export default function Accounting() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const formatMoney = (value?: number | null) => `₹${formatINR(value ?? 0)}`;
+  const formatMoney = (value?: number | null) => `Rs. ${formatINR(value ?? 0)}`;
 
   // Fetch dashboard metrics
   const { data: metrics, isLoading } = useQuery<DashboardMetrics>({

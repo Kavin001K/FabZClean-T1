@@ -34,25 +34,24 @@ export function formatNumber(value: number | string | null | undefined): string 
 }
 
 /**
- * Format currency values - returns "₹0" for missing amounts
+ * Format currency values - returns "Rs. 0" for missing amounts
  */
 export function formatCurrency(value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === '') {
-    return '₹0';
+    return 'Rs. 0.00';
   }
   
   const num = typeof value === 'string' ? parseFloat(value) : value;
   
   if (isNaN(num)) {
-    return '₹0';
+    return 'Rs. 0.00';
   }
   
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+  const formatted = new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(num);
+  return `Rs. ${formatted}`;
 }
 
 /**
@@ -166,4 +165,3 @@ export function formatData(
       return formatText(value);
   }
 }
-

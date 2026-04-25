@@ -48,7 +48,8 @@ import {
   Activity,
   Clock,
   Star,
-  Award
+  Award,
+  Loader2
 } from "lucide-react";
 import { formatCurrency, formatNumber, formatPercentage } from "@/lib/data-service";
 import { useToast } from "@/hooks/use-toast";
@@ -57,6 +58,41 @@ import type { Service, Order, Customer } from "@shared/schema";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { exportAnalyticsDashboard } from '@/lib/analytics-pdf-export';
+
+const CustomAxisTick = ({ x, y, payload, vertical, ...props }: any) => {
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={0}
+        y={0}
+        dy={vertical ? 4 : 12}
+        textAnchor={vertical ? "end" : "middle"}
+        fill="currentColor"
+        className="text-[10px] font-bold text-slate-500 dark:text-slate-400"
+        {...props}
+      >
+        {payload.value}
+      </text>
+    </g>
+  );
+};
+
+const CustomYAxisTick = ({ x, y, payload, formatter, ...props }: any) => {
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={-10}
+        y={4}
+        textAnchor="end"
+        fill="currentColor"
+        className="text-[10px] font-bold text-slate-500 dark:text-slate-400"
+        {...props}
+      >
+        {formatter ? formatter(payload.value) : payload.value}
+      </text>
+    </g>
+  );
+};
 import {
   mean,
   calculateGrowthRate,
@@ -570,7 +606,7 @@ export default function Analytics() {
                 <div className="rounded-lg border border-dashed border-border p-3 bg-background">
                   <p className="text-sm">Pending orders: {bookingSuggestions?.analytics.pendingOrders ?? '—'}</p>
                   <p className="text-sm">Overdue orders: {bookingSuggestions?.analytics.overdueOrders ?? '—'}</p>
-                  <p className="text-sm">30d revenue: ₹{bookingSuggestions?.analytics.revenueLast30Days?.toLocaleString() ?? '—'}</p>
+                  <p className="text-sm">30d revenue: Rs. {bookingSuggestions?.analytics.revenueLast30Days?.toLocaleString() ?? '—'}</p>
                 </div>
               </div>
             </div>
@@ -844,7 +880,7 @@ export default function Analytics() {
       )}
 
       <Tabs defaultValue="revenue" className="space-y-4">
-        <TabsList>
+        <TabsList className="w-full overflow-x-auto justify-start no-scrollbar">
           <TabsTrigger value="revenue">Revenue Analysis</TabsTrigger>
           <TabsTrigger value="services">Service Performance</TabsTrigger>
           <TabsTrigger value="customers">Customer Analytics</TabsTrigger>
@@ -859,15 +895,37 @@ export default function Analytics() {
                 <CardTitle>Revenue Trend</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <div className="rounded-2xl bg-muted/60 p-4">
+                  <ResponsiveContainer width="100%" height={300}>
                   <AreaChart data={analyticsData.revenueByMonth}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Revenue']} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.8} vertical={false} />
+                    <XAxis 
+                      dataKey="month" 
+                      tick={<CustomAxisTick />}
+                      tickLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
+                    />
+                    <YAxis 
+                      tick={<CustomYAxisTick formatter={(value: any) => `Rs. ${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`} />}
+                      tickLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
+                    />
+                    <Tooltip
+                      contentStyle={{ 
+                        background: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))', 
+                        borderRadius: 12,
+                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                        padding: '8px 12px'
+                      }}
+                      itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600, fontSize: 12 }}
+                      labelStyle={{ color: 'hsl(var(--muted-foreground))', fontWeight: 500, fontSize: 11, marginBottom: 4 }}
+                      formatter={(value) => [formatCurrency(Number(value)), 'Revenue']} 
+                    />
                     <Area type="monotone" dataKey="revenue" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
                   </AreaChart>
                 </ResponsiveContainer>
+              </div>
               </CardContent>
             </Card>
 
@@ -876,15 +934,37 @@ export default function Analytics() {
                 <CardTitle>Daily Revenue</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <div className="rounded-2xl bg-muted/60 p-4">
+                  <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={analyticsData.revenueTrend}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Revenue']} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.8} vertical={false} />
+                    <XAxis 
+                      dataKey="date" 
+                      tick={<CustomAxisTick />}
+                      tickLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
+                    />
+                    <YAxis 
+                      tick={<CustomYAxisTick formatter={(value: any) => `Rs. ${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`} />}
+                      tickLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
+                    />
+                    <Tooltip
+                      contentStyle={{ 
+                        background: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))', 
+                        borderRadius: 12,
+                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                        padding: '8px 12px'
+                      }}
+                      itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600, fontSize: 12 }}
+                      labelStyle={{ color: 'hsl(var(--muted-foreground))', fontWeight: 500, fontSize: 11, marginBottom: 4 }}
+                      formatter={(value) => [formatCurrency(Number(value)), 'Revenue']} 
+                    />
                     <Line type="monotone" dataKey="revenue" stroke="#82ca9d" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
+              </div>
               </CardContent>
             </Card>
           </div>
@@ -897,9 +977,25 @@ export default function Analytics() {
               <ResponsiveContainer width="100%" height={300}>
                 <ComposedChart data={analyticsData.revenueByMonth}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
+                  <XAxis 
+                    dataKey="month" 
+                    tick={<CustomAxisTick />}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    yAxisId="left" 
+                    tick={<CustomYAxisTick formatter={(value: any) => `Rs. ${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`} />}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    yAxisId="right" 
+                    orientation="right" 
+                    tick={<CustomAxisTick />}
+                    tickLine={false}
+                    axisLine={false}
+                  />
                   <Tooltip />
                   <Legend />
                   <Bar yAxisId="left" dataKey="revenue" fill="#8884d8" name="Revenue" />
@@ -918,18 +1014,40 @@ export default function Analytics() {
                 <CardTitle>Service Performance</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <div className="rounded-2xl bg-muted/60 p-4">
+                  <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={analyticsData.servicePerformance}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip formatter={(value, name) => [
-                      name === 'revenue' ? formatCurrency(Number(value)) : value,
-                      name === 'revenue' ? 'Revenue' : 'Orders'
-                    ]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.8} vertical={false} />
+                    <XAxis 
+                      dataKey="name" 
+                      tick={<CustomAxisTick />}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      tick={<CustomYAxisTick />}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{ 
+                        background: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))', 
+                        borderRadius: 12,
+                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                        padding: '8px 12px'
+                      }}
+                      itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600, fontSize: 12 }}
+                      labelStyle={{ color: 'hsl(var(--muted-foreground))', fontWeight: 500, fontSize: 11, marginBottom: 4 }}
+                      formatter={(value, name) => [
+                        name === 'revenue' ? formatCurrency(Number(value)) : value,
+                        name === 'revenue' ? 'Revenue' : 'Orders'
+                      ]} 
+                    />
                     <Bar dataKey="revenue" fill="#8884d8" name="Revenue" />
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
               </CardContent>
             </Card>
 
@@ -938,7 +1056,8 @@ export default function Analytics() {
                 <CardTitle>Service Distribution</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <div className="rounded-2xl bg-muted/60 p-4">
+                  <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
                       data={analyticsData.servicePerformance}
@@ -957,6 +1076,7 @@ export default function Analytics() {
                     <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
+              </div>
               </CardContent>
             </Card>
           </div>
@@ -969,8 +1089,20 @@ export default function Analytics() {
               <ResponsiveContainer width="100%" height={300}>
                 <ScatterChart data={analyticsData.serviceEfficiency}>
                   <CartesianGrid />
-                  <XAxis dataKey="orders" name="Orders" />
-                  <YAxis dataKey="efficiency" name="Avg Order Value" />
+                  <XAxis 
+                    dataKey="orders" 
+                    name="Orders" 
+                    tick={<CustomAxisTick />}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    dataKey="efficiency" 
+                    name="Avg Order Value" 
+                    tick={<CustomYAxisTick />}
+                    tickLine={false}
+                    axisLine={false}
+                  />
                   <Tooltip cursor={{ strokeDasharray: '3 3' }} />
                   <Scatter dataKey="efficiency" fill="#8884d8" />
                 </ScatterChart>
@@ -987,7 +1119,8 @@ export default function Analytics() {
                 <CardTitle>Customer Segments</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <div className="rounded-2xl bg-muted/60 p-4">
+                  <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
                       data={analyticsData.customerSegments}
@@ -1006,6 +1139,7 @@ export default function Analytics() {
                     <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
+              </div>
               </CardContent>
             </Card>
 
@@ -1014,15 +1148,26 @@ export default function Analytics() {
                 <CardTitle>Customer Growth</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <div className="rounded-2xl bg-muted/60 p-4">
+                  <ResponsiveContainer width="100%" height={300}>
                   <AreaChart data={analyticsData.customerGrowth}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
+                    <XAxis 
+                      dataKey="month" 
+                      tick={<CustomAxisTick />}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      tick={<CustomYAxisTick />}
+                      tickLine={false}
+                      axisLine={false}
+                    />
                     <Tooltip />
                     <Area type="monotone" dataKey="newCustomers" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.6} />
                   </AreaChart>
                 </ResponsiveContainer>
+              </div>
               </CardContent>
             </Card>
           </div>
@@ -1064,15 +1209,26 @@ export default function Analytics() {
                 <CardTitle>Order Status Distribution</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <div className="rounded-2xl bg-muted/60 p-4">
+                  <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={analyticsData.orderStatusDistribution}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="status" />
-                    <YAxis />
+                    <XAxis 
+                      dataKey="status" 
+                      tick={<CustomAxisTick />}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      tick={<CustomYAxisTick />}
+                      tickLine={false}
+                      axisLine={false}
+                    />
                     <Tooltip />
                     <Bar dataKey="count" fill="#8884d8" />
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
               </CardContent>
             </Card>
 
@@ -1081,15 +1237,26 @@ export default function Analytics() {
                 <CardTitle>Hourly Order Distribution</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <div className="rounded-2xl bg-muted/60 p-4">
+                  <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={analyticsData.timeAnalysis}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="hour" />
-                    <YAxis />
+                    <XAxis 
+                      dataKey="hour" 
+                      tick={<CustomAxisTick />}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      tick={<CustomYAxisTick />}
+                      tickLine={false}
+                      axisLine={false}
+                    />
                     <Tooltip />
                     <Bar dataKey="orders" fill="#82ca9d" />
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
               </CardContent>
             </Card>
           </div>
@@ -1102,8 +1269,17 @@ export default function Analytics() {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={analyticsData.inventoryAnalysis}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
+                  <XAxis 
+                    dataKey="name" 
+                    tick={<CustomAxisTick />}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    tick={<CustomYAxisTick />}
+                    tickLine={false}
+                    axisLine={false}
+                  />
                   <Tooltip formatter={(value) => [value, 'Stock']} />
                   <Bar dataKey="stock" fill="#ffc658" />
                 </BarChart>

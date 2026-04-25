@@ -62,12 +62,13 @@ const BRAND = {
   paper: [248, 250, 252] as [number, number, number],
 };
 
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
+const formatCurrency = (amount: number) => {
+  const value = new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(Number(amount || 0));
+  return `Rs. ${value}`;
+};
 
 const formatNumber = (value: number) => new Intl.NumberFormat('en-IN').format(Number(value || 0));
 
@@ -173,7 +174,7 @@ function addInsightList(doc: jsPDFWithAutoTable, insights: OverviewReport['insig
     doc.setTextColor(...BRAND.slate);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
-    doc.text(signal.summary, 20, y + 12, { maxWidth: doc.internal.pageSize.width - 44 });
+    doc.text(signal.summary.replace(/Rs. /g, 'Rs. '), 20, y + 12, { maxWidth: doc.internal.pageSize.width - 44 });
     y += 22;
   });
   return y;

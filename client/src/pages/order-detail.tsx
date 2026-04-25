@@ -97,6 +97,7 @@ export default function OrderDetailPage() {
         `${window.location.origin}/bill/${encodeURIComponent(orderNumber)}${(mutationOrder as any).isEdited ? '?preset=edited' : ''}`,
         (mutationOrder as any).invoiceUrl || undefined,
         itemSummary,
+        undefined, // secondaryPhone
         sendCount
       );
 

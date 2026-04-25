@@ -515,7 +515,7 @@ export const DriverManagement: React.FC<DriverManagementProps> = ({
                 </div>
                 <div className="flex items-center gap-1">
                   <Fuel className="h-3 w-3" />
-                  <span>₹{driver.totalEarnings.toLocaleString()}</span>
+                  <span>Rs. {driver.totalEarnings.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <MapPin className="h-3 w-3" />

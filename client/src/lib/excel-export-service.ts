@@ -80,7 +80,7 @@ function setCellFormat(ws: XLSX.WorkSheet, cellRef: string, format: string) {
 
   switch (format) {
     case 'currency':
-      ws[cellRef].z = '₹#,##0.00';
+      ws[cellRef].z = 'Rs. #,##0.00';
       break;
     case 'date':
       ws[cellRef].z = 'dd/mm/yyyy';

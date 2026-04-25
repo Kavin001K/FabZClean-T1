@@ -262,7 +262,7 @@ export function ExpenseTracker() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹{summary?.totalExpenses ? formatINR(summary.totalExpenses) : '0.00'}
+              Rs. {summary?.totalExpenses ? formatINR(summary.totalExpenses) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -273,7 +273,7 @@ export function ExpenseTracker() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              ₹{summary?.thisMonth ? formatINR(summary.thisMonth) : '0.00'}
+              Rs. {summary?.thisMonth ? formatINR(summary.thisMonth) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -284,7 +284,7 @@ export function ExpenseTracker() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-600">
-              ₹{summary?.lastMonth ? formatINR(summary.lastMonth) : '0.00'}
+              Rs. {summary?.lastMonth ? formatINR(summary.lastMonth) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -295,7 +295,7 @@ export function ExpenseTracker() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              ₹{summary?.pendingApproval ? formatINR(summary.pendingApproval) : '0.00'}
+              Rs. {summary?.pendingApproval ? formatINR(summary.pendingApproval) : '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -324,7 +324,7 @@ export function ExpenseTracker() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => `₹${formatINR(value)}`} />
+                <Tooltip formatter={(value: number) => `Rs. ${formatINR(value)}`} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -341,7 +341,7 @@ export function ExpenseTracker() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="category" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => `₹${formatINR(value)}`} />
+                <Tooltip formatter={(value: number) => `Rs. ${formatINR(value)}`} />
                 <Bar dataKey="amount" fill="#3b82f6" />
               </BarChart>
             </ResponsiveContainer>
@@ -476,7 +476,7 @@ export function ExpenseTracker() {
                         <TableCell>{expense.vendor}</TableCell>
                         <TableCell className="max-w-xs truncate">{expense.description}</TableCell>
                         <TableCell className="text-right font-medium">
-                          ₹{formatINR(expense.amount)}
+                          Rs. {formatINR(expense.amount)}
                         </TableCell>
                         <TableCell>{expense.paymentMethod}</TableCell>
                         <TableCell>{getStatusBadge(expense.status)}</TableCell>

@@ -216,7 +216,7 @@ export async function exportAnalyticsDashboard(data: AnalyticsData) {
   const metrics = [
     {
       label: 'Total Revenue',
-      value: `₹${data.totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`,
+      value: `Rs. ${data.totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`,
       growth: data.revenueGrowth,
       color: BRAND_COLORS.primary,
     },
@@ -228,7 +228,7 @@ export async function exportAnalyticsDashboard(data: AnalyticsData) {
     },
     {
       label: 'Avg Order Value',
-      value: `₹${data.avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`,
+      value: `Rs. ${data.avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`,
       color: '#3b82f6',
     },
     {
@@ -269,7 +269,7 @@ export async function exportAnalyticsDashboard(data: AnalyticsData) {
     const serviceData = safeTopServices.slice(0, 5).map((service) => [
       service?.name || 'Unknown',
       (service?.count || 0).toString(),
-      `₹${(service?.revenue || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`,
+      `Rs. ${(service?.revenue || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`,
       totalServiceRevenue > 0 ? `${(((service?.revenue || 0) / totalServiceRevenue) * 100).toFixed(1)}%` : '0%',
     ]);
 
@@ -323,7 +323,7 @@ export async function exportAnalyticsDashboard(data: AnalyticsData) {
       }
       return [
         item?.month || 'N/A',
-        `₹${(item?.revenue || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`,
+        `Rs. ${(item?.revenue || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`,
         growth,
       ];
     });
@@ -433,7 +433,7 @@ export async function exportAnalyticsDashboard(data: AnalyticsData) {
   pdf.setFontSize(PDF_CONFIG.fontSize.body);
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(BRAND_COLORS.text);
-  const summaryText = `This comprehensive analytics report shows strong business performance with ₹${data.totalRevenue.toLocaleString('en-IN')} in total revenue across ${data.totalOrders} orders. The average order value stands at ₹${data.avgOrderValue.toFixed(2)}, serving ${data.customerCount} active customers.`;
+  const summaryText = `This comprehensive analytics report shows strong business performance with Rs. ${data.totalRevenue.toLocaleString('en-IN')} in total revenue across ${data.totalOrders} orders. The average order value stands at Rs. ${data.avgOrderValue.toFixed(2)}, serving ${data.customerCount} active customers.`;
   const summaryLines = pdf.splitTextToSize(summaryText, pageWidth - 2 * PDF_CONFIG.margin - 10);
   pdf.text(summaryLines, PDF_CONFIG.margin + 5, currentY + 14);
 
@@ -505,7 +505,7 @@ export async function exportAnalyticsDashboardWithCharts(
   const metrics = [
     {
       label: 'Total Revenue',
-      value: `₹${data.totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`,
+      value: `Rs. ${data.totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`,
       growth: data.revenueGrowth,
       color: BRAND_COLORS.primary,
     },
@@ -517,7 +517,7 @@ export async function exportAnalyticsDashboardWithCharts(
     },
     {
       label: 'Avg Order Value',
-      value: `₹${data.avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`,
+      value: `Rs. ${data.avgOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`,
       color: '#3b82f6',
     },
     {

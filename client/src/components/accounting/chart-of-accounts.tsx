@@ -264,7 +264,7 @@ export function ChartOfAccounts() {
           <TableCell className="text-muted-foreground">{account.accountSubType || '-'}</TableCell>
           <TableCell className="text-right font-semibold">
             <span className={balance !== 0 ? accountTypeColors[account.accountType] : ''}>
-              ₹{formatINR(balance)}
+              Rs. {formatINR(balance)}
             </span>
           </TableCell>
           <TableCell>
@@ -337,7 +337,7 @@ export function ChartOfAccounts() {
           <Card className="border-l-4 border-l-green-500">
             <CardHeader className="pb-3">
               <CardDescription>Total Assets</CardDescription>
-              <CardTitle className="text-3xl text-green-600">₹{formatINR(accountStats.totalAssets)}</CardTitle>
+              <CardTitle className="text-3xl text-green-600">Rs. {formatINR(accountStats.totalAssets)}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">Asset accounts</p>
@@ -348,7 +348,7 @@ export function ChartOfAccounts() {
           <Card className="border-l-4 border-l-red-500">
             <CardHeader className="pb-3">
               <CardDescription>Total Liabilities</CardDescription>
-              <CardTitle className="text-3xl text-red-600">₹{formatINR(accountStats.totalLiabilities)}</CardTitle>
+              <CardTitle className="text-3xl text-red-600">Rs. {formatINR(accountStats.totalLiabilities)}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">Liability accounts</p>
@@ -359,7 +359,7 @@ export function ChartOfAccounts() {
           <Card className="border-l-4 border-l-blue-500">
             <CardHeader className="pb-3">
               <CardDescription>Total Equity</CardDescription>
-              <CardTitle className="text-3xl text-blue-600">₹{formatINR(accountStats.totalEquity)}</CardTitle>
+              <CardTitle className="text-3xl text-blue-600">Rs. {formatINR(accountStats.totalEquity)}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">Equity accounts</p>

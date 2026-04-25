@@ -162,7 +162,7 @@ export function printOrderList(orders: any[]): void {
     'Service': order.service || order.serviceName || 'N/A',
     'Status': order.status || 'pending',
     'Payment': order.paymentStatus || 'pending',
-    'Amount': `₹${parseFloat(order.totalAmount || 0).toFixed(2)}`,
+    'Amount': `Rs. ${parseFloat(order.totalAmount || 0).toFixed(2)}`,
     'Date': new Date(order.createdAt || Date.now()).toLocaleDateString(),
   }));
 
@@ -177,7 +177,7 @@ export function printOrderList(orders: any[]): void {
     data: formattedData,
     stats: [
       { label: 'Total Orders', value: orders.length },
-      { label: 'Total Revenue', value: `₹${totalRevenue.toFixed(2)}` },
+      { label: 'Total Revenue', value: `Rs. ${totalRevenue.toFixed(2)}` },
       { label: 'Completed', value: completedOrders },
       { label: 'Pending', value: pendingOrders },
     ],
@@ -191,8 +191,8 @@ export function printOrderDetails(order: any): void {
     '#': index + 1,
     'Item': item.name || item.description || 'Service Item',
     'Quantity': item.quantity || 1,
-    'Unit Price': `₹${parseFloat(item.unitPrice || item.price || 0).toFixed(2)}`,
-    'Total': `₹${parseFloat(item.total || (item.quantity * item.unitPrice) || 0).toFixed(2)}`,
+    'Unit Price': `Rs. ${parseFloat(item.unitPrice || item.price || 0).toFixed(2)}`,
+    'Total': `Rs. ${parseFloat(item.total || (item.quantity * item.unitPrice) || 0).toFixed(2)}`,
   }));
 
   const subtotal = items.reduce((sum: number, item: any) => {
@@ -207,7 +207,7 @@ export function printOrderDetails(order: any): void {
       { label: 'Order Number', value: order.orderNumber || order.id },
       { label: 'Order Date', value: new Date(order.createdAt).toLocaleDateString() },
       { label: 'Total Items', value: items.length },
-      { label: 'Total Amount', value: `₹${parseFloat(order.totalAmount || subtotal).toFixed(2)}` },
+      { label: 'Total Amount', value: `Rs. ${parseFloat(order.totalAmount || subtotal).toFixed(2)}` },
     ],
     footer: `Payment Method: ${order.paymentMethod || 'N/A'} | Payment Status: ${order.paymentStatus || 'N/A'}`,
   });
@@ -223,7 +223,7 @@ export function printCustomerList(customers: any[]): void {
     'Email': customer.email || 'N/A',
     'Phone': customer.phone || 'N/A',
     'Orders': customer.totalOrders || customer.orderCount || 0,
-    'Total Spent': `₹${parseFloat(customer.totalSpent || customer.lifetimeValue || 0).toFixed(2)}`,
+    'Total Spent': `Rs. ${parseFloat(customer.totalSpent || customer.lifetimeValue || 0).toFixed(2)}`,
     'Last Order': customer.lastOrder ? new Date(customer.lastOrder).toLocaleDateString() : 'Never',
     'Status': customer.status || 'active',
   }));
@@ -240,8 +240,8 @@ export function printCustomerList(customers: any[]): void {
     stats: [
       { label: 'Total Customers', value: customers.length },
       { label: 'Active Customers', value: activeCustomers },
-      { label: 'Total Revenue', value: `₹${totalRevenue.toFixed(2)}` },
-      { label: 'Avg Order Value', value: `₹${avgOrderValue.toFixed(2)}` },
+      { label: 'Total Revenue', value: `Rs. ${totalRevenue.toFixed(2)}` },
+      { label: 'Avg Order Value', value: `Rs. ${avgOrderValue.toFixed(2)}` },
     ],
     footer: 'Customer data is confidential and for internal use only',
   });
@@ -253,7 +253,7 @@ export function printCustomerDetails(customer: any): void {
     'Order #': order.orderNumber || order.id,
     'Date': new Date(order.createdAt).toLocaleDateString(),
     'Service': order.service || order.serviceName || 'N/A',
-    'Amount': `₹${parseFloat(order.totalAmount || 0).toFixed(2)}`,
+    'Amount': `Rs. ${parseFloat(order.totalAmount || 0).toFixed(2)}`,
     'Status': order.status || 'N/A',
   }));
 
@@ -263,8 +263,8 @@ export function printCustomerDetails(customer: any): void {
     data: formattedOrders,
     stats: [
       { label: 'Total Orders', value: orders.length },
-      { label: 'Total Spent', value: `₹${parseFloat(customer.totalSpent || 0).toFixed(2)}` },
-      { label: 'Average Order', value: `₹${(parseFloat(customer.totalSpent || 0) / orders.length || 0).toFixed(2)}` },
+      { label: 'Total Spent', value: `Rs. ${parseFloat(customer.totalSpent || 0).toFixed(2)}` },
+      { label: 'Average Order', value: `Rs. ${(parseFloat(customer.totalSpent || 0) / orders.length || 0).toFixed(2)}` },
       { label: 'Member Since', value: new Date(customer.createdAt).toLocaleDateString() },
     ],
     footer: `Customer ID: ${customer.id} | Status: ${customer.status || 'active'}`,
@@ -279,7 +279,7 @@ export function printServiceCatalog(services: any[]): void {
   const formattedData = services.map(service => ({
     'Service Name': service.name || 'N/A',
     'Category': service.category || 'General',
-    'Price': `₹${parseFloat(service.price || 0).toFixed(2)}`,
+    'Price': `Rs. ${parseFloat(service.price || 0).toFixed(2)}`,
     'Duration': service.duration || service.estimatedDuration || 'N/A',
     'Status': service.status || service.isActive ? 'Active' : 'Inactive',
     'Description': service.description?.substring(0, 50) || 'N/A',
@@ -298,7 +298,7 @@ export function printServiceCatalog(services: any[]): void {
       { label: 'Total Services', value: totalServices },
       { label: 'Active Services', value: activeServices },
       { label: 'Categories', value: categories },
-      { label: 'Average Price', value: `₹${avgPrice.toFixed(2)}` },
+      { label: 'Average Price', value: `Rs. ${avgPrice.toFixed(2)}` },
     ],
     footer: 'Prices are subject to change. Please verify current pricing before quoting.',
   });
@@ -308,7 +308,7 @@ export function printServicePerformance(services: any[]): void {
   const formattedData = services.map(service => ({
     'Service': service.name || 'N/A',
     'Total Orders': service.orderCount || service.totalOrders || 0,
-    'Revenue': `₹${parseFloat(service.revenue || service.totalRevenue || 0).toFixed(2)}`,
+    'Revenue': `Rs. ${parseFloat(service.revenue || service.totalRevenue || 0).toFixed(2)}`,
     'Avg Rating': service.avgRating || service.rating || 'N/A',
     'Completion Rate': service.completionRate ? `${service.completionRate}%` : 'N/A',
   }));
@@ -324,7 +324,7 @@ export function printServicePerformance(services: any[]): void {
     stats: [
       { label: 'Total Services', value: services.length },
       { label: 'Total Orders', value: totalOrders },
-      { label: 'Total Revenue', value: `₹${totalRevenue.toFixed(2)}` },
+      { label: 'Total Revenue', value: `Rs. ${totalRevenue.toFixed(2)}` },
       { label: 'Avg Rating', value: avgRating.toFixed(1) },
     ],
   });
@@ -341,8 +341,8 @@ export function printInventoryReport(inventory: any[]): void {
     'Category': item.category || 'N/A',
     'Stock': item.stockQuantity || item.quantity || 0,
     'Min Stock': item.minStockLevel || item.reorderPoint || 'N/A',
-    'Unit Price': `₹${parseFloat(item.price || item.unitPrice || 0).toFixed(2)}`,
-    'Total Value': `₹${(Number(item.stockQuantity || 0) * Number(item.price || item.unitPrice || 0)).toFixed(2)}`,
+    'Unit Price': `Rs. ${parseFloat(item.price || item.unitPrice || 0).toFixed(2)}`,
+    'Total Value': `Rs. ${(Number(item.stockQuantity || 0) * Number(item.price || item.unitPrice || 0)).toFixed(2)}`,
     'Status': (item.stockQuantity || 0) <= (item.minStockLevel || 0) ? 'Low Stock' : 'OK',
   }));
 
@@ -361,7 +361,7 @@ export function printInventoryReport(inventory: any[]): void {
     data: formattedData,
     stats: [
       { label: 'Total Items', value: totalItems },
-      { label: 'Total Value', value: `₹${totalValue.toFixed(2)}` },
+      { label: 'Total Value', value: `Rs. ${totalValue.toFixed(2)}` },
       { label: 'Low Stock Items', value: lowStockItems },
       { label: 'Out of Stock', value: outOfStock },
     ],
@@ -408,9 +408,9 @@ export function printFinancialStatement(data: any): void {
     'Description': txn.description || txn.notes || 'N/A',
     'Type': txn.type || txn.transactionType || 'N/A',
     'Category': txn.category || 'N/A',
-    'Debit': txn.type === 'debit' ? `₹${parseFloat(txn.amount || 0).toFixed(2)}` : '-',
-    'Credit': txn.type === 'credit' ? `₹${parseFloat(txn.amount || 0).toFixed(2)}` : '-',
-    'Balance': `₹${parseFloat(txn.balance || 0).toFixed(2)}`,
+    'Debit': txn.type === 'debit' ? `Rs. ${parseFloat(txn.amount || 0).toFixed(2)}` : '-',
+    'Credit': txn.type === 'credit' ? `Rs. ${parseFloat(txn.amount || 0).toFixed(2)}` : '-',
+    'Balance': `Rs. ${parseFloat(txn.balance || 0).toFixed(2)}`,
   }));
 
   const totalCredit = transactions
@@ -428,9 +428,9 @@ export function printFinancialStatement(data: any): void {
     subtitle: `Period: ${data.startDate || 'N/A'} to ${data.endDate || 'N/A'}`,
     data: formattedData,
     stats: [
-      { label: 'Total Credit', value: `₹${totalCredit.toFixed(2)}` },
-      { label: 'Total Debit', value: `₹${totalDebit.toFixed(2)}` },
-      { label: 'Net Balance', value: `₹${netBalance.toFixed(2)}` },
+      { label: 'Total Credit', value: `Rs. ${totalCredit.toFixed(2)}` },
+      { label: 'Total Debit', value: `Rs. ${totalDebit.toFixed(2)}` },
+      { label: 'Net Balance', value: `Rs. ${netBalance.toFixed(2)}` },
       { label: 'Transactions', value: transactions.length },
     ],
     footer: 'This financial statement is for internal use only and should be kept confidential',
@@ -439,17 +439,17 @@ export function printFinancialStatement(data: any): void {
 
 export function printProfitLossStatement(data: any): void {
   const income = [
-    { 'Category': 'Service Revenue', 'Amount': `₹${parseFloat(data.serviceRevenue || 0).toFixed(2)}` },
-    { 'Category': 'Product Sales', 'Amount': `₹${parseFloat(data.productSales || 0).toFixed(2)}` },
-    { 'Category': 'Other Income', 'Amount': `₹${parseFloat(data.otherIncome || 0).toFixed(2)}` },
+    { 'Category': 'Service Revenue', 'Amount': `Rs. ${parseFloat(data.serviceRevenue || 0).toFixed(2)}` },
+    { 'Category': 'Product Sales', 'Amount': `Rs. ${parseFloat(data.productSales || 0).toFixed(2)}` },
+    { 'Category': 'Other Income', 'Amount': `Rs. ${parseFloat(data.otherIncome || 0).toFixed(2)}` },
   ];
 
   const expenses = [
-    { 'Category': 'Operating Expenses', 'Amount': `₹${parseFloat(data.operatingExpenses || 0).toFixed(2)}` },
-    { 'Category': 'Salaries & Wages', 'Amount': `₹${parseFloat(data.salaries || 0).toFixed(2)}` },
-    { 'Category': 'Rent & Utilities', 'Amount': `₹${parseFloat(data.rentUtilities || 0).toFixed(2)}` },
-    { 'Category': 'Marketing', 'Amount': `₹${parseFloat(data.marketing || 0).toFixed(2)}` },
-    { 'Category': 'Other Expenses', 'Amount': `₹${parseFloat(data.otherExpenses || 0).toFixed(2)}` },
+    { 'Category': 'Operating Expenses', 'Amount': `Rs. ${parseFloat(data.operatingExpenses || 0).toFixed(2)}` },
+    { 'Category': 'Salaries & Wages', 'Amount': `Rs. ${parseFloat(data.salaries || 0).toFixed(2)}` },
+    { 'Category': 'Rent & Utilities', 'Amount': `Rs. ${parseFloat(data.rentUtilities || 0).toFixed(2)}` },
+    { 'Category': 'Marketing', 'Amount': `Rs. ${parseFloat(data.marketing || 0).toFixed(2)}` },
+    { 'Category': 'Other Expenses', 'Amount': `Rs. ${parseFloat(data.otherExpenses || 0).toFixed(2)}` },
   ];
 
   const totalIncome = (data.serviceRevenue || 0) + (data.productSales || 0) + (data.otherIncome || 0);
@@ -468,9 +468,9 @@ export function printProfitLossStatement(data: any): void {
     subtitle: `Period: ${data.startDate || 'N/A'} to ${data.endDate || 'N/A'}`,
     data: combinedData,
     stats: [
-      { label: 'Total Income', value: `₹${totalIncome.toFixed(2)}` },
-      { label: 'Total Expenses', value: `₹${totalExpenses.toFixed(2)}` },
-      { label: 'Net Profit', value: `₹${netProfit.toFixed(2)}` },
+      { label: 'Total Income', value: `Rs. ${totalIncome.toFixed(2)}` },
+      { label: 'Total Expenses', value: `Rs. ${totalExpenses.toFixed(2)}` },
+      { label: 'Net Profit', value: `Rs. ${netProfit.toFixed(2)}` },
       { label: 'Profit Margin', value: `${profitMargin}%` },
     ],
   });
@@ -478,16 +478,16 @@ export function printProfitLossStatement(data: any): void {
 
 export function printBalanceSheet(data: any): void {
   const assets = [
-    { 'Category': 'Cash & Bank', 'Amount': `₹${parseFloat(data.cash || 0).toFixed(2)}` },
-    { 'Category': 'Accounts Receivable', 'Amount': `₹${parseFloat(data.accountsReceivable || 0).toFixed(2)}` },
-    { 'Category': 'Inventory', 'Amount': `₹${parseFloat(data.inventory || 0).toFixed(2)}` },
-    { 'Category': 'Fixed Assets', 'Amount': `₹${parseFloat(data.fixedAssets || 0).toFixed(2)}` },
+    { 'Category': 'Cash & Bank', 'Amount': `Rs. ${parseFloat(data.cash || 0).toFixed(2)}` },
+    { 'Category': 'Accounts Receivable', 'Amount': `Rs. ${parseFloat(data.accountsReceivable || 0).toFixed(2)}` },
+    { 'Category': 'Inventory', 'Amount': `Rs. ${parseFloat(data.inventory || 0).toFixed(2)}` },
+    { 'Category': 'Fixed Assets', 'Amount': `Rs. ${parseFloat(data.fixedAssets || 0).toFixed(2)}` },
   ];
 
   const liabilities = [
-    { 'Category': 'Accounts Payable', 'Amount': `₹${parseFloat(data.accountsPayable || 0).toFixed(2)}` },
-    { 'Category': 'Loans', 'Amount': `₹${parseFloat(data.loans || 0).toFixed(2)}` },
-    { 'Category': 'Other Liabilities', 'Amount': `₹${parseFloat(data.otherLiabilities || 0).toFixed(2)}` },
+    { 'Category': 'Accounts Payable', 'Amount': `Rs. ${parseFloat(data.accountsPayable || 0).toFixed(2)}` },
+    { 'Category': 'Loans', 'Amount': `Rs. ${parseFloat(data.loans || 0).toFixed(2)}` },
+    { 'Category': 'Other Liabilities', 'Amount': `Rs. ${parseFloat(data.otherLiabilities || 0).toFixed(2)}` },
   ];
 
   const totalAssets = (data.cash || 0) + (data.accountsReceivable || 0) +
@@ -505,9 +505,9 @@ export function printBalanceSheet(data: any): void {
     subtitle: `As of ${data.asOfDate || new Date().toLocaleDateString()}`,
     data: combinedData,
     stats: [
-      { label: 'Total Assets', value: `₹${totalAssets.toFixed(2)}` },
-      { label: 'Total Liabilities', value: `₹${totalLiabilities.toFixed(2)}` },
-      { label: 'Equity', value: `₹${equity.toFixed(2)}` },
+      { label: 'Total Assets', value: `Rs. ${totalAssets.toFixed(2)}` },
+      { label: 'Total Liabilities', value: `Rs. ${totalLiabilities.toFixed(2)}` },
+      { label: 'Equity', value: `Rs. ${equity.toFixed(2)}` },
       { label: 'Debt Ratio', value: `${((totalLiabilities / totalAssets) * 100).toFixed(2)}%` },
     ],
   });
@@ -519,11 +519,11 @@ export function printBalanceSheet(data: any): void {
 
 export function printDashboardSummary(metrics: any): void {
   const data = [
-    { 'Metric': 'Total Revenue', 'Value': `₹${parseFloat(metrics.totalRevenue || 0).toFixed(2)}`, 'Change': metrics.revenueChange || 'N/A' },
+    { 'Metric': 'Total Revenue', 'Value': `Rs. ${parseFloat(metrics.totalRevenue || 0).toFixed(2)}`, 'Change': metrics.revenueChange || 'N/A' },
     { 'Metric': 'Total Orders', 'Value': metrics.totalOrders || 0, 'Change': metrics.ordersChange || 'N/A' },
     { 'Metric': 'Active Customers', 'Value': metrics.activeCustomers || 0, 'Change': metrics.customersChange || 'N/A' },
     { 'Metric': 'Completion Rate', 'Value': `${metrics.completionRate || 0}%`, 'Change': metrics.completionChange || 'N/A' },
-    { 'Metric': 'Average Order Value', 'Value': `₹${parseFloat(metrics.averageOrderValue || 0).toFixed(2)}`, 'Change': metrics.aovChange || 'N/A' },
+    { 'Metric': 'Average Order Value', 'Value': `Rs. ${parseFloat(metrics.averageOrderValue || 0).toFixed(2)}`, 'Change': metrics.aovChange || 'N/A' },
     { 'Metric': 'Customer Satisfaction', 'Value': `${metrics.satisfaction || 0}%`, 'Change': metrics.satisfactionChange || 'N/A' },
   ];
 
@@ -532,10 +532,10 @@ export function printDashboardSummary(metrics: any): void {
     subtitle: 'Performance overview and key metrics',
     data,
     stats: [
-      { label: 'Total Revenue', value: `₹${parseFloat(metrics.totalRevenue || 0).toFixed(2)}` },
+      { label: 'Total Revenue', value: `Rs. ${parseFloat(metrics.totalRevenue || 0).toFixed(2)}` },
       { label: 'Total Orders', value: metrics.totalOrders || 0 },
       { label: 'Active Customers', value: metrics.activeCustomers || 0 },
-      { label: 'Avg Order Value', value: `₹${parseFloat(metrics.averageOrderValue || 0).toFixed(2)}` },
+      { label: 'Avg Order Value', value: `Rs. ${parseFloat(metrics.averageOrderValue || 0).toFixed(2)}` },
     ],
   });
 }

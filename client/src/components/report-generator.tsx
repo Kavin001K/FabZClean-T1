@@ -311,7 +311,7 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({ initialData })
                       <IndianRupee className="h-4 w-4 text-green-600" />
                       <span className="text-sm font-medium">Total Revenue</span>
                     </div>
-                    <div className="text-2xl font-bold">₹{reportData.summary.totalRevenue.toLocaleString()}</div>
+                    <div className="text-2xl font-bold">Rs. {reportData.summary.totalRevenue.toLocaleString()}</div>
                   </CardContent>
                 </Card>
 
@@ -331,7 +331,7 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({ initialData })
                       <TrendingUp className="h-4 w-4 text-orange-600" />
                       <span className="text-sm font-medium">Avg Order Value</span>
                     </div>
-                    <div className="text-2xl font-bold">₹{reportData.summary.averageOrderValue.toFixed(2)}</div>
+                    <div className="text-2xl font-bold">Rs. {reportData.summary.averageOrderValue.toFixed(2)}</div>
                   </CardContent>
                 </Card>
               </div>
@@ -352,7 +352,7 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({ initialData })
                           <div className="text-sm text-gray-600">{service.count} orders</div>
                         </div>
                         <Badge variant="outline" className="text-green-600">
-                          ₹{service.revenue.toLocaleString()}
+                          Rs. {service.revenue.toLocaleString()}
                         </Badge>
                       </div>
                     ))}
@@ -520,7 +520,7 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({ initialData })
                         <div className="text-sm text-gray-600">Orders</div>
                       </div>
                       <div className="text-center p-4 bg-green-50 rounded-lg">
-                        <div className="text-2xl font-bold text-green-600">₹{reportData.summary.totalRevenue.toLocaleString()}</div>
+                        <div className="text-2xl font-bold text-green-600">Rs. {reportData.summary.totalRevenue.toLocaleString()}</div>
                         <div className="text-sm text-gray-600">Revenue</div>
                       </div>
                       <div className="text-center p-4 bg-purple-50 rounded-lg">
@@ -528,7 +528,7 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({ initialData })
                         <div className="text-sm text-gray-600">Customers</div>
                       </div>
                       <div className="text-center p-4 bg-orange-50 rounded-lg">
-                        <div className="text-2xl font-bold text-orange-600">₹{reportData.summary.averageOrderValue.toFixed(2)}</div>
+                        <div className="text-2xl font-bold text-orange-600">Rs. {reportData.summary.averageOrderValue.toFixed(2)}</div>
                         <div className="text-sm text-gray-600">Avg Order</div>
                       </div>
                     </div>

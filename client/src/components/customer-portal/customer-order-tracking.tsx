@@ -345,7 +345,7 @@ export default function CustomerOrderTracking({ orders, customer }: CustomerOrde
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 text-sm">
                         <Package className="h-4 w-4 text-muted-foreground" />
-                        <span>{order.items.length} items • ₹{order.totalAmount}</span>
+                        <span>{order.items.length} items • Rs. {order.totalAmount}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <CreditCard className="h-4 w-4 text-muted-foreground" />
@@ -366,7 +366,7 @@ export default function CustomerOrderTracking({ orders, customer }: CustomerOrde
                   {order.items.slice(0, 2).map((item: any, itemIndex: number) => (
                     <div key={itemIndex} className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">{item.name}</span>
-                      <span className="font-medium">₹{item.price}</span>
+                      <span className="font-medium">Rs. {item.price}</span>
                     </div>
                   ))}
                         {order.items.length > 2 && (
@@ -525,14 +525,14 @@ export default function CustomerOrderTracking({ orders, customer }: CustomerOrde
                           <div className="text-sm text-muted-foreground">Quantity: {item.quantity}</div>
                         </div>
                         <div className="text-right">
-                          <div className="font-semibold">₹{item.price}</div>
-                          <div className="text-sm text-muted-foreground">Total: ₹{(parseFloat(item.price) * item.quantity).toFixed(2)}</div>
+                          <div className="font-semibold">Rs. {item.price}</div>
+                          <div className="text-sm text-muted-foreground">Total: Rs. {(parseFloat(item.price) * item.quantity).toFixed(2)}</div>
                         </div>
                       </div>
                     ))}
                     <div className="flex items-center justify-between pt-3 border-t font-semibold text-lg">
                       <span>Total Amount:</span>
-                      <span>₹{selectedOrder.totalAmount}</span>
+                      <span>Rs. {selectedOrder.totalAmount}</span>
                     </div>
                   </div>
                 </CardContent>

@@ -38,7 +38,7 @@ const PERIOD_FILTERS: Array<{ value: PresetPeriod; label: string }> = [
     { value: 'fortnight', label: 'Fortnightly' },
     { value: 'month', label: 'Monthly' },
     { value: 'quarter', label: 'Quarterly' },
-    { value: 'year', label: 'Yearly' },
+    { value: 'year', label: 'Year-on' },
 ];
 
 export default function AdminDashboard() {

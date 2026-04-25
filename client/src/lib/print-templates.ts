@@ -471,7 +471,7 @@ export function printOrders(orders: any[]) {
     'Service': order.service || 'N/A',
     'Status': order.status,
     'Payment': order.paymentStatus || 'N/A',
-    'Amount': `₹${order.totalAmount}`,
+    'Amount': `Rs. ${order.totalAmount}`,
     'Date': new Date(order.createdAt).toLocaleDateString(),
   }));
 
@@ -485,7 +485,7 @@ export function printOrders(orders: any[]) {
     data: formattedData,
     stats: [
       { label: 'Total Orders', value: orders.length },
-      { label: 'Total Revenue', value: `₹${totalRevenue.toFixed(2)}` },
+      { label: 'Total Revenue', value: `Rs. ${totalRevenue.toFixed(2)}` },
       { label: 'Completed', value: completedOrders },
       { label: 'Pending', value: pendingOrders },
     ],
@@ -498,7 +498,7 @@ export function printCustomers(customers: any[]) {
     'Email': customer.email || 'N/A',
     'Phone': customer.phone || 'N/A',
     'Orders': customer.totalOrders || 0,
-    'Total Spent': `₹${customer.totalSpent || 0}`,
+    'Total Spent': `Rs. ${customer.totalSpent || 0}`,
     'Last Order': customer.lastOrder ? new Date(customer.lastOrder).toLocaleDateString() : 'Never',
   }));
 
@@ -512,7 +512,7 @@ export function printCustomers(customers: any[]) {
     data: formattedData,
     stats: [
       { label: 'Total Customers', value: customers.length },
-      { label: 'Total Revenue', value: `₹${totalRevenue.toFixed(2)}` },
+      { label: 'Total Revenue', value: `Rs. ${totalRevenue.toFixed(2)}` },
       { label: 'Active Customers', value: activeCustomers },
       { label: 'Avg Orders', value: avgOrders.toFixed(1) },
     ],
@@ -523,7 +523,7 @@ export function printServices(services: any[]) {
   const formattedData = services.map(service => ({
     'Service Name': service.name,
     'Category': service.category || 'General',
-    'Price': `₹${service.price}`,
+    'Price': `Rs. ${service.price}`,
     'Duration': service.duration || 'N/A',
     'Status': service.status || 'Active',
   }));
@@ -539,7 +539,7 @@ export function printServices(services: any[]) {
     stats: [
       { label: 'Total Services', value: services.length },
       { label: 'Active Services', value: activeServices },
-      { label: 'Avg Price', value: `₹${avgPrice.toFixed(2)}` },
+      { label: 'Avg Price', value: `Rs. ${avgPrice.toFixed(2)}` },
       { label: 'Categories', value: categories },
     ],
   });
@@ -547,11 +547,11 @@ export function printServices(services: any[]) {
 
 export function printDashboardSummary(metrics: any) {
   const data = [
-    { 'Metric': 'Total Revenue', 'Value': `₹${metrics.totalRevenue?.toFixed(2) || 0}` },
+    { 'Metric': 'Total Revenue', 'Value': `Rs. ${metrics.totalRevenue?.toFixed(2) || 0}` },
     { 'Metric': 'Total Orders', 'Value': metrics.totalOrders || 0 },
     { 'Metric': 'Active Customers', 'Value': metrics.activeCustomers || 0 },
     { 'Metric': 'Completion Rate', 'Value': `${metrics.completionRate || 0}%` },
-    { 'Metric': 'Average Order Value', 'Value': `₹${metrics.averageOrderValue?.toFixed(2) || 0}` },
+    { 'Metric': 'Average Order Value', 'Value': `Rs. ${metrics.averageOrderValue?.toFixed(2) || 0}` },
   ];
 
   printDocument({
@@ -559,7 +559,7 @@ export function printDashboardSummary(metrics: any) {
     subtitle: 'Business performance overview and key metrics',
     data,
     stats: [
-      { label: 'Total Revenue', value: `₹${metrics.totalRevenue?.toFixed(2) || 0}` },
+      { label: 'Total Revenue', value: `Rs. ${metrics.totalRevenue?.toFixed(2) || 0}` },
       { label: 'Total Orders', value: metrics.totalOrders || 0 },
       { label: 'Active Customers', value: metrics.activeCustomers || 0 },
       { label: 'Completion Rate', value: `${metrics.completionRate || 0}%` },

@@ -7,6 +7,7 @@ import { normalizePhoneForComparison, sanitizePhoneForStorage } from "../../shar
 
 const protectedBookingsRouter = Router();
 const publicBookingsRouter = Router();
+let bookingSchemaCapabilitiesCache: { hasBookingId: boolean; hasCustomerId: boolean; checkedAt: number } | null = null;
 
 protectedBookingsRouter.use(jwtRequired);
 
@@ -80,6 +81,38 @@ function formatBookingForClient(row: any) {
   };
 }
 
+async function getBookingSchemaCapabilities(supabase: any) {
+  const now = Date.now();
+  if (bookingSchemaCapabilitiesCache && now - bookingSchemaCapabilitiesCache.checkedAt < 60_000) {
+    return bookingSchemaCapabilitiesCache;
+  }
+
+  const fallback = {
+    hasBookingId: false,
+    hasCustomerId: false,
+    checkedAt: now,
+  };
+
+  try {
+    const [bookingIdProbe, customerIdProbe] = await Promise.all([
+      supabase.from("booking_requests").select("booking_id").limit(1),
+      supabase.from("booking_requests").select("customer_id").limit(1),
+    ]);
+
+    const bookingIdError = String(bookingIdProbe?.error?.message || "").toLowerCase();
+    const customerIdError = String(customerIdProbe?.error?.message || "").toLowerCase();
+    bookingSchemaCapabilitiesCache = {
+      hasBookingId: !bookingIdError.includes("does not exist"),
+      hasCustomerId: !customerIdError.includes("does not exist"),
+      checkedAt: now,
+    };
+    return bookingSchemaCapabilitiesCache;
+  } catch {
+    bookingSchemaCapabilitiesCache = fallback;
+    return fallback;
+  }
+}
+
 async function resolveOrCreateCustomerId(input: {
   customerName: string;
   customerPhone: string;
@@ -119,21 +152,28 @@ async function resolveOrCreateCustomerId(input: {
   return created?.id || null;
 }
 
-async function nextBookingId(supabase: any): Promise<string> {
+async function nextBookingId(supabase: any, options?: { skipRpc?: boolean }): Promise<string> {
   const year = new Date().getFullYear().toString().slice(-2);
 
-  try {
-    const { data, error } = await supabase.rpc("next_booking_request_id");
-    if (!error && typeof data === "string" && data.trim()) return data.trim();
-  } catch {
-    // fallback below
+  if (!options?.skipRpc) {
+    try {
+      const { data, error } = await supabase.rpc("next_booking_request_id");
+      if (!error && typeof data === "string" && data.trim()) return data.trim();
+    } catch {
+      // fallback below
+    }
   }
 
   const prefix = `${year}FAB`;
+  const schema = await getBookingSchemaCapabilities(supabase);
+  const selectColumns = schema.hasBookingId ? "booking_id, request_number" : "request_number";
+  const searchPredicate = schema.hasBookingId
+    ? `booking_id.ilike.${prefix}%,request_number.ilike.${prefix}%`
+    : `request_number.ilike.${prefix}%`;
   const { data: rows } = await supabase
     .from("booking_requests")
-    .select("booking_id, request_number")
-    .or(`booking_id.ilike.${prefix}%,request_number.ilike.${prefix}%`)
+    .select(selectColumns)
+    .or(searchPredicate)
     .order("created_at", { ascending: false })
     .limit(500);
 
@@ -148,6 +188,36 @@ async function nextBookingId(supabase: any): Promise<string> {
   const next = max + 1;
   const suffix = String.fromCharCode(65 + ((next - 1) % 26));
   return `${year}FAB${String(next).padStart(3, "0")}${suffix}`;
+}
+
+function bumpBookingId(current: string): string {
+  const code = String(current || "").trim().toUpperCase();
+  const match = code.match(/^(\d{2}FAB)(\d+)([A-Z])$/);
+  if (!match) {
+    const year = new Date().getFullYear().toString().slice(-2);
+    return `${year}FAB001A`;
+  }
+
+  const prefix = match[1];
+  const runningNo = Number(match[2] || 0);
+  const nextNo = Math.max(1, runningNo + 1);
+  const suffix = String.fromCharCode(65 + ((nextNo - 1) % 26));
+  return `${prefix}${String(nextNo).padStart(3, "0")}${suffix}`;
+}
+
+function buildTimeBasedBookingId(): string {
+  const year = new Date().getFullYear().toString().slice(-2);
+  const runningNo = Math.floor(Date.now() / 1000) % 1_000_000;
+  const safeNo = Math.max(1, runningNo);
+  const suffix = String.fromCharCode(65 + ((safeNo - 1) % 26));
+  return `${year}FAB${String(safeNo).padStart(3, "0")}${suffix}`;
+}
+
+function isDuplicateBookingCodeError(error: any): boolean {
+  const message = String(error?.message || "").toLowerCase();
+  return message.includes("booking_requests_request_number_key")
+    || message.includes("booking_requests_booking_id_unique")
+    || message.includes("duplicate key value");
 }
 
 async function getBookingByIdentifier(supabase: any, identifier: string) {
@@ -168,12 +238,15 @@ async function getBookingByIdentifier(supabase: any, identifier: string) {
     .maybeSingle();
   if (!byRequestNumber.error && byRequestNumber.data) return byRequestNumber.data;
 
-  const byBookingId = await supabase
-    .from("booking_requests")
-    .select("*")
-    .eq("booking_id", id)
-    .maybeSingle();
-  if (!byBookingId.error && byBookingId.data) return byBookingId.data;
+  const schema = await getBookingSchemaCapabilities(supabase);
+  if (schema.hasBookingId) {
+    const byBookingId = await supabase
+      .from("booking_requests")
+      .select("*")
+      .eq("booking_id", id)
+      .maybeSingle();
+    if (!byBookingId.error && byBookingId.data) return byBookingId.data;
+  }
 
   return null;
 }
@@ -207,12 +280,14 @@ publicBookingsRouter.post("/bookings", async (req, res) => {
       return res.status(500).json(createErrorResponse("Database unavailable", 500));
     }
 
-    const bookingId = await nextBookingId(supabase);
-    const customerId = await resolveOrCreateCustomerId(parsed);
+    const customerId = await resolveOrCreateCustomerId({
+      customerName: parsed.customerName,
+      customerPhone: parsed.customerPhone,
+      customerEmail: parsed.customerEmail || null,
+      pickupAddress: parsed.pickupAddress,
+    });
 
-    const payload: any = {
-      booking_id: bookingId,
-      request_number: bookingId,
+    const basePayload: any = {
       source: parsed.source,
       channel: parsed.channel,
       store_code: normalizeStoreCode(parsed.storeCode) || undefined,
@@ -232,19 +307,48 @@ publicBookingsRouter.post("/bookings", async (req, res) => {
       created_by: "public_api",
       updated_by: "public_api",
     };
+    const schema = await getBookingSchemaCapabilities(supabase);
 
     let insertedRow: any = null;
+    let finalBookingId = "";
+    let generatedId = await nextBookingId(supabase);
 
-    const firstInsert = await supabase
-      .from("booking_requests")
-      .insert(payload)
-      .select("*")
-      .single();
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      if (attempt === 1) {
+        generatedId = buildTimeBasedBookingId();
+      } else if (attempt > 1) {
+        generatedId = bumpBookingId(generatedId);
+      }
 
-    if (firstInsert.error) {
+      const payload = {
+        ...basePayload,
+        request_number: generatedId,
+      };
+      if (schema.hasBookingId) {
+        payload.booking_id = generatedId;
+      }
+
+      const insertResult = await supabase
+        .from("booking_requests")
+        .insert(payload)
+        .select("*")
+        .single();
+
+      if (!insertResult.error) {
+        insertedRow = insertResult.data;
+        finalBookingId = generatedId;
+        break;
+      }
+
+      if (isDuplicateBookingCodeError(insertResult.error)) {
+        continue;
+      }
+
       const fallbackPayload = { ...payload };
-      delete fallbackPayload.booking_id;
-      delete fallbackPayload.customer_id;
+      if (schema.hasBookingId) {
+        delete (fallbackPayload as any).booking_id;
+      }
+      delete (fallbackPayload as any).customer_id;
 
       const fallbackInsert = await supabase
         .from("booking_requests")
@@ -253,12 +357,38 @@ publicBookingsRouter.post("/bookings", async (req, res) => {
         .single();
 
       if (fallbackInsert.error) {
+        if (isDuplicateBookingCodeError(fallbackInsert.error)) {
+          continue;
+        }
         throw new Error(fallbackInsert.error.message || "Failed to create booking");
       }
 
       insertedRow = fallbackInsert.data;
-    } else {
-      insertedRow = firstInsert.data;
+      finalBookingId = insertedRow?.request_number || generatedId;
+      break;
+    }
+
+    if (!insertedRow) {
+      throw new Error("Failed to create booking after retries");
+    }
+
+    if (schema.hasCustomerId && customerId && insertedRow?.id && !insertedRow?.customer_id) {
+      try {
+        const patchResult = await supabase
+          .from("booking_requests")
+          .update({ customer_id: customerId })
+          .eq("id", insertedRow.id)
+          .select("id, customer_id")
+          .single();
+        if (!patchResult.error && patchResult.data?.customer_id) {
+          insertedRow = {
+            ...insertedRow,
+            customer_id: patchResult.data.customer_id,
+          };
+        }
+      } catch {
+        // ignore when the schema does not support customer_id yet
+      }
     }
 
     try {
@@ -268,11 +398,14 @@ publicBookingsRouter.post("/bookings", async (req, res) => {
     }
 
     return res.status(201).json(createSuccessResponse({
-      bookingId,
+      bookingId: finalBookingId || insertedRow.booking_id || insertedRow.request_number,
       id: insertedRow.id,
       status: insertedRow.status || "new",
       customerId: customerId || null,
-      booking: formatBookingForClient({ ...insertedRow, booking_id: insertedRow.booking_id || bookingId }),
+      booking: formatBookingForClient({
+        ...insertedRow,
+        booking_id: insertedRow.booking_id || finalBookingId || insertedRow.request_number,
+      }),
     }, "Booking created successfully"));
   } catch (error: any) {
     return res.status(400).json(createErrorResponse(error?.message || "Invalid booking payload", 400));
@@ -312,11 +445,17 @@ protectedBookingsRouter.get("/", async (req, res) => {
     if (from) query = query.gte("created_at", new Date(from).toISOString());
     if (to) query = query.lte("created_at", new Date(to).toISOString());
     if (search) {
-      query = query.or([
+      const schema = await getBookingSchemaCapabilities(supabase);
+      const predicates = [
         `customer_name.ilike.%${search}%`,
         `customer_phone.ilike.%${search}%`,
         `request_number.ilike.%${search}%`,
-        `booking_id.ilike.%${search}%`,
+      ];
+      if (schema.hasBookingId) {
+        predicates.push(`booking_id.ilike.%${search}%`);
+      }
+      query = query.or([
+        ...predicates,
       ].join(","));
     }
 

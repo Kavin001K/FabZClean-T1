@@ -1015,7 +1015,7 @@ export const analyticsApi = {
 // Helper functions for displaying data
 export const formatCurrency = (amount: number | string): string => {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(numAmount)) return '₹0';
+  if (isNaN(numAmount)) return 'Rs. 0';
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
