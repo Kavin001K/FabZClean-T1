@@ -650,9 +650,6 @@ export default function ReportsPage() {
           </Badge>
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Operations dashboard for Fab Clean.</h1>
-            <p className="max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
-              Clean numbers, usable signals, and direct drill-downs for stores, customers, services, staff, and finance.
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <span>Window: {formatDate(meta.startDate)} to {formatDate(meta.endDate)}</span>

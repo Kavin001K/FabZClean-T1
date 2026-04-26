@@ -296,9 +296,7 @@ export default function AdminDashboard() {
                         <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
                             Dashboard
                         </h1>
-                        <p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">
-                            A simple, live view of orders, customers, printing, and what needs attention today.
-                        </p>
+
                     </div>
                     <div className="grid grid-cols-2 gap-3 text-sm sm:w-auto sm:grid-cols-3">
                         <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3">
