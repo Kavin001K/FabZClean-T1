@@ -78,6 +78,70 @@ function formatBookingForClient(row: any) {
     conversionNote: row.conversion_note || null,
     createdAt: row.created_at || null,
     updatedAt: row.updated_at || null,
+    origin: "booking_request",
+  };
+}
+
+function normalizePickupStatusForClient(status: string | null | undefined) {
+  switch (String(status || "").toLowerCase()) {
+    case "pending":
+      return "new";
+    case "confirmed":
+      return "confirmed";
+    case "processing":
+      return "processing";
+    case "picked_up":
+    case "ready":
+    case "out_for_delivery":
+    case "delivered":
+      return "converted";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return String(status || "").toLowerCase() || "new";
+  }
+}
+
+function normalizeBookingStatusForPickup(status: string | null | undefined) {
+  switch (String(status || "").toLowerCase()) {
+    case "new":
+      return "pending";
+    case "confirmed":
+      return "confirmed";
+    case "processing":
+      return "processing";
+    case "converted":
+      return "picked_up";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return null;
+  }
+}
+
+function formatPickupForClient(row: any) {
+  return {
+    id: row.id,
+    bookingId: row.booking_reference || null,
+    requestNumber: row.booking_reference || null,
+    source: "website",
+    channel: "web",
+    storeCode: normalizeStoreCode(row.branch) || null,
+    customerId: null,
+    customerName: row.customer_name || "",
+    customerPhone: row.customer_phone || "",
+    customerEmail: row.customer_email || null,
+    pickupAddress: row.pickup_address || row.address || null,
+    preferredDate: row.preferred_date || row.preferredDate || null,
+    preferredSlot: row.preferred_slot || row.time_slot || null,
+    notes: row.notes || row.special_instructions || null,
+    status: normalizePickupStatusForClient(row.status),
+    convertedOrderId: row.converted_order_id || null,
+    convertedAt: row.converted_at || null,
+    conversionNote: row.conversion_note || null,
+    createdAt: row.created_at || row.createdAt || null,
+    updatedAt: row.updated_at || row.updatedAt || null,
+    origin: "pickup",
   };
 }
 
@@ -229,14 +293,14 @@ async function getBookingByIdentifier(supabase: any, identifier: string) {
     .select("*")
     .eq("id", id)
     .maybeSingle();
-  if (!byId.error && byId.data) return byId.data;
+  if (!byId.error && byId.data) return { origin: "booking_request", row: byId.data };
 
   const byRequestNumber = await supabase
     .from("booking_requests")
     .select("*")
     .eq("request_number", id)
     .maybeSingle();
-  if (!byRequestNumber.error && byRequestNumber.data) return byRequestNumber.data;
+  if (!byRequestNumber.error && byRequestNumber.data) return { origin: "booking_request", row: byRequestNumber.data };
 
   const schema = await getBookingSchemaCapabilities(supabase);
   if (schema.hasBookingId) {
@@ -245,8 +309,22 @@ async function getBookingByIdentifier(supabase: any, identifier: string) {
       .select("*")
       .eq("booking_id", id)
       .maybeSingle();
-    if (!byBookingId.error && byBookingId.data) return byBookingId.data;
+    if (!byBookingId.error && byBookingId.data) return { origin: "booking_request", row: byBookingId.data };
   }
+
+  const byPickupId = await supabase
+    .from("pickups")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (!byPickupId.error && byPickupId.data) return { origin: "pickup", row: byPickupId.data };
+
+  const byPickupReference = await supabase
+    .from("pickups")
+    .select("*")
+    .eq("booking_reference", id)
+    .maybeSingle();
+  if (!byPickupReference.error && byPickupReference.data) return { origin: "pickup", row: byPickupReference.data };
 
   return null;
 }
@@ -415,12 +493,16 @@ publicBookingsRouter.post("/bookings", async (req, res) => {
 publicBookingsRouter.get("/bookings/:id", async (req, res) => {
   try {
     const supabase = (storage as any).supabase;
-    const row = await getBookingByIdentifier(supabase, req.params.id);
-    if (!row) {
+    const result = await getBookingByIdentifier(supabase, req.params.id);
+    if (!result) {
       return res.status(404).json(createErrorResponse("Booking not found", 404));
     }
 
-    return res.json(createSuccessResponse(formatBookingForClient(row)));
+    const booking = result.origin === "pickup"
+      ? formatPickupForClient(result.row)
+      : formatBookingForClient(result.row);
+
+    return res.json(createSuccessResponse(booking));
   } catch (error: any) {
     return res.status(500).json(createErrorResponse(error?.message || "Failed to fetch booking", 500));
   }
@@ -429,7 +511,8 @@ publicBookingsRouter.get("/bookings/:id", async (req, res) => {
 protectedBookingsRouter.get("/", async (req, res) => {
   try {
     const supabase = (storage as any).supabase;
-    let query = supabase.from("booking_requests").select("*").order("created_at", { ascending: false });
+    let bookingQuery = supabase.from("booking_requests").select("*").order("created_at", { ascending: false });
+    let pickupQuery = supabase.from("pickups").select("*").order("created_at", { ascending: false });
 
     const status = String(req.query.status || "").trim();
     const storeCode = normalizeStoreCode(String(req.query.storeCode || "").trim()) || null;
@@ -439,34 +522,79 @@ protectedBookingsRouter.get("/", async (req, res) => {
     const search = String(req.query.search || "").trim();
     const limit = Math.min(500, Math.max(1, Number(req.query.limit || 100)));
 
-    if (status) query = query.eq("status", status);
-    if (storeCode) query = query.eq("store_code", storeCode);
-    if (source) query = query.eq("source", source);
-    if (from) query = query.gte("created_at", new Date(from).toISOString());
-    if (to) query = query.lte("created_at", new Date(to).toISOString());
+    if (status) {
+      bookingQuery = bookingQuery.eq("status", status);
+      const pickupStatusMap: Record<string, string | string[]> = {
+        new: "pending",
+        confirmed: "confirmed",
+        processing: "processing",
+        converted: ["picked_up", "ready", "out_for_delivery", "delivered"],
+        cancelled: "cancelled",
+      };
+      const mappedPickupStatus = pickupStatusMap[status] ?? status;
+      if (Array.isArray(mappedPickupStatus)) {
+        pickupQuery = pickupQuery.in("status", mappedPickupStatus);
+      } else {
+        pickupQuery = pickupQuery.eq("status", mappedPickupStatus);
+      }
+    }
+    if (storeCode) {
+      bookingQuery = bookingQuery.eq("store_code", storeCode);
+      pickupQuery = pickupQuery.eq("branch", storeCode);
+    }
+    if (source) {
+      bookingQuery = bookingQuery.eq("source", source);
+      if (source !== "website") {
+        pickupQuery = pickupQuery.eq("id", "__none__");
+      }
+    }
+    if (from) {
+      bookingQuery = bookingQuery.gte("created_at", new Date(from).toISOString());
+      pickupQuery = pickupQuery.gte("created_at", new Date(from).toISOString());
+    }
+    if (to) {
+      bookingQuery = bookingQuery.lte("created_at", new Date(to).toISOString());
+      pickupQuery = pickupQuery.lte("created_at", new Date(to).toISOString());
+    }
     if (search) {
       const schema = await getBookingSchemaCapabilities(supabase);
-      const predicates = [
+      const bookingPredicates = [
         `customer_name.ilike.%${search}%`,
         `customer_phone.ilike.%${search}%`,
         `request_number.ilike.%${search}%`,
       ];
       if (schema.hasBookingId) {
-        predicates.push(`booking_id.ilike.%${search}%`);
+        bookingPredicates.push(`booking_id.ilike.%${search}%`);
       }
-      query = query.or([
-        ...predicates,
-      ].join(","));
+      bookingQuery = bookingQuery.or(bookingPredicates.join(","));
+      const pickupPredicates = [
+        `customer_name.ilike.%${search}%`,
+        `customer_phone.ilike.%${search}%`,
+        `booking_reference.ilike.%${search}%`,
+      ];
+      pickupQuery = pickupQuery.or(pickupPredicates.join(","));
     }
 
-    const { data, error } = await query.limit(limit);
+    const [bookingResult, pickupResult] = await Promise.all([
+      bookingQuery.limit(limit),
+      pickupQuery.limit(limit),
+    ]);
 
-    if (error) throw new Error(error.message);
+    if (bookingResult.error) throw new Error(bookingResult.error.message);
+    if (pickupResult.error) throw new Error(pickupResult.error.message);
 
-    const rows = Array.isArray(data) ? data : [];
+    const bookingRows = Array.isArray(bookingResult.data) ? bookingResult.data : [];
+    const pickupRows = Array.isArray(pickupResult.data) ? pickupResult.data : [];
+    const rows = [...bookingRows.map(formatBookingForClient), ...pickupRows.map(formatPickupForClient)]
+      .sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      })
+      .slice(0, limit);
 
     return res.json(createSuccessResponse({
-      rows: rows.map(formatBookingForClient),
+      rows,
       total: rows.length,
     }));
   } catch (error: any) {
@@ -477,26 +605,28 @@ protectedBookingsRouter.get("/", async (req, res) => {
 protectedBookingsRouter.get("/:id", async (req, res) => {
   try {
     const supabase = (storage as any).supabase;
-    const row = await getBookingByIdentifier(supabase, req.params.id);
+    const result = await getBookingByIdentifier(supabase, req.params.id);
 
-    if (!row) {
+    if (!result) {
       return res.status(404).json(createErrorResponse("Booking not found", 404));
     }
 
     let items: any[] = [];
-    try {
-      const itemResult = await supabase
-        .from("booking_request_items")
-        .select("*")
-        .eq("booking_request_id", row.id)
-        .order("line_no", { ascending: true });
-      items = itemResult.data || [];
-    } catch {
-      items = [];
+    if (result.origin === "booking_request") {
+      try {
+        const itemResult = await supabase
+          .from("booking_request_items")
+          .select("*")
+          .eq("booking_request_id", result.row.id)
+          .order("line_no", { ascending: true });
+        items = itemResult.data || [];
+      } catch {
+        items = [];
+      }
     }
 
     return res.json(createSuccessResponse({
-      ...formatBookingForClient(row),
+      ...(result.origin === "pickup" ? formatPickupForClient(result.row) : formatBookingForClient(result.row)),
       items,
     }));
   } catch (error: any) {
@@ -507,42 +637,54 @@ protectedBookingsRouter.get("/:id", async (req, res) => {
 protectedBookingsRouter.patch("/:id", async (req, res) => {
   try {
     const supabase = (storage as any).supabase;
-    const row = await getBookingByIdentifier(supabase, req.params.id);
-    if (!row) {
+    const result = await getBookingByIdentifier(supabase, req.params.id);
+    if (!result) {
       return res.status(404).json(createErrorResponse("Booking not found", 404));
     }
 
     const payload = bookingPatchSchema.parse(req.body || {});
+    const updatePayload: any = {};
 
-    const updatePayload: any = {
-      updated_by: req.employee?.username || "system",
-    };
+    if (payload.status) {
+      updatePayload.status = result.origin === "pickup"
+        ? normalizeBookingStatusForPickup(payload.status) ?? payload.status
+        : payload.status;
+    }
+    if (payload.storeCode !== undefined) {
+      if (result.origin === "pickup") {
+        updatePayload.branch = normalizeStoreCode(payload.storeCode);
+      } else {
+        updatePayload.store_code = normalizeStoreCode(payload.storeCode);
+      }
+    }
+    if (payload.notes !== undefined && result.origin === "booking_request") {
+      updatePayload.notes = payload.notes;
+    }
+    if (payload.conversionNote !== undefined && result.origin === "booking_request") {
+      updatePayload.conversion_note = payload.conversionNote;
+    }
+    if (result.origin === "booking_request") {
+      updatePayload.updated_by = req.employee?.username || "system";
+    }
 
-    if (payload.status) updatePayload.status = payload.status;
-    if (payload.storeCode !== undefined) updatePayload.store_code = normalizeStoreCode(payload.storeCode);
-    if (payload.notes !== undefined) updatePayload.notes = payload.notes;
-    if (payload.conversionNote !== undefined) updatePayload.conversion_note = payload.conversionNote;
-
+    const tableName = result.origin === "pickup" ? "pickups" : "booking_requests";
     const { data, error } = await supabase
-      .from("booking_requests")
+      .from(tableName)
       .update(updatePayload)
-      .eq("id", row.id)
+      .eq("id", result.row.id)
       .select("*")
       .single();
 
     if (error) {
-      delete updatePayload.conversion_note;
-      const fallback = await supabase
-        .from("booking_requests")
-        .update(updatePayload)
-        .eq("id", row.id)
-        .select("*")
-        .single();
-      if (fallback.error) throw new Error(fallback.error.message);
-      return res.json(createSuccessResponse(formatBookingForClient(fallback.data), "Booking updated"));
+      throw new Error(error.message);
     }
 
-    return res.json(createSuccessResponse(formatBookingForClient(data), "Booking updated"));
+    return res.json(createSuccessResponse(
+      result.origin === "pickup"
+        ? formatPickupForClient(data)
+        : formatBookingForClient(data),
+      "Booking updated"
+    ));
   } catch (error: any) {
     return res.status(400).json(createErrorResponse(error?.message || "Failed to update booking", 400));
   }
@@ -551,13 +693,14 @@ protectedBookingsRouter.patch("/:id", async (req, res) => {
 protectedBookingsRouter.post("/:id/convert-to-order", async (req, res) => {
   try {
     const supabase = (storage as any).supabase;
-    const booking = await getBookingByIdentifier(supabase, req.params.id);
+    const result = await getBookingByIdentifier(supabase, req.params.id);
 
-    if (!booking) {
+    if (!result) {
       return res.status(404).json(createErrorResponse("Booking not found", 404));
     }
 
-    if (booking.converted_order_id) {
+    const booking = result.row;
+    if (result.origin === "booking_request" && booking.converted_order_id) {
       const existingOrder = await (storage as any).getOrder(booking.converted_order_id);
       return res.json(createSuccessResponse({
         booking: formatBookingForClient(booking),
@@ -566,47 +709,52 @@ protectedBookingsRouter.post("/:id/convert-to-order", async (req, res) => {
     }
 
     let bookingItems: any[] = [];
-    try {
-      const itemResult = await supabase
-        .from("booking_request_items")
-        .select("*")
-        .eq("booking_request_id", booking.id)
-        .order("line_no", { ascending: true });
-      bookingItems = itemResult.data || [];
-    } catch {
-      bookingItems = [];
+    if (result.origin === "booking_request") {
+      try {
+        const itemResult = await supabase
+          .from("booking_request_items")
+          .select("*")
+          .eq("booking_request_id", booking.id)
+          .order("line_no", { ascending: true });
+        bookingItems = itemResult.data || [];
+      } catch {
+        bookingItems = [];
+      }
     }
 
     let customerId = booking.customer_id || null;
-
     if (!customerId) {
       customerId = await resolveOrCreateCustomerId({
         customerName: booking.customer_name,
         customerPhone: booking.customer_phone,
         customerEmail: booking.customer_email,
-        pickupAddress: booking.pickup_address,
+        pickupAddress: booking.pickup_address || booking.address,
       });
     }
 
-    const orderItems = (bookingItems.length > 0 ? bookingItems : [{ service_name: "Laundry Service", quantity: 1, unit_price: 0, total_price: 0 }])
-      .map((item: any, index: number) => {
-        const quantity = Math.max(1, Number(item.quantity || 1));
-        const unitPrice = Number(item.unit_price ?? item.unitPrice ?? 0);
-        const subtotal = Number(item.total_price ?? unitPrice * quantity ?? 0);
-        return {
-          serviceId: `booking-${booking.id}-${index + 1}`,
-          serviceName: String(item.service_name || item.serviceName || "Laundry Service"),
-          quantity,
-          price: String(Number.isFinite(unitPrice) ? unitPrice : 0),
-          subtotal: String(Number.isFinite(subtotal) ? subtotal : 0),
-          customName: String(item.service_name || item.serviceName || "Laundry Service"),
-          tagNote: item.remarks || item.note || undefined,
-        };
-      });
+    const orderItems = (result.origin === "booking_request"
+      ? bookingItems
+      : Array.isArray(booking.services) && booking.services.length
+        ? booking.services
+        : [{ service_name: "Pickup Service", quantity: 1, unit_price: 0, total_price: 0 }]
+    ).map((item: any, index: number) => {
+      const serviceName = String(item.service_name || item.serviceName || item || "Pickup Service");
+      const quantity = Math.max(1, Number(item.quantity || 1));
+      const unitPrice = Number(item.unit_price ?? item.unitPrice ?? 0);
+      const subtotal = Number(item.total_price ?? unitPrice * quantity ?? 0);
+      return {
+        serviceId: `${result.origin === "booking_request" ? "booking" : "pickup"}-${booking.id}-${index + 1}`,
+        serviceName,
+        quantity,
+        price: String(Number.isFinite(unitPrice) ? unitPrice : 0),
+        subtotal: String(Number.isFinite(subtotal) ? subtotal : 0),
+        customName: serviceName,
+        tagNote: item.remarks || item.note || undefined,
+      };
+    });
 
     const totalAmount = orderItems.reduce((sum: number, item: any) => sum + Number(item.subtotal || 0), 0);
-
-    const bookingId = booking.booking_id || booking.request_number || null;
+    const bookingId = booking.booking_id || booking.request_number || booking.booking_reference || null;
 
     const createdOrder = await (storage as any).createOrder({
       customerId,
@@ -617,16 +765,17 @@ protectedBookingsRouter.post("/:id/convert-to-order", async (req, res) => {
       paymentStatus: "pending",
       totalAmount: String(totalAmount),
       items: orderItems,
-      storeCode: normalizeStoreCode(booking.store_code) || "POL",
+      storeCode: normalizeStoreCode(booking.store_code || booking.branch) || "POL",
       pickupDate: booking.preferred_date ? new Date(booking.preferred_date) : new Date(),
       fulfillmentType: "pickup",
-      deliveryAddress: booking.pickup_address || null,
-      specialInstructions: booking.notes || null,
+      deliveryAddress: booking.pickup_address || booking.address || null,
+      specialInstructions: booking.notes || booking.special_instructions || null,
       bookingSource: booking.source || "website",
       bookingChannel: booking.channel || "web",
-      bookingSlot: booking.preferred_slot || null,
+      bookingSlot: booking.preferred_slot || booking.time_slot || null,
       bookingContext: {
-        bookingRequestId: booking.id,
+        bookingRequestId: result.origin === "booking_request" ? booking.id : null,
+        pickupId: result.origin === "pickup" ? booking.id : null,
         bookingId,
         source: booking.source || "website",
         channel: booking.channel || "web",
@@ -634,44 +783,49 @@ protectedBookingsRouter.post("/:id/convert-to-order", async (req, res) => {
     });
 
     const convertedAt = new Date().toISOString();
-
-    let bookingUpdate: any = {
-      status: "converted",
-      converted_order_id: createdOrder.id,
-      converted_at: convertedAt,
-      conversion_note: String(req.body?.note || "Converted from booking inbox"),
-      customer_id: customerId || null,
-      updated_by: req.employee?.username || "system",
-    };
-
-    const conversionResult = await supabase
-      .from("booking_requests")
-      .update(bookingUpdate)
-      .eq("id", booking.id)
-      .select("*")
-      .single();
-
-    if (conversionResult.error) {
-      bookingUpdate = {
+    if (result.origin === "booking_request") {
+      const bookingUpdate: any = {
         status: "converted",
         converted_order_id: createdOrder.id,
+        converted_at: convertedAt,
+        conversion_note: String(req.body?.note || "Converted from booking inbox"),
+        customer_id: customerId || null,
         updated_by: req.employee?.username || "system",
       };
-      const fallback = await supabase
+
+      const conversionResult = await supabase
         .from("booking_requests")
         .update(bookingUpdate)
         .eq("id", booking.id)
         .select("*")
         .single();
-      if (fallback.error) throw new Error(fallback.error.message);
+
+      if (conversionResult.error) {
+        const fallback = await supabase
+          .from("booking_requests")
+          .update({
+            status: "converted",
+            converted_order_id: createdOrder.id,
+            updated_by: req.employee?.username || "system",
+          })
+          .eq("id", booking.id)
+          .select("*")
+          .single();
+        if (fallback.error) throw new Error(fallback.error.message);
+      }
+    } else {
+      await supabase
+        .from("pickups")
+        .update({ status: "picked_up" })
+        .eq("id", booking.id);
     }
 
     try {
       await supabase
         .from("orders")
         .update({
-          booking_request_id: booking.id,
           booking_id: bookingId,
+          ...(result.origin === "booking_request" ? { booking_request_id: booking.id } : {}),
         })
         .eq("id", createdOrder.id);
     } catch {
@@ -680,7 +834,9 @@ protectedBookingsRouter.post("/:id/convert-to-order", async (req, res) => {
 
     return res.status(201).json(createSuccessResponse({
       bookingId,
-      booking: formatBookingForClient({ ...booking, status: "converted", converted_order_id: createdOrder.id }),
+      booking: result.origin === "pickup"
+        ? formatPickupForClient({ ...booking, status: "converted" })
+        : formatBookingForClient({ ...booking, status: "converted", converted_order_id: createdOrder.id }),
       order: createdOrder,
     }, "Booking converted to order"));
   } catch (error: any) {
