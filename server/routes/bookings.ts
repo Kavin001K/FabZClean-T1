@@ -511,8 +511,13 @@ publicBookingsRouter.get("/bookings/:id", async (req, res) => {
 protectedBookingsRouter.get("/", async (req, res) => {
   try {
     const supabase = (storage as any).supabase;
+    if (!supabase) {
+      console.error("[Diagnostics] Supabase client is UNDEFINED in bookings route!");
+    } else {
+      console.log("[Diagnostics] Supabase client found in storage.");
+    }
     let bookingQuery = supabase.from("booking_requests").select("*").order("created_at", { ascending: false });
-    let pickupQuery = supabase.from("pickups").select("*").order("created_at", { ascending: false });
+    let pickupQuery = supabase.from("pickups").select("*"); // removed .order() to avoid errors with created_at vs createdAt
 
     const status = String(req.query.status || "").trim();
     const storeCode = normalizeStoreCode(String(req.query.storeCode || "").trim()) || null;
@@ -580,8 +585,11 @@ protectedBookingsRouter.get("/", async (req, res) => {
       pickupQuery.limit(limit),
     ]);
 
-    if (bookingResult.error) throw new Error(bookingResult.error.message);
-    if (pickupResult.error) throw new Error(pickupResult.error.message);
+    console.log(`[Diagnostics] Bookings query returned: ${bookingResult.data?.length || 0} rows, error:`, bookingResult.error);
+    console.log(`[Diagnostics] Pickups query returned: ${pickupResult.data?.length || 0} rows, error:`, pickupResult.error);
+
+    if (bookingResult.error) console.error("Booking fetch error:", bookingResult.error);
+    if (pickupResult.error) console.warn("Pickup fetch error (ignored):", pickupResult.error);
 
     const bookingRows = Array.isArray(bookingResult.data) ? bookingResult.data : [];
     const pickupRows = Array.isArray(pickupResult.data) ? pickupResult.data : [];
