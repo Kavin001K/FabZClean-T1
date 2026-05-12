@@ -1167,9 +1167,51 @@ export class SupabaseStorage {
         return !error;
     }
 
-    async listOrders(franchiseId?: string): Promise<Order[]> {
+    async listOrders(franchiseId?: string, options: {
+        status?: string;
+        search?: string;
+        customerEmail?: string;
+        customerId?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        limit?: number;
+        page?: number;
+    } = {}): Promise<Order[]> {
         let query = this.supabase.from('orders').select('*');
         if (franchiseId) query = query.eq('franchise_id', franchiseId);
+
+        if (options.customerId) {
+            query = query.eq('customer_id', options.customerId);
+        }
+
+        if (options.status && options.status !== 'all') {
+            query = query.eq('status', options.status);
+        }
+
+        if (options.customerEmail) {
+            query = query.eq('customer_email', options.customerEmail);
+        }
+
+        if (options.search) {
+            const safeSearch = String(options.search).trim();
+            query = query.or(`customer_name.ilike.%${safeSearch}%,order_number.ilike.%${safeSearch}%,customer_phone.ilike.%${safeSearch}%`);
+        }
+
+        if (options.sortBy) {
+            // Map camelCase to snake_case for Supabase
+            const snakeSortBy = options.sortBy.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+            query = query.order(snakeSortBy, { ascending: options.sortOrder === 'asc' });
+        } else {
+            query = query.order('created_at', { ascending: false });
+        }
+
+        if (options.limit) {
+            const pageNum = options.page || 1;
+            const from = (pageNum - 1) * options.limit;
+            const to = from + options.limit - 1;
+            query = query.range(from, to);
+        }
+
         const { data, error } = await query;
         if (error) throw error;
         return data.map(item => this.mapDates(item));

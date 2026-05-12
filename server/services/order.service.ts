@@ -11,6 +11,7 @@ import {
   calculateOrderPriority,
   calculateOrderScore,
 } from '../algorithms';
+import { toISTDateString } from '../utils/date-utils';
 
 import { Order, InsertOrder } from '../../shared/schema';
 
@@ -45,66 +46,24 @@ export class OrderService {
     try {
       console.log('📦 [OrderService] Fetching orders with filters:', filters);
 
-      // Fetch orders from database
-      let orders = await storage.listOrders();
+      // Fetch orders from database with filters
+      let orders = await storage.listOrders(undefined, {
+        status: filters.status,
+        search: filters.search,
+        customerEmail: filters.customerEmail,
+        sortBy: filters.sortBy,
+        sortOrder: filters.sortOrder,
+        limit: filters.limit,
+        page: filters.cursor ? parseInt(filters.cursor) : undefined
+      });
 
-      // Apply email filter if provided
-      if (filters.customerEmail) {
-        orders = orders.filter((order: Order) => order.customerEmail === filters.customerEmail);
-      }
-
-      // Apply status filter if provided
-      if (filters.status && filters.status !== 'all') {
-        orders = orders.filter((order: Order) => order.status === filters.status);
-      }
-      
       // Apply createdDate filter if provided (YYYY-MM-DD)
+      // This remains in-memory for now to ensure consistency with existing IST logic
       if (filters.createdDate) {
         const targetDate = filters.createdDate;
         orders = orders.filter((order: Order) => {
-          if (!order.createdAt) return false;
-          try {
-            const d = new Date(order.createdAt);
-            // Convert to IST (UTC+5.5) for comparison if needed, 
-            // but for now simple YYYY-MM-DD from ISO string is usually fine if client sends UTC or local.
-            // Let's match the server's toISTDateString logic from routes/index.ts for consistency
-            const istTime = d.getTime() + (5.5 * 60 * 60 * 1000);
-            const dateStr = new Date(istTime).toISOString().split('T')[0];
-            return dateStr === targetDate;
-          } catch (e) {
-            return false;
-          }
-        });
-      }
-
-      // Apply search filter if provided
-      if (filters.search && typeof filters.search === 'string') {
-        const searchTerm = filters.search.toLowerCase();
-        orders = orders.filter(
-          (order: Order) =>
-            order.customerName?.toLowerCase().includes(searchTerm) ||
-            order.customerEmail?.toLowerCase().includes(searchTerm) ||
-            order.id.toLowerCase().includes(searchTerm) ||
-            order.orderNumber?.toLowerCase().includes(searchTerm) ||
-            order.customerPhone?.toLowerCase().includes(searchTerm)
-        );
-      }
-
-      // Apply sorting if provided
-      if (filters.sortBy) {
-        const sortBy = filters.sortBy as keyof Order;
-        const sortOrder = filters.sortOrder || 'desc';
-        orders.sort((a: Order, b: Order) => {
-          const aValue = a[sortBy];
-          const bValue = b[sortBy];
-
-          if (aValue === undefined || aValue === null || bValue === undefined || bValue === null) return 0;
-
-          if (sortOrder === 'asc') {
-            return aValue > bValue ? 1 : -1;
-          } else {
-            return aValue < bValue ? 1 : -1;
-          }
+          const dateStr = toISTDateString(order.createdAt);
+          return dateStr === targetDate;
         });
       }
 
@@ -242,26 +201,9 @@ export class OrderService {
 
       console.log(`✅ [OrderService] Order created: ${order.id}`);
 
-      // PERF: Defer customer stats update — not critical for the response
+      // PERF: Defer customer stats refresh
       if (order.customerId) {
-        const custId = order.customerId;
-        const orderTotal = parseFloat(order.totalAmount || '0');
-        setImmediate(async () => {
-          try {
-            const customer = await storage.getCustomer(custId);
-            if (customer) {
-              const currentTotalSpent = parseFloat(customer.totalSpent || '0');
-              await storage.updateCustomer(custId, {
-                totalOrders: (customer.totalOrders || 0) + 1,
-                totalSpent: (currentTotalSpent + orderTotal).toString(),
-                lastOrder: new Date().toISOString()
-              });
-              console.log(`✅ [OrderService] Deferred stats update for customer: ${custId}`);
-            }
-          } catch (error) {
-            console.error(`❌ [OrderService] Deferred stats update failed:`, error);
-          }
-        });
+        setImmediate(() => this.refreshCustomerStats(order.customerId!));
       }
 
       // PERF: Skip algorithm enrichment on create path — only needed for list/display
@@ -289,6 +231,16 @@ export class OrderService {
 
       const updatedOrder = await storage.updateOrder(orderId, updateData);
 
+      // If status changed to or from cancelled/refunded, refresh customer stats
+      if (
+        (updateData.status && updateData.status !== order.status) &&
+        (updateData.status === 'cancelled' || updateData.status === 'refunded' || order.status === 'cancelled' || order.status === 'refunded')
+      ) {
+        if (updatedOrder.customerId) {
+          setImmediate(() => this.refreshCustomerStats(updatedOrder.customerId!));
+        }
+      }
+
       // Re-enrich with algorithms
       const enrichedOrder = enrichOrderWithAlgorithms(updatedOrder);
 
@@ -302,16 +254,56 @@ export class OrderService {
   }
 
   /**
+   * Cancel an order
+   */
+  async cancelOrder(orderId: string, reason: string, cancelledBy: string): Promise<Order> {
+    try {
+      console.log(`📦 [OrderService] Cancelling order: ${orderId}`);
+
+      const updatedOrder = typeof (storage as any).cancelOrder === 'function'
+        ? await (storage as any).cancelOrder(orderId, reason, cancelledBy)
+        : await storage.updateOrder(orderId, {
+            status: 'cancelled',
+            cancellationReason: reason,
+            cancelledAt: new Date(),
+            cancelledBy: cancelledBy,
+          });
+
+      if (!updatedOrder) {
+        throw new Error(`Failed to cancel order: ${orderId}`);
+      }
+
+      // Refresh customer stats after cancellation
+      if (updatedOrder.customerId) {
+        setImmediate(() => this.refreshCustomerStats(updatedOrder.customerId!));
+      }
+
+      console.log(`✅ [OrderService] Order cancelled: ${orderId}`);
+
+      return enrichOrderWithAlgorithms(updatedOrder);
+    } catch (error) {
+      console.error(`❌ [OrderService] Error cancelling order ${orderId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Delete an order
    */
   async deleteOrder(orderId: string): Promise<boolean> {
     try {
       console.log(`📦 [OrderService] Deleting order: ${orderId}`);
 
+      const order = await storage.getOrder(orderId);
       const deleted = await storage.deleteOrder(orderId);
 
       if (!deleted) {
         throw new Error(`Failed to delete order: ${orderId}`);
+      }
+
+      // Refresh customer stats after deletion
+      if (order?.customerId) {
+        setImmediate(() => this.refreshCustomerStats(order.customerId!));
       }
 
       console.log(`✅ [OrderService] Order deleted: ${orderId}`);
@@ -359,15 +351,24 @@ export class OrderService {
     try {
       const orders = await this.findAllOrders(filters);
 
+      // For stats, we define "valid" orders as non-cancelled and non-refunded
+      const validOrders = orders.filter((o: any) => 
+        o.status !== 'cancelled' && 
+        o.status !== 'refunded'
+      );
+
       const stats = {
         totalOrders: orders.length,
+        activeOrders: validOrders.length,
+        cancelledOrders: orders.filter((o: any) => o.status === 'cancelled').length,
+        refundedOrders: orders.filter((o: any) => o.status === 'refunded').length,
         priorityBreakdown: {
-          high: orders.filter((o: any) => o.priority === 'high').length,
-          medium: orders.filter((o: any) => o.medium === 'medium').length,
-          normal: orders.filter((o: any) => o.normal === 'normal').length,
-          low: orders.filter((o: any) => o.low === 'low').length,
+          high: validOrders.filter((o: any) => o.priority === 'high').length,
+          medium: validOrders.filter((o: any) => o.priority === 'medium').length,
+          normal: validOrders.filter((o: any) => o.priority === 'normal').length,
+          low: validOrders.filter((o: any) => o.priority === 'low').length,
         },
-        totalValue: orders.reduce(
+        totalValue: validOrders.reduce(
           (sum, order) => sum + parseFloat(order.totalAmount || '0'),
           0
         ),
@@ -378,6 +379,40 @@ export class OrderService {
     } catch (error) {
       console.error('❌ [OrderService] Error getting statistics:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Internal helper to refresh customer statistics from their order history
+   */
+  private async refreshCustomerStats(customerId: string): Promise<void> {
+    try {
+      const customer = await storage.getCustomer(customerId);
+      if (!customer) return;
+
+      const customerOrders = await storage.listOrders(undefined, {
+        customerId: customerId
+      });
+
+      // Valid orders for spending/count are non-cancelled, non-refunded
+      const validOrders = customerOrders.filter(o => 
+        o.status !== 'cancelled' && 
+        o.status !== 'refunded'
+      );
+
+      const totalSpent = validOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || '0'), 0);
+      
+      await storage.updateCustomer(customerId, {
+        totalOrders: validOrders.length,
+        totalSpent: totalSpent.toFixed(2),
+        lastOrder: validOrders.length > 0 
+          ? new Date(Math.max(...validOrders.map(o => new Date(o.createdAt || 0).getTime()))).toISOString()
+          : customer.lastOrder
+      });
+      
+      console.log(`✅ [OrderService] Refreshed stats for customer: ${customerId}`);
+    } catch (error) {
+      console.error(`❌ [OrderService] Failed to refresh customer stats:`, error);
     }
   }
 }

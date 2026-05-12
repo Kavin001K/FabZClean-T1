@@ -14,6 +14,18 @@
 import { db as storage } from './db';
 import { extractListData } from './utils/list-result';
 
+/**
+ * Filter orders to include only active/valid orders for analytics
+ * Excludes cancelled, refunded, and deleted orders.
+ */
+function getValidOrders(orders: any[]): any[] {
+  return (orders || []).filter((o: any) => 
+    o.status !== 'cancelled' && 
+    o.status !== 'refunded' && 
+    o.status !== 'deleted'
+  );
+}
+
 // ============================================================================
 // STATISTICAL FUNCTIONS
 // ============================================================================
@@ -213,12 +225,13 @@ export interface RFMScore {
   segment: string;
 }
 
+
 /**
  * Perform RFM analysis on customers
  */
 export async function performRFMAnalysis(): Promise<RFMScore[]> {
   const customers = extractListData(await storage.listCustomers());
-  const orders = await storage.listOrders();
+  const orders = getValidOrders(await storage.listOrders());
 
   const now = new Date();
   const rfmData: RFMScore[] = [];
@@ -321,7 +334,7 @@ export interface CohortData {
  * Perform cohort analysis
  */
 export async function performCohortAnalysis(): Promise<CohortData[]> {
-  const orders = await storage.listOrders();
+  const orders = getValidOrders(await storage.listOrders());
   const customers = extractListData(await storage.listCustomers());
 
   // Group customers by first order month
@@ -446,7 +459,7 @@ export interface RevenueForecast {
  * Forecast revenue using linear regression and moving averages
  */
 export async function forecastRevenue(days: number = 30): Promise<RevenueForecast[]> {
-  const orders = await storage.listOrders();
+  const orders = getValidOrders(await storage.listOrders());
 
   // Group orders by date
   const revenueByDate: { [date: string]: number } = {};
@@ -534,7 +547,7 @@ export interface BusinessAnalytics {
  * Generate comprehensive business analytics
  */
 export async function generateBusinessAnalytics(): Promise<BusinessAnalytics> {
-  const orders = await storage.listOrders();
+  const orders = getValidOrders(await storage.listOrders());
   const customers = extractListData(await storage.listCustomers());
   const allServices = await storage.getServices();
 

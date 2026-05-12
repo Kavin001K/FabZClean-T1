@@ -494,7 +494,7 @@ router.patch('/:id/deliver', async (req, res) => {
 // Format: FAB260001 (FAB + Year + Sequence)
 router.get('/next-order-number', async (req, res) => {
   try {
-    const nextOrderNumber = (storage as any).getNextOrderNumber();
+    const nextOrderNumber = await (storage as any).getNextOrderNumber();
 
     const now = new Date();
     const yearStr = String(now.getFullYear()).slice(-2);
@@ -779,7 +779,8 @@ router.post(
       orderData.advancePaid = '0';
       orderData.walletUsed = '0';
       orderData.creditUsed = '0';
-      delete orderData.creditOverrideApproved;
+      const creditOverrideApproved = parseBoolean(orderData.creditOverrideApproved, false);
+
 
       let creditOverrideMetadata: {
         customerId: string;
@@ -1064,14 +1065,7 @@ router.put('/:id', async (req, res) => {
       const cancelledBy = req.employee?.username || req.employee?.employeeId || 'system';
 
       try {
-        const updatedOrder = typeof (storage as any).cancelOrder === 'function'
-          ? await (storage as any).cancelOrder(orderId, cancellationReason, cancelledBy)
-          : await storage.updateOrder(orderId, {
-              status: 'cancelled',
-              cancellationReason,
-              cancelledAt: new Date(),
-              cancelledBy,
-            });
+        const updatedOrder = await orderService.cancelOrder(orderId, cancellationReason, cancelledBy);
         if (!updatedOrder) {
           return res.status(500).json(createErrorResponse('Failed to cancel order', 500));
         }

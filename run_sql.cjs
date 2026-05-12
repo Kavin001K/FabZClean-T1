@@ -1,5 +1,6 @@
 const { Client } = require('pg');
 const fs = require('fs');
+require('dotenv').config();
 
 const sqlFile = process.argv[2] || 'scripts/customer_autocomplete_indexes.sql';
 const connectionString = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;

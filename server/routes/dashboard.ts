@@ -72,7 +72,11 @@ router.get("/metrics", authMiddleware, async (req, res) => {
         const customers = await listAllCustomers();
         const products = await storage.listProducts();
 
-        const activeOrders = allOrders.filter((order: any) => order.status !== 'cancelled');
+        const activeOrders = allOrders.filter((order: any) => 
+            order.status !== 'cancelled' && 
+            order.status !== 'refunded' &&
+            order.status !== 'deleted'
+        );
         const totalRevenue = activeOrders.reduce(
             (sum: number, order: any) => sum + toNumber(order.totalAmount),
             0

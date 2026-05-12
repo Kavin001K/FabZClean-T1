@@ -50,6 +50,8 @@ router.get("/overview", authMiddleware, async (req, res) => {
         let orderQuery = supabase.from('orders')
             .select('id, total_amount, status, created_at, items')
             .gte('created_at', startDate.toISOString())
+            .neq('status', 'cancelled')
+            .neq('status', 'refunded')
             .order('created_at', { ascending: true });
         
         if (franchiseId) orderQuery = orderQuery.eq('franchise_id', franchiseId);
@@ -58,15 +60,15 @@ router.get("/overview", authMiddleware, async (req, res) => {
         if (orderError) throw orderError;
 
         // 3. Process Metrics (Now only on indexed/filtered data)
-        const orders = filteredOrders || [];
-        const totalOrders = orders.length;
+        const activeOrders = filteredOrders || [];
+        const totalOrders = activeOrders.length;
         let totalRevenue = 0;
         
         const revenueMap = new Map<string, number>();
         const statusMap = new Map<string, number>();
         const serviceMap = new Map<string, { name: string, revenue: number, count: number }>();
 
-        orders.forEach(o => {
+        activeOrders.forEach(o => {
             const rev = parseFloat(o.total_amount || '0');
             totalRevenue += rev;
 

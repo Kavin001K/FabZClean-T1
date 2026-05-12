@@ -121,7 +121,8 @@ function normalizeStoreCode(value: unknown): string {
 }
 
 function isOrderActive(order: any): boolean {
-  return String(order?.status || "").toLowerCase() !== "cancelled";
+  const status = String(order?.status || "").toLowerCase();
+  return status !== "cancelled" && status !== "refunded" && status !== "deleted";
 }
 
 function isOrderComplete(order: any): boolean {

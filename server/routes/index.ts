@@ -1,4 +1,5 @@
 import { Express, Router } from 'express';
+import { toISTDateString, getTodayIST } from '../utils/date-utils';
 import ordersRouter from './orders';
 import customersRouter from './customers';
 import employeesRouter from './employees';
@@ -70,23 +71,8 @@ export function registerAllRoutes(app: Express): void {
         const targetDate = date as string;
 
         filteredOrders = filteredOrders.filter((order: any) => {
-          let dueDateStr = null;
-          let pickupDateStr = null;
-
-          const toISTDateString = (dateVal: any) => {
-            if (!dateVal) return null;
-            try {
-              const d = new Date(dateVal);
-              const istTime = d.getTime() + (5.5 * 60 * 60 * 1000);
-              const result = new Date(istTime).toISOString().split('T')[0];
-              return result;
-            } catch (e) {
-              return null;
-            }
-          };
-
-          if (order.dueDate) dueDateStr = toISTDateString(order.dueDate);
-          if (order.pickupDate) pickupDateStr = toISTDateString(order.pickupDate);
+          const dueDateStr = toISTDateString(order.dueDate);
+          const pickupDateStr = toISTDateString(order.pickupDate);
 
           const match = dueDateStr === targetDate || pickupDateStr === targetDate;
           const isCompleted = ['completed', 'delivered', 'cancelled'].includes(order.status?.toLowerCase());
@@ -94,27 +80,11 @@ export function registerAllRoutes(app: Express): void {
           return match && !isCompleted;
         });
       } else if (type === 'today') {
-        const now = new Date();
-        const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
-        const today = istNow.toISOString().split('T')[0];
+        const today = getTodayIST();
 
         filteredOrders = filteredOrders.filter((order: any) => {
-          let dueDateStr = null;
-          let pickupDateStr = null;
-
-          const toISTDateString = (dateVal: any) => {
-            if (!dateVal) return null;
-            try {
-              const d = new Date(dateVal);
-              const istTime = d.getTime() + (5.5 * 60 * 60 * 1000);
-              return new Date(istTime).toISOString().split('T')[0];
-            } catch (e) {
-              return null;
-            }
-          };
-
-          if (order.dueDate) dueDateStr = toISTDateString(order.dueDate);
-          if (order.pickupDate) pickupDateStr = toISTDateString(order.pickupDate);
+          const dueDateStr = toISTDateString(order.dueDate);
+          const pickupDateStr = toISTDateString(order.pickupDate);
 
           const match = dueDateStr === today || pickupDateStr === today;
           const isCompleted = ['completed', 'delivered', 'cancelled'].includes(order.status?.toLowerCase());

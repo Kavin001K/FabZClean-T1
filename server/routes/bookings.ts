@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db as storage } from "../db";
 import { jwtRequired } from "../middleware/auth";
 import { createErrorResponse, createSuccessResponse } from "../services/serialization";
+import { toISTDateString } from '../utils/date-utils';
 import { normalizePhoneForComparison, sanitizePhoneForStorage } from "../../shared/customer-phone";
 
 const protectedBookingsRouter = Router();
@@ -47,13 +48,6 @@ function normalizeStoreCode(value?: string | null): string | null {
   const raw = String(value || "").trim().toUpperCase();
   if (!raw) return null;
   return STORE_CODES.includes(raw as any) ? raw : null;
-}
-
-function toDateIsoString(value?: string | null): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
 }
 
 function formatBookingForClient(row: any) {
@@ -184,36 +178,49 @@ async function resolveOrCreateCustomerId(input: {
   pickupAddress?: any;
 }) {
   const phoneNormalized = normalizePhoneForComparison(input.customerPhone);
-  if (!phoneNormalized) return null;
+  if (!phoneNormalized) {
+    console.warn("[Booking] Cannot resolve customer: Invalid phone number", input.customerPhone);
+    return null;
+  }
 
-  const queryResult = await (storage as any).listCustomers(undefined, {
-    search: phoneNormalized,
-    limit: 200,
-    sortBy: "createdAt",
-    sortOrder: "desc",
-  });
+  const findExact = async () => {
+    const queryResult = await (storage as any).listCustomers(undefined, {
+      search: phoneNormalized,
+      limit: 20,
+    });
+    const candidates = Array.isArray(queryResult?.data) ? queryResult.data : [];
+    return candidates.find((customer: any) => {
+      const primary = normalizePhoneForComparison(customer.phone);
+      const secondary = normalizePhoneForComparison(customer.secondaryPhone);
+      return primary === phoneNormalized || secondary === phoneNormalized;
+    });
+  };
 
-  const candidates = Array.isArray(queryResult?.data) ? queryResult.data : [];
-  const exact = candidates.find((customer: any) => {
-    const primary = normalizePhoneForComparison(customer.phone);
-    const secondary = normalizePhoneForComparison(customer.secondaryPhone);
-    return primary === phoneNormalized || secondary === phoneNormalized;
-  });
+  const existing = await findExact();
+  if (existing?.id) return existing.id;
 
-  if (exact?.id) return exact.id;
-
-  const created = await (storage as any).createCustomer({
-    name: input.customerName,
-    phone: sanitizePhoneForStorage(input.customerPhone),
-    email: input.customerEmail || null,
-    address: typeof input.pickupAddress === "object" && input.pickupAddress ? input.pickupAddress : {},
-    status: "active",
-    creditLimit: "1000",
-    totalOrders: 0,
-    totalSpent: "0",
-  });
-
-  return created?.id || null;
+  try {
+    const created = await (storage as any).createCustomer({
+      name: input.customerName || "Guest Customer",
+      phone: sanitizePhoneForStorage(input.customerPhone),
+      email: input.customerEmail || null,
+      address: typeof input.pickupAddress === "object" && input.pickupAddress ? input.pickupAddress : {},
+      status: "active",
+      creditLimit: "1000",
+      totalOrders: 0,
+      totalSpent: "0",
+    });
+    return created?.id || null;
+  } catch (error: any) {
+    // If it's a unique constraint violation, someone else might have created the customer
+    if (error?.message?.includes("unique constraint") || error?.code === "23505") {
+      console.log("[Booking] Customer already exists (race condition), retrying search...");
+      const secondChance = await findExact();
+      return secondChance?.id || null;
+    }
+    console.error("[Booking] Failed to create customer:", error.message || error);
+    return null;
+  }
 }
 
 async function nextBookingId(supabase: any, options?: { skipRpc?: boolean }): Promise<string> {
@@ -376,7 +383,7 @@ publicBookingsRouter.post("/bookings", async (req, res) => {
       pickup_address: typeof parsed.pickupAddress === "string"
         ? { line1: parsed.pickupAddress }
         : parsed.pickupAddress || null,
-      preferred_date: toDateIsoString(parsed.preferredDate),
+      preferred_date: toISTDateString(parsed.preferredDate),
       preferred_slot: parsed.preferredSlot || null,
       notes: parsed.notes || null,
       weather_snapshot: parsed.weatherSnapshot || {},
@@ -426,7 +433,9 @@ publicBookingsRouter.post("/bookings", async (req, res) => {
       if (schema.hasBookingId) {
         delete (fallbackPayload as any).booking_id;
       }
-      delete (fallbackPayload as any).customer_id;
+      if (!schema.hasCustomerId) {
+        delete (fallbackPayload as any).customer_id;
+      }
 
       const fallbackInsert = await supabase
         .from("booking_requests")
