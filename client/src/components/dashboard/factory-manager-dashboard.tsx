@@ -66,7 +66,11 @@ export default function FactoryManagerDashboard() {
     const today = new Date().toISOString().split("T")[0];
     const todaysIncoming = orders.filter((o: any) => {
         const created = new Date(o.createdAt || o.created_at || 0);
-        return created.toISOString().split("T")[0] === today;
+        const status = String(o.status || '').toLowerCase();
+        return created.toISOString().split("T")[0] === today && 
+               status !== 'cancelled' && 
+               status !== 'refunded' && 
+               status !== 'deleted';
     });
 
     return (

@@ -45,7 +45,10 @@ const isWithinSelectedRange = (value: string | Date | null | undefined, range: D
   return date >= range.from && date <= range.to;
 };
 
-const isNonCancelledOrder = (order: Order) => order.status !== 'cancelled';
+const isOrderActive = (order: any) => {
+  const status = String(order.status || '').toLowerCase();
+  return status !== 'cancelled' && status !== 'refunded' && status !== 'deleted';
+};
 
 export function useDashboard() {
   const { toast } = useToast();
@@ -116,7 +119,7 @@ export function useDashboard() {
   }, [safeOrders, filters.dateRange, filters.status, filters.serviceType]);
 
   const activeFilteredOrders = useMemo(
-    () => filteredOrders.filter(isNonCancelledOrder),
+    () => filteredOrders.filter(isOrderActive),
     [filteredOrders]
   );
 
@@ -131,7 +134,7 @@ export function useDashboard() {
     const dayAfterTomorrow = new Date(tomorrow);
     dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
 
-    return safeOrders.filter(isNonCancelledOrder).reduce((stats, order) => {
+    return safeOrders.filter(isOrderActive).reduce((stats, order) => {
       if (!order.pickupDate) return stats;
       const pickupDate = startOfDay(new Date(order.pickupDate));
 
@@ -155,7 +158,7 @@ export function useDashboard() {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     return safeOrders.filter((order) =>
-      isNonCancelledOrder(order) &&
+      isOrderActive(order) &&
       order.createdAt &&
       new Date(order.createdAt) >= today &&
       new Date(order.createdAt) < tomorrow
@@ -168,7 +171,7 @@ export function useDashboard() {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     return safeOrders.reduce((sum, order) => {
-      if (!isNonCancelledOrder(order) || !order.createdAt) return sum;
+      if (!isOrderActive(order) || !order.createdAt) return sum;
       const createdAt = new Date(order.createdAt);
       if (createdAt < today || createdAt >= tomorrow) return sum;
       return sum + toAmount(order.totalAmount);
@@ -288,7 +291,7 @@ export function useDashboard() {
     const today = startOfDay(new Date());
     return safeOrders
       .filter((order) => {
-        if (!isNonCancelledOrder(order) || !order.pickupDate) return false;
+        if (!isOrderActive(order) || !order.pickupDate) return false;
         const pickupDate = startOfDay(new Date(order.pickupDate));
         return pickupDate <= today;
       })
@@ -308,10 +311,10 @@ export function useDashboard() {
     const startOfLastMonth = startOfDay(new Date(now.getFullYear(), now.getMonth() - 1, 1));
 
     const thisMonthOrders = safeOrders.filter((order) =>
-      isNonCancelledOrder(order) && isWithinSelectedRange(order.createdAt, { from: startOfThisMonth, to: endOfDay(now) })
+      isOrderActive(order) && isWithinSelectedRange(order.createdAt, { from: startOfThisMonth, to: endOfDay(now) })
     );
     const lastMonthOrders = safeOrders.filter((order) => {
-      if (!isNonCancelledOrder(order) || !order.createdAt) return false;
+      if (!isOrderActive(order) || !order.createdAt) return false;
       const createdAt = new Date(order.createdAt);
       return createdAt >= startOfLastMonth && createdAt < startOfThisMonth;
     });

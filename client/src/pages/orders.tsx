@@ -1170,9 +1170,15 @@ function OrdersComponent() {
 
   // Calculate Quick Stats
   const stats = useMemo(() => {
-    const totalOrders = filteredOrders.length;
-    const totalRevenue = filteredOrders.length > 0
-      ? filteredOrders.reduce((sum, order) => sum + safeParseFloat(order.totalAmount), 0)
+    const activeStatsOrders = filteredOrders.filter(o => 
+      o.status !== 'cancelled' && 
+      o.status !== 'refunded' && 
+      (o as any).status !== 'deleted'
+    );
+
+    const totalOrders = activeStatsOrders.length;
+    const totalRevenue = totalOrders > 0
+      ? activeStatsOrders.reduce((sum, order) => sum + safeParseFloat(order.totalAmount), 0)
       : 0;
     const completedOrders = filteredOrders.filter(o => o.status === 'completed').length;
     const pendingOrders = filteredOrders.filter(o => o.status === 'pending').length;
@@ -1203,7 +1209,11 @@ function OrdersComponent() {
       const getPeriodStats = (startDate: Date, endDate: Date) => {
         const periodOrders = orders.filter(o => {
           const d = new Date(o.createdAt || now);
-          return d >= startDate && d < endDate;
+          const status = String(o.status || '').toLowerCase();
+          return d >= startDate && d < endDate && 
+                 status !== 'cancelled' && 
+                 status !== 'refunded' && 
+                 status !== 'deleted';
         });
         return {
           count: periodOrders.length,

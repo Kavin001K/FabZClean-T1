@@ -52,6 +52,7 @@ router.get("/overview", authMiddleware, async (req, res) => {
             .gte('created_at', startDate.toISOString())
             .neq('status', 'cancelled')
             .neq('status', 'refunded')
+            .neq('status', 'deleted')
             .order('created_at', { ascending: true });
         
         if (franchiseId) orderQuery = orderQuery.eq('franchise_id', franchiseId);

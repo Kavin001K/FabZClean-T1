@@ -41,14 +41,18 @@ export default function StoreManagerDashboard() {
     });
     const dashStats = (dashRes as any)?.data || dashRes || {};
 
-    // Today's orders
+    // Helper to filter active orders (non-cancelled, non-refunded, non-deleted)
+    const filterActive = (orderList: any[]) => Array.isArray(orderList) ? orderList.filter((o: any) => {
+        const status = String(o.status || '').toLowerCase();
+        return status !== 'cancelled' && status !== 'refunded' && status !== 'deleted';
+    }) : [];
+
+    // Today's orders (Active only)
     const today = new Date().toISOString().split("T")[0];
-    const todaysOrders = Array.isArray(orders)
-        ? orders.filter((o: any) => {
-            const created = new Date(o.createdAt || o.created_at || 0);
-            return created.toISOString().split("T")[0] === today;
-        })
-        : [];
+    const todaysOrders = filterActive(orders).filter((o: any) => {
+        const created = new Date(o.createdAt || o.created_at || 0);
+        return created.toISOString().split("T")[0] === today;
+    });
 
     const todaysRevenue = todaysOrders.reduce(
         (sum: number, o: any) => sum + parseFloat(o.totalAmount || o.total_amount || "0"),

@@ -36,7 +36,11 @@ export async function computeMonthlyMetrics(monthYear?: string): Promise<void> {
         const monthOrders = allOrders.filter((order: any) => {
             const createdAt = new Date(order.createdAt || 0);
             const orderMonth = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}`;
-            return orderMonth === targetMonthYear;
+            const status = String(order.status || '').toLowerCase();
+            return orderMonth === targetMonthYear && 
+                   status !== 'cancelled' && 
+                   status !== 'refunded' && 
+                   status !== 'deleted';
         });
 
         // Filter delivered orders for the target month

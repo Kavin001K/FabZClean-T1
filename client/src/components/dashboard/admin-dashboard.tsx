@@ -114,24 +114,32 @@ export default function AdminDashboard() {
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
 
-        // Use filtered orders for primary stats
-        const totalRevenue = filteredOrders.reduce((sum: number, order: any) => sum + parseFloat(order.totalAmount || 0), 0);
-        const totalOrders = filteredOrders.length;
-        const activeCustomers = new Set(filteredOrders.map((o: any) => o.customerId)).size;
+        // Helper to filter active orders (non-cancelled, non-refunded, non-deleted)
+        const filterActive = (orderList: any[]) => orderList.filter((o: any) => {
+            const status = String(o.status || '').toLowerCase();
+            return status !== 'cancelled' && status !== 'refunded' && status !== 'deleted';
+        });
 
-        // Growth calculations always use ALL orders
-        const thisMonthOrders = orders.filter((o: any) => new Date(o.createdAt || now) >= startOfThisMonth);
-        const lastMonthOrders = orders.filter((o: any) => {
+        // Use filtered orders for primary stats
+        const activeFilteredOrders = filterActive(filteredOrders);
+        const totalRevenue = activeFilteredOrders.reduce((sum: number, order: any) => sum + parseFloat(order.totalAmount || 0), 0);
+        const totalOrders = activeFilteredOrders.length;
+        const activeCustomers = new Set(activeFilteredOrders.map((o: any) => o.customerId)).size;
+
+        // Growth calculations always use ALL orders but filtered for active status
+        const allActiveOrders = filterActive(orders);
+        const thisMonthOrders = allActiveOrders.filter((o: any) => new Date(o.createdAt || now) >= startOfThisMonth);
+        const lastMonthOrders = allActiveOrders.filter((o: any) => {
             const d = new Date(o.createdAt || now);
             return d >= startOfLastMonth && d < startOfThisMonth;
         });
-        const thisWeekOrders = orders.filter((o: any) => new Date(o.createdAt || now) >= startOfThisWeek);
-        const lastWeekOrders = orders.filter((o: any) => {
+        const thisWeekOrders = allActiveOrders.filter((o: any) => new Date(o.createdAt || now) >= startOfThisWeek);
+        const lastWeekOrders = allActiveOrders.filter((o: any) => {
             const d = new Date(o.createdAt || now);
             return d >= startOfLastWeek && d < startOfThisWeek;
         });
-        const todayOrders = orders.filter((o: any) => new Date(o.createdAt || now) >= startOfToday);
-        const yesterdayOrders = orders.filter((o: any) => {
+        const todayOrders = allActiveOrders.filter((o: any) => new Date(o.createdAt || now) >= startOfToday);
+        const yesterdayOrders = allActiveOrders.filter((o: any) => {
             const d = new Date(o.createdAt || now);
             return d >= startOfYesterday && d < startOfToday;
         });
