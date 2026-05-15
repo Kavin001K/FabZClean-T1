@@ -90,8 +90,9 @@ export default function FactoryManagerDashboard() {
                     Factory Dashboard
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                    Welcome, {employee?.fullName || "Manager"} — Live processing overview
+                    Welcome, {employee?.fullName || "Manager"} - Live processing overview
                 </p>
+
             </div>
 
             {/* Pipeline Cards */}
