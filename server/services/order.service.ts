@@ -20,6 +20,8 @@ export interface OrderFilters {
   search?: string;
   customerEmail?: string;
   createdDate?: string;
+  dateFrom?: string;
+  dateTo?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   limit?: number;
@@ -51,6 +53,8 @@ export class OrderService {
         status: filters.status,
         search: filters.search,
         customerEmail: filters.customerEmail,
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
         sortBy: filters.sortBy,
         sortOrder: filters.sortOrder,
         limit: filters.limit,

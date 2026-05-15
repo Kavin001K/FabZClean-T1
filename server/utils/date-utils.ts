@@ -13,9 +13,22 @@ export function toISTDateString(dateVal: any): string | null {
     const d = new Date(dateVal);
     if (isNaN(d.getTime())) return null;
     
-    // IST is UTC + 5.5 hours
-    const istTime = d.getTime() + (5.5 * 60 * 60 * 1000);
-    return new Date(istTime).toISOString().split('T')[0];
+    // Format to Asia/Kolkata using Intl API
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(d);
+    
+    const year = parts.find(p => p.type === 'year')?.value;
+    const month = parts.find(p => p.type === 'month')?.value;
+    const day = parts.find(p => p.type === 'day')?.value;
+    
+    if (year && month && day) {
+        return `${year}-${month}-${day}`;
+    }
+    return null;
   } catch (e) {
     return null;
   }
@@ -26,7 +39,17 @@ export function toISTDateString(dateVal: any): string | null {
  * @returns YYYY-MM-DD string in IST
  */
 export function getTodayIST(): string {
-  const now = new Date();
-  const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
-  return istNow.toISOString().split('T')[0];
+  const d = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(d);
+  
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  
+  return `${year}-${month}-${day}`;
 }

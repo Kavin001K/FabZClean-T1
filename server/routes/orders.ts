@@ -582,6 +582,8 @@ router.get('/', async (req, res) => {
     const status = req.query.status as string;
     const customerEmail = req.query.customerEmail as string;
     const createdDate = req.query.createdDate as string;
+    const dateFrom = req.query.dateFrom as string;
+    const dateTo = req.query.dateTo as string;
 
     console.log(`[GET /api/orders] Query: ${JSON.stringify(req.query)}`);
 
@@ -591,6 +593,8 @@ router.get('/', async (req, res) => {
       status: status === 'all' ? undefined : status,
       customerEmail,
       createdDate,
+      dateFrom,
+      dateTo,
     };
 
     const orders = await orderService.findAllOrders(filters);
@@ -779,7 +783,6 @@ router.post(
       orderData.advancePaid = '0';
       orderData.walletUsed = '0';
       orderData.creditUsed = '0';
-      const creditOverrideApproved = parseBoolean(orderData.creditOverrideApproved, false);
 
 
       let creditOverrideMetadata: {

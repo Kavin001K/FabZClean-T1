@@ -8,9 +8,10 @@ import { storage } from './storage';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
+if (!JWT_SECRET && !process.env.SESSION_SECRET && process.env.NODE_ENV === 'production') {
     // In production, we must have a secure secret
-    console.warn("⚠️ JWT_SECRET is not set. Using fallback for now, but this is insecure for production.");
+    console.error("🚨 FATAL: JWT_SECRET or SESSION_SECRET must be set in production.");
+    process.exit(1);
 }
 
 const FINAL_SECRET = JWT_SECRET || process.env.SESSION_SECRET || 'fabzclean-secret-key-change-in-production';
@@ -80,7 +81,7 @@ export class AuthService {
                         ipAddress
                     );
                 } catch (logErr) {
-                    console.warn(`⚠️ Audit log failed (User not found):`, (logErr as any).message);
+                    console.error(`🚨 FATAL AUDIT LOG FAILURE (User not found):`, (logErr as any).message);
                 }
                 console.log(`❌ User not found: ${username}`);
                 throw new Error('Invalid username or password');
@@ -107,7 +108,7 @@ export class AuthService {
                         ipAddress
                     );
                 } catch (logErr) {
-                    console.warn(`⚠️ Audit log failed (Invalid password):`, (logErr as any).message);
+                    console.error(`🚨 FATAL AUDIT LOG FAILURE (Invalid password):`, (logErr as any).message);
                 }
                 console.log(`❌ Password mismatch for user: ${username}`);
                 console.log(`DEBUG: Entered password length: ${password.length}`);
@@ -164,7 +165,7 @@ export class AuthService {
                     ipAddress
                 );
             } catch (logErr) {
-                console.warn(`⚠️ Audit log failed (Login success):`, (logErr as any).message);
+                console.error(`🚨 FATAL AUDIT LOG FAILURE (Login success):`, (logErr as any).message);
             }
 
             console.log(`✅ Login successful for: ${username}`);
@@ -241,26 +242,14 @@ export class AuthService {
         const firstName = names[0];
         const lastName = names.slice(1).join(' ') || 'Staff';
 
-        // Auto-generate employee_id matching: FZCEM001, FZCEM002...
-        const localEmployees = await storage.listEmployees();
-
-        // Find highest existing FZCEM number
-        let maxSequence = 0;
-        for (const emp of localEmployees) {
-            const empId = emp.employeeId || emp.employee_id || '';
-            if (empId && empId.startsWith('FZCEM')) {
-                const numStr = empId.substring(5);
-                const num = parseInt(numStr, 10);
-                if (!isNaN(num) && num > maxSequence) {
-                    maxSequence = num;
-                }
-            }
-        }
-
-        // Generate next sequence. If maxSequence is 0 (no valid IDs found), we start at 1.
-        const nextSequence = maxSequence > 0 ? maxSequence + 1 : 1;
-        const sequenceNum = String(nextSequence).padStart(3, '0');
-        const generatedEmployeeId = `FZCEM${sequenceNum}`;
+        // Generate employee_id using timestamp to prevent race conditions and O(N) loop
+        // Format: FZCEM + YYMMDD + Random(2 digits)
+        const now = new Date();
+        const yy = String(now.getFullYear()).slice(-2);
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const randomSuffix = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+        const generatedEmployeeId = `FZCEM${yy}${mm}${dd}${randomSuffix}`;
 
         const newEmployee = await storage.createEmployee({
             // Basic Info

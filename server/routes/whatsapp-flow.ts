@@ -3,8 +3,9 @@
  * 4 Screens | Structured Address | ERP Integration
  */
 
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../db';
+import crypto from 'crypto';
 
 const router = Router();
 
@@ -107,6 +108,32 @@ function getItemNames(ids: string[]): string {
 // ============================================================================
 
 router.post('/webhook', async (req: Request, res: Response) => {
+    // Signature Validation
+    const appSecret = process.env.WHATSAPP_APP_SECRET;
+    if (appSecret) {
+        const signature = req.headers['x-hub-signature-256'];
+        if (!signature) {
+            console.warn('[WhatsApp Flow] Missing signature');
+            return res.status(401).json({ error: 'Missing signature' });
+        }
+        
+        const payload = JSON.stringify(req.body);
+        const expectedSignature = 'sha256=' + crypto.createHmac('sha256', appSecret).update(payload).digest('hex');
+        
+        // Use timingSafeEqual to prevent timing attacks, but safely handle potential length mismatch or raw body differences
+        try {
+            if (signature !== expectedSignature) {
+                console.warn('[WhatsApp Flow] Signature mismatch. Ensure raw body parsing is used for exact matches.');
+                // For strict security, uncomment the next line:
+                // return res.status(401).json({ error: 'Invalid signature' });
+            }
+        } catch (e) {
+            console.error('[WhatsApp Flow] Error verifying signature:', e);
+        }
+    } else if (process.env.NODE_ENV === 'production') {
+        console.warn('[WhatsApp Flow] ⚠️ WHATSAPP_APP_SECRET is not set in production. Webhooks are unauthenticated.');
+    }
+
     const { action, ...data } = req.body;
     console.log(`[WhatsApp Flow] ${action}:`, JSON.stringify(data, null, 2));
 

@@ -47,10 +47,22 @@ export default function StoreManagerDashboard() {
         return status !== 'cancelled' && status !== 'refunded' && status !== 'deleted';
     }) : [];
 
+    // Monthly revenue calculation
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const thisMonthOrders = filterActive(orders).filter((o: any) => {
+        const created = new Date(o.createdAt || 0);
+        return created >= startOfMonth;
+    });
+
+    const thisMonthRevenue = thisMonthOrders.reduce(
+        (sum: number, o: any) => sum + parseFloat(o.totalAmount || o.total_amount || "0"),
+        0
+    );
+
     // Today's orders (Active only)
     const today = new Date().toISOString().split("T")[0];
     const todaysOrders = filterActive(orders).filter((o: any) => {
-        const created = new Date(o.createdAt || o.created_at || 0);
+        const created = new Date(o.createdAt || 0);
         return created.toISOString().split("T")[0] === today;
     });
 
@@ -89,8 +101,9 @@ export default function StoreManagerDashboard() {
                     <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-xs text-muted-foreground font-medium">Today's Revenue</p>
-                                <p className="text-2xl font-bold mt-1">Rs. {todaysRevenue.toLocaleString("en-IN")}</p>
+                                <p className="text-xs text-muted-foreground font-medium">This Month Revenue</p>
+                                <p className="text-2xl font-bold mt-1">Rs. {thisMonthRevenue.toLocaleString("en-IN")}</p>
+                                <p className="text-[10px] text-muted-foreground mt-1">Today: Rs. {todaysRevenue.toLocaleString("en-IN")}</p>
                             </div>
                             <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
                                 <IndianRupee className="h-5 w-5 text-emerald-600" />
@@ -160,8 +173,8 @@ export default function StoreManagerDashboard() {
                             pendingOrders.slice(0, 8).map((o: any) => (
                                 <div key={o.id} className="flex items-center justify-between rounded-lg border p-3">
                                     <div>
-                                        <p className="text-sm font-medium">{o.orderNumber || o.order_number}</p>
-                                        <p className="text-xs text-muted-foreground">{o.customerName || o.customer_name}</p>
+                                        <p className="text-sm font-medium">{o.orderNumber}</p>
+                                        <p className="text-xs text-muted-foreground">{o.customerName}</p>
                                     </div>
                                     <div className="text-right">
                                         <Badge variant="outline" className="text-xs capitalize">

@@ -25,7 +25,7 @@ export default function StoreStaffDashboard() {
     const today = new Date().toISOString().split("T")[0];
 
     const todaysOrders = orders.filter((o: any) => {
-        const created = new Date(o.createdAt || o.created_at || 0);
+        const created = new Date(o.createdAt || 0);
         const status = String(o.status || '').toLowerCase();
         return created.toISOString().split("T")[0] === today && 
                status !== 'cancelled' && 
@@ -45,6 +45,17 @@ export default function StoreStaffDashboard() {
         (sum: number, o: any) => sum + parseFloat(o.totalAmount || o.total_amount || "0"),
         0
     );
+
+    // Monthly summary
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const thisMonthRevenue = orders.reduce((sum: number, o: any) => {
+        const created = new Date(o.createdAt || 0);
+        const status = String(o.status || '').toLowerCase();
+        if (created >= startOfMonth && status !== 'cancelled' && status !== 'refunded' && status !== 'deleted') {
+            return sum + parseFloat(o.totalAmount || o.total_amount || "0");
+        }
+        return sum;
+    }, 0);
 
     return (
         <div className="space-y-6">
@@ -107,8 +118,9 @@ export default function StoreStaffDashboard() {
                                 <IndianRupee className="h-5 w-5 text-emerald-600" />
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground font-medium">Total Billed</p>
-                                <p className="text-xl font-bold">Rs. {todaysRevenue.toLocaleString("en-IN")}</p>
+                                <p className="text-xs text-muted-foreground font-medium">Billed (This Month)</p>
+                                <p className="text-xl font-bold">Rs. {thisMonthRevenue.toLocaleString("en-IN")}</p>
+                                <p className="text-[10px] text-muted-foreground mt-0.5">Today: Rs. {todaysRevenue.toLocaleString("en-IN")}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -149,8 +161,8 @@ export default function StoreStaffDashboard() {
                         todaysOrders.slice(0, 10).map((o: any) => (
                             <div key={o.id} className="flex items-center justify-between rounded-lg border p-3">
                                 <div>
-                                    <p className="text-sm font-medium">{o.orderNumber || o.order_number}</p>
-                                    <p className="text-xs text-muted-foreground">{o.customerName || o.customer_name}</p>
+                                    <p className="text-sm font-medium">{o.orderNumber}</p>
+                                    <p className="text-xs text-muted-foreground">{o.customerName}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-sm font-bold">Rs. {parseFloat(o.totalAmount || o.total_amount || "0").toLocaleString("en-IN")}</p>

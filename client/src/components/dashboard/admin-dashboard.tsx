@@ -24,7 +24,7 @@ import DashboardQuickActions from "./components/dashboard-quick-actions";
 import WeatherWidget from "./components/weather-widget";
 import DashboardOrdersByDate from "./components/orders-by-date";
 import DashboardNewCustomers from "./components/new-customers";
-import { format, startOfDay, endOfDay, isWithinInterval, isSameDay, subDays } from "date-fns";
+import { format, startOfDay, endOfDay, isWithinInterval, isSameDay, subDays, startOfMonth, startOfQuarter, startOfYear } from "date-fns";
 import { cn } from "@/lib/utils";
 
 import { useQuery } from "@tanstack/react-query";
@@ -43,8 +43,8 @@ const PERIOD_FILTERS: Array<{ value: PresetPeriod; label: string }> = [
 
 export default function AdminDashboard() {
     // Date filter state
-    const [filterMode, setFilterMode] = useState<FilterMode>('all');
-    const [presetPeriod, setPresetPeriod] = useState<PresetPeriod>('day');
+    const [filterMode, setFilterMode] = useState<FilterMode>('preset');
+    const [presetPeriod, setPresetPeriod] = useState<PresetPeriod>('month');
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
     const [rangeStart, setRangeStart] = useState<Date | undefined>(undefined);
     const [rangeEnd, setRangeEnd] = useState<Date | undefined>(undefined);
@@ -73,11 +73,11 @@ export default function AdminDashboard() {
             } else if (presetPeriod === 'fortnight') {
                 start = startOfDay(subDays(now, 13));
             } else if (presetPeriod === 'month') {
-                start = startOfDay(subDays(now, 29));
+                start = startOfMonth(now);
             } else if (presetPeriod === 'quarter') {
-                start = startOfDay(subDays(now, 89));
+                start = startOfQuarter(now);
             } else if (presetPeriod === 'year') {
-                start = startOfDay(subDays(now, 364));
+                start = startOfYear(now);
             }
             return orders.filter((o: any) => {
                 const d = new Date(o.createdAt || now);
@@ -158,12 +158,12 @@ export default function AdminDashboard() {
         const todayRevenue = todayOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
         const yesterdayRevenue = yesterdayOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || 0), 0);
 
-        const revGrowth = filterMode === 'all'
+        const revGrowth = filterMode === 'preset' && presetPeriod === 'month'
             ? getGrowth(thisMonthRevenue, lastMonthRevenue, lastWeekRevenue, yesterdayRevenue)
             : { val: null, label: null };
 
         // Orders Growth
-        const ordGrowth = filterMode === 'all'
+        const ordGrowth = filterMode === 'preset' && presetPeriod === 'month'
             ? getGrowth(thisMonthOrders.length, lastMonthOrders.length, lastWeekOrders.length, yesterdayOrders.length)
             : { val: null, label: null };
 
@@ -173,7 +173,7 @@ export default function AdminDashboard() {
         const activeLastWeek = new Set(lastWeekOrders.map((o: any) => o.customerId)).size;
         const activeYesterday = new Set(yesterdayOrders.map((o: any) => o.customerId)).size;
 
-        const custGrowth = filterMode === 'all'
+        const custGrowth = filterMode === 'preset' && presetPeriod === 'month'
             ? getGrowth(activeThisMonth, activeLastMonth, activeLastWeek, activeYesterday)
             : { val: null, label: null };
 
@@ -232,7 +232,7 @@ export default function AdminDashboard() {
         }
         if (filterMode === 'date' && selectedDate) return format(selectedDate, 'dd MMM yyyy');
         if (filterMode === 'range' && rangeStart && rangeEnd) return `${format(rangeStart, 'dd MMM')} — ${format(rangeEnd, 'dd MMM yyyy')}`;
-        return 'All Time';
+        return 'All Time View';
     }, [filterMode, presetPeriod, selectedDate, rangeStart, rangeEnd]);
 
     const handleDateSelect = (date: Date | undefined) => {
@@ -449,12 +449,12 @@ export default function AdminDashboard() {
                                                 <ArrowDownRight className="h-3 w-3" />
                                             )}
                                             {Math.abs(card.growth)}%
-                                            <span className="text-muted-foreground/60 font-medium">vs last {card.label}</span>
+                                            <span className="text-muted-foreground/60 font-medium ml-1">vs prev {card.label}</span>
                                         </div>
-                                    ) : filterMode !== 'all' ? (
+                                    ) : (filterMode !== 'all' && filterMode !== 'preset') || (filterMode === 'preset' && presetPeriod !== 'month') ? (
                                         <Badge variant="outline" className="text-[9px] h-5 border-border/50 font-bold uppercase tracking-tight text-muted-foreground/60">Filtered view</Badge>
                                     ) : (
-                                        <span className="text-[10px] text-muted-foreground/40 font-medium">No comparison data</span>
+                                        <span className="text-[10px] text-muted-foreground/40 font-medium">Monthly baseline set</span>
                                     )}
                                 </div>
                             </CardContent>

@@ -26,17 +26,24 @@ router.get("/overview", authMiddleware, async (req, res) => {
         }
 
         const franchiseId = getFranchiseId(req);
-        const dateRange = req.query.dateRange as string || 'last-30-days';
+        const dateRange = req.query.dateRange as string || 'this-month';
 
         // 1. Calculate Date Range
         const now = new Date();
         let startDate = new Date();
         switch (dateRange) {
+            case 'this-month':
+                // First day of current month (00:00:00)
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                break;
             case 'last-7-days': startDate.setDate(now.getDate() - 7); break;
             case 'last-30-days': startDate.setDate(now.getDate() - 30); break;
             case 'last-90-days': startDate.setDate(now.getDate() - 90); break;
             case 'last-year': startDate.setFullYear(now.getFullYear() - 1); break;
-            default: startDate = new Date(0); // All time
+            case 'all-time': startDate = new Date(0); break;
+            default: 
+                // Default to first day of current month if not recognized
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         }
 
         // 2. Efficient Counts & Revenue using Supabase

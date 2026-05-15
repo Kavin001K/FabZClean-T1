@@ -228,7 +228,7 @@ function OrdersComponent() {
     status: [],
     paymentStatus: [],
     search: '',
-    dateFrom: undefined,
+    dateFrom: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // Default to start of current month
     dateTo: undefined,
     dueDate: undefined,
     dueDatePreset: undefined,
@@ -259,10 +259,14 @@ function OrdersComponent() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['orders'],
-    queryFn: () => ordersApi.getAll({ limit: 10000 }),
-    staleTime: 15000,
-    refetchOnWindowFocus: false,
+    queryKey: ['/api/orders', filters.dateFrom?.toISOString(), filters.dateTo?.toISOString()],
+    queryFn: () => ordersApi.getAll({ 
+      limit: 10000,
+      dateFrom: filters.dateFrom?.toISOString(),
+      dateTo: filters.dateTo?.toISOString()
+    }),
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
@@ -1158,7 +1162,7 @@ function OrdersComponent() {
       status: [],
       paymentStatus: [],
       search: '',
-      dateFrom: undefined,
+      dateFrom: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
       dateTo: undefined,
       dueDate: undefined,
       dueDatePreset: undefined,
@@ -1189,23 +1193,6 @@ function OrdersComponent() {
     
     // Growth calculation helper
     const getGrowth = (current: number, period: 'month' | 'week' | 'day') => {
-      let pastDate = new Date();
-      let label = "";
-      
-      if (period === 'month') {
-        pastDate.setMonth(now.getMonth() - 1);
-        label = "from last month";
-      } else if (period === 'week') {
-        pastDate.setDate(now.getDate() - 7);
-        label = "from last week";
-      } else {
-        pastDate.setDate(now.getDate() - 1);
-        label = "from yesterday";
-      }
-
-      const pastOrders = orders.filter(o => new Date(o.createdAt || now) < pastDate && new Date(o.createdAt || now) >= new Date(pastDate.getTime() - (now.getTime() - pastDate.getTime())));
-      
-      // Simplify: Let's use a more robust comparison logic similar to AdminDashboard
       const getPeriodStats = (startDate: Date, endDate: Date) => {
         const periodOrders = orders.filter(o => {
           const d = new Date(o.createdAt || now);
@@ -1221,36 +1208,37 @@ function OrdersComponent() {
         };
       };
 
-      // Current Period (Last 30 days, 7 days, or 1 day)
-      const currentMonth = getPeriodStats(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000), now);
-      const lastMonth = getPeriodStats(new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000), new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
-      
-      const currentWeek = getPeriodStats(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000), now);
-      const lastWeek = getPeriodStats(new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000), new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
-      
-      const currentDay = getPeriodStats(new Date(now.getTime() - 24 * 60 * 60 * 1000), now);
-      const lastDay = getPeriodStats(new Date(now.getTime() - 48 * 24 * 60 * 60 * 1000), new Date(now.getTime() - 24 * 60 * 60 * 1000));
+      if (period === 'month') {
+        const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
 
-      // Try Month -> Week -> Day
-      if (lastMonth.count > 0) return { 
-        orders: ((currentMonth.count - lastMonth.count) / lastMonth.count) * 100,
-        revenue: lastMonth.revenue > 0 ? ((currentMonth.revenue - lastMonth.revenue) / lastMonth.revenue) * 100 : 0,
-        label: "from last month"
-      };
-      
-      if (lastWeek.count > 0) return {
-        orders: ((currentWeek.count - lastWeek.count) / lastWeek.count) * 100,
-        revenue: lastWeek.revenue > 0 ? ((currentWeek.revenue - lastWeek.revenue) / lastWeek.revenue) * 100 : 0,
-        label: "from last week"
-      };
-      
-      if (lastDay.count > 0) return {
-        orders: ((currentDay.count - lastDay.count) / lastDay.count) * 100,
-        revenue: lastDay.revenue > 0 ? ((currentDay.revenue - lastDay.revenue) / lastDay.revenue) * 100 : 0,
-        label: "from yesterday"
-      };
+        const thisMonthStats = getPeriodStats(startOfThisMonth, now);
+        const lastMonthStats = getPeriodStats(startOfLastMonth, endOfLastMonth);
 
-      return null;
+        return {
+          orders: lastMonthStats.count > 0 ? ((thisMonthStats.count - lastMonthStats.count) / lastMonthStats.count) * 100 : null,
+          revenue: lastMonthStats.revenue > 0 ? ((thisMonthStats.revenue - lastMonthStats.revenue) / lastMonthStats.revenue) * 100 : null,
+          label: "vs prev month"
+        };
+      } 
+      
+      // Fallback for other periods if needed (though current implementation only uses 'month')
+      let pastDate = new Date();
+      if (period === 'week') {
+        pastDate.setDate(now.getDate() - 7);
+      } else {
+        pastDate.setDate(now.getDate() - 1);
+      }
+      
+      const currentStats = getPeriodStats(pastDate, now);
+      const prevStats = getPeriodStats(new Date(pastDate.getTime() - (now.getTime() - pastDate.getTime())), pastDate);
+
+      return {
+        orders: prevStats.count > 0 ? ((currentStats.count - prevStats.count) / prevStats.count) * 100 : null,
+        revenue: prevStats.revenue > 0 ? ((currentStats.revenue - prevStats.revenue) / prevStats.revenue) * 100 : null,
+        label: period === 'week' ? "from last week" : "from yesterday"
+      };
     };
 
     const growth = getGrowth(totalOrders, 'month');
@@ -1854,7 +1842,7 @@ function OrdersComponent() {
             <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Orders</p>
+                  <p className="text-sm font-medium text-muted-foreground">Orders This Month</p>
                   <p className="text-xl sm:text-3xl font-bold mt-2 truncate">{stats.totalOrders}</p>
                   <div className={cn("flex items-center gap-1 mt-2 text-sm", (stats.ordersChange ?? 0) < 0 ? "text-red-500" : "text-green-600")}>
                     {stats.ordersChange !== null && (
@@ -1882,7 +1870,7 @@ function OrdersComponent() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
+                  <p className="text-sm font-medium text-muted-foreground">Revenue This Month</p>
                   <p className="text-xl sm:text-3xl font-bold mt-2 truncate">{formatCurrency(stats.totalRevenue)}</p>
                   <div className={cn("flex items-center gap-1 mt-2 text-sm", (stats.revenueChange ?? 0) < 0 ? "text-red-500" : "text-green-600")}>
                     {stats.revenueChange !== null && (
@@ -2468,8 +2456,10 @@ function OrdersComponent() {
                       </Badge>
                     ))}
                     {filters.dateFrom && (
-                      <Badge variant="secondary" className="gap-1">
-                        From: {format(filters.dateFrom, "PPP")}
+                      <Badge variant="secondary" className="gap-1 bg-primary/10 text-primary border-primary/20">
+                        {filters.dateFrom.getTime() === new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() 
+                          ? "This Month" 
+                          : `From: ${format(filters.dateFrom, "dd MMM")}`}
                         <X
                           className="h-3 w-3 cursor-pointer"
                           onClick={() => setFilters(prev => ({ ...prev, dateFrom: undefined }))}

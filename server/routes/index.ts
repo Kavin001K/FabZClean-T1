@@ -62,35 +62,17 @@ export function registerAllRoutes(app: Express): void {
     try {
       const { type, date } = req.query;
 
-      const orders = await storage.listOrders();
-
-      let filteredOrders = orders;
+      let filteredOrders: any[] = [];
 
       // Filter by date
       if (type === 'specific' && date) {
         const targetDate = date as string;
-
-        filteredOrders = filteredOrders.filter((order: any) => {
-          const dueDateStr = toISTDateString(order.dueDate);
-          const pickupDateStr = toISTDateString(order.pickupDate);
-
-          const match = dueDateStr === targetDate || pickupDateStr === targetDate;
-          const isCompleted = ['completed', 'delivered', 'cancelled'].includes(order.status?.toLowerCase());
-
-          return match && !isCompleted;
-        });
+        filteredOrders = await storage.getDueDateOrders(targetDate);
       } else if (type === 'today') {
         const today = getTodayIST();
-
-        filteredOrders = filteredOrders.filter((order: any) => {
-          const dueDateStr = toISTDateString(order.dueDate);
-          const pickupDateStr = toISTDateString(order.pickupDate);
-
-          const match = dueDateStr === today || pickupDateStr === today;
-          const isCompleted = ['completed', 'delivered', 'cancelled'].includes(order.status?.toLowerCase());
-
-          return match && !isCompleted;
-        });
+        filteredOrders = await storage.getDueDateOrders(today);
+      } else {
+        filteredOrders = await storage.listOrders();
       }
 
       // Transform orders
@@ -141,8 +123,6 @@ export function registerAllRoutes(app: Express): void {
   app.use('/api/products', productsRouter);
   app.use('/api/services', servicesRouter);
   app.use('/api/employees', employeesRouter);
-  app.use('/api/v1/orders', ordersRouter);
-  app.use('/api/v1/customers', customersRouter);
   app.use('/api/v1/bookings', bookingsRouter);
   app.use('/api/franchises', franchiseRouter);
   app.use('/api/drivers', driversRouter);
@@ -159,10 +139,6 @@ export function registerAllRoutes(app: Express): void {
 
   // Initialize the autonomous analytics cron job
   initAnalyticsCron();
-
-  app.use('/api/v1/deliveries', deliveriesRouter);
-  app.use('/api/v1/products', productsRouter);
-  app.use('/api/v1/services', servicesRouter);
 
   // Algorithm and search API routes
   app.use('/api/v1/search', searchRouter);
@@ -185,9 +161,6 @@ export function registerAllRoutes(app: Express): void {
 
   // WhatsApp Flow endpoint (public - no auth for Meta webhooks)
   app.use('/api/whatsapp-flow', whatsappFlowRouter);
-  // Legacy search and algorithm routes
-  app.use('/api/search', searchRouter);
-  app.use('/api/algorithms', algorithmsRouter);
 }
 
 export { default as ordersRouter } from './orders';

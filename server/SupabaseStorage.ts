@@ -50,34 +50,18 @@ export class SupabaseStorage {
         payload: Record<string, any>,
         id?: string
     ): Promise<any> {
-        let workingPayload = { ...payload };
-
-        for (let attempt = 0; attempt < SupabaseStorage.MAX_CUSTOMER_WRITE_RETRIES; attempt += 1) {
-            const result = operation === 'insert'
-                ? await this.supabase.from('customers').insert(workingPayload).select().single()
-                : await this.supabase.from('customers').update(workingPayload).eq('id', id).select().single();
-            const { data, error } = result;
-            if (!error) {
-                return data;
-            }
-
-            const errorMessage = `${error.message || ''} ${error.details || ''}`.trim();
-            const missingColumnMatch =
-                errorMessage.match(/Could not find the '([^']+)' column of 'customers'/i) ||
-                errorMessage.match(/column\s+customers\.([a-zA-Z0-9_]+)\s+does not exist/i) ||
-                errorMessage.match(/column\s+"?([a-zA-Z0-9_]+)"?\s+does not exist/i);
-            const missingColumn = missingColumnMatch?.[1];
-
-            if (missingColumn && Object.prototype.hasOwnProperty.call(workingPayload, missingColumn)) {
-                console.warn(`[SupabaseStorage] customers.${missingColumn} is missing in the live schema; retrying without it`);
-                delete workingPayload[missingColumn];
-                continue;
-            }
-
+        const result = operation === 'insert'
+            ? await this.supabase.from('customers').insert(payload).select().single()
+            : await this.supabase.from('customers').update(payload).eq('id', id).select().single();
+            
+        const { data, error } = result;
+        
+        if (error) {
+            console.error(`[SupabaseStorage] customers ${operation} failed:`, error.message, error.details);
             throw error;
         }
-
-        throw new Error('Failed to write customer record after removing unsupported columns');
+        
+        return data;
     }
 
     private async writeOrderRecord(
@@ -85,35 +69,18 @@ export class SupabaseStorage {
         payload: Record<string, any>,
         id?: string
     ): Promise<any> {
-        let workingPayload = { ...payload };
+        const result = operation === 'insert'
+            ? await this.supabase.from('orders').insert(payload).select('*').single()
+            : await this.supabase.from('orders').update(payload).eq('id', id).select('*').single();
+            
+        const { data, error } = result;
 
-        for (let attempt = 0; attempt < SupabaseStorage.MAX_ORDER_WRITE_RETRIES; attempt += 1) {
-            const result = operation === 'insert'
-                ? await this.supabase.from('orders').insert(workingPayload).select('*').single()
-                : await this.supabase.from('orders').update(workingPayload).eq('id', id).select('*').single();
-            const { data, error } = result;
-
-            if (!error) {
-                return data;
-            }
-
-            const errorMessage = `${error.message || ''} ${error.details || ''}`.trim();
-            const missingColumnMatch =
-                errorMessage.match(/Could not find the '([^']+)' column of 'orders'/i) ||
-                errorMessage.match(/column\s+orders\.([a-zA-Z0-9_]+)\s+does not exist/i) ||
-                errorMessage.match(/column\s+"?([a-zA-Z0-9_]+)"?\s+does not exist/i);
-            const missingColumn = missingColumnMatch?.[1];
-
-            if (missingColumn && Object.prototype.hasOwnProperty.call(workingPayload, missingColumn)) {
-                console.warn(`[SupabaseStorage] orders.${missingColumn} is missing in the live schema; retrying without it`);
-                delete workingPayload[missingColumn];
-                continue;
-            }
-
+        if (error) {
+            console.error(`[SupabaseStorage] orders ${operation} failed:`, error.message, error.details);
             throw error;
         }
 
-        throw new Error('Failed to write order record after removing unsupported columns');
+        return data;
     }
 
     private shouldFallbackCancelOrderRpc(error: any): boolean {
@@ -684,6 +651,7 @@ export class SupabaseStorage {
         const insertedIds: string[] = [];
         const skippedPhones: string[] = [];
         let errorCount = 0;
+        const cryptoStr = require('crypto');
 
         // Pre-fetch existing phone numbers for duplicate detection
         const { data: existingCustomers } = await this.supabase
@@ -714,13 +682,9 @@ export class SupabaseStorage {
                         continue;
                     }
 
-                    // Generate a sequential ID via RPC
-                    const { data: generatedId, error: rpcErr } = await this.supabase.rpc('get_next_customer_id');
-                    if (rpcErr) {
-                        console.error('[importBulk] ID generation failed:', rpcErr.message);
-                        errorCount++;
-                        continue;
-                    }
+                    // Generate ID locally for bulk import to eliminate O(N) RPC bottleneck
+                    // Fallback format similar to CUST sequence but with random suffix to prevent collisions
+                    const generatedId = `CUST-${Date.now().toString(36).toUpperCase()}-${cryptoStr.randomBytes(2).toString('hex').toUpperCase()}`;
 
                     // Build row with ONLY columns that exist in the DB
                     const address = (cust as any).address || {};
@@ -731,7 +695,7 @@ export class SupabaseStorage {
                         email: ((cust as any).email || null) || null,
                         phone,
                         address: typeof address === 'object' ? address : {},
-                        credit_limit: parseFloat(String((cust as any).creditLimit || '1000')) || 1000,
+                        credit_limit: parseFloat(String((cust as any).creditLimit || '-500')) || -500,
                         status: (cust as any).status || 'active',
                         franchise_id: (cust as any).franchiseId || null,
                         total_orders: parseInt(String((cust as any).totalOrders || '0')) || 0,
@@ -981,14 +945,8 @@ export class SupabaseStorage {
      * Maps franchiseId to 3-letter branch code
      * Handles formats: 'pollachi', 'franchise-pollachi', 'FR-001', etc.
      */
-    private getBranchCode(franchiseId?: string): string {
+    private async getBranchCode(franchiseId?: string): Promise<string> {
         if (!franchiseId) return 'FAB';
-
-        const branchCodes: Record<string, string> = {
-            'pollachi': 'POL',
-            'kinathukadavu': 'KIN',
-            'coimbatore': 'CBE',
-        };
 
         let normalizedId = franchiseId.toLowerCase().trim();
 
@@ -996,6 +954,29 @@ export class SupabaseStorage {
         if (normalizedId.startsWith('franchise-')) {
             normalizedId = normalizedId.replace('franchise-', '');
         }
+
+        // Fetch from DB if franchiseId is a UUID
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(franchiseId)) {
+            try {
+                const { data } = await this.supabase
+                    .from('franchises')
+                    .select('code, name')
+                    .eq('id', franchiseId)
+                    .single();
+                    
+                if (data?.code) return data.code.toUpperCase();
+                if (data?.name) return data.name.substring(0, 3).toUpperCase();
+            } catch (e) {
+                console.warn(`[SupabaseStorage] Failed to fetch branch code for franchise ${franchiseId}`, e);
+            }
+        }
+
+        const branchCodes: Record<string, string> = {
+            'pollachi': 'POL',
+            'kinathukadavu': 'KIN',
+            'coimbatore': 'CBE',
+        };
 
         return branchCodes[normalizedId] || normalizedId.substring(0, 3).toUpperCase();
     }
@@ -1005,7 +986,7 @@ export class SupabaseStorage {
      * Format: FZC-2025POL0001A
      */
     async getNextOrderNumber(franchiseId?: string): Promise<string> {
-        const branchCode = this.getBranchCode(franchiseId);
+        const branchCode = await this.getBranchCode(franchiseId);
 
         try {
             // Try to use the database function for atomic sequence generation
@@ -1167,11 +1148,28 @@ export class SupabaseStorage {
         return !error;
     }
 
+    async getDueDateOrders(dateStr: string): Promise<Order[]> {
+        // Optimizes fetching orders by dueDate or pickupDate for a specific date
+        const startOfDay = `${dateStr}T00:00:00.000Z`;
+        const endOfDay = `${dateStr}T23:59:59.999Z`;
+
+        const { data, error } = await this.supabase
+            .from('orders')
+            .select('*')
+            .not('status', 'in', '("completed","delivered","cancelled")')
+            .or(`and(due_date.gte.${startOfDay},due_date.lte.${endOfDay}),and(pickup_date.gte.${startOfDay},pickup_date.lte.${endOfDay})`);
+
+        if (error) throw error;
+        return data.map(item => this.mapDates(item));
+    }
+
     async listOrders(franchiseId?: string, options: {
         status?: string;
         search?: string;
         customerEmail?: string;
         customerId?: string;
+        dateFrom?: string;
+        dateTo?: string;
         sortBy?: string;
         sortOrder?: 'asc' | 'desc';
         limit?: number;
@@ -1190,6 +1188,14 @@ export class SupabaseStorage {
 
         if (options.customerEmail) {
             query = query.eq('customer_email', options.customerEmail);
+        }
+
+        if (options.dateFrom) {
+            query = query.gte('created_at', options.dateFrom);
+        }
+
+        if (options.dateTo) {
+            query = query.lte('created_at', options.dateTo);
         }
 
         if (options.search) {
@@ -1266,7 +1272,7 @@ export class SupabaseStorage {
      * Format: TRN-2025POL001A-F
      */
     async getNextTransitId(franchiseId?: string, type: 'To Factory' | 'Return to Store' | string = 'To Factory'): Promise<string> {
-        const branchCode = this.getBranchCode(franchiseId);
+        const branchCode = await this.getBranchCode(franchiseId);
 
         // Direction indicator: F (To Factory) or S (To Store)
         const direction = type === 'To Factory' || type === 'store_to_factory' ? 'F' : 'S';

@@ -106,7 +106,8 @@ export interface IStorage {
   listEmployees(franchiseId?: string, factoryId?: string): Promise<any[]>;
 
   // Order methods
-  listOrders(): Promise<any[]>;
+  listOrders(franchiseId?: string, options?: any): Promise<any[]>;
+  getDueDateOrders(dateStr: string): Promise<any[]>;
   getOrder(id: string): Promise<any | undefined>;
   createOrder(data: any): Promise<any>;
   updateOrder(id: string, data: any): Promise<any | undefined>;
