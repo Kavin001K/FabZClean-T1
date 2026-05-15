@@ -1,3 +1,4 @@
+import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/contexts/auth-context";
 import DashboardOrdersByDate from "./components/orders-by-date";
 import DashboardNewCustomers from "./components/new-customers";
+
 
 /** Processing pipeline status config */
 const PIPELINE_STAGES = [
