@@ -128,6 +128,7 @@ export default React.memo(function EditOrderDialog({
         status: formData.status,
         priority: (formData as any).priority || 'normal',
         pickupDate: (formData as any).pickupDate || null,
+        createdAt: (formData as any).createdAt || order.createdAt || null,
         fulfillmentType: (formData as any).fulfillmentType || (order as any).fulfillmentType || 'pickup',
         items: cleanedItems,
         totalAmount: recalculatedTotal.toFixed(2),
@@ -350,6 +351,36 @@ export default React.memo(function EditOrderDialog({
                       mode="single"
                       selected={(formData as any).pickupDate ? new Date((formData as any).pickupDate) : undefined}
                       onSelect={(date) => handleInputChange('pickupDate', date ? date.toISOString() : '')}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-medium">Bill Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left transition-all",
+                        (formData as any).createdAt ? "border-primary/30 bg-primary/5 text-primary shadow-sm font-medium" : "text-muted-foreground font-normal border-primary/20 hover:border-primary/50 focus:ring-primary/20"
+                      )}
+                    >
+                      <CalendarIcon className={cn("mr-2 h-4 w-4", (formData as any).createdAt ? "text-primary" : "text-primary")} />
+                      {(formData as any).createdAt ? (
+                        <span className="font-semibold">{format(new Date((formData as any).createdAt), "PPP")}</span>
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 z-[100]">
+                    <Calendar
+                      mode="single"
+                      selected={(formData as any).createdAt ? new Date((formData as any).createdAt) : undefined}
+                      onSelect={(date) => handleInputChange('createdAt', date ? date.toISOString() : '')}
                       initialFocus
                     />
                   </PopoverContent>

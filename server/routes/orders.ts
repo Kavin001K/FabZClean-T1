@@ -59,6 +59,7 @@ const ORDER_UPDATE_FIELDS = new Set([
   'cancellationReason',
   'cancelledAt',
   'cancelledBy',
+  'createdAt',
 ]);
 // Apply rate limiting to all order routes
 router.use(jwtRequired);
