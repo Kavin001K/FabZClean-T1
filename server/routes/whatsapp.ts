@@ -152,7 +152,7 @@ router.post("/send-bill", async (req, res) => {
             String(order.orderNumber || '') === String(orderId || '')
         );
 
-        if (matchedOrder?.id) {
+        if (matchedOrder?.id && !pdfUrl) {
             const billingResult = await processOrderBillingPipeline(matchedOrder.id);
             return res.status(billingResult.success ? 200 : 500).json({
                 success: billingResult.success,
@@ -236,6 +236,7 @@ router.post("/send-bill", async (req, res) => {
             newSendCount,
             canResendAgain: newSendCount < MAX_RESENDS,
             remainingSends: MAX_RESENDS - newSendCount,
+            invoiceUrl: resolvedPdfUrl,
         });
     } catch (error) {
         console.error("[WhatsApp] Bill Error:", error);

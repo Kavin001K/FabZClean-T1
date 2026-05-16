@@ -467,13 +467,16 @@ function OrdersComponent() {
           // This will return the saved document from the server
           const savedDoc = await printDriver.printInvoice(invoiceData);
           
-          if (savedDoc && savedDoc.url) {
-            console.log('[Orders] New invoice generated and uploaded:', savedDoc.url);
+          // The server response can have the URL in document.fileUrl (success) or fileUrl (warning fallback)
+          const newInvoiceUrl = savedDoc?.document?.fileUrl || savedDoc?.fileUrl || savedDoc?.url;
+          
+          if (newInvoiceUrl) {
+            console.log('[Orders] New invoice generated and uploaded:', newInvoiceUrl);
             
             // 2. Trigger the WhatsApp bill resend with the new URL and (Updated) tag
             resendBillMutation.mutate({ 
               order: updatedOrder, 
-              customInvoiceUrl: savedDoc.url,
+              customInvoiceUrl: newInvoiceUrl,
               isUpdate: true 
             });
           } else {

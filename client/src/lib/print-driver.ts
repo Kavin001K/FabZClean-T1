@@ -536,7 +536,7 @@ export function convertOrderToInvoiceData(order: any, enableGST: boolean = false
   return {
     invoiceNumber,
     invoiceDate: order.createdAt ? new Date(order.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+    dueDate: order.pickupDate ? new Date(order.pickupDate).toISOString().split('T')[0] : new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     orderNumber: order.orderNumber || order.id,
     franchiseId: franchiseId,
     enableGST,

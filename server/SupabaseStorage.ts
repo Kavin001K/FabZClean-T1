@@ -290,7 +290,8 @@ export class SupabaseStorage {
             'layout_key': 'layoutKey',
             'config': 'config',
             'is_ai_optimized': 'isAiOptimized',
-            'short_name': 'shortName'
+            'short_name': 'shortName',
+            'is_edited': 'isEdited'
         };
 
         Object.entries(mappings).forEach(([snake, camel]) => {
@@ -521,6 +522,7 @@ export class SupabaseStorage {
             'layoutKey': 'layout_key',
             'isAiOptimized': 'is_ai_optimized',
             'shortName': 'short_name',
+            'isEdited': 'is_edited',
             // Order cancellation fields
             'cancellationReason': 'cancellation_reason',
             'cancelledAt': 'cancelled_at',
