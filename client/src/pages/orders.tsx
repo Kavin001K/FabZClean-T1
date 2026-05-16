@@ -218,7 +218,7 @@ function OrdersComponent() {
 
   // State Management
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [sortField, setSortField] = useState<keyof Order | null>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -271,14 +271,9 @@ function OrdersComponent() {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
-  useEffect(() => {
-    if (!selectedOrder) return;
-
-    const freshOrder = orders.find((order) => order.id === selectedOrder.id);
-    if (freshOrder && freshOrder !== selectedOrder) {
-      setSelectedOrder(freshOrder);
-    }
-  }, [orders, selectedOrder]);
+  const selectedOrder = useMemo(() => 
+    selectedOrderId ? orders.find(o => o.id === selectedOrderId) || null : null
+  , [orders, selectedOrderId]);
 
   // Deep Link Handling for Order Edit
   useEffect(() => {
@@ -426,16 +421,16 @@ function OrdersComponent() {
     mutationFn: ({ orderId, updates }: { orderId: string; updates: Partial<Order> }) =>
       ordersApi.update(orderId, updates),
     onMutate: async ({ orderId, updates }) => {
-      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-      await queryClient.cancelQueries({ queryKey: ['orders'] });
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/orders'] });
 
       // Snapshot the previous value
-      const previousOrders = queryClient.getQueryData<Order[]>(['orders']);
+      const previousOrders = queryClient.getQueryData(['/api/orders']);
 
-      // Optimistically update to the new value
-      queryClient.setQueryData<Order[]>(['orders'], (old) => {
-        if (!old) return [];
-        return old.map((order) =>
+      // Optimistically update to the new value across all matching queries
+      queryClient.setQueriesData({ queryKey: ['/api/orders'] }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((order: any) =>
           order.id === orderId ? { ...order, ...updates } : order
         );
       });
@@ -444,14 +439,19 @@ function OrdersComponent() {
       setIsEditDialogOpen(false);
       setEditingOrder(null);
 
-      // Return a context object with the snapshotted value
       return { previousOrders };
     },
     onSuccess: async (updatedOrder, { orderId }) => {
       if (updatedOrder) {
         toast({
           title: "Order Updated",
-          description: `Order ${orderId} has been updated successfully`,
+          description: `Order ${updatedOrder.orderNumber || orderId} has been updated successfully`,
+        });
+
+        // Ensure state is updated (redundant with setQueriesData but good for safety)
+        queryClient.setQueriesData({ queryKey: ['/api/orders'] }, (old: any) => {
+          if (!Array.isArray(old)) return old;
+          return old.map((order: any) => (order.id === orderId ? { ...order, ...updatedOrder } : order));
         });
 
         // AUTOMATICALLY RE-GENERATE INVOICE & RESEND BILL
@@ -507,7 +507,7 @@ function OrdersComponent() {
     },
     onSettled: () => {
       // Always refetch after error or success
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
     },
   });
 
@@ -515,36 +515,30 @@ function OrdersComponent() {
     mutationFn: ({ orderId, newStatus, cancellationReason }: { orderId: string; newStatus: string; cancellationReason?: string }) =>
       ordersApi.update(orderId, { status: newStatus as any, cancellationReason } as any),
     onMutate: async ({ orderId, newStatus, cancellationReason }) => {
-      await queryClient.cancelQueries({ queryKey: ['orders'] });
-      const previousOrders = queryClient.getQueryData<Order[]>(['orders']);
+      await queryClient.cancelQueries({ queryKey: ['/api/orders'] });
+      const previousOrders = queryClient.getQueryData(['/api/orders']);
 
-      queryClient.setQueryData<Order[]>(['orders'], (old) => {
-        if (!old) return [];
-        return old.map((order) =>
+      queryClient.setQueriesData({ queryKey: ['/api/orders'] }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((order: any) =>
           order.id === orderId
             ? { ...order, status: newStatus as any, ...(cancellationReason ? { cancellationReason } : {}) }
             : order
         );
       });
-      setSelectedOrder((prev) =>
-        prev && prev.id === orderId
-          ? { ...prev, status: newStatus as any, ...(cancellationReason ? { cancellationReason } : {}) }
-          : prev
-      );
 
       return { previousOrders };
     },
     onSuccess: (updatedOrder, { orderId, newStatus }) => {
       if (updatedOrder) {
-        queryClient.setQueryData<Order[]>(['orders'], (old) =>
-          Array.isArray(old) ? old.map((order) => (order.id === orderId ? { ...order, ...updatedOrder } : order)) : old
+        queryClient.setQueriesData({ queryKey: ['/api/orders'] }, (old: any) =>
+          Array.isArray(old) ? old.map((order: any) => (order.id === orderId ? { ...order, ...updatedOrder } : order)) : old
         );
-        setSelectedOrder((prev) => (prev && prev.id === orderId ? { ...prev, ...updatedOrder } : prev));
 
         addNotification({
           type: 'info',
           title: 'Order Status Updated',
-          message: `Order ${orderId} has been moved to ${newStatus}`,
+          message: `Order ${updatedOrder.orderNumber || orderId} has been moved to ${newStatus}`,
           actionUrl: '/orders',
           actionText: 'View Orders'
         });
@@ -559,7 +553,7 @@ function OrdersComponent() {
     },
     onError: (error, _variables, context) => {
       if (context?.previousOrders) {
-        queryClient.setQueryData(['orders'], context.previousOrders);
+        queryClient.setQueriesData({ queryKey: ['/api/orders'] }, context.previousOrders);
       }
       console.error('Failed to update order status:', error);
       toast({
@@ -569,7 +563,7 @@ function OrdersComponent() {
       });
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
     },
   });
 
@@ -586,10 +580,9 @@ function OrdersComponent() {
         return;
       }
 
-      queryClient.setQueryData<Order[]>(['orders'], (old) =>
-        Array.isArray(old) ? old.map((order) => (order.id === orderId ? { ...order, ...updatedOrder } : order)) : old
+      queryClient.setQueriesData({ queryKey: ['/api/orders'] }, (old: any) =>
+        Array.isArray(old) ? old.map((order: any) => (order.id === orderId ? { ...order, ...updatedOrder } : order)) : old
       );
-      setSelectedOrder((prev) => (prev && prev.id === orderId ? { ...prev, ...updatedOrder } : prev));
 
       toast({
         title: "Order Marked Paid",
@@ -605,7 +598,7 @@ function OrdersComponent() {
       });
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
       queryClient.invalidateQueries({ queryKey: ['wallet-management', 'customers'] });
       queryClient.invalidateQueries({ queryKey: ['credits'] });
     },
@@ -614,7 +607,7 @@ function OrdersComponent() {
   const deleteOrderMutation = useMutation({
     mutationFn: (orderId: string) => ordersApi.delete(orderId),
     onSuccess: (_, orderId) => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
       toast({
         title: "Order Deleted",
         description: "Order has been deleted successfully",
@@ -693,7 +686,7 @@ function OrdersComponent() {
     },
     onSettled: async () => {
       setSendingBillOrderId(null);
-      await queryClient.invalidateQueries({ queryKey: ['orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
     },
   });
 
@@ -728,7 +721,7 @@ function OrdersComponent() {
   }, []);
 
   const handleViewOrder = useCallback((order: Order) => {
-    setSelectedOrder(order);
+    setSelectedOrderId(order.id);
     setIsOrderDetailsOpen(true);
   }, []);
 
@@ -2801,7 +2794,7 @@ function OrdersComponent() {
         isOpen={isOrderDetailsOpen}
         onClose={() => {
           setIsOrderDetailsOpen(false);
-          setSelectedOrder(null);
+          setSelectedOrderId(null);
         }}
         onEdit={handleEditOrder}
         onCancel={handleCancelOrder}

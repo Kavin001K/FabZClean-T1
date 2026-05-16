@@ -541,6 +541,7 @@ export async function sendCustomerFeedbackNotification({
 export async function handleOrderStatusChange(
     order: {
         customerPhone?: string | null;
+        secondaryPhone?: string | null;
         customerName: string;
         orderNumber: string;
         totalAmount: string;
@@ -552,23 +553,23 @@ export async function handleOrderStatusChange(
         cancellationReason?: string | null; // Reason for cancellation (used when status = cancelled)
     },
     previousStatus?: OrderStatus
-): Promise<SendResult | null> {
-    // Skip if no phone number
-    if (!order.customerPhone) {
+): Promise<SendResult | BatchSendResult | null> {
+    // Skip if no phone numbers
+    if (!order.customerPhone && !order.secondaryPhone) {
         console.log(`⚠️ [WhatsApp] No phone number for order ${order.orderNumber}, skipping notification`);
         return null;
     }
 
     const currentStatusLine = order.status as string;
     const prevStatusStr = (previousStatus as string) || '';
+    const phoneNumbers = [order.customerPhone, order.secondaryPhone];
 
     console.log(`🔄 [WhatsApp] Order ${order.orderNumber} status changed: ${prevStatusStr || 'NONE'} -> ${currentStatusLine}`);
 
     // STATUS: cancelled - Send cancellation notification
     if (currentStatusLine === 'cancelled' && prevStatusStr !== 'cancelled') {
         console.log(`📤 [WhatsApp] Triggering Cancellation notification for order ${order.orderNumber}`);
-        return await sendOrderCancellationNotification({
-            phoneNumber: order.customerPhone,
+        return await sendOrderCancellationWhatsAppBatch(phoneNumbers, {
             customerName: order.customerName,
             orderNumber: order.orderNumber,
             cancellationReason: order.cancellationReason || 'Operational Issue',
@@ -578,9 +579,7 @@ export async function handleOrderStatusChange(
     // STATUS: pending or received - Send Order Created (Bill) notification
     if ((currentStatusLine === 'pending' || currentStatusLine === 'received') && !prevStatusStr) {
         console.log(`📤 [WhatsApp] Triggering Order Created (Bill) notification for order ${order.orderNumber}`);
-        return await sendInvoiceWhatsApp({
-            phoneNumber: order.customerPhone,
-            // Use public PDF endpoint as fallback if direct URL is missing
+        return await sendInvoiceWhatsAppBatch(phoneNumbers, {
             pdfUrl: order.invoiceUrl || `${APP_BASE_URL}/api/public/invoice/${order.orderNumber}/pdf`,
             filename: `Invoice-${order.orderNumber}.pdf`,
             customerName: order.customerName,
@@ -594,8 +593,7 @@ export async function handleOrderStatusChange(
     // STATUS: ready_for_pickup - Send status update
     if (currentStatusLine === 'ready_for_pickup' && prevStatusStr !== 'ready_for_pickup') {
         console.log(`📤 [WhatsApp] Triggering Ready for Pickup notification for order ${order.orderNumber}`);
-        return await sendOrderStatusUpdateNotification({
-            phoneNumber: order.customerPhone,
+        return await sendOrderStatusUpdateWhatsAppBatch(phoneNumbers, {
             customerName: order.customerName,
             orderNumber: order.orderNumber,
             status: 'Ready to Pickup',
@@ -605,8 +603,7 @@ export async function handleOrderStatusChange(
     // STATUS: out_for_delivery - Send status update
     if (currentStatusLine === 'out_for_delivery' && prevStatusStr !== 'out_for_delivery') {
         console.log(`📤 [WhatsApp] Triggering Out for Delivery notification for order ${order.orderNumber}`);
-        return await sendOrderStatusUpdateNotification({
-            phoneNumber: order.customerPhone,
+        return await sendOrderStatusUpdateWhatsAppBatch(phoneNumbers, {
             customerName: order.customerName,
             orderNumber: order.orderNumber,
             status: 'Out For Delivery',
@@ -616,8 +613,7 @@ export async function handleOrderStatusChange(
     // STATUS: completed - Send feedback request
     if (currentStatusLine === 'completed' && prevStatusStr !== 'completed') {
         console.log(`📤 [WhatsApp] Triggering Feedback notification for order ${order.orderNumber}`);
-        return await sendCustomerFeedbackNotification({
-            phoneNumber: order.customerPhone,
+        return await sendCustomerFeedbackWhatsAppBatch(phoneNumbers, {
             customerName: order.customerName,
             orderNumber: order.orderNumber,
         });
@@ -954,6 +950,102 @@ export async function sendInvoiceWhatsAppBatch(
         sentTo,
         failedRecipients,
     };
+}
+
+export async function sendOrderStatusUpdateWhatsAppBatch(
+    phoneNumbers: Array<string | null | undefined>,
+    params: Omit<OrderStatusUpdateMessageParams, 'phoneNumber'>
+): Promise<BatchSendResult> {
+    const recipients = buildUniqueRecipientList(...phoneNumbers);
+
+    if (!recipients.length) {
+        return { success: false, error: 'No valid WhatsApp recipient numbers available', sentTo: [], failedRecipients: [] };
+    }
+
+    const sentTo: string[] = [];
+    const failedRecipients: Array<{ phoneNumber: string; error: string }> = [];
+    let templateUsed: string | undefined;
+
+    for (const phoneNumber of recipients) {
+        const result = await sendOrderStatusUpdateNotification({ ...params, phoneNumber });
+        if (result.success) {
+            sentTo.push(phoneNumber);
+            templateUsed = result.templateUsed || templateUsed;
+            continue;
+        }
+        failedRecipients.push({ phoneNumber, error: result.error || 'WhatsApp delivery failed' });
+    }
+
+    if (!sentTo.length) {
+        return { success: false, templateUsed, error: failedRecipients.map((entry) => `${entry.phoneNumber}: ${entry.error}`).join('; '), sentTo, failedRecipients };
+    }
+
+    const warning = failedRecipients.length ? `Sent to ${sentTo.join(', ')}. Failed for ${failedRecipients.map((entry) => entry.phoneNumber).join(', ')}.` : undefined;
+    return { success: true, templateUsed, warning, sentTo, failedRecipients };
+}
+
+export async function sendOrderCancellationWhatsAppBatch(
+    phoneNumbers: Array<string | null | undefined>,
+    params: Omit<OrderCancellationMessageParams, 'phoneNumber'>
+): Promise<BatchSendResult> {
+    const recipients = buildUniqueRecipientList(...phoneNumbers);
+
+    if (!recipients.length) {
+        return { success: false, error: 'No valid WhatsApp recipient numbers available', sentTo: [], failedRecipients: [] };
+    }
+
+    const sentTo: string[] = [];
+    const failedRecipients: Array<{ phoneNumber: string; error: string }> = [];
+    let templateUsed: string | undefined;
+
+    for (const phoneNumber of recipients) {
+        const result = await sendOrderCancellationNotification({ ...params, phoneNumber });
+        if (result.success) {
+            sentTo.push(phoneNumber);
+            templateUsed = result.templateUsed || templateUsed;
+            continue;
+        }
+        failedRecipients.push({ phoneNumber, error: result.error || 'WhatsApp delivery failed' });
+    }
+
+    if (!sentTo.length) {
+        return { success: false, templateUsed, error: failedRecipients.map((entry) => `${entry.phoneNumber}: ${entry.error}`).join('; '), sentTo, failedRecipients };
+    }
+
+    const warning = failedRecipients.length ? `Sent to ${sentTo.join(', ')}. Failed for ${failedRecipients.map((entry) => entry.phoneNumber).join(', ')}.` : undefined;
+    return { success: true, templateUsed, warning, sentTo, failedRecipients };
+}
+
+export async function sendCustomerFeedbackWhatsAppBatch(
+    phoneNumbers: Array<string | null | undefined>,
+    params: Omit<FeedbackMessageParams, 'phoneNumber'>
+): Promise<BatchSendResult> {
+    const recipients = buildUniqueRecipientList(...phoneNumbers);
+
+    if (!recipients.length) {
+        return { success: false, error: 'No valid WhatsApp recipient numbers available', sentTo: [], failedRecipients: [] };
+    }
+
+    const sentTo: string[] = [];
+    const failedRecipients: Array<{ phoneNumber: string; error: string }> = [];
+    let templateUsed: string | undefined;
+
+    for (const phoneNumber of recipients) {
+        const result = await sendCustomerFeedbackNotification({ ...params, phoneNumber });
+        if (result.success) {
+            sentTo.push(phoneNumber);
+            templateUsed = result.templateUsed || templateUsed;
+            continue;
+        }
+        failedRecipients.push({ phoneNumber, error: result.error || 'WhatsApp delivery failed' });
+    }
+
+    if (!sentTo.length) {
+        return { success: false, templateUsed, error: failedRecipients.map((entry) => `${entry.phoneNumber}: ${entry.error}`).join('; '), sentTo, failedRecipients };
+    }
+
+    const warning = failedRecipients.length ? `Sent to ${sentTo.join(', ')}. Failed for ${failedRecipients.map((entry) => entry.phoneNumber).join(', ')}.` : undefined;
+    return { success: true, templateUsed, warning, sentTo, failedRecipients };
 }
 
 /**

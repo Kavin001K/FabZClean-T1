@@ -148,6 +148,7 @@ const scheduleOrderStatusNotification = (
   handleOrderStatusChange(
     {
       customerPhone: updatedOrder?.customerPhone || previousOrder?.customerPhone,
+      secondaryPhone: (updatedOrder as any)?.secondaryPhone || (previousOrder as any)?.secondaryPhone,
       customerName: updatedOrder?.customerName || previousOrder?.customerName,
       orderNumber: updatedOrder?.orderNumber || previousOrder?.orderNumber,
       totalAmount: updatedOrder?.totalAmount || previousOrder?.totalAmount,

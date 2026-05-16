@@ -355,10 +355,10 @@ async function hydrateOrderForInvoice(orderId: string, templateId?: string): Pro
       throw new Error(`Customer ${(order as any).customerId} not found for order ${order.orderNumber}`);
     }
 
-    mutableOrder.customerName = safeText((customer as any).name, mutableOrder.customerName);
-    mutableOrder.customerPhone = safeText((customer as any).phone, mutableOrder.customerPhone);
-    mutableOrder.secondaryPhone = safeText((customer as any).secondaryPhone, mutableOrder.secondaryPhone);
-    mutableOrder.customerEmail = safeText((customer as any).email, mutableOrder.customerEmail);
+    mutableOrder.customerName = safeText(mutableOrder.customerName, (customer as any).name);
+    mutableOrder.customerPhone = safeText(mutableOrder.customerPhone, (customer as any).phone);
+    mutableOrder.secondaryPhone = safeText(mutableOrder.secondaryPhone, (customer as any).secondaryPhone);
+    mutableOrder.customerEmail = safeText(mutableOrder.customerEmail, (customer as any).email);
 
     const hasOrderAddress = mutableOrder.deliveryAddress || mutableOrder.shippingAddress || mutableOrder.customerAddress || mutableOrder.address;
     if (!hasOrderAddress && (customer as any).address) {
