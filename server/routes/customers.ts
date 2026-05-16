@@ -72,6 +72,7 @@ async function getBookingRequestSchemaCapabilities(supabase: any) {
 function normalizeCustomerPhonePayload(payload: Record<string, unknown>) {
   const hasPhoneField = Object.prototype.hasOwnProperty.call(payload, 'phone');
   const hasSecondaryField = Object.prototype.hasOwnProperty.call(payload, 'secondaryPhone');
+  
   if (!hasPhoneField && !hasSecondaryField) {
     return payload;
   }
@@ -80,6 +81,13 @@ function normalizeCustomerPhonePayload(payload: Record<string, unknown>) {
     ...splitRawPhoneInput(payload.phone as string | null | undefined),
     ...splitRawPhoneInput(payload.secondaryPhone as string | null | undefined),
   ];
+
+  if (rawTokens.length === 0) {
+    const result = { ...payload };
+    if (hasPhoneField) result.phone = null;
+    if (hasSecondaryField) result.secondaryPhone = null;
+    return result;
+  }
 
   const dedupedTokens = rawTokens.filter((token, index) => {
     const key = normalizePhone(token) || token;
@@ -91,25 +99,40 @@ function normalizeCustomerPhonePayload(payload: Record<string, unknown>) {
   }
 
   const parsedPhones = parseCustomerPhones(dedupedTokens.join(", "));
+  
   if (parsedPhones.primaryPhone && !normalizePhone(parsedPhones.primaryPhone)) {
     throw new Error('Primary phone number is invalid');
   }
   if (parsedPhones.secondaryPhone && !normalizePhone(parsedPhones.secondaryPhone)) {
     throw new Error('Secondary phone number is invalid');
   }
+
+  const result = { ...payload };
+
+  if (hasPhoneField && hasSecondaryField) {
+    result.phone = parsedPhones.primaryPhone || null;
+    result.secondaryPhone = parsedPhones.secondaryPhone;
+  } else if (hasPhoneField) {
+    result.phone = parsedPhones.primaryPhone || null;
+    // If user provided multiple phones in the primary field, redistribute to secondary
+    if (dedupedTokens.length > 1) {
+      result.secondaryPhone = parsedPhones.secondaryPhone;
+    }
+  } else if (hasSecondaryField) {
+    // If only secondary field provided, the first token is the secondary phone
+    result.secondaryPhone = parsedPhones.primaryPhone || null;
+  }
+
+  // Final validation: if both result phones are present, they must be different
   if (
-    parsedPhones.primaryPhone &&
-    parsedPhones.secondaryPhone &&
-    normalizePhone(parsedPhones.primaryPhone) === normalizePhone(parsedPhones.secondaryPhone)
+    result.phone &&
+    result.secondaryPhone &&
+    normalizePhone(result.phone as string) === normalizePhone(result.secondaryPhone as string)
   ) {
     throw new Error('Primary and secondary phone numbers must be different');
   }
 
-  return {
-    ...payload,
-    phone: parsedPhones.primaryPhone || null,
-    secondaryPhone: parsedPhones.secondaryPhone,
-  };
+  return result;
 }
 
 type CustomerFeedbackSummary = {

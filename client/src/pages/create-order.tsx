@@ -240,7 +240,7 @@ export default function CreateOrder() {
       }
 
       try {
-        const response = await authorizedFetch(`/v1/customers/${encodeURIComponent(foundCustomer.id)}/addresses`);
+        const response = await authorizedFetch(`/customers/${encodeURIComponent(foundCustomer.id)}/addresses`);
         if (!response.ok) {
           setCustomerAddresses([]);
           setSelectedCustomerAddressId('manual');
@@ -1113,8 +1113,13 @@ export default function CreateOrder() {
       if (hasNameChanged || hasPhoneChanged || hasSecondaryPhoneChanged || hasEmailChanged || hasAddressChanged) {
         const updates: any = {};
         if (hasNameChanged) updates.name = customerName;
-        if (hasPhoneChanged) updates.phone = customerPhone;
-        if (hasSecondaryPhoneChanged) updates.secondaryPhone = customerSecondaryPhone || null;
+        
+        // Send both phone fields if either changed to ensure correct normalization in backend
+        if (hasPhoneChanged || hasSecondaryPhoneChanged) {
+          updates.phone = customerPhone;
+          updates.secondaryPhone = customerSecondaryPhone || null;
+        }
+        
         if (hasEmailChanged) updates.email = customerEmail || null;
         if (hasAddressChanged) updates.address = { street: customerStreet, city: customerCity, pincode: customerPincode };
 
