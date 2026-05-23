@@ -223,6 +223,7 @@ export const services = pgTable("services", {
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   duration: text("duration").notNull(),
+  unit: text("unit").notNull().default("Qty"),
   status: text("status", { enum: ["Active", "Inactive"] }).notNull().default("Active"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -368,7 +369,7 @@ export const insertOrderSchema = z.object({
   storeCode: z.enum(ORDER_STORE_CODES).optional().default(DEFAULT_ORDER_STORE_CODE),
   customerName: z.string(),
   customerEmail: z.string().optional().nullable(),
-  customerPhone: z.string().min(10, "Phone number is required"),
+  customerPhone: z.string().regex(/^[0-9]{10}$/, "Phone number must be exactly 10 digits (without country code)"),
   secondaryPhone: z.string().optional().nullable(),
   status: z.enum(["pending", "processing", "completed", "cancelled", "assigned", "in_transit", "shipped", "out_for_delivery", "delivered", "in_store", "ready_for_transit", "ready_for_pickup"]),
   paymentStatus: z.enum(["pending", "paid", "failed", "credit"]).default("pending"),
@@ -418,7 +419,33 @@ export const insertDeliverySchema = createInsertSchema(deliveries);
 
 export const insertOrderTransactionSchema = createInsertSchema(orderTransactions);
 
-export const insertCustomerSchema = createInsertSchema(customers);
+export const insertCustomerSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(2, "Name must be at least 2 characters").max(50, "Name must be less than 50 characters"),
+  email: z.string()
+    .transform(val => val ? val.trim() : null)
+    .refine(val => !val || /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(val), {
+      message: "Please enter a valid email address (e.g., name@domain.com)",
+    })
+    .optional().nullable(),
+  phone: z.string().regex(/^[0-9]{10}$/, "Phone number must be exactly 10 digits (without country code)"),
+  secondaryPhone: z.string()
+    .transform(val => val ? val.trim() : null)
+    .refine(val => !val || /^[0-9]{10}$/.test(val), {
+      message: "Secondary phone number must be exactly 10 digits (without country code)",
+    })
+    .optional().nullable(),
+  franchiseId: z.string().optional().nullable(),
+  address: z.any().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  companyName: z.string().optional().nullable(),
+  taxId: z.string().optional().nullable(),
+  dateOfBirth: z.string().optional().nullable(),
+  paymentTerms: z.string().optional().nullable(),
+  status: z.enum(["active", "inactive", "deleted"]).optional().default("active"),
+  creditLimit: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+  creditBalance: z.union([z.string(), z.number()]).transform(val => val.toString()).optional().nullable(),
+});
 
 export const insertServiceSchema = createInsertSchema(services);
 

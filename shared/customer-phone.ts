@@ -6,16 +6,26 @@ export type ParsedCustomerPhones = {
 
 const PHONE_SPLIT_REGEX = /[,\n;]+/;
 
-export function normalizePhoneForComparison(value?: string | null): string {
+export function cleanAndNormalizePhone(value?: string | null): string {
   const digits = String(value || "").replace(/\D/g, "");
-  if (!digits) return "";
-  const withoutLeadingZeros = digits.replace(/^0+/, "");
-  return withoutLeadingZeros.slice(-10);
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return digits.slice(2);
+  }
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return digits.slice(1);
+  }
+  return digits;
+}
+
+export function normalizePhoneForComparison(value?: string | null): string {
+  const digits = cleanAndNormalizePhone(value);
+  return digits.slice(-10);
 }
 
 export function sanitizePhoneForStorage(value?: string | null): string {
-  return String(value || "").trim().replace(/\s+/g, " ");
+  return cleanAndNormalizePhone(value);
 }
+
 
 export function parseCustomerPhones(input?: string | null): ParsedCustomerPhones {
   const rawParts = String(input || "")

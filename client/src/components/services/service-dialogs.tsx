@@ -32,6 +32,7 @@ const serviceFormSchema = z.object({
   description: z.string().optional(),
   price: z.string().min(1, 'Price is required').refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, 'Price must be a positive number'),
   duration: z.string().min(1, 'Duration is required'),
+  unit: z.string().min(1, 'Unit is required'),
   status: z.enum(['Active', 'Inactive']),
 });
 
@@ -80,6 +81,14 @@ const durationOptions = [
   '1 Week'
 ];
 
+const unitOptions = [
+  'Qty',
+  'Kgs',
+  'Meters',
+  'Sq. Ft',
+  'Liters'
+];
+
 export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
   selectedService,
   isEditDialogOpen,
@@ -102,6 +111,7 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
       description: selectedService?.description || '',
       price: selectedService?.price || '',
       duration: selectedService?.duration || '',
+      unit: selectedService?.unit || 'Qty',
       status: selectedService?.status || 'Active',
     },
   });
@@ -114,6 +124,7 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
       description: '',
       price: '',
       duration: '',
+      unit: 'Qty',
       status: 'Active',
     },
   });
@@ -137,6 +148,7 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
         description: selectedService.description || '',
         price: selectedService.price,
         duration: selectedService.duration,
+        unit: selectedService.unit || 'Qty',
         status: selectedService.status,
       });
     }
@@ -150,6 +162,7 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
         description: '',
         price: '',
         duration: '',
+        unit: 'Qty',
         status: 'Active',
       });
     }
@@ -269,6 +282,30 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
               {editForm.formState.errors.duration && (
                 <p className="text-sm text-red-500">
                   {editForm.formState.errors.duration.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-unit">Unit *</Label>
+              <Select
+                value={editForm.watch('unit')}
+                onValueChange={(value) => editForm.setValue('unit', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {unitOptions.map((unit) => (
+                    <SelectItem key={unit} value={unit}>
+                      {unit}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {editForm.formState.errors.unit && (
+                <p className="text-sm text-red-500">
+                  {editForm.formState.errors.unit.message}
                 </p>
               )}
             </div>
@@ -416,6 +453,30 @@ export const ServiceDialogs: React.FC<ServiceDialogsProps> = React.memo(({
               {createForm.formState.errors.duration && (
                 <p className="text-sm text-red-500">
                   {createForm.formState.errors.duration.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-unit">Unit *</Label>
+              <Select
+                value={createForm.watch('unit')}
+                onValueChange={(value) => createForm.setValue('unit', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {unitOptions.map((unit) => (
+                    <SelectItem key={unit} value={unit}>
+                      {unit}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {createForm.formState.errors.unit && (
+                <p className="text-sm text-red-500">
+                  {createForm.formState.errors.unit.message}
                 </p>
               )}
             </div>

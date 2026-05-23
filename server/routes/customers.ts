@@ -99,35 +99,37 @@ function normalizeCustomerPhonePayload(payload: Record<string, unknown>) {
   }
 
   const parsedPhones = parseCustomerPhones(dedupedTokens.join(", "));
+  const primaryNormalized = normalizePhone(parsedPhones.primaryPhone);
+  const secondaryNormalized = parsedPhones.secondaryPhone ? normalizePhone(parsedPhones.secondaryPhone) : null;
   
-  if (parsedPhones.primaryPhone && !normalizePhone(parsedPhones.primaryPhone)) {
-    throw new Error('Primary phone number is invalid');
+  if (parsedPhones.primaryPhone && (!primaryNormalized || primaryNormalized.length !== 10)) {
+    throw new Error('Primary phone number must be exactly 10 digits (without country code)');
   }
-  if (parsedPhones.secondaryPhone && !normalizePhone(parsedPhones.secondaryPhone)) {
-    throw new Error('Secondary phone number is invalid');
+  if (parsedPhones.secondaryPhone && (!secondaryNormalized || secondaryNormalized.length !== 10)) {
+    throw new Error('Secondary phone number must be exactly 10 digits (without country code)');
   }
 
   const result = { ...payload };
 
   if (hasPhoneField && hasSecondaryField) {
-    result.phone = parsedPhones.primaryPhone || null;
-    result.secondaryPhone = parsedPhones.secondaryPhone;
+    result.phone = primaryNormalized || null;
+    result.secondaryPhone = secondaryNormalized;
   } else if (hasPhoneField) {
-    result.phone = parsedPhones.primaryPhone || null;
+    result.phone = primaryNormalized || null;
     // If user provided multiple phones in the primary field, redistribute to secondary
     if (dedupedTokens.length > 1) {
-      result.secondaryPhone = parsedPhones.secondaryPhone;
+      result.secondaryPhone = secondaryNormalized;
     }
   } else if (hasSecondaryField) {
     // If only secondary field provided, the first token is the secondary phone
-    result.secondaryPhone = parsedPhones.primaryPhone || null;
+    result.secondaryPhone = primaryNormalized || null;
   }
 
   // Final validation: if both result phones are present, they must be different
   if (
     result.phone &&
     result.secondaryPhone &&
-    normalizePhone(result.phone as string) === normalizePhone(result.secondaryPhone as string)
+    result.phone === result.secondaryPhone
   ) {
     throw new Error('Primary and secondary phone numbers must be different');
   }

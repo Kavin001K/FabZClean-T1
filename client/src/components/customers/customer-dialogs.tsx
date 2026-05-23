@@ -52,16 +52,32 @@ import type { CustomerBookingRecord, CustomerFeedbackRecord, CustomerOrderHistor
 import { WalletRechargeModal } from '../wallet-recharge-modal';
 import { CustomerWalletHistory } from '../customer-wallet-history';
 
-// Form validation schemas - with separate address fields
 const customerFormSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name must be less than 50 characters'),
-  email: z.string().refine((val) => !val || z.string().email().safeParse(val).success, {
-    message: 'Please enter a valid email address',
-  }).optional(),
-  phone: z.string().refine((val) => /^\d{10}$/.test(val.replace(/[^\d]/g, '').replace(/^(91|0+)/, '')), { message: 'Phone number must be exactly 10 digits' }),
-  secondaryPhone: z.string().refine((val) => !val || /^\d{10}$/.test(val.replace(/[^\d]/g, '').replace(/^(91|0+)/, '')), {
-    message: 'Secondary phone must be exactly 10 digits',
-  }).optional(),
+  email: z.string()
+    .transform(val => val ? val.trim() : "")
+    .refine((val) => !val || /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(val), {
+      message: 'Please enter a valid email address (e.g., name@domain.com)',
+    }).optional().nullable(),
+  phone: z.string()
+    .transform((val) => {
+      const clean = val.replace(/\D/g, "");
+      if (clean.length === 12 && clean.startsWith('91')) return clean.slice(2);
+      if (clean.length === 11 && clean.startsWith('0')) return clean.slice(1);
+      return clean;
+    })
+    .refine((val) => /^\d{10}$/.test(val), { message: 'Phone number must be exactly 10 digits (without country code/prefix)' }),
+  secondaryPhone: z.string()
+    .transform((val) => {
+      if (!val) return "";
+      const clean = val.replace(/\D/g, "");
+      if (clean.length === 12 && clean.startsWith('91')) return clean.slice(2);
+      if (clean.length === 11 && clean.startsWith('0')) return clean.slice(1);
+      return clean;
+    })
+    .refine((val) => !val || /^\d{10}$/.test(val), {
+      message: 'Secondary phone must be exactly 10 digits (without country code/prefix)',
+    }).optional().nullable(),
   // Separate address fields for clean data collection
   addressStreet: z.string().min(1, 'Street address is required'),
   addressCity: z.string().optional(),

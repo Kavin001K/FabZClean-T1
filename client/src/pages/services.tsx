@@ -377,7 +377,7 @@ export default function Services() {
                 <td><strong>${service.name}</strong></td>
                 <td>${service.category}</td>
                 <td>${service.duration}</td>
-                <td><strong>${formatCurrency(service.price)}</strong></td>
+                <td><strong>${formatCurrency(service.price)} / ${service.unit || 'Qty'}</strong></td>
                 <td>${service.status}</td>
               </tr>
             `).join('')}
@@ -766,7 +766,7 @@ export default function Services() {
                           <div>
                             <p className="text-sm text-muted-foreground">Service Price</p>
                             <p className="text-2xl font-bold text-lime-600">
-                              {formatCurrency(service.price)}
+                              {formatCurrency(service.price)} <span className="text-sm text-muted-foreground font-normal">/ {service.unit || 'Qty'}</span>
                             </p>
                           </div>
                         </div>
@@ -873,7 +873,7 @@ export default function Services() {
                         <div className="text-left lg:text-right">
                           <p className="text-sm text-muted-foreground mb-1">Service Price</p>
                           <p className="text-3xl font-bold text-lime-600">
-                            {formatCurrency(service.price)}
+                            {formatCurrency(service.price)} <span className="text-lg text-muted-foreground font-normal">/ {service.unit || 'Qty'}</span>
                           </p>
                         </div>
 
@@ -959,6 +959,7 @@ function EditServiceDialog({
     description: service?.description || '',
     price: service?.price || '',
     duration: service?.duration || '',
+    unit: service?.unit || 'Qty',
     status: (service?.status as 'Active' | 'Inactive') || 'Active',
   });
 
@@ -970,6 +971,7 @@ function EditServiceDialog({
         description: service.description || '',
         price: service.price,
         duration: service.duration,
+        unit: service.unit || 'Qty',
         status: service.status,
       });
     }
@@ -1066,6 +1068,25 @@ function EditServiceDialog({
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="edit-service-unit">Unit</Label>
+                <Select
+                  value={formData.unit}
+                  onValueChange={(v) => setFormData({ ...formData, unit: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Qty">Qty</SelectItem>
+                    <SelectItem value="Kgs">Kgs</SelectItem>
+                    <SelectItem value="Meters">Meters</SelectItem>
+                    <SelectItem value="Sq. Ft">Sq. Ft</SelectItem>
+                    <SelectItem value="Liters">Liters</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="edit-service-status">Status</Label>
                 <Select
                   value={formData.status}
@@ -1115,6 +1136,7 @@ function CreateServiceDialog({
     description: '',
     price: '',
     duration: '',
+    unit: 'Qty',
     status: 'Active' as 'Active' | 'Inactive',
   });
 
@@ -1127,6 +1149,7 @@ function CreateServiceDialog({
       description: '',
       price: '',
       duration: '',
+      unit: 'Qty',
       status: 'Active',
     });
   };
@@ -1214,6 +1237,25 @@ function CreateServiceDialog({
                     aria-required="true"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="unit">Unit</Label>
+                <Select
+                  value={formData.unit}
+                  onValueChange={(v) => setFormData({ ...formData, unit: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Qty">Qty</SelectItem>
+                    <SelectItem value="Kgs">Kgs</SelectItem>
+                    <SelectItem value="Meters">Meters</SelectItem>
+                    <SelectItem value="Sq. Ft">Sq. Ft</SelectItem>
+                    <SelectItem value="Liters">Liters</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

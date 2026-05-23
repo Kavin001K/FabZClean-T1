@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Service, Order, Customer, OrderStoreCode, OrderCoverType } from "@shared/schema";
+import { cleanAndNormalizePhone } from "@shared/customer-phone";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -623,11 +624,31 @@ export default function CreateOrder() {
       return;
     }
 
-    // Validate email if provided
-    if (newCustomerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newCustomerEmail)) {
+    const normalizedPhone = normalizePhoneInput(newCustomerPhone);
+    if (normalizedPhone.length !== 10) {
       toast({
         title: "Validation Error",
-        description: "Please enter a valid email address",
+        description: "Primary phone number must be exactly 10 digits (without country code)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const normalizedSecondaryPhone = newCustomerSecondaryPhone ? normalizePhoneInput(newCustomerSecondaryPhone) : '';
+    if (newCustomerSecondaryPhone && normalizedSecondaryPhone.length !== 10) {
+      toast({
+        title: "Validation Error",
+        description: "Secondary phone number must be exactly 10 digits (without country code)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate email if provided
+    if (newCustomerEmail && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(newCustomerEmail)) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid email address (e.g., name@domain.com)",
         variant: "destructive",
       });
       return;
@@ -652,9 +673,9 @@ export default function CreateOrder() {
 
     createCustomerMutation.mutate({
       name: newCustomerName,
-      phone: newCustomerPhone,
-      secondaryPhone: newCustomerSecondaryPhone || undefined,
-      email: newCustomerEmail || undefined,
+      phone: normalizedPhone,
+      secondaryPhone: normalizedSecondaryPhone || undefined,
+      email: newCustomerEmail ? newCustomerEmail.trim() : undefined,
       address: addressObj,
     });
   };
@@ -1014,18 +1035,15 @@ export default function CreateOrder() {
     setCoverType('bag');
   };
 
-  // Validate phone number - flexible to accept various international formats
+  // Normalize phone number to 10 digits
+  const normalizePhoneInput = (phone: string): string => {
+    return cleanAndNormalizePhone(phone);
+  };
+
+  // Validate phone number
   const validatePhoneNumber = (phone: string): boolean => {
-    if (!phone || phone.trim().length === 0) return false;
-
-    // Remove all non-digit characters (spaces, dashes, parentheses, plus, dots)
-    const digitsOnly = phone.replace(/[^\d]/g, '');
-
-    // Accept 7-15 digits to support:
-    // - Local numbers without country code (10 digits in India, 7-10 in other countries)
-    // - International numbers with country code (1-4 digit code + 7-12 digit number)
-    // Examples: +1-555-0128 (8 digits), 9876543210 (10 digits), +91 9876543210 (12 digits)
-    return digitsOnly.length >= 7 && digitsOnly.length <= 15;
+    const normalized = normalizePhoneInput(phone);
+    return normalized.length === 10;
   };
 
   // Handle create order
@@ -1040,10 +1058,30 @@ export default function CreateOrder() {
       return;
     }
 
-    if (!validatePhoneNumber(customerPhone)) {
+    const normalizedPrimaryPhone = normalizePhoneInput(customerPhone);
+    if (normalizedPrimaryPhone.length !== 10) {
       toast({
         title: "Validation Error",
-        description: "Please enter a valid phone number (7-15 digits, any format)",
+        description: "Customer phone number must be exactly 10 digits (without country code)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const normalizedSecondaryPhone = customerSecondaryPhone ? normalizePhoneInput(customerSecondaryPhone) : '';
+    if (customerSecondaryPhone && normalizedSecondaryPhone.length !== 10) {
+      toast({
+        title: "Validation Error",
+        description: "Secondary phone number must be exactly 10 digits (without country code)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (customerEmail && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(customerEmail)) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid email address (e.g., name@domain.com)",
         variant: "destructive",
       });
       return;
@@ -1065,21 +1103,11 @@ export default function CreateOrder() {
     // If no customer found, create a new one
     if (!currentCustomerId) {
       try {
-        // Validate email if provided
-        if (customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
-          toast({
-            title: "Validation Error",
-            description: "Please enter a valid email address",
-            variant: "destructive",
-          });
-          return;
-        }
-
         const newCustomer = await customersApi.create({
           name: customerName,
-          phone: customerPhone,
-          secondaryPhone: customerSecondaryPhone || undefined,
-          email: customerEmail || undefined,
+          phone: normalizedPrimaryPhone,
+          secondaryPhone: normalizedSecondaryPhone || undefined,
+          email: customerEmail ? customerEmail.trim() : undefined,
           // Send address as an object to satisfy jsonb requirement
           address: { street: customerStreet, city: customerCity, pincode: customerPincode },
         });
@@ -1101,9 +1129,9 @@ export default function CreateOrder() {
     } else if (foundCustomer) {
       // PERF: Fire-and-forget profile update — don't block order creation
       const hasNameChanged = foundCustomer.name !== customerName;
-      const hasPhoneChanged = foundCustomer.phone !== customerPhone;
-      const hasSecondaryPhoneChanged = foundCustomer.secondaryPhone !== customerSecondaryPhone;
-      const hasEmailChanged = foundCustomer.email !== (customerEmail || null);
+      const hasPhoneChanged = foundCustomer.phone !== normalizedPrimaryPhone;
+      const hasSecondaryPhoneChanged = foundCustomer.secondaryPhone !== normalizedSecondaryPhone;
+      const hasEmailChanged = foundCustomer.email !== (customerEmail ? customerEmail.trim() : null);
       
       const addrObj = foundCustomer.address as { street?: string, city?: string, pincode?: string };
       const hasAddressChanged = customerStreet !== (addrObj?.street || "") || 
@@ -1116,11 +1144,11 @@ export default function CreateOrder() {
         
         // Send both phone fields if either changed to ensure correct normalization in backend
         if (hasPhoneChanged || hasSecondaryPhoneChanged) {
-          updates.phone = customerPhone;
-          updates.secondaryPhone = customerSecondaryPhone || null;
+          updates.phone = normalizedPrimaryPhone;
+          updates.secondaryPhone = normalizedSecondaryPhone || null;
         }
         
-        if (hasEmailChanged) updates.email = customerEmail || null;
+        if (hasEmailChanged) updates.email = customerEmail ? customerEmail.trim() : null;
         if (hasAddressChanged) updates.address = { street: customerStreet, city: customerCity, pincode: customerPincode };
 
         try {
@@ -1150,9 +1178,9 @@ export default function CreateOrder() {
       customerId: currentCustomerId,
       storeCode,
       customerName,
-      customerEmail: customerEmail || undefined,
-      customerPhone,
-      secondaryPhone: customerSecondaryPhone || undefined,
+      customerEmail: customerEmail ? customerEmail.trim() : undefined,
+      customerPhone: normalizedPrimaryPhone,
+      secondaryPhone: normalizedSecondaryPhone || undefined,
       status: "pending",
       paymentStatus: paymentStatus,
       totalAmount: totalAmount.toFixed(2),

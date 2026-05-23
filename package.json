@@ -182,6 +182,7 @@
     "@types/ws": "^8.5.13",
     "@vitest/browser-playwright": "^4.0.16",
     "@vitest/coverage-v8": "^4.0.16",
+    "drizzle-kit": "^0.31.10",
     "husky": "^9.1.7",
     "playwright": "^1.57.0",
     "storybook": "^10.1.11",

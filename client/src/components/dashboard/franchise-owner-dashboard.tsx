@@ -118,12 +118,40 @@ export default React.memo(function FranchiseOwnerDashboard() {
     e.preventDefault();
     if (isSubmittingCustomer) return;
 
+    const phoneRaw = quickActionForms.customer.phone;
+    const phoneClean = phoneRaw.replace(/\D/g, "");
+    const phoneNormalized = (phoneClean.length === 12 && phoneClean.startsWith('91')) 
+      ? phoneClean.slice(2) 
+      : (phoneClean.length === 11 && phoneClean.startsWith('0')) 
+        ? phoneClean.slice(1) 
+        : phoneClean;
+
+    if (phoneNormalized.length !== 10) {
+      toast({
+        title: "Validation Error",
+        description: "Phone number must be exactly 10 digits (without country code)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const emailRaw = quickActionForms.customer.email;
+    const emailVal = emailRaw ? emailRaw.trim() : '';
+    if (emailVal && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(emailVal)) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid email address (e.g., name@domain.com)",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmittingCustomer(true);
     try {
       const customerData = {
         name: quickActionForms.customer.name,
-        phone: quickActionForms.customer.phone,
-        email: quickActionForms.customer.email || undefined,
+        phone: phoneNormalized,
+        email: emailVal || undefined,
         joinDate: new Date().toISOString(),
         totalSpent: '0',
         loyaltyPoints: 0

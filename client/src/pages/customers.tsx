@@ -1159,10 +1159,23 @@ function ImportCustomerModal({ isOpen, onClose, onDownloadTemplate, onImport }: 
           
           if (!name || !phone) return null;
 
+          const phoneClean = phone.replace(/\D/g, "");
+          const phoneNormalized = (phoneClean.length === 12 && phoneClean.startsWith('91')) 
+            ? phoneClean.slice(2) 
+            : (phoneClean.length === 11 && phoneClean.startsWith('0')) 
+              ? phoneClean.slice(1) 
+              : phoneClean;
+
+          if (phoneNormalized.length !== 10) return null; // Skip invalid phone rows
+
+          const emailRaw = getValue(['Email', 'email', 'E-mail']);
+          const emailVal = emailRaw ? String(emailRaw).trim() : '';
+          const isValidEmail = !emailVal || /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(emailVal);
+
           return {
             name: String(name).trim(),
-            phone: phone,
-            email: getValue(['Email', 'email', 'E-mail']),
+            phone: phoneNormalized,
+            email: isValidEmail && emailVal ? emailVal : undefined,
             address: createAddressObject({
               street: String(getValue(['Address Street', 'Street', 'Address Line 1', 'address_street']) || '').trim(),
               city: String(getValue(['Address City', 'City', 'address_city']) || 'Pollachi').trim(),
