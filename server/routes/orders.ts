@@ -578,8 +578,9 @@ router.get('/search', async (req, res) => {
 // Get orders with pagination and search
 router.get('/', async (req, res) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const requestedLimit = parseInt(req.query.limit as string) || 10;
+    const limit = Math.max(1, Math.min(requestedLimit, 500));
     const search = req.query.search as string;
     const status = req.query.status as string;
     const customerEmail = req.query.customerEmail as string;
@@ -598,21 +599,57 @@ router.get('/', async (req, res) => {
       dateTo,
     };
 
-    const orders = await orderService.findAllOrders(filters);
+    // For createdDate filter we keep existing in-memory behavior for IST date consistency.
+    // For regular requests, push pagination down to storage to avoid loading all orders first.
+    const shouldUseLegacyInMemoryPagination = Boolean(createdDate);
 
-    // Calculate pagination
-    const total = orders.length;
-    const startIndex = (page - 1) * limit;
-    const endIndex = page * limit;
-    const paginatedOrders = orders.slice(startIndex, endIndex);
+    let paginatedOrders: Order[] = [];
+    let hasMore = false;
+    let total = 0;
+
+    if (shouldUseLegacyInMemoryPagination) {
+      const orders = await orderService.findAllOrders(filters);
+      const startIndex = (page - 1) * limit;
+      const endIndex = page * limit;
+      paginatedOrders = orders.slice(startIndex, endIndex);
+      total = orders.length;
+      hasMore = endIndex < total;
+    } else {
+      paginatedOrders = await orderService.findAllOrders({
+        ...filters,
+        limit,
+        cursor: String(page),
+      });
+
+      if (typeof (storage as any).countOrders === 'function') {
+        total = await (storage as any).countOrders(undefined, {
+          search,
+          status: status === 'all' ? undefined : status,
+          customerEmail,
+          dateFrom,
+          dateTo,
+        });
+        hasMore = page * limit < total;
+      } else {
+        const nextPageProbe = await orderService.findAllOrders({
+          ...filters,
+          limit: 1,
+          cursor: String(page + 1),
+        });
+        hasMore = nextPageProbe.length > 0;
+        total = hasMore
+          ? page * limit + 1
+          : (page - 1) * limit + paginatedOrders.length;
+      }
+    }
 
     const serializedOrders = paginatedOrders.map(order => serializeOrder(order));
 
     const response = createPaginatedResponse(serializedOrders, {
-      total: orders.length,
+      total,
       limit: limit,
       page,
-      hasMore: endIndex < total,
+      hasMore,
     });
 
     res.json(response);

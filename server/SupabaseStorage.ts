@@ -1239,6 +1239,47 @@ export class SupabaseStorage {
         return data.map(item => this.mapDates(item));
     }
 
+    async countOrders(franchiseId?: string, options: {
+        status?: string;
+        search?: string;
+        customerEmail?: string;
+        customerId?: string;
+        dateFrom?: string;
+        dateTo?: string;
+    } = {}): Promise<number> {
+        let query = this.supabase.from('orders').select('*', { count: 'exact', head: true });
+        if (franchiseId) query = query.eq('franchise_id', franchiseId);
+
+        if (options.customerId) {
+            query = query.eq('customer_id', options.customerId);
+        }
+
+        if (options.status && options.status !== 'all') {
+            query = query.eq('status', options.status);
+        }
+
+        if (options.customerEmail) {
+            query = query.eq('customer_email', options.customerEmail);
+        }
+
+        if (options.dateFrom) {
+            query = query.gte('created_at', options.dateFrom);
+        }
+
+        if (options.dateTo) {
+            query = query.lte('created_at', options.dateTo);
+        }
+
+        if (options.search) {
+            const safeSearch = String(options.search).trim();
+            query = query.or(`customer_name.ilike.%${safeSearch}%,order_number.ilike.%${safeSearch}%,customer_phone.ilike.%${safeSearch}%`);
+        }
+
+        const { count, error } = await query;
+        if (error) throw error;
+        return count || 0;
+    }
+
     async getOrdersForPrintQueue(): Promise<Order[]> {
         let query = this.supabase
             .from('orders')
